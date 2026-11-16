@@ -95,78 +95,82 @@ export function TeamScene({ ms, still }: { ms: number; still?: boolean }) {
             <Hash className="size-[1.2cqw] text-muted" />
             {T.channel}
           </header>
-          <div className="flex-1 space-y-[1.4cqw] overflow-hidden px-[2.4cqw] py-[1.6cqw] text-ink">
-            {shown(AT.first) && (
-              <div data-focus="first" className="film-pop flex max-w-[78%] gap-[0.8cqw]">
-                <Initial who={T.sam} />
-                <div>
-                  <p className={name}>
-                    {T.sam} <span className={when}>9:12 am</span>
-                  </p>
-                  <p className={clsx(text, "mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-canvas px-[1.2cqw] py-[0.7cqw]")}>
-                    {T.first}
-                  </p>
+          <div data-camera-scroll className="min-h-0 flex-1 overflow-hidden px-[2.4cqw] py-[1.6cqw] text-ink">
+            <div className="space-y-[1.4cqw]">
+              {shown(AT.first) && (
+                <div data-focus="first" className="film-pop flex max-w-[78%] gap-[0.8cqw]">
+                  <Initial who={T.sam} />
+                  <div>
+                    <p className={name}>
+                      {T.sam} <span className={when}>9:12 am</span>
+                    </p>
+                    <p className={clsx(text, "mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-canvas px-[1.2cqw] py-[0.7cqw]")}>
+                      {T.first}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {shown(AT.second) && (
-              <div data-focus="talk" className="film-pop ml-auto flex max-w-[70%] flex-col items-end gap-[0.4cqw]">
-                <p className={name}>
-                  {T.you} <span className={when}>9:13 am</span>
-                </p>
-                <p className={clsx(text, "rounded-[1cqw] rounded-tr-[0.3cqw] bg-primary px-[1.2cqw] py-[0.7cqw] text-white")}>{T.second}</p>
-                {shown(AT.ask) && (
-                  <p className={clsx(text, "film-pop rounded-[1cqw] rounded-tr-[0.3cqw] bg-primary px-[1.2cqw] py-[0.7cqw] text-white")}>
-                    <span className="rounded-[0.3cqw] bg-sun-line px-[0.3cqw] font-semibold">{T.tag}</span>{" "}
-                    {typed(T.ask, t, AT.ask + 300, TYPE_ASK)}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {shown(AT.joining) && (
-              <div data-focus="answer" className="film-pop flex max-w-[86%] gap-[0.8cqw]">
-                <span className="grid size-[2.6cqw] shrink-0 place-items-center">
-                  <SolMark className="size-full" />
-                </span>
-                <div className="min-w-0">
+              {shown(AT.second) && (
+                <div data-focus="talk" className="film-pop ml-auto flex max-w-[70%] flex-col items-end gap-[0.4cqw]">
                   <p className={name}>
-                    Sol <span className={when}>9:13 am</span>
+                    {T.you} <span className={when}>9:13 am</span>
                   </p>
-                  {shown(AT.answer) ? (
-                    <div className="mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-sun px-[1.2cqw] py-[0.8cqw]">
-                      <p className={text}>{typed(T.answer, t, AT.answer, TYPE_ANSWER)}</p>
-                      {shown(AT.caveat) && <p className={clsx(text, "film-pop mt-[0.6cqw] text-ink-2")}>{T.caveat}</p>}
-                    </div>
-                  ) : (
-                    <p className={clsx(text, "mt-[0.3cqw] flex items-center gap-[0.6cqw] text-muted")}>
-                      <span className="film-pulse size-[0.7cqw] rounded-full bg-sun-line" />
-                      {T.joining}
+                  <p className={clsx(text, "rounded-[1cqw] rounded-tr-[0.3cqw] bg-primary px-[1.2cqw] py-[0.7cqw] text-white")}>
+                    {T.second}
+                  </p>
+                  {shown(AT.ask) && (
+                    <p className={clsx(text, "film-pop rounded-[1cqw] rounded-tr-[0.3cqw] bg-primary px-[1.2cqw] py-[0.7cqw] text-white")}>
+                      <span className="rounded-[0.3cqw] bg-sun-line px-[0.3cqw] font-semibold">{T.tag}</span>{" "}
+                      {typed(T.ask, t, AT.ask + 300, TYPE_ASK)}
                     </p>
                   )}
-                  {shown(AT.drawing) && (
-                    <div data-focus="drawing" className="film-pop mt-[0.8cqw] max-w-[34cqw]">
-                      <WallDrawing />
-                    </div>
-                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {shown(AT.thanks) && (
-              <div data-focus="thanks" className="film-pop flex max-w-[70%] gap-[0.8cqw]">
-                <Initial who={T.sam} />
-                <div>
-                  <p className={name}>
-                    {T.sam} <span className={when}>9:14 am</span>
-                  </p>
-                  <p className={clsx(text, "mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-canvas px-[1.2cqw] py-[0.7cqw]")}>
-                    {T.thanks}
-                  </p>
+              {shown(AT.joining) && (
+                <div data-focus="answer" className="film-pop flex max-w-[86%] gap-[0.8cqw]">
+                  <span className="grid size-[2.6cqw] shrink-0 place-items-center">
+                    <SolMark className="size-full" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className={name}>
+                      Sol <span className={when}>9:13 am</span>
+                    </p>
+                    {shown(AT.answer) ? (
+                      <div className="mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-sun px-[1.2cqw] py-[0.8cqw]">
+                        <p className={text}>{typed(T.answer, t, AT.answer, TYPE_ANSWER)}</p>
+                        {shown(AT.caveat) && <p className={clsx(text, "film-pop mt-[0.6cqw] text-ink-2")}>{T.caveat}</p>}
+                      </div>
+                    ) : (
+                      <p className={clsx(text, "mt-[0.3cqw] flex items-center gap-[0.6cqw] text-muted")}>
+                        <span className="film-pulse size-[0.7cqw] rounded-full bg-sun-line" />
+                        {T.joining}
+                      </p>
+                    )}
+                    {shown(AT.drawing) && (
+                      <div data-focus="drawing" className="film-pop mt-[0.8cqw] max-w-[34cqw]">
+                        <WallDrawing />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+
+              {shown(AT.thanks) && (
+                <div data-focus="thanks" className="film-pop flex max-w-[70%] gap-[0.8cqw]">
+                  <Initial who={T.sam} />
+                  <div>
+                    <p className={name}>
+                      {T.sam} <span className={when}>9:14 am</span>
+                    </p>
+                    <p className={clsx(text, "mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-canvas px-[1.2cqw] py-[0.7cqw]")}>
+                      {T.thanks}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="px-[2.4cqw] pb-[1.6cqw]">
             <p className="rounded-[1cqw] px-[1.4cqw] py-[0.9cqw] text-[clamp(8px,1cqw,15px)] text-muted ring-1 ring-line">{T.box}</p>

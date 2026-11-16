@@ -63,6 +63,8 @@ export function useFocusCamera(focus: string, most = 1.75) {
     const el = box?.querySelector<HTMLElement>(`[data-focus="${focus}"]`);
     if (!box || !el) return setCamera("none");
     const column = el.closest<HTMLElement>("[data-camera-column]") ?? el;
+    // The chat's messages scroll as a chat does: the newest at the foot, older ones up out of sight.
+    const scroller = box.querySelector<HTMLElement>("[data-camera-scroll]");
     const place = (n: HTMLElement) => {
       let x = 0;
       let y = 0;
@@ -70,9 +72,11 @@ export function useFocusCamera(focus: string, most = 1.75) {
         x += p.offsetLeft;
         y += p.offsetTop;
       }
+      for (let p = n.parentElement; p && p !== box; p = p.parentElement) y -= p.scrollTop;
       return { x, y };
     };
     const aim = () => {
+      if (scroller) scroller.scrollTop = scroller.scrollHeight;
       const W = box.offsetWidth;
       const H = box.offsetHeight;
       const col = place(column);
@@ -89,6 +93,7 @@ export function useFocusCamera(focus: string, most = 1.75) {
     aim();
     const watch = new ResizeObserver(aim);
     watch.observe(el);
+    if (scroller?.firstElementChild) watch.observe(scroller.firstElementChild);
     return () => watch.disconnect();
   }, [focus, most]);
   return [root, camera] as const;
@@ -180,101 +185,103 @@ export function SolScene({ ms, still }: { ms: number; still?: boolean }) {
             <SolMark className="size-[1.8cqw]" />
             <span className="text-[clamp(8px,1cqw,15px)] font-semibold">Sol</span>
           </header>
-          <div className="flex-1 space-y-[1.5cqw] overflow-hidden px-[3cqw]">
-            <p className="text-center text-[clamp(7px,0.85cqw,13px)] text-white/45">{S.when}</p>
+          <div data-camera-scroll className="min-h-0 flex-1 overflow-hidden px-[3cqw]">
+            <div className="space-y-[1.5cqw] pb-[1cqw]">
+              <p className="text-center text-[clamp(7px,0.85cqw,13px)] text-white/45">{S.when}</p>
 
-            <div data-focus="opening" className="max-w-[78%]">
-              <SolSays text={typed(S.opening, t, AT.opening, TYPE.opening)} className={text} />
-            </div>
-
-            {shown(AT.ask) && (
-              <div data-focus="ask" className="film-pop flex justify-end">
-                <p className={clsx(text, "border-r border-white/60 pr-[1cqw] text-white")}>{S.ask}</p>
+              <div data-focus="opening" className="max-w-[78%]">
+                <SolSays text={typed(S.opening, t, AT.opening, TYPE.opening)} className={text} />
               </div>
-            )}
 
-            {shown(AT.steps) && (
-              <div data-focus="steps" className="film-pop space-y-[0.4cqw]">
-                {S.steps.map((s, i) =>
-                  shown(AT.steps + i * STEP) ? (
-                    <p key={s} className={clsx(text, "film-pop flex items-center gap-[0.6cqw] text-white/60")}>
-                      <Check className="size-[1.2cqw] text-sun-line" />
-                      {s}
+              {shown(AT.ask) && (
+                <div data-focus="ask" className="film-pop flex justify-end">
+                  <p className={clsx(text, "border-r border-white/60 pr-[1cqw] text-white")}>{S.ask}</p>
+                </div>
+              )}
+
+              {shown(AT.steps) && (
+                <div data-focus="steps" className="film-pop space-y-[0.4cqw]">
+                  {S.steps.map((s, i) =>
+                    shown(AT.steps + i * STEP) ? (
+                      <p key={s} className={clsx(text, "film-pop flex items-center gap-[0.6cqw] text-white/60")}>
+                        <Check className="size-[1.2cqw] text-sun-line" />
+                        {s}
+                      </p>
+                    ) : null,
+                  )}
+                  {!shown(AT.answer) && (
+                    <p className={clsx(text, "flex items-center gap-[0.6cqw] text-white/45")}>
+                      <span className="film-pulse size-[0.7cqw] rounded-full bg-sun-line" />
+                      {S.working}
                     </p>
-                  ) : null,
-                )}
-                {!shown(AT.answer) && (
-                  <p className={clsx(text, "flex items-center gap-[0.6cqw] text-white/45")}>
-                    <span className="film-pulse size-[0.7cqw] rounded-full bg-sun-line" />
-                    {S.working}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {shown(AT.answer) && (
-              <div data-focus="answer" className="max-w-[82%]">
-                <SolSays text={typed(S.answer, t, AT.answer, TYPE.answer)} className={text} />
-              </div>
-            )}
-
-            {shown(AT.draft) && (
-              <div
-                data-focus="draft"
-                className="film-pop max-w-[70%] rounded-[1cqw] bg-white p-[1.4cqw] text-ink shadow-[0_1cqw_3cqw_-1cqw_rgba(0,0,0,0.5)]"
-              >
-                <p className="flex items-center gap-[0.6cqw] text-[clamp(7px,0.8cqw,12px)] font-medium uppercase tracking-[0.14em] text-muted">
-                  <Mail className="size-[1cqw]" />
-                  {sent ? S.draft.sent : S.draft.label}
-                </p>
-                <p className="mt-[0.6cqw] text-[clamp(8px,0.9cqw,13px)] text-muted">{S.draft.to}</p>
-                <p className="text-[clamp(9px,1.1cqw,16px)] font-semibold">{S.draft.subject}</p>
-                <p className="mt-[0.4cqw] text-[clamp(8px,1cqw,15px)] leading-snug text-ink-2">{S.draft.body}</p>
-                <div className="mt-[1cqw] flex gap-[0.6cqw]">
-                  <span
-                    className={clsx(
-                      "rounded-full px-[1.4cqw] py-[0.4cqw] text-[clamp(8px,0.95cqw,14px)] font-medium transition-all duration-300",
-                      sent ? "bg-positive text-white" : "bg-ink text-white",
-                      shown(AT.send - 300) && !sent && "scale-95 ring-[0.3cqw] ring-sun-line/50",
-                    )}
-                  >
-                    {sent ? <Check className="inline size-[1.1cqw]" /> : S.draft.send}
-                  </span>
-                  {!sent && (
-                    <span className="rounded-full px-[1.2cqw] py-[0.4cqw] text-[clamp(8px,0.95cqw,14px)] ring-1 ring-line">
-                      {S.draft.edit}
-                    </span>
                   )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {shown(AT.choice) && (
-              <div data-focus="choice" className="film-pop max-w-[62%] overflow-hidden rounded-[1cqw] ring-1 ring-white/25">
-                <p className={clsx(text, "px-[1.4cqw] py-[0.8cqw] font-semibold")}>{S.choice.ask}</p>
-                {S.choice.options.map((o, i) => (
-                  <p
-                    key={o}
-                    className={clsx(
-                      text,
-                      "flex items-center gap-[1cqw] border-t border-white/15 px-[1.4cqw] py-[0.7cqw] transition-colors duration-300",
-                      picked && i === 0 ? "bg-white/15" : "text-white/80",
-                    )}
-                  >
-                    <span className="grid size-[1.8cqw] place-items-center rounded-full text-[clamp(7px,0.8cqw,12px)] ring-1 ring-white/30">
-                      {i + 1}
-                    </span>
-                    {o}
+              {shown(AT.answer) && (
+                <div data-focus="answer" className="max-w-[82%]">
+                  <SolSays text={typed(S.answer, t, AT.answer, TYPE.answer)} className={text} />
+                </div>
+              )}
+
+              {shown(AT.draft) && (
+                <div
+                  data-focus="draft"
+                  className="film-pop max-w-[70%] rounded-[1cqw] bg-white p-[1.4cqw] text-ink shadow-[0_1cqw_3cqw_-1cqw_rgba(0,0,0,0.5)]"
+                >
+                  <p className="flex items-center gap-[0.6cqw] text-[clamp(7px,0.8cqw,12px)] font-medium uppercase tracking-[0.14em] text-muted">
+                    <Mail className="size-[1cqw]" />
+                    {sent ? S.draft.sent : S.draft.label}
                   </p>
-                ))}
-              </div>
-            )}
+                  <p className="mt-[0.6cqw] text-[clamp(8px,0.9cqw,13px)] text-muted">{S.draft.to}</p>
+                  <p className="text-[clamp(9px,1.1cqw,16px)] font-semibold">{S.draft.subject}</p>
+                  <p className="mt-[0.4cqw] text-[clamp(8px,1cqw,15px)] leading-snug text-ink-2">{S.draft.body}</p>
+                  <div className="mt-[1cqw] flex gap-[0.6cqw]">
+                    <span
+                      className={clsx(
+                        "rounded-full px-[1.4cqw] py-[0.4cqw] text-[clamp(8px,0.95cqw,14px)] font-medium transition-all duration-300",
+                        sent ? "bg-positive text-white" : "bg-ink text-white",
+                        shown(AT.send - 300) && !sent && "scale-95 ring-[0.3cqw] ring-sun-line/50",
+                      )}
+                    >
+                      {sent ? <Check className="inline size-[1.1cqw]" /> : S.draft.send}
+                    </span>
+                    {!sent && (
+                      <span className="rounded-full px-[1.2cqw] py-[0.4cqw] text-[clamp(8px,0.95cqw,14px)] ring-1 ring-line">
+                        {S.draft.edit}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
-            {shown(AT.done) && (
-              <div data-focus="done" className="film-pop max-w-[70%]">
-                <SolSays text={typed(S.done, t, AT.done, TYPE.done)} className={text} />
-              </div>
-            )}
+              {shown(AT.choice) && (
+                <div data-focus="choice" className="film-pop max-w-[62%] overflow-hidden rounded-[1cqw] ring-1 ring-white/25">
+                  <p className={clsx(text, "px-[1.4cqw] py-[0.8cqw] font-semibold")}>{S.choice.ask}</p>
+                  {S.choice.options.map((o, i) => (
+                    <p
+                      key={o}
+                      className={clsx(
+                        text,
+                        "flex items-center gap-[1cqw] border-t border-white/15 px-[1.4cqw] py-[0.7cqw] transition-colors duration-300",
+                        picked && i === 0 ? "bg-white/15" : "text-white/80",
+                      )}
+                    >
+                      <span className="grid size-[1.8cqw] place-items-center rounded-full text-[clamp(7px,0.8cqw,12px)] ring-1 ring-white/30">
+                        {i + 1}
+                      </span>
+                      {o}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {shown(AT.done) && (
+                <div data-focus="done" className="film-pop max-w-[70%]">
+                  <SolSays text={typed(S.done, t, AT.done, TYPE.done)} className={text} />
+                </div>
+              )}
+            </div>
           </div>
           <div className="px-[2cqw] pb-[1.6cqw] pt-[1cqw]">
             <p className="rounded-full px-[1.6cqw] py-[0.9cqw] text-[clamp(8px,1cqw,15px)] text-white/40 ring-1 ring-white/20">{S.box}</p>
