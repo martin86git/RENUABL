@@ -293,6 +293,12 @@ export function DesignStudio() {
   // The job only counts while its own roof is the one open.
   const onJob = job && roof && job.lat === roof.lat && job.lng === roof.lng ? job : null;
   const waiting = useChatWaiting(onJob?.id ?? null);
+  // The window round the designer learns the deal this roof is on, however it was opened (by its address from the design
+  // home too), so its tools beside the window (Record, the proposal) show (16 Nov 2026, Martin: no Record on a deal's roof).
+  const onJobId = onJob?.id ?? null;
+  useEffect(() => {
+    if (onJobId && inDrawer()) tellDeal({ job: onJobId });
+  }, [onJobId]);
   const signedIn = Boolean(account?.signedIn && account.business);
 
   /**

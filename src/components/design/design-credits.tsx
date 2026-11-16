@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { Gem } from "lucide-react";
+import { Coins } from "lucide-react";
 import { BATTERY_SITE_CREDITS, designBalanceWords } from "@/lib/domain/design/plans";
 import { loadDesignCredits, type DesignCredits as Credits } from "@/lib/services/billing";
 
@@ -51,7 +51,7 @@ export function DesignCredits({ className }: { className?: string }) {
         className,
       )}
     >
-      <Gem className={clsx("size-3.5", low ? "text-danger" : "text-sun-line")} aria-hidden />
+      <Coins className={clsx("size-3.5", low ? "text-danger" : "text-sun-line")} aria-hidden />
       {trialLeft > 0 ? (
         <span>
           {trialLeft} free {trialLeft === 1 ? "site" : "sites"}
