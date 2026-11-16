@@ -254,30 +254,9 @@ export function ProductFilm() {
       `}</style>
       <div
         ref={stage}
-        className="relative isolate aspect-[16/10] w-full select-none overflow-hidden rounded-[28px] bg-[#0d0e11] shadow-[0_50px_120px_-40px_rgba(11,11,12,0.6)] ring-1 ring-black/10 [container-type:inline-size]"
+        className="relative isolate aspect-[16/10] w-full select-none overflow-hidden rounded-[24px] [container-type:inline-size]"
       >
-        {/* The stage: graphite, lit by a slow sun from the top right, fine grain over it. */}
-        <div aria-hidden className="absolute inset-0 overflow-hidden">
-          <div
-            className="film-sun absolute -right-[20%] -top-[45%] h-[120%] w-[85%] rounded-full opacity-90 blur-[6cqw]"
-            style={{
-              background: "radial-gradient(closest-side, rgba(255,110,40,0.75), rgba(255,90,31,0.25) 55%, rgba(255,90,31,0) 100%)",
-              animation: "film-sun 16s ease-in-out infinite",
-            }}
-          />
-          <div
-            className="absolute -bottom-[40%] -left-[15%] h-[90%] w-[70%] rounded-full blur-[6cqw]"
-            style={{ background: "radial-gradient(closest-side, rgba(120,140,255,0.16), rgba(120,140,255,0) 100%)" }}
-          />
-          <div
-            className="absolute inset-0 opacity-[0.08] mix-blend-overlay"
-            style={{
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-            }}
-          />
-        </div>
-
+        {/* No box round the film (17 Nov 2026, Martin): the window sits on the page itself. */}
         {/* The window rising flat out of a tilt. */}
         <div
           className={clsx("absolute inset-0 transition-[transform,opacity] duration-[1400ms]", ease, market && "opacity-0")}
@@ -293,7 +272,7 @@ export function ProductFilm() {
             style={{ transform: cameraOf(move.light) }}
           >
             <div
-              className="absolute overflow-hidden rounded-[1.1cqw] bg-[#f7f7f8] shadow-[0_3cqw_8cqw_-2cqw_rgba(0,0,0,0.75)] ring-1 ring-white/15"
+              className="absolute overflow-hidden rounded-[1.1cqw] bg-[#f7f7f8] shadow-[0_3cqw_7cqw_-2.5cqw_rgba(11,11,12,0.35)] ring-1 ring-black/10"
               style={{ left: pct(SCREEN.left), top: pct(SCREEN.top - BAR), width: pct(SCREEN.size), height: pct(SCREEN.size + BAR) }}
             >
               <div className="flex items-center gap-[0.55cqw] px-[1.1cqw]" style={{ height: `${(BAR / (SCREEN.size + BAR)) * 100}%` }}>
@@ -374,11 +353,11 @@ export function ProductFilm() {
             <span className="mx-auto grid size-[7cqw] place-items-center rounded-full bg-market text-white shadow-[0_0_6cqw_rgba(40,90,255,0.45)]">
               <MarketplaceMark className="size-[3.6cqw]" />
             </span>
-            <p className="mt-[2.4cqw] text-[clamp(20px,3.6cqw,44px)] font-semibold tracking-[-0.03em] text-white">
+            <p className="mt-[2.4cqw] text-[clamp(20px,3.6cqw,44px)] font-semibold tracking-[-0.03em] text-ink">
               {FILM.marketplace.title}
             </p>
-            <p className="mx-auto mt-[1cqw] max-w-[36ch] text-[clamp(12px,1.5cqw,18px)] text-white/65">{FILM.marketplace.line}</p>
-            <span className="mt-[2cqw] inline-block rounded-full bg-white/10 px-[1.6cqw] py-[0.5cqw] text-[clamp(11px,1.1cqw,14px)] font-medium text-white ring-1 ring-white/20">
+            <p className="mx-auto mt-[1cqw] max-w-[36ch] text-[clamp(12px,1.5cqw,18px)] text-ink-2">{FILM.marketplace.line}</p>
+            <span className="mt-[2cqw] inline-block rounded-full bg-surface-2 px-[1.6cqw] py-[0.5cqw] text-[clamp(11px,1.1cqw,14px)] font-medium text-ink ring-1 ring-line">
               {FILM.marketplace.soon}
             </span>
           </div>
