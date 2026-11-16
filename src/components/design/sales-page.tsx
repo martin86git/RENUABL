@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, Brain, Check, Clock, LifeBuoy, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
-import { ENTERPRISE_FROM, TOKEN_PACKS, dollars, packPriceCents, type BillingInterval } from "@/lib/domain/design/plans";
+import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import {
   CLOSING,
   COMING_SOON,
@@ -880,7 +880,7 @@ function Everything() {
       <Reveal className="mx-auto w-full max-w-6xl">
         <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">And all of this, included</p>
         <h2 id="everything" className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]">
-          The rest of the toolbox. No add-ons.
+          The rest of the toolbox, in every plan.
         </h2>
         <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-line ring-1 ring-line sm:grid-cols-2 lg:grid-cols-3">
           {EVERYTHING.map((f) => (
@@ -1089,10 +1089,25 @@ function Pricing() {
             <p className="mt-4 flex flex-wrap gap-2 text-[13px]">
               {TOKEN_PACKS.map((p) => (
                 <span key={p} className="rounded-full bg-canvas px-3 py-1 tabular-nums ring-1 ring-line">
-                  {p} jobs · {dollars(packPriceCents(p))}
+                  {packWords(p)}
                 </span>
               ))}
             </p>
+          </div>
+        </div>
+        <div className="mt-5 rounded-3xl bg-surface p-7 ring-1 ring-line sm:p-8">
+          <p className="text-[15px] font-semibold">{PRICING.addOnsTitle}</p>
+          <p className="mt-1 text-[14px] text-ink-2">{PRICING.addOnsSub}</p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            {PRICING.addOns.map((a) => (
+              <div key={a.key} className="rounded-2xl bg-canvas p-5 ring-1 ring-line">
+                <p className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="text-[16px] font-semibold">{a.name}</span>
+                  <span className="text-[13px] text-ink-2">{a.price}</span>
+                </p>
+                <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{a.what}</p>
+              </div>
+            ))}
           </div>
         </div>
         <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] leading-relaxed text-muted">{PRICING.start}</p>

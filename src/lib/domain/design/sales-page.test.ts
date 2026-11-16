@@ -16,8 +16,12 @@ describe("the sign-up page for solar businesses", () => {
   });
 
   it("takes its prices from the plans", () => {
-    expect(PRICING.plans.map((p) => p.price)).toEqual(["$99", "$69"]);
-    expect(PRICING.firstMonth).toBe("Your first month is $29 a user, on either plan. Prices include GST.");
+    expect(PRICING.plans.map((p) => p.price)).toEqual(["$49", "$39"]);
+    expect(PRICING.firstMonth).toBe("Your first month is free, on either plan, with 6 free sites in the designer. Prices include GST.");
+    expect(PRICING.addOns.map((a) => [a.name, a.price])).toEqual([
+      ["Calls & Texts", "$29 a month for your business, including GST"],
+      ["Growth", "$19 a month for your business, including GST"],
+    ]);
   });
 
   it("never crosses a price out or calls it a discount", () => {

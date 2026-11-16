@@ -5,6 +5,8 @@
  * labelled, and every screenshot a real screen of the product with made-up example data.
  */
 import { COMMIT_MONTHS, COMMIT_SEAT_CENTS, ENTERPRISE_FROM, PLAN_WORDS, SEAT_MONTHLY_CENTS, dollars } from "./plans";
+import { ADD_ON_KEYS, ADD_ON_WORDS, addOnPriceWords } from "./add-ons";
+import { SOL_PER_USER } from "./sol-credits";
 
 /**
  * The hero (3 Nov 2026, Martin, after "Pay less. Do more." and "Just ask. It's done." didn't land: witty, not a feature
@@ -367,8 +369,8 @@ export const MARKETPLACE = {
  */
 export const PRICING = {
   eyebrow: "Pricing",
-  headline: "One price. Everything in it.",
-  sub: "Every feature for every user. No add-ons, no per-signature fees.",
+  headline: "One price a user. Every feature in it.",
+  sub: "Every feature for every user, and no per-signature fees. Add calls and marketing email when you want them.",
   plans: [
     {
       key: "month",
@@ -387,19 +389,22 @@ export const PRICING = {
       featured: true,
     },
   ],
-  firstMonth: `Your first month is ${PLAN_WORDS.firstMonth.replace(" for your first month", "")}, on either plan. ${PLAN_WORDS.gst}`,
+  firstMonth: `${PLAN_WORDS.firstMonth}, on either plan, with ${PLAN_WORDS.trialSites.replace(" in your first month", "")} in the designer. ${PLAN_WORDS.gst}`,
   includesTitle: "Every plan includes",
   includes: [
     "The full CRM, pipelines and Today",
     "Branded proposals with online acceptance",
     "Approvals, install calendar and ordering",
     "Installer job cards and invoices",
-    "Sol, the AI assistant",
+    `Sol, the AI assistant: ${SOL_PER_USER} credits a user a month`,
     "Team chat, Gmail inbox and note-taker",
   ],
-  tokensTitle: `Design jobs: ${PLAN_WORDS.token}`,
+  tokensTitle: `The designer: ${PLAN_WORDS.token}`,
   tokens: PLAN_WORDS.tokenExplained,
   start: PLAN_WORDS.startExplained,
+  addOnsTitle: "Add-ons for your business",
+  addOnsSub: "One price for the whole business, whatever its size. Add one from Billing when you want it, and take it off any time.",
+  addOns: ADD_ON_KEYS.map((key) => ({ key, name: ADD_ON_WORDS[key].name, price: addOnPriceWords(key), what: ADD_ON_WORDS[key].what })),
   enterprise: {
     title: "Enterprise",
     lead: `${ENTERPRISE_FROM} users or more`,
@@ -415,10 +420,10 @@ export const FAQ: readonly { q: string; a: string }[] = [
   },
   { q: "What happens after the first month?", a: PLAN_WORDS.offerExplained },
   { q: "Can I leave the 12-month plan early?", a: PLAN_WORDS.commitExplained },
-  { q: "What's a design job?", a: PLAN_WORDS.tokenExplained },
+  { q: "How does the designer charge?", a: PLAN_WORDS.tokenExplained },
   {
-    q: "Is it really everything for one price a user?",
-    a: "Every feature for every user, including Sol. The only other cost is design jobs, which you buy as you use them.",
+    q: "What else is there to pay for?",
+    a: "Every feature for every user, including Sol. Designer credits are bought as you use them, and Calls & Texts or Growth are added when you want them.",
   },
   { q: "Are prices with GST?", a: "Yes. Every price on this page includes GST." },
   {
@@ -428,21 +433,46 @@ export const FAQ: readonly { q: string; a: string }[] = [
 ];
 
 /**
- * The hero's product film (6 Nov 2026, Martin: a film like Stack AI's, taking the reader through several selling points):
- * the camera glides into a laptop and on through real screens, a chapter at a time. Every chapter is something the
- * product does today, on the made-up demo business. `CRM_TOAST` is what the call note-taker's Apply all leaves.
+ * The hero's product film (16 Nov 2026, Martin: the old film showed Sol laying panels from one sentence, which isn't how
+ * the designer works today; "it should be a real video of how the designer works today", "I just want to make sure the
+ * film isn't misleading", and not so much that a competitor could copy it). Every frame is a real screen of the product
+ * on the made-up demo business, a camera moving over it: nothing drawn over the screens says something the product
+ * doesn't do. The roof is shown in the designer's own drawn view, so the site isn't recognisable, and every address on
+ * screen is a made-up one. Chapters that need an add-on say so (`addOn`): Martin, voice agents are an expansion of the
+ * subscription, not out of the box, and marketing email is extra. The Marketplace closes it, marked coming soon.
  */
 export const FILM = {
   label: "RENUABL at work: a short film of the product on example data",
   chapters: [
-    { key: "today", title: "Sol lines up your day", line: "What needs you, in the order it matters." },
-    { key: "design", title: "Ask, and the roof is designed", line: "Panels, inverter and battery from one sentence." },
-    { key: "crm", title: "The CRM that takes its own notes", line: "Calls written up, next steps on the deal." },
-    { key: "service", title: "Service, sorted", line: "Sol reads the case and recommends the fix." },
+    {
+      key: "sol",
+      title: "Sol knows your business",
+      line: "He lines up what needs you, offers the next move and answers the technical questions.",
+    },
+    { key: "service", title: "Service, answered", line: "Sol sums up the case, recommends the fix and drafts the reply." },
+    { key: "voice", title: "Voice agents call your customers", line: "Hand the call to your agent and watch it live.", addOn: "voice" },
+    { key: "design", title: "The assisted designer", line: "Sol suggests a system from the bill. You check and adjust it." },
+    {
+      key: "proposal",
+      title: "Your proposal, your brand",
+      line: "Build it your way. Your customer compares the options and signs online.",
+    },
+    { key: "signed", title: "Signed, and the rest follows", line: "The order opens itself, then the install day and the job card." },
+    {
+      key: "marketing",
+      title: "Email your database",
+      line: "Sol writes the subject and the words. You choose who gets it.",
+      addOn: "marketing",
+    },
   ],
-  /** What is typed to Sol on Today, before he lays out the day. */
-  todayAsk: "Who should I call next?",
-  crmToast: { title: "Call with Olivia written up", body: "Notes, next step and a follow-up added to her deal." },
+  /** The film's last card. */
+  marketplace: {
+    title: "RENUABL Marketplace",
+    line: "List jobs for installers, find partners and trade spare stock.",
+    soon: "Coming soon",
+  },
+  /** Beside a chapter that needs an add-on. */
+  addOn: "Add-on",
   pause: "Pause the film",
   play: "Play the film",
 } as const;
@@ -483,15 +513,19 @@ export function salesCopy(): string[] {
     PRICING.sub,
     ...PRICING.includes,
     ...Object.values(PRICING.enterprise),
+    PRICING.addOnsTitle,
+    PRICING.addOnsSub,
+    ...PRICING.addOns.flatMap((a) => [a.name, a.price, a.what]),
     ...FAQ.flatMap((f) => [f.q, f.a]),
     ...PRICING.plans.flatMap((p) => [p.name, p.per, p.note]),
     PRICING.firstMonth,
     PRICING.includesTitle,
     ...PRICING.includes,
     ...FILM.chapters.flatMap((c) => [c.title, c.line]),
-    FILM.todayAsk,
-    FILM.crmToast.title,
-    FILM.crmToast.body,
+    FILM.addOn,
+    FILM.marketplace.title,
+    FILM.marketplace.line,
+    FILM.marketplace.soon,
     CLOSING.headline,
     CLOSING.sub,
   ];
