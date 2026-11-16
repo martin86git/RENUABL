@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
+    area: "CRM",
+    words: "Bring your sold jobs in from Pylon: paste your Pylon key in Settings and each one becomes a deal with its signed proposal.",
+  },
+  {
+    day: "2026-11-16",
     area: "Design tool",
     words: "Dragging out a row of panels, Sol counts it as it grows: the panels, the kW, and how many more to reach the target.",
   },
