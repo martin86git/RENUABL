@@ -2,39 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
-
-/**
- * A note on Today about the new look (31 Oct 2026, as Primero's): one line, Show me around (a tour that dims the page
- * and rings each area in turn), Got it. Shown once a browser until it is closed, kept under `NEW_LOOK_KEY`; for the
- * next big change, write new steps under a new key so it shows again.
- */
-const NEW_LOOK_KEY = "renuabl.design.new-look-2026-10-31";
-
-/** Where each step lights; a step whose place isn't on screen (a phone, a narrow window) is passed over. */
-const WHERE: { what: string; now: string; at: string }[] = [
-  {
-    what: "The menu down the left",
-    now: "is gone. Today, CRM, Procurement, Installation and Service are across the top; each one's pages sit under it.",
-    at: 'nav[aria-label="Sections"]',
-  },
-  {
-    what: "Search",
-    now: "is the round magnifier top right (or Ctrl K): a name, a phone number as it rings, an email or an address.",
-    at: 'button[aria-label="Search, or ask Sol"]',
-  },
-  {
-    what: "Top right",
-    now: "has today's date and weather, and your profile: Settings, your account and signing out.",
-    at: '[data-tour="icons"]',
-  },
-  {
-    what: "The rail on the right",
-    now: "has team chat, your notifications (customers' messages and mentions), email and the numbers.",
-    at: ".sol-rail",
-  },
-  { what: "The pad", now: "is where each page sits. Today opens on what needs you now.", at: '[data-tour="pad"]' },
-];
 
 type Box = { top: number; left: number; width: number; height: number };
 
@@ -47,7 +14,7 @@ function boxOf(sel: string): Box | null {
 
 /**
  * A spotlight tour: the page dimmed, one area lit with an orange ring, and a card beside it with Back, Next and Done.
- * Used by the new-look note and by the welcome on Today (welcome.ts `WELCOME_TOUR`).
+ * Used by the welcome on Today, the tour of a first visit (welcome.ts `WELCOME_TOUR`).
  */
 export function Spotlight({ steps: all, onEnd }: { steps: readonly { what: string; now: string; at: string }[]; onEnd: () => void }) {
   const [steps] = useState(() => all.filter((w) => boxOf(w.at)));
@@ -124,67 +91,5 @@ export function Spotlight({ steps: all, onEnd }: { steps: readonly { what: strin
       </div>
     </div>,
     document.body,
-  );
-}
-
-/** Someone just shown round by the welcome on Today doesn't need the new-look note as well. */
-export function skipNewLook() {
-  try {
-    localStorage.setItem(NEW_LOOK_KEY, new Date().toISOString());
-  } catch {
-    // Private window: the note may show once, nothing worse.
-  }
-}
-
-export function NewLook({ name }: { name?: string | null }) {
-  const [show, setShow] = useState(false);
-  const [touring, setTouring] = useState(false);
-  useEffect(() => {
-    // Read once the page is in the browser (its storage is the browser's own).
-    const t = setTimeout(() => {
-      try {
-        if (!localStorage.getItem(NEW_LOOK_KEY)) setShow(true);
-      } catch {
-        setShow(true);
-      }
-    }, 0);
-    return () => clearTimeout(t);
-  }, []);
-  if (!show) return null;
-  const done = () => {
-    setShow(false);
-    try {
-      localStorage.setItem(NEW_LOOK_KEY, new Date().toISOString());
-    } catch {
-      // Private window: it shows again next time, nothing worse.
-    }
-  };
-  return (
-    <section className="relative mb-4 rounded-2xl bg-sun p-4 text-left ring-1 ring-sun-line/30 sm:p-5" aria-label="What's new">
-      <button
-        type="button"
-        onClick={done}
-        aria-label="Close"
-        className="absolute right-3 top-3 rounded-full p-1 text-ink-2 hover:bg-white/70 hover:text-ink"
-      >
-        <X className="size-4" aria-hidden />
-      </button>
-      <h2 className="pr-8 text-base font-semibold tracking-[-0.01em] text-ink">
-        Hi{name ? ` ${name}` : ""}, RENUABL has a new look, and some things have a new home.
-      </h2>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setTouring(true)}
-          className="rounded-full bg-sun-line px-4 py-1.5 text-sm font-semibold text-white hover:bg-ink"
-        >
-          Show me around
-        </button>
-        <button type="button" onClick={done} className="rounded-full bg-ink px-4 py-1.5 text-sm font-medium text-white hover:bg-ink-2">
-          Got it
-        </button>
-      </div>
-      {touring && <Spotlight steps={WHERE} onEnd={() => setTouring(false)} />}
-    </section>
   );
 }

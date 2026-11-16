@@ -34,7 +34,7 @@ import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
-import { NewLook, Spotlight } from "./new-look";
+import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
@@ -225,11 +225,6 @@ export function TodayPad(props: {
             onDone={() => setWelcoming(false)}
             onTour={tour}
           />
-        )}
-        {!welcoming && (
-          <div className="mx-auto w-full max-w-3xl">
-            <NewLook name={props.name} />
-          </div>
         )}
         {!welcoming && onFeed && (
           <div className="pb-6">

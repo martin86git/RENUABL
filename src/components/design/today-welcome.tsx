@@ -9,7 +9,6 @@ import { todayInMarket } from "@/lib/domain/market";
 import { addMember, finishWelcome, setMemberPermissions } from "@/lib/services/design-account";
 import { connectGmailHere, loadInbox, type GmailOutcome } from "@/lib/services/inbox";
 import { connectMyCalendar, loadMyCalendar } from "@/lib/services/my-calendar";
-import { skipNewLook } from "./new-look";
 import { SolSays, Typed } from "./today-pad";
 
 type Stage = "hello" | WelcomeStep | "done";
@@ -60,7 +59,6 @@ export function Welcome({
     if (s === "hello") window.setTimeout(next, 500);
   };
   const end = () => {
-    skipNewLook();
     void finishWelcome();
     onDone();
   };
@@ -80,7 +78,6 @@ export function Welcome({
                 type="button"
                 className={dark}
                 onClick={() => {
-                  skipNewLook();
                   void finishWelcome();
                   onTour();
                 }}
