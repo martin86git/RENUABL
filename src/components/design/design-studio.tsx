@@ -65,7 +65,7 @@ const STEPS = [
  * Opened inside a deal's design drawer (an iframe of this page), the deal is told when the design is saved or published,
  * so its system details fill in from it there and then, and whether there is work not yet saved. Same site only.
  */
-function tellDeal(news: { saved?: boolean; unsaved?: boolean; fold?: boolean; job?: string }) {
+function tellDeal(news: { saved?: boolean; unsaved?: boolean; fold?: boolean; job?: string; proposal?: boolean }) {
   if (typeof window === "undefined" || window.parent === window) return;
   window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
@@ -300,6 +300,11 @@ export function DesignStudio() {
    * where the designer is, nothing navigated. The design is saved, so the deal finds this roof (its design joins it),
    * and the pop-up is told the deal, so its tools (Record, the proposal) are there at once.
    */
+  // A deal can be made here by a signed-in retailer who sees costs; Proceed to proposal on a roof with none asks for one.
+  const canMakeDeal = signedIn && !costsHidden() && cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer";
+  const [dealAsk, setDealAsk] = useState(0);
+  // Run once the design is next saved (going on to the proposal after a deal is made for it).
+  const afterSave = useRef<(() => void) | null>(null);
   const createDealHere = async (input: NewDealInput): Promise<{ ok: true } | { ok: false; message: string }> => {
     if (!roof) return { ok: false, message: "Open an address first." };
     const res = await createCustomer({
@@ -316,6 +321,21 @@ export function DesignStudio() {
     });
     if (!res.ok) return { ok: false, message: res.message };
     if (!res.job) return { ok: false, message: "The customer was kept, but their deal couldn't be made: add it from their page." };
+    // Asked from Proceed to proposal: on to the proposal once the design is saved (or after a moment, when there was
+    // nothing new to save).
+    const made = res.job;
+    if (dealAsk > 0) {
+      let done = false;
+      const go = () => {
+        if (done) return;
+        done = true;
+        afterSave.current = null;
+        if (inDrawer()) tellDeal({ proposal: true });
+        else router.push(`/design/deals/${encodeURIComponent(made.id)}/proposal`);
+      };
+      afterSave.current = go;
+      window.setTimeout(go, 2500);
+    }
     window.dispatchEvent(new Event("renuabl:design-save"));
     setJob({ id: res.job.id, customerId: res.customer.id, customerName: res.customer.name, lat: roof.lat, lng: roof.lng });
     tellDeal({ job: res.job.id, saved: true });
@@ -352,6 +372,7 @@ export function DesignStudio() {
             const problem = await saveRoofWork(roof, next, extras);
             if (!problem) {
               tellDeal({ saved: true });
+              afterSave.current?.();
               // A roof's first save, or its first with a battery, uses the business's credits: the chip reads them again.
               if (signedIn) window.dispatchEvent(new Event(CREDITS_EVENT));
             }
@@ -439,6 +460,7 @@ export function DesignStudio() {
           onUnsaved={noteUnsaved}
           tight={popped}
           footRoom={popped ? 52 : 0}
+          onNeedDeal={popped && canMakeDeal ? () => setDealAsk((n) => n + 1) : undefined}
           bar={
             <>
               {/* In the pop-up the frame around it says where you are: no wordmark, every bit of width for the work. */}
@@ -516,12 +538,9 @@ export function DesignStudio() {
             onPick={pick}
             deal={onJob ? { customerName: onJob.customerName } : null}
             onOpenDeal={onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
+            askToCreate={dealAsk}
             extra={signedIn ? <DesignCredits className="h-10 px-3.5 text-[13px]" /> : null}
-            onCreate={
-              signedIn && !costsHidden() && cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer"
-                ? createDealHere
-                : undefined
-            }
+            onCreate={canMakeDeal ? createDealHere : undefined}
           />
         )}
         {pictureMissing && (

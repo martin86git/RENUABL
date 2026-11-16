@@ -28,6 +28,7 @@ export function AddressStrip({
   onCreate,
   onOpenDeal,
   extra,
+  askToCreate,
 }: {
   address: string;
   onPick: (address: Address) => void;
@@ -38,9 +39,15 @@ export function AddressStrip({
   onOpenDeal?: () => void;
   /** Beside the address: the business's design credits. */
   extra?: React.ReactNode;
+  /** Raised (counted up) to open the Create deal window from elsewhere: Proceed to proposal on a roof with no deal. */
+  askToCreate?: number;
 }) {
   const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (askToCreate) setCreating(true);
+  }, [askToCreate]);
   return (
     <div className="mx-auto mt-1.5 flex w-full max-w-[min(100%,72rem)] flex-wrap items-center gap-2 px-1">
       <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-surface py-0.5 pl-3.5 pr-1 shadow-sm ring-1 ring-line">

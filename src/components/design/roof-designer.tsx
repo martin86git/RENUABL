@@ -1023,6 +1023,8 @@ export function RoofDesigner(props: {
   tight?: boolean;
   /** Room kept under the picture in the first fold, in pixels: the address strip under it in the pop-up. */
   footRoom?: number;
+  /** A roof with no deal asked to go on to its proposal: the deal is made first (the address strip's Create deal). */
+  onNeedDeal?: () => void;
   /** What to say once saved: where the work is kept ("Saved to your account", "Saved on this device"). */
   savedLabel?: string;
   /** Makes the proposal from the design just saved. Answers with what went wrong, or null. */
@@ -4102,7 +4104,7 @@ export function RoofDesigner(props: {
    * deal's proposal opens in the same window, or on its own page; a site with no deal shows why there is none yet.
    */
   const toProposal = async () => {
-    if (!props.jobId) return showSide("proposal");
+    if (!props.jobId) return props.onNeedDeal ? props.onNeedDeal() : showSide("proposal");
     if (!(await saveNow.current())) return;
     if (window.parent !== window) window.parent.postMessage({ renuablDesign: { proposal: true } }, window.location.origin);
     else router.push(`/design/deals/${encodeURIComponent(props.jobId)}/proposal`);
