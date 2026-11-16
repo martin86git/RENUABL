@@ -287,8 +287,33 @@
 .studio-frame .studio-own-mark {
   display: none;
 }
-.studio-frame .staff-scroll {
-  scrollbar-width: thin;
+/* A slim, quiet bar for lists that scroll (team chat, its deals; 16 Nov 2026, Martin: the browser's own bar with arrows looked
+   ugly and not native). Wherever the list is drawn, frame or page body. Chrome ignores the ::-webkit-scrollbar styles once
+   scrollbar-width is set, so the standard properties are only for browsers without them (Firefox). */
+.staff-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.staff-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.staff-scroll::-webkit-scrollbar-button {
+  display: none;
+}
+.staff-scroll::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background: rgb(11 11 12 / 0.16) padding-box;
+}
+.staff-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: rgb(11 11 12 / 0.28);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .staff-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(11 11 12 / 0.22) transparent;
+  }
 }
 /* A list that scrolls with no bar showing (Today's Deals column): the wheel, touch and keys still move it. */
 .no-scrollbar {
