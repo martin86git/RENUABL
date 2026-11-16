@@ -381,9 +381,10 @@ function Hero({ signedIn }: { signedIn: boolean }) {
       */}
       <div className="mx-auto grid w-full max-w-[100rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(18rem,28rem)_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-12 lg:pb-8 lg:pt-8">
         <div className="text-center lg:text-left">
-          <BrandEyebrow className="mb-6">
-            {SALES_HERO.introducing}
-          </BrandEyebrow>
+          <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
+          <p className="mb-7 mt-3 text-balance text-[clamp(20px,1.9vw,28px)] font-medium leading-snug tracking-[-0.02em] text-ink">
+            {SALES_HERO.newWay}
+          </p>
           <h1 id="hero" className="text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
             {SALES_HERO.headline.map((part, i, all) => (
               <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
@@ -401,7 +402,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
           </div>
         </div>
         <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:items-center lg:[container-type:size]">
-          <div className="w-full text-left lg:w-[min(88cqw,calc((100cqh-7rem)*1.6),54rem)]">
+          <div className="w-full text-left lg:w-[min(80cqw,calc((100cqh-9rem)*1.6),48rem)]">
             <ProductFilm />
           </div>
         </div>

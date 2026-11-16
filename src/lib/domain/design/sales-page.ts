@@ -16,7 +16,9 @@ import { SOL_PER_USER } from "./sol-credits";
 export const SALES_HERO = {
   eyebrow: "RENUABL Business · Powered by AI",
   /** Over the headline (16 Nov 2026, Martin: as xAI and OpenAI introduce theirs). */
-  introducing: "Introducing RENUABL Business",
+  introducing: "Introducing",
+  /** What is introduced, said large under it (17 Nov 2026, Martin: "introducing something big"). */
+  newWay: "The new way to run your solar business.",
   /** Said in two lines, the second lit in the signal orange. */
   headline: ["Solar just", "got a brain."],
   sub: "The all-in-one platform for solar businesses, with AI in every part.",
