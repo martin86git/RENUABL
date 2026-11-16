@@ -95,8 +95,8 @@ describe.skipIf(!url)("add-ons and business numbers (database)", () => {
     await addons.syncAddOnsFromStripe("sub_alpha", [{ id: "si_seats", addon: undefined }], false);
     expect(await addons.standingOf(a, "marketing")).toBe("off");
     // Switched on by staff without a charge: left alone when the plan ends.
-    await addons.switchOn(a, "custom-proposals", "staff@renuabl.test");
+    await addons.switchOn(a, "voice", "staff@renuabl.test");
     await addons.syncAddOnsFromStripe("sub_alpha", [], true);
-    expect(await addons.standingOf(a, "custom-proposals")).toBe("on");
+    expect(await addons.standingOf(a, "voice")).toBe("on");
   });
 });

@@ -12,7 +12,7 @@ describe("custom proposals", () => {
 
   it("says the price once it is set", () => {
     expect(customPriceWords(null)).toMatch(/included/);
-    expect(customPriceWords(4900)).toBe("Custom proposals are $49 a month for your whole business, including GST.");
+    expect(customPriceWords(4900)).toBe("Custom proposals come with Growth, $49 a month for your whole business, including GST.");
   });
 });
 

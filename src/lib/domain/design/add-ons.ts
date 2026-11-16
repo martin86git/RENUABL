@@ -4,14 +4,18 @@
  * the business (`design_addons`), charged as an item of its own on the plan's Stripe subscription, shown in Settings →
  * Billing and wherever the feature lives as "Add to your plan". Pure, tested.
  *
- * Prices are Martin's to set. Until one is, the add-on is "Price on request": pressing Add to your plan asks for it (kept
+ * Prices (16 Nov 2026, Martin): **Calls & Texts** (key `voice`) $29 a month, with the business number, 250 texts and 60
+ * voice-agent minutes, Sol credits beyond (`VOICE_INCLUDES`); **Growth** (key `marketing`) $19 a month: custom proposals
+ * and marketing email, 2,000 emails a month, then $10 per 5,000 more (`GROWTH_EMAILS`). Custom proposals are no longer
+ * sold apart: they come with Growth (`CUSTOM_PROPOSALS` is its key). Prices are Martin's to set; one set to null is
+ * "Price on request": pressing Add to your plan asks for it (kept
  * on the business and shown as asked for, RENUABL's staff told), and staff switch it on from /admin once the price is
  * agreed. Once a price is set, Add to your plan puts it on the subscription there and then. Never invent a price.
  *
  * RENUABL's own business has every add-on, always, at no charge: it is the business they were built on.
  */
 
-export const ADD_ON_KEYS = ["voice", "marketing", "custom-proposals"] as const;
+export const ADD_ON_KEYS = ["voice", "marketing"] as const;
 export type AddOnKey = (typeof ADD_ON_KEYS)[number];
 
 export const cleanAddOnKey = (raw: unknown): AddOnKey | null => (ADD_ON_KEYS.includes(raw as AddOnKey) ? (raw as AddOnKey) : null);
@@ -22,10 +26,14 @@ export const cleanAddOnKey = (raw: unknown): AddOnKey | null => (ADD_ON_KEYS.inc
  * Martin how usage is charged before setting it).
  */
 export const ADD_ON_MONTHLY_CENTS: Record<AddOnKey, number | null> = {
-  voice: null,
-  marketing: null,
-  "custom-proposals": null,
+  voice: 2900,
+  marketing: 1900,
 };
+
+/** What Calls & Texts includes each month; beyond it, texts and minutes take Sol credits. Usage isn't metered yet. */
+export const VOICE_INCLUDES = { texts: 250, minutes: 60, textCredits: 1, minuteCredits: 3 } as const;
+/** Marketing emails a month with Growth, and the price of each 5,000 more (not charged yet). */
+export const GROWTH_EMAILS = { included: 2000, extraBlock: 5000, extraCents: 1000 } as const;
 
 export interface AddOnWords {
   name: string;
@@ -37,10 +45,11 @@ export interface AddOnWords {
 
 export const ADD_ON_WORDS: Record<AddOnKey, AddOnWords> = {
   voice: {
-    name: "Voice agents",
-    what: "Phone agents that ring your leads and customers in your business's name, on a phone number of your own.",
+    name: "Calls & Texts",
+    what: "Your own business number, texting from every deal, and phone agents that ring your leads and customers in your business's name.",
     includes: [
       "Your own Australian business number, for calls and texts",
+      "250 texts and 60 voice-agent minutes a month; beyond that, a text takes 1 Sol credit and a minute 3",
       "A sales agent and a post-sale agent with names, voices and scripts you set",
       "Calls coming in to your number answered and put on the right deal",
       "Texting customers from a deal, with replies landing on it",
@@ -48,19 +57,16 @@ export const ADD_ON_WORDS: Record<AddOnKey, AddOnWords> = {
     ],
   },
   marketing: {
-    name: "Marketing email",
-    what: "Email your contacts and customers in your business's name: campaigns, sequences and a builder for each email.",
+    name: "Growth",
+    what: "Custom proposals in your own design, and marketing email to your contacts and customers in your business's name.",
     includes: [
+      "Custom proposals: blocks moved, added and laid out your way, pictures placed and sized",
+      "2,000 marketing emails a month, with more available as you need them",
       "Import contacts, or bring your customers across, with consent kept on each",
       "Emails built from blocks, written with Sol",
       "Campaigns sent when you choose, and sequences that run by themselves",
       "Opens, clicks and unsubscribes reported",
     ],
-  },
-  "custom-proposals": {
-    name: "Custom proposals",
-    what: "A proposal design of your own: blocks moved, added and laid out your way.",
-    includes: ["Blocks rearranged and your own added", "Pictures placed and sized", "Dark grounds for your own blocks"],
   },
 };
 

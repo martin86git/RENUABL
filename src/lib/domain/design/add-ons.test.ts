@@ -16,11 +16,10 @@ import {
 } from "./add-ons";
 
 describe("add-ons", () => {
-  it("has no invented prices: every add-on is price on request until Martin sets it", () => {
-    for (const key of ADD_ON_KEYS) {
-      expect(ADD_ON_MONTHLY_CENTS[key]).toBeNull();
-      expect(addOnPriceWords(key)).toBe("Price on request");
-    }
+  it("prices Calls & Texts at $29 and Growth at $19 a month (Martin, 16 Nov 2026)", () => {
+    expect(ADD_ON_MONTHLY_CENTS).toEqual({ voice: 2900, marketing: 1900 });
+    expect(addOnPriceWords("voice")).toBe("$29 a month for your business, including GST");
+    expect(addOnPriceWords("voice", null)).toBe("Price on request");
     expect(addOnPriceWords("voice", 4900)).toBe("$49 a month for your business, including GST");
     expect(addOnPriceWords("marketing", 1950)).toBe("$19.50 a month for your business, including GST");
   });
@@ -86,7 +85,7 @@ describe("add-ons", () => {
       expect(needsAddOn(key)).toContain("Settings → Billing");
     }
     const note = addOnRequestNote({ key: "voice", business: "Sunrise Solar", by: "sam@example.com" });
-    expect(note).toContain("Voice agents");
+    expect(note).toContain("Calls & Texts");
     expect(note).toContain("/admin");
   });
 });
