@@ -90,6 +90,8 @@ import { CallChooser } from "./call-choice";
 import { SolIcon } from "./sol-icon";
 import { TodayCalls, type CallsSummary } from "./today-calls";
 import { TodayNews } from "./today-news";
+import { SolDraftPanel } from "./sol-draft-panel";
+import { solSuggestions, type SolSuggestion } from "@/lib/domain/design/sol-suggestions";
 
 const FEED_PICK_KEY = "renuabl.design.feed-pipeline";
 const POLL_MS = 60_000;
@@ -125,6 +127,9 @@ export function DealFeed(props: {
   const [showAll, setShowAll] = useState(false);
   // The deal picked in the deals panel, shown as its card on the left.
   const [picked, setPicked] = useState<string | null>(null);
+  // A suggestion of Sol's pressed in the Deals list: his email for that deal in the feed's place until it is sent or
+  // put away (16 Nov 2026, Martin, as Primero's).
+  const [handOff, setHandOff] = useState<{ jobId: string; suggestion: SolSuggestion; at: number } | null>(null);
   // What the Calls part says, for the strip and for its place in the column.
   const [calls, setCalls] = useState<CallsSummary | null>(null);
   const [data, setData] = useState<FeedAnswer | null>(null);
@@ -230,6 +235,12 @@ export function DealFeed(props: {
 
   const parts = todayParts(deals, now);
   const pickedDeal = picked ? (deals.find((d) => d.jobId === picked) ?? null) : null;
+  const handOffDeal = handOff ? ((data?.deals ?? []).find((d) => d.jobId === handOff.jobId) ?? null) : null;
+  const handing = Boolean(handOff && handOffDeal);
+  const doneHandOff = () => {
+    setHandOff(null);
+    void load();
+  };
   // The salespeople (members, not designers or the owner): two or more and the owner sees a line for each, and chooses
   // who their new leads go to (10 Nov 2026).
   const sellers = (data?.team ?? []).filter((m) => m.role === "member");
@@ -358,7 +369,32 @@ export function DealFeed(props: {
             </p>
           )}
           {/* My day, in the feed's place (16 Nov 2026, Martin: not the whole screen; the deals stay beside it). */}
-          {props.day && !pickedDeal && (
+          {/* Sol's hand-off: the email he writes, or the one he has waiting, in the feed's place. */}
+          {handOff && handOffDeal && handOff.suggestion.kind === "write" && (
+            <SolDraftPanel
+              key={`${handOff.jobId}-${handOff.at}`}
+              deal={handOffDeal}
+              label={handOff.suggestion.label}
+              ask={handOff.suggestion.ask ?? ""}
+              onClose={() => setHandOff(null)}
+              onSent={doneHandOff}
+            />
+          )}
+          {handOff && handOffDeal && handOff.suggestion.kind === "review" && handOffDeal.sol && (
+            <div className="mt-9">
+              <button
+                type="button"
+                onClick={() => setHandOff(null)}
+                className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
+              >
+                <ChevronLeft className="size-4" aria-hidden /> Back to your day
+              </button>
+              <div className="max-w-[44rem]">
+                <ReviewSol deal={handOffDeal} now={now} onClose={() => setHandOff(null)} onDone={doneHandOff} />
+              </div>
+            </div>
+          )}
+          {props.day && !pickedDeal && !handing && (
             <div className="mt-9">
               <button
                 type="button"
@@ -371,7 +407,7 @@ export function DealFeed(props: {
             </div>
           )}
           {/* A deal picked in the panel: its whole card, with the way back. */}
-          {pickedDeal && (
+          {pickedDeal && !handing && (
             <div className="mt-9">
               <button
                 type="button"
@@ -398,7 +434,7 @@ export function DealFeed(props: {
               </div>
             </div>
           )}
-          <div className={clsx((pickedDeal || props.day) && "hidden")}>
+          <div className={clsx((pickedDeal || props.day || handing) && "hidden")}>
             <div className="flex flex-col">
               {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
               <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls, view(TODAY_IDS.calls))} onSummary={setCalls} />
@@ -591,7 +627,14 @@ export function DealFeed(props: {
           deals={deals}
           now={now}
           picked={pickedDeal?.jobId ?? null}
+          handingOff={handing ? (handOff?.jobId ?? null) : null}
+          onSuggest={(jobId, suggestion) => {
+            setPicked(null);
+            setHandOff({ jobId, suggestion, at: Date.now() });
+            window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+          }}
           onPick={(id) => {
+            setHandOff(null);
             setPicked(id);
             window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
           }}
@@ -1651,6 +1694,9 @@ function DealsPanel(props: {
   now: Date;
   picked: string | null;
   onPick: (jobId: string) => void;
+  /** A suggestion of Sol's pressed under a deal, and the deal whose hand-off is open. */
+  onSuggest: (jobId: string, suggestion: SolSuggestion) => void;
+  handingOff: string | null;
   onNew?: () => void;
   adding?: boolean;
   /** The toggles, from the pipeline picked (panelTabsFor). */
@@ -1770,17 +1816,18 @@ function DealsPanel(props: {
       <ul className="no-scrollbar mt-3 min-h-0 space-y-1.5 p-0.5 lg:flex-1 lg:overflow-y-auto">
         {rows.map((d) => {
           const mark = panelMark(d);
-          const on = props.picked === d.jobId;
+          const on = props.picked === d.jobId || props.handingOff === d.jobId;
+          const ideas = solSuggestions(d, props.now);
           return (
-            <li key={d.jobId}>
+            <li
+              key={d.jobId}
+              className={clsx("rounded-2xl bg-surface ring-1 transition", on ? "ring-2 ring-ink" : "ring-line hover:ring-ink-2")}
+            >
               <button
                 type="button"
                 onClick={() => props.onPick(d.jobId)}
                 aria-current={on ? "true" : undefined}
-                className={clsx(
-                  "flex w-full items-center gap-3 rounded-2xl bg-surface p-2.5 text-left ring-1 transition",
-                  on ? "ring-2 ring-ink" : "ring-line hover:ring-ink-2",
-                )}
+                className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left"
               >
                 <RoofThumb deal={d} small />
                 <span className="min-w-0 flex-1">
@@ -1804,6 +1851,28 @@ function DealsPanel(props: {
                   </span>
                 </span>
               </button>
+              {/* What Sol can take off your hands here (16 Nov 2026, Martin): a press, and his email opens in the feed's place. */}
+              {ideas.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 border-t border-line px-2.5 py-2">
+                  {ideas.map((idea) => (
+                    <button
+                      key={idea.label}
+                      type="button"
+                      onClick={() => props.onSuggest(d.jobId, idea)}
+                      className={clsx(
+                        "inline-flex h-7 items-center gap-1.5 rounded-full pl-1.5 pr-3 text-[12px] font-medium transition",
+                        idea.kind === "review"
+                          ? "bg-sun-line/15 text-sun-ink hover:bg-sun-line/25"
+                          : "bg-surface-2 text-ink-2 hover:bg-ink hover:text-white",
+                      )}
+                      title={idea.kind === "write" ? `Sol writes it, you check and send` : "Sol's email, waiting for you"}
+                    >
+                      <SolIcon className="size-3.5 text-sun-line" />
+                      {idea.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </li>
           );
         })}
