@@ -48,22 +48,16 @@ function focusAt(ms: number): Focus {
   return "opening";
 }
 
-const typed = (text: string, ms: number, from: number, over: number) => {
-  if (ms < from) return "";
-  const n = Math.ceil(Math.min(1, (ms - from) / over) * text.length);
-  return text.slice(0, n);
-};
-
-export function SolScene({ ms, still }: { ms: number; still?: boolean }) {
-  const t = still ? SOL_SCENE_MS : ms;
-  const shown = (at: number) => t >= at;
-  const focus = still ? "wide" : focusAt(t);
+/**
+ * A scene's camera: it closes in on the part marked `data-focus` with the given name, filling most of the scene and
+ * kept inside it, and draws back to the whole scene for any name nothing is marked with. Shared by the film's scenes.
+ */
+export function useFocusCamera(focus: string, most = 1.75) {
   const root = useRef<HTMLDivElement | null>(null);
   const [camera, setCamera] = useState("none");
-
   useLayoutEffect(() => {
     const box = root.current;
-    const el = focus === "wide" ? null : box?.querySelector<HTMLElement>(`[data-focus="${focus}"]`);
+    const el = box?.querySelector<HTMLElement>(`[data-focus="${focus}"]`);
     if (!box || !el) return setCamera("none");
     const W = box.offsetWidth;
     const H = box.offsetHeight;
@@ -75,11 +69,25 @@ export function SolScene({ ms, still }: { ms: number; still?: boolean }) {
     }
     const w = el.offsetWidth;
     const h = el.offsetHeight;
-    const s = Math.max(1, Math.min(1.75, (0.82 * W) / w, (0.62 * H) / h));
+    const s = Math.max(1, Math.min(most, (0.82 * W) / w, (0.62 * H) / h));
     const tx = Math.min(0, Math.max(W - W * s, W / 2 - (x + w / 2) * s));
     const ty = Math.min(0, Math.max(H - H * s, H / 2 - (y + h / 2) * s));
     setCamera(`translate(${tx}px, ${ty}px) scale(${s})`);
-  }, [focus]);
+  }, [focus, most]);
+  return [root, camera] as const;
+}
+
+export const typed = (text: string, ms: number, from: number, over: number) => {
+  if (ms < from) return "";
+  const n = Math.ceil(Math.min(1, (ms - from) / over) * text.length);
+  return text.slice(0, n);
+};
+
+export function SolScene({ ms, still }: { ms: number; still?: boolean }) {
+  const t = still ? SOL_SCENE_MS : ms;
+  const shown = (at: number) => t >= at;
+  const focus = still ? "wide" : focusAt(t);
+  const [root, camera] = useFocusCamera(focus);
 
   const charlieBusy = shown(AT.charlie);
   const sent = shown(AT.send);

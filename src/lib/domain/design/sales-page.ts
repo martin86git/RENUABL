@@ -17,7 +17,7 @@ export const SALES_HERO = {
   eyebrow: "RENUABL Business · Powered by AI",
   /** Said in two lines, the second lit in the signal orange. */
   headline: ["Solar just", "got a brain."],
-  sub: "RENUABL is the all-in-one platform for solar businesses, with AI built into every part of it. Ask it to design a roof, line up your day, check a standard or write the follow-up, and watch it happen.",
+  sub: "The all-in-one platform for solar businesses, with AI in every part.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
 } as const;
@@ -485,6 +485,11 @@ export const FILM = {
       title: "Sol, who knows your business",
       line: "He lines up what needs you, offers the next move and answers the technical questions.",
     },
+    {
+      key: "team",
+      title: "Team chat, with Sol in it",
+      line: "Talk a job over with your colleague, then ask @Sol into the conversation.",
+    },
     { key: "service", title: "Service, answered by Sol", line: "Sol sums up the case, recommends the fix and drafts the reply." },
     { key: "voice", title: "Voice agents for your calls", line: "Hand the call to your agent and watch it live.", addOn: "voice" },
     { key: "design", title: "The assisted designer", line: "Sol suggests a system from the bill. You check and adjust it." },
@@ -545,6 +550,33 @@ export const FILM = {
     choice: { ask: "Anything else?", options: ["Remind me to call her at 10 am", "Draft a follow-up for Friday"] },
     done: "Done. I'll remind you at 10 am.",
     box: "Message Sol…",
+  },
+  /**
+   * The team chapter (16 Nov 2026, Martin: "show chat to the team, and invite Sol to the conversation… talking with a
+   * colleague and then loop in sol for a question on battery locations"). Sol's answer is his real one, asked in the
+   * demo business, with its caveat; made-up people only.
+   */
+  team: {
+    channel: "installations",
+    channels: ["deals", "installations", "service"],
+    people: ["Sam", "Priya"],
+    you: "You",
+    sam: "Sam",
+    first: "Jane Doe wants her battery in the garage, on the wall by the side door. Is that alright?",
+    second: "Not sure how close it can go to the door.",
+    tag: "@Sol",
+    ask: "where can a battery go on a garage wall with a door and a window?",
+    joining: "Sol is answering",
+    answer:
+      "On the clear stretch between them: nothing within 600 mm either side of the door frame, or 600 mm either side of the window and 900 mm below its sill. If a car could hit it, it needs a bollard.",
+    caveat: "Check the figures against the current AS/NZS 5139 and the battery maker's manual before you pick the spot.",
+    drawing: "Garage wall, from inside (not to scale)",
+    door: "Door",
+    window: "Window",
+    battery: "Battery",
+    noGo: "No battery",
+    thanks: "Perfect, I'll mark it on her job card.",
+    box: "Message #installations",
   },
   /** Over each chapter, as a launch film says it. */
   introducing: "Introducing",
@@ -607,6 +639,7 @@ export function salesCopy(): string[] {
     ...FILM.chapters.flatMap((c) => [c.title, c.line]),
     FILM.addOn,
     FILM.introducing,
+    ...Object.values(FILM.team).flatMap((v) => (typeof v === "string" ? [v] : [...v])),
     ...Object.values(FILM.sol).flatMap((v) => (typeof v === "string" ? [v] : (JSON.stringify(v).match(/"[^"]{3,}"/g) ?? []))),
     FILM.marketplace.title,
     FILM.marketplace.line,

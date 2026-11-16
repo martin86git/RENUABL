@@ -8,6 +8,7 @@ import { FILM } from "@/lib/domain/design/sales-page";
 import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
 import { MarketplaceMark } from "./marketplace-bar";
 import { SolScene, SOL_SCENE_MS } from "./film-sol-scene";
+import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
 
 /**
  * The hero's product film (16 Nov 2026, Martin: a real film of how the product works today, not misleading, and not so
@@ -25,7 +26,7 @@ type Key = Chapter | "market";
 type Rect = readonly [number, number, number, number];
 /** One move of the camera: how long it holds, and the part it lights (none: the whole screen). */
 type Move = { ms: number; light?: Rect };
-type Shot = { chapter: Key; src?: string; scene?: "sol"; moves: Move[] };
+type Shot = { chapter: Key; src?: string; scene?: "sol" | "team"; moves: Move[] };
 
 const TICK = 40;
 const WHOLE = 1300;
@@ -33,6 +34,7 @@ const WHOLE = 1300;
 /** The shots in order, with the parts of each screen the camera goes to (measured on the screens). */
 const SHOTS: Shot[] = [
   { chapter: "sol", scene: "sol", moves: [{ ms: SOL_SCENE_MS }] },
+  { chapter: "team", scene: "team", moves: [{ ms: TEAM_SCENE_MS }] },
   {
     chapter: "service",
     src: "/design/landing/film/service-case.webp",
@@ -306,7 +308,12 @@ export function ProductFilm() {
                       key={s.scene}
                       className={clsx("absolute inset-0 transition-opacity duration-700", move.shot === i ? "opacity-100" : "opacity-0")}
                     >
-                      {move.shot === i && <SolScene ms={t - SHOT_AT[i]} still={still} />}
+                      {move.shot === i &&
+                        (s.scene === "team" ? (
+                          <TeamScene ms={t - SHOT_AT[i]} still={still} />
+                        ) : (
+                          <SolScene ms={t - SHOT_AT[i]} still={still} />
+                        ))}
                     </div>
                   ) : null,
                 )}
@@ -405,7 +412,7 @@ export function ProductFilm() {
       </div>
 
       {/* The chapters: where the film is, and a way to any of them. */}
-      <ol className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4 lg:grid-cols-8">
+      <ol className="mt-4 grid grid-cols-3 gap-x-4 gap-y-3 sm:grid-cols-5 lg:grid-cols-9">
         {RAIL.map((c, i) => {
           const [from, to] = SPANS[c.key];
           const share = still ? (i === index ? 1 : 0) : Math.min(1, Math.max(0, (t - from) / (to - from)));

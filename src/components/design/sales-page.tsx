@@ -32,6 +32,7 @@ import { Reveal } from "./front-hero";
 import { SolIcon } from "./sol-icon";
 import { MarketplaceMark } from "./marketplace-bar";
 import { ProductFilm } from "./product-film";
+import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -351,35 +352,26 @@ function Hero({ signedIn }: { signedIn: boolean }) {
         solar just got a brain was on the left and the video on the right", and the film bigger). On a large screen the
         hero is one fold; the film takes the column beside the words at its own 16:10, with room for its chapter rail.
       */}
-      <div className="mx-auto grid w-full max-w-[120rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-10 lg:pb-6 lg:pt-6">
+      <div className="mx-auto grid w-full max-w-[100rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(18rem,28rem)_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-12 lg:pb-8 lg:pt-8">
         <div className="text-center lg:text-left">
-          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{SALES_HERO.eyebrow}</p>
-          <h1 id="hero" className="mt-4 text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+          <h1 id="hero" className="text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
             {SALES_HERO.headline.map((part, i, all) => (
               <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
                 {part}
               </span>
             ))}
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.sub}</p>
-          <div className="mt-7 flex flex-col items-center gap-4 lg:items-start">
+          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.sub}</p>
+          <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
             <div className="flex flex-col items-center gap-4 sm:flex-row">
               <SignUpLink />
               {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
               {!signedIn && <TryDemoButton look="quiet" />}
             </div>
-            <ul className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-[13px] text-ink-2 lg:flex-col lg:justify-start">
-              {SALES_HERO.small.map((s) => (
-                <li key={s} className="inline-flex items-center gap-1.5">
-                  <Check className="size-3.5 text-sun-line" aria-hidden />
-                  {s}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
         <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:items-center lg:[container-type:size]">
-          <div className="w-full text-left lg:w-[min(100cqw,calc((100cqh-4.25rem)*1.6))]">
+          <div className="w-full text-left lg:w-[min(100cqw,calc((100cqh-4.25rem)*1.6),62rem)]">
             <ProductFilm />
           </div>
         </div>
@@ -468,9 +460,26 @@ function CardShot({ src, alt }: { src: string; alt: string }) {
 
 /** How long each card of the upgrade stays on top before the next is dealt, ms. */
 const DECK_MS = 4500;
+/** The team card plays its conversation through before the next is dealt. */
+const holdOf = (key: string) => (key === "team" ? TEAM_SCENE_MS + 800 : DECK_MS);
+
+/** The team chat scene on its own clock, from the start each time its card comes to the top; still otherwise. */
+function LiveTeam({ live }: { live?: boolean }) {
+  const [ms, setMs] = useState(0);
+  useEffect(() => {
+    if (!live) return;
+    const from = performance.now();
+    const timer = window.setInterval(() => setMs(Math.min(TEAM_SCENE_MS, performance.now() - from)), 40);
+    return () => {
+      window.clearInterval(timer);
+      setMs(0);
+    };
+  }, [live]);
+  return <TeamScene ms={ms} still={!live} />;
+}
 
 /** What each card of the upgrade shows: a real screen where there is one, else the product drawn (made-up data). */
-function UpgradeVisual({ k }: { k: (typeof UPGRADE.items)[number]["key"] }) {
+function UpgradeVisual({ k, live }: { k: (typeof UPGRADE.items)[number]["key"]; live?: boolean }) {
   const shot = (src: string, alt: string, position = "object-top") => (
     <Image src={src} alt={alt} fill sizes="(min-width: 1024px) 720px, 100vw" className={clsx("object-cover", position)} />
   );
@@ -492,7 +501,14 @@ function UpgradeVisual({ k }: { k: (typeof UPGRADE.items)[number]["key"] }) {
     case "installs":
       return shot("/design/landing/calendar.webp", "The install calendar with each week's capacity");
     case "team":
-      return shot("/design/landing/sol-garage-wall.webp", "Team chat with Sol answering in the Installations channel");
+      return (
+        <div
+          className="absolute inset-0 [container-type:inline-size]"
+          aria-label="Team chat: a colleague asks about a battery in a garage and Sol is asked in"
+        >
+          <LiveTeam live={live} />
+        </div>
+      );
     case "market":
       return (
         <div className="absolute inset-0 grid place-items-center bg-market p-6">
@@ -559,9 +575,9 @@ function Upgrade() {
   }, []);
   useEffect(() => {
     if (paused || still) return;
-    const t = window.setTimeout(() => setAt((n) => (n + 1) % items.length), DECK_MS);
+    const t = window.setTimeout(() => setAt((n) => (n + 1) % items.length), holdOf(items[at].key));
     return () => window.clearTimeout(t);
-  }, [at, paused, still, items.length]);
+  }, [at, paused, still, items]);
   const now = items[at];
   return (
     <section
@@ -576,7 +592,7 @@ function Upgrade() {
         style={{ background: "radial-gradient(closest-side, rgba(255,90,31,0.22), rgba(255,90,31,0))" }}
       />
       <div
-        className="mx-auto grid w-full max-w-[88rem] items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,0.68fr)_minmax(0,1.32fr)]"
+        className="mx-auto grid w-full max-w-[74rem] items-center gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
@@ -609,7 +625,7 @@ function Upgrade() {
                       aria-hidden
                       className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-sun-line"
                       style={{
-                        animation: `upgrade-fill ${DECK_MS}ms linear forwards`,
+                        animation: `upgrade-fill ${holdOf(item.key)}ms linear forwards`,
                         animationPlayState: paused ? "paused" : "running",
                       }}
                     />
@@ -638,7 +654,7 @@ function Upgrade() {
                   }}
                 >
                   <div className="relative h-full w-full overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-25px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                    {shown && <UpgradeVisual k={item.key} />}
+                    {shown && <UpgradeVisual k={item.key} live={place === 0 && !still} />}
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/55 to-transparent px-5 pb-4 pt-14 text-white sm:px-6">
                       <p className="text-[12px] text-white/60 line-through decoration-sun-line">{item.was}</p>
                       <p className="mt-1 text-[20px] font-semibold tracking-tight sm:text-[24px]">{item.title}</p>
