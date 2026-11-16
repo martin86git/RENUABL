@@ -141,9 +141,16 @@ export const ASK_DEMO = {
  * coming soon. The designer has no band of its own (6 Nov 2026, Martin: the "Your business, upgraded" deck just above
  * already shows it, and the hero's film; "we don't need it twice").
  */
+/** Over the cards of the four big parts (16 Nov 2026, Martin, as xAI's Grok Bot page lays its features out). */
+export const FEATURES = {
+  headline: "Everything a solar business runs on",
+  sub: "One login for the CRM, service, Sol and the marketplace. AI takes the busywork in every part, and you make the calls.",
+} as const;
+
 export const BIG_THREE = [
   {
     id: "crm",
+    line: "The note-taker writes the call up and fills in the deal. Sol drafts the follow-up, and every deal says who to ring next.",
     eyebrow: "The smart CRM",
     title: "The CRM that takes its own notes.",
     body: "A normal CRM sits there waiting for you to type. This one does the typing. Turn on the note-taker for a call and it writes the call up, fills in the deal and sends the design notes straight to the design tool. Sol drafts the follow-up in your voice. And every deal tells you how warm it is and who to ring next.",
@@ -157,6 +164,7 @@ export const BIG_THREE = [
   },
   {
     id: "service",
+    line: "Pick the case and Sol has read the lot: the issue in a line, what was promised, and the steps he would take.",
     eyebrow: "After the sale",
     title: "“My inverter's flashing red.” Relax.",
     body: "Service is where solar businesses lose hours: digging through old chats, emails and notes to work out what's wrong and what was promised. On RENUABL, pick the case and Sol has already read the lot: the issue in a line, what the customer told you, what's been done, and the steps he'd take next.",
@@ -170,6 +178,7 @@ export const BIG_THREE = [
   },
   {
     id: "sol",
+    line: "He lines up your day, writes up your calls and checks the rules of the trade, with the sources to prove it.",
     eyebrow: "Sol, your AI assistant",
     title: "An expert on solar, on every screen.",
     body: "Sol knows your deals, your customers and the rules of the trade. He lines up your day, drafts the follow-ups, writes up your calls, reads bills and switchboard photos, and looks up network rules, rebates and datasheets with the sources to prove it. You check, you send.",
@@ -183,6 +192,7 @@ export const BIG_THREE = [
   },
   {
     id: "marketplace",
+    line: "Find a crew for your jobs, win work near your base and move spare stock. Opening once the network is big enough.",
     eyebrow: "RENUABL Marketplace · Coming soon",
     title: "The solar industry, connected.",
     body: "One network for retailers, installers and electrical inspectors. Sell a job and find the crew to install it, win work near your base, nominate the inspector, and move spare stock to the business down the road.",
@@ -380,16 +390,23 @@ export const PRICING = {
       name: "Monthly",
       price: dollars(SEAT_MONTHLY_CENTS),
       per: "a user a month",
-      note: "Month to month. Cancel any time.",
+      note: "Billed monthly. Cancel any time.",
       featured: false,
+      listHead: "Includes:",
     },
     {
       key: "commit",
       name: `${COMMIT_MONTHS}-month plan`,
       price: dollars(COMMIT_SEAT_CENTS),
       per: "a user a month",
-      note: `For ${COMMIT_MONTHS} months. Sign up, then choose it in Billing.`,
+      note: `Billed monthly for ${COMMIT_MONTHS} months. Choose it in Billing.`,
       featured: true,
+      listHead: "Everything in Monthly, plus:",
+      list: [
+        `${dollars(SEAT_MONTHLY_CENTS - COMMIT_SEAT_CENTS)} less a user, every month`,
+        `That price held for ${COMMIT_MONTHS} months`,
+        "Leave early and you repay what you saved",
+      ],
     },
   ],
   firstMonth: `${PLAN_WORDS.firstMonth}, on either plan, with ${PLAN_WORDS.trialSites.replace(" in your first month", "")} in the designer. ${PLAN_WORDS.gst}`,
@@ -413,7 +430,12 @@ export const PRICING = {
     lead: `${ENTERPRISE_FROM} users or more`,
     body: "Volume pricing, help moving your team and data across, and a direct line to us.",
     cta: "Talk to sales",
+    price: "Let's talk",
+    note: "For large teams.",
+    listHead: `Everything in the ${COMMIT_MONTHS}-month plan, plus:`,
+    list: ["Volume pricing", "Help moving your team and data across", "A direct line to us"],
   },
+  perShort: "/ user / month",
 } as const;
 
 export const FAQ: readonly { q: string; a: string }[] = [
@@ -449,21 +471,21 @@ export const FILM = {
   chapters: [
     {
       key: "sol",
-      title: "Sol knows your business",
+      title: "Sol, who knows your business",
       line: "He lines up what needs you, offers the next move and answers the technical questions.",
     },
-    { key: "service", title: "Service, answered", line: "Sol sums up the case, recommends the fix and drafts the reply." },
-    { key: "voice", title: "Voice agents call your customers", line: "Hand the call to your agent and watch it live.", addOn: "voice" },
+    { key: "service", title: "Service, answered by Sol", line: "Sol sums up the case, recommends the fix and drafts the reply." },
+    { key: "voice", title: "Voice agents for your calls", line: "Hand the call to your agent and watch it live.", addOn: "voice" },
     { key: "design", title: "The assisted designer", line: "Sol suggests a system from the bill. You check and adjust it." },
     {
       key: "proposal",
-      title: "Your proposal, your brand",
+      title: "Proposals in your brand",
       line: "Build it your way. Your customer compares the options and signs online.",
     },
-    { key: "signed", title: "Signed, and the rest follows", line: "The order opens itself, then the install day and the job card." },
+    { key: "signed", title: "Everything after the signature", line: "The order opens itself, then the install day and the job card." },
     {
       key: "marketing",
-      title: "Email your database",
+      title: "Email for your whole database",
       line: "Sol writes the subject and the words. You choose who gets it.",
       addOn: "marketing",
     },
@@ -474,6 +496,47 @@ export const FILM = {
     line: "List jobs for installers, find partners and trade spare stock.",
     soon: "Coming soon",
   },
+  /**
+   * Sol's chapter, played as a live chat (16 Nov 2026, Martin: as xAI's Grok Bot page shows its bots at work). Made-up
+   * people only, and only what Sol does today: reads the deal, checks a standard, drafts a reply that a person sends,
+   * offers the next move, sets a reminder; the phone assistant works beside him.
+   */
+  sol: {
+    business: "Sunrise Solar (example)",
+    agents: [
+      { key: "sol", name: "Sol", job: "Your AI", preview: "One thing needs you this morning" },
+      {
+        key: "charlie",
+        name: "Charlie",
+        job: "Sales calls",
+        preview: "Booked Adam Smith a call, Thu 10 am",
+        busy: "On a call with Adam Smith",
+      },
+      { key: "alex", name: "Alex", job: "Post sale", preview: "Pencilled in an install day, Tue 2 Dec" },
+    ],
+    team: { name: "Team chat", preview: "Sam: the roof photos are in" },
+    when: "Monday 7:48 am",
+    opening: "Morning. Jane Doe opened her proposal last night and asked in the chat whether the battery can go in her garage.",
+    ask: "can it?",
+    steps: ["Read her chat and the deal's notes", "Checked the battery standard, AS/NZS 5139", "Drafted her reply"],
+    working: "Working",
+    answer:
+      "It can, if it's clear of the door, the window and anywhere a car could hit it. The standard sets the clearances and your electrician confirms them on site. Her reply is ready.",
+    draft: {
+      label: "Draft email · not sent",
+      to: "To Jane Doe",
+      subject: "Your battery and the garage",
+      body: "Hi Jane, good question. Yes, the battery can go in your garage, clear of the door and the window. We'll confirm where it goes when we visit.",
+      send: "Send",
+      edit: "Edit",
+      sent: "Sent from Jane's deal",
+    },
+    choice: { ask: "Anything else?", options: ["Remind me to call her at 10 am", "Draft a follow-up for Friday"] },
+    done: "Done. I'll remind you at 10 am.",
+    box: "Message Sol…",
+  },
+  /** Over each chapter, as a launch film says it. */
+  introducing: "Introducing",
   /** Beside a chapter that needs an add-on. */
   addOn: "Add-on",
   pause: "Pause the film",
@@ -497,7 +560,13 @@ export function salesCopy(): string[] {
     UPGRADE.headline,
     UPGRADE.sub,
     ...UPGRADE.items.flatMap((i) => [i.was, i.title, i.body]),
-    ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.body, ...p.points, p.link.label]),
+    FEATURES.headline,
+    FEATURES.sub,
+    PRICING.perShort,
+    ...PRICING.enterprise.list,
+    PRICING.enterprise.listHead,
+    ...PRICING.plans.flatMap((p) => [p.listHead, ...("list" in p ? p.list : [])]),
+    ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.line, p.body, ...p.points, p.link.label]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),
     SOL.eyebrow,
     SOL.headline,
@@ -515,7 +584,7 @@ export function salesCopy(): string[] {
     PRICING.headline,
     PRICING.sub,
     ...PRICING.includes,
-    ...Object.values(PRICING.enterprise),
+    ...Object.values(PRICING.enterprise).flat(),
     PRICING.addOnsTitle,
     PRICING.addOnsSub,
     ...PRICING.addOns.flatMap((a) => [a.name, a.price, a.what]),
@@ -526,6 +595,8 @@ export function salesCopy(): string[] {
     ...PRICING.includes,
     ...FILM.chapters.flatMap((c) => [c.title, c.line]),
     FILM.addOn,
+    FILM.introducing,
+    ...Object.values(FILM.sol).flatMap((v) => (typeof v === "string" ? [v] : (JSON.stringify(v).match(/"[^"]{3,}"/g) ?? []))),
     FILM.marketplace.title,
     FILM.marketplace.line,
     FILM.marketplace.soon,

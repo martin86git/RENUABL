@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Brain, Check, Clock, LifeBuoy, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Clock, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import {
@@ -17,6 +17,7 @@ import {
   MARKETPLACE,
   ASK_DEMO,
   BIG_THREE,
+  FEATURES,
   PRICING,
   SALES_HERO,
   CRM_SHOT,
@@ -36,7 +37,7 @@ import {
   ThreeDesignsDemo,
 } from "./designer-showcase";
 import { Reveal } from "./front-hero";
-import { SolBadge, SolIcon } from "./sol-icon";
+import { SolIcon } from "./sol-icon";
 import { MarketplaceMark } from "./marketplace-bar";
 import { ProductFilm } from "./product-film";
 
@@ -354,35 +355,38 @@ function Hero({ signedIn }: { signedIn: boolean }) {
         style={{ background: "radial-gradient(55% 50% at 30% 30%, rgba(255,90,31,0.12), rgba(255,90,31,0) 70%)" }}
       />
       {/*
-        As Stack AI's (6 Nov 2026, Martin): the line centred, the product film under it. On a large screen the hero is
-        one fold and the film takes the room left under the words (a size container), at its own 16:10 with room for
-        its chapter rail, so the whole of it is on screen (Martin: "I can only see half of it").
+        The words on the left and the film on the right, as large as the fold allows (16 Nov 2026, Martin: "i prefer when
+        solar just got a brain was on the left and the video on the right", and the film bigger). On a large screen the
+        hero is one fold; the film takes the column beside the words at its own 16:10, with room for its chapter rail.
       */}
-      <div className="mx-auto flex w-full max-w-7xl flex-col px-5 pb-16 pt-12 text-center lg:h-full lg:px-8 lg:pb-6 lg:pt-8">
-        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{SALES_HERO.eyebrow}</p>
-        <h1 id="hero" className="mt-4 text-[clamp(44px,5.6vw,80px)] font-semibold leading-[0.95] tracking-[-0.045em]">
-          {SALES_HERO.headline.map((part, i, all) => (
-            <span key={part} className={clsx("block sm:inline", i === all.length - 1 && "text-sun-line")}>
-              {part}
-              {i < all.length - 1 && " "}
-            </span>
-          ))}
-        </h1>
-        <p className="mx-auto mt-4 max-w-3xl text-[17px] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
-        <div className="mt-6 flex flex-col items-center gap-4 lg:flex-row lg:justify-center lg:gap-7">
-          <SignUpLink />
-          {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
-          {!signedIn && <TryDemoButton look="quiet" />}
-          <ul className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-[13px] text-ink-2">
-            {SALES_HERO.small.map((s) => (
-              <li key={s} className="inline-flex items-center gap-1.5">
-                <Check className="size-3.5 text-sun-line" aria-hidden />
-                {s}
-              </li>
+      <div className="mx-auto grid w-full max-w-[120rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(20rem,26rem)_minmax(0,1fr)] lg:items-center lg:gap-12 lg:px-10 lg:pb-6 lg:pt-6">
+        <div className="text-center lg:text-left">
+          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{SALES_HERO.eyebrow}</p>
+          <h1 id="hero" className="mt-4 text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+            {SALES_HERO.headline.map((part, i, all) => (
+              <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
+                {part}
+              </span>
             ))}
-          </ul>
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.sub}</p>
+          <div className="mt-7 flex flex-col items-center gap-4 lg:items-start">
+            <div className="flex flex-col items-center gap-4 sm:flex-row">
+              <SignUpLink />
+              {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
+              {!signedIn && <TryDemoButton look="quiet" />}
+            </div>
+            <ul className="flex flex-wrap justify-center gap-x-5 gap-y-1 text-[13px] text-ink-2 lg:flex-col lg:justify-start">
+              {SALES_HERO.small.map((s) => (
+                <li key={s} className="inline-flex items-center gap-1.5">
+                  <Check className="size-3.5 text-sun-line" aria-hidden />
+                  {s}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        <div className="mt-10 flex w-full justify-center lg:mt-6 lg:min-h-0 lg:flex-1 lg:[container-type:size]">
+        <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:items-center lg:[container-type:size]">
           <div className="w-full text-left lg:w-[min(100cqw,calc((100cqh-4.25rem)*1.6))]">
             <ProductFilm />
           </div>
@@ -396,116 +400,77 @@ function Hero({ signedIn }: { signedIn: boolean }) {
  * The three things RENUABL is known by, a band each under the hero (3 Nov 2026, Martin: the designer, Sol and the
  * Marketplace are huge features and must feel it): the design tool with AI over it, Sol, and the Marketplace.
  */
+/**
+ * The four big parts as cards in a grid under one heading (16 Nov 2026, Martin: "i like their layout much more than
+ * ours", xAI's Grok Bot page): each a large rounded card with its title, one line, and the product at work running off
+ * its foot. Each card keeps its anchor (#crm, #service, #network) for the links into it.
+ */
 function BigThree() {
   return (
-    <div aria-label="The smart CRM, service, Sol and RENUABL Marketplace">
-      {BIG_THREE.map((p, i) => {
-        const look =
-          p.id === "crm" || p.id === "service"
-            ? {
-                band: p.id === "crm" ? "bg-surface text-ink" : "bg-canvas text-ink",
-                eyebrow: "text-ink-2",
-                body: "text-ink-2",
-                tick: "text-sun-line",
-                link: "text-sun-line hover:brightness-110",
-              }
-            : p.id === "sol"
-              ? {
-                  band: "bg-primary text-white",
-                  eyebrow: "text-sun-bright",
-                  body: "text-white/75",
-                  tick: "text-sun-bright",
-                  link: "text-white hover:text-white/80",
-                }
-              : {
-                  band: "bg-market text-white",
-                  eyebrow: "text-market-ink",
-                  body: "text-white/80",
-                  tick: "text-market-ink",
-                  link: "text-white hover:text-white/80",
-                };
-        const linkClass = clsx("mt-6 inline-flex items-center gap-1.5 text-[15px] font-semibold", look.link);
-        const mark =
-          p.id === "crm" ? (
-            <span className="grid size-12 place-items-center rounded-full bg-primary text-white">
-              <Brain className="size-6" />
-            </span>
-          ) : p.id === "service" ? (
-            <span className="grid size-12 place-items-center rounded-full bg-primary text-white">
-              <LifeBuoy className="size-6" />
-            </span>
-          ) : p.id === "sol" ? (
-            <span className="grid size-12 place-items-center rounded-full bg-white/10">
-              <SolBadge className="size-7" />
-            </span>
-          ) : (
-            <span className="grid size-12 place-items-center rounded-full bg-white text-market">
-              <MarketplaceMark className="size-6" />
-            </span>
-          );
-        const visual =
-          p.id === "crm" ? (
-            <Screen src={CRM_SHOT.src} alt={CRM_SHOT.alt} />
-          ) : p.id === "service" ? (
-            <Screen src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
-          ) : p.id === "sol" ? (
-            <Screen
-              src="/design/landing/today-sol.webp"
-              alt="RENUABL's Today screen: Sol writes up the day, the most pressing thing at the top (example data)"
-            />
-          ) : (
-            <div className="overflow-hidden rounded-2xl ring-1 ring-white/15">
-              <ListingRoofExample className="block h-auto w-full" />
-            </div>
-          );
-        return (
-          <section
-            key={p.id}
-            id={p.id === "marketplace" ? "network" : p.id === "crm" || p.id === "service" ? p.id : undefined}
-            className={clsx(
-              "scroll-mt-16 px-5 py-20 lg:px-8 lg:py-24 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center",
-              look.band,
-            )}
-            aria-labelledby={`big-${p.id}`}
-          >
-            {/* One fold (Martin): the words beside the picture, the picture given the larger share. */}
-            <Reveal className="mx-auto grid w-full max-w-[88rem] items-center gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,0.68fr)_minmax(0,1.32fr)]">
-              <div className={clsx(i % 2 === 1 && "lg:order-2")}>
-                <div className="flex items-center gap-4" aria-hidden>
-                  {mark}
-                  <span className={clsx("font-mono text-[13px]", look.eyebrow)}>0{i + 1}</span>
+    <section className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="features">
+      <Reveal className="mx-auto max-w-[96rem]">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 id="features" className="text-[clamp(34px,4.2vw,60px)] font-semibold leading-[1.02] tracking-[-0.04em]">
+            {FEATURES.headline}
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{FEATURES.sub}</p>
+        </div>
+        <div className="mt-14 grid gap-6 lg:grid-cols-2">
+          {BIG_THREE.map((p) => {
+            const market = p.id === "marketplace";
+            const visual =
+              p.id === "crm" ? (
+                <CardShot src={CRM_SHOT.src} alt={CRM_SHOT.alt} />
+              ) : p.id === "service" ? (
+                <CardShot src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
+              ) : p.id === "sol" ? (
+                <CardShot
+                  src="/design/landing/today-sol.webp"
+                  alt="RENUABL's Today screen: Sol writes up the day, the most pressing thing at the top (example data)"
+                />
+              ) : (
+                <div className="overflow-hidden rounded-t-2xl ring-1 ring-white/15">
+                  <ListingRoofExample className="block h-auto w-full" />
                 </div>
-                <p className={clsx("mt-6 text-[13px] font-medium uppercase tracking-[0.18em]", look.eyebrow)}>{p.eyebrow}</p>
-                <h2 id={`big-${p.id}`} className="mt-3 text-[clamp(32px,3.6vw,52px)] font-semibold leading-[1] tracking-[-0.04em]">
-                  {p.title}
-                </h2>
-                <p className={clsx("mt-5 text-[16px] leading-relaxed", look.body)}>{p.body}</p>
-                <ul className="mt-5 grid gap-2 text-[14px]">
-                  {p.points.map((pt) => (
-                    <li key={pt} className="flex items-start gap-2.5">
-                      <Check className={clsx("mt-0.5 size-4 shrink-0", look.tick)} aria-hidden />
-                      {pt}
-                    </li>
-                  ))}
-                </ul>
-                {p.link.href.startsWith("#") ? (
-                  <a href={p.link.href} className={linkClass}>
-                    {p.link.label}
-                    <ArrowRight className="size-4" aria-hidden />
-                  </a>
-                ) : (
-                  <Link href={p.link.href} className={linkClass}>
-                    {p.link.label}
-                    <ArrowRight className="size-4" aria-hidden />
-                  </Link>
+              );
+            return (
+              <article
+                key={p.id}
+                id={market ? "network" : p.id === "crm" || p.id === "service" ? p.id : undefined}
+                className={clsx(
+                  "flex scroll-mt-20 flex-col overflow-hidden rounded-[32px] px-7 pt-9 sm:px-10 sm:pt-11",
+                  market ? "bg-market text-white" : "bg-surface ring-1 ring-line",
                 )}
-              </div>
-              <div className={clsx("min-w-0", i % 2 === 1 && "lg:order-1")}>{visual}</div>
-            </Reveal>
-          </section>
-        );
-      })}
-    </div>
+                aria-labelledby={`big-${p.id}`}
+              >
+                <p className={clsx("text-[12px] font-medium uppercase tracking-[0.18em]", market ? "text-white/70" : "text-muted")}>
+                  {p.eyebrow}
+                </p>
+                <h3 id={`big-${p.id}`} className="mt-3 text-[clamp(24px,2.1vw,32px)] font-semibold leading-[1.1] tracking-[-0.03em]">
+                  {p.title}
+                </h3>
+                <p className={clsx("mt-3 max-w-xl text-[16px] leading-relaxed", market ? "text-white/80" : "text-ink-2")}>{p.line}</p>
+                <div className="relative mt-9 h-[clamp(220px,24vw,380px)] overflow-hidden">{visual}</div>
+              </article>
+            );
+          })}
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+/** A real screen running off the foot of a card: its top, in a window. */
+function CardShot({ src, alt }: { src: string; alt: string }) {
+  return (
+    <figure className="overflow-hidden rounded-t-2xl bg-surface shadow-[0_20px_60px_-30px_rgba(11,11,12,0.4)] ring-1 ring-line">
+      <div className="flex h-6 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
+        <span className="size-2 rounded-full bg-line-strong" />
+        <span className="size-2 rounded-full bg-line-strong" />
+        <span className="size-2 rounded-full bg-line-strong" />
+      </div>
+      <Image src={src} alt={alt} width={2880} height={1800} sizes="(min-width: 1024px) 720px, 100vw" className="h-auto w-full" />
+    </figure>
   );
 }
 
@@ -1024,7 +989,7 @@ function Pricing() {
   const [open, setOpen] = useState<string | null>(null);
   return (
     <section id="pricing" className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="pricing-title">
-      <Reveal className="mx-auto w-full max-w-6xl">
+      <Reveal className="mx-auto w-full max-w-7xl">
         <div className="text-center">
           <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{PRICING.eyebrow}</p>
           <h2 id="pricing-title" className="mt-5 text-[clamp(36px,5vw,64px)] font-semibold leading-[1] tracking-[-0.035em]">
@@ -1033,60 +998,49 @@ function Pricing() {
           <p className="mx-auto mt-5 max-w-xl text-[18px] text-ink-2">{PRICING.sub}</p>
         </div>
 
+        {/*
+          Three even cards, as xAI prices Grok Bot (16 Nov 2026, Martin: "i love the way they make the $30 pricing look so
+          cheap"): the price large, one button, then what it includes, each plan building on the one before.
+        */}
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {PRICING.plans.map((p) => (
-            <div
+            <PlanCard
               key={p.key}
-              className={clsx(
-                "flex flex-col rounded-3xl bg-surface p-7 shadow-lift sm:p-8",
-                p.featured ? "ring-2 ring-sun-line" : "ring-1 ring-line",
-              )}
+              name={p.name}
+              price={p.price}
+              per={PRICING.perShort}
+              note={p.note}
+              listHead={p.listHead}
+              list={"list" in p ? p.list : PRICING.includes}
             >
-              <p className="text-[15px] font-semibold">{p.name}</p>
-              <p className="mt-5 flex items-baseline gap-2">
-                <span className="text-[56px] font-semibold leading-none tracking-[-0.04em] tabular-nums">{p.price}</span>
-                <span className="text-[15px] text-ink-2">{p.per}</span>
-              </p>
-              <p className="mt-3 text-[14px] leading-relaxed text-ink-2">{p.note}</p>
-              <div className="mt-auto pt-8">
-                {open === p.key ? (
-                  <TrialForm id={p.key} label="Continue" />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setOpen(p.key)}
-                    className={clsx(
-                      "h-12 w-full rounded-xl text-[15px] font-semibold",
-                      p.featured ? "bg-sun-line text-white hover:brightness-105" : "bg-primary text-white hover:brightness-110",
-                    )}
-                  >
-                    {SALES_HERO.cta}
-                  </button>
-                )}
-              </div>
-            </div>
+              {open === p.key ? (
+                <TrialForm id={p.key} label="Continue" />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setOpen(p.key)}
+                  className="h-12 w-full rounded-full bg-primary text-[16px] font-medium text-white hover:brightness-110"
+                >
+                  {SALES_HERO.cta}
+                </button>
+              )}
+            </PlanCard>
           ))}
           <Enterprise />
         </div>
 
         <p className="mt-5 text-center text-[14px] text-ink-2">{PRICING.firstMonth}</p>
 
-        <div className="mt-12 grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <div className="rounded-3xl bg-surface p-7 ring-1 ring-line sm:p-8">
-            <p className="text-[15px] font-semibold">{PRICING.includesTitle}</p>
-            <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-              {PRICING.includes.map((p) => (
-                <li key={p} className="flex gap-2.5 text-[15px]">
-                  <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-3xl bg-surface p-7 ring-1 ring-line sm:p-8">
-            <p className="text-[15px] font-semibold">{PRICING.tokensTitle}</p>
-            <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{PRICING.tokens}</p>
-            <p className="mt-4 flex flex-wrap gap-2 text-[13px]">
+        {/* What's charged beside a plan: the designer by the job, and the two add-ons, one price for the business. */}
+        <div className="mt-16 text-center">
+          <p className="text-[22px] font-semibold tracking-[-0.02em]">{PRICING.addOnsTitle}</p>
+          <p className="mx-auto mt-2 max-w-2xl text-[15px] text-ink-2">{PRICING.addOnsSub}</p>
+        </div>
+        <div className="mt-8 grid gap-5 lg:grid-cols-3">
+          <div className="rounded-[28px] bg-surface p-8 ring-1 ring-line">
+            <p className="text-[17px] font-semibold">{PRICING.tokensTitle}</p>
+            <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{PRICING.tokens}</p>
+            <p className="mt-5 flex flex-wrap gap-2 text-[13px]">
               {TOKEN_PACKS.map((p) => (
                 <span key={p} className="rounded-full bg-canvas px-3 py-1 tabular-nums ring-1 ring-line">
                   {packWords(p)}
@@ -1094,21 +1048,13 @@ function Pricing() {
               ))}
             </p>
           </div>
-        </div>
-        <div className="mt-5 rounded-3xl bg-surface p-7 ring-1 ring-line sm:p-8">
-          <p className="text-[15px] font-semibold">{PRICING.addOnsTitle}</p>
-          <p className="mt-1 text-[14px] text-ink-2">{PRICING.addOnsSub}</p>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            {PRICING.addOns.map((a) => (
-              <div key={a.key} className="rounded-2xl bg-canvas p-5 ring-1 ring-line">
-                <p className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-[16px] font-semibold">{a.name}</span>
-                  <span className="text-[13px] text-ink-2">{a.price}</span>
-                </p>
-                <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{a.what}</p>
-              </div>
-            ))}
-          </div>
+          {PRICING.addOns.map((a) => (
+            <div key={a.key} className="rounded-[28px] bg-surface p-8 ring-1 ring-line">
+              <p className="text-[17px] font-semibold">{a.name}</p>
+              <p className="mt-3 text-[15px] font-medium">{a.price}</p>
+              <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{a.what}</p>
+            </div>
+          ))}
         </div>
         <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] leading-relaxed text-muted">{PRICING.start}</p>
       </Reveal>
@@ -1132,19 +1078,22 @@ function Enterprise() {
   };
   const input = "block h-11 w-full rounded-xl border border-line bg-surface px-3 text-[16px] outline-none focus:border-ink-2";
   return (
-    <div className="flex flex-col rounded-3xl bg-primary p-7 text-white sm:p-10">
-      <p className="text-[14px] font-medium text-white/70">{PRICING.enterprise.title}</p>
-      <p className="mt-2 text-[32px] font-semibold leading-tight tracking-tight">{PRICING.enterprise.lead}</p>
-      <p className="mt-3 text-[15px] leading-relaxed text-white/70">{PRICING.enterprise.body}</p>
+    <PlanCard
+      name={PRICING.enterprise.title}
+      price={PRICING.enterprise.price}
+      note={`${PRICING.enterprise.lead}. ${PRICING.enterprise.note}`}
+      listHead={PRICING.enterprise.listHead}
+      list={PRICING.enterprise.list}
+    >
       {state?.ok ? (
-        <p className="mt-8 text-[15px] text-sun-bright">{state.message}</p>
+        <p className="text-[15px] text-positive">{state.message}</p>
       ) : open ? (
-        <form onSubmit={(e) => void go(e)} className="mt-6 space-y-2.5 text-ink">
+        <form onSubmit={(e) => void go(e)} className="space-y-2.5 text-ink">
           <input className={input} placeholder="Your name" required value={form.name} onChange={set("name")} />
           <input className={input} placeholder="Business" required value={form.business} onChange={set("business")} />
           <input className={input} placeholder="Work email" type="email" required value={form.email} onChange={set("email")} />
           <input className={input} placeholder="Mobile" type="tel" value={form.mobile} onChange={set("mobile")} />
-          <label className="block text-[13px] text-white/70">
+          <label className="block text-[13px] text-ink-2">
             How many users?
             <input className={clsx(input, "mt-1")} type="number" min={1} value={form.users} onChange={set("users")} />
           </label>
@@ -1154,19 +1103,66 @@ function Enterprise() {
             value={form.note}
             onChange={set("note")}
           />
-          <button disabled={busy} className="h-11 w-full rounded-xl bg-white text-[15px] font-semibold text-ink hover:bg-white/90">
+          <button disabled={busy} className="h-11 w-full rounded-full bg-primary text-[15px] font-medium text-white hover:brightness-110">
             {busy ? "Sending…" : PRICING.enterprise.cta}
           </button>
-          {state && !state.ok && <p className="text-sm text-sun-bright">{state.message}</p>}
+          {state && !state.ok && <p className="text-sm text-danger">{state.message}</p>}
         </form>
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="mt-auto h-12 rounded-xl bg-white text-[15px] font-semibold text-ink hover:bg-white/90 lg:mt-10"
+          className="h-12 w-full rounded-full bg-surface text-[16px] font-medium text-ink ring-1 ring-line-strong hover:bg-canvas"
         >
           {PRICING.enterprise.cta}
         </button>
       )}
+    </PlanCard>
+  );
+}
+
+/** One plan, as xAI sets theirs out: its name, the price large with what it's per, a line, the button, what it includes. */
+function PlanCard({
+  name,
+  price,
+  per,
+  note,
+  listHead,
+  list,
+  children,
+}: {
+  name: string;
+  price: string;
+  per?: string;
+  note: string;
+  listHead: string;
+  list: readonly string[];
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col rounded-[32px] bg-surface p-8 ring-1 ring-line sm:p-10">
+      <p className="text-[17px] text-ink-2">{name}</p>
+      <p className="mt-6 flex items-baseline gap-2">
+        <span
+          className={clsx(
+            "text-[clamp(48px,4.4vw,64px)] font-semibold leading-none tracking-[-0.04em]",
+            price.startsWith("$") && "tabular-nums",
+          )}
+        >
+          {price}
+        </span>
+        {per && <span className="text-[17px] text-ink-2">{per}</span>}
+      </p>
+      <p className="mt-3 min-h-[3em] text-[16px] leading-[1.5] text-ink-2">{note}</p>
+      <div className="mt-8">{children}</div>
+      <p className="mt-10 text-[16px] font-semibold">{listHead}</p>
+      <ul className="mt-4 space-y-3">
+        {list.map((l) => (
+          <li key={l} className="flex gap-3 text-[16px] text-ink-2">
+            <Check className="mt-1 size-4 shrink-0 text-ink-2" aria-hidden />
+            {l}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

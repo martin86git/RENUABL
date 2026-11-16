@@ -7,6 +7,7 @@ import { Pause, Play } from "lucide-react";
 import { FILM } from "@/lib/domain/design/sales-page";
 import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
 import { MarketplaceMark } from "./marketplace-bar";
+import { SolScene, SOL_SCENE_MS } from "./film-sol-scene";
 
 /**
  * The hero's product film (16 Nov 2026, Martin: a real film of how the product works today, not misleading, and not so
@@ -24,26 +25,14 @@ type Key = Chapter | "market";
 type Rect = readonly [number, number, number, number];
 /** One move of the camera: how long it holds, and the part it lights (none: the whole screen). */
 type Move = { ms: number; light?: Rect };
-type Shot = { chapter: Key; src?: string; moves: Move[] };
+type Shot = { chapter: Key; src?: string; scene?: "sol"; moves: Move[] };
 
 const TICK = 40;
 const WHOLE = 1300;
 
 /** The shots in order, with the parts of each screen the camera goes to (measured on the screens). */
 const SHOTS: Shot[] = [
-  {
-    chapter: "sol",
-    src: "/design/landing/film/sol-day.webp",
-    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.117, 0.17, 0.556, 0.28] }, { ms: 3000, light: [0.117, 0.475, 0.556, 0.305] }],
-  },
-  {
-    chapter: "sol",
-    src: "/design/landing/film/sol-tech.webp",
-    moves: [
-      { ms: 2800, light: [0.117, 0.294, 0.556, 0.225] },
-      { ms: 2600, light: [0.117, 0.556, 0.556, 0.093] },
-    ],
-  },
+  { chapter: "sol", scene: "sol", moves: [{ ms: SOL_SCENE_MS }] },
   {
     chapter: "service",
     src: "/design/landing/film/service-case.webp",
@@ -117,6 +106,8 @@ const TIMELINE = (() => {
   return { moves: out, total: at };
 })();
 const TOTAL = TIMELINE.total;
+/** When each shot starts on the clock. */
+const SHOT_AT = SHOTS.map((_, i) => TIMELINE.moves.find((m) => m.shot === i)?.at ?? 0);
 
 /** Each chapter's span on the clock. */
 const SPANS = (() => {
@@ -151,7 +142,7 @@ function moveAt(t: number) {
 }
 
 /** The window's screen within the stage (the stage and the screen are both 16:10). */
-const SCREEN = { left: 0.08, top: 0.12, size: 0.84 };
+const SCREEN = { left: 0.05, top: 0.075, size: 0.9 };
 const BAR = 0.035;
 
 /** The camera as a transform on the stage: the lit part brought to the middle and filling most of it. */
@@ -219,6 +210,8 @@ export function ProductFilm() {
   const tilted = !still && (t < 500 || t >= TOTAL - 900);
   const ease = "ease-[cubic-bezier(0.65,0,0.35,1)]";
   const addOn = chapter && "addOn" in chapter ? ADD_ON_WORDS[chapter.addOn].name : null;
+  /** The chapter card says itself in full as the chapter begins, then folds to a small label out of the way. */
+  const folded = !still && t - SPANS[key][0] > 2800;
 
   const goTo = (k: Key) => setT(still || paused ? STILL_AT[k] : SPANS[k][0]);
 
@@ -227,7 +220,13 @@ export function ProductFilm() {
       <style>{`
         @keyframes film-sun { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-6%,4%) scale(1.12); } }
         @keyframes film-rise { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
-        @media (prefers-reduced-motion: reduce) { .film-sun, .film-rise { animation: none !important; } }
+        @keyframes film-pop { from { opacity: 0; transform: translateY(0.8cqw) scale(0.98); } to { opacity: 1; transform: none; } }
+        @keyframes film-pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 1; } }
+        @keyframes film-wave { 0%,100% { transform: scaleY(0.5); } 50% { transform: scaleY(1.1); } }
+        .film-pop { animation: film-pop 500ms cubic-bezier(0.2,0.8,0.2,1) both; }
+        .film-pulse { animation: film-pulse 1.1s ease-in-out infinite; }
+        .film-wave { animation: film-wave 0.9s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .film-sun, .film-rise, .film-pop, .film-pulse, .film-wave { animation: none !important; } }
       `}</style>
       <div
         ref={stage}
@@ -302,6 +301,13 @@ export function ProductFilm() {
                         className="object-cover object-top"
                       />
                     </div>
+                  ) : s.scene ? (
+                    <div
+                      key={s.scene}
+                      className={clsx("absolute inset-0 transition-opacity duration-700", move.shot === i ? "opacity-100" : "opacity-0")}
+                    >
+                      {move.shot === i && <SolScene ms={t - SHOT_AT[i]} still={still} />}
+                    </div>
                   ) : null,
                 )}
 
@@ -351,24 +357,37 @@ export function ProductFilm() {
 
         {/* The chapter, rising in as it begins. */}
         {chapter && (
-          <div className="pointer-events-none absolute left-[3.5%] top-[4%] max-w-[60%]" aria-live="polite">
+          <div className="pointer-events-none absolute left-[2%] top-[2.5%] max-w-[60%]" aria-live="polite">
             <div
               key={index}
-              className="film-rise rounded-[1.2cqw] bg-[#0d0e11]/70 px-[1.6cqw] py-[1.2cqw] shadow-[0_1cqw_3cqw_-1cqw_rgba(0,0,0,0.5)] ring-1 ring-white/10 backdrop-blur-xl"
+              className={clsx(
+                "film-rise rounded-[1.2cqw] bg-[#0d0e11]/80 shadow-[0_1cqw_3cqw_-1cqw_rgba(0,0,0,0.5)] ring-1 ring-white/10 backdrop-blur-xl transition-all duration-700",
+                folded ? "px-[1cqw] py-[0.5cqw] opacity-80" : "px-[1.6cqw] py-[1.2cqw]",
+              )}
               style={{ animation: still ? undefined : "film-rise 700ms cubic-bezier(0.2,0.8,0.2,1) both" }}
             >
-              <p className="flex items-center gap-[0.8cqw] text-[clamp(10px,1cqw,13px)] font-semibold tabular-nums tracking-[0.2em] text-sun-line">
-                {String(index + 1).padStart(2, "0")}
+              <p
+                className={clsx(
+                  "flex items-center gap-[0.8cqw] text-[clamp(10px,1cqw,13px)] font-semibold uppercase tracking-[0.2em] text-sun-line",
+                  folded && "hidden",
+                )}
+              >
+                {FILM.introducing}
                 {addOn && (
                   <span className="rounded-full bg-white/10 px-[0.8cqw] py-[0.15cqw] text-[clamp(9px,0.9cqw,12px)] font-medium tracking-normal text-white/80 ring-1 ring-white/15">
                     {FILM.addOn} · {addOn}
                   </span>
                 )}
               </p>
-              <p className="mt-[0.4cqw] text-[clamp(15px,2.1cqw,26px)] font-semibold leading-tight tracking-[-0.02em] text-white">
+              <p
+                className={clsx(
+                  "font-semibold leading-tight tracking-[-0.02em] text-white transition-all duration-700",
+                  folded ? "text-[clamp(10px,1cqw,14px)]" : "mt-[0.4cqw] text-[clamp(15px,2.1cqw,26px)]",
+                )}
+              >
                 {chapter.title}
               </p>
-              <p className="mt-[0.3cqw] hidden text-[clamp(11px,1.15cqw,15px)] text-white/60 sm:block">{chapter.line}</p>
+              {!folded && <p className="mt-[0.3cqw] hidden text-[clamp(11px,1.15cqw,15px)] text-white/60 sm:block">{chapter.line}</p>}
             </div>
           </div>
         )}
