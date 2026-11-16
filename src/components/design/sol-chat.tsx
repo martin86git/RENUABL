@@ -377,12 +377,17 @@ export function SolChat({
       )}
     >
       <div className="flex items-center gap-3 px-5 py-3">
-        <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <span className="sol-orb inline-flex size-8 items-center justify-center rounded-full">
-            <SolMark className="size-5" glow={false} />
+        {/* Sol large at the head of his chat (16 Nov 2026, Martin: "make sols icon in the chat large like the
+            example"): the lit sun with its glow, his name and what he is under it. */}
+        <div className="flex items-center gap-3">
+          <span className="sol-orb inline-flex size-14 shrink-0 items-center justify-center rounded-full">
+            <SolMark className="size-14" />
           </span>
-          Sol {!side && <span className="font-normal text-muted">· your conversation is yours alone</span>}
-        </p>
+          <span className="leading-tight">
+            <span className="block text-[15px] font-semibold text-ink">Sol</span>
+            <span className="block text-[12px] text-muted">Your AI{!side && " · your conversation is yours alone"}</span>
+          </span>
+        </div>
         <span className="ml-auto" />
         {/* His usage this month, in a window of its own (16 Nov 2026, Martin). */}
         <SolUsage />
