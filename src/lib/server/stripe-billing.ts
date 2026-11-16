@@ -389,3 +389,61 @@ export async function portalWithoutCancel(stripe: Stripe): Promise<string> {
   portalConfigId = config.id;
   return config.id;
 }
+
+/** The card a business's plan is paid with: the customer's default, else its subscription's, else its first card. */
+async function cardOnFile(stripe: Stripe, customer: string): Promise<string | null> {
+  const c = await stripe.customers.retrieve(customer, { expand: ["invoice_settings.default_payment_method"] });
+  if (c.deleted) return null;
+  const dpm = c.invoice_settings?.default_payment_method;
+  if (dpm) return typeof dpm === "string" ? dpm : dpm.id;
+  const subs = await stripe.subscriptions.list({ customer, status: "all", limit: 5 });
+  for (const s of subs.data) {
+    const pm = s.default_payment_method;
+    if (pm) return typeof pm === "string" ? pm : pm.id;
+  }
+  const cards = await stripe.paymentMethods.list({ customer, type: "card", limit: 1 });
+  return cards.data[0]?.id ?? null;
+}
+
+export type TopUpCharge = { paid: true; invoice: string } | { paid: false; invoice: string | null; reason: string };
+
+/**
+ * A pack bought by itself (top-up.ts): one invoice of its own on the business's Stripe customer, GST inclusive, charged
+ * to the card on file there and then, so it sits among their tax invoices like a pack bought on Stripe's page.
+ */
+export async function chargeTopUp(
+  stripe: Stripe,
+  opts: { customer: string; businessId: string; cents: number; description: string; kind: string; credits: number },
+): Promise<TopUpCharge> {
+  const card = await cardOnFile(stripe, opts.customer);
+  if (!card) return { paid: false, invoice: null, reason: "No card on file." };
+  const invoice = await stripe.invoices.create({
+    customer: opts.customer,
+    collection_method: "charge_automatically",
+    auto_advance: false,
+    default_payment_method: card,
+    footer: INVOICE_FOOTER,
+    pending_invoice_items_behavior: "exclude",
+    metadata: { kind: `top-up-${opts.kind}`, business: opts.businessId, credits: String(opts.credits) },
+  });
+  if (!invoice.id) return { paid: false, invoice: null, reason: "Stripe made no invoice." };
+  await stripe.invoiceItems.create({
+    customer: opts.customer,
+    invoice: invoice.id,
+    currency: "aud",
+    amount: opts.cents,
+    description: opts.description,
+    tax_rates: [await gstTaxRate(stripe)],
+  });
+  await stripe.invoices.finalizeInvoice(invoice.id, { auto_advance: false });
+  try {
+    const paid = await stripe.invoices.pay(invoice.id, { off_session: true });
+    return paid.status === "paid"
+      ? { paid: true, invoice: invoice.id }
+      : { paid: false, invoice: invoice.id, reason: "The card wasn't charged." };
+  } catch (e) {
+    // Not paid: the invoice is voided so it isn't left owing.
+    await stripe.invoices.voidInvoice(invoice.id).catch(() => undefined);
+    return { paid: false, invoice: invoice.id, reason: e instanceof Error ? e.message.slice(0, 200) : "The card was declined." };
+  }
+}

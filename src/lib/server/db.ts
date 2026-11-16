@@ -1276,6 +1276,29 @@ alter table design_tokens alter column in_dollars set default true;
 alter table design_tokens add column if not exists source text not null default 'paid';
 alter table design_tokens add column if not exists month text;
 create index if not exists design_tokens_pool on design_tokens(business_id, month) where source = 'included';
+-- Topping up by itself (domain/design/top-up.ts, 16 Nov 2026): each business's settings for its design and Sol
+-- credits, and every pack bought that way (one row a try, its invoice once Stripe has made one).
+create table if not exists design_top_ups (
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  settings jsonb not null,
+  by_email text,
+  updated_at timestamptz not null default now(),
+  primary key (business_id, kind)
+);
+create table if not exists design_top_up_charges (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  pack integer not null,
+  cents integer not null,
+  credits integer not null,
+  status text not null,
+  invoice text,
+  reason text,
+  at timestamptz not null default now()
+);
+create index if not exists design_top_up_charges_business on design_top_up_charges(business_id, kind, at desc);
 create table if not exists design_leads (
   id text primary key,
   kind text not null,

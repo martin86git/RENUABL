@@ -478,15 +478,18 @@ export async function creditSolPack(
 export interface SolUseLine {
   use: string;
   count: number;
+  /** The credits those answers took. */
+  credits: number;
 }
 
 /** This month's answers by what they were for, most first. */
 export async function solUseThisMonth(businessId: string, today: string): Promise<SolUseLine[]> {
-  const rows = await query<{ use: string; n: string }>(
-    `select use, count(*) as n from design_sol_credits where business_id = $1 and month = $2 and use is not null group by use order by n desc`,
+  const rows = await query<{ use: string; n: string; c: string | null }>(
+    `select use, count(*) as n, coalesce(-sum(change) filter (where change < 0), 0) as c from design_sol_credits
+      where business_id = $1 and month = $2 and use is not null group by use order by c desc, n desc`,
     [businessId, monthOf(today)],
   );
-  return rows.map((r) => ({ use: r.use, count: Number(r.n) }));
+  return rows.map((r) => ({ use: r.use, count: Number(r.n), credits: Number(r.c ?? 0) }));
 }
 
 /** Packs bought, newest first. */

@@ -9,6 +9,7 @@ import type { SolUse } from "@/lib/domain/design/sol-credits";
 import { solModel, TIER_CREDITS, type SolTier } from "@/lib/domain/design/sol-routing";
 import { addToSolCredit, keepSolCost, refundSolCredit, spendSolCredit } from "./design-billing-repo";
 import { isDemoBusiness } from "./design-demo-check";
+import { topUpSoon } from "./design-top-up";
 
 /** Whether running out of design tokens or Sol credits stops anything (off until RENUABL's plans are live). Counted either way. */
 export const billingEnforced = () => process.env.BILLING_ENFORCED?.trim() === "true";
@@ -18,7 +19,10 @@ export const modelFor = (tier: SolTier) => solModel(tier, process.env);
 
 /** Credits for an answer: the row's id, to add to, give back or keep the cost on, or null when too few are left. */
 export async function takeSolCredit(businessId: string, use: SolUse, by: string | null, credits = 1): Promise<string | null> {
-  return spendSolCredit(businessId, use, by, todayInMarket(), await enforcedFor(businessId), credits);
+  const id = await spendSolCredit(businessId, use, by, todayInMarket(), await enforcedFor(businessId), credits);
+  // Running low: the business's own top-up, when it has switched one on (top-up.ts).
+  topUpSoon(businessId, "sol");
+  return id;
 }
 
 /** A demo account's allowance always holds (demo.ts), whatever billing is doing for everyone else. */

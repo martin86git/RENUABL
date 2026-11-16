@@ -4,6 +4,7 @@ import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { packedHasBattery } from "@/lib/domain/design/roof-design";
 import { NO_DESIGN_JOBS } from "@/lib/domain/design/plans";
 import { canAddBattery, spendBatteryDesign } from "@/lib/server/design-billing-repo";
+import { topUpSoon } from "@/lib/server/design-top-up";
 import { billingEnforced } from "@/lib/server/sol-credits";
 import { deleteProject, projectById, saveProject } from "@/lib/server/design-repo";
 
@@ -52,7 +53,10 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/proje
     const saved = await saveProject(who.member.businessId, id, read.body.version as number, work, who.member.email, address);
     if (saved === "missing") return Response.json({ ok: false }, { status: 404 });
     if (saved === "conflict") return Response.json({ ok: false, conflict: true, message: PROJECT_CONFLICT }, { status: 409 });
-    if (withBattery) await spendBatteryDesign(who.member.businessId, id, who.member.email);
+    if (withBattery) {
+      await spendBatteryDesign(who.member.businessId, id, who.member.email);
+      topUpSoon(who.member.businessId, "design");
+    }
     return Response.json({ ok: true, version: saved.version });
   });
 }

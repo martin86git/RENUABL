@@ -19,6 +19,8 @@ import {
 } from "@/lib/server/design-billing-repo";
 import { billingCustomer, ensureBillingCustomer } from "@/lib/server/design-billing-customer";
 import { syncSeats } from "@/lib/server/design-seats";
+import { saveTopUpSettings, topUpHistory, topUpSettingsOf } from "@/lib/server/design-top-up";
+import { cleanTopUp, cleanTopUpKind } from "@/lib/domain/design/top-up";
 import { billingPortalUrl, createTokenCheckout, stripeClient, subscriptionFacts } from "@/lib/server/stripe";
 import { cancelPlan, commitToTwelveMonths, createSolCheckout, invoicesOf, syncBillingCustomer } from "@/lib/server/stripe-billing";
 
@@ -52,6 +54,7 @@ export async function GET() {
       billingDetailsOf(businessId),
       billingCustomer(businessId),
     ]);
+    const [topUps, topUpLines] = await Promise.all([topUpSettingsOf(businessId), topUpHistory(businessId)]);
     const stripe = stripeClient();
     // Invoices come from Stripe as they are; Stripe being slow or down never stops the rest of the page.
     const invoices =
@@ -92,6 +95,8 @@ export async function GET() {
           hostedUrl,
         })) ?? null,
       payments: Boolean(stripe),
+      topUps: withSol ? topUps : { design: topUps.design },
+      topUpLines,
     });
   });
 }
@@ -123,6 +128,16 @@ export async function POST(request: Request) {
           console.error("billing details not given to Stripe", e instanceof Error ? e.message : e),
         );
       return Response.json({ ok: true, details: details.value });
+    }
+
+    // Topping up by itself (top-up.ts): the owner's settings, kept as cleaned here. Sol only where Sol is billed.
+    if (read.body.do === "top-up") {
+      const which = cleanTopUpKind(read.body.kind);
+      if (!which || (which === "sol" && !billsFor(kind, "sol")))
+        return Response.json({ ok: false, message: KIND_REFUSAL }, { status: 403 });
+      const settings = cleanTopUp(which, read.body.settings);
+      await saveTopUpSettings(businessId, which, settings, email);
+      return Response.json({ ok: true, settings });
     }
 
     const origin = new URL(request.url).origin;

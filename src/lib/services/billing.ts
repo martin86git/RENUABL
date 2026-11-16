@@ -7,6 +7,7 @@ import type { BillingPart } from "@/lib/domain/design/business-kind";
 import type { BillingDetails } from "@/lib/domain/design/billing-invoice";
 import type { BillingInterval, DesignPool, PlanTerm, TokenPack } from "@/lib/domain/design/plans";
 import type { SolBalance } from "@/lib/domain/design/sol-credits";
+import type { TopUpKind, TopUpSettings } from "@/lib/domain/design/top-up";
 
 type Answer = { ok: true; url?: string; message?: string } | { ok: false; message: string };
 
@@ -68,12 +69,15 @@ export interface BillingState {
   ledger: { change: number; reason: string; source?: string; by: string | null; at: string }[];
   /** Null for a business with no Sol (an installer). */
   sol: SolBalance | null;
-  solUses: { use: string; count: number }[];
+  solUses: { use: string; count: number; credits?: number }[];
   solPacks: { credits: number; by: string | null; at: string }[];
   details: BillingDetails | null;
   /** Null when Stripe couldn't be asked just now. */
   invoices: { id: string; number: string | null; created: number; status: string; totalCents: number; hostedUrl: string | null }[] | null;
   payments: boolean;
+  /** Topping up by itself (top-up.ts): each kind the business may top up. */
+  topUps: Partial<Record<TopUpKind, TopUpSettings>>;
+  topUpLines: TopUpLineView[];
 }
 
 export async function loadBilling(): Promise<BillingState | { error: string }> {
@@ -85,6 +89,27 @@ export async function loadBilling(): Promise<BillingState | { error: string }> {
   } catch {
     return { error: "Billing couldn't be loaded." };
   }
+}
+
+/** A pack bought by itself, as Billing shows it. */
+export interface TopUpLineView {
+  kind: TopUpKind;
+  credits: number;
+  cents: number;
+  status: "paid" | "failed" | "trying";
+  reason: string | null;
+  at: string;
+}
+
+/** Saves the owner's top-up settings: what the server kept, or why not. */
+export async function saveTopUp(
+  kind: TopUpKind,
+  settings: TopUpSettings,
+): Promise<{ ok: true; settings: TopUpSettings } | { ok: false; message: string }> {
+  const a = await post("/api/design/billing", { do: "top-up", kind, settings });
+  return a.ok
+    ? { ok: true, settings: (a as unknown as { settings: TopUpSettings }).settings }
+    : { ok: false, message: a.message ?? "Not saved." };
 }
 
 export function buyTokens(pack: TokenPack) {
@@ -122,6 +147,26 @@ export async function loadDesignCredits(): Promise<DesignCredits | null> {
     if (!res.ok) return null;
     const json = (await res.json()) as { ok?: boolean } & DesignCredits;
     return json.ok ? { credits: json.credits, trial: json.trial, owner: json.owner } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Sol's usage this month, for the window in his chat. */
+export interface SolUsageView {
+  balance: SolBalance;
+  uses: { use: string; count: number; credits: number }[];
+  resetsOn: string;
+  topUp: { on: boolean; words: string };
+  owner: boolean;
+}
+
+export async function loadSolUsage(): Promise<SolUsageView | null> {
+  try {
+    const res = await fetch("/api/design/sol/usage", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { ok?: boolean } & SolUsageView;
+    return json.ok ? json : null;
   } catch {
     return null;
   }

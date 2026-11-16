@@ -30,6 +30,7 @@ import {
 } from "@/lib/services/billing";
 import { ADD_ON_KEYS } from "@/lib/domain/design/add-ons";
 import { AddOnOffer } from "./add-on-offer";
+import { TopUpControl } from "./top-up-control";
 import { ui } from "./design-shell";
 import type { BillingPart } from "@/lib/domain/design/business-kind";
 
@@ -235,6 +236,15 @@ export function BillingPanel() {
               </button>
             ))}
           </div>
+          {state.topUps.sol && (
+            <TopUpControl
+              kind="sol"
+              packs={SOL_PACKS.map((p) => p.credits)}
+              settings={state.topUps.sol}
+              lines={state.topUpLines}
+              payments={state.payments}
+            />
+          )}
           {state.solUses.length > 0 && (
             <ul className="divide-y divide-line text-sm">
               {state.solUses.map((u) => (
@@ -296,6 +306,15 @@ export function BillingPanel() {
           ))}
         </div>
         {!state.payments && <p className="text-xs text-muted">Payments aren&apos;t switched on yet.</p>}
+        {state.topUps.design && (
+          <TopUpControl
+            kind="design"
+            packs={TOKEN_PACKS}
+            settings={state.topUps.design}
+            lines={state.topUpLines}
+            payments={state.payments}
+          />
+        )}
         {packsOnly && !state.ledger.length && <p className="text-sm text-ink-2">No design credits bought or used yet.</p>}
         {state.ledger.length > 0 && (
           <ul className="divide-y divide-line text-sm">

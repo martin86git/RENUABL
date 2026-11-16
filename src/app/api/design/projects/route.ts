@@ -2,6 +2,7 @@ import { MAX_PROJECTS, MAX_PROJECT_BYTES, can, cleanRoofPlace, cleanRoofWork } f
 import { keepCostEdits, withoutCostEdits } from "@/lib/domain/design/permissions";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { canStartRoof, spendBatteryDesign, spendToken } from "@/lib/server/design-billing-repo";
+import { topUpSoon } from "@/lib/server/design-top-up";
 import { createProject, listProjects, projectAt } from "@/lib/server/design-repo";
 import { packedHasBattery } from "@/lib/domain/design/roof-design";
 import { NO_DESIGN_JOBS } from "@/lib/domain/design/plans";
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     if (!made.existed) {
       await spendToken(who.member.businessId, made.project.id, who.member.email);
       if (withBattery) await spendBatteryDesign(who.member.businessId, made.project.id, who.member.email);
+      topUpSoon(who.member.businessId, "design");
     }
     const project = seesCosts ? made.project : { ...made.project, extras: withoutCostEdits(made.project.extras) };
     return Response.json({ ok: true, project, existed: made.existed });

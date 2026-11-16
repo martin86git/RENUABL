@@ -64,6 +64,7 @@ import {
 import { askToStartAfresh, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
+import { SolUsage } from "./sol-usage";
 import { SolSources } from "./sol-sources";
 import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
@@ -383,6 +384,8 @@ export function SolChat({
           Sol {!side && <span className="font-normal text-muted">· your conversation is yours alone</span>}
         </p>
         <span className="ml-auto" />
+        {/* His usage this month, in a window of its own (16 Nov 2026, Martin). */}
+        <SolUsage />
         {seeing && (
           <button
             type="button"
