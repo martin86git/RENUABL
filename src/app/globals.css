@@ -379,6 +379,17 @@ html.sol-resizing .team-pop {
     0 10px 26px rgb(255 90 31 / 0.3),
     0 0 0 2px var(--sun-line);
 }
+/* A deal opened from team chat comes out beside the chat (16 Nov 2026, Martin). */
+@keyframes team-deal-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 /* Something unread in team chat: its round flashes on and off, filling with the signal orange and back (15 Nov 2026,
    Martin: "make the chat logo flash on and off to flag a notification"). Still, and lit, with reduced motion. */
 @keyframes team-flash {

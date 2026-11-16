@@ -2,6 +2,7 @@
 
 import { CustomerConversations } from "./customer-conversations";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
@@ -30,7 +31,7 @@ import {
   type ChatAction,
 } from "@/lib/domain/design/sol-chat-work";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
-import { TEAM_LIST, readWindowSize, teamListWidth, teamWindowSize } from "@/lib/domain/design/team-window";
+import { TEAM_LIST, TEAM_WINDOW, readWindowSize, teamListWidth, teamWindowSize } from "@/lib/domain/design/team-window";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
 import {
@@ -117,10 +118,16 @@ export function TeamChatPanel({
   me,
   start,
   customers = 0,
+  onOpenDeal,
+  dealShown,
 }: {
   onClose?: () => void;
   me: string;
   start?: string | null;
+  /** In the window: Open deal shows the deal beside the chat instead of going to its page. */
+  onOpenDeal?: (jobId: string) => void;
+  /** The deal shown beside the chat, if any. */
+  dealShown?: string | null;
   /** Customers' lines waiting and this member's unread mentions: the count on the Customers side. */
   customers?: number;
 }) {
@@ -529,9 +536,19 @@ export function TeamChatPanel({
             <div className="flex shrink-0 items-center gap-1">
               <Link
                 href={`/design/deals/${dealJob}?tab=team`}
-                className="rounded-full px-2.5 py-1 text-[12px] font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+                aria-pressed={onOpenDeal ? dealShown === dealJob : undefined}
+                onClick={(e) => {
+                  if (!onOpenDeal || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                  // In the window the deal comes out beside the chat (16 Nov 2026, Martin), not as a page of its own.
+                  e.preventDefault();
+                  onOpenDeal(dealJob);
+                }}
+                className={clsx(
+                  "rounded-full px-2.5 py-1 text-[12px] font-medium ring-1",
+                  onOpenDeal && dealShown === dealJob ? "bg-ink text-white ring-ink" : "text-ink-2 ring-line hover:text-ink",
+                )}
               >
-                Open deal
+                {onOpenDeal && dealShown === dealJob ? "Deal open" : "Open deal"}
               </Link>
               {onClose && (
                 <button
@@ -1646,17 +1663,50 @@ export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: 
     }
     return () => window.removeEventListener(TEAM_OPEN, openOn);
   }, []);
+  // A deal opened from its chat comes out of the window beside the chat (16 Nov 2026, Martin: rather than a new page,
+  // the chat narrows to about half the screen and the deal emerges beside it). The deal is its own page in a frame.
+  const [deal, setDeal] = useState<string | null>(null);
+  const dealFrame = useRef<HTMLIFrameElement>(null);
+  const router = useRouter();
+  const closeAll = () => {
+    setOpen(false);
+    setDeal(null);
+  };
   useEffect(() => {
     if (!open) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    // Escape puts the deal away first, then the window.
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (deal) setDeal(null);
+      else setOpen(false);
+    };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [open]);
+  }, [open, deal]);
+  useEffect(() => {
+    if (!deal) return;
+    // A link in the deal to somewhere else in the product goes there on the page itself (the frame tells us).
+    const hear = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== dealFrame.current?.contentWindow) return;
+      const go = (e.data as { renuablDesign?: { go?: unknown } } | null)?.renuablDesign?.go;
+      if (typeof go === "string" && go.startsWith("/") && !go.startsWith("//")) {
+        setOpen(false);
+        setDeal(null);
+        router.push(go);
+      }
+    };
+    window.addEventListener("message", hear);
+    return () => window.removeEventListener("message", hear);
+  }, [deal, router]);
+  const room = typeof window === "undefined" ? null : screenRoom();
+  // With a deal out: the chat keeps a little under half the screen, the deal takes the rest of the room.
+  const chatW = fitted && room ? Math.min(fitted.width, Math.max(TEAM_WINDOW.minWidth, Math.round(room.width * 0.44))) : 0;
+  const totalW = room ? Math.max(chatW, room.width - TEAM_WINDOW.sideRoom) : 0;
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => (open ? closeAll() : setOpen(true))}
         title="Team chat"
         aria-label={unread ? `Team chat: ${unread} unread` : "Team chat"}
         aria-pressed={open}
@@ -1678,11 +1728,56 @@ export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: 
       {open &&
         createPortal(
           <div
-            style={fitted ? { width: fitted.width, height: fitted.height } : undefined}
-            className="theme-studio team-pop fixed right-20 top-1/2 z-[52] h-[min(48rem,90dvh)] w-[min(50rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line"
+            style={fitted ? { width: deal ? totalW : fitted.width, height: fitted.height } : undefined}
+            className="theme-studio team-pop fixed right-20 top-1/2 z-[52] flex h-[min(48rem,90dvh)] w-[min(50rem,calc(100vw-7rem))] -translate-y-1/2 overflow-hidden rounded-3xl bg-surface shadow-[0_12px_40px_rgba(20,22,26,0.16)] ring-1 ring-line motion-safe:transition-[width] motion-safe:duration-300 motion-safe:ease-out"
           >
-            <TeamChatPanel key={start ?? "last"} me={me} start={start} customers={customers} onClose={() => setOpen(false)} />
-            {fitted && (
+            {deal && (
+              <section
+                aria-label="The deal"
+                className="flex min-w-0 flex-1 flex-col border-r border-line bg-canvas motion-safe:animate-[team-deal-in_300ms_ease-out]"
+              >
+                <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2.5">
+                  <p className="truncate text-sm font-semibold">The deal</p>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Link
+                      href={`/design/deals/${deal}`}
+                      onClick={() => closeAll()}
+                      className="rounded-full px-2.5 py-1 text-[12px] font-medium text-ink-2 ring-1 ring-line hover:text-ink"
+                    >
+                      Full page
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label="Put the deal away"
+                      title="Put the deal away (Esc)"
+                      onClick={() => setDeal(null)}
+                      className="rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-ink"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </header>
+                <iframe
+                  ref={dealFrame}
+                  key={deal}
+                  src={`/design/deals/${deal}`}
+                  title="The deal"
+                  className="min-h-0 w-full flex-1 border-0 bg-canvas"
+                />
+              </section>
+            )}
+            <div style={deal && chatW ? { width: chatW } : undefined} className={clsx("h-full min-w-0", deal ? "shrink-0" : "flex-1")}>
+              <TeamChatPanel
+                key={start ?? "last"}
+                me={me}
+                start={start}
+                customers={customers}
+                onClose={closeAll}
+                dealShown={deal}
+                onOpenDeal={(job) => setDeal((d) => (d === job ? null : job))}
+              />
+            </div>
+            {fitted && !deal && (
               <>
                 {/* The window stays against the rail on its right and centred top to bottom: its left edge sets the
                     width, its foot the height (growing both ways, so the foot follows the pointer). */}
