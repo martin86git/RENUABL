@@ -9,7 +9,7 @@ import {
   setLocked,
   COACH_COPY,
 } from "@/lib/domain/design/coaching";
-import { cleanDelivery, DEFAULT_DELIVERY, sameDelivery } from "@/lib/domain/design/delivery";
+import { cleanDelivery } from "@/lib/domain/design/delivery";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
 
 /**
  * PUT { id, text }: reword a note by hand. PUT { id, locked }: lock a note in as a rule, or unlock it. PUT { delivery }:
- * how the agent speaks (domain/design/delivery.ts; the usual choices are kept as nothing chosen). For a member who may
+ * how the agent speaks (domain/design/delivery.ts; null goes back to the agent's own way). For a member who may
  * change settings.
  */
 export async function PUT(request: Request) {
@@ -142,10 +142,11 @@ export async function PUT(request: Request) {
     if ("refuse" in read) return read.refuse;
     const role = roleIn(request);
     if (read.body.delivery !== undefined) {
+      // What was chosen is kept as chosen (a plain manner too, since a sales agent's own way is natural); null goes
+      // back to the agent's own way.
       const delivery = read.body.delivery === null ? null : cleanDelivery(read.body.delivery);
-      const kept = delivery && !sameDelivery(delivery, DEFAULT_DELIVERY) ? delivery : null;
-      await saveDelivery(who.member.businessId, kept, who.member.email, role);
-      return Response.json({ ok: true, delivery: kept });
+      await saveDelivery(who.member.businessId, delivery, who.member.email, role);
+      return Response.json({ ok: true, delivery: await deliveryOf(who.member.businessId, role) });
     }
     if (typeof read.body.locked === "boolean") {
       const was = await coachingOf(who.member.businessId, role);

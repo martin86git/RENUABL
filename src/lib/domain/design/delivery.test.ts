@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_DELIVERY, DELIVERY_COPY, NATURAL_DELIVERY, cleanDelivery, deliveryBlock, deliveryParams, sameDelivery } from "./delivery";
+import {
+  DEFAULT_DELIVERY,
+  DELIVERY_COPY,
+  NATURAL_DELIVERY,
+  cleanDelivery,
+  defaultDelivery,
+  deliveryBlock,
+  deliveryParams,
+  sameDelivery,
+} from "./delivery";
 
 describe("how a voice agent speaks", () => {
   it("changes nothing until something is chosen", () => {
@@ -7,6 +16,11 @@ describe("how a voice agent speaks", () => {
     expect(deliveryParams(null)).toEqual({});
     expect(deliveryBlock(DEFAULT_DELIVERY)).toBe("");
     expect(deliveryParams(DEFAULT_DELIVERY)).toEqual({});
+  });
+
+  it("has a sales agent speak naturally until someone chooses, and the post-sale one plainly", () => {
+    expect(defaultDelivery(true)).toEqual(NATURAL_DELIVERY);
+    expect(defaultDelivery(false)).toEqual(DEFAULT_DELIVERY);
   });
 
   it("reads only the choices it knows", () => {

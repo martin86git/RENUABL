@@ -4,10 +4,10 @@
  * installations: domain/install-call.ts), business id first as everywhere; no row is Sol with no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
-import { SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
+import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
-import { cleanDelivery, type Delivery } from "@/lib/domain/design/delivery";
+import { cleanDelivery, defaultDelivery, type Delivery } from "@/lib/domain/design/delivery";
 import { dbConfigured, query } from "./db";
 
 export interface Caller {
@@ -111,14 +111,18 @@ export async function coachingOf(businessId: string, role: CallerKey = "sales"):
   return { notes: cleanNotes(rows[0]?.coach_notes), turns: cleanTurns(rows[0]?.coach_chat) };
 }
 
-/** How the agent speaks (domain/design/delivery.ts): null until the business has chosen, which is the calls as they were. */
-export async function deliveryOf(businessId: string, role: CallerKey = "sales"): Promise<Delivery | null> {
-  if (!dbConfigured()) return null;
+/**
+ * How the agent speaks (domain/design/delivery.ts): what the business chose, else its kind's own way (a sales agent
+ * as a natural phone call, the post-sale one plainly).
+ */
+export async function deliveryOf(businessId: string, role: CallerKey = "sales"): Promise<Delivery> {
+  const usual = defaultDelivery(roleOfKey(role) === "sales");
+  if (!dbConfigured()) return usual;
   const rows = await query<{ delivery: unknown }>(`select delivery from design_caller where business_id = $1 and role = $2`, [
     businessId,
     role,
   ]);
-  return rows[0]?.delivery ? cleanDelivery(rows[0].delivery) : null;
+  return rows[0]?.delivery ? cleanDelivery(rows[0].delivery) : usual;
 }
 
 export async function saveDelivery(businessId: string, delivery: Delivery | null, by: string, role: CallerKey = "sales"): Promise<void> {
@@ -137,7 +141,11 @@ export async function scriptFor(
   businessId: string,
   role: CallerKey = "sales",
 ): Promise<{ coaching: string[]; locked: string[]; delivery: Delivery | null }> {
-  const [c, delivery] = await Promise.all([coachingOf(businessId, role).catch(() => null), deliveryOf(businessId, role).catch(() => null)]);
+  const [c, delivery] = await Promise.all([
+    coachingOf(businessId, role).catch(() => null),
+    // If it can't be read, the call goes as calls always did.
+    deliveryOf(businessId, role).catch(() => null),
+  ]);
   return { ...scriptLines(c?.notes ?? []), delivery };
 }
 

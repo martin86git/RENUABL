@@ -463,7 +463,12 @@ export function DeliverySettings(props: { delivery: Delivery | null; editable: b
       })}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {props.editable && !usual && (
-          <button type="button" onClick={() => void save(null)} disabled={busy} className="text-xs font-medium text-ink-2 hover:text-ink">
+          <button
+            type="button"
+            onClick={() => void save(DEFAULT_DELIVERY)}
+            disabled={busy}
+            className="text-xs font-medium text-ink-2 hover:text-ink"
+          >
             {DELIVERY_COPY.reset}
           </button>
         )}

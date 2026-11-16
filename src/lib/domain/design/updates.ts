@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-17",
+    area: "Calls",
+    words: "Sales voice agents now speak as a natural phone call unless you choose otherwise under How it speaks.",
+  },
+  {
     day: "2026-11-16",
     area: "Calls",
     words: "Train your voice agent: it rings you, knows you're its trainer, and what you ask for waits in its chat to keep or drop.",

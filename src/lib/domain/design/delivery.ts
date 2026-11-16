@@ -4,8 +4,9 @@
  * chooses its manner, pace, how it opens, how long it leaves before answering and whether there is a room behind it;
  * the choices become instructions after every rule (`deliveryBlock`) and two of Vapi's call settings (`deliveryParams`).
  *
- * Unset is the calls as they were: nothing here changes a call until the business chooses. None of it changes what the
- * agent may say: it always says it is automated, and every rule holds. Pure, tested.
+ * A sales agent nobody has set speaks as a natural phone call (17 Nov 2026, Martin: "make natural delivery the default
+ * for Charlie"); the post-sale agent is plain until chosen (`defaultDelivery`). None of it changes what the agent may
+ * say: it always says it is automated, and every rule holds. Pure, tested.
  */
 
 export const MANNERS = ["plain", "natural"] as const;
@@ -31,6 +32,9 @@ export const DEFAULT_DELIVERY: Delivery = { manner: "plain", pace: "steady", ope
 
 /** One press: a natural phone call. */
 export const NATURAL_DELIVERY: Delivery = { manner: "natural", pace: "relaxed", opening: "easy", pause: "considered", room: "office" };
+
+/** How an agent speaks while nobody has chosen: a sales agent naturally, the post-sale one plainly. */
+export const defaultDelivery = (sales: boolean): Delivery => (sales ? NATURAL_DELIVERY : DEFAULT_DELIVERY);
 
 const pick = <T extends string>(list: readonly T[], raw: unknown, or: T): T => (list.includes(raw as T) ? (raw as T) : or);
 
@@ -105,7 +109,7 @@ export const DELIVERY_COPY = {
       : `${d.manner === "natural" ? "Natural" : "Plain"}, ${d.pace}, ${d.opening === "easy" ? "an easy opening" : "opening word for word"}`,
   preset: "Make it a natural phone call",
   presetNote: "Short turns, small acknowledgements, room to breathe, and an opening in two easy beats.",
-  reset: "Back to how it was",
+  reset: "Make it plain again",
   note: "It always says it's your automated assistant, and none of this changes what it may say.",
   parts: {
     manner: {
