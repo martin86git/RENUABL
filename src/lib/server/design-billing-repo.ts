@@ -200,8 +200,9 @@ async function poolIn(q: Q, businessId: string, today: string): Promise<DesignPo
     )[0] ?? null;
   const row = (
     await q<{ n: string }>(
-      `select count(*) as n from design_tokens where business_id = $1 and source = 'included' and reason = 'job' and month = $2`,
-      [businessId, monthOf(today)],
+      // The trial sites are once an account (16 Nov 2026), so every free site ever used counts, not the month's.
+      `select count(*) as n from design_tokens where business_id = $1 and source = 'included' and reason = 'job'`,
+      [businessId],
     )
   )[0];
   return designPool(designsIncluded(plan, today), Number(row?.n ?? 0));

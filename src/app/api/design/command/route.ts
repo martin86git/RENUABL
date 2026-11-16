@@ -2,7 +2,8 @@ import { DESIGN_COMMAND_PROMPT, DESIGN_COMMAND_SCHEMA, commandFrom } from "@/lib
 import { looksLikeQuestion } from "@/lib/domain/design/find";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
-import { modelFor } from "@/lib/server/sol-credits";
+import { withSolCredit } from "@/lib/server/sol-credits";
+import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -32,16 +33,27 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     try {
-      const reading = await readWithClaude<Record<string, unknown>>(
-        [{ type: "text", text: `THE DESIGN\n${design}\n\nTHE REQUEST\n${text}` }],
-        DESIGN_COMMAND_SCHEMA,
-        DESIGN_COMMAND_PROMPT,
-        apiKey,
-        // A change to the design: the quick model. A question about it ("how could I bring the payback down?") wants
-        // judgement over the figures, so the deep one, which answers it the same way each time (9 Nov 2026, Martin:
-        // the quick model's answers to such questions wandered). The command bar takes no credit either way.
-        { model: modelFor(looksLikeQuestion(text) ? "deep" : "quick") },
+      // A change to the design: the quick model. A question about it ("how could I bring the payback down?") wants
+      // judgement over the figures, so the deep one, which answers it the same way each time (9 Nov 2026, Martin:
+      // the quick model's answers to such questions wandered). Sol's credits as any answer (16 Nov 2026, Martin).
+      // Common requests are read in the browser and never reach here, so they cost nothing.
+      const tier = looksLikeQuestion(text) ? "deep" : "quick";
+      const reading = await withSolCredit(
+        who.member.businessId,
+        "designer",
+        who.member.email,
+        (ai) =>
+          readWithClaude<Record<string, unknown>>(
+            [{ type: "text", text: `THE DESIGN\n${design}\n\nTHE REQUEST\n${text}` }],
+            DESIGN_COMMAND_SCHEMA,
+            DESIGN_COMMAND_PROMPT,
+            apiKey,
+            ai,
+          ),
+        tier,
+        tier === "deep" ? "designer question" : "designer change",
       );
+      if (reading === "out") return Response.json({ ok: false, message: SOL_OUT_SHORT }, { status: 402 });
       return Response.json({ ok: true, command: commandFrom(reading) });
     } catch (e) {
       console.error("designer command failed", redactSecrets(e instanceof Error ? e.message : String(e)));

@@ -1,23 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { DESIGNS_PER_USER, FIRST_MONTH_DESIGNS, PLAN_WORDS, designPool, designPoolWords, designsIncluded } from "./plans";
+import { PLAN_WORDS, TRIAL_SITES, designPool, designPoolWords, designsIncluded } from "./plans";
 
-describe("the pooled design jobs", () => {
-  const settled = { status: "active", seats: 3, startedAt: "2026-08-01" };
-  it("gives each paid user's share to one pool for the business", () => {
-    expect(designsIncluded(settled, "2026-11-15")).toBe(DESIGNS_PER_USER * 3);
-    expect(designsIncluded({ ...settled, status: "past_due" }, "2026-11-15")).toBe(90);
-    expect(designsIncluded({ ...settled, status: "canceled" }, "2026-11-15")).toBe(0);
+describe("the free trial sites", () => {
+  const plan = { status: "active", seats: 3, startedAt: "2026-11-01" };
+  it("gives each account 6 sites in its first month, whatever its users, and none after", () => {
+    expect(TRIAL_SITES).toBe(6);
+    expect(designsIncluded(plan, "2026-11-15")).toBe(6);
+    expect(designsIncluded({ ...plan, seats: 12 }, "2026-11-15")).toBe(6);
+    expect(designsIncluded(plan, "2026-12-02")).toBe(0);
+    expect(designsIncluded({ ...plan, status: "canceled" }, "2026-11-15")).toBe(0);
     expect(designsIncluded(null, "2026-11-15")).toBe(0);
   });
-  it("holds the first month's larger pool for 31 days, never less than the users bring", () => {
-    expect(designsIncluded({ ...settled, startedAt: "2026-11-01" }, "2026-11-15")).toBe(FIRST_MONTH_DESIGNS);
-    expect(designsIncluded({ ...settled, startedAt: "2026-10-16" }, "2026-11-15")).toBe(FIRST_MONTH_DESIGNS);
-    expect(designsIncluded({ ...settled, startedAt: "2026-10-15" }, "2026-11-15")).toBe(90);
-    expect(designsIncluded({ status: "active", seats: 8, startedAt: "2026-11-10" }, "2026-11-15")).toBe(240);
-  });
-  it("never goes below nothing left, and says it is shared", () => {
-    expect(designPool(90, 95)).toEqual({ included: 90, used: 95, left: 0 });
-    expect(designPoolWords(designPool(90, 12))).toBe("12 of 90 used this month · shared by everyone in the business");
-    expect(PLAN_WORDS.firstMonthDesigns).not.toMatch(/unlimited/i);
+  it("says it is shared, and never says unlimited", () => {
+    expect(designPool(6, 8)).toEqual({ included: 6, used: 8, left: 0 });
+    expect(designPoolWords(designPool(6, 2))).toBe("2 of 6 free trial sites used · shared by everyone in the business");
+    expect(PLAN_WORDS.trialSites).toBe("6 free sites in your first month");
+    for (const w of Object.values(PLAN_WORDS)) expect(w.toLowerCase()).not.toContain("unlimited");
   });
 });

@@ -7,7 +7,12 @@ import { syncAddOnsFromStripe } from "@/lib/server/design-addons";
 import { connectFacts } from "@/lib/server/stripe-billing";
 import { businessOfAccount, updateConnect } from "@/lib/server/design-connect-repo";
 import { recordCardPayment } from "@/lib/server/design-proposal-repo";
-import { TOKEN_CENTS } from "@/lib/domain/design/plans";
+import { cleanPack, packDollars } from "@/lib/domain/design/plans";
+
+const creditsForPack = (n: number) => {
+  const pack = cleanPack(n);
+  return pack ? packDollars(pack) : n * 3;
+};
 import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
 
 /**
@@ -86,8 +91,8 @@ export async function POST(request: Request) {
     const tokens = Number(session.metadata?.tokens);
     if (business && Number.isInteger(tokens) && tokens > 0 && session.payment_status === "paid") {
       try {
-        // A pack of N design jobs adds its price to the balance, in dollars (plans.ts: $3 a job).
-        await creditPack(business, session.id, (tokens * TOKEN_CENTS) / 100, session.metadata?.email ?? null);
+        // A pack adds its credits with its bonus (plans.ts); a checkout from before 16 Nov 2026 named jobs at $3.
+        await creditPack(business, session.id, creditsForPack(tokens), session.metadata?.email ?? null);
       } catch (e) {
         console.error("token pack not credited", session.id, e instanceof Error ? e.message : e);
         return new Response("Not saved", { status: 500 });

@@ -30,7 +30,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { siteUrl } from "@/lib/domain/sms";
 import { parseApiKey, redactSecrets } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
-import { modelFor } from "./sol-credits";
+import { withSolCredit } from "./sol-credits";
 import { newId, query } from "./db";
 import { listProposals } from "./design-after-sale-repo";
 import { listJobs } from "./design-crm-repo";
@@ -203,8 +203,17 @@ export async function draftPending(businessId: string, pending: Pending[], sol =
     let words: { subject: string; body: string } | null = null;
     if (apiKey) {
       try {
-        // A customer reads it: the deeper model (sol-routing.ts).
-        words = cleanDraft(await readWithClaude<unknown>([], DRAFT_SCHEMA, followUpPrompt(p.facts), apiKey, { model: modelFor("deep") }));
+        // A customer reads it: the deeper model, and Sol's credits for it (16 Nov 2026, Martin: Sol's work is charged).
+        // None left: the plain words stay.
+        const drafted = await withSolCredit(
+          businessId,
+          "follow-up",
+          null,
+          async (ai) => cleanDraft(await readWithClaude<unknown>([], DRAFT_SCHEMA, followUpPrompt(p.facts), apiKey, ai)),
+          "deep",
+          "follow-up",
+        );
+        words = drafted === "out" ? null : drafted;
       } catch (e) {
         console.error("a follow-up couldn't be drafted", redactSecrets(e instanceof Error ? e.message : String(e)));
       }

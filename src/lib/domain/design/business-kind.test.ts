@@ -169,8 +169,6 @@ describe("choosing a plan at sign-up", () => {
   });
 
   it("says the retailer's price as it is, not the first month alone", () => {
-    expect(BUSINESS_KINDS.find((k) => k.kind === "retailer")!.price).toBe(
-      "$99 a user a month. Your first month, $29 a user. Cancel any time.",
-    );
+    expect(BUSINESS_KINDS.find((k) => k.kind === "retailer")!.price).toBe("$49 a user a month. Your first month is free. Cancel any time.");
   });
 });

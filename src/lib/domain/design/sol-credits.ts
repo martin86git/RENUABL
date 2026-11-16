@@ -11,7 +11,7 @@
 import { dollars } from "./plans";
 
 /** Included with each paid user, each calendar month. */
-export const SOL_PER_USER = 150;
+export const SOL_PER_USER = 50;
 /** Included while a business is on a free trial from before 3 Nov 2026 (the whole business, not each user). */
 export const SOL_TRIAL = 100;
 
@@ -31,7 +31,7 @@ export function cleanSolPack(raw: unknown): SolPack | null {
 }
 
 /** What Sol is used for, kept on each credit used so the Billing page can say where they went. */
-export const SOL_USES = ["chat", "channel", "inbox", "customer", "call-notes", "usage", "marketing"] as const;
+export const SOL_USES = ["chat", "channel", "inbox", "customer", "call-notes", "usage", "marketing", "follow-up", "designer"] as const;
 export type SolUse = (typeof SOL_USES)[number];
 export const SOL_USE_WORDS: Record<SolUse, string> = {
   chat: "Asked Sol",
@@ -41,6 +41,8 @@ export const SOL_USE_WORDS: Record<SolUse, string> = {
   "call-notes": "Call written up",
   usage: "Usage found in a file",
   marketing: "Marketing email written",
+  "follow-up": "Follow-up drafted",
+  designer: "Designer request",
 };
 
 /**

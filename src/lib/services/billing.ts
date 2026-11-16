@@ -108,3 +108,21 @@ export async function saveBillingDetails(
 
 /** Where a tax invoice PDF is downloaded from. */
 export const invoicePdfUrl = (id: string) => `/api/design/billing/invoices/${encodeURIComponent(id)}`;
+
+/** The business's design credits and its free trial sites, for the chip in the designer. */
+export interface DesignCredits {
+  credits: number;
+  trial: DesignPool;
+  owner: boolean;
+}
+
+export async function loadDesignCredits(): Promise<DesignCredits | null> {
+  try {
+    const res = await fetch("/api/design/billing/credits", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { ok?: boolean } & DesignCredits;
+    return json.ok ? { credits: json.credits, trial: json.trial, owner: json.owner } : null;
+  } catch {
+    return null;
+  }
+}

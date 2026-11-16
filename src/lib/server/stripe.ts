@@ -6,6 +6,7 @@ import {
   FIRST_MONTH_CENTS,
   SEAT_MONTHLY_CENTS,
   dollars,
+  packDollars,
   packPriceCents,
   type BillingInterval,
   type TokenPack,
@@ -167,7 +168,10 @@ export async function createTokenCheckout(
         price_data: {
           currency: "aud",
           unit_amount: packPriceCents(opts.pack),
-          product_data: { name: `${opts.pack} design jobs`, description: `RENUABL design tool tokens, $3 a job. Includes GST.` },
+          product_data: {
+            name: `${packDollars(opts.pack)} design credits`,
+            description: `RENUABL designer credits: 3 a site, 7 with a battery. Includes GST.`,
+          },
         },
       },
     ],

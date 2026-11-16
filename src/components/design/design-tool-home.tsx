@@ -26,6 +26,7 @@ import { attachSite, listJobs, loadDesignHome, saveJob, shortDate, type JobLine 
 import { loadPulses } from "@/lib/services/deal-pulse";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { useDesignAccount } from "./design-account";
+import { DesignCredits } from "./design-credits";
 import type { DesignRoof } from "@/lib/services/design-store";
 import type { DesignHomeData } from "@/lib/server/design-home-repo";
 import { ui } from "./design-shell";
@@ -121,6 +122,7 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
             </p>
           </div>
         </div>
+        {account?.signedIn && <DesignCredits />}
       </header>
 
       <FindBar inputRef={bar} jobs={jobs} deals={deals !== false} onPick={onPick} />

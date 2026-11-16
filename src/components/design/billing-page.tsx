@@ -9,6 +9,8 @@ import {
   SEAT_NOTE,
   TOKEN_PACKS,
   designBalanceWords,
+  packBonus,
+  packDollars,
   dollars,
   packPriceCents,
   planNow,
@@ -32,7 +34,7 @@ import { ui } from "./design-shell";
 import type { BillingPart } from "@/lib/domain/design/business-kind";
 
 /** Above an installer's Billing: what it pays for, and what it doesn't. */
-const PACKS_ONLY_NOTE = `Your business joined RENUABL free: there are no users to pay for. You pay only for design jobs, ${PLAN_WORDS.token}, bought in packs.`;
+const PACKS_ONLY_NOTE = `Your business joined RENUABL free: there are no users to pay for. You pay only for design credits, ${PLAN_WORDS.token}, bought in packs.`;
 
 const STATUS: Record<string, string> = {
   trialing: "Free trial",
@@ -248,16 +250,16 @@ export function BillingPanel() {
 
       <section className={clsx(ui.card, "space-y-4 p-5 sm:p-6")}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-base font-semibold text-ink">Design jobs</h2>
+          <h2 className="text-base font-semibold text-ink">Design credits</h2>
           <p className="text-sm text-ink-2">
-            <span className="text-2xl font-semibold tabular-nums text-ink">{dollars(Math.max(0, state.tokens) * 100)}</span> left
+            <span className="text-2xl font-semibold tabular-nums text-ink">{Math.max(0, Math.floor(state.tokens))}</span> credits
             <span className="ml-2 text-xs text-muted">{designBalanceWords(state.tokens).split(" · ")[1]}</span>
           </p>
         </div>
         {state.pool && state.pool.included > 0 && (
           <div className="space-y-2 rounded-md border border-line p-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-              <span className="font-medium text-ink">This month&apos;s pool</span>
+              <span className="font-medium text-ink">Free trial sites</span>
               <span className="tabular-nums text-ink">
                 <span className="text-lg font-semibold">{state.pool.left}</span> of {state.pool.included} left
               </span>
@@ -271,16 +273,13 @@ export function BillingPanel() {
             <p className="text-xs text-muted">{designPoolWords(state.pool)}</p>
           </div>
         )}
-        <p className="text-sm leading-relaxed text-ink-2">
-          {state.pool && state.pool.included > 0 ? `${PLAN_WORDS.poolExplained} ` : ""}
-          {PLAN_WORDS.tokenExplained}
-        </p>
+        <p className="text-sm leading-relaxed text-ink-2">{PLAN_WORDS.tokenExplained}</p>
         {bought && (
           <p className="rounded-md bg-positive-soft px-3 py-2 text-sm text-positive">
             Thanks. Your pack is added as soon as Stripe confirms it.
           </p>
         )}
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-4">
           {TOKEN_PACKS.map((pack: TokenPack) => (
             <button
               key={pack}
@@ -288,7 +287,8 @@ export function BillingPanel() {
               disabled={busy !== null || !state.payments}
               onClick={() => void go(`pack-${pack}`, () => buyTokens(pack))}
             >
-              <span className="text-base font-semibold text-ink">{pack} design jobs</span>
+              <span className="text-base font-semibold text-ink">{packDollars(pack)} credits</span>
+              {packBonus(pack) > 0 && <span className="text-xs font-medium text-positive">+{packBonus(pack)} bonus</span>}
               <span className="text-xs tabular-nums text-ink-2">
                 {busy === `pack-${pack}` ? "Opening Stripe…" : dollars(packPriceCents(pack))}
               </span>
@@ -296,7 +296,7 @@ export function BillingPanel() {
           ))}
         </div>
         {!state.payments && <p className="text-xs text-muted">Payments aren&apos;t switched on yet.</p>}
-        {packsOnly && !state.ledger.length && <p className="text-sm text-ink-2">No design jobs bought or used yet.</p>}
+        {packsOnly && !state.ledger.length && <p className="text-sm text-ink-2">No design credits bought or used yet.</p>}
         {state.ledger.length > 0 && (
           <ul className="divide-y divide-line text-sm">
             {state.ledger.slice(0, 12).map((l, i) => (
@@ -306,11 +306,7 @@ export function BillingPanel() {
                   <span className="ml-2 text-xs text-muted">{day(l.at)}</span>
                 </span>
                 <span className={clsx("tabular-nums", l.change > 0 ? "text-positive" : "text-ink")}>
-                  {l.source === "included"
-                    ? "From the pool"
-                    : l.change > 0
-                      ? `+${dollars(l.change * 100)}`
-                      : `−${dollars(-l.change * 100)}`}
+                  {l.source === "included" ? "From the pool" : l.change > 0 ? `+${l.change}` : `−${-l.change}`}
                 </span>
               </li>
             ))}

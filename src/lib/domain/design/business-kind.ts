@@ -9,7 +9,7 @@
  * which of the designer's addresses a member may use (`apiAllowed`, checked in requireMember). Pure, tested.
  */
 import { marketplaceOpen } from "./marketplace-launch";
-import { FIRST_MONTH_CENTS, SEAT_MONTHLY_CENTS, dollars } from "./plans";
+import { SEAT_MONTHLY_CENTS, dollars, firstMonthWords } from "./plans";
 
 export const BUSINESS_KINDS = [
   {
@@ -17,7 +17,7 @@ export const BUSINESS_KINDS = [
     label: "Solar retailer",
     about: "You sell and run the whole job: leads, designs, proposals, ordering and installation.",
     // 5 Nov 2026, Martin: "From $29" read as the price; it is only the first month.
-    price: `${dollars(SEAT_MONTHLY_CENTS)} a user a month. Your first month, ${dollars(FIRST_MONTH_CENTS)} a user. Cancel any time.`,
+    price: `${dollars(SEAT_MONTHLY_CENTS)} a user a month. Your first month is ${firstMonthWords}. Cancel any time.`,
   },
   {
     kind: "installer",

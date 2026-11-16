@@ -325,7 +325,7 @@ function PlanStep({ account, onSkip }: { account: Extract<DesignAccount, { signe
         <dl className="space-y-1.5 border-t border-line pt-4 text-[14px]">
           <div className="flex justify-between gap-3">
             <dt className="text-ink-2">Your first month</dt>
-            <dd className="font-medium tabular-nums text-ink">{dollars(FIRST_MONTH_CENTS * seats)}</dd>
+            <dd className="font-medium tabular-nums text-ink">{FIRST_MONTH_CENTS === 0 ? "Free" : dollars(FIRST_MONTH_CENTS * seats)}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="text-ink-2">Then each month</dt>

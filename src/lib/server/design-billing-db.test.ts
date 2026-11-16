@@ -99,26 +99,26 @@ describe.skipIf(!url)("plans and design tokens (database)", () => {
     expect((await billing.tokenLedger(a)).map((l) => l.reason)).toEqual(["battery", "job", "pack"]);
   });
 
-  it("pools the month's design jobs for the whole business, used first by any designer, battery included, then the balance", async () => {
+  it("pools the 6 free trial sites for the whole business, used first by any designer, battery included, then the balance", async () => {
     const a = (await db.query<{ id: string }>(`select id from businesses where created_by = $1`, [A]))[0].id;
     await billing.updateSubscription({ ...alphaPlan, status: "active", seats: 1 });
-    // Started more than a month ago: one user's 30.
-    await db.query(`update design_subscriptions set created_at = now() - interval '60 days' where email = $1`, [A]);
+    // Started this month: the account's 6 free trial sites.
+    await db.query(`update design_subscriptions set created_at = timestamptz '2026-11-10T00:00:00Z' where email = $1`, [A]);
     const today = "2026-11-15";
-    expect(await billing.designPoolOf(a, today)).toEqual({ included: 30, used: 0, left: 30 });
+    expect(await billing.designPoolOf(a, today)).toEqual({ included: 6, used: 0, left: 6 });
     const before = await billing.tokenBalance(a);
     expect(await billing.spendToken(a, "roof_pool_1", A, today)).toBe("used");
     expect(await billing.spendToken(a, "roof_pool_2", "designer@alpha-billing.test", today)).toBe("used");
     expect(await billing.spendToken(a, "roof_pool_2", A, today)).toBe("already");
     expect(await billing.spendBatteryDesign(a, "roof_pool_1", A)).toBe("used");
     expect(await billing.tokenBalance(a)).toBe(before);
-    expect(await billing.designPoolOf(a, today)).toEqual({ included: 30, used: 2, left: 28 });
-    // Next month the pool is whole again.
-    expect((await billing.designPoolOf(a, "2026-12-01")).used).toBe(0);
+    expect(await billing.designPoolOf(a, today)).toEqual({ included: 6, used: 2, left: 4 });
+    // Once an account: the trial sites used carry across the month's end.
+    expect((await billing.designPoolOf(a, "2026-12-01")).used).toBe(2);
     // Pool used up: the next comes from the balance.
     await db.query(
       `insert into design_tokens (id, business_id, change, reason, project_id, source, month)
-         select 'tok_fill_' || g, $1, 0, 'job', 'roof_fill_' || g, 'included', '2026-11' from generate_series(1, 28) g`,
+         select 'tok_fill_' || g, $1, 0, 'job', 'roof_fill_' || g, 'included', '2026-11' from generate_series(1, 4) g`,
       [a],
     );
     expect((await billing.designPoolOf(a, today)).left).toBe(0);

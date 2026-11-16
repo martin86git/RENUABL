@@ -1,28 +1,29 @@
 /**
  * What RENUABL costs a solar business, in one place (Martin, 1 Nov 2026). Pure, tested (`plans.test.ts`).
  *
- * Every price is in Australian dollars and **includes GST**. A seat is a user. The design tool is paid by the job in
- * tokens, bought in packs: one token is used when a job's first design is saved. There is no free trial (3 Nov 2026,
- * Martin: "just charge immediately"): the card is taken on Stripe's own page when they sign up. Teams of 13 or more
- * talk to sales.
+ * Every price is in Australian dollars and **includes GST**. A seat is a user. Teams of 13 or more talk to sales.
  *
- * **The offer (3 Nov 2026, Martin: $29 undervalued specialist software for a small market)**: $99 a user a month,
- * month to month. The first month is $29 a user, with nothing to sign. Before it ends (or any time after) a business
- * can choose the **12-month plan**: $69 a user a month for 12 months from the bill that started the month it chose it.
- * Leaving the 12-month plan early means paying back what it saved: $30 a user for each month billed at $69 on it,
- * after the first month (`earlyExitCents`). When the 12 months are up it carries on at $99, month to month, unless
- * they choose another 12-month plan. Yearly billing (20% off) was dropped for new sign-ups: the 12-month plan is the
- * better deal and easier to say. Old yearly plans are still read (`BillingInterval`).
+ * **The offer (16 Nov 2026, Martin: $99 was too premium; lead with $49)**: $49 a user a month, month to month, and
+ * **the first month free**: the card is taken on Stripe's page at sign-up and the first charge is a month later
+ * (a once-only coupon for the whole first bill). Any time, a business can choose the **12-month plan**: $39 a user a
+ * month (20% off) for 12 months. Leaving it early pays back what it saved: $10 a user for each month billed at $39 on
+ * it (`earlyExitCents`). When the 12 months are up it carries on at $49, unless another 12-month plan is chosen.
+ *
+ * **The designer is paid in credits** (16 Nov 2026, Martin): one credit is worth $1 at the smallest pack; a site
+ * (a roof's first design) takes 3 credits, and 4 more the first time a design on it has a battery, so 7 in all.
+ * Bigger packs add bonus credits. Every account gets `TRIAL_SITES` free sites in its first month, battery or not,
+ * shared by everyone in it; after that nothing is included. The balance is kept in credits (`design_tokens`), shared
+ * by the whole business.
  */
 
 export type BillingInterval = "month" | "year";
 
 /** A user a month, month to month, cents, GST inclusive. */
-export const SEAT_MONTHLY_CENTS = 9900;
-/** A user for the first month, cents. */
-export const FIRST_MONTH_CENTS = 2900;
+export const SEAT_MONTHLY_CENTS = 4900;
+/** A user for the first month, cents: free (16 Nov 2026). */
+export const FIRST_MONTH_CENTS = 0;
 /** A user a month on the 12-month plan, cents. */
-export const COMMIT_SEAT_CENTS = 6900;
+export const COMMIT_SEAT_CENTS = 3900;
 /** How long the 12-month plan runs. */
 export const COMMIT_MONTHS = 12;
 /** Saved a user a month on the 12-month plan, and paid back for each month used when leaving it early. */
@@ -69,35 +70,39 @@ export const commitRunning = (until: string | null, today: string) => Boolean(un
 export const MAX_SELF_SERVE_SEATS = 12;
 /** Enterprise starts here: talk to sales. */
 export const ENTERPRISE_FROM = MAX_SELF_SERVE_SEATS + 1;
-/**
- * A design job, cents, GST inclusive (3 Nov 2026, Martin: $3 is where it starts, $7 once a battery is added). Design
- * jobs are a balance in whole dollars: a roof's first save takes $3, and the first save of any design on it with a
- * battery takes $4 more, so a battery job is $7 in all. Packs keep their prices and add their dollars.
- */
-export const TOKEN_CENTS = 300;
-/** A design job with a battery, cents. */
-export const BATTERY_DESIGN_CENTS = 700;
-/** Taken when a roof's designs first have a battery, dollars of the balance. */
-export const BATTERY_EXTRA_DOLLARS = (BATTERY_DESIGN_CENTS - TOKEN_CENTS) / 100;
-/** Taken at a roof's first save, dollars of the balance. */
-export const DESIGN_DOLLARS = TOKEN_CENTS / 100;
-/** A pack of design jobs adds its price to the balance, in dollars. */
-export const packDollars = (pack: TokenPack) => (pack * TOKEN_CENTS) / 100;
+/** One credit, cents: what a credit costs in the smallest pack. */
+export const CREDIT_CENTS = 100;
+/** A site with solar only, credits (and cents, at the smallest pack). */
+export const SITE_CREDITS = 3;
+/** A site with a battery, credits in all. */
+export const BATTERY_SITE_CREDITS = 7;
+/** The same in cents, as the page prints them. */
+export const TOKEN_CENTS = SITE_CREDITS * CREDIT_CENTS;
+export const BATTERY_DESIGN_CENTS = BATTERY_SITE_CREDITS * CREDIT_CENTS;
+/** Taken when a roof's designs first have a battery, credits. */
+export const BATTERY_EXTRA_DOLLARS = BATTERY_SITE_CREDITS - SITE_CREDITS;
+/** Taken at a roof's first save, credits. */
+export const DESIGN_DOLLARS = SITE_CREDITS;
 
-/** Said when a roof can't be designed, or a battery added, for want of design jobs. */
-export const NO_DESIGN_JOBS =
-  "This month's design jobs are used, and there isn't enough on your balance for this one ($3, or $7 with a battery). Buy a pack in Settings → Billing.";
+/** Said when a roof can't be designed, or a battery added, for want of credits. */
+export const NO_DESIGN_JOBS = `There aren't enough design credits for this site (${SITE_CREDITS} credits, or ${BATTERY_SITE_CREDITS} with a battery). Buy credits in Settings → Billing.`;
 
-/** The balance in words: "$57 · 19 designs, or 8 with a battery". */
-export function designBalanceWords(dollarsLeft: number): string {
-  const n = Math.max(0, dollarsLeft);
-  const plain = Math.floor(n / DESIGN_DOLLARS);
-  const withBattery = Math.floor((n * 100) / BATTERY_DESIGN_CENTS);
-  return `${dollars(n * 100)} · ${plain} ${plain === 1 ? "design" : "designs"}, or ${withBattery} with a battery`;
+/** The balance in words: "52 credits · 17 sites, or 7 with a battery". */
+export function designBalanceWords(credits: number): string {
+  const n = Math.max(0, Math.floor(credits));
+  const plain = Math.floor(n / SITE_CREDITS);
+  const withBattery = Math.floor(n / BATTERY_SITE_CREDITS);
+  return `${n} ${n === 1 ? "credit" : "credits"} · ${plain} ${plain === 1 ? "site" : "sites"}, or ${withBattery} with a battery`;
 }
-/** The packs tokens are sold in. */
-export const TOKEN_PACKS = [20, 50, 100] as const;
+/** The packs credits are sold in, by their price in dollars (16 Nov 2026, Martin: bigger packs earn bonus credits). */
+export const TOKEN_PACKS = [60, 150, 300, 600] as const;
 export type TokenPack = (typeof TOKEN_PACKS)[number];
+/** Bonus credits on each pack, as a share of its price. */
+export const PACK_BONUS: Record<TokenPack, number> = { 60: 0, 150: 0.1, 300: 0.15, 600: 0.2 };
+/** The credits a pack adds: its price in dollars and its bonus. */
+export const packDollars = (pack: TokenPack) => Math.round(pack * (1 + PACK_BONUS[pack]));
+/** The bonus credits in a pack. */
+export const packBonus = (pack: TokenPack) => packDollars(pack) - pack;
 
 /** A seat count from the browser: a whole number from 1 to the self-serve limit, else null. */
 export function cleanSeats(raw: unknown): number | null {
@@ -146,7 +151,13 @@ export function priceFor(seats: number, interval: BillingInterval): PlanPrice {
 }
 
 export function packPriceCents(pack: TokenPack): number {
-  return pack * TOKEN_CENTS;
+  return pack * 100;
+}
+
+/** A pack in words: "165 credits · $150 · +15 bonus". */
+export function packWords(pack: TokenPack): string {
+  const bonus = packBonus(pack);
+  return `${packDollars(pack)} credits · ${dollars(packPriceCents(pack))}${bonus ? ` · +${bonus} bonus` : ""}`;
 }
 
 /** Dollars from cents for the page: whole dollars when there are no cents ("$29"), else two places ("$23.20"). */
@@ -157,25 +168,25 @@ export function dollars(cents: number): string {
 
 /** The lines the page and the Billing page print, so they always agree with the prices above. */
 /**
- * Design jobs that come with the plan (15 Nov 2026, Martin: pooled across the account, as Pylon's are, so every
- * designer in the business draws from the same pool). Each paid user adds `DESIGNS_PER_USER` to the business's pool
- * each calendar month (the market's month; they don't carry over); a new plan's first month holds up to
- * `FIRST_MONTH_DESIGNS` whatever its users. A design job from the pool covers the roof, battery or not. Once the month's
- * are used, jobs come from the bought balance at $3, or $7 with a battery.
+ * The free sites a new account gets in its first month (16 Nov 2026, Martin: "6 trial sites per account… they don't
+ * need 50 to see the value"): one pool for the whole business, used by any designer, a site from it covering the
+ * battery too. Nothing is included after the first month: sites come from the credits bought.
  */
-export const DESIGNS_PER_USER = 30;
-/** A new plan's pool for its first month, whatever its users. Not "unlimited": a figure we can stand behind. */
-export const FIRST_MONTH_DESIGNS = 200;
-/** How long the first month's pool holds, days from the plan's start. */
+export const TRIAL_SITES = 6;
+/** Sites included each month after the first: none. */
+export const DESIGNS_PER_USER = 0;
+/** The first month's pool. */
+export const FIRST_MONTH_DESIGNS = TRIAL_SITES;
+/** How long the trial sites hold, days from the plan's start. */
 export const FIRST_MONTH_DAYS = 31;
 
 /** Whole days from one ISO date to another. */
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / 86_400_000);
 
-/** The month's pooled design jobs for a plan on `today`: every paid user's share, the first month's more, else none. */
+/** The free sites a plan has this month on `today`: the trial's in its first month, else none. */
 export function designsIncluded(plan: { status: string; seats: number; startedAt?: string | null } | null, today: string): number {
   if (!plan || !["active", "past_due", "trialing"].includes(plan.status)) return 0;
-  const perUsers = DESIGNS_PER_USER * Math.max(1, plan.seats);
+  const perUsers = DESIGNS_PER_USER * Math.max(1, plan.seats); // none since 16 Nov 2026
   const firstMonth =
     plan.startedAt != null && daysBetween(plan.startedAt, today) >= 0 && daysBetween(plan.startedAt, today) < FIRST_MONTH_DAYS;
   return firstMonth ? Math.max(perUsers, FIRST_MONTH_DESIGNS) : perUsers;
@@ -194,32 +205,34 @@ export function designPool(included: number, used: number): DesignPool {
   return { included, used, left: Math.max(0, included - used) };
 }
 
-/** "12 of 90 used this month · shared by everyone in the business". */
+/** "2 of 6 free trial sites used · shared by everyone in the business". */
 export function designPoolWords(pool: DesignPool): string {
-  return `${pool.used} of ${pool.included} used this month · shared by everyone in the business`;
+  return `${pool.used} of ${pool.included} free trial sites used · shared by everyone in the business`;
 }
+
+/** The first month, in words: "free", or "$29 a user". */
+export const firstMonthWords = FIRST_MONTH_CENTS === 0 ? "free" : `${dollars(FIRST_MONTH_CENTS)} a user`;
 
 export const PLAN_WORDS = {
   seat: `${dollars(SEAT_MONTHLY_CENTS)} a user a month`,
   /** The offer, in one line for the page. */
-  offer: `${dollars(SEAT_MONTHLY_CENTS)} a user. Your first month, ${dollars(FIRST_MONTH_CENTS)}.`,
-  firstMonth: `${dollars(FIRST_MONTH_CENTS)} a user for your first month`,
+  offer: `${dollars(SEAT_MONTHLY_CENTS)} a user a month. Your first month is ${firstMonthWords}.`,
+  firstMonth: `Your first month ${FIRST_MONTH_CENTS === 0 ? "is free" : `is ${firstMonthWords}`}`,
   commit: `${dollars(COMMIT_SEAT_CENTS)} a user a month on the ${COMMIT_MONTHS}-month plan`,
-  noLockIn: "Nothing to sign for the first month. Cancel any time.",
-  offerExplained: `Your first month is ${dollars(FIRST_MONTH_CENTS)} a user, with nothing to sign. Before it ends, choose the ${COMMIT_MONTHS}-month plan and stay at ${dollars(COMMIT_SEAT_CENTS)} a user a month, or do nothing and carry on month to month at ${dollars(SEAT_MONTHLY_CENTS)}, cancel any time.`,
-  commitExplained: `${dollars(COMMIT_SEAT_CENTS)} a user a month for ${COMMIT_MONTHS} months, counted from the start of the month you choose it. Leave before the ${COMMIT_MONTHS} months are up and you pay back what you saved: ${dollars(COMMIT_SAVING_CENTS)} a user for each month billed at ${dollars(COMMIT_SEAT_CENTS)} on the plan, after your first month. When the ${COMMIT_MONTHS} months are up it carries on at ${dollars(SEAT_MONTHLY_CENTS)} a month, unless you choose another ${COMMIT_MONTHS}-month plan.`,
+  noLockIn: "No lock-in contract. Cancel any time.",
+  offerExplained: `Your first month is ${firstMonthWords}. After that it's ${dollars(SEAT_MONTHLY_CENTS)} a user a month, month to month, cancel any time. Or choose the ${COMMIT_MONTHS}-month plan for ${dollars(COMMIT_SEAT_CENTS)} a user a month.`,
+  commitExplained: `${dollars(COMMIT_SEAT_CENTS)} a user a month for ${COMMIT_MONTHS} months, counted from the start of the month you choose it. Leave before the ${COMMIT_MONTHS} months are up and you pay back what you saved: ${dollars(COMMIT_SAVING_CENTS)} a user for each month billed at ${dollars(COMMIT_SEAT_CENTS)} on the plan. When the ${COMMIT_MONTHS} months are up it carries on at ${dollars(SEAT_MONTHLY_CENTS)} a month, unless you choose another ${COMMIT_MONTHS}-month plan.`,
   gst: "Prices include GST.",
   /** Said beside the plan step's button, so trying the first month is plainly free of risk (5 Nov 2026, Martin). */
-  tryFirstMonth: `Try your first month for ${dollars(FIRST_MONTH_CENTS)} a user. Not for you? Cancel any time in Settings → Billing: no lock-in contract, and nothing more is charged.`,
+  tryFirstMonth: `Your first month is ${firstMonthWords}. Not for you? Cancel any time in Settings → Billing before it ends and nothing is charged. No lock-in contract.`,
   yearly: `${Math.round(YEARLY_DISCOUNT * 100)}% off when you pay for the year`,
   yearlySeat: `${dollars(Math.round(seatPriceCents("year") / 12))} a user a month, billed yearly`,
-  token: `${dollars(TOKEN_CENTS)} a design, ${dollars(BATTERY_DESIGN_CENTS)} with a battery`,
-  designsPerUser: `${DESIGNS_PER_USER} design jobs a user each month, pooled`,
-  firstMonthDesigns: `Up to ${FIRST_MONTH_DESIGNS} design jobs in your first month`,
-  poolExplained: `Each user brings ${DESIGNS_PER_USER} design jobs a month to one pool the whole business shares, so any designer can use them; your first month holds up to ${FIRST_MONTH_DESIGNS}. They start again on the 1st. Once they are used, design jobs come from your balance.`,
-  tokenExplained: `Beyond the month's pool, the design tool is ${dollars(TOKEN_CENTS)} a design job, ${dollars(BATTERY_DESIGN_CENTS)} once it has a battery: taken once a roof, the day it's saved, and the rest the day a battery goes on it. Open it, change it and send it again as often as you like. Packs add their price to your balance.`,
+  token: `${SITE_CREDITS} credits a site, ${BATTERY_SITE_CREDITS} with a battery`,
+  trialSites: `${TRIAL_SITES} free sites in your first month`,
+  tokenExplained: `The designer runs on credits your whole team shares: a site is ${SITE_CREDITS} credits, ${BATTERY_SITE_CREDITS} once it has a battery, taken once a roof. Open it, change it and send it again as often as you like. Credits start at ${dollars(CREDIT_CENTS)} each, and bigger packs add bonus credits. Your first month includes ${TRIAL_SITES} free sites.`,
+  packs: TOKEN_PACKS.map(packWords).join("; "),
   start: "Get started",
-  startExplained: `Your card is taken on Stripe's secure page and your plan starts straight away, at ${dollars(FIRST_MONTH_CENTS)} a user for the first month. Cancel any time: it runs to the end of the month you've paid for.`,
+  startExplained: `Your card is taken on Stripe's secure page. Your first month is ${firstMonthWords}, then ${dollars(SEAT_MONTHLY_CENTS)} a user a month. Cancel any time before it ends and nothing is charged.`,
   enterprise: `${ENTERPRISE_FROM} users or more? Talk to us about Enterprise.`,
 } as const;
 

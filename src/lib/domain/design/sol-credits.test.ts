@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { SOL_PACKS, cleanSolPack, creditSource, includedThisMonth, monthOf, solBalance } from "./sol-credits";
 
 describe("Sol credits", () => {
-  it("brings 150 a paid user a month, 100 on an old trial, none without a plan", () => {
-    expect(includedThisMonth({ status: "active", seats: 3 })).toBe(450);
-    expect(includedThisMonth({ status: "past_due", seats: 1 })).toBe(150);
+  it("brings 50 a paid user a month, 100 on an old trial, none without a plan", () => {
+    expect(includedThisMonth({ status: "active", seats: 3 })).toBe(150);
+    expect(includedThisMonth({ status: "past_due", seats: 1 })).toBe(50);
     expect(includedThisMonth({ status: "trialing", seats: 5 })).toBe(100);
     expect(includedThisMonth({ status: "canceled", seats: 5 })).toBe(0);
     expect(includedThisMonth(null)).toBe(0);
