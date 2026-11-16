@@ -15,11 +15,65 @@ import { SOL_PER_USER } from "./sol-credits";
  */
 export const SALES_HERO = {
   eyebrow: "RENUABL Business · Powered by AI",
+  /** Over the headline (16 Nov 2026, Martin: as xAI and OpenAI introduce theirs). */
+  introducing: "Introducing RENUABL Business",
   /** Said in two lines, the second lit in the signal orange. */
   headline: ["Solar just", "got a brain."],
   sub: "The all-in-one platform for solar businesses, with AI in every part.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
+} as const;
+
+/**
+ * The AI team, straight after the hero (16 Nov 2026, Martin: retailers should be excited they can run their business
+ * on AI, with the energy of xAI's Grok Bot and OpenAI's Dots pages). The agents as characters, each with its job and
+ * what it is doing now. Every line is something the product does today; Charlie and Alex are the phone agents of the
+ * Calls & Texts add-on, and the names are the ones a business gives them (made-up customers only).
+ */
+export const AI_TEAM = {
+  eyebrow: "Meet your AI team",
+  headline: ["Run your solar business", "on AI."],
+  sub: "Sol knows your deals, your products and the rules. Your phone agents ring your leads and book your installs. You stay in charge of every one of them.",
+  working: "At work",
+  agents: [
+    {
+      key: "sol",
+      name: "Sol",
+      job: "Knows your business",
+      what: "Answers the technical questions, drafts every follow-up and tells you who to call next.",
+      doing: [
+        "Drafted Jane Doe's follow-up",
+        "Checked AS/NZS 5139 for a garage battery",
+        "Found the usage in Adam Smith's bill",
+        "Summed up a service case in a line",
+      ],
+    },
+    {
+      key: "charlie",
+      name: "Charlie",
+      job: "Sales calls",
+      what: "Rings your new leads, answers their questions and books them a call with your team.",
+      doing: [
+        "On a call with Adam Smith · 2:14",
+        "Booked a 15-minute call for Thursday",
+        "Answered: is a battery worth it?",
+        "Texted Jane Doe her proposal link",
+      ],
+    },
+    {
+      key: "alex",
+      name: "Alex",
+      job: "Post sale",
+      what: "Calls your signed customers to book the install, offering only the days you have room for.",
+      doing: [
+        "Offered Jane Doe three install days",
+        "Pencilled in Tuesday 26 November",
+        "Calling Adam Smith to book his install",
+        "Told the team a day is pencilled in",
+      ],
+    },
+  ],
+  note: "Sol is in every plan. Your phone agents come with Calls & Texts. You name them, choose their voices and set what they say.",
 } as const;
 
 /**
@@ -601,6 +655,12 @@ export const CLOSING = {
 export function salesCopy(): string[] {
   return [
     ...Object.values(SALES_HERO).flat(),
+    AI_TEAM.eyebrow,
+    ...AI_TEAM.headline,
+    AI_TEAM.sub,
+    AI_TEAM.working,
+    AI_TEAM.note,
+    ...AI_TEAM.agents.flatMap((a) => [a.name, a.job, a.what, ...a.doing]),
     ...Object.values(ASK_DEMO),
     ASK_ANYTHING.label,
     ASK_ANYTHING.caption,

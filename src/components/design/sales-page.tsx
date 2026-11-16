@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, Check, Clock, Sparkles, X } from "lucide-react";
+import { AiTeam, BrandEyebrow, Sunrise } from "./business-brand";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import {
@@ -47,6 +48,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       <Hero signedIn={signedIn} />
+      <AiTeam />
       <Upgrade />
       <BigThree />
       <Journey />
@@ -149,40 +151,40 @@ function useFoldScroll() {
 
 function Header({ signedIn }: { signedIn: boolean }) {
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b0b0d]/85 text-white backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
         {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
         <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
-          <Wordmark />
+          <Wordmark tone="light" />
           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
-        <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
-          <a href="#step-design" className="hover:text-ink">
+        <nav className="hidden items-center gap-7 text-[14px] text-white/65 md:flex">
+          <a href="#step-design" className="hover:text-white">
             Designer
           </a>
-          <a href="#sol" className="hover:text-ink">
+          <a href="#sol" className="hover:text-white">
             Sol
           </a>
-          <a href="#network" className="hover:text-ink">
+          <a href="#network" className="hover:text-white">
             Marketplace
           </a>
-          <a href="#journey" className="hover:text-ink">
+          <a href="#journey" className="hover:text-white">
             How it works
           </a>
-          <a href="#pricing" className="hover:text-ink">
+          <a href="#pricing" className="hover:text-white">
             Pricing
           </a>
         </nav>
         <div className="flex items-center gap-3">
-          <Link href="/" className="hidden text-[14px] text-ink-2 hover:text-ink lg:inline">
+          <Link href="/" className="hidden text-[14px] text-white/65 hover:text-white lg:inline">
             For homeowners
           </Link>
           {signedIn ? (
-            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-ink hover:text-sun-line">
+            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-white hover:text-sun-line">
               Open RENUABL
             </Link>
           ) : (
-            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
+            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-white/65 hover:text-white">
               Sign in
             </Link>
           )}
@@ -339,14 +341,11 @@ function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section
       id="start"
-      className="relative isolate overflow-x-clip snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
+      className="relative isolate overflow-hidden bg-[#0b0b0d] text-white snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
       aria-labelledby="hero"
     >
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 -z-10 h-[80vh]"
-        style={{ background: "radial-gradient(55% 50% at 30% 30%, rgba(255,90,31,0.12), rgba(255,90,31,0) 70%)" }}
-      />
+      {/* The brand's sun rising behind the hero (16 Nov 2026, Martin: the page needed a brand feel, as xAI's and OpenAI's). */}
+      <Sunrise />
       {/*
         The words on the left and the film on the right, as large as the fold allows (16 Nov 2026, Martin: "i prefer when
         solar just got a brain was on the left and the video on the right", and the film bigger). On a large screen the
@@ -354,6 +353,9 @@ function Hero({ signedIn }: { signedIn: boolean }) {
       */}
       <div className="mx-auto grid w-full max-w-[100rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(18rem,28rem)_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-12 lg:pb-8 lg:pt-8">
         <div className="text-center lg:text-left">
+          <BrandEyebrow dark className="mb-6">
+            {SALES_HERO.introducing}
+          </BrandEyebrow>
           <h1 id="hero" className="text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
             {SALES_HERO.headline.map((part, i, all) => (
               <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
@@ -361,7 +363,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
               </span>
             ))}
           </h1>
-          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.sub}</p>
+          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-white/65 lg:mx-0">{SALES_HERO.sub}</p>
           <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
             <div className="flex flex-col items-center gap-4 sm:flex-row">
               <SignUpLink />
@@ -597,7 +599,7 @@ function Upgrade() {
         onMouseLeave={() => setPaused(false)}
       >
         <div>
-          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-bright">{UPGRADE.eyebrow}</p>
+          <BrandEyebrow dark>{UPGRADE.eyebrow}</BrandEyebrow>
           <h2 id="upgrade" className="mt-3 text-[clamp(36px,4.4vw,64px)] font-semibold leading-[0.95] tracking-[-0.045em]">
             {UPGRADE.headline}
           </h2>
@@ -751,7 +753,7 @@ function Journey() {
   return (
     <section id="journey" className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="journey-title">
       <Reveal className="mx-auto w-full max-w-4xl text-center">
-        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">How it works</p>
+        <BrandEyebrow>How it works</BrandEyebrow>
         <h2 id="journey-title" className="mt-5 text-[clamp(36px,5.5vw,72px)] font-semibold leading-[1] tracking-[-0.035em]">
           One deal. Start to finish. One place.
         </h2>
@@ -867,7 +869,7 @@ function Everything() {
   return (
     <section className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="everything">
       <Reveal className="mx-auto w-full max-w-6xl">
-        <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">And all of this, included</p>
+        <BrandEyebrow>And all of this, included</BrandEyebrow>
         <h2 id="everything" className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]">
           The rest of the toolbox, in every plan.
         </h2>
@@ -1015,7 +1017,7 @@ function Pricing() {
     <section id="pricing" className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="pricing-title">
       <Reveal className="mx-auto w-full max-w-7xl">
         <div className="text-center">
-          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-ink-2">{PRICING.eyebrow}</p>
+          <BrandEyebrow>{PRICING.eyebrow}</BrandEyebrow>
           <h2 id="pricing-title" className="mt-5 text-[clamp(36px,5vw,64px)] font-semibold leading-[1] tracking-[-0.035em]">
             {PRICING.headline}
           </h2>
@@ -1220,7 +1222,11 @@ function Faq() {
 
 function Closing() {
   return (
-    <section className="snap-start bg-primary px-5 py-24 text-white lg:px-8 lg:py-32" aria-labelledby="closing">
+    <section
+      className="relative isolate overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white snap-start lg:px-8 lg:pb-56 lg:pt-36"
+      aria-labelledby="closing"
+    >
+      <Sunrise size="small" />
       <Reveal className="mx-auto w-full max-w-3xl text-center">
         <h2 id="closing" className="text-[clamp(40px,6.5vw,84px)] font-semibold leading-[0.98] tracking-[-0.04em]">
           {CLOSING.headline}
