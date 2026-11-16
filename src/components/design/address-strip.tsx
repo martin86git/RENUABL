@@ -27,6 +27,7 @@ export function AddressStrip({
   deal,
   onCreate,
   onOpenDeal,
+  extra,
 }: {
   address: string;
   onPick: (address: Address) => void;
@@ -35,6 +36,8 @@ export function AddressStrip({
   /** Making a deal here (signed in, a business that sells); absent where none can be made. */
   onCreate?: (input: NewDealInput) => Promise<{ ok: true } | { ok: false; message: string }>;
   onOpenDeal?: () => void;
+  /** Beside the address: the business's design credits. */
+  extra?: React.ReactNode;
 }) {
   const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -75,6 +78,7 @@ export function AddressStrip({
           {searching ? <X className="size-4" aria-hidden /> : <Search className="size-4" aria-hidden />}
         </button>
       </div>
+      {extra}
       {deal ? (
         <button
           type="button"

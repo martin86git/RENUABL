@@ -32,6 +32,7 @@ import {
 } from "@/lib/services/design-store";
 import { createCustomer, loadJob, saveJob } from "@/lib/services/crm";
 import { AddressStrip, type NewDealInput } from "./address-strip";
+import { CREDITS_EVENT, DesignCredits } from "./design-credits";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
 import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
@@ -349,7 +350,11 @@ export function DesignStudio() {
           yieldPerKwDay={YIELD_PER_KW_DAY}
           onSave={async (next, extras, net) => {
             const problem = await saveRoofWork(roof, next, extras);
-            if (!problem) tellDeal({ saved: true });
+            if (!problem) {
+              tellDeal({ saved: true });
+              // A roof's first save, or its first with a battery, uses the business's credits: the chip reads them again.
+              if (signedIn) window.dispatchEvent(new Event(CREDITS_EVENT));
+            }
             // Designed for a customer's job: the job carries the quote's price, so the pipeline shows what it is worth.
             if (!problem && onJob && net !== null)
               void saveJob(onJob.id, { value: net, kw: designSummary(next.designs[next.primary] ?? next.designs[0]).kw });
@@ -500,6 +505,8 @@ export function DesignStudio() {
                   <AddressEntry compact placeholder="Search another address" onPick={pick} />
                 </div>
               )}
+              {/* The business's design credits (16 Nov 2026, Martin): in the pop-up they sit in the address strip. */}
+              {!popped && signedIn && <DesignCredits className="shrink-0" />}
             </>
           }
         />
@@ -509,6 +516,7 @@ export function DesignStudio() {
             onPick={pick}
             deal={onJob ? { customerName: onJob.customerName } : null}
             onOpenDeal={onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
+            extra={signedIn ? <DesignCredits className="h-12 px-4 text-[13px]" /> : null}
             onCreate={
               signedIn && !costsHidden() && cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer"
                 ? createDealHere
