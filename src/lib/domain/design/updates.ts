@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
+    area: "Design tool",
+    words: "Dragging out a row of panels, Sol counts it as it grows: the panels, the kW, and how many more to reach the target.",
+  },
+  {
+    day: "2026-11-16",
     area: "Sol",
     words:
       "Ask Sol to set up a call and he books it in your Google Calendar with a Google Meet link, then gives you the link to send. Connect your calendar again from the date tile first.",

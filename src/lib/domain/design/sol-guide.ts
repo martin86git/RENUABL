@@ -152,3 +152,25 @@ export function reachedWords(kw: number, target: GuideTarget | null): string {
     ? `Target reached: ${Math.round(kw * 100) / 100} kW of ${target.kw} kW. More panels only drive the cost up.`
     : `${Math.round(kw * 100) / 100} kW on the roof. Done placing?`;
 }
+
+/**
+ * What Sol says over a row of panels while it is being dragged out (16 Nov 2026, Martin: "as panels are being dragged
+ * to form an array, sol should let me know how many panels left"; he was counting them before letting go). `laying`
+ * is the panels in the row now, `placed` those already on the roof; with a target it says how many more to reach it,
+ * that the row reaches it, or how many it goes over.
+ */
+export function layingWords(
+  laying: number,
+  placed: number,
+  watts: number,
+  target: GuideTarget | null,
+): { row: string; left: string | null; state: "short" | "on" | "over" | "none" } {
+  const total = laying + placed;
+  const kw = Math.round((total * (watts || 475)) / 10) / 100;
+  const row = `${laying} ${laying === 1 ? "panel" : "panels"} · ${kw.toFixed(2)} kW${placed ? " in all" : ""}`;
+  if (!target || !(target.kw > 0)) return { row, left: null, state: "none" };
+  const need = panelsFor(target.kw, watts) - total;
+  if (need > 0) return { row, left: `${need} more to reach ${target.kw} kW`, state: "short" };
+  if (need === 0) return { row, left: `Target reached: ${target.kw} kW`, state: "on" };
+  return { row, left: `${-need} over the ${target.kw} kW target`, state: "over" };
+}

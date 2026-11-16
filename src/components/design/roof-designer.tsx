@@ -11,6 +11,7 @@ import {
   FREE_HOURS,
   guideStep,
   guiding,
+  layingWords,
   panelsFor,
   type GuideFacts,
   type GuideStepId,
@@ -1501,6 +1502,8 @@ export function RoofDesigner(props: {
   const [band, setBand] = useState<{ a: Point; b: Point } | null>(null);
   // The outline of the panel the "place a panel" tool would put down.
   const [ghosts, setGhosts] = useState<Ghost[]>([]);
+  // A row of panels being dragged out with Add a panel: Sol counts it as it grows (16 Nov 2026, Martin).
+  const [laying, setLaying] = useState(false);
   // Which way a picked group's turn handle points, in degrees from straight up: it follows the pointer while the group is spun.
   const [spinAt, setSpinAt] = useState(0);
   // The discussion: saved the moment something is said, apart from the drawing.
@@ -2808,6 +2811,7 @@ export function RoofDesigner(props: {
       if (!shown) return;
       svg.current?.setPointerCapture(e.pointerId);
       press.current = { mode: "array", anchor: shown };
+      setLaying(true);
       return setGhosts([shown]);
     }
     if (tool === "label") {
@@ -3119,6 +3123,7 @@ export function RoofDesigner(props: {
   const onPointerUp = (e: React.PointerEvent) => {
     const held = press.current;
     press.current = null;
+    setLaying(false);
     svg.current?.releasePointerCapture(e.pointerId);
     // The drag is over: whatever it changed becomes one step to undo.
     setSettled((n) => n + 1);
@@ -7968,6 +7973,43 @@ export function RoofDesigner(props: {
                         <Trash2 className="size-4" aria-hidden />
                         Remove
                       </button>
+                    </div>
+                  );
+                })()}
+
+              {/* A row being dragged out: how many panels, the kW, and how many more to the target, over the row as it grows
+                  (16 Nov 2026, Martin: he was counting them before letting go). */}
+              {laying &&
+                ghosts.length > 0 &&
+                (() => {
+                  const words = layingWords(ghosts.length, summary.panels, size.watts, guideTarget);
+                  const lefts = ghosts.map((g) => ((ROOF_IMAGE.width / 2 + g.x / scale - view.x) / view.w) * 100);
+                  const tops = ghosts.map((g) => ((ROOF_IMAGE.height / 2 + g.y / scale - view.y) / view.h) * 100);
+                  const left = (Math.min(...lefts) + Math.max(...lefts)) / 2;
+                  const top = Math.min(...tops);
+                  const low = Math.max(...tops);
+                  return (
+                    <div
+                      className="pointer-events-none absolute z-30 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-primary py-1.5 pl-2 pr-3.5 text-primary-ink shadow-lift"
+                      style={{
+                        left: `clamp(8rem, ${left}%, calc(100% - 8rem))`,
+                        top: top < 16 ? `calc(${low}% + 2.5rem)` : `calc(${top}% - 4rem)`,
+                      }}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <SolIcon className="size-4 text-sun-line" />
+                      <span className="text-[13px] font-semibold tabular-nums">{words.row}</span>
+                      {words.left && (
+                        <span
+                          className={clsx(
+                            "border-l border-white/20 pl-2 text-[13px] font-medium tabular-nums",
+                            words.state === "short" ? "text-white/80" : words.state === "on" ? "text-emerald-300" : "text-sun-bright",
+                          )}
+                        >
+                          {words.left}
+                        </span>
+                      )}
                     </div>
                   );
                 })()}

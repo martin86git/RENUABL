@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { guideStep, guiding, panelsFor, reachedWords, targetWords, type GuideFacts } from "./sol-guide";
-import { batteryForKw, batteryWords, unstrungWords, wantsInputs } from "./sol-guide";
+import { batteryForKw, batteryWords, unstrungWords, wantsInputs, layingWords } from "./sol-guide";
 
 const facts = (over: Partial<GuideFacts> = {}): GuideFacts => ({
   roof: "tile",
@@ -102,5 +102,24 @@ describe("panels already on the roof", () => {
     expect(guideStep(answered, facts({ existingSolar: true }))).toBe("existing");
     expect(guideStep([...answered, "existing"], facts({ existingSolar: true }))).toBe("panel");
     expect(guideStep(answered, facts())).toBe("panel");
+  });
+});
+
+describe("layingWords", () => {
+  it("counts the row and what is left to the target", () => {
+    expect(layingWords(6, 0, 475, { kw: 5.2, kwh: 0 })).toEqual({
+      row: "6 panels · 2.85 kW",
+      left: "5 more to reach 5.2 kW",
+      state: "short",
+    });
+    expect(layingWords(4, 7, 475, { kw: 5.2, kwh: 0 }).state).toBe("on");
+    expect(layingWords(8, 7, 475, { kw: 5.2, kwh: 0 })).toMatchObject({
+      row: "8 panels · 7.13 kW in all",
+      left: "4 over the 5.2 kW target",
+      state: "over",
+    });
+  });
+  it("counts alone without a target", () => {
+    expect(layingWords(1, 0, 475, null)).toEqual({ row: "1 panel · 0.48 kW", left: null, state: "none" });
   });
 });
