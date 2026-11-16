@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, Sparkles, X } from "lucide-react";
+import { ArrowRight, Check, Clock, Menu, Sparkles, X } from "lucide-react";
 import { AiTeam, BrandEyebrow, Sunrise } from "./business-brand";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
@@ -149,47 +149,78 @@ function useFoldScroll() {
   }, []);
 }
 
+/** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
+const PAGE_LINKS = [
+  { href: "#step-design", label: "Designer" },
+  { href: "#sol", label: "Sol" },
+  { href: "#team", label: "Your AI team" },
+  { href: "#network", label: "Marketplace" },
+  { href: "#journey", label: "How it works" },
+  { href: "#pricing", label: "Pricing" },
+] as const;
+
+/**
+ * The top bar (17 Nov 2026, Martin): the menu on the left, RENUABL alone in the middle (the wordmark, no "Business"
+ * beside it), Start demo and Sign up on the right.
+ */
 function Header({ signedIn }: { signedIn: boolean }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [open]);
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
-        {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
-        <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
+      {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
+      <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 lg:px-8">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls="page-menu"
+            aria-label={open ? "Close the menu" : "Open the menu"}
+            className="grid size-10 place-items-center rounded-full text-ink hover:bg-surface-2"
+          >
+            {open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
+          </button>
+          {open && (
+            <>
+              <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-0 cursor-default" onClick={() => setOpen(false)} />
+              <nav
+                id="page-menu"
+                className="absolute left-0 top-12 z-10 w-60 rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line"
+              >
+                {PAGE_LINKS.map((l) => (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    onClick={() => setOpen(false)}
+                    className="block rounded-xl px-3 py-2.5 text-[15px] text-ink-2 hover:bg-surface-2 hover:text-ink"
+                  >
+                    {l.label}
+                  </a>
+                ))}
+                <div className="my-1.5 h-px bg-line" />
+                <Link
+                  href={signedIn ? "/design" : "/design/sign-in"}
+                  className="block rounded-xl px-3 py-2.5 text-[15px] text-ink-2 hover:bg-surface-2 hover:text-ink"
+                >
+                  {signedIn ? "Open RENUABL" : "Sign in"}
+                </Link>
+              </nav>
+            </>
+          )}
+        </div>
+        <Link href="/business" aria-label="RENUABL Business" className="justify-self-center">
           <Wordmark />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
-        <nav className="hidden items-center gap-7 text-[14px] text-ink-2 md:flex">
-          <a href="#step-design" className="hover:text-ink">
-            Designer
-          </a>
-          <a href="#sol" className="hover:text-ink">
-            Sol
-          </a>
-          <a href="#network" className="hover:text-ink">
-            Marketplace
-          </a>
-          <a href="#journey" className="hover:text-ink">
-            How it works
-          </a>
-          <a href="#pricing" className="hover:text-ink">
-            Pricing
-          </a>
-        </nav>
-        <div className="flex items-center gap-3">
-          {signedIn ? (
-            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-ink hover:text-sun-line">
-              Open RENUABL
-            </Link>
-          ) : (
-            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-ink-2 hover:text-ink">
-              Sign in
-            </Link>
-          )}
-          {!signedIn && (
-            <span className="hidden sm:inline-flex">
-              <TryDemoButton look="bar" />
-            </span>
-          )}
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
+          <span className="hidden sm:inline-flex">
+            <TryDemoButton look="bar" label="Start demo" />
+          </span>
           <a
             href="#pricing"
             className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
@@ -370,7 +401,7 @@ function Hero({ signedIn }: { signedIn: boolean }) {
           </div>
         </div>
         <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:items-center lg:[container-type:size]">
-          <div className="w-full text-left lg:w-[min(100cqw,calc((100cqh-4.25rem)*1.6),62rem)]">
+          <div className="w-full text-left lg:w-[min(88cqw,calc((100cqh-7rem)*1.6),54rem)]">
             <ProductFilm />
           </div>
         </div>
