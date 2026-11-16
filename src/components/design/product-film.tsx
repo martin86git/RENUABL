@@ -38,14 +38,14 @@ const SHOTS: Shot[] = [
   {
     chapter: "service",
     src: "/design/landing/film/service-case.webp",
-    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.146, 0.21, 0.46, 0.12] }, { ms: 2600, light: [0.655, 0.724, 0.246, 0.276] }],
+    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.128, 0.205, 0.478, 0.13] }, { ms: 2600, light: [0.652, 0.72, 0.252, 0.263] }],
   },
   {
     chapter: "service",
     src: "/design/landing/film/service-reply.webp",
     moves: [
-      { ms: 2800, light: [0.165, 0.172, 0.438, 0.232] },
-      { ms: 2600, light: [0.165, 0.417, 0.438, 0.251] },
+      { ms: 2800, light: [0.13, 0.172, 0.475, 0.232] },
+      { ms: 2600, light: [0.155, 0.417, 0.46, 0.262] },
     ],
   },
   {
@@ -62,7 +62,7 @@ const SHOTS: Shot[] = [
     chapter: "design",
     src: "/design/landing/film/design-strings.webp",
     moves: [
-      { ms: 2400, light: [0.176, 0.253, 0.647, 0.073] },
+      { ms: 2400, light: [0.176, 0.253, 0.71, 0.073] },
       { ms: 2600, light: [0.345, 0.535, 0.145, 0.18] },
       { ms: 3000, light: [0.335, 0.767, 0.331, 0.103] },
     ],
@@ -75,7 +75,7 @@ const SHOTS: Shot[] = [
   {
     chapter: "proposal",
     src: "/design/landing/film/proposal-customer.webp",
-    moves: [{ ms: 2800, light: [0.211, 0.324, 0.579, 0.493] }],
+    moves: [{ ms: 2800, light: [0.211, 0.31, 0.579, 0.507] }],
   },
   {
     chapter: "signed",
@@ -90,7 +90,7 @@ const SHOTS: Shot[] = [
   {
     chapter: "marketing",
     src: "/design/landing/film/marketing.webp",
-    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.072, 0.456, 0.855, 0.185] }, { ms: 2600, light: [0.072, 0.665, 0.855, 0.076] }],
+    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.072, 0.456, 0.855, 0.185] }, { ms: 2600, light: [0.064, 0.655, 0.866, 0.088] }],
   },
   { chapter: "market", moves: [{ ms: 4200 }] },
 ];
