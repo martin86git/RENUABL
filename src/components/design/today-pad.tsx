@@ -149,6 +149,8 @@ export function TodayPad(props: {
     if (below > -40 && below < 480) el.scrollIntoView({ block: "end", behavior: reducedMotion() ? "auto" : "smooth" });
   }, []);
 
+  // My day pressed on the feed: written up in the feed's place, the deals staying beside it.
+  const [feedDay, setFeedDay] = useState(false);
   const showDay = () => {
     setOnFeed(false);
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
@@ -231,7 +233,14 @@ export function TodayPad(props: {
         )}
         {!welcoming && onFeed && (
           <div className="pb-6">
-            <DealFeed me={props.email} onNew={() => setAdding((a) => !a)} adding={adding} onDay={showDay} />
+            <DealFeed
+              me={props.email}
+              onNew={() => setAdding((a) => !a)}
+              adding={adding}
+              onDay={() => setFeedDay(true)}
+              day={feedDay ? <SolDay {...props} items={items} onGrow={() => {}} /> : null}
+              onDismissDay={() => setFeedDay(false)}
+            />
           </div>
         )}
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}

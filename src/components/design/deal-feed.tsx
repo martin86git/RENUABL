@@ -112,7 +112,15 @@ const EVENT_ICONS: Record<FeedEventKind, React.ComponentType<{ className?: strin
  * where it's at in Sol's words, the latest of the conversation and what Sol has lined up, with the controls to write
  * to the customer with Sol, have Sol call them, or bring in a teammate, all without leaving Today.
  */
-export function DealFeed(props: { me: string; onNew?: () => void; adding?: boolean; onDay?: () => void }) {
+export function DealFeed(props: {
+  me: string;
+  onNew?: () => void;
+  adding?: boolean;
+  onDay?: () => void;
+  /** Sol's day, shown in the feed's place with the deals still beside it (16 Nov 2026, Martin), and how to put it away. */
+  day?: React.ReactNode;
+  onDismissDay?: () => void;
+}) {
   const { me } = props;
   const [showAll, setShowAll] = useState(false);
   // The deal picked in the deals panel, shown as its card on the left.
@@ -349,6 +357,19 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               {problem}
             </p>
           )}
+          {/* My day, in the feed's place (16 Nov 2026, Martin: not the whole screen; the deals stay beside it). */}
+          {props.day && !pickedDeal && (
+            <div className="mt-9">
+              <button
+                type="button"
+                onClick={props.onDismissDay}
+                className="mb-3 inline-flex h-9 items-center gap-1.5 rounded-full bg-surface pl-2.5 pr-4 text-[13px] font-medium text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-ink-2"
+              >
+                <X className="size-4" aria-hidden /> Dismiss
+              </button>
+              <div className="max-w-[44rem]">{props.day}</div>
+            </div>
+          )}
           {/* A deal picked in the panel: its whole card, with the way back. */}
           {pickedDeal && (
             <div className="mt-9">
@@ -377,7 +398,7 @@ export function DealFeed(props: { me: string; onNew?: () => void; adding?: boole
               </div>
             </div>
           )}
-          <div className={clsx(pickedDeal && "hidden")}>
+          <div className={clsx((pickedDeal || props.day) && "hidden")}>
             <div className="flex flex-col">
               {/* The phone assistant's calls: on now, lined up and done today (12 Nov 2026, Martin). */}
               <TodayCalls id={TODAY_IDS.calls} className={clsx(TRAY, place.calls, view(TODAY_IDS.calls))} onSummary={setCalls} />
