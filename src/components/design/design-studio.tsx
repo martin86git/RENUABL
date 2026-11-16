@@ -438,7 +438,7 @@ export function DesignStudio() {
           savedLabel={kept}
           onUnsaved={noteUnsaved}
           tight={popped}
-          footRoom={popped ? 64 : 0}
+          footRoom={popped ? 52 : 0}
           bar={
             <>
               {/* In the pop-up the frame around it says where you are: no wordmark, every bit of width for the work. */}
@@ -516,7 +516,7 @@ export function DesignStudio() {
             onPick={pick}
             deal={onJob ? { customerName: onJob.customerName } : null}
             onOpenDeal={onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
-            extra={signedIn ? <DesignCredits className="h-12 px-4 text-[13px]" /> : null}
+            extra={signedIn ? <DesignCredits className="h-10 px-3.5 text-[13px]" /> : null}
             onCreate={
               signedIn && !costsHidden() && cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer"
                 ? createDealHere

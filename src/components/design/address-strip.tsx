@@ -42,9 +42,9 @@ export function AddressStrip({
   const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
   return (
-    <div className="mx-auto mt-3 flex w-full max-w-[min(100%,72rem)] flex-wrap items-center gap-2 px-1">
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-surface py-1.5 pl-4 pr-1.5 shadow-sm ring-1 ring-line">
-        <MapPin className="size-[18px] shrink-0 text-sun-line" aria-hidden />
+    <div className="mx-auto mt-1.5 flex w-full max-w-[min(100%,72rem)] flex-wrap items-center gap-2 px-1">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-surface py-0.5 pl-3.5 pr-1 shadow-sm ring-1 ring-line">
+        <MapPin className="size-4 shrink-0 text-sun-line" aria-hidden />
         {searching ? (
           <div className="min-w-0 flex-1">
             <AddressEntry
@@ -63,7 +63,7 @@ export function AddressStrip({
             type="button"
             onClick={() => setSearching(true)}
             title="Search another address"
-            className="min-w-0 flex-1 truncate py-1.5 text-left text-[16px] font-medium text-ink"
+            className="min-w-0 flex-1 truncate py-1.5 text-left text-[14.5px] font-medium text-ink"
           >
             {address}
           </button>
@@ -83,7 +83,7 @@ export function AddressStrip({
         <button
           type="button"
           onClick={onOpenDeal}
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-full bg-surface px-4 text-[15px] font-medium text-ink shadow-sm ring-1 ring-line hover:text-sun-ink"
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-surface px-4 text-[14px] font-medium text-ink shadow-sm ring-1 ring-line hover:text-sun-ink"
           title={`${deal.customerName}: open the deal`}
         >
           <UserRound className="size-4 text-sun-line" aria-hidden />
@@ -94,7 +94,7 @@ export function AddressStrip({
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-full bg-sun-line px-5 text-[15px] font-semibold text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] hover:brightness-105"
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-sun-line px-4 text-[14px] font-semibold text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] hover:brightness-105"
         >
           <Plus className="size-4" aria-hidden /> Create deal
         </button>
