@@ -47,7 +47,10 @@ import {
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
-import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { addActivity, customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { asksForMeeting, cleanMeeting, meetingDescription } from "@/lib/domain/design/sol-meeting";
+import { CalendarOff, bookMeeting } from "./my-calendar";
+import { siteUrl } from "@/lib/domain/sms";
 import { listMembers, loadLists, type Member } from "./design-repo";
 import { seesAllDeals, type DealViewer } from "@/lib/domain/design/account";
 
@@ -67,6 +70,10 @@ interface ToolGuard {
   readCustomerText: boolean;
   /** The files the member put on this message (for a datasheet to keep). */
   files: readonly SolFile[];
+  /** The member's own words this answer is for: a meeting is booked only when they ask for one (sol-meeting.ts). */
+  asked: string;
+  /** Meetings booked in this answer (at most two). */
+  booked: number;
 }
 import { casesForJob, casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
@@ -178,6 +185,26 @@ const TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { deal_id: { type: "string" }, subject: { type: "string" }, body: { type: "string" } },
       required: ["deal_id", "subject", "body"],
+    },
+  },
+  {
+    name: "book_meeting",
+    description:
+      "Put a meeting on this person's own Google Calendar, with a Google Meet link unless they don't want one, and get the link back to give them. Nobody is invited and Google emails no one: they send the link to the customer themselves. Only when they asked for a meeting, and only for a day and time they gave or that was plainly agreed (the market's local time); with no time, ask them for one instead of booking.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: 'What the event is called in their calendar ("Call with Mike Larry about his solar and battery").',
+        },
+        when_local: { type: "string", description: "When it starts, local time as YYYY-MM-DD HH:mm." },
+        minutes: { type: "integer", description: "How long, in minutes (30 unless they said)." },
+        meet: { type: "boolean", description: "Make a Google Meet link (true unless they said otherwise)." },
+        deal_id: { type: "string", description: "The deal it is about, if any." },
+        notes: { type: "string", description: "A line on what it's for. Never a customer's phone or email." },
+      },
+      required: ["title", "when_local"],
     },
   },
   {
@@ -473,6 +500,54 @@ async function runTool(
     );
     return hits.length ? hits.slice(0, 25).join("\n") : "Nothing on the price lists matches that.";
   }
+  if (name === "book_meeting") {
+    // Only on the member's own say-so: never because of something a customer wrote.
+    if (!asksForMeeting(guard.asked)) return "Not booked: they didn't ask for a meeting. Offer to book one instead.";
+    if (member.viewedBy) return "Not booked: this is someone else's view.";
+    if (guard.booked >= 2) return "That's two meetings booked in this answer: book more when they ask again.";
+    const clean = cleanMeeting(input);
+    if (!clean.ok) return clean.message;
+    const dealId = s(input.deal_id);
+    const deal = dealId ? await jobById(businessId, dealId, viewer) : null;
+    if (dealId && !deal) return "There's no such deal, or this person can't see it.";
+    const site = siteUrl();
+    const description = meetingDescription({
+      notes: clean.value.notes,
+      deal: deal ? `${deal.customer.name} · ${deal.job.title}` : undefined,
+      dealUrl: deal && site ? `${site}/design/deals/${deal.job.id}` : null,
+      by: email,
+    });
+    try {
+      const booked = await bookMeeting({ businessId, email }, clean.value, description);
+      guard.booked += 1;
+      if (deal)
+        await addActivity(
+          businessId,
+          deal.customer.id,
+          {
+            jobId: deal.job.id,
+            kind: "note",
+            text: `Meeting booked by Sol in ${email}'s calendar: ${clean.value.title}, ${dueWords(clean.value.start)}${booked.meet ? ` · ${booked.meet}` : ""}`,
+          },
+          "sol",
+        ).catch(() => undefined);
+      return [
+        `Booked in their Google Calendar: "${clean.value.title}", ${dueWords(clean.value.start)}, ${clean.value.minutes} minutes. Nobody was invited.`,
+        booked.meet
+          ? `Google Meet link (give it to them exactly): ${booked.meet}`
+          : clean.value.meet
+            ? "Google didn't make a Meet link for it: say so."
+            : "",
+        "Say it's booked and give the link, and that they can send it to the customer (Text on the deal's chat, or an email).",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    } catch (e) {
+      if (e instanceof CalendarOff) return `Not booked. ${e.message}`;
+      console.error("sol book_meeting failed", e instanceof Error ? e.message : e);
+      return "Not booked: Google Calendar didn't answer. Say so and suggest trying again shortly.";
+    }
+  }
   if (name === "draft_email") {
     if (shown.drafts.length >= DRAFTS_PER_TURN) return `Only ${DRAFTS_PER_TURN} drafts an answer.`;
     const got = await jobById(businessId, s(input.deal_id), viewer);
@@ -689,7 +764,7 @@ export async function askSol(
   if (!credit) return asItWas(SOL_OUT);
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
-  const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files };
+  const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text, booked: 0 };
   const [state, jobs, customers, serviceOpen] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),

@@ -16,8 +16,11 @@ export const CALENDAR_PROVIDERS: readonly { id: CalendarProvider; name: string }
 export const providerName = (p: CalendarProvider) => CALENDAR_PROVIDERS.find((x) => x.id === p)?.name ?? "Your calendar";
 export const isProvider = (p: unknown): p is CalendarProvider => p === "google" || p === "outlook";
 
-/** Reading events only: nothing is ever added, changed or deleted in their calendar. */
-export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events.readonly";
+/**
+ * Their events, read and added to: Sol books a meeting on it when they ask (sol-meeting.ts, 16 Nov 2026). Nothing is ever
+ * changed or deleted. A calendar connected before then was given reading only; it is asked to connect again to book.
+ */
+export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 export const OUTLOOK_SCOPE = "https://graph.microsoft.com/Calendars.Read";
 /**
  * Outlook is asked for its times in the market's own zone (Windows' name for Melbourne's), so an all-day event keeps
@@ -253,7 +256,7 @@ export const CONNECT_RESULTS: Record<string, string | null> = {
 
 export const CALENDAR_WORDS = {
   connectTitle: "Connect your calendar",
-  connectBody: "See your calendar here, beside your work. RENUABL only reads it, and only you see it.",
+  connectBody: "See your calendar here, beside your work, and let Sol book meetings on it when you ask. Only you see it.",
   viewing: "You're viewing as someone else: their calendar isn't shown.",
   broken: "Your calendar stopped sharing with RENUABL. Connect it again to see it here.",
   waiting: "Finish signing in in the window that opened.",

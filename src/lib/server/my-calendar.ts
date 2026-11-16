@@ -1,6 +1,6 @@
 /**
- * Server only. Each member's own calendar, read only (domain/design/my-calendar.ts): Google Calendar or Outlook, one at a
- * time. The provider's sign-in for read-only calendar access, the refresh token kept encrypted as Gmail's is (`seal`
+ * Server only. Each member's own calendar (domain/design/my-calendar.ts), read, and added to when Sol books a meeting (bookMeeting): Google Calendar or Outlook, one at a
+ * time. The provider's sign-in for calendar access, the refresh token kept encrypted as Gmail's is (`seal`
  * in gmail.ts) and never sent to a browser, and the one events call the popup needs.
  * - Google: the same client as "Continue with Google" (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET), with the
  *   Google Calendar API enabled on that project.
@@ -21,6 +21,7 @@ import {
   type OutlookEvent,
 } from "@/lib/domain/design/my-calendar";
 import { siteUrl } from "@/lib/domain/sms";
+import { googleEventBody, meetLinkOf, type MeetingAsk } from "@/lib/domain/design/sol-meeting";
 import { query } from "./db";
 import { open, seal } from "./gmail";
 
@@ -207,4 +208,37 @@ export async function calendarEvents(member: Who, timeMin: string, timeMax: stri
   if (!res.ok) throw new Error(`Calendar ${res.status}`);
   if (google) return cleanEvents(((await res.json()) as { items?: GoogleEvent[] }).items ?? []);
   return cleanOutlookEvents(((await res.json()) as { value?: OutlookEvent[] }).value ?? []);
+}
+
+/** A meeting Sol booked: its Meet link (null when none was asked for or Google gave none) and the event's own page. */
+export interface BookedMeeting {
+  meet: string | null;
+  link: string | null;
+}
+
+/**
+ * Puts an event on the member's own main Google Calendar (sol-meeting.ts): no guests, so Google emails nobody, and a
+ * Google Meet link when asked. Outlook isn't booked into yet. A calendar connected with reading only answers CalendarOff.
+ */
+export async function bookMeeting(member: Who, ask: MeetingAsk, description: string): Promise<BookedMeeting> {
+  const got = await accessToken(member);
+  if (!got) throw new CalendarOff("Their calendar isn't connected: they connect Google Calendar from the date tile at the top.");
+  if (got.provider !== "google") throw new CalendarOff("Their calendar is Outlook, and Sol can only book into Google Calendar so far.");
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${new URLSearchParams({ conferenceDataVersion: "1", sendUpdates: "none" })}`,
+    {
+      method: "POST",
+      headers: { authorization: `Bearer ${got.token}`, "content-type": "application/json" },
+      body: JSON.stringify(googleEventBody(ask, description, crypto.randomUUID())),
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (res.status === 401 || res.status === 403)
+    throw new CalendarOff(
+      "Their Google Calendar was connected for reading only: they connect it again (the date tile at the top, Disconnect, then Google Calendar) to let Sol book meetings.",
+    );
+  if (!res.ok) throw new Error(`Calendar ${res.status}`);
+  const e = (await res.json()) as Parameters<typeof meetLinkOf>[0] & { htmlLink?: unknown };
+  const link = typeof e.htmlLink === "string" && e.htmlLink.startsWith("https://www.google.com/calendar/") ? e.htmlLink : null;
+  return { meet: meetLinkOf(e), link };
 }
