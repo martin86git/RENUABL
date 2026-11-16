@@ -57,9 +57,13 @@ function eventOfActivity(kind: string, text: string, at: string, by: string): Fe
 export async function dealFeed(
   member: { businessId: string; businessName: string; email: string },
   viewer: DealViewer,
+  /** One deal only (the line at the top of its page, sol-on-deal.ts). */
+  only?: string,
 ): Promise<FeedDeal[]> {
   const businessId = member.businessId;
-  const jobs = (await listJobs(businessId, viewer)).filter((j) => OPEN_STAGES.includes(j.stage) || PRE_INSTALL_STAGES.includes(j.stage));
+  const jobs = (await listJobs(businessId, viewer)).filter(
+    (j) => (!only || j.id === only) && (OPEN_STAGES.includes(j.stage) || PRE_INSTALL_STAGES.includes(j.stage)),
+  );
   if (!jobs.length) return [];
   const ids = jobs.map((j) => j.id);
   const [pulses, box, customers, activity, messages, proposals, pads, marks] = await Promise.all([

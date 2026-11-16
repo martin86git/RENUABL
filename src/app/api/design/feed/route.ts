@@ -14,10 +14,17 @@ import { can, seesAllDeals } from "@/lib/domain/design/account";
  * GET → { deals, callsOn, team }: the deal feed on Today (deal-feed.ts), every deal this member may see that is being
  * sold or heading to install, whether Sol may ring customers, and the others in the business to bring in.
  */
-export async function GET() {
+export async function GET(request: Request) {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
+    // ?job=<id> → { deal }: that one deal's card, for Sol's line at the top of its page (sol-on-deal.ts); null when it
+    // isn't one the member may see, or isn't being sold or heading to install.
+    const only = new URL(request.url).searchParams.get("job");
+    if (only) {
+      const [deal] = await dealFeed(who.member, viewerOf(who.member), only);
+      return Response.json({ ok: true, deal: deal ?? null });
+    }
     // Sol looks over the deals not yet designed whose customers have said what they want, and asks for a design in
     // the deal's team chat (at most every few minutes a business; by rule, no credit).
     await solAsksForDesigns(who.member.businessId).catch((e) => console.error("sol's design requests", e instanceof Error ? e.message : e));

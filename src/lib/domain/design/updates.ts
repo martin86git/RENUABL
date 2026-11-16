@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
     area: "CRM",
+    words: "Sol now sits at the top of each deal: what last happened, the email he has lined up, and what the deal needs from you.",
+  },
+  {
+    day: "2026-11-16",
+    area: "CRM",
     words: "Bring your sold jobs in from Pylon: paste your Pylon key in Settings and each one becomes a deal with its signed proposal.",
   },
   {

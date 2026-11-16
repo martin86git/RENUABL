@@ -1344,7 +1344,7 @@ function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewin
 }
 
 /** A ring that empties as Sol's email nears its time. */
-function Countdown({ sol, now }: { sol: NonNullable<FeedDeal["sol"]>; now: Date }) {
+export function Countdown({ sol, now }: { sol: NonNullable<FeedDeal["sol"]>; now: Date }) {
   const end = Date.parse(sol.firesAt);
   const start = Date.parse(sol.readyAt ?? "") || end - 30 * 60_000;
   const left = Math.max(0, Math.min(1, (end - now.getTime()) / Math.max(1, end - start)));
@@ -1372,7 +1372,7 @@ function Countdown({ sol, now }: { sol: NonNullable<FeedDeal["sol"]>; now: Date 
  * (LIVE_SOFTWARE.md: Sol gives notice with a countdown instead of asking permission). Send now, an hour later,
  * tomorrow at 9, hold it, or don't send it.
  */
-function ReviewSol(props: { deal: FeedDeal; now: Date; onClose: () => void; onDone: () => void }) {
+export function ReviewSol(props: { deal: FeedDeal; now: Date; onClose: () => void; onDone: () => void }) {
   const sol = props.deal.sol!;
   const first = props.deal.customer.split(/\s+/)[0] || "them";
   const [subject, setSubject] = useState(sol.subject);

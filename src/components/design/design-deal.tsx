@@ -68,6 +68,7 @@ import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
+import { SolOnDealCard } from "./sol-on-deal";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 import { DealFiles } from "./deal-pulse";
@@ -561,6 +562,24 @@ export function DealPage({ id }: { id: string }) {
             }}
           />
         )}
+
+        {/* Sol's line (16 Nov 2026, Martin): what happened, what he does next, what the deal needs from you. */}
+        <SolOnDealCard
+          jobId={job.id}
+          phone={customer.phone || null}
+          refresh={activity.length * 1000 + designVersion}
+          onMove={(kind) =>
+            kind === "reply"
+              ? setTab("chat")
+              : kind === "design"
+                ? menu.onDesign()
+                : kind === "proposal"
+                  ? openTool("proposal")
+                  : kind === "book"
+                    ? setTab("details")
+                    : setTab("team")
+          }
+        />
 
         <CallNotetaker
           handle={notetaker}

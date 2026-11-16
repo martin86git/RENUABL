@@ -27,6 +27,8 @@ export const saveLeadRule = (leadRule: "adder" | "turns") =>
   ask<{ leadRule: "adder" | "turns" }>("/api/design/feed", { method: "POST", body: { leadRule } });
 
 export const loadFeed = () => ask<FeedAnswer>("/api/design/feed");
+/** One deal's card (or null), for Sol's line at the top of its page. */
+export const loadFeedDeal = (jobId: string) => ask<{ deal: FeedDeal | null }>(`/api/design/feed?job=${encodeURIComponent(jobId)}`);
 /** Sol writes an email to the deal's customer, as asked: words to change and send, nothing sent. */
 export const writeWithSol = (jobId: string, text: string) =>
   ask<{ subject: string; body: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/write`, { method: "POST", body: { ask: text } });
