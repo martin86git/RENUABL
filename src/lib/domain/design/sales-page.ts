@@ -42,6 +42,8 @@ export const UPGRADE = {
   eyebrow: "What you get",
   headline: "Your business, upgraded.",
   sub: "Out with the old way. Here's what changes the day you start.",
+  before: "The old way",
+  after: "With RENUABL",
   items: [
     {
       key: "crm",
@@ -242,12 +244,12 @@ export const JOURNEY: readonly JourneyStep[] = [
   {
     key: "three",
     step: "Check it",
-    title: "You lay it out. Sol asks what the quote needs.",
-    body: "Place the panels on today's aerial photo of the roof and string them in one press. Every string is checked against the inverter's inputs, and Sol asks what's still to decide, like blackout backup, before the quote goes out.",
+    title: "You lay it out. Sol spots what's left.",
+    body: "Place the panels on today's aerial photo of the roof. Sol points out what still needs doing, like panels not yet on a string, and strings them in one press, each checked against the inverter's inputs.",
     visual: {
       kind: "shot",
-      src: "/design/landing/film/design-ready.webp",
-      alt: "A finished design on the roof with its strings, battery and inverter, and Sol asking whether the customer wants blackout backup (example data)",
+      src: "/design/landing/film/design-strings.webp",
+      alt: "A design on the roof with half the panels strung and Sol pointing out the 21 panels not yet on a string (example data)",
     },
   },
   {
@@ -602,6 +604,8 @@ export function salesCopy(): string[] {
     UPGRADE.eyebrow,
     UPGRADE.headline,
     UPGRADE.sub,
+    UPGRADE.before,
+    UPGRADE.after,
     ...UPGRADE.items.flatMap((i) => [i.was, i.title, i.body]),
     FEATURES.headline,
     FEATURES.sub,

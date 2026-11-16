@@ -49,8 +49,11 @@ function focusAt(ms: number): Focus {
 }
 
 /**
- * A scene's camera: it closes in on the part marked `data-focus` with the given name, filling most of the scene and
- * kept inside it, and draws back to the whole scene for any name nothing is marked with. Shared by the film's scenes.
+ * A scene's camera: it closes in on the chat column (marked `data-camera-column`), filling the scene's width with it
+ * so no line is cut and no sliver of the sidebar is left, and moves up and down to the part marked `data-focus` with
+ * the given name, kept low with the lines before it above, its top kept in view. Measured again as that part grows (16 Nov 2026, Martin: measured while a line
+ * was still being typed, the zoom grew past the frame and cut the words off). Draws back to the whole scene for any name
+ * nothing is marked with. Shared by the film's scenes.
  */
 export function useFocusCamera(focus: string, most = 1.75) {
   const root = useRef<HTMLDivElement | null>(null);
@@ -59,20 +62,34 @@ export function useFocusCamera(focus: string, most = 1.75) {
     const box = root.current;
     const el = box?.querySelector<HTMLElement>(`[data-focus="${focus}"]`);
     if (!box || !el) return setCamera("none");
-    const W = box.offsetWidth;
-    const H = box.offsetHeight;
-    let x = 0;
-    let y = 0;
-    for (let n: HTMLElement | null = el; n && n !== box; n = n.offsetParent as HTMLElement | null) {
-      x += n.offsetLeft;
-      y += n.offsetTop;
-    }
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    const s = Math.max(1, Math.min(most, (0.82 * W) / w, (0.62 * H) / h));
-    const tx = Math.min(0, Math.max(W - W * s, W / 2 - (x + w / 2) * s));
-    const ty = Math.min(0, Math.max(H - H * s, H / 2 - (y + h / 2) * s));
-    setCamera(`translate(${tx}px, ${ty}px) scale(${s})`);
+    const column = el.closest<HTMLElement>("[data-camera-column]") ?? el;
+    const place = (n: HTMLElement) => {
+      let x = 0;
+      let y = 0;
+      for (let p: HTMLElement | null = n; p && p !== box; p = p.offsetParent as HTMLElement | null) {
+        x += p.offsetLeft;
+        y += p.offsetTop;
+      }
+      return { x, y };
+    };
+    const aim = () => {
+      const W = box.offsetWidth;
+      const H = box.offsetHeight;
+      const col = place(column);
+      const at = place(el);
+      const h = el.offsetHeight;
+      const s = Math.max(1, Math.min(most, W / column.offsetWidth));
+      const tx = Math.min(0, Math.max(W - W * s, W / 2 - (col.x + column.offsetWidth / 2) * s));
+      // As a chat reads: the newest part low in the frame with what came before above it, but its top never under
+      // the chapter's title.
+      const low = 0.86 * H - (at.y + h) * s;
+      const ty = Math.min(0, Math.max(H - H * s, Math.min(low, 0.14 * H - at.y * s)));
+      setCamera(`translate(${tx}px, ${ty}px) scale(${s})`);
+    };
+    aim();
+    const watch = new ResizeObserver(aim);
+    watch.observe(el);
+    return () => watch.disconnect();
   }, [focus, most]);
   return [root, camera] as const;
 }
@@ -158,7 +175,7 @@ export function SolScene({ ms, still }: { ms: number; still?: boolean }) {
         </aside>
 
         {/* Sol's chat, on the charcoal. */}
-        <section className="relative flex min-w-0 flex-1 flex-col text-white">
+        <section data-camera-column className="relative flex min-w-0 flex-1 flex-col text-white">
           <header className="flex items-center justify-center gap-[0.6cqw] py-[1.2cqw]">
             <SolMark className="size-[1.8cqw]" />
             <span className="text-[clamp(8px,1cqw,15px)] font-semibold">Sol</span>

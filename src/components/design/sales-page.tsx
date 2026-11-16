@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, Sparkles } from "lucide-react";
+import { ArrowRight, Check, Clock, Sparkles, X } from "lucide-react";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import {
@@ -637,7 +637,7 @@ function Upgrade() {
         </div>
         {/* The deck: the card on top, the next two peeking up behind it. */}
         <div className="relative min-w-0 pt-10">
-          <div className="relative aspect-[16/11] w-full">
+          <div className="relative aspect-[16/10] w-full">
             {items.map((item, i) => {
               const place = (i - at + items.length) % items.length;
               const shown = place < 3;
@@ -655,19 +655,35 @@ function Upgrade() {
                 >
                   <div className="relative h-full w-full overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-25px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
                     {shown && <UpgradeVisual k={item.key} live={place === 0 && !still} />}
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/55 to-transparent px-5 pb-4 pt-14 text-white sm:px-6">
-                      <p className="text-[12px] text-white/60 line-through decoration-sun-line">{item.was}</p>
-                      <p className="mt-1 text-[20px] font-semibold tracking-tight sm:text-[24px]">{item.title}</p>
-                      <p className="mt-0.5 max-w-xl text-[13px] text-white/80 sm:text-[14px]">{item.body}</p>
-                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
-          <p className="sr-only" aria-live="polite">
-            {now.title}: {now.body}
-          </p>
+          {/* The old way and the new, side by side under the screen (16 Nov 2026, Martin: a crossed-out line over the
+              picture wasn't instantly read as the old way). */}
+          <div
+            key={now.key}
+            className="film-pop mt-6 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_auto_minmax(0,1.2fr)] sm:items-stretch"
+            aria-live="polite"
+          >
+            <div className="rounded-2xl bg-white/[0.04] px-5 py-4 ring-1 ring-white/10">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                <X className="size-3.5" aria-hidden />
+                {UPGRADE.before}
+              </p>
+              <p className="mt-2 text-[16px] leading-snug text-white/55">{now.was}</p>
+            </div>
+            <ArrowRight className="hidden size-5 self-center text-sun-bright sm:block" aria-hidden />
+            <div className="rounded-2xl bg-white px-5 py-4 text-ink">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-sun-line">
+                <Check className="size-3.5" aria-hidden />
+                {UPGRADE.after}
+              </p>
+              <p className="mt-2 text-[18px] font-semibold leading-snug tracking-tight">{now.title}</p>
+              <p className="mt-1 text-[14px] leading-snug text-ink-2">{now.body}</p>
+            </div>
+          </div>
         </div>
       </div>
     </section>

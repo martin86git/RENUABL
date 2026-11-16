@@ -90,7 +90,7 @@ export function TeamScene({ ms, still }: { ms: number; still?: boolean }) {
         </aside>
 
         {/* The channel. */}
-        <section className="flex min-w-0 flex-1 flex-col">
+        <section data-camera-column className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center gap-[0.5cqw] border-b border-line px-[2.4cqw] py-[1.2cqw] text-[clamp(9px,1.1cqw,16px)] font-semibold text-ink">
             <Hash className="size-[1.2cqw] text-muted" />
             {T.channel}

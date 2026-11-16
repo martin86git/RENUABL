@@ -38,7 +38,7 @@ const SHOTS: Shot[] = [
   {
     chapter: "service",
     src: "/design/landing/film/service-case.webp",
-    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.165, 0.218, 0.434, 0.1] }, { ms: 2600, light: [0.655, 0.724, 0.246, 0.276] }],
+    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.146, 0.21, 0.46, 0.12] }, { ms: 2600, light: [0.655, 0.724, 0.246, 0.276] }],
   },
   {
     chapter: "service",
@@ -60,11 +60,11 @@ const SHOTS: Shot[] = [
   },
   {
     chapter: "design",
-    src: "/design/landing/film/design-ready.webp",
+    src: "/design/landing/film/design-strings.webp",
     moves: [
       { ms: 2400, light: [0.176, 0.253, 0.647, 0.073] },
-      { ms: 2600, light: [0.343, 0.529, 0.355, 0.198] },
-      { ms: 2600, light: [0.333, 0.726, 0.335, 0.146] },
+      { ms: 2600, light: [0.345, 0.535, 0.145, 0.18] },
+      { ms: 3000, light: [0.335, 0.767, 0.331, 0.103] },
     ],
   },
   {
@@ -81,7 +81,7 @@ const SHOTS: Shot[] = [
     chapter: "signed",
     src: "/design/landing/film/order.webp",
     moves: [
-      { ms: 2400, light: [0.1, 0.284, 0.455, 0.053] },
+      { ms: 2400, light: [0.085, 0.276, 0.475, 0.07] },
       { ms: 2400, light: [0.1, 0.549, 0.801, 0.451] },
     ],
   },
@@ -151,7 +151,8 @@ const BAR = 0.035;
 function cameraOf(light?: Rect) {
   if (!light) return "none";
   const [x, y, w, h] = light;
-  const s = Math.min(2.3, Math.max(1.05, 0.78 / (SCREEN.size * Math.max(w, h))));
+  // Never so close that the lit part, or the words round it, run off the frame (16 Nov 2026, Martin).
+  const s = Math.min(1.8, Math.max(1.05, 0.7 / (SCREEN.size * Math.max(w, h))));
   const centre = (f: number) => Math.min(0, Math.max(1 - s, 0.5 - f * s));
   const fx = SCREEN.left + SCREEN.size * (x + w / 2);
   const fy = SCREEN.top + SCREEN.size * (y + h / 2);
