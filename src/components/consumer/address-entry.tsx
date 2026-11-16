@@ -25,6 +25,8 @@ export function AddressEntry({
   entry,
   compact,
   placeholder,
+  above,
+  autoFocus,
 }: {
   className?: string;
   onPick?: (address: Address) => void;
@@ -32,6 +34,9 @@ export function AddressEntry({
   /** A slimmer box for a tool's header bar (the roof designer), in place of the home page's large one. */
   compact?: boolean;
   placeholder?: string;
+  /** The suggestions open above the box (a box at the foot of a window, as the designer's address strip). */
+  above?: boolean;
+  autoFocus?: boolean;
 }) {
   const router = useRouter();
   const { state, update } = useFlow();
@@ -123,6 +128,7 @@ export function AddressEntry({
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
           autoComplete="street-address"
+          autoFocus={autoFocus}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -176,7 +182,8 @@ export function AddressEntry({
           id={listId}
           role="listbox"
           className={cn(
-            "absolute left-0 top-full z-40 mt-2 overflow-hidden bg-surface py-2 shadow-[var(--shadow-lift)] ring-1 ring-line",
+            above ? "absolute bottom-full left-0 z-40 mb-2 overflow-hidden" : "absolute left-0 top-full z-40 mt-2 overflow-hidden",
+            "bg-surface py-2 shadow-[var(--shadow-lift)] ring-1 ring-line",
             compact ? "w-[26rem] max-w-[90vw] rounded-lg" : "right-0 rounded-3xl",
           )}
         >

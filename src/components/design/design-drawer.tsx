@@ -70,7 +70,7 @@ export function openDesigner(href: string, router: { push: (href: string) => voi
 }
 
 /** The drawer is told by the designer inside it (same site only). */
-type News = { saved?: boolean; unsaved?: boolean; fold?: boolean; go?: string; proposal?: boolean };
+type News = { saved?: boolean; unsaved?: boolean; fold?: boolean; go?: string; proposal?: boolean; job?: string };
 function tell(news: News) {
   if (inDrawer()) window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
@@ -103,11 +103,19 @@ export function DesignDrawer(props: {
 }) {
   const { src, open, onOpen, onFold, onSaved, onGo, back = "Back", onSwitch } = props;
   const tool = toolOf(src);
+  // A deal made from inside the designer (16 Nov 2026, Martin: Create deal under the map) is told here, so the deal's
+  // tools beside the window (Record, the proposal) are there at once, without loading the designer again.
+  const [adopted, setAdopted] = useState<{ src: string; job: string } | null>(null);
+  const dealJob = tool.job ?? (adopted?.src === src ? adopted.job : null);
   const [loaded, setLoaded] = useState(false);
   const [unsaved, setUnsaved] = useState(false);
   const frameEl = useRef<HTMLIFrameElement>(null);
+  const srcNow = useRef(src);
+  useEffect(() => {
+    srcNow.current = src;
+  });
   // The designer's "Proceed to proposal" (15 Nov 2026, Martin): it saves, then asks for the deal's proposal in this window.
-  const onProposal = tool.job && onSwitch ? () => onSwitch(proposalHref(tool.job!)) : undefined;
+  const onProposal = dealJob && onSwitch ? () => onSwitch(proposalHref(dealJob!)) : undefined;
   const heard = useRef({ onSaved, onFold, onGo, onProposal });
   useEffect(() => {
     heard.current = { onSaved, onFold, onGo, onProposal };
@@ -128,6 +136,7 @@ export function DesignDrawer(props: {
         heard.current.onFold();
         heard.current.onGo?.(news.go);
       }
+      if (typeof news.job === "string" && /^[\w-]{1,80}$/.test(news.job)) setAdopted({ src: srcNow.current, job: news.job });
       if (typeof news.unsaved === "boolean") setUnsaved(news.unsaved);
       if (news.saved) {
         setUnsaved(false);
@@ -162,7 +171,7 @@ export function DesignDrawer(props: {
   // should be one click from the quote): the designer open is told to bring its quote out; else the designer opens on it.
   const openQuote = () => {
     if (tool.kind === "design") frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "quote" } }, window.location.origin);
-    else if (onSwitch && tool.job) onSwitch(`${designHref(tool.job)}&side=quote`);
+    else if (onSwitch && dealJob) onSwitch(`${designHref(dealJob)}&side=quote`);
   };
   // To the proposal from a design not saved yet (8 Nov 2026, Martin: a "lose your changes?" box appeared): the proposal
   // reads the saved design, so the designer is asked to save first, and the proposal opens once it has. If no word comes
@@ -232,7 +241,7 @@ export function DesignDrawer(props: {
       {/* Its tools as rounds in the grey just left of the window (wide screens): the designer's orange round, the quote and
           the proposal's, the one open ringed. A site with no deal has them too (9 Nov 2026, Martin): its Proposal says why
           there is none yet and how to put it on a deal. */}
-      {open && onSwitch && (tool.job || tool.kind === "design") && (
+      {open && onSwitch && (dealJob || tool.kind === "design") && (
         <nav
           aria-label="This deal's tools"
           className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
@@ -244,7 +253,7 @@ export function DesignDrawer(props: {
               // Already designing: the round brings the Designer view (the home, Sol, the switchboard, the notes) out or away.
               tool.kind === "design"
                 ? frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "designer" } }, window.location.origin)
-                : onSwitch(designHref(tool.job!))
+                : onSwitch(designHref(dealJob!))
             }
             aria-pressed={tool.kind === "design"}
             aria-label="Design"
@@ -270,8 +279,8 @@ export function DesignDrawer(props: {
             onClick={() =>
               tool.kind === "proposal"
                 ? undefined
-                : tool.job
-                  ? saveThen(proposalHref(tool.job))
+                : dealJob
+                  ? saveThen(proposalHref(dealJob))
                   : frameEl.current?.contentWindow?.postMessage({ renuablDesign: { side: "proposal" } }, window.location.origin)
             }
             aria-pressed={tool.kind === "proposal"}
@@ -285,7 +294,7 @@ export function DesignDrawer(props: {
             <FileText className="size-5" aria-hidden />
           </button>
           {/* Record a walkthrough (15 Nov 2026, Martin: floating in the grey around the designer, not on the picture). */}
-          {tool.kind === "design" && tool.job && (
+          {tool.kind === "design" && dealJob && (
             <button
               type="button"
               onClick={() => frameEl.current?.contentWindow?.postMessage({ renuablDesign: { record: true } }, window.location.origin)}

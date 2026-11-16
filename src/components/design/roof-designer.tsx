@@ -155,6 +155,8 @@ import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/desi
 import {
   faces as facesWay,
   parseCommand,
+  asksForGuide,
+  examplePrompt,
   allByQuery,
   pricesInWords,
   pickByQuery,
@@ -1019,6 +1021,8 @@ export function RoofDesigner(props: {
   onSave: (set: DesignSet, extras: DesignExtras, net: number | null) => Promise<string | null>;
   /** Inside the designer pop-up (8 Nov 2026): a squarer window, so the bar is trimmed to one line and the picture fits it. */
   tight?: boolean;
+  /** Room kept under the picture in the first fold, in pixels: the address strip under it in the pop-up. */
+  footRoom?: number;
   /** What to say once saved: where the work is kept ("Saved to your account", "Saved on this device"). */
   savedLabel?: string;
   /** Makes the proposal from the design just saved. Answers with what went wrong, or null. */
@@ -1529,6 +1533,7 @@ export function RoofDesigner(props: {
   // strip starts on the page to the foot of the window, since the bar above it changes height with what it holds.
   // The strip may arrive after the designer mounts, so it is watched from its own ref.
   const [fitPx, setFitPx] = useState<number | null>(null);
+  const footRoomNow = useRef(props.footRoom);
   // The first fold from the top of the figures strip, which the column beside the picture keeps within.
   const [foldPx, setFoldPx] = useState<number | null>(null);
   const stripBox = useCallback((strip: HTMLElement | null) => {
@@ -1536,7 +1541,7 @@ export function RoofDesigner(props: {
     const measure = () => {
       const box = strip.getBoundingClientRect();
       const top = box.top + window.scrollY;
-      const room = window.innerHeight - top - box.height - 8 - 16;
+      const room = window.innerHeight - top - box.height - 8 - 16 - (footRoomNow.current ?? 0);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
       setFoldPx(Math.max(320, Math.round(window.innerHeight - top - 16)));
     };
@@ -5054,6 +5059,19 @@ export function RoofDesigner(props: {
       setCommandOpen(false);
       return;
     }
+    // "Design this with me, step by step" (the example Tab takes): Sol leads the design from its first question (the
+    // home), keeping what is on the design and what has been answered once there are panels.
+    if (asksForGuide(text) && !costsHidden) {
+      if (!summary.panels) {
+        setGuideAnswered([]);
+        setGuideTarget(null);
+      }
+      setGuideOn(true);
+      setCommandText("");
+      setCommandReply(null);
+      setCommandOpen(false);
+      return;
+    }
     setCommandBusy(true);
     setAsked(text);
     setCommandText("");
@@ -6490,8 +6508,13 @@ export function RoofDesigner(props: {
                         onChange={(e) => setCommandText(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Escape") putSolAway();
+                          // Tab takes the example (16 Nov 2026, Martin).
+                          if (e.key === "Tab" && !e.shiftKey && !commandText.trim()) {
+                            e.preventDefault();
+                            setCommandText(examplePrompt(summary.panels));
+                          }
                         }}
-                        placeholder="Fit 8 kW on the north face · add the storage it needs · how could I bring the payback down?"
+                        placeholder={`${examplePrompt(summary.panels)}  ⇥ Tab`}
                         aria-label="Tell Sol what to change in the design, or ask him about it"
                         className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-white outline-none placeholder:text-white/45"
                       />
@@ -6595,8 +6618,12 @@ export function RoofDesigner(props: {
                           setCommandOpen(false);
                           setCommandReply(null);
                         }
+                        if (e.key === "Tab" && !e.shiftKey && !commandText.trim()) {
+                          e.preventDefault();
+                          setCommandText(examplePrompt(summary.panels));
+                        }
                       }}
-                      placeholder="Fit 8 kW on the north face · use the Sigenergy battery · why is string B failing?"
+                      placeholder={`${examplePrompt(summary.panels)}  ⇥ Tab`}
                       aria-label="Tell Sol what to change in the design"
                       className="h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
                     />
@@ -9435,8 +9462,14 @@ export function RoofDesigner(props: {
               )}
               {tips.corner}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
-              {guideActive && !menu && !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-[6.25rem] z-30 flex justify-center">
+              {guideActive && !menu && !(props.tight && !solAway && (commandReply || commandBusy)) && (
+                <div
+                  className={clsx(
+                    "pointer-events-none absolute inset-x-0 flex justify-center",
+                    // Above Sol's box while it is open (16 Nov 2026, Martin: the box hid the step at hand).
+                    props.tight && !solAway && commandOpen ? "bottom-[10.5rem] z-[56]" : "bottom-[6.25rem] z-30",
+                  )}
+                >
                   <SolGuide
                     step={guideNow}
                     placing={

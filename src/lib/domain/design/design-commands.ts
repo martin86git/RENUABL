@@ -610,3 +610,18 @@ export function pricesInWords(p: {
   kind("Batteries", p.batteries);
   return out.join("\n");
 }
+
+/**
+ * The example in Sol's box, which Tab takes (16 Nov 2026, Martin: "i should be able to press tab to actually use that
+ * text prompt, which should trigger sol's step by step question"). On a design with nothing on it the example is to
+ * design it together; once there are panels, the usual requests.
+ */
+export const GUIDE_PROMPT = "Design this with me, step by step";
+export const CHANGE_PROMPT = "Fit 8 kW on the north face";
+export const examplePrompt = (panels: number) => (panels > 0 ? CHANGE_PROMPT : GUIDE_PROMPT);
+
+/** Whether words ask Sol to lead the design a step at a time (his guide), rather than to change something. */
+export function asksForGuide(raw: string): boolean {
+  const t = raw.trim().toLowerCase();
+  return /\bstep[\s-]*by[\s-]*step\b/.test(t) || /^(design|do) (this|it) with me\b/.test(t) || /^(guide|walk|lead) me\b/.test(t);
+}

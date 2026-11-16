@@ -3,7 +3,6 @@
 import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets";
 import { findDatasheetOnline, loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
-import { MapPin } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DesignBrief } from "./design-brief";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -31,7 +30,8 @@ import {
   whereKept,
   costsHidden,
 } from "@/lib/services/design-store";
-import { loadJob, saveJob } from "@/lib/services/crm";
+import { createCustomer, loadJob, saveJob } from "@/lib/services/crm";
+import { AddressStrip, type NewDealInput } from "./address-strip";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
 import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
@@ -64,7 +64,7 @@ const STEPS = [
  * Opened inside a deal's design drawer (an iframe of this page), the deal is told when the design is saved or published,
  * so its system details fill in from it there and then, and whether there is work not yet saved. Same site only.
  */
-function tellDeal(news: { saved?: boolean; unsaved?: boolean; fold?: boolean }) {
+function tellDeal(news: { saved?: boolean; unsaved?: boolean; fold?: boolean; job?: string }) {
   if (typeof window === "undefined" || window.parent === window) return;
   window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
@@ -88,7 +88,6 @@ export function DesignStudio() {
   // Null until this device's last roof has been looked up, so the address box doesn't flash before a saved roof.
   // Inside the designer pop-up: the bar is trimmed and the picture sized to the window.
   const popped = useInDrawer();
-  const [finding, setFinding] = useState(false);
   const [ready, setReady] = useState(false);
   const [roof, setRoof] = useState<DesignRoof | null>(null);
   // The work the designer opens on: a draft kept from an earlier visit when there is one still drawn over the saved roof
@@ -295,6 +294,33 @@ export function DesignStudio() {
   const waiting = useChatWaiting(onJob?.id ?? null);
   const signedIn = Boolean(account?.signedIn && account.business);
 
+  /**
+   * Create deal from the address strip (16 Nov 2026, Martin): a customer and their first deal at this roof's address, made
+   * where the designer is, nothing navigated. The design is saved, so the deal finds this roof (its design joins it),
+   * and the pop-up is told the deal, so its tools (Record, the proposal) are there at once.
+   */
+  const createDealHere = async (input: NewDealInput): Promise<{ ok: true } | { ok: false; message: string }> => {
+    if (!roof) return { ok: false, message: "Open an address first." };
+    const res = await createCustomer({
+      name: [input.firstName, input.lastName].filter(Boolean).join(" "),
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phone: input.phone,
+      email: input.email,
+      address: roof.address,
+      lat: roof.lat,
+      lng: roof.lng,
+      source: "Design tool",
+      notes: "",
+    });
+    if (!res.ok) return { ok: false, message: res.message };
+    if (!res.job) return { ok: false, message: "The customer was kept, but their deal couldn't be made: add it from their page." };
+    window.dispatchEvent(new Event("renuabl:design-save"));
+    setJob({ id: res.job.id, customerId: res.customer.id, customerName: res.customer.name, lat: roof.lat, lng: roof.lng });
+    tellDeal({ job: res.job.id, saved: true });
+    return { ok: true };
+  };
+
   if (roof && work && image)
     return (
       <div className={popped ? "theme-studio" : "theme-studio pb-10"}>
@@ -407,6 +433,7 @@ export function DesignStudio() {
           savedLabel={kept}
           onUnsaved={noteUnsaved}
           tight={popped}
+          footRoom={popped ? 64 : 0}
           bar={
             <>
               {/* In the pop-up the frame around it says where you are: no wordmark, every bit of width for the work. */}
@@ -467,26 +494,8 @@ export function DesignStudio() {
                   )}
                 </button>
               )}
-              {/* Another roof, without leaving the designer; in the pop-up behind a round, for the odd wrong address. */}
-              {popped ? (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setFinding(!finding)}
-                    aria-expanded={finding}
-                    title="The wrong address? Find the right one"
-                    aria-label="Find another address"
-                    className="flex size-9 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink"
-                  >
-                    <MapPin className="size-4" aria-hidden />
-                  </button>
-                  {finding && (
-                    <div className="absolute left-full top-0 z-50 ml-2 w-80 rounded-lg bg-surface p-2 shadow-lift ring-1 ring-line">
-                      <AddressEntry compact placeholder="The right address" onPick={pick} />
-                    </div>
-                  )}
-                </div>
-              ) : (
+              {/* Another roof, without leaving the designer; in the pop-up it is the address strip under the picture. */}
+              {!popped && (
                 <div className="w-72 min-w-44 max-w-full shrink xl:w-80 2xl:w-96">
                   <AddressEntry compact placeholder="Search another address" onPick={pick} />
                 </div>
@@ -494,6 +503,19 @@ export function DesignStudio() {
             </>
           }
         />
+        {popped && (
+          <AddressStrip
+            address={roof.address}
+            onPick={pick}
+            deal={onJob ? { customerName: onJob.customerName } : null}
+            onOpenDeal={onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
+            onCreate={
+              signedIn && !costsHidden() && cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer"
+                ? createDealHere
+                : undefined
+            }
+          />
+        )}
         {pictureMissing && (
           <p className="mx-auto mt-4 max-w-3xl rounded-lg bg-warning-soft px-5 py-3 text-center text-[13.5px] text-warning" role="status">
             The picture of this roof couldn&apos;t be loaded, so there is nothing to trace yet. Try again in a moment, or change the

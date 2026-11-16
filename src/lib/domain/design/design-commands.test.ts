@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHANGE_PROMPT,
+  GUIDE_PROMPT,
   PRICED_PER_KIND,
+  asksForGuide,
+  examplePrompt,
   allByQuery,
   batteryWords,
   confirmWord,
@@ -279,5 +283,19 @@ describe("two ways at once", () => {
     expect(commandFrom({ ...base, facing: "E", also_facing: "W" })).toEqual({ do: "targetKw", kw: 10, facing: "E", also: "W" });
     expect(commandFrom({ ...base, facing: "E", also_facing: "E" })).toEqual({ do: "targetKw", kw: 10, facing: "E" });
     expect(commandFrom({ ...base, facing: null, also_facing: "W" })).toEqual({ do: "targetKw", kw: 10 });
+  });
+});
+
+describe("Sol's example prompt", () => {
+  it("offers the step by step on an empty design, and a change once there are panels", () => {
+    expect(examplePrompt(0)).toBe(GUIDE_PROMPT);
+    expect(examplePrompt(12)).toBe(CHANGE_PROMPT);
+  });
+  it("reads a request to be led step by step", () => {
+    expect(asksForGuide(GUIDE_PROMPT)).toBe(true);
+    expect(asksForGuide("walk me through it")).toBe(true);
+    expect(asksForGuide("design it with me")).toBe(true);
+    expect(asksForGuide(CHANGE_PROMPT)).toBe(false);
+    expect(asksForGuide("add a battery")).toBe(false);
   });
 });

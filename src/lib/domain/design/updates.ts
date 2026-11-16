@@ -14,6 +14,16 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-16",
+    area: "Designer",
+    words: "The address sits under the map: search another there, or Create deal to put the design on a new customer's deal.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Designer",
+    words: "Press Tab in Sol's box to use the example. On a new design it starts Sol's step by step questions.",
+  },
+  {
     day: "2026-11-15",
     area: "Team chat",
     words: "Text a customer back from their deal's chat. Their replies show under their name, and each deal shows its address.",
