@@ -58,8 +58,8 @@ export const UPGRADE = {
     {
       key: "design",
       was: "Drawing every roof from scratch",
-      title: "A design tool that designs itself",
-      body: "Ask for 8 kW and a battery, or press once for three designs, priced as they're drawn.",
+      title: "A designer with AI beside you",
+      body: "Sol suggests the system from the bill. You lay it out, and the quote prices itself as you go.",
     },
     {
       key: "proposals",
@@ -118,7 +118,10 @@ export const ASK_ANYTHING = {
       answer: "The clearances and barriers it asks for, and why. Check the clause in your copy.",
     },
     { ask: "Write the follow-up for Priya's proposal", answer: "Drafted in your voice. Have a read, then press send." },
-    { ask: "Read this bill and size the system", answer: "About 18 kWh a day. Three designs are ready, each priced against it." },
+    {
+      ask: "Read this bill and size the system",
+      answer: "About 18 kWh a day. I'd suggest 6.6 kW of panels and a battery for the evenings. Want to lay it out?",
+    },
   ],
   caption: "Requests you can make in RENUABL today. Made-up customers.",
 } as const;
@@ -228,16 +231,24 @@ export const JOURNEY: readonly JourneyStep[] = [
   {
     key: "design",
     step: "Design",
-    title: "Draw the roof. The quote builds itself.",
-    body: "Panels, rails, brackets, inverter, battery and every fee, priced from your own wholesaler lists as you place them. Strung and checked against the inverter's inputs.",
-    visual: { kind: "demo", demo: "automation" },
+    title: "Sol suggests. You design.",
+    body: "Add the customer's bill and Sol suggests the system to suit it, with his reasons. You lay it out on the roof and change anything, and the quote prices from your own wholesaler lists as you go.",
+    visual: {
+      kind: "shot",
+      src: "/design/landing/film/design-sol.webp",
+      alt: "The designer with Sol suggesting the size of panels and battery from the customer's bill (example data)",
+    },
   },
   {
     key: "three",
-    step: "Design it for me",
-    title: "Three designs. One click.",
-    body: "The fastest payback, the most dollars back over the years, the most independence. Each laid by installer rules, priced and strung, set against the customer's bill.",
-    visual: { kind: "demo", demo: "three" },
+    step: "Check it",
+    title: "You lay it out. Sol asks what the quote needs.",
+    body: "Place the panels on today's aerial photo of the roof and string them in one press. Every string is checked against the inverter's inputs, and Sol asks what's still to decide, like blackout backup, before the quote goes out.",
+    visual: {
+      kind: "shot",
+      src: "/design/landing/film/design-ready.webp",
+      alt: "A finished design on the roof with its strings, battery and inverter, and Sol asking whether the customer wants blackout backup (example data)",
+    },
   },
   {
     key: "proposal",

@@ -15,7 +15,6 @@ import {
   FAQ,
   JOURNEY,
   MARKETPLACE,
-  ASK_DEMO,
   BIG_THREE,
   FEATURES,
   PRICING,
@@ -28,14 +27,7 @@ import {
 } from "@/lib/domain/design/sales-page";
 import { askSales, registerInterest, startPlan } from "@/lib/services/billing";
 import { TryDemoButton } from "./business-demo";
-import {
-  AfterSigningDemo,
-  AskDesignDemo,
-  AutomationDemo,
-  ConversationDemo,
-  ListingRoofExample,
-  ThreeDesignsDemo,
-} from "./designer-showcase";
+import { AfterSigningDemo, AutomationDemo, ConversationDemo, ListingRoofExample, ThreeDesignsDemo } from "./designer-showcase";
 import { Reveal } from "./front-hero";
 import { SolIcon } from "./sol-icon";
 import { MarketplaceMark } from "./marketplace-bar";
@@ -488,10 +480,10 @@ function UpgradeVisual({ k }: { k: (typeof UPGRADE.items)[number]["key"] }) {
     case "sol":
       return shot("/design/landing/today-sol.webp", "Sol writing up the day, the most pressing thing at the top");
     case "design":
-      return (
-        <div className="absolute inset-0 overflow-hidden bg-canvas p-3">
-          <AskDesignDemo label={ASK_DEMO.label} request={ASK_DEMO.request} reply={ASK_DEMO.reply} />
-        </div>
+      return shot(
+        "/design/landing/film/design-sol.webp",
+        "Sol suggesting the system from the customer's bill in the designer",
+        "object-center",
       );
     case "proposals":
       return <ProposalCardExample />;
