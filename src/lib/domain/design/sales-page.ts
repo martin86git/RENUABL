@@ -16,14 +16,78 @@ import { SOL_PER_USER } from "./sol-credits";
 export const SALES_HERO = {
   eyebrow: "RENUABL Business · Powered by AI",
   /** Over the headline (16 Nov 2026, Martin: as xAI and OpenAI introduce theirs). */
-  introducing: "Introducing",
-  /** What is introduced, said large under it (17 Nov 2026, Martin: "introducing something big"). */
-  newWay: "The new way to run your solar business.",
-  /** Said in two lines, the second lit in the signal orange. */
-  headline: ["Solar just", "got a brain."],
-  sub: "The all-in-one platform for solar businesses, with AI in every part.",
+  introducing: "Introducing RENUABL",
+  /**
+   * Lead with the sales team (17 Nov 2026, Martin: "ultimately what's going to really drive willingness to try is the
+   * potential to increase sales… we should instantly lead with YOUR SALES TEAM"). The second part lit in orange.
+   */
+  headline: ["Your new", "sales team."],
+  /** What Sol is, said plainly (Martin: a prospect won't know what, let alone who, Sol is). */
+  sub: "Sol is AI built for solar sales. He works every deal beside you, follows up every lead and tells you who to call next. Charlie and Alex work the phones.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
+} as const;
+
+/**
+ * The sales loop, the slide after the hero (17 Nov 2026, Martin: "selling revenue is probably the easiest thing to
+ * sell… the power of the features is being lost", and every tile needs motion). Four moving tiles, each one thing the
+ * team does to a lead, in order. Mechanisms, never a promised result: no figure for sales won.
+ */
+export const SALES_LOOP = {
+  eyebrow: "How your sales team sells",
+  headline: "No lead left cold.",
+  sub: "Speed to lead, programmed follow-up, and a voice agent your customer can call while they read their proposal.",
+  tiles: [
+    {
+      key: "call",
+      who: "charlie",
+      title: "Speed to lead.",
+      body: "A new lead comes in and Charlie rings them, answers their questions and books them in with your team.",
+      scene: {
+        lead: "New lead · Olivia Hart",
+        ringing: "Calling Olivia",
+        talking: "On the call",
+        booked: "Booked a 15-minute call · Thu 10:00 am",
+      },
+    },
+    {
+      key: "follow",
+      who: "sol",
+      title: "Programmed follow-up.",
+      body: "Sol writes each customer's follow-up and it goes on schedule, 2, 7 and 14 days after the proposal. Or check each one before it goes.",
+      scene: {
+        opened: "Priya opened her proposal · twice",
+        drafted: "Follow-up written for Priya",
+        goes: "Goes in",
+        sent: "Sent from Priya's deal",
+      },
+    },
+    {
+      key: "callme",
+      who: "charlie",
+      title: "A voice agent on every proposal.",
+      body: "Reading their proposal, the customer presses Call me. Charlie rings, goes through it with them and meets their worries.",
+      scene: {
+        title: "Solar and battery for Jane Doe",
+        button: "Call me",
+        ringing: "Charlie is calling Jane",
+        said: "Hi Jane, it's Charlie. Happy to go through your battery questions.",
+      },
+    },
+    {
+      key: "signed",
+      who: "sol",
+      title: "Signed online, deposit asked.",
+      body: "Your proposal, in your brand. They choose a system, sign and pay the deposit by card.",
+      scene: {
+        title: "Solar and battery for Jane Doe",
+        going: "I'd like to go ahead",
+        name: "Jane Doe",
+        signed: "Signed",
+        deposit: "Deposit due · pay by card",
+      },
+    },
+  ],
 } as const;
 
 /**
@@ -100,6 +164,7 @@ export const HERO_LIVE = {
     note: "Written answers on this page. In RENUABL, Sol answers from your own business.",
   },
   film: { eyebrow: "See it work", headline: "A day with Sol, start to finish." },
+  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs" },
 } as const;
 
 export const AI_TEAM = {
@@ -750,6 +815,11 @@ export const CLOSING = {
 export function salesCopy(): string[] {
   return [
     ...Object.values(SALES_HERO).flat(),
+    SALES_LOOP.eyebrow,
+    SALES_LOOP.headline,
+    SALES_LOOP.sub,
+    ...SALES_LOOP.tiles.flatMap((t) => [t.title, t.body, ...Object.values(t.scene).flat()]),
+    ...Object.values(HERO_LIVE.jobs),
     ...Object.values(HERO_LIVE.says).flat(),
     ...HERO_LIVE.feed.map((f) => f.text),
     HERO_LIVE.ask.placeholder,

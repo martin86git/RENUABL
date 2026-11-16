@@ -20,7 +20,7 @@ type Who = "sol" | "charlie" | "alex";
 const TINT: Record<Exclude<Who, "sol">, string> = { charlie: "#ff5a1f", alex: "#2bb5a0" };
 const NAMES: Record<Who, string> = { sol: "Sol", charlie: "Charlie", alex: "Alex" };
 
-function useMotionOk() {
+export function useMotionOk() {
   const [ok, setOk] = useState(false);
   useEffect(() => {
     const m = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -267,19 +267,19 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
       <Sunrise light />
       <div className="mx-auto flex max-w-6xl flex-col items-center text-center">
         <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
-        <p className="mt-3 text-balance text-[clamp(20px,1.9vw,28px)] font-medium leading-snug tracking-[-0.02em] text-ink">
-          {SALES_HERO.newWay}
-        </p>
-        <h1 id="hero" className="mt-4 text-[clamp(44px,5.4vw,84px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+        <h1 id="hero" className="mt-5 text-[clamp(48px,6.4vw,104px)] font-semibold leading-[0.92] tracking-[-0.05em]">
           {SALES_HERO.headline[0]} <span className="text-sun-line">{SALES_HERO.headline[1]}</span>
         </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-balance text-[clamp(17px,1.5vw,21px)] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
 
         {/* The team at work: Charlie, Sol, Alex. */}
-        <div className="mt-10 grid w-full items-end gap-6 sm:grid-cols-[1fr_auto_1fr] lg:mt-12">
+        <div className="mt-8 grid w-full items-end gap-6 sm:grid-cols-[1fr_auto_1fr] lg:mt-12">
           <div className="hidden flex-col items-center gap-3 sm:flex">
             <Bubble who="charlie" text={charlie.shown} busy={charlie.busy} tail="down" />
             <AgentWave who="charlie" size={64} busy={charlie.busy || live} />
-            <p className="text-[13px] text-muted">Sales calls</p>
+            <p className="text-[13px] text-muted">
+              <span className="font-medium text-ink">Charlie</span> · {HERO_LIVE.jobs.charlie}
+            </p>
           </div>
           <div className="flex flex-col items-center gap-4">
             <div aria-live="polite">
@@ -295,11 +295,16 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
               )}
             </div>
             <BigSol busy={solBusy || answer.thinking} lean={lean} />
+            <p className="text-[13px] text-muted">
+              <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
+            </p>
           </div>
           <div className="hidden flex-col items-center gap-3 sm:flex">
             <Bubble who="alex" text={alex.shown} busy={alex.busy} tail="down" />
             <AgentWave who="alex" size={64} busy={alex.busy || live} />
-            <p className="text-[13px] text-muted">Post sale</p>
+            <p className="text-[13px] text-muted">
+              <span className="font-medium text-ink">Alex</span> · {HERO_LIVE.jobs.alex}
+            </p>
           </div>
         </div>
 

@@ -4,36 +4,17 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Clock, Menu, Sparkles, X } from "lucide-react";
+import { ArrowRight, Check, Menu, Sparkles, X } from "lucide-react";
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { LivingHero } from "./living-hero";
+import { SalesLoop } from "./sales-loop";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
-import {
-  CLOSING,
-  COMING_SOON,
-  COMING_SOON_LABEL,
-  EVERYTHING,
-  FAQ,
-  JOURNEY,
-  MARKETPLACE,
-  BIG_THREE,
-  FEATURES,
-  PRICING,
-  SALES_HERO,
-  HERO_LIVE,
-  CRM_SHOT,
-  SERVICE_SHOT,
-  SOL,
-  UPGRADE,
-  type Visual,
-} from "@/lib/domain/design/sales-page";
-import { askSales, registerInterest, startPlan } from "@/lib/services/billing";
+import { CLOSING, COMING_SOON_LABEL, FAQ, PRICING, SALES_HERO, HERO_LIVE, UPGRADE } from "@/lib/domain/design/sales-page";
+import { askSales, startPlan } from "@/lib/services/billing";
 import { TryDemoButton } from "./business-demo";
-import { AfterSigningDemo, AutomationDemo, ConversationDemo, ListingRoofExample, ThreeDesignsDemo } from "./designer-showcase";
+import { ListingRoofExample } from "./designer-showcase";
 import { Reveal } from "./front-hero";
-import { SolIcon } from "./sol-icon";
-import { MarketplaceMark } from "./marketplace-bar";
 import { ProductFilm } from "./product-film";
 import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
 
@@ -49,15 +30,12 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
+      {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
+          your sales team, how it sells, the film, the old way and the new, pricing with the questions, the close. */}
       <LivingHero signedIn={signedIn} />
+      <SalesLoop />
       <FilmSection />
       <Upgrade />
-      <BigThree />
-      <Journey />
-      <SolSection />
-      <Everything />
-      <Soon />
-      <Marketplace />
       <Pricing />
       <Faq />
       <Closing />
@@ -153,12 +131,12 @@ function useFoldScroll() {
 
 /** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
 const PAGE_LINKS = [
-  { href: "#step-design", label: "Designer" },
-  { href: "#sol", label: "Sol" },
-  { href: "#team", label: "Your AI team" },
-  { href: "#network", label: "Marketplace" },
-  { href: "#journey", label: "How it works" },
+  { href: "#start", label: "Your sales team" },
+  { href: "#sales", label: "How it sells" },
+  { href: "#film", label: "See it work" },
+  { href: "#upgrade", label: "What you get" },
   { href: "#pricing", label: "Pricing" },
+  { href: "#faq", label: "Questions" },
 ] as const;
 
 /**
@@ -298,39 +276,6 @@ function TrialForm({
   );
 }
 
-function Screen({
-  src,
-  alt,
-  priority,
-  width = 2880,
-  height = 1800,
-}: {
-  src: string;
-  alt: string;
-  priority?: boolean;
-  width?: number;
-  height?: number;
-}) {
-  return (
-    <figure className="overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line">
-      <div className="flex h-7 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
-        <span className="size-2.5 rounded-full bg-line-strong" />
-        <span className="size-2.5 rounded-full bg-line-strong" />
-        <span className="size-2.5 rounded-full bg-line-strong" />
-      </div>
-      <Image
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        sizes="(min-width: 1024px) 760px, 100vw"
-        priority={priority}
-        className="h-auto w-full"
-      />
-    </figure>
-  );
-}
-
 /** "Sign up": every one on the page goes to the pricing, where the plan is chosen (3 Nov 2026, Martin). */
 function SignUpLink({ dark = false }: { dark?: boolean }) {
   return (
@@ -344,23 +289,6 @@ function SignUpLink({ dark = false }: { dark?: boolean }) {
       {SALES_HERO.cta}
       <ArrowRight className="size-4" aria-hidden />
     </a>
-  );
-}
-
-function VisualOf({ visual }: { visual: Visual }) {
-  if (visual.kind === "shot") return <Screen src={visual.src} alt={visual.alt} />;
-  return (
-    <div className="overflow-hidden rounded-2xl">
-      {visual.demo === "automation" ? (
-        <AutomationDemo />
-      ) : visual.demo === "three" ? (
-        <ThreeDesignsDemo />
-      ) : visual.demo === "conversation" ? (
-        <ConversationDemo />
-      ) : (
-        <AfterSigningDemo />
-      )}
-    </div>
   );
 }
 
@@ -388,79 +316,6 @@ function FilmSection() {
  * The three things RENUABL is known by, a band each under the hero (3 Nov 2026, Martin: the designer, Sol and the
  * Marketplace are huge features and must feel it): the design tool with AI over it, Sol, and the Marketplace.
  */
-/**
- * The four big parts as cards in a grid under one heading (16 Nov 2026, Martin: "i like their layout much more than
- * ours", xAI's Grok Bot page): each a large rounded card with its title, one line, and the product at work running off
- * its foot. Each card keeps its anchor (#crm, #service, #network) for the links into it.
- */
-function BigThree() {
-  return (
-    <section className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="features">
-      <Reveal className="mx-auto max-w-[96rem]">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 id="features" className="text-[clamp(34px,4.2vw,60px)] font-semibold leading-[1.02] tracking-[-0.04em]">
-            {FEATURES.headline}
-          </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{FEATURES.sub}</p>
-        </div>
-        <div className="mt-14 grid gap-6 lg:grid-cols-2">
-          {BIG_THREE.map((p) => {
-            const market = p.id === "marketplace";
-            const visual =
-              p.id === "crm" ? (
-                <CardShot src={CRM_SHOT.src} alt={CRM_SHOT.alt} />
-              ) : p.id === "service" ? (
-                <CardShot src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
-              ) : p.id === "sol" ? (
-                <CardShot
-                  src="/design/landing/today-sol.webp"
-                  alt="RENUABL's Today screen: Sol writes up the day, the most pressing thing at the top (example data)"
-                />
-              ) : (
-                <div className="overflow-hidden rounded-t-2xl ring-1 ring-white/15">
-                  <ListingRoofExample className="block h-auto w-full" />
-                </div>
-              );
-            return (
-              <article
-                key={p.id}
-                id={market ? "network" : p.id === "crm" || p.id === "service" ? p.id : undefined}
-                className={clsx(
-                  "flex scroll-mt-20 flex-col overflow-hidden rounded-[32px] px-7 pt-9 sm:px-10 sm:pt-11",
-                  market ? "bg-market text-white" : "bg-surface ring-1 ring-line",
-                )}
-                aria-labelledby={`big-${p.id}`}
-              >
-                <p className={clsx("text-[12px] font-medium uppercase tracking-[0.18em]", market ? "text-white/70" : "text-muted")}>
-                  {p.eyebrow}
-                </p>
-                <h3 id={`big-${p.id}`} className="mt-3 text-[clamp(24px,2.1vw,32px)] font-semibold leading-[1.1] tracking-[-0.03em]">
-                  {p.title}
-                </h3>
-                <p className={clsx("mt-3 max-w-xl text-[16px] leading-relaxed", market ? "text-white/80" : "text-ink-2")}>{p.line}</p>
-                <div className="relative mt-9 h-[clamp(220px,24vw,380px)] overflow-hidden">{visual}</div>
-              </article>
-            );
-          })}
-        </div>
-      </Reveal>
-    </section>
-  );
-}
-
-/** A real screen running off the foot of a card: its top, in a window. */
-function CardShot({ src, alt }: { src: string; alt: string }) {
-  return (
-    <figure className="overflow-hidden rounded-t-2xl bg-surface shadow-[0_20px_60px_-30px_rgba(11,11,12,0.4)] ring-1 ring-line">
-      <div className="flex h-6 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
-        <span className="size-2 rounded-full bg-line-strong" />
-        <span className="size-2 rounded-full bg-line-strong" />
-        <span className="size-2 rounded-full bg-line-strong" />
-      </div>
-      <Image src={src} alt={alt} width={2880} height={1800} sizes="(min-width: 1024px) 720px, 100vw" className="h-auto w-full" />
-    </figure>
-  );
-}
 
 /** How long each card of the upgrade stays on top before the next is dealt, ms. */
 const DECK_MS = 4500;
@@ -751,263 +606,6 @@ function StickySignUp() {
   );
 }
 
-function Journey() {
-  return (
-    <section id="journey" className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="journey-title">
-      <Reveal className="mx-auto w-full max-w-4xl text-center">
-        <BrandEyebrow>How it works</BrandEyebrow>
-        <h2 id="journey-title" className="mt-5 text-[clamp(36px,5.5vw,72px)] font-semibold leading-[1] tracking-[-0.035em]">
-          One deal. Start to finish. One place.
-        </h2>
-        <p className="mt-6 text-[18px] leading-relaxed text-ink-2">
-          From the enquiry to the grid connection, every step of a solar job runs here. No exports, no double entry, no chasing.
-        </p>
-        <ol className="mx-auto mt-10 flex flex-wrap justify-center gap-2 text-[13px]">
-          {JOURNEY.map((j, i) => (
-            <li key={j.key}>
-              <a
-                href={`#step-${j.key}`}
-                className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 ring-1 ring-line hover:ring-ink-2"
-              >
-                <span className="tabular-nums text-sun-line">{String(i + 1).padStart(2, "0")}</span>
-                {j.step}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </Reveal>
-      <div className="mx-auto mt-20 w-full max-w-7xl space-y-24 lg:mt-0 lg:space-y-0">
-        {JOURNEY.map((j, i) => {
-          const label = (
-            <p className="text-[13px] font-medium tabular-nums tracking-[0.18em] text-sun-line">
-              {String(i + 1).padStart(2, "0")} · {j.step.toUpperCase()}
-            </p>
-          );
-          // The product drawn at work needs the whole width: its words go above it. A screenshot sits beside its words.
-          if (j.visual.kind === "demo")
-            return (
-              <article
-                key={j.key}
-                id={`step-${j.key}`}
-                className="snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
-              >
-                <Reveal className="mx-auto max-w-3xl text-center">
-                  {label}
-                  <h3 className="mt-4 text-[clamp(28px,3.6vw,46px)] font-semibold leading-[1.05] tracking-[-0.03em]">{j.title}</h3>
-                  <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{j.body}</p>
-                </Reveal>
-                <Reveal className="mt-12">
-                  <VisualOf visual={j.visual} />
-                </Reveal>
-              </article>
-            );
-          const flip = JOURNEY.slice(0, i).filter((x) => x.visual.kind === "shot").length % 2 === 1;
-          return (
-            <article
-              key={j.key}
-              id={`step-${j.key}`}
-              className="snap-start grid items-center gap-10 lg:min-h-[calc(100dvh-4rem)] lg:content-center lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16"
-            >
-              <Reveal className={clsx(flip && "lg:order-2")}>
-                {label}
-                <h3 className="mt-4 text-[clamp(28px,3.6vw,46px)] font-semibold leading-[1.05] tracking-[-0.03em]">{j.title}</h3>
-                <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{j.body}</p>
-              </Reveal>
-              <Reveal className={clsx(flip && "lg:order-1")}>
-                <VisualOf visual={j.visual} />
-              </Reveal>
-            </article>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function SolSection() {
-  return (
-    <section id="sol" className="snap-start relative isolate overflow-x-clip px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="sol-title">
-      <div aria-hidden className="absolute inset-0 -z-10 bg-sun/60" />
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <Reveal>
-          <p className="inline-flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.18em] text-sun-ink">
-            <SolIcon className="size-4" aria-hidden />
-            {SOL.eyebrow}
-          </p>
-          <h2 id="sol-title" className="mt-5 text-[clamp(32px,4.4vw,56px)] font-semibold leading-[1.04] tracking-[-0.03em]">
-            {SOL.headline}
-          </h2>
-          <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{SOL.sub}</p>
-          <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-            {SOL.points.map((p) => (
-              <li key={p} className="flex gap-2.5 text-[15px] leading-snug text-ink">
-                <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
-                {p}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-8 text-xs text-muted">{SOL.footnote}</p>
-        </Reveal>
-        <Reveal>
-          <Screen src={SOL.shot.src} alt={SOL.shot.alt} />
-        </Reveal>
-      </div>
-      <div className="mx-auto mt-20 grid w-full max-w-7xl items-center gap-12 lg:mt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
-        <Reveal className="lg:order-2">
-          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-ink">{SOL.example.eyebrow}</p>
-          <h3 className="mt-4 text-[clamp(26px,3.2vw,40px)] font-semibold leading-[1.08] tracking-[-0.025em]">{SOL.example.title}</h3>
-          <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{SOL.example.body}</p>
-          <p className="mt-6 text-xs text-muted">{SOL.example.fine}</p>
-        </Reveal>
-        <Reveal className="mx-auto w-full max-w-[620px] lg:order-1">
-          <Screen {...SOL.example.shot} />
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-function Everything() {
-  return (
-    <section className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="everything">
-      <Reveal className="mx-auto w-full max-w-6xl">
-        <BrandEyebrow>And all of this, included</BrandEyebrow>
-        <h2 id="everything" className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]">
-          The rest of the toolbox, in every plan.
-        </h2>
-        <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-line ring-1 ring-line sm:grid-cols-2 lg:grid-cols-3">
-          {EVERYTHING.map((f) => (
-            <div key={f.title} className="bg-surface p-6">
-              <h3 className="text-[16px] font-semibold">{f.title}</h3>
-              <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{f.body}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(["customers", "service"] as const).map((s) => (
-            <Screen
-              key={s}
-              src={`/design/landing/${s}.webp`}
-              alt={s === "customers" ? "RENUABL's customers list, with example data" : "RENUABL's service pipeline"}
-            />
-          ))}
-        </div>
-      </Reveal>
-    </section>
-  );
-}
-
-function Soon() {
-  return (
-    <section className="snap-start px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="soon">
-      <Reveal className="mx-auto w-full max-w-6xl">
-        <h2 id="soon" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
-          On the way
-        </h2>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {COMING_SOON.map((f) => (
-            <div key={f.title} className="rounded-2xl bg-surface p-6 ring-1 ring-line">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-sun-ink">
-                <Clock className="size-3" aria-hidden />
-                {COMING_SOON_LABEL}
-              </span>
-              <h3 className="mt-4 text-[16px] font-semibold">{f.title}</h3>
-              <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{f.body}</p>
-            </div>
-          ))}
-        </div>
-      </Reveal>
-    </section>
-  );
-}
-
-function Marketplace() {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<{ ok: boolean; message: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const go = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    const a = await registerInterest(email);
-    setBusy(false);
-    setState({ ok: a.ok, message: a.message ?? "" });
-  };
-  return (
-    <section
-      id="marketplace"
-      className="snap-start scroll-mt-16 bg-surface px-5 py-24 lg:px-8 lg:py-32"
-      aria-labelledby="marketplace-title"
-    >
-      <Reveal className="mx-auto w-full max-w-6xl">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <p className="flex items-center gap-4" aria-label="RENUABL Marketplace">
-            <span
-              className="grid size-16 place-items-center rounded-full bg-market text-white shadow-[0_8px_24px_rgba(24,73,169,0.3)]"
-              aria-hidden
-            >
-              <MarketplaceMark className="size-8" />
-            </span>
-            <span className="flex flex-col leading-none" aria-hidden>
-              <span className="text-[13px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
-              <span className="mt-1.5 text-[36px] font-semibold tracking-[-0.02em] text-sun-line">Marketplace</span>
-            </span>
-          </p>
-          <span className="rounded-full bg-canvas px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted ring-1 ring-line">
-            {COMING_SOON_LABEL}
-          </span>
-        </div>
-        <h2
-          id="marketplace-title"
-          className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]"
-        >
-          {MARKETPLACE.headline}
-        </h2>
-        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{MARKETPLACE.sub}</p>
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
-          {MARKETPLACE.sides.map((s) => (
-            <div key={s.title} className="rounded-2xl bg-canvas p-7 ring-1 ring-line">
-              <h3 className="text-[20px] font-semibold">{s.title}</h3>
-              <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{s.body}</p>
-            </div>
-          ))}
-        </div>
-        <Link
-          href="/design/marketplace"
-          className="mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold text-market hover:underline"
-        >
-          {MARKETPLACE.look}
-          <ArrowRight className="size-4" aria-hidden />
-        </Link>
-        {state?.ok ? (
-          <p className="mt-10 text-[16px] text-market">{state.message}</p>
-        ) : (
-          <form
-            onSubmit={(e) => void go(e)}
-            className="mt-10 flex max-w-lg flex-col gap-2 rounded-2xl bg-canvas p-1.5 ring-1 ring-line sm:flex-row"
-          >
-            <label className="sr-only" htmlFor="interest-email">
-              Email
-            </label>
-            <input
-              id="interest-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your work email"
-              className="h-12 min-w-0 flex-1 rounded-xl bg-transparent px-4 text-[16px] text-ink outline-none placeholder:text-muted"
-            />
-            <button disabled={busy} className="h-12 rounded-xl bg-market px-5 text-[15px] font-semibold text-white hover:brightness-110">
-              {busy ? "Adding you…" : MARKETPLACE.cta}
-            </button>
-          </form>
-        )}
-        {state && !state.ok && <p className="mt-2 text-sm text-danger">{state.message}</p>}
-      </Reveal>
-    </section>
-  );
-}
-
 /**
  * The pricing, as a software pricing page (3 Nov 2026, Martin): Monthly and the 12-month plan side by side with
  * Enterprise, nothing crossed out. Each plan's Sign up opens the email box under it and goes to Stripe's checkout; the
@@ -1197,7 +795,7 @@ function PlanCard({
 
 function Faq() {
   return (
-    <section className="snap-start px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
+    <section className="scroll-mt-20 px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
       <Reveal className="mx-auto w-full max-w-3xl">
         <h2 id="faq" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
           Questions
