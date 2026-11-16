@@ -16,6 +16,26 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
     area: "Today",
+    words: "News now has Beyond solar: EVs, Tesla and driverless cars, clean energy, and business news each morning.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Today",
+    words: "You can like and comment on Sol's news stories, as on posts.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Today",
+    words: "Posts can ask a poll. Results show once you've voted.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Today",
+    words: "News shows what's most talked about this week at the top.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Today",
     words: "Sol's suggestions under each deal in the Deals list: press one and he writes the email, opened in the feed's place to check and send.",
   },
   {

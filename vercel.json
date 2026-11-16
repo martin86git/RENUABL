@@ -11,6 +11,10 @@
       "schedule": "0 19 * * *"
     },
     {
+      "path": "/api/cron/news?part=wider",
+      "schedule": "30 19 * * *"
+    },
+    {
       "path": "/api/cron/sol-outbox",
       "schedule": "0 * * * *"
     },

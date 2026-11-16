@@ -61,7 +61,15 @@ export function cleanPostLink(raw: unknown): string | null {
 }
 
 /** Why a post can't go up, or null: it needs words, a link or a photo. */
-export function postProblem(text: string, link: string | null, hasPhoto: boolean, linkTyped: boolean): string | null {
+export function postProblem(
+  text: string,
+  link: string | null,
+  hasPhoto: boolean,
+  linkTyped: boolean,
+  poll: { asked: boolean; choices: string[] | null } = { asked: false, choices: null },
+): string | null {
+  if (poll.asked && !poll.choices) return "A poll needs at least two different choices.";
+  if (poll.asked && !text) return "Write the question for your poll.";
   if (linkTyped && !link) return "That link doesn't look like a web address starting https.";
   if (!text && !link && !hasPhoto) return "Write something, add a link or a photo.";
   return null;
@@ -105,6 +113,8 @@ export interface FeedPost {
   hidden: boolean;
   /** For staff: how many businesses reported it. */
   reports?: number;
+  /** A poll asked with it (16 Nov 2026), as this reader may see it. */
+  poll?: FeedPoll | null;
 }
 
 export interface FeedComment {
@@ -148,3 +158,132 @@ export function agoShort(iso: string, now: Date): string {
 
 /** The site a link is on, for the card. */
 export const linkSite = (url: string) => hostOf(url);
+
+/**
+ * Polls (16 Nov 2026, Martin: make the feed more engaging, an internal social network for the industry): a post may ask
+ * a question with two to four choices. Each member votes once and may change their vote while it is open
+ * (`POLL_DAYS`). The counts are shown to someone who has voted, to the poll's writer, and to everyone once it closes, so
+ * nobody votes with the crowd.
+ */
+export const POLL_LIMITS = { min: 2, max: 4, choice: 60 } as const;
+export const POLL_DAYS = 7;
+
+/** The poll's choices cleaned (`publicWords`, no repeats), or null when there aren't two. */
+export function cleanPoll(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of raw) {
+    const c = publicWords(r, POLL_LIMITS.choice);
+    if (!c || seen.has(c.toLowerCase())) continue;
+    seen.add(c.toLowerCase());
+    out.push(c);
+    if (out.length === POLL_LIMITS.max) break;
+  }
+  return out.length >= POLL_LIMITS.min ? out : null;
+}
+
+/** Whether a poll posted then still takes votes. */
+export const pollOpen = (postedAt: string, now: Date) => now.getTime() - Date.parse(postedAt) < POLL_DAYS * 86_400_000;
+
+export interface FeedPoll {
+  choices: string[];
+  /** Votes for each choice; null while the reader may not see them yet. */
+  votes: number[] | null;
+  total: number;
+  /** The reader's own vote, by its place. */
+  mine: number | null;
+  open: boolean;
+}
+
+/** A poll as one reader is sent it: counts only once they've voted, wrote it, or it has closed. */
+export function pollFor(
+  choices: string[],
+  counts: readonly number[],
+  mine: number | null,
+  writer: boolean,
+  postedAt: string,
+  now: Date,
+): FeedPoll {
+  const open = pollOpen(postedAt, now);
+  const votes = choices.map((_, i) => counts[i] ?? 0);
+  const total = votes.reduce((a, b) => a + b, 0);
+  return { choices, votes: mine !== null || writer || !open ? votes : null, total, mine, open };
+}
+
+/** "3 days left", "Closes today", "Closed": how long a poll has. */
+export function pollTimeWords(postedAt: string, now: Date): string {
+  const left = Date.parse(postedAt) + POLL_DAYS * 86_400_000 - now.getTime();
+  if (left <= 0) return "Closed";
+  if (left < 86_400_000) return "Closes today";
+  const days = Math.ceil(left / 86_400_000);
+  return days === 1 ? "1 day left" : `${days} days left`;
+}
+
+/** A choice's share of the votes, whole per cent. */
+export const pollShare = (votes: number, total: number) => (total ? Math.round((votes / total) * 100) : 0);
+
+/** Likes and comments on one of Sol's stories, for the reader (added by the news route, never stored on the story). */
+export interface StoryTalk {
+  likes: number;
+  liked: boolean;
+  comments: number;
+}
+
+/**
+ * Most talked about this week (16 Nov 2026): the stories and posts from the last 7 days with the most said and liked,
+ * a comment counting twice a like and each vote once; at most `TALKED_SHOWN`, only from `TALKED_MIN`, so the strip
+ * shows only when businesses are really talking.
+ */
+export const TALKED_SHOWN = 3;
+export const TALKED_MIN = 3;
+
+export interface Talked {
+  id: string;
+  kind: "story" | "post";
+  title: string;
+  likes: number;
+  comments: number;
+  votes: number;
+}
+
+export function talkedAbout(entries: readonly FeedEntry[], now: Date): Talked[] {
+  const weekAgo = now.getTime() - 7 * 86_400_000;
+  const all: (Talked & { score: number })[] = [];
+  for (const e of entries) {
+    if (e.at < weekAgo) continue;
+    if (e.kind === "story") {
+      const t = e.item.talk;
+      if (!t) continue;
+      all.push({
+        id: e.item.id,
+        kind: "story",
+        title: e.item.headline,
+        likes: t.likes,
+        comments: t.comments,
+        votes: 0,
+        score: t.likes + 2 * t.comments,
+      });
+    } else {
+      const p = e.post;
+      const votes = p.poll?.total ?? 0;
+      const words = p.text || p.link?.title || "A post";
+      const title = words.length > 90 ? `${words.slice(0, words.lastIndexOf(" ", 88) > 40 ? words.lastIndexOf(" ", 88) : 88)}…` : words;
+      all.push({ id: p.id, kind: "post", title, likes: p.likes, comments: p.comments, votes, score: p.likes + 2 * p.comments + votes });
+    }
+  }
+  return all
+    .filter((t) => t.score >= TALKED_MIN)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, TALKED_SHOWN)
+    .map((t) => ({ id: t.id, kind: t.kind, title: t.title, likes: t.likes, comments: t.comments, votes: t.votes }));
+}
+
+/** "4 likes · 2 comments · 9 votes", only what there is. */
+export function talkWords(t: { likes: number; comments: number; votes: number }): string {
+  const parts: string[] = [];
+  if (t.likes) parts.push(`${t.likes} like${t.likes === 1 ? "" : "s"}`);
+  if (t.comments) parts.push(`${t.comments} comment${t.comments === 1 ? "" : "s"}`);
+  if (t.votes) parts.push(`${t.votes} vote${t.votes === 1 ? "" : "s"}`);
+  return parts.join(" · ");
+}

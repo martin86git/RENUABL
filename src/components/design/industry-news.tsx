@@ -20,11 +20,18 @@ import {
   UtilityPole,
   Wrench,
   CalendarDays,
+  Car,
+  Flame,
+  Leaf,
+  Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 import {
   NEWS_STANDING_LABELS,
   NEWS_TOPICS,
+  PART_LABELS,
+  partOf,
+  type NewsPart,
   type NewsStanding,
   NEWS_TOPIC_LABELS,
   newsDayGroup,
@@ -35,9 +42,9 @@ import {
 } from "@/lib/domain/design/industry-news";
 import { todayInMarket } from "@/lib/domain/market";
 import { loadNews, type NewsAnswer } from "@/lib/services/industry-news";
-import { mergeFeed, type FeedEntry, type FeedPost } from "@/lib/domain/design/feed-posts";
-import { loadPosts } from "@/lib/services/feed-posts";
-import { PostCard, PostComposer } from "./feed-posts";
+import { mergeFeed, talkWords, talkedAbout, type FeedEntry, type FeedPost, type Talked } from "@/lib/domain/design/feed-posts";
+import { commentOnStory, likeStory, loadPosts, loadStoryComments, removeStoryComment } from "@/lib/services/feed-posts";
+import { PostCard, PostComposer, Talk } from "./feed-posts";
 import { SolBadge } from "./sol-icon";
 import { listWords, moveShare, priceMovesWords, systemsWords, type PriceMovesNote } from "@/lib/domain/design/product-watch";
 
@@ -63,7 +70,7 @@ export function NewsPage() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [staff, setStaff] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [filter, setFilter] = useState<NewsTopic | "all" | "yours" | "posts" | "reported">("all");
+  const [filter, setFilter] = useState<NewsTopic | NewsPart | "all" | "yours" | "posts" | "reported">("all");
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -115,7 +122,9 @@ export function NewsPage() {
     data && filter !== "posts" && filter !== "reported"
       ? filter === "yours"
         ? newsShown(data.items, "all").filter(touches)
-        : newsShown(data.items, filter === "all" ? "all" : filter)
+        : filter === "solar" || filter === "wider"
+          ? newsShown(data.items, "all").filter((n) => partOf(n.topic) === filter)
+          : newsShown(data.items, filter === "all" ? "all" : filter)
       : [];
   const shownPosts = filter === "all" || filter === "posts" || filter === "reported" ? posts : [];
   const notes = filter === "all" || filter === "yours" ? (data?.priceMoves ?? []) : [];
@@ -133,14 +142,24 @@ export function NewsPage() {
     if (last?.day === day) last.entries.push(e);
     else groups.push({ day, entries: [e] });
   }
-  const topics = NEWS_TOPICS.filter((t) => data?.items.some((n) => n.topic === t));
+  // The part on show (Solar, Beyond solar), whose topics show as a second row of chips.
+  const part: NewsPart | null =
+    filter === "solar" || filter === "wider"
+      ? filter
+      : (NEWS_TOPICS as readonly string[]).includes(filter)
+        ? partOf(filter as NewsTopic)
+        : null;
+  const topics = part ? NEWS_TOPICS.filter((t) => partOf(t) === part && data?.items.some((n) => n.topic === t)) : [];
+  const wider = data?.items.some((n) => partOf(n.topic) === "wider") ?? false;
+  const talked = filter === "all" ? talkedAbout(mergeFeed(data?.items ?? [], posts), new Date()) : [];
   const touching = data?.items.filter(touches).length ?? 0;
   const looks = data?.items.filter((n) => n.look).length ?? 0;
   const chips: { id: typeof filter; label: string }[] = [
     { id: "all", label: "All" },
     ...(touching || data?.priceMoves.length ? [{ id: "yours" as const, label: "Your products" }] : []),
     { id: "posts", label: "Posts" },
-    ...topics.map((t) => ({ id: t, label: NEWS_TOPIC_LABELS[t] })),
+    { id: "solar", label: PART_LABELS.solar },
+    ...(wider ? [{ id: "wider" as const, label: PART_LABELS.wider }] : []),
     ...(staff ? [{ id: "reported" as const, label: "Reported" }] : []),
   ];
 
@@ -156,10 +175,10 @@ export function NewsPage() {
           </h2>
           <p className="mt-0.5 text-[13px] text-muted">
             {data?.reading
-              ? "Sol is reading this morning's solar news…"
+              ? "Sol is reading this morning's news…"
               : data?.readAt
-                ? `Sol reads the solar news each morning. Last read ${readWords(data.readAt)}.`
-                : "Sol reads the solar news each morning: companies, rebates, rules, networks and new products."}
+                ? `Sol reads the solar news each morning, and what's happening beyond it. Last read ${readWords(data.readAt)}.`
+                : "Sol reads the solar news each morning, and what's happening beyond it: EVs, clean energy and business."}
           </p>
         </div>
       </div>
@@ -179,18 +198,40 @@ export function NewsPage() {
             key={c.id}
             type="button"
             onClick={() => setFilter(c.id)}
-            aria-pressed={filter === c.id}
+            aria-pressed={filter === c.id || part === c.id}
             className={clsx(
               "rounded-full px-3 py-1.5 text-[13px] ring-1 transition",
-              filter === c.id ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
+              filter === c.id || part === c.id
+                ? "bg-primary text-primary-ink ring-primary"
+                : "bg-surface text-ink-2 ring-line hover:text-ink",
             )}
           >
             {c.label}
           </button>
         ))}
       </div>
+      {topics.length > 1 && (
+        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Topics">
+          {topics.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setFilter(filter === t ? (part ?? "all") : t)}
+              aria-pressed={filter === t}
+              className={clsx(
+                "rounded-full px-2.5 py-1 text-[12.5px] transition",
+                filter === t ? "bg-ink-2 text-canvas" : "text-ink-2 hover:bg-surface hover:text-ink",
+              )}
+            >
+              {NEWS_TOPIC_LABELS[t]}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {looks > 0 && filter !== "posts" && filter !== "reported" && (
+      {talked.length > 0 && <TalkedAbout talked={talked} />}
+
+      {looks > 0 && filter !== "posts" && filter !== "reported" && part !== "wider" && (
         <button
           type="button"
           onClick={() => setFilter("yours")}
@@ -203,7 +244,7 @@ export function NewsPage() {
           </span>
         </button>
       )}
-      {!looks && touching > 0 && filter !== "posts" && filter !== "reported" && filter !== "yours" && (
+      {!looks && touching > 0 && filter !== "posts" && filter !== "reported" && filter !== "yours" && part !== "wider" && (
         <p className="mt-4 flex items-center gap-2 text-[13px] text-ink">
           <PackageSearch className="size-4 text-sun-line" aria-hidden />
           {touching === 1 ? "One story names" : `${touching} stories name`} your products. They&apos;re marked below.
@@ -304,6 +345,9 @@ const TOPIC_ART: Record<NewsTopic, { icon: typeof Newspaper; soft: string; ink: 
   networks: { icon: UtilityPole, soft: "bg-kind-lead-soft", ink: "text-kind-lead" },
   products: { icon: BatteryCharging, soft: "bg-kind-install-soft", ink: "text-kind-install" },
   technology: { icon: Cpu, soft: "bg-kind-date-soft", ink: "text-kind-date" },
+  ev: { icon: Car, soft: "bg-market/10", ink: "text-market" },
+  cleantech: { icon: Leaf, soft: "bg-positive-soft", ink: "text-positive" },
+  business: { icon: Briefcase, soft: "bg-sand", ink: "text-ink-2" },
 };
 
 /**
@@ -345,8 +389,9 @@ function Story({ item }: { item: NewsItem }) {
   const date = storyDate(item, todayInMarket());
   return (
     <li
+      id={`feed-${item.id}`}
       className={clsx(
-        "overflow-hidden rounded-2xl bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
+        "scroll-mt-24 overflow-hidden rounded-2xl bg-surface shadow-[0_1px_3px_rgba(0,0,0,0.06)]",
         item.look ? "ring-2 ring-warning" : "ring-1 ring-line",
       )}
     >
@@ -369,6 +414,9 @@ function Story({ item }: { item: NewsItem }) {
             <span className="text-muted">· {date.ago}</span>
           </time>
           <span className="ml-auto flex flex-wrap items-center gap-1.5">
+            {partOf(item.topic) === "wider" && (
+              <span className="rounded-full bg-market/10 px-2 py-0.5 font-medium text-market">{PART_LABELS.wider}</span>
+            )}
             {item.hasImage && (
               <span className="rounded-full bg-canvas px-2 py-0.5 text-ink-2 ring-1 ring-line">{NEWS_TOPIC_LABELS[item.topic]}</span>
             )}
@@ -442,11 +490,22 @@ function Story({ item }: { item: NewsItem }) {
           <p className="mt-3 flex items-start gap-2 rounded-xl bg-sun px-3 py-2 text-[13px] text-sun-ink">
             <SolBadge className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              <span className="font-medium">For you: </span>
+              <span className="font-medium">{partOf(item.topic) === "wider" ? "Why it's interesting: " : "For you: "}</span>
               {item.meaning}
             </span>
           </p>
         )}
+        <Talk
+          liked={item.talk?.liked ?? false}
+          likes={item.talk?.likes ?? 0}
+          comments={item.talk?.comments ?? 0}
+          api={{
+            like: (like) => likeStory(item.id, like),
+            load: () => loadStoryComments(item.id),
+            comment: (text) => commentOnStory(item.id, text),
+            uncomment: (id) => removeStoryComment(item.id, id),
+          }}
+        />
       </div>
     </li>
   );
@@ -485,5 +544,39 @@ function PriceMovesCard({ note }: { note: PriceMovesNote }) {
         </p>
       </div>
     </li>
+  );
+}
+
+/**
+ * Most talked about this week (16 Nov 2026: what businesses on RENUABL are liking, saying and voting on), at the top of
+ * All; a press takes the reader to it in the feed.
+ */
+function TalkedAbout({ talked }: { talked: Talked[] }) {
+  const go = (id: string) => document.getElementById(`feed-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  return (
+    <section className="mt-5 rounded-2xl bg-surface p-4 ring-1 ring-line" aria-label="Most talked about this week">
+      <h3 className="flex items-center gap-1.5 text-[12px] font-medium uppercase tracking-[0.08em] text-muted">
+        <Flame className="size-3.5 text-sun-line" aria-hidden /> Most talked about this week
+      </h3>
+      <ol className="mt-2.5 grid gap-1">
+        {talked.map((t, i) => (
+          <li key={t.id}>
+            <button
+              type="button"
+              onClick={() => go(t.id)}
+              className="flex w-full items-start gap-3 rounded-xl px-2 py-1.5 text-left hover:bg-canvas"
+            >
+              <span className="mt-0.5 w-4 shrink-0 text-[13px] font-semibold tabular-nums text-sun-line">{i + 1}</span>
+              <span className="min-w-0">
+                <span className="line-clamp-2 text-[13.5px] font-medium text-ink">{t.title}</span>
+                <span className="text-[12px] text-muted">
+                  {t.kind === "story" ? "Sol's story" : "Post"} · {talkWords(t)}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

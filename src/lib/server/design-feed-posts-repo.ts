@@ -13,6 +13,8 @@ import {
   hiddenByReports,
   kindWords,
   linkSite,
+  pollFor,
+  pollOpen,
   type FeedComment,
   type FeedPost,
 } from "@/lib/domain/design/feed-posts";
@@ -54,6 +56,9 @@ interface PostRow {
   comments: number;
   reported: boolean;
   reports: number;
+  poll: unknown;
+  votes: number[] | null;
+  myVote: number | null;
 }
 
 const POST_COLUMNS = (who: number, biz: number) => `
@@ -64,7 +69,12 @@ const POST_COLUMNS = (who: number, biz: number) => `
   exists (select 1 from design_feed_likes l where l.post_id = p.id and l.member_email = $${who}) as liked,
   (select count(*)::int from design_feed_comments c where c.post_id = p.id and c.removed_at is null) as comments,
   exists (select 1 from design_feed_reports r where r.post_id = p.id and r.business_id = $${biz}) as reported,
-  (select count(*)::int from design_feed_reports r where r.post_id = p.id) as reports`;
+  (select count(*)::int from design_feed_reports r where r.post_id = p.id) as reports,
+  p.poll,
+  case when p.poll is null then null else array(
+    select (select count(*)::int from design_feed_votes v where v.post_id = p.id and v.choice = i)
+      from generate_series(0, jsonb_array_length(p.poll) - 1) i order by i) end as votes,
+  (select v.choice from design_feed_votes v where v.post_id = p.id and v.member_email = $${who}) as "myVote"`;
 
 const postOf = (r: PostRow, reader: Reader): FeedPost => ({
   id: r.id,
@@ -82,7 +92,16 @@ const postOf = (r: PostRow, reader: Reader): FeedPost => ({
   reported: r.reported,
   hidden: r.hidden,
   ...(reader.staff ? { reports: r.reports } : {}),
+  poll: pollOf(r, reader),
 });
+
+const choicesOf = (v: unknown) => (Array.isArray(v) ? v.filter((c): c is string => typeof c === "string") : []);
+
+function pollOf(r: PostRow, reader: Reader) {
+  const choices = choicesOf(r.poll);
+  if (choices.length < 2) return null;
+  return pollFor(choices, r.votes ?? [], r.myVote, r.memberEmail === reader.email, r.at, new Date());
+}
 
 const mayRemove = (p: { businessId: string; memberEmail: string }, reader: Reader) =>
   reader.staff || p.memberEmail === reader.email || (reader.owner && p.businessId === reader.businessId);
@@ -111,11 +130,27 @@ async function onePost(id: string, reader: Reader): Promise<PostRow | null> {
 }
 
 /** A new post as this member; answers its id. Its link's title and picture are filled in later (`setLinkPreview`). */
-export async function createPost(m: Member, body: string, linkUrl: string | null, photo: Buffer | null): Promise<string> {
+export async function createPost(
+  m: Member,
+  body: string,
+  linkUrl: string | null,
+  photo: Buffer | null,
+  poll: string[] | null = null,
+): Promise<string> {
   const id = newId("post", 8);
   await query(
-    `insert into design_feed_posts (id, business_id, member_email, author, body, link_url, photo) values ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, m.businessId, m.email.toLowerCase(), authorWords(m.firstName, m.businessName), body, linkUrl, photo],
+    `insert into design_feed_posts (id, business_id, member_email, author, body, link_url, photo, poll)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+    [
+      id,
+      m.businessId,
+      m.email.toLowerCase(),
+      authorWords(m.firstName, m.businessName),
+      body,
+      linkUrl,
+      photo,
+      poll ? JSON.stringify(poll) : null,
+    ],
   );
   return id;
 }
@@ -146,6 +181,20 @@ export async function setLike(id: string, reader: Reader, like: boolean): Promis
       reader.email,
     ]);
   else await query(`delete from design_feed_likes where post_id = $1 and member_email = $2`, [id, reader.email]);
+  return true;
+}
+
+/** Votes in a post's poll (or changes a vote) while it is open; false when there is no such poll or choice, or it has closed. */
+export async function votePoll(id: string, reader: Reader, choice: number): Promise<boolean> {
+  const p = await onePost(id, reader);
+  const choices = p ? choicesOf(p.poll) : [];
+  if (!p || choices.length < 2 || !Number.isInteger(choice) || choice < 0 || choice >= choices.length) return false;
+  if (!pollOpen(p.at, new Date())) return false;
+  await query(
+    `insert into design_feed_votes (post_id, business_id, member_email, choice) values ($1, $2, $3, $4)
+     on conflict (post_id, member_email) do update set choice = excluded.choice, at = now()`,
+    [id, reader.businessId, reader.email, choice],
+  );
   return true;
 }
 

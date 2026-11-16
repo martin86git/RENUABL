@@ -12,12 +12,13 @@
  */
 import { BLOCKED_SITES, hostOf, urlKey } from "./sol-knowledge";
 import type { ListMatch, SystemsMatch } from "./product-watch";
+import type { StoryTalk } from "./feed-posts";
 
 /**
  * Recalls, approved products and maker notices joined on 10 Nov 2026 (Martin: news at the product level), matched to
  * each business's lists and customers' systems (product-watch.ts).
  */
-export const NEWS_TOPICS = [
+export const SOLAR_TOPICS = [
   "recalls",
   "listings",
   "companies",
@@ -28,7 +29,29 @@ export const NEWS_TOPICS = [
   "products",
   "technology",
 ] as const;
+
+/**
+ * Beyond solar (16 Nov 2026, Martin: "what might be complimentary to solar news that users might enjoy… news on tesla…
+ * driverless cars"): a second, shorter reading each morning of the news a solar business reads for interest, not for
+ * its work: electric cars and driving (Tesla, EV launches and prices, charging, driverless cars and robotaxis), clean
+ * energy at large (big batteries, wind and solar farms, the grid, energy and AI, world records), and the business of
+ * running a trade business (interest rates, home building, trades and skills, small business rules). World news is
+ * welcome here; it is never matched against a business's lists or customers (product-watch.ts).
+ */
+export const WIDER_TOPICS = ["ev", "cleantech", "business"] as const;
+
+export const NEWS_TOPICS = [...SOLAR_TOPICS, ...WIDER_TOPICS] as const;
 export type NewsTopic = (typeof NEWS_TOPICS)[number];
+export type SolarTopic = (typeof SOLAR_TOPICS)[number];
+
+/** The two morning readings: the solar news, then beyond solar. */
+export const NEWS_PARTS = ["solar", "wider"] as const;
+export type NewsPart = (typeof NEWS_PARTS)[number];
+export const cleanPart = (v: unknown): NewsPart => (v === "wider" ? "wider" : "solar");
+export const topicsOf = (part: NewsPart): readonly NewsTopic[] => (part === "wider" ? WIDER_TOPICS : SOLAR_TOPICS);
+export const partOf = (topic: NewsTopic): NewsPart => ((WIDER_TOPICS as readonly string[]).includes(topic) ? "wider" : "solar");
+/** What the two readings are called on the tab. */
+export const PART_LABELS: Record<NewsPart, string> = { solar: "Solar", wider: "Beyond solar" };
 
 export const NEWS_TOPIC_LABELS: Record<NewsTopic, string> = {
   recalls: "Recalls and safety",
@@ -40,6 +63,9 @@ export const NEWS_TOPIC_LABELS: Record<NewsTopic, string> = {
   networks: "Networks and the grid",
   products: "New products",
   technology: "Technology",
+  ev: "EVs and driving",
+  cleantech: "Clean energy",
+  business: "Business and economy",
 };
 
 export interface NewsItem {
@@ -77,6 +103,8 @@ export interface NewsItem {
   systems?: SystemsMatch | null;
   /** A recall, delisting, maker notice or maker leaving that touches this business. */
   look?: boolean;
+  /** Its likes and comments, for the reader (added by the route, never stored on the story). */
+  talk?: StoryTalk;
 }
 
 /**
@@ -170,7 +198,7 @@ export function cleanStanding(
 }
 
 /** What Sol is asked to return for each story, before it is checked. */
-export type NewsDraft = Omit<NewsItem, "id" | "site" | "foundAt" | "hasImage" | "mine" | "lists" | "systems" | "look">;
+export type NewsDraft = Omit<NewsItem, "id" | "site" | "foundAt" | "hasImage" | "mine" | "lists" | "systems" | "look" | "talk">;
 
 /** The most of a story's page read to find its picture, and the largest picture fetched. */
 export const PAGE_READ_BYTES = 600_000;
@@ -212,6 +240,31 @@ export const NEWS_SHOWN = 60;
 /** Most stories kept from one day's reading, and how many Sol is asked to find (10 Nov 2026, Martin: more stories). */
 export const MAX_PER_RUN = 15;
 export const AIM_STORIES = 10;
+/** The beyond-solar reading: fewer, lighter stories. */
+export const WIDER_MAX = 8;
+export const WIDER_AIM = 6;
+/**
+ * At most this many beyond-solar stories a topic in one reading (16 Nov 2026: the first tries came back nearly all
+ * Tesla robotaxis), so the three topics share the reading.
+ */
+export const WIDER_PER_TOPIC = 3;
+/** Trading, crypto and share-tip sites: never the source of a beyond-solar story (the first tries took two). */
+export const NOT_FOR_WIDER: readonly string[] = [
+  "kucoin.com",
+  "binance.com",
+  "coinmarketcap.com",
+  "coindesk.com",
+  "investing.com",
+  "fool.com",
+  "fool.com.au",
+  "seekingalpha.com",
+  "marketbeat.com",
+  "tipranks.com",
+  "benzinga.com",
+  "zacks.com",
+  "247wallst.com",
+  "nasdaq.com",
+];
 /** A day's reading is due again after this many hours (the cron runs each morning; a read of the tab catches up). */
 export const NEWS_REFRESH_HOURS = 20;
 /** How long to wait before trying again after a reading failed. */
@@ -249,21 +302,31 @@ const blocked = (host: string) => BLOCKED_SITES.some((s) => host === s || host.e
  * nothing made up is linked); none from a blocked site, none older than `NEWS_DAYS`, none already kept (`known`, page
  * keys), each page once, at most `MAX_PER_RUN`.
  */
-export function cleanNewsItems(raw: unknown, seen: readonly string[], known: readonly string[], today: string): NewsDraft[] {
+export function cleanNewsItems(
+  raw: unknown,
+  seen: readonly string[],
+  known: readonly string[],
+  today: string,
+  part: NewsPart = "solar",
+): NewsDraft[] {
   if (!Array.isArray(raw)) return [];
+  const allowed = topicsOf(part);
+  const most = part === "wider" ? WIDER_MAX : MAX_PER_RUN;
   const seenKeys = new Map(seen.map((u) => [urlKey(u), u]));
   const taken = new Set(known);
   const out: NewsDraft[] = [];
   for (const r of raw) {
-    if (out.length >= MAX_PER_RUN) break;
+    if (out.length >= most) break;
     if (!r || typeof r !== "object") continue;
     const o = r as Record<string, unknown>;
     const url = seenKeys.get(urlKey(typeof o.url === "string" ? o.url.trim() : ""));
     if (!url || !/^https:\/\//i.test(url)) continue;
     const key = urlKey(url);
     if (taken.has(key) || blocked(hostOf(url))) continue;
-    const topic = NEWS_TOPICS.includes(o.topic as NewsTopic) ? (o.topic as NewsTopic) : null;
+    const topic = allowed.includes(o.topic as NewsTopic) ? (o.topic as NewsTopic) : null;
     if (topic && OFFICIAL_TOPICS.includes(topic) && onSite(url, NOT_FOR_OFFICIAL_TOPICS)) continue;
+    if (part === "wider" && onSite(url, NOT_FOR_WIDER)) continue;
+    if (part === "wider" && topic && out.filter((n) => n.topic === topic).length >= WIDER_PER_TOPIC) continue;
     const headline = oneLine(o.headline, LIMITS.headline);
     const summary = wholeSentences(o.summary, LIMITS.summary);
     if (!topic || headline.length < 8 || summary.length < 20) continue;
@@ -345,7 +408,33 @@ Rules:
 - Up to ${MAX_PER_RUN} stories, the most important first. Fewer is fine: no filler, nothing older than ${NEWS_DAYS} days.
 
 End your reply with the stories as JSON in a \`\`\`json fence: a list of objects with
-"topic" (one of ${NEWS_TOPICS.map((t) => `"${t}"`).join(", ")}), "headline" (under 15 words), "summary" (2 or 3 sentences), "meaning" (1 sentence), "url", "publishedOn" (YYYY-MM-DD if the page says, else null), "brands" (makers or businesses named, as written), "models" (exact model numbers named, else []), "replaces" (models a new one replaces, else []), "standing" ("confirmed", "reported" or "unconfirmed"), "standingNote" (1 short sentence).`;
+"topic" (one of ${SOLAR_TOPICS.map((t) => `"${t}"`).join(", ")}), "headline" (under 15 words), "summary" (2 or 3 sentences), "meaning" (1 sentence), "url", "publishedOn" (YYYY-MM-DD if the page says, else null), "brands" (makers or businesses named, as written), "models" (exact model numbers named, else []), "replaces" (models a new one replaces, else []), "standing" ("confirmed", "reported" or "unconfirmed"), "standingNote" (1 short sentence).`;
+}
+
+/** The beyond-solar reading's prompt (`WIDER_TOPICS`): news a solar business reads for interest, from anywhere. */
+export function widerPrompt(today: string, recent: readonly string[]): string {
+  const already = recent.length
+    ? `\nAlready in the feed (don't send these stories again):\n${recent.map((h) => `- ${h}`).join("\n")}\n`
+    : "";
+  return `Today is ${today} in Melbourne. You are Sol, the assistant inside RENUABL, software for Australian solar retailers and installers.
+
+Another reading already covers rooftop solar, home batteries and rebates. This one is the news beside it that people running a solar business enjoy reading, in three sections. Search the web for the most interesting stories from the last 10 days in each:
+- ev: electric cars and driving: Tesla (its cars, Powerwall, self-driving software, robotaxis), new EV models and prices in Australia, charging networks, driverless cars and robotaxis anywhere in the world, vehicle-to-home
+- cleantech: clean energy at large (not rooftop solar or home batteries): grid-scale batteries and solar and wind farms, the grid and AEMO, records, energy and AI data centres, hydrogen, world energy news that matters to Australia
+- business: running a trade business in Australia: interest rates and the Reserve Bank, home building approvals and renovations, trades and apprentices, small business tax and rules, consumer confidence
+
+Australia first where there is Australian news; world news is welcome here (Tesla, driverless cars, records). Prefer the companies' and governments' own announcements, then reputable news (ABC, AFR, Reuters, The Driven, Drive, RenewEconomy and the like). Never a trading, crypto or share-tip site. Search each of the three sections at least twice, with different words, before you write. Send two stories from each section (there is always clean energy and business news in a 10-day week; a business story need not mention solar at all), at most ${WIDER_PER_TOPIC} from a topic, and no more than two about one company. Pick stories people would want to talk about: new, surprising or useful.
+${already}
+Rules:
+- Every story must come from a page your search showed or you read. Copy its address exactly. Never make up or guess a link.
+- Say how sure each story is: "confirmed" when the body or company responsible says it on its own page, "reported" when credible news says it, "unconfirmed" for anything speculative: leaks, rumours, "reportedly", plans not announced, a chief executive's predictions. Then one short sentence saying why, naming who says it.
+- Write the headline and summary in your own words. Never copy a sentence from the page.
+- Only facts the page states. No figure, date or name it doesn't give.
+- "meaning" is one plain sentence on why a solar business might find it interesting (for example: customers buying an EV often ask about charging it from their solar). If the link to solar is thin, say plainly what it is about instead. Never financial, investment or legal advice; never say a share price will rise or fall.
+- Send between 4 and ${WIDER_MAX} stories, aiming for ${WIDER_AIM}, spread across the three topics. No filler, nothing older than ${NEWS_DAYS} days.
+
+End your reply with the stories as JSON in a \`\`\`json fence: a list of objects with
+"topic" (one of ${WIDER_TOPICS.map((t) => `"${t}"`).join(", ")}), "headline" (under 15 words), "summary" (2 or 3 sentences), "meaning" (1 sentence), "url", "publishedOn" (YYYY-MM-DD if the page says, else null), "brands" (companies named, as written), "models" ([]), "replaces" ([]), "standing" ("confirmed", "reported" or "unconfirmed"), "standingNote" (1 short sentence).`;
 }
 
 /** Whether a fresh reading is due: never read, the last good one over `NEWS_REFRESH_HOURS` ago, a failed one over `NEWS_RETRY_HOURS`. */

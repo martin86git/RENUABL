@@ -18,6 +18,9 @@ import {
   isOfficialSite,
   NOT_OFFICIAL_NOTE,
   readNewsJson,
+  widerPrompt,
+  partOf,
+  WIDER_MAX,
   type NewsItem,
 } from "./industry-news";
 
@@ -284,5 +287,42 @@ describe("pageImageUrl", () => {
 describe("asking for more stories", () => {
   it("asks for products every time", () => {
     expect(newsPrompt(today, [])).toMatch(/Always search for products/);
+  });
+});
+
+describe("beyond solar", () => {
+  const url = (i: number) => `https://news.example.com/ev-${i}`;
+  const evs = Array.from({ length: 12 }, (_, i) => story({ topic: "ev", url: url(i), headline: `Robotaxi service number ${i} opens` }));
+  const seen = evs.map((_, i) => url(i));
+
+  it("keeps only its own topics, at most three a topic and WIDER_MAX in all", () => {
+    const kept = cleanNewsItems([story({ url: url(0) }), ...evs], seen, [], today, "wider");
+    expect(kept.every((n) => n.topic === "ev")).toBe(true);
+    expect(kept).toHaveLength(3);
+    const mixed = evs.map((e, i) => ({ ...e, topic: ["ev", "cleantech", "business"][i % 3] }));
+    expect(cleanNewsItems(mixed, seen, [], today, "wider")).toHaveLength(WIDER_MAX);
+  });
+
+  it("never takes a trading or crypto site", () => {
+    const u = "https://www.kucoin.com/news/tesla";
+    expect(cleanNewsItems([story({ topic: "cleantech", url: u })], [u], [], today, "wider")).toEqual([]);
+  });
+
+  it("and the solar reading never takes a beyond-solar topic", () => {
+    expect(cleanNewsItems(evs.slice(0, 2), seen, [], today)).toEqual([]);
+  });
+
+  it("asks for Tesla and driverless cars, with no investment advice", () => {
+    const p = widerPrompt(today, ["Old story"]);
+    expect(p).toMatch(/Tesla/);
+    expect(p).toMatch(/driverless/);
+    expect(p).toMatch(/Never financial, investment or legal advice/);
+    expect(p).toMatch(/Old story/);
+  });
+
+  it("knows which reading a topic belongs to", () => {
+    expect(partOf("ev")).toBe("wider");
+    expect(partOf("business")).toBe("wider");
+    expect(partOf("recalls")).toBe("solar");
   });
 });

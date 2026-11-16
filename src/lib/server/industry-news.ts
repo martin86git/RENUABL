@@ -23,6 +23,9 @@ import {
   cleanNewsItems,
   newsDue,
   newsPrompt,
+  widerPrompt,
+  NEWS_PARTS,
+  type NewsPart,
   readNewsJson,
   type NewsItem,
   type NewsTopic,
@@ -33,11 +36,27 @@ import { newId, query, transaction } from "./db";
 
 const MODEL = () => process.env.NEWS_MODEL?.trim() || "claude-sonnet-5-5";
 
-const TOOLS: Anthropic.ToolUnion[] = [
-  // 10 Nov 2026, Martin: more stories, products every day: a few more searches than the first ten.
-  { type: "web_search_20260209", name: "web_search", max_uses: 14, blocked_domains: [...BLOCKED_SITES], user_location: SEARCH_FROM },
-  { type: "web_fetch_20260209", name: "web_fetch", max_uses: 5, blocked_domains: [...BLOCKED_SITES], max_content_tokens: 12_000 },
+const toolsFor = (searches: number, fetches: number): Anthropic.ToolUnion[] => [
+  { type: "web_search_20260209", name: "web_search", max_uses: searches, blocked_domains: [...BLOCKED_SITES], user_location: SEARCH_FROM },
+  { type: "web_fetch_20260209", name: "web_fetch", max_uses: fetches, blocked_domains: [...BLOCKED_SITES], max_content_tokens: 12_000 },
 ];
+/** 10 Nov 2026, Martin: more stories, products every day: a few more searches than the first ten. Beyond solar is lighter. */
+/**
+ * Beyond solar uses the plain search (16 Nov 2026): the newer one runs its searches in code, which took past the time
+ * limit for a light reading and hid most of the pages it saw; the plain one answers quickly with each page it showed.
+ */
+const WIDER_TOOLS: Anthropic.ToolUnion[] = [
+  { type: "web_search_20250305", name: "web_search", max_uses: 8, blocked_domains: [...BLOCKED_SITES], user_location: SEARCH_FROM },
+];
+const TOOLS: Record<NewsPart, Anthropic.ToolUnion[]> = { solar: toolsFor(14, 5), wider: WIDER_TOOLS };
+
+/**
+ * The most a reading may take, inside the route's 300 seconds (16 Nov 2026: readings from the morning cron weren't
+ * landing; a reading that runs past the function's limit is cut off and never kept). Each call to Claude gets what is
+ * left, and no further turn starts with too little left.
+ */
+const READING_BUDGET_MS = 270_000;
+const LAST_TURN_MS = 45_000;
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -99,10 +118,11 @@ interface RunRow {
   ok: boolean | null;
 }
 
-const lastRun = (q: typeof query = query) =>
+const lastRun = (part: NewsPart, q: typeof query = query) =>
   q<RunRow>(
     `select ${moment("started_at")} as "startedAt", ${moment("finished_at")} as "finishedAt", ok
-       from industry_news_runs order by started_at desc limit 1`,
+       from industry_news_runs where part = $1 order by started_at desc limit 1`,
+    [part],
   ).then((r) => r[0] ?? null);
 
 /** The feed, newest first, with how the reading stands. */
@@ -117,8 +137,10 @@ export async function newsFeed(): Promise<NewsFeed> {
         order by coalesce(published_on, found_at::date) desc, found_at desc limit $2`,
       [NEWS_DAYS * 2, NEWS_SHOWN],
     ),
-    lastRun(),
-    query<{ at: string }>(`select ${moment("finished_at")} as at from industry_news_runs where ok order by started_at desc limit 1`),
+    lastRun("solar"),
+    query<{ at: string }>(
+      `select ${moment("finished_at")} as at from industry_news_runs where ok and part = 'solar' order by started_at desc limit 1`,
+    ),
   ]);
   return {
     items: rows.map(itemOf),
@@ -129,20 +151,22 @@ export async function newsFeed(): Promise<NewsFeed> {
   };
 }
 
-/** Whether a reading is due now (so the tab can start one after answering). */
-export async function newsReadingDue(): Promise<boolean> {
-  return configured() && newsDue(await lastRun(), new Date());
+/** The readings due now (so the tab can start them after answering). */
+export async function newsReadingsDue(): Promise<NewsPart[]> {
+  if (!configured()) return [];
+  const due = await Promise.all(NEWS_PARTS.map(async (p) => (newsDue(await lastRun(p), new Date()) ? p : null)));
+  return due.filter((p): p is NewsPart => p !== null);
 }
 
 /** Claims the next reading under a lock: its id, or null when one isn't due (or another has it). */
-async function claimRun(force: boolean): Promise<string | null> {
+async function claimRun(force: boolean, part: NewsPart): Promise<string | null> {
   return transaction(async (q) => {
-    await q(`select pg_advisory_xact_lock(hashtext('industry_news'))`);
-    const last = await lastRun(q as typeof query);
+    await q(`select pg_advisory_xact_lock(hashtext('industry_news:' || $1))`, [part]);
+    const last = await lastRun(part, q as typeof query);
     if (!force && !newsDue(last, new Date())) return null;
     if (last && last.ok === null && !newsDue(last, new Date())) return null;
     const id = newId("news", 8);
-    await q(`insert into industry_news_runs (id) values ($1)`, [id]);
+    await q(`insert into industry_news_runs (id, part) values ($1, $2)`, [id, part]);
     return id;
   });
 }
@@ -242,11 +266,14 @@ export async function newsPicture(id: string): Promise<{ bytes: Buffer; contentT
 function pagesIn(blocks: readonly unknown[]): string[] {
   const out: string[] = [];
   const walk = (v: unknown) => {
-    if (Array.isArray(v)) v.forEach(walk);
+    // The search tool often runs inside Sol's own code (16 Nov 2026: most results came back only as the code's printed
+    // output, so the pages he really saw were dropped as unseen); the addresses printed there count as seen too.
+    if (typeof v === "string") out.push(...(v.slice(0, 400_000).match(/https:\/\/[^\s"'<>|)\]]+/g) ?? []));
+    else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === "object") {
       const o = v as Record<string, unknown>;
       if (typeof o.url === "string") out.push(o.url);
-      for (const [k, x] of Object.entries(o)) if (k !== "url" && typeof x === "object") walk(x);
+      for (const [k, x] of Object.entries(o)) if (k !== "url" && (typeof x === "object" || typeof x === "string")) walk(x);
     }
   };
   for (const b of blocks) if (b && typeof b === "object" && /tool_result$/.test(String((b as { type?: unknown }).type))) walk(b);
@@ -257,10 +284,11 @@ function pagesIn(blocks: readonly unknown[]): string[] {
  * A morning's reading: Sol searches, writes the stories up, and the ones that pass `cleanNewsItems` are kept. Answers
  * how many were kept, or null when no reading was due or Claude isn't set up. `force` reads even when not due (cron).
  */
-export async function readTheNews(force = false): Promise<number | null> {
+export async function readTheNews(force = false, part: NewsPart = "solar"): Promise<number | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) return null;
-  const runId = await claimRun(force);
+  const startedAt = Date.now();
+  const runId = await claimRun(force, part);
   if (!runId) return null;
   let usage = noUsage(MODEL());
   try {
@@ -269,11 +297,11 @@ export async function readTheNews(force = false): Promise<number | null> {
       `select url_key as "urlKey", headline from industry_news where found_at > now() - make_interval(days => $1) order by found_at desc`,
       [NEWS_DAYS * 2],
     );
-    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 1 });
+    const client = new Anthropic({ apiKey, maxRetries: 0 });
     const messages: Anthropic.MessageParam[] = [
       {
         role: "user",
-        content: newsPrompt(
+        content: (part === "wider" ? widerPrompt : newsPrompt)(
           today,
           known.slice(0, 40).map((k) => k.headline),
         ),
@@ -283,7 +311,12 @@ export async function readTheNews(force = false): Promise<number | null> {
     let text = "";
     // The web tools run on Anthropic's side; a long search may pause and is carried on (a few times at most).
     for (let turn = 0; turn < 5; turn++) {
-      const m = await client.messages.create({ model: MODEL(), max_tokens: 12_000, tools: TOOLS, messages });
+      const left = READING_BUDGET_MS - (Date.now() - startedAt);
+      if (turn > 0 && left < LAST_TURN_MS) break;
+      const m = await client.messages.create(
+        { model: MODEL(), max_tokens: 12_000, tools: TOOLS[part], messages },
+        { timeout: Math.max(left, 30_000) },
+      );
       usage = addUsage(usage, usageOf(m.model, m.usage));
       seen.push(...pagesIn(m.content));
       text = m.content.map((b) => (b.type === "text" ? b.text : "")).join("\n");
@@ -305,6 +338,7 @@ export async function readTheNews(force = false): Promise<number | null> {
       seen,
       known.map((k) => k.urlKey),
       today,
+      part,
     );
     let kept = 0;
     for (const s of stories) {

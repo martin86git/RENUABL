@@ -9,6 +9,7 @@ import {
   removePost,
   reportPost,
   setLike,
+  votePoll,
 } from "@/lib/server/design-feed-posts-repo";
 import { tellStaff } from "@/lib/server/design-staff-note";
 import { staffBehind } from "@/lib/server/design-staff-view";
@@ -32,7 +33,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/post
 }
 
 /**
- * POST { do: like | unlike | comment (text) | uncomment (comment) | report (reason) | remove | keep }: what a member does
+ * POST { do: like | unlike | vote (choice) | comment (text) | uncomment (comment) | report (reason) | remove | keep }: what a member does
  * to a post. Remove is its writer, their business's owner or staff; keep (clearing its reports) is staff only.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/posts/[id]">) {
@@ -42,13 +43,21 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/post
     const { id } = await ctx.params;
     if (!validId(id)) return notFound();
     if (who.member.viewedBy) return refuse(403, "Not while viewing as someone.");
-    const body = (await request.json().catch(() => ({}))) as { do?: string; text?: unknown; comment?: unknown; reason?: unknown };
+    const body = (await request.json().catch(() => ({}))) as {
+      do?: string;
+      text?: unknown;
+      comment?: unknown;
+      reason?: unknown;
+      choice?: unknown;
+    };
     const staff = await isStaff();
     const reader = readerOf(who.member, staff);
     switch (body.do) {
       case "like":
       case "unlike":
         return (await setLike(id, reader, body.do === "like")) ? ok() : notFound();
+      case "vote":
+        return (await votePoll(id, reader, Number(body.choice))) ? ok() : refuse(400, "That poll has closed.");
       case "comment": {
         if (!allow(request, "feed-comment", 120)) return refuse(429, "Too many comments this hour.");
         const text = cleanCommentText(body.text);

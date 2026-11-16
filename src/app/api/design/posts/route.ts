@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { cleanPostLink, cleanPostText, postProblem, POST_LIMITS } from "@/lib/domain/design/feed-posts";
+import { cleanPoll, cleanPostLink, cleanPostText, postProblem, POST_LIMITS } from "@/lib/domain/design/feed-posts";
 import { answer, requireMember } from "@/lib/server/design-context";
 import { safeImage } from "@/lib/server/design-images";
 import { createPost, listPosts, readerOf, setLinkPreview } from "@/lib/server/design-feed-posts-repo";
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST a form (text, link, photo) → { id }: a post every business sees, as the signed-in member. The words are cleaned
+ * POST a form (text, link, photo, poll: a JSON list of choices) → { id }: a post every business sees, as the signed-in member. The words are cleaned
  * (`cleanPostText`), the link checked (`cleanPostLink`), the photo redrawn (`safeImage`); the link's title and picture
  * are read after the answer has gone back.
  */
@@ -47,9 +47,19 @@ export async function POST(request: Request) {
       if ("problem" in safe) return Response.json({ ok: false, message: safe.problem }, { status: 400 });
       photo = safe.bytes;
     }
-    const problem = postProblem(text, link, Boolean(photo), Boolean(typed));
+    // A poll: its choices sent as a JSON list (domain/design/feed-posts.ts, `cleanPoll`).
+    const pollRaw = form.get("poll");
+    const asked = typeof pollRaw === "string" && pollRaw.trim() !== "";
+    let poll: string[] | null = null;
+    if (asked)
+      try {
+        poll = cleanPoll(JSON.parse(pollRaw));
+      } catch {
+        poll = null;
+      }
+    const problem = postProblem(text, link, Boolean(photo), Boolean(typed), { asked, choices: poll });
     if (problem) return Response.json({ ok: false, message: problem }, { status: 400 });
-    const id = await createPost(who.member, text, link, photo);
+    const id = await createPost(who.member, text, link, photo, poll);
     if (link)
       after(async () => {
         const preview = await linkPreview(link).catch(() => null);

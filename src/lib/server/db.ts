@@ -719,6 +719,8 @@ create table if not exists industry_news_runs (
   cost_micros bigint
 );
 create index if not exists industry_news_runs_started on industry_news_runs(started_at desc);
+-- Which morning reading a run was: the solar news, or beyond solar (16 Nov 2026).
+alter table industry_news_runs add column if not exists part text not null default 'solar';
 -- Posts in the industry feed (domain/design/feed-posts.ts): every business sees them. Each row carries the business
 -- and member that wrote it; readers are sent a first name and business only. Gone with the business.
 create table if not exists design_feed_posts (
@@ -752,6 +754,36 @@ create table if not exists design_feed_likes (
   post_id text not null references design_feed_posts(id) on delete cascade,
   business_id text not null references businesses(id) on delete cascade,
   member_email text not null,
+  at timestamptz not null default now(),
+  primary key (post_id, member_email)
+);
+-- Likes and comments on Sol's stories (16 Nov 2026: the feed as the industry's own social network): as on posts, each row
+-- carries the member and business; readers see a first name and business. Gone with the story or the business.
+create table if not exists design_story_likes (
+  story_id text not null references industry_news(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  at timestamptz not null default now(),
+  primary key (story_id, member_email)
+);
+create table if not exists design_story_comments (
+  id text primary key,
+  story_id text not null references industry_news(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  author text not null,
+  body text not null,
+  created_at timestamptz not null default now(),
+  removed_at timestamptz
+);
+create index if not exists design_story_comments_story on design_story_comments(story_id, created_at);
+-- A poll on a post (its choices), and each member's vote (16 Nov 2026).
+alter table design_feed_posts add column if not exists poll jsonb;
+create table if not exists design_feed_votes (
+  post_id text not null references design_feed_posts(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  member_email text not null,
+  choice integer not null,
   at timestamptz not null default now(),
   primary key (post_id, member_email)
 );
