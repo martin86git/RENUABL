@@ -245,11 +245,11 @@ export const JOURNEY: readonly JourneyStep[] = [
     key: "three",
     step: "Check it",
     title: "You lay it out. Sol spots what's left.",
-    body: "Place the panels on today's aerial photo of the roof. Sol points out what still needs doing, like panels not yet on a string, and strings them in one press, each checked against the inverter's inputs.",
+    body: "Place the panels on today's aerial photo of the roof. Sol points out what's next: string the panels in one press, each checked against the inverter's inputs, then a battery for the evenings.",
     visual: {
       kind: "shot",
-      src: "/design/landing/film/design-strings.webp",
-      alt: "A design on the roof with half the panels strung and Sol pointing out the 21 panels not yet on a string (example data)",
+      src: "/design/landing/film/design-string-2.webp",
+      alt: "A design on the roof, strung in two strings, with Sol suggesting a battery for the evenings (example data)",
     },
   },
   {
@@ -494,7 +494,11 @@ export const FILM = {
     },
     { key: "service", title: "Service, answered by Sol", line: "Sol sums up the case, recommends the fix and drafts the reply." },
     { key: "voice", title: "Voice agents for your calls", line: "Hand the call to your agent and watch it live.", addOn: "voice" },
-    { key: "design", title: "The assisted designer", line: "Sol suggests a system from the bill. You check and adjust it." },
+    {
+      key: "design",
+      title: "The assisted designer",
+      line: "Sol suggests the system, then what's next. Record a walkthrough and send it to the customer.",
+    },
     {
       key: "proposal",
       title: "Proposals in your brand",

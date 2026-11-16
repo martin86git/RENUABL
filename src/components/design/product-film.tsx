@@ -60,11 +60,32 @@ const SHOTS: Shot[] = [
   },
   {
     chapter: "design",
-    src: "/design/landing/film/design-strings.webp",
+    src: "/design/landing/film/design-string-1.webp",
     moves: [
-      { ms: 2400, light: [0.176, 0.253, 0.71, 0.073] },
-      { ms: 2600, light: [0.345, 0.535, 0.145, 0.18] },
-      { ms: 3000, light: [0.335, 0.767, 0.331, 0.103] },
+      { ms: 2200, light: [0.176, 0.253, 0.71, 0.073] },
+      { ms: 2400, light: [0.34, 0.525, 0.19, 0.19] },
+      { ms: 2600, light: [0.326, 0.752, 0.345, 0.122] },
+    ],
+  },
+  {
+    chapter: "design",
+    src: "/design/landing/film/design-string-2.webp",
+    moves: [
+      { ms: 2600, light: [0.334, 0.462, 0.6, 0.23] },
+      { ms: 3000, light: [0.326, 0.738, 0.345, 0.14] },
+    ],
+  },
+  {
+    chapter: "design",
+    src: "/design/landing/film/design-record.webp",
+    moves: [{ ms: WHOLE }, { ms: 2800, light: [0.352, 0.922, 0.296, 0.066] }],
+  },
+  {
+    chapter: "design",
+    src: "/design/landing/film/design-share.webp",
+    moves: [
+      { ms: 2800, light: [0.265, 0.14, 0.47, 0.425] },
+      { ms: 3200, light: [0.265, 0.565, 0.47, 0.375] },
     ],
   },
   {
