@@ -16,12 +16,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
     area: "Billing",
-    words: "Voice agents and marketing email are add-ons. Add them to your plan in Settings → Billing, or where each one lives.",
+    words: "Add-ons: Calls & Texts, $29 a month, and Growth (custom proposals and marketing email), $19. Add them in Settings → Billing.",
   },
   {
     day: "2026-11-16",
     area: "Calls",
-    words: "With voice agents on your plan, your agents call and text from a business number of your own.",
+    words: "With Calls & Texts on your plan, your agents call and text from a business number of your own.",
   },
   {
     day: "2026-11-16",
