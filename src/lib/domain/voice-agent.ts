@@ -1,5 +1,6 @@
 import { buildCallAvailability, formatCallTime, isBookableCallSlot } from "./booking";
 import { coachingBlock } from "./design/coaching";
+import { deliveryBlock, deliveryParams, type Delivery } from "./design/delivery";
 import { saidAs, saidAsNote } from "./said-as";
 import { formatDate } from "./format";
 import { INSTALL_TOOL, installFirstMessage, installSystemPrompt, installVoicemail, type InstallDay } from "./install-call";
@@ -217,6 +218,10 @@ export interface CallBrief {
   installDays?: InstallDay[];
   /** How the business has coached its assistant, a note a line (domain/design/coaching.ts), after every rule above. */
   coaching?: string[];
+  /** The rules the business has locked in (coaching.ts `CoachNote.locked`): followed on every call, not guidance. */
+  locked?: string[];
+  /** How it speaks (domain/design/delivery.ts); unset is the calls as they were. */
+  delivery?: Delivery | null;
   /** A call back the team asked for after an earlier call: the one thing to ask or confirm (`cleanTeamAsk`). */
   teamAsk?: string | null;
 }
@@ -325,13 +330,24 @@ export const HELLO_AFTER_SECONDS = 4;
 export function openingBlock(b: CallBrief): string {
   const { ask, then } = openingParts(b);
   const name = speakableName(b.firstName);
+  // An easy opening (delivery.ts): who it is in a few words, a beat for them to take it in, then why it's ringing,
+  // in its own words. It still says its name, whose assistant it is and that it's automated, every time.
+  const easy = b.delivery?.opening === "easy" && !b.inbound;
+  const easyThen = `open the way a person does, in two short beats, in your own words. First, only who you are: your name, that you're ${spoken(b.business) || "the team"}'s assistant, and that you're automated (always all three), in one short sentence. Then stop for a moment and let them take it in or answer. Second, why you're ringing in one short sentence, and ask if now's a good time. Never run the two together, and never add anything else before they've spoken again. For the sense of it, not to read out: "${then}"`;
   const person = ask
-    ? `- A person answers ("Hello?", their name, "Who's this?"): your opening has two parts, and they are two separate turns.
+    ? easy
+      ? `- A person answers ("Hello?", their name, "Who's this?"): your opening is separate turns, never one speech.
+  1. Say only this, then stop talking: "${ask}" That is your whole turn. Wait in silence for them to answer, however long they take.
+  2. Only once they have answered: ${easyThen}
+  If they say it isn't ${name || "them"}, ask whether ${name || "they"} is around. If not, say who you are in one sentence, say you'll try again another time, thank them and end the call.`
+      : `- A person answers ("Hello?", their name, "Who's this?"): your opening has two parts, and they are two separate turns.
   1. Say only this, then stop talking: "${ask}" That is your whole turn. Don't say who you are or why you're calling yet, and add nothing after the question. Wait in silence for them to answer, however long they take.
   2. Only once they have answered (yes, "speaking", "who's this?", or anything else): say who you are and why you're calling, word for word: "${then}"
   If they say it isn't ${name || "them"}, ask whether ${name || "they"} is around. If not, say who you are in one sentence, say you'll try again another time, thank them and end the call.
   This order comes before any note about how to open: a note can change the words, never join the two turns into one.`
-    : `- A person answers ("Hello?", their name, "Who's this?"): say your opening, word for word: "${then}"`;
+    : easy
+      ? `- A person answers ("Hello?", their name, "Who's this?"): ${easyThen}`
+      : `- A person answers ("Hello?", their name, "Who's this?"): say your opening, word for word: "${then}"`;
   return `How this call starts:
 You rang them, so the other end speaks first. Listen to what answers before you say anything.
 ${person}
@@ -448,7 +464,7 @@ export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTran
       : `What we know about them:\n${b.about.map((l) => `- ${plain(l, 200)}`).join("\n") || "- Nothing more yet."}`;
 
   // How the business has coached its assistant comes last, after every rule it always keeps.
-  const coached = coachingBlock(b.coaching ?? [], business);
+  const coached = [deliveryBlock(b.delivery), coachingBlock(b.coaching ?? [], business, b.locked ?? [])].filter(Boolean).join("\n\n");
   return `You are ${plain(b.assistant, 20) || "Sol"}, ${business}'s automated phone assistant.
 
 ${job}
@@ -584,6 +600,8 @@ export function assistantConfig(o: {
       tools,
     },
     ...(o.voice ? { voice: o.voice } : {}),
+    // How long it leaves before answering, and the room behind it, when the business chose other than Vapi's defaults.
+    ...deliveryParams(b.delivery),
     transcriber: transcriberFor([b.assistant, b.business, b.firstName ?? ""]),
     // A control address for the call, so the team can tell the assistant something while it's on (live-call.ts).
     monitorPlan: { controlEnabled: true },

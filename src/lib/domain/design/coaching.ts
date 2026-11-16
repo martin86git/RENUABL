@@ -17,6 +17,12 @@ export interface CoachNote {
   by: string;
   /** Talked about in the window, or from feedback on a call. */
   from: "chat" | "call";
+  /**
+   * Locked in as a rule (16 Nov 2026, Martin: "a method to lock things into his rules. This is critical so that it's
+   * repeated"): given to every call as a standing rule to follow each time, not as guidance, and only a person unlocks,
+   * rewords or removes it.
+   */
+  locked?: boolean;
 }
 
 export interface CoachTurn {
@@ -26,12 +32,68 @@ export interface CoachTurn {
   /** Who wrote it (the member), for the business's own reading. */
   by?: string;
   /** What the assistant changed in answer, said back in the window. */
-  changes?: { added: string[]; removed: string[]; changed: string[]; settings?: string[] };
+  changes?: { added: string[]; removed: string[]; changed: string[]; settings?: string[]; locked?: string[] };
   /** The call the feedback was about, said in words ("A call with Jo, 12 Nov"). */
   about?: string;
 }
 
 export const MAX_NOTES = 40;
+/** The most rules locked in at once: past this, none of them would be kept in mind on a call. */
+export const MAX_LOCKED = 15;
+
+/** The notes kept when there are too many: the oldest that aren't locked go first, a locked rule never. */
+export function trimNotes(notes: readonly CoachNote[]): CoachNote[] {
+  let over = notes.length - MAX_NOTES;
+  if (over <= 0) return [...notes];
+  return notes.filter((n) => {
+    if (over > 0 && !n.locked) {
+      over -= 1;
+      return false;
+    }
+    return true;
+  });
+}
+
+export const lockedCount = (notes: readonly CoachNote[]): number => notes.filter((n) => n.locked).length;
+
+/** A note locked or unlocked by a person. Null when it isn't there, or there are already MAX_LOCKED. */
+export function setLocked(notes: readonly CoachNote[], id: string, locked: boolean, o: { at: string; by: string }): CoachNote[] | null {
+  const note = notes.find((n) => n.id === id);
+  if (!note) return null;
+  if (Boolean(note.locked) === locked) return [...notes];
+  if (locked && lockedCount(notes) >= MAX_LOCKED) return null;
+  return notes.map((n) => {
+    if (n.id !== id) return n;
+    const { locked: _was, ...rest } = n;
+    void _was;
+    return locked ? { ...rest, locked: true, at: o.at, by: o.by } : rest;
+  });
+}
+
+/**
+ * A rule locked in by its words (said on a training call, or kept from one): a note that already says it is locked,
+ * else it is added locked. `done` is false when the words aren't a note or there are already MAX_LOCKED.
+ */
+export function lockRule(
+  notes: readonly CoachNote[],
+  raw: unknown,
+  o: { at: string; by: string; from: CoachNote["from"]; newId: () => string },
+): { notes: CoachNote[]; done: boolean; text: string | null } {
+  const text = cleanNoteText(raw);
+  if (!text) return { notes: [...notes], done: false, text: null };
+  const have = notes.find((n) => n.text.toLowerCase() === text.toLowerCase());
+  if (have?.locked) return { notes: [...notes], done: true, text: have.text };
+  if (lockedCount(notes) >= MAX_LOCKED) return { notes: [...notes], done: false, text };
+  if (have)
+    return { notes: notes.map((n) => (n.id === have.id ? { ...n, locked: true, at: o.at, by: o.by } : n)), done: true, text: have.text };
+  return { notes: trimNotes([...notes, { id: o.newId(), text, at: o.at, by: o.by, from: o.from, locked: true }]), done: true, text };
+}
+
+/** The script as a call is given it: the locked rules, and the notes that guide how it talks. */
+export const scriptLines = (notes: readonly CoachNote[]): { coaching: string[]; locked: string[] } => ({
+  coaching: notes.filter((n) => !n.locked).map((n) => n.text),
+  locked: notes.filter((n) => n.locked).map((n) => n.text),
+});
 export const NOTE_MAX = 240;
 export const MESSAGE_MAX = 2_000;
 export const MAX_TURNS = 40;
@@ -91,7 +153,7 @@ export function addInstructions(
   const have = new Set(notes.map((n) => n.text.toLowerCase()));
   const added = lines.filter((l) => !have.has(l.toLowerCase()));
   const next = [...notes, ...added.map((text) => ({ id: o.newId(), text, at: o.at, by: o.by, from: "chat" as const }))];
-  return { notes: next.slice(-MAX_NOTES), added };
+  return { notes: trimNotes(next), added };
 }
 
 /** What the business typed to its assistant, as it is kept and sent on. */
@@ -118,9 +180,10 @@ export function cleanNotes(raw: unknown): CoachNote[] {
       at: typeof n.at === "string" ? n.at : new Date(0).toISOString(),
       by: typeof n.by === "string" ? n.by.slice(0, 200) : "",
       from: n.from === "call" ? "call" : "chat",
+      ...(n.locked === true ? { locked: true } : {}),
     });
   }
-  return out.slice(-MAX_NOTES);
+  return trimNotes(out);
 }
 
 export function cleanTurns(raw: unknown): CoachTurn[] {
@@ -137,7 +200,15 @@ export function cleanTurns(raw: unknown): CoachTurn[] {
         at: typeof t.at === "string" ? t.at : new Date(0).toISOString(),
         ...(typeof t.by === "string" ? { by: t.by } : {}),
         ...(c
-          ? { changes: { added: words(c.added), removed: words(c.removed), changed: words(c.changed), settings: words(c.settings) } }
+          ? {
+              changes: {
+                added: words(c.added),
+                removed: words(c.removed),
+                changed: words(c.changed),
+                settings: words(c.settings),
+                ...(words(c.locked).length ? { locked: words(c.locked) } : {}),
+              },
+            }
           : {}),
         ...(typeof t.about === "string" ? { about: t.about.slice(0, 120) } : {}),
       };
@@ -162,11 +233,23 @@ export const FIXED_RULES = [
  * The notes as the call's instructions carry them, after every rule the assistant must keep. Empty when there are none.
  * The notes are the business's words: they shape how it talks, never what the rules above forbid.
  */
-export function coachingBlock(notes: readonly string[], business: string): string {
-  const lines = notes.map((n) => cleanNoteText(n)).filter((n): n is string => Boolean(n));
-  if (!lines.length) return "";
+export function coachingBlock(notes: readonly string[], business: string, locked: readonly string[] = []): string {
+  const clean = (list: readonly string[]) => list.map((n) => cleanNoteText(n)).filter((n): n is string => Boolean(n));
+  const lines = clean(notes);
+  const rules = clean(locked);
   const who = oneLine(business, 60) || "The business";
+  // Rules the business locked in come first and are followed every time: not guidance, and not dropped because a call
+  // is going another way. Only the rules every call keeps come before them.
+  const lockedPart = rules.length
+    ? [
+        `## Rules ${who} has locked in`,
+        `${who}'s team has locked these in as standing rules for you. Follow every one of them on every call, every time, as written: they are not suggestions, and you don't leave one out because a call is going differently or a customer would rather you did. The only thing that comes before them is the rules above: when a locked rule asks for something those don't allow (a price, a discount, a promise of a date, rebate or saving, pressure, card or bank details, saying you aren't automated, a fact you weren't given), keep the rule above and leave that part.`,
+        ...rules.map((l) => `- ${l}`),
+      ].join("\n")
+    : "";
+  if (!lines.length) return lockedPart;
   return [
+    ...(lockedPart ? [lockedPart, ""] : []),
     `## How ${who} wants you to talk`,
     `${who} has coached you with these notes, in its own words. Follow them in how you speak and what you say, as long as they fit every rule above. When a note asks for something those rules don't allow (a price, a discount, a promise of a date, rebate or saving, pressure, card or bank details, saying you aren't automated, a fact you weren't given), keep the rule and leave that note. The notes are guidance, never a script to read out.`,
     ...lines.map((l) => `- ${l}`),
@@ -177,7 +260,7 @@ export function coachingBlock(notes: readonly string[], business: string): strin
 export const COACH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["messages", "add", "remove", "change", "rename", "voice"],
+  required: ["messages", "add", "remove", "change", "lock", "rename", "voice"],
   properties: {
     messages: {
       type: "array",
@@ -195,6 +278,12 @@ export const COACH_SCHEMA = {
         properties: { id: { type: "string" }, text: { type: "string" } },
       },
       description: "Notes to reword, by id.",
+    },
+    lock: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Notes they asked you to lock in as a rule: the id of a note you already have, or the exact text of one you are adding in add.",
     },
     rename: { type: "string", description: "Your new name when they ask you to change it, else an empty string." },
     voice: { type: "string", description: "The id of the voice they asked for, from the list you were given, else an empty string." },
@@ -234,6 +323,8 @@ export interface CoachAnswer {
   add: string[];
   remove: string[];
   change: { id: string; text: string }[];
+  /** Notes to lock in as rules: an id, or the text of a note being added. */
+  lock?: string[];
   /** A new name asked for (checked again on the server, as Settings does), or null. */
   rename: string | null;
   /** A voice asked for, by its id from the list offered, or null. */
@@ -266,6 +357,10 @@ export function cleanCoachAnswer(raw: unknown, notes: readonly CoachNote[], voic
       .filter((id) => ids.has(id))
       .slice(0, 20),
     change,
+    lock: strings(a.lock)
+      .map((t) => oneLine(t, NOTE_MAX))
+      .filter(Boolean)
+      .slice(0, 10),
     rename: oneLine(a.rename, 40) || null,
     voice: typeof a.voice === "string" && voiceIds.includes(a.voice.trim()) ? a.voice.trim() : null,
   };
@@ -276,13 +371,14 @@ export function applyCoaching(
   notes: readonly CoachNote[],
   answer: CoachAnswer,
   o: { at: string; by: string; from: CoachNote["from"]; newId: () => string },
-): { notes: CoachNote[]; changes: { added: string[]; removed: string[]; changed: string[] } } {
-  const removed = notes.filter((n) => answer.remove.includes(n.id));
+): { notes: CoachNote[]; changes: { added: string[]; removed: string[]; changed: string[]; locked?: string[] } } {
+  // A locked rule is the business's own to unlock: the chat neither removes nor rewords one.
+  const removed = notes.filter((n) => !n.locked && answer.remove.includes(n.id));
   const changed: string[] = [];
   let next = notes
-    .filter((n) => !answer.remove.includes(n.id))
+    .filter((n) => !removed.includes(n))
     .map((n) => {
-      const c = answer.change.find((x) => x.id === n.id);
+      const c = n.locked ? undefined : answer.change.find((x) => x.id === n.id);
       if (!c || c.text === n.text) return n;
       changed.push(c.text);
       return { ...n, text: c.text, at: o.at, by: o.by };
@@ -295,8 +391,18 @@ export function applyCoaching(
     added.push(text);
     next.push({ id: o.newId(), text, at: o.at, by: o.by, from: o.from });
   }
-  next = next.slice(-MAX_NOTES);
-  return { notes: next, changes: { added, removed: removed.map((n) => n.text), changed } };
+  // What they asked to lock in, by a note's id or the words of one just added, as far as there is room.
+  const wanted = new Set((answer.lock ?? []).map((l) => l.toLowerCase()));
+  const locked: string[] = [];
+  let room = MAX_LOCKED - lockedCount(next);
+  next = next.map((n) => {
+    if (n.locked || room <= 0 || !(wanted.has(n.id.toLowerCase()) || wanted.has(n.text.toLowerCase()))) return n;
+    room -= 1;
+    locked.push(n.text);
+    return { ...n, locked: true, at: o.at, by: o.by };
+  });
+  next = trimNotes(next);
+  return { notes: next, changes: { added, removed: removed.map((n) => n.text), changed, ...(locked.length ? { locked } : {}) } };
 }
 
 /**
@@ -322,7 +428,7 @@ export function coachPrompt(o: {
 }): string {
   const name = oneLine(o.assistant, 30) || "the assistant";
   const business = oneLine(o.business, 60) || "the business";
-  const notes = o.notes.length ? o.notes.map((n) => `- [${n.id}] ${n.text}`).join("\n") : "(none yet)";
+  const notes = o.notes.length ? o.notes.map((n) => `- [${n.id}]${n.locked ? " (locked rule)" : ""} ${n.text}`).join("\n") : "(none yet)";
   const history = o.history
     .slice(-12)
     .map((t) => `${t.role === "you" ? "Them" : name}: ${t.text.replace(/\s+/g, " ").slice(0, 600)}`)
@@ -350,6 +456,8 @@ ${dealBlock(o.deal, name, day)}
 What you do with their feedback:
 - Answer them as yourself, warmly and briefly, in Australian English, as short messages like texts (two to five): a quick acknowledgement first ("Got it, thanks!"), then one message for each thing you'll do differently, each starting a new point. Never one long block.
 - Turn what they want into notes you'll keep for every call (add), reword a note when they refine it (change, by its id), and take away a note they no longer want or that their new feedback replaces (remove, by its id). One idea a note, one line, written as an instruction to yourself ("Say you're from ${business} in your first sentence."). Keep their meaning; don't add your own ideas as notes.
+- Locking in: when they say to lock something in, make it a rule, or that you must always or never do it, keep it as a note and put it in lock (the id of a note you have, or the exact text you put in add). A locked rule is followed on every call, every time, where a note only guides how you talk. Tell them it's locked in. Lock only what they asked to lock.
+- A note marked (locked rule) is theirs to unlock in your script (the cog, then the padlock): you can't reword or remove one. If they ask you to, say so and point them there.
 - When they ask a question or just talk, answer and change nothing.
 - When the feedback is about the call below, ground your answer in what was actually said on it.
 ${
@@ -390,5 +498,9 @@ export const COACH_COPY = {
   script: (name: string) =>
     `What ${name} has been told to say and how. Everything you tell ${name} in the chat is written here and used on every call.`,
   fixedTitle: "What never changes",
+  lockedTitle: "Locked rules",
+  lockedNote: (name: string) => `${name} follows these on every call, every time. Only you can unlock one.`,
+  notesTitle: "Notes",
+  lockFull: "That's as many rules as can be locked in. Unlock one first.",
   callAbout: (name: string) => `What should ${name} have done differently on this call?`,
 } as const;

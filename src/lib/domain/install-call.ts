@@ -9,6 +9,7 @@
  * the assistant says so on the call. Pure rules here; the call is placed by server/voice-calls.ts.
  */
 import { coachingBlock } from "./design/coaching";
+import { deliveryBlock } from "./design/delivery";
 import { saidAs, saidAsNote } from "./said-as";
 import { formatDate } from "./format";
 import { addDaysISO, isInstallDay } from "./scheduling";
@@ -168,7 +169,7 @@ export function installSystemPrompt(b: CallBrief, days: readonly InstallDay[], o
     o.canTransfer && "- transferCall: when they want to speak to a person right now.",
     "- endCall: to finish once you've said goodbye.",
   ].filter(Boolean);
-  const coached = coachingBlock(b.coaching ?? [], business);
+  const coached = [deliveryBlock(b.delivery), coachingBlock(b.coaching ?? [], business, b.locked ?? [])].filter(Boolean).join("\n\n");
   return `You are ${plain(b.assistant, 20) || "Sol"}, ${business}'s automated phone assistant for bookings.
 
 You are on a phone call with ${name || "a customer"}, who has gone ahead with ${business}. Their job is ready to be booked in. Your one job: find a day for the installation that suits them from the days below, and pencil it in.

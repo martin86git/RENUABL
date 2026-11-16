@@ -4,7 +4,8 @@ import { readVapiEvent, VOICE_SECRET_HEADER } from "@/lib/domain/voice-agent";
 import { readLiveEvent } from "@/lib/domain/live-call";
 import { answerInbound, handleCallEnded, handleToolCall, keepLive, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
 import { isPracticeRef } from "@/lib/domain/design/practice-call";
-import { keepPracticeLive } from "@/lib/server/design-practice-call";
+import { keepPracticeLive, lockInFromTraining, writeUpTraining } from "@/lib/server/design-practice-call";
+import { TRAINING_TOOL } from "@/lib/domain/design/training-call";
 
 function sameSecret(given: string | null, expected: string): boolean {
   if (!given) return false;
@@ -39,10 +40,22 @@ export async function POST(request: Request) {
   if (isPracticeRef(ref)) {
     const live = readLiveEvent(body);
     if (live) await keepPracticeLive(ref, live);
-    if (event.type === "tool-calls")
-      return Response.json({
-        results: event.toolCalls.map((t) => ({ toolCallId: t.id, result: "This is a practice call: nothing is booked or sent." })),
+    // A training call that has ended is read for what the trainer asked for, once its last words are in.
+    if (live?.kind === "status" && live.status === "ended")
+      after(async () => {
+        await new Promise((r) => setTimeout(r, 3_000));
+        await writeUpTraining(ref);
       });
+    if (event.type === "tool-calls") {
+      // A training call's one tool locks a rule the trainer confirmed into the script; nothing else is connected.
+      const results = [];
+      for (const t of event.toolCalls)
+        results.push({
+          toolCallId: t.id,
+          result: t.name === TRAINING_TOOL ? await lockInFromTraining(ref, t.args) : "This is a practice call: nothing is booked or sent.",
+        });
+      return Response.json({ results });
+    }
     return Response.json({});
   }
 

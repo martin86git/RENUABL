@@ -9,6 +9,7 @@
  * under the id `PRACTICE_ID`.
  */
 import type { CallBrief } from "../voice-agent";
+import type { Delivery } from "./delivery";
 
 /** The live call window's id for a practice call (never a deal's id, which starts job_). */
 export const PRACTICE_ID = "practice";
@@ -30,7 +31,14 @@ const plain = (raw: string | null | undefined, max: number) =>
     .slice(0, max);
 
 /** What the assistant is told about the practice "customer": the member, playing a new lead. */
-export function practiceBrief(o: { assistant: string; business: string; memberFirstName: string | null; coaching: string[] }): CallBrief {
+export function practiceBrief(o: {
+  assistant: string;
+  business: string;
+  memberFirstName: string | null;
+  coaching: string[];
+  locked?: string[];
+  delivery?: Delivery | null;
+}): CallBrief {
   return {
     mode: "lead",
     assistant: o.assistant,
@@ -43,6 +51,8 @@ export function practiceBrief(o: { assistant: string; business: string; memberFi
     canSendLink: false,
     hasEmail: false,
     coaching: o.coaching,
+    locked: o.locked ?? [],
+    delivery: o.delivery ?? null,
   };
 }
 

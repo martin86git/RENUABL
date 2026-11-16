@@ -6,7 +6,10 @@ import {
   cleanMessage,
   cleanNoteText,
   instructionLines,
+  setLocked,
+  COACH_COPY,
 } from "@/lib/domain/design/coaching";
+import { cleanDelivery, DEFAULT_DELIVERY, sameDelivery } from "@/lib/domain/design/delivery";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
@@ -14,7 +17,7 @@ import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log
 import { callTranscriptsFor } from "@/lib/server/call-transcripts";
 import { chatLines, fileChatAway, forgetChat, isChatId, reopenChat } from "@/lib/domain/design/coach-threads";
 import { coachAssistant, newChatId, newNoteId } from "@/lib/server/design-caller-coach";
-import { coachChatsOf, coachingOf, saveCoachChats, saveCoaching } from "@/lib/server/design-caller-repo";
+import { coachChatsOf, coachingOf, deliveryOf, saveCoachChats, saveCoaching, saveDelivery } from "@/lib/server/design-caller-repo";
 import { ADMIN_FIXED_RULES, cleanCallerKey } from "@/lib/domain/install-call";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
@@ -31,10 +34,14 @@ export async function GET(request: Request) {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const role = roleIn(request);
-    const [c, chats] = await Promise.all([coachingOf(who.member.businessId, role), coachChatsOf(who.member.businessId, role)]);
+    const [c, chats, delivery] = await Promise.all([
+      coachingOf(who.member.businessId, role),
+      coachChatsOf(who.member.businessId, role),
+      deliveryOf(who.member.businessId, role),
+    ]);
     const mayCoach = can(who.member.role, "prices", who.member.permissions);
     return Response.json(
-      { ok: true, ...c, past: chatLines(chats), fixed: role === "admin" ? ADMIN_FIXED_RULES : FIXED_RULES, mayCoach },
+      { ok: true, ...c, past: chatLines(chats), fixed: role === "admin" ? ADMIN_FIXED_RULES : FIXED_RULES, mayCoach, delivery },
       { headers: PRIVATE },
     );
   });
@@ -122,16 +129,35 @@ export async function POST(request: Request) {
   });
 }
 
-/** PUT { id, text }: reword a note by hand. For a member who may change settings. */
+/**
+ * PUT { id, text }: reword a note by hand. PUT { id, locked }: lock a note in as a rule, or unlock it. PUT { delivery }:
+ * how the agent speaks (domain/design/delivery.ts; the usual choices are kept as nothing chosen). For a member who may
+ * change settings.
+ */
 export async function PUT(request: Request) {
   return answer(async () => {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
     const read = await readBody(request, 2_000);
     if ("refuse" in read) return read.refuse;
+    const role = roleIn(request);
+    if (read.body.delivery !== undefined) {
+      const delivery = read.body.delivery === null ? null : cleanDelivery(read.body.delivery);
+      const kept = delivery && !sameDelivery(delivery, DEFAULT_DELIVERY) ? delivery : null;
+      await saveDelivery(who.member.businessId, kept, who.member.email, role);
+      return Response.json({ ok: true, delivery: kept });
+    }
+    if (typeof read.body.locked === "boolean") {
+      const was = await coachingOf(who.member.businessId, role);
+      if (!was.notes.some((n) => n.id === read.body.id))
+        return Response.json({ ok: false, message: "That note isn't here." }, { status: 404 });
+      const next = setLocked(was.notes, String(read.body.id), read.body.locked, { at: new Date().toISOString(), by: who.member.email });
+      if (!next) return Response.json({ ok: false, message: COACH_COPY.lockFull }, { status: 409 });
+      await saveCoaching(who.member.businessId, { notes: next, turns: was.turns }, who.member.email, role);
+      return Response.json({ ok: true, notes: next });
+    }
     const text = cleanNoteText(read.body.text);
     if (!text) return Response.json({ ok: false, message: "Write the note in a few words." }, { status: 422 });
-    const role = roleIn(request);
     const c = await coachingOf(who.member.businessId, role);
     if (!c.notes.some((n) => n.id === read.body.id)) return Response.json({ ok: false, message: "That note isn't here." }, { status: 404 });
     const at = new Date().toISOString();

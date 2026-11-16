@@ -85,6 +85,22 @@ export async function ringMeToHear(role: CallerKey = "sales") {
   return res;
 }
 
+/** Heard by the agent's chat window when a training call is placed, so it starts watching for what comes of it. */
+export const TRAINING_PLACED = "renuabl:training";
+
+/**
+ * A training call (domain/design/training-call.ts): the agent rings the member's own mobile and talks to them as its
+ * trainer, not a customer. What they ask for is written up afterwards in its chat, to keep or drop.
+ */
+export async function ringMeToTrain(role: CallerKey = "sales") {
+  const res = await ask<{ message: string }>(`/api/design/caller/test?role=${role}&kind=training`, { method: "POST" });
+  if (res.ok) {
+    watchAssistantCall({ jobId: PRACTICE_ID, name: "you", message: res.message, role });
+    window.dispatchEvent(new CustomEvent(TRAINING_PLACED));
+  }
+  return res;
+}
+
 export async function uploadCallerPhoto(file: File, role: CallerKey = "sales") {
   const form = new FormData();
   form.set("file", file);

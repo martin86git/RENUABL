@@ -6,7 +6,8 @@
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
 import { SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
-import { cleanNotes, cleanTurns, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
+import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
+import { cleanDelivery, type Delivery } from "@/lib/domain/design/delivery";
 import { dbConfigured, query } from "./db";
 
 export interface Caller {
@@ -108,6 +109,36 @@ export async function coachingOf(businessId: string, role: CallerKey = "sales"):
     [businessId, role],
   );
   return { notes: cleanNotes(rows[0]?.coach_notes), turns: cleanTurns(rows[0]?.coach_chat) };
+}
+
+/** How the agent speaks (domain/design/delivery.ts): null until the business has chosen, which is the calls as they were. */
+export async function deliveryOf(businessId: string, role: CallerKey = "sales"): Promise<Delivery | null> {
+  if (!dbConfigured()) return null;
+  const rows = await query<{ delivery: unknown }>(`select delivery from design_caller where business_id = $1 and role = $2`, [
+    businessId,
+    role,
+  ]);
+  return rows[0]?.delivery ? cleanDelivery(rows[0].delivery) : null;
+}
+
+export async function saveDelivery(businessId: string, delivery: Delivery | null, by: string, role: CallerKey = "sales"): Promise<void> {
+  await query(
+    `insert into design_caller (business_id, name, delivery, updated_by, role) values ($1, $2, $3, $4, $5)
+     on conflict (business_id, role) do update set delivery = excluded.delivery, updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, DEFAULT_CALLER, delivery ? JSON.stringify(delivery) : null, by, role],
+  );
+}
+
+/**
+ * The agent's script as every call is given it, read fresh: the notes that guide how it talks, the rules locked in,
+ * and how it speaks. Never throws: a call goes ahead with what could be read.
+ */
+export async function scriptFor(
+  businessId: string,
+  role: CallerKey = "sales",
+): Promise<{ coaching: string[]; locked: string[]; delivery: Delivery | null }> {
+  const [c, delivery] = await Promise.all([coachingOf(businessId, role).catch(() => null), deliveryOf(businessId, role).catch(() => null)]);
+  return { ...scriptLines(c?.notes ?? []), delivery };
 }
 
 /** The chats before the one going (domain/design/coach-threads.ts), newest first. */

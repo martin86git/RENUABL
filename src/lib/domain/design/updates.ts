@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
+    area: "Calls",
+    words: "Train your voice agent: it rings you, knows you're its trainer, and what you ask for waits in its chat to keep or drop.",
+  },
+  {
+    day: "2026-11-16",
+    area: "Calls",
+    words: 'Lock a rule in: say "lock that in" on a training call, or use the padlock in the script. Locked rules are followed every call.',
+  },
+  {
+    day: "2026-11-16",
+    area: "Calls",
+    words: "How it speaks: make your voice agent a natural phone call, with short turns, a beat before answering and an easy opening.",
+  },
+  {
+    day: "2026-11-16",
     area: "Today",
     words: "News now has Beyond solar: EVs, Tesla and driverless cars, clean energy, and business news each morning.",
   },

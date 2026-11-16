@@ -11,6 +11,8 @@ import {
   ChevronLeft,
   ChevronUp,
   Loader2,
+  Lock,
+  LockOpen,
   Minus,
   Pencil,
   Phone,
@@ -36,7 +38,9 @@ import {
 } from "@/lib/domain/design/coach-window";
 import { currentChatLine, type CoachChatLine } from "@/lib/domain/design/coach-threads";
 import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
-import { callerChanged, ringMeToHear, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
+import { callerChanged, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
+import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
+import { DeliverySettings, RingMe, TrainingCard } from "./coach-training";
 import { voiceLabel } from "@/lib/domain/design/caller";
 import {
   clearCoachCall,
@@ -45,6 +49,7 @@ import {
   forgetCoachChat,
   loadAssistantDeals,
   loadCoaching,
+  lockNote,
   newCoachChat,
   openCoach,
   openCoachChat,
@@ -251,6 +256,8 @@ function CoachWindowFor() {
   const [turns, setTurns] = useState<CoachTurn[]>([]);
   const [fixed, setFixed] = useState<string[]>([]);
   const [mayCoach, setMayCoach] = useState(false);
+  // How it speaks (delivery.ts): null until the business has chosen.
+  const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState("");
   // What the microphone is hearing, shown in the box as it comes (14 Nov 2026, Martin: talk into the chat field).
@@ -337,6 +344,7 @@ function CoachWindowFor() {
       setPast(res.past);
       setFixed(res.fixed);
       setMayCoach(res.mayCoach);
+      setDelivery(res.delivery ?? null);
     });
     const t = window.setTimeout(() => box.current?.focus(), 50);
     const key = (e: KeyboardEvent) => e.key === "Escape" && closeCoach();
@@ -513,7 +521,7 @@ function CoachWindowFor() {
               {/* What the window can show and do, together by the title (14 Nov 2026, Martin: kept away from minimise and
                 close, so they aren't taken for window controls). */}
               <div className="ml-1 flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 p-0.5">
-                <HearButton />
+                {mayCoach && <RingMe caller={caller} />}
                 <button
                   type="button"
                   onClick={() => toggleDeals(!deals)}
@@ -574,6 +582,8 @@ function CoachWindowFor() {
               fixed={fixed}
               fresh={fresh}
               mayCoach={mayCoach}
+              delivery={delivery}
+              onDelivery={setDelivery}
               onNotes={setNotes}
               onBack={() => toggleSettings(false)}
             />
@@ -589,8 +599,23 @@ function CoachWindowFor() {
           )}
           <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", (settings || deals) && "hidden sm:flex")}>
             <ContactReach open={reaching} onOpen={setReaching} />
+            {!reaching && (
+              <TrainingCard
+                caller={caller}
+                onNotes={(next) => {
+                  const was = new Map(notes.map((n) => [n.id, n.text]));
+                  setFresh(new Set(next.filter((n) => was.get(n.id) !== n.text).map((n) => n.id)));
+                  setNotes(next);
+                }}
+              />
+            )}
             {landing && !reaching && (
               <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
+                {mayCoach && (
+                  <div className="mb-4">
+                    <RingMe caller={caller} row />
+                  </div>
+                )}
                 <CoachWelcome
                   caller={caller}
                   current={currentChatLine(turns)}
@@ -778,12 +803,17 @@ function CoachSettings(props: {
   fixed: string[];
   fresh: Set<string>;
   mayCoach: boolean;
+  delivery: Delivery | null;
+  onDelivery: (d: Delivery | null) => void;
   onNotes: (n: CoachNote[]) => void;
   onBack: () => void;
 }) {
   const { callsOn } = useCallerInfo();
   const caller = useCoachCaller();
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [speakOpen, setSpeakOpen] = useState(false);
+  const locked = props.notes.filter((n) => n.locked);
+  const loose = props.notes.filter((n) => !n.locked);
   const [scriptOpen, setScriptOpen] = useState(true);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const name = caller.name;
@@ -830,10 +860,14 @@ function CoachSettings(props: {
           </div>
         )}
       </section>
+      <section className="border-b border-line">
+        {head(DELIVERY_COPY.title, DELIVERY_COPY.summary(props.delivery), speakOpen, () => setSpeakOpen((o) => !o))}
+        {speakOpen && <DeliverySettings delivery={props.delivery} editable={props.mayCoach} onSaved={props.onDelivery} />}
+      </section>
       <section>
         {head(
           "Script",
-          `${props.notes.length} ${props.notes.length === 1 ? "line" : "lines"}: what ${name} has been told to say`,
+          `${locked.length ? `${locked.length} locked ${locked.length === 1 ? "rule" : "rules"}, ` : ""}${loose.length} ${loose.length === 1 ? "note" : "notes"}`,
           scriptOpen,
           () => setScriptOpen((o) => !o),
         )}
@@ -841,7 +875,22 @@ function CoachSettings(props: {
           <div className="space-y-1.5 px-4 pb-4">
             <p className="text-xs text-muted">{COACH_COPY.script(name)}</p>
             {props.notes.length === 0 && <p className="text-xs text-muted">{COACH_COPY.empty(name)}</p>}
-            {props.notes.map((n) => (
+            {locked.length > 0 && (
+              <div className="rounded-xl bg-surface p-2 ring-1 ring-line">
+                <p className="flex items-center gap-1.5 px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-ink">
+                  <Lock className="size-3 text-sun-line" aria-hidden />
+                  {COACH_COPY.lockedTitle}
+                </p>
+                <p className="px-1 pb-1 text-xs text-muted">{COACH_COPY.lockedNote(name)}</p>
+                {locked.map((n) => (
+                  <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
+                ))}
+              </div>
+            )}
+            {locked.length > 0 && loose.length > 0 && (
+              <p className="px-1 pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{COACH_COPY.notesTitle}</p>
+            )}
+            {loose.map((n) => (
               <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
             ))}
             {props.fixed.length > 0 && (
@@ -913,43 +962,11 @@ function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: s
   );
 }
 
-/** A practice call: the assistant rings the member's own mobile and talks to them as a customer (practice-call.ts). */
-function HearButton() {
-  const caller = useCoachCaller();
-  const [said, setSaid] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const ring = async () => {
-    setBusy(true);
-    const res = await ringMeToHear(caller.role ?? "sales");
-    setBusy(false);
-    setSaid(res.ok ? null : res.message);
-    window.setTimeout(() => setSaid(null), 6000);
-  };
-  return (
-    <span className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => void ring()}
-        disabled={busy}
-        aria-label={`Practice a call with ${caller.name}`}
-        title={`Practice a call with ${caller.name}: ${caller.name} rings your mobile`}
-        className="grid size-8 place-items-center rounded-full hover:bg-white/10 disabled:opacity-60"
-      >
-        {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <PhoneCall className="size-4" aria-hidden />}
-      </button>
-      {said && (
-        <span className="absolute right-0 top-10 z-10 w-48 rounded-lg bg-surface px-3 py-2 text-xs text-ink shadow-lift ring-1 ring-line">
-          {said}
-        </span>
-      )}
-    </span>
-  );
-}
-
 function Changes({ changes }: { changes?: CoachTurn["changes"] }) {
   if (!changes) return null;
   const rows = [
     ...changes.added.map((t) => ({ t, word: "Added" })),
+    ...(changes.locked ?? []).map((t) => ({ t, word: "Locked in" })),
     ...changes.changed.map((t) => ({ t, word: "Changed" })),
     ...changes.removed.map((t) => ({ t, word: "Removed" })),
     ...(changes.settings ?? []).map((t) => ({ t, word: t.startsWith("Name not changed") ? "Not done" : "Updated" })),
@@ -1007,6 +1024,16 @@ function NoteRow({
     setBusy(false);
     if (res.ok) onNotes(res.notes);
   };
+  // Locked in as a rule it follows on every call, or back to a note (16 Nov 2026, Martin: lock things into its rules).
+  const [said, setSaid] = useState<string | null>(null);
+  const lock = async () => {
+    setBusy(true);
+    setSaid(null);
+    const res = await lockNote(note.id, !note.locked);
+    setBusy(false);
+    if (res.ok) onNotes(res.notes);
+    else setSaid(res.message);
+  };
   if (editing)
     return (
       <div className="flex items-center gap-1.5">
@@ -1030,10 +1057,28 @@ function NoteRow({
         fresh && "bg-sun ring-1 ring-sun-line/40",
       )}
     >
-      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sun-line" aria-hidden />
-      <span className="flex-1">{note.text}</span>
+      {note.locked ? (
+        <Lock className="mt-1 size-3 shrink-0 text-sun-line" aria-hidden />
+      ) : (
+        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sun-line" aria-hidden />
+      )}
+      <span className="flex-1">
+        {note.text}
+        {said && <span className="block text-xs text-warning">{said}</span>}
+      </span>
       {editable && (
         <span className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+          <button
+            type="button"
+            onClick={() => void lock()}
+            disabled={busy}
+            aria-pressed={Boolean(note.locked)}
+            aria-label={note.locked ? "Unlock this rule: back to a note" : "Lock this in as a rule"}
+            title={note.locked ? "Unlock: back to a note" : "Lock in as a rule, followed on every call"}
+            className="text-muted hover:text-ink"
+          >
+            {note.locked ? <LockOpen className="size-3.5" aria-hidden /> : <Lock className="size-3.5" aria-hidden />}
+          </button>
           <button type="button" onClick={() => setEditing(true)} aria-label="Reword this note" className="text-muted hover:text-ink">
             <Pencil className="size-3.5" aria-hidden />
           </button>

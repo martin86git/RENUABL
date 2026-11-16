@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Camera, Check, MessageCircle, Phone, PhoneCall, Trash2 } from "lucide-react";
+import { Camera, Check, GraduationCap, MessageCircle, Phone, PhoneCall, Trash2 } from "lucide-react";
 import {
   CALLER_COPY,
   CALLER_NAME_MAX,
@@ -21,6 +21,7 @@ import {
   loadCaller,
   removeCallerPhoto,
   ringMeToHear,
+  ringMeToTrain,
   saveCallerName,
   saveCallerVoice,
   uploadCallerPhoto,
@@ -324,9 +325,9 @@ export function VoicePicker({
     void choose(v);
   };
 
-  const ring = async () => {
+  const ring = async (training = false) => {
     setBusy(true);
-    const res = await ringMeToHear(role);
+    const res = await (training ? ringMeToTrain : ringMeToHear)(role);
     setBusy(false);
     onStatus(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.message });
   };
@@ -357,18 +358,29 @@ export function VoicePicker({
     <div className={compact ? "" : clsx(ui.card, "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         {!compact && <p className="text-[13px] font-medium text-ink">Its voice</p>}
-        <button
-          type="button"
-          className={ui.quiet}
-          disabled={busy || !callsOn}
-          onClick={() => void ring()}
-          title={callsOn ? "" : "Once calls are on"}
-        >
-          <PhoneCall className="size-4" aria-hidden /> Practice a call
-        </button>
+        <span className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={ui.quiet}
+            disabled={busy || !callsOn}
+            onClick={() => void ring(true)}
+            title={callsOn ? "It rings you and you talk as its trainer" : "Once calls are on"}
+          >
+            <GraduationCap className="size-4" aria-hidden /> Train
+          </button>
+          <button
+            type="button"
+            className={ui.quiet}
+            disabled={busy || !callsOn}
+            onClick={() => void ring()}
+            title={callsOn ? "It rings you as it would a new lead" : "Once calls are on"}
+          >
+            <PhoneCall className="size-4" aria-hidden /> Test call
+          </button>
+        </span>
       </div>
       <p className={clsx("mt-1 text-xs text-muted", compact && "hidden")}>
-        Pick one that suits the name. The test call rings the mobile on your account, in the voice saved here.
+        Pick one that suits the name. Train and Test call both ring the mobile on your account, in the voice saved here.
       </p>
       {(["female", "male"] as const).map((sex) => (
         <div key={sex} className="mt-3">

@@ -2,6 +2,7 @@ import { answer, requireMember } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
 import { cleanCallerKey } from "@/lib/domain/install-call";
 import { practicePlacedWords } from "@/lib/domain/design/practice-call";
+import { cleanCallKind, trainingPlacedWords } from "@/lib/domain/design/training-call";
 import { startPracticeCall } from "@/lib/server/design-practice-call";
 
 const WORDS = {
@@ -20,8 +21,12 @@ export async function POST(request: Request) {
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "design-caller-test", 6))
       return Response.json({ ok: false, message: "That's a few practice calls: try again in a little while." }, { status: 429 });
-    const out = await startPracticeCall(who.member, cleanCallerKey(new URL(request.url).searchParams.get("role")));
-    if (out.result === "placed") return Response.json({ ok: true, message: practicePlacedWords(out.assistant) });
+    const at = new URL(request.url).searchParams;
+    // ?kind=training: the member is the agent's trainer on the call, not a customer (domain/design/training-call.ts).
+    const kind = cleanCallKind(at.get("kind"));
+    const out = await startPracticeCall(who.member, cleanCallerKey(at.get("role")), kind);
+    if (out.result === "placed")
+      return Response.json({ ok: true, message: (kind === "training" ? trainingPlacedWords : practicePlacedWords)(out.assistant) });
     return Response.json({ ok: false, message: WORDS[out.result] }, { status: out.result === "failed" ? 502 : 409 });
   });
 }

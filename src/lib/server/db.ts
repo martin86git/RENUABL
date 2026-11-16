@@ -1470,6 +1470,13 @@ create table if not exists design_practice_calls (
   created_at timestamptz not null default now()
 );
 create index if not exists design_practice_calls_member on design_practice_calls (business_id, member_email, created_at desc);
+-- A training call (domain/design/training-call.ts): the same call with the member as the agent's trainer; what they asked
+-- for, written up afterwards as changes to keep or drop.
+alter table design_practice_calls add column if not exists kind text not null default 'practice';
+alter table design_practice_calls add column if not exists outcome jsonb;
+alter table design_practice_calls add column if not exists outcome_claimed_at timestamptz;
+-- The rules locked in by voice on a training call, as they were kept.
+alter table design_practice_calls add column if not exists locked jsonb not null default '[]'::jsonb;
 create table if not exists design_call_consent (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
@@ -1554,6 +1561,8 @@ alter table design_caller add column if not exists voice_id text;
 alter table design_caller add column if not exists coach_notes jsonb;
 alter table design_caller add column if not exists coach_chat jsonb;
 alter table design_caller add column if not exists coach_past jsonb;
+-- How a voice agent speaks (domain/design/delivery.ts): null is the calls as they were.
+alter table design_caller add column if not exists delivery jsonb;
 -- A business has two phone assistants (domain/install-call.ts CALLER_ROLES): 'sales' (every row made before) and
 -- 'admin', which rings sold customers to book their installation. One row a business a role.
 alter table design_caller add column if not exists role text not null default 'sales';

@@ -9,6 +9,8 @@ import { useSyncExternalStore } from "react";
 import type { AssistantDeal, AssistantDealCall } from "@/lib/domain/design/assistant-deals";
 import type { CoachChatLine } from "@/lib/domain/design/coach-threads";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
+import type { Delivery } from "@/lib/domain/design/delivery";
+import type { TrainingView } from "@/lib/domain/design/training-call";
 import type { CallerKey } from "@/lib/domain/install-call";
 import { callerFor, useCallerInfo, type CallerState } from "./caller";
 
@@ -75,7 +77,9 @@ const json = (method: string, body: unknown): RequestInit => ({
 });
 
 export const loadCoaching = () =>
-  ask<{ notes: CoachNote[]; turns: CoachTurn[]; past: CoachChatLine[]; fixed: string[]; mayCoach: boolean }>(at());
+  ask<{ notes: CoachNote[]; turns: CoachTurn[]; past: CoachChatLine[]; fixed: string[]; mayCoach: boolean; delivery?: Delivery | null }>(
+    at(),
+  );
 
 type Chats = { turns: CoachTurn[]; past: CoachChatLine[] };
 /** An earlier chat becomes the one going; the one that was going is filed away in its place. */
@@ -96,7 +100,20 @@ export const coachAssistant = (message: string, call: CoachCall | null, dealJobI
   );
 
 export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, text }));
+/** A note locked in as a rule the agent follows on every call, or unlocked back to a note. */
+export const lockNote = (id: string, locked: boolean) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, locked }));
+/** How the agent speaks; null goes back to how it was. */
+export const saveDelivery = (delivery: Delivery | null) => ask<{ delivery: Delivery | null }>(at(), json("PUT", { delivery }));
 export const removeNote = (id: string) => ask<{ notes: CoachNote[] }>(at("", `&id=${encodeURIComponent(id)}`), { method: "DELETE" });
+
+/** The agent's latest training call: still on, being written up, or the changes it proposes (training-call.ts). */
+export const loadTraining = () => ask<{ training: TrainingView | null; mayKeep: boolean }>(at("train"));
+type Trained = { notes: CoachNote[]; training: TrainingView | null; gone: boolean; full?: boolean };
+/** One proposed change locked in as a rule, kept as a note, or dropped. */
+export const answerProposal = (id: string, proposal: string, what: "lock" | "keep" | "drop") =>
+  ask<Trained>(at("train"), json("POST", { id, proposal, do: what }));
+/** A write-up that failed is tried again. */
+export const retryTraining = (id: string) => ask<Trained>(at("train"), json("POST", { id, do: "retry" }));
 
 /** The deals the assistant is across: those it has rung, is on a call with or has a call lined up for. */
 export const loadAssistantDeals = () => ask<{ deals: AssistantDeal[] }>(at("deals"));

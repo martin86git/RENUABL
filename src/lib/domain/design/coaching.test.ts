@@ -47,7 +47,15 @@ describe("the assistant's answer to coaching", () => {
       },
       notes,
     );
-    expect(a).toEqual({ reply: "Got it.", add: ["Say RENUABL first"], remove: ["cn_bbbbbb"], change: [], rename: null, voice: null });
+    expect(a).toEqual({
+      reply: "Got it.",
+      add: ["Say RENUABL first"],
+      remove: ["cn_bbbbbb"],
+      change: [],
+      lock: [],
+      rename: null,
+      voice: null,
+    });
     expect(cleanCoachAnswer({ reply: "" }, notes)).toBeNull();
   });
 

@@ -72,7 +72,7 @@ import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
 import { testCallWords } from "@/lib/domain/design/caller";
-import { callerOf, coachingOf } from "./design-caller-repo";
+import { callerOf, scriptFor } from "./design-caller-repo";
 import { pencilledLine, PENCILLED_WORDS, readInstallDay, cleanCallerKey, roleOfMode, type CallerKey } from "@/lib/domain/install-call";
 import { installDaysFor, pencilInstall } from "./design-install-call";
 import { voiceStanding, type VoiceStanding } from "@/lib/domain/design/add-ons";
@@ -288,7 +288,8 @@ async function briefFor(
   const role = keyOfCall(row);
   const caller = await callerOf(row.business_id, role);
   // How the business has coached its assistant, read fresh for every call.
-  const coaching = (await coachingOf(row.business_id, role).catch(() => null))?.notes.map((n) => n.text) ?? [];
+  // (the notes, the rules locked in and how it speaks: design-caller-repo.ts `scriptFor`)
+  const script = await scriptFor(row.business_id, role);
   if (row.mode === "install")
     return {
       token: null,
@@ -304,7 +305,7 @@ async function briefFor(
         canSendLink: false,
         hasEmail: Boolean(row.email),
         installDays: await installDaysFor(row.business_id).catch(() => []),
-        coaching,
+        ...script,
       },
     };
   // Someone ringing in may be ringing about their proposal: theirs is read whenever one is out.
@@ -327,7 +328,7 @@ async function briefFor(
       canSendLink: Boolean(view) && smsConfigured(),
       hasEmail: Boolean(row.email),
       inbound: Boolean(row.lead.inbound),
-      coaching,
+      ...script,
     },
   };
 }
