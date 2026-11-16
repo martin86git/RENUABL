@@ -176,9 +176,6 @@ function Header({ signedIn }: { signedIn: boolean }) {
           </a>
         </nav>
         <div className="flex items-center gap-3">
-          <Link href="/" className="hidden text-[14px] text-white/65 hover:text-white lg:inline">
-            For homeowners
-          </Link>
           {signedIn ? (
             <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-white hover:text-sun-line">
               Open RENUABL
