@@ -294,7 +294,10 @@ export const SOL = {
     "Never sends anything himself: you check, you send",
   ],
   footnote: "Sol runs on Claude, by Anthropic.",
-  shot: { src: "/design/landing/sol.webp", alt: "Sol suggesting which proposal to follow up and drafting the email" },
+  shot: {
+    src: "/design/landing/sol.webp",
+    alt: "Sol going through the day: overdue installs, leads and proposals waiting, most urgent first (example data)",
+  },
   /** A real answer from Sol on solar work (Martin, 1 Nov 2026: "use examples like this in our marketing"). */
   example: {
     eyebrow: "Asked in the Installations channel",

@@ -34,7 +34,7 @@ const SHOTS: Shot[] = [
   {
     chapter: "sol",
     src: "/design/landing/film/sol-day.webp",
-    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.117, 0.218, 0.556, 0.258] }, { ms: 3000, light: [0.117, 0.503, 0.556, 0.145] }],
+    moves: [{ ms: WHOLE }, { ms: 2600, light: [0.117, 0.17, 0.556, 0.28] }, { ms: 3000, light: [0.117, 0.475, 0.556, 0.305] }],
   },
   {
     chapter: "sol",
