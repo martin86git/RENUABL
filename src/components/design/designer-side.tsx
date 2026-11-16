@@ -211,7 +211,9 @@ export function ProposalSide({ jobId, refresh }: { jobId: string; refresh?: numb
           <DealChat jobId={jobId} compact />
         </div>
       </section>
-      <ProposalTimeline jobId={jobId} refresh={refresh} />
+      <div data-private>
+        <ProposalTimeline jobId={jobId} refresh={refresh} />
+      </div>
     </>
   );
 }

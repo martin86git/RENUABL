@@ -1318,7 +1318,9 @@ export function RoofDesigner(props: {
     open(new URLSearchParams(window.location.search).get("side"), false);
     const hear = (e: MessageEvent) => {
       if (e.origin !== window.location.origin || e.source !== window.parent) return;
-      const asked = (e.data as { renuablDesign?: { side?: unknown; save?: unknown } } | null)?.renuablDesign;
+      const asked = (e.data as { renuablDesign?: { side?: unknown; save?: unknown; record?: unknown } } | null)?.renuablDesign;
+      // The Record round in the grey beside the pop-up (design-drawer.tsx) opens the walkthrough recorder.
+      if (asked?.record === true) setRecordOpen(true);
       // The window round it asks for a save before it shows the proposal (design-drawer.tsx, `saveThen`).
       if (asked?.save === true) window.dispatchEvent(new Event("renuabl:design-save"));
       open(asked?.side, true);
@@ -5695,7 +5697,7 @@ export function RoofDesigner(props: {
   );
 
   return (
-    <div className={clsx(props.tight && "relative p-2")}>
+    <div data-design-popup className={clsx(props.tight && "relative p-2")}>
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
@@ -9574,7 +9576,8 @@ export function RoofDesigner(props: {
                     aria-label="Record a walkthrough of this design for the customer"
                     className={clsx(
                       "pointer-events-auto absolute bottom-0 flex items-center gap-2 rounded-full bg-surface pl-3 pr-4 text-[14px] font-medium text-ink shadow-[0_12px_32px_rgba(11,11,12,0.25)] ring-1 ring-line transition hover:-translate-y-0.5 motion-reduce:transition-none",
-                      props.tight ? "left-[calc(50%+6.75rem)] h-14" : "left-[calc(50%+9rem)] h-12",
+                      // In the pop-up on a wide screen it floats in the grey beside the window instead (design-drawer.tsx).
+                      props.tight ? "left-[calc(50%+6.75rem)] h-14 xl:hidden" : "left-[calc(50%+9rem)] h-12",
                     )}
                   >
                     <span className="relative flex size-3">
@@ -9915,7 +9918,7 @@ export function RoofDesigner(props: {
             </div>
           </div>
 
-          <aside className="mt-5 grid items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <aside className="mt-5 grid items-start gap-5 empty:hidden md:grid-cols-2 xl:grid-cols-3">
             {tool === "label" && (
               <div className="space-y-3 rounded-lg border-2 border-forest bg-surface p-4">
                 <p className={label}>The label to place</p>
@@ -10252,7 +10255,7 @@ export function RoofDesigner(props: {
                   </div>
                 )}
               </section>
-              {props.notes}
+              <div data-private>{props.notes}</div>
             </div>
             <div className={clsx(shown !== "quote" && "hidden")}>
               <DesignQuote

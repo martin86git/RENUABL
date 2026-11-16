@@ -1009,3 +1009,16 @@ html.team-resizing .team-pop {
     opacity: 0.5;
   }
 }
+
+/* A walkthrough recording (walkthrough.ts, 16 Nov 2026, Martin: the recording mustn't catch what a customer shouldn't
+   see): inside the designer what is marked private is hidden, and on the page holding it only the designer's window
+   shows (visibility comes back for it, so everything else on the page, fixed windows included, stays off the video). */
+html[data-presenting] [data-private] {
+  visibility: hidden !important;
+}
+html[data-curtain] body {
+  visibility: hidden;
+}
+html[data-curtain] [data-design-popup] {
+  visibility: visible;
+}

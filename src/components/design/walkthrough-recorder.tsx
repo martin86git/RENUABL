@@ -368,7 +368,7 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
   // While it records: one small bar at the foot of the window (it is in the recording too, so it stays small).
   if (phase === "recording" || phase === "starting")
     return createPortal(
-      <div className="theme-studio contents">
+      <div data-design-popup className="theme-studio contents">
         {bubble}
         <div
           data-popup
@@ -417,7 +417,7 @@ export function WalkthroughRecorder({ jobId, customer, onClose }: { jobId: strin
     );
 
   return createPortal(
-    <div className="theme-studio contents">
+    <div data-design-popup className="theme-studio contents">
       {phase === "ready" && bubble}
       <div
         className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 p-4"

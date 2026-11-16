@@ -100,10 +100,23 @@ export function deleteWalkthrough(jobId: string, id: string) {
 
 export const walkthroughVideoUrl = (jobId: string, id: string) => `${base(jobId)}/${encodeURIComponent(id)}/video`;
 
-/** Told while a walkthrough records, so the designer puts away anything the customer mustn't see (the quote's costs). */
+/**
+ * Told while a walkthrough records, so nothing the customer mustn't see is on the recording (16 Nov 2026, Martin):
+ * the designer puts away the quote, and everything marked `data-private` (the deal's notes, the proposal's timeline)
+ * is hidden by globals.css under `html[data-presenting]`. The page round the designer is curtained too
+ * (`html[data-curtain]`: only the designer's window shows, so the top bar, team chat, Sol, call windows and the
+ * other customers on the page under the pop-up are off the recording): the window the designer sits in when it is
+ * the pop-up, told by message (design-drawer.tsx), else this page.
+ */
 export const PRESENTING_EVENT = "renuabl:presenting";
 export function setPresenting(on: boolean) {
   window.dispatchEvent(new CustomEvent(PRESENTING_EVENT, { detail: on }));
+  const root = document.documentElement;
+  if (on) root.dataset.presenting = "";
+  else delete root.dataset.presenting;
+  if (window.parent !== window) window.parent.postMessage({ renuablDesign: { presenting: on } }, window.location.origin);
+  else if (on) root.dataset.curtain = "";
+  else delete root.dataset.curtain;
 }
 
 /** For the customer's page: the walkthrough shown on their proposal, if any. */

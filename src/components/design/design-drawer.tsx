@@ -70,7 +70,7 @@ export function openDesigner(href: string, router: { push: (href: string) => voi
 }
 
 /** The drawer is told by the designer inside it (same site only). */
-type News = { saved?: boolean; unsaved?: boolean; fold?: boolean; go?: string; proposal?: boolean; job?: string };
+type News = { saved?: boolean; unsaved?: boolean; fold?: boolean; go?: string; proposal?: boolean; job?: string; presenting?: boolean };
 function tell(news: News) {
   if (inDrawer()) window.parent.postMessage({ renuablDesign: news }, window.location.origin);
 }
@@ -120,6 +120,13 @@ export function DesignDrawer(props: {
   useEffect(() => {
     heard.current = { onSaved, onFold, onGo, onProposal };
   });
+  // Closed (or gone) while a recording had the page curtained: the page comes back, never left blank.
+  useEffect(() => {
+    if (!open) delete document.documentElement.dataset.curtain;
+    return () => {
+      delete document.documentElement.dataset.curtain;
+    };
+  }, [open]);
   useEffect(() => {
     // Opening it is what loads it; from then on it stays.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -141,6 +148,11 @@ export function DesignDrawer(props: {
       if (news.saved) {
         setUnsaved(false);
         heard.current.onSaved?.();
+      }
+      // A walkthrough recording: only the designer's window shows on this page until it stops (walkthrough.ts).
+      if (typeof news.presenting === "boolean") {
+        if (news.presenting) document.documentElement.dataset.curtain = "";
+        else delete document.documentElement.dataset.curtain;
       }
     };
     window.addEventListener("message", hear);
@@ -207,6 +219,7 @@ export function DesignDrawer(props: {
           space, so it reads as quick); the whole screen on a phone. It opens with a short zoom from a touch smaller. */}
       <section
         role="dialog"
+        data-design-popup
         aria-modal={open}
         aria-label={tool.kind === "proposal" ? "Proposal" : "Design"}
         aria-hidden={!open}
@@ -243,6 +256,7 @@ export function DesignDrawer(props: {
           there is none yet and how to put it on a deal. */}
       {open && onSwitch && (dealJob || tool.kind === "design") && (
         <nav
+          data-design-popup
           aria-label="This deal's tools"
           className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
           style={{ left: "calc((100vw - min(calc(100vw - 3rem), calc(min(92dvh, 62rem) * 1.62))) / 2 - 4rem)" }}
