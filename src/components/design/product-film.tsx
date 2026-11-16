@@ -9,6 +9,8 @@ import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
 import { MarketplaceMark } from "./marketplace-bar";
 import { SolScene, SOL_SCENE_MS } from "./film-sol-scene";
 import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
+import { AgentWave } from "./living-hero";
+import { SolMark } from "./sol-icon";
 
 /**
  * The hero's product film (16 Nov 2026, Martin: a real film of how the product works today, not misleading, and not so
@@ -237,6 +239,13 @@ export function ProductFilm() {
   /** The chapter card says itself in full as the chapter begins, then folds to a small label out of the way. */
   const folded = !still && t - SPANS[key][0] > 2800;
 
+  const fileName =
+    shot.src
+      ?.split("/")
+      .pop()
+      ?.replace(/.webp$/, "") ?? "";
+  const narration = !market && fileName in FILM.narration ? FILM.narration[fileName as keyof typeof FILM.narration] : null;
+
   const goTo = (k: Key) => setT(still || paused ? STILL_AT[k] : SPANS[k][0]);
 
   return (
@@ -353,9 +362,7 @@ export function ProductFilm() {
             <span className="mx-auto grid size-[7cqw] place-items-center rounded-full bg-market text-white shadow-[0_0_6cqw_rgba(40,90,255,0.45)]">
               <MarketplaceMark className="size-[3.6cqw]" />
             </span>
-            <p className="mt-[2.4cqw] text-[clamp(20px,3.6cqw,44px)] font-semibold tracking-[-0.03em] text-ink">
-              {FILM.marketplace.title}
-            </p>
+            <p className="mt-[2.4cqw] text-[clamp(20px,3.6cqw,44px)] font-semibold tracking-[-0.03em] text-ink">{FILM.marketplace.title}</p>
             <p className="mx-auto mt-[1cqw] max-w-[36ch] text-[clamp(12px,1.5cqw,18px)] text-ink-2">{FILM.marketplace.line}</p>
             <span className="mt-[2cqw] inline-block rounded-full bg-surface-2 px-[1.6cqw] py-[0.5cqw] text-[clamp(11px,1.1cqw,14px)] font-medium text-ink ring-1 ring-line">
               {FILM.marketplace.soon}
@@ -398,6 +405,18 @@ export function ProductFilm() {
               {!folded && <p className="mt-[0.3cqw] hidden text-[clamp(11px,1.15cqw,15px)] text-white/60 sm:block">{chapter.line}</p>}
             </div>
           </div>
+        )}
+
+        {/* Who is doing the work, in their own words (17 Nov 2026, Martin: the answering should come from Sol, not the
+            software). On the side away from what is lit. */}
+        {narration && (
+          <Narrator
+            key={move.shot}
+            who={narration.who}
+            text={narration.text}
+            ms={still ? 1e9 : t - SHOT_AT[move.shot]}
+            side={"side" in narration ? narration.side : move.light && move.light[0] + move.light[2] / 2 < 0.5 ? "right" : "left"}
+          />
         )}
 
         {!still && (
@@ -444,5 +463,43 @@ export function ProductFilm() {
         })}
       </ol>
     </figure>
+  );
+}
+
+/** An agent saying what it is doing on the screen: its face and a bubble, typed as it is said. */
+function Narrator({ who, text, ms, side }: { who: string; text: string; ms: number; side: "left" | "right" }) {
+  const n = Math.max(0, Math.floor((ms - 500) / 24));
+  const shown = text.slice(0, n);
+  const busy = ms >= 500 && n < text.length;
+  const name = who === "sol" ? "Sol" : who === "charlie" ? "Charlie" : "Alex";
+  return (
+    <div
+      className={clsx(
+        "film-pop pointer-events-none absolute bottom-[4%] flex max-w-[44%] items-end gap-[1cqw]",
+        side === "left" ? "left-[2.5%]" : "right-[2.5%] flex-row-reverse",
+      )}
+      aria-live="polite"
+    >
+      <span className="relative grid size-[5.5cqw] shrink-0 place-items-center">
+        <span
+          aria-hidden
+          className={clsx("absolute -inset-[1cqw] rounded-full bg-sun-line/40 blur-[1.5cqw]", busy ? "film-pulse" : "opacity-60")}
+        />
+        {who === "sol" ? (
+          <SolMark className="relative size-full" />
+        ) : (
+          <span className="relative">
+            <AgentWave who={who === "alex" ? "alex" : "charlie"} size={40} busy={busy} />
+          </span>
+        )}
+      </span>
+      <div className="rounded-[1.4cqw] bg-surface/95 px-[1.6cqw] py-[1cqw] shadow-[0_1.5cqw_4cqw_-1.5cqw_rgba(11,11,12,0.5)] ring-1 ring-sun-line/50 backdrop-blur">
+        <p className="text-[clamp(8px,0.85cqw,12px)] font-semibold uppercase tracking-[0.16em] text-sun-line">{name}</p>
+        <p className="mt-[0.2cqw] min-h-[2.6em] text-[clamp(10px,1.35cqw,17px)] leading-snug text-ink">
+          {shown}
+          {busy && <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.15em] bg-sun-line" aria-hidden />}
+        </p>
+      </div>
+    </div>
   );
 }

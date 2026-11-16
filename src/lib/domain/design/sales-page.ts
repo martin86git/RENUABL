@@ -32,6 +32,76 @@ export const SALES_HERO = {
  * what it is doing now. Every line is something the product does today; Charlie and Alex are the phone agents of the
  * Calls & Texts add-on, and the names are the ones a business gives them (made-up customers only).
  */
+/**
+ * The living hero (17 Nov 2026, Martin: "the bots themselves are the marketing… it makes the software feel alive"):
+ * Sol in the middle with Charlie and Alex either side, each saying what they're doing as they do it, a feed of the work
+ * they've just done, and a box to ask Sol. Every line is something the product does today; the customers are made up.
+ * Sol's answers here are written ones (no Claude call from the open page), and say so by sending people to the demo
+ * for answers from their own deals.
+ */
+export const HERO_LIVE = {
+  says: {
+    sol: [
+      "Morning. Three things need you today.",
+      "Priya opened her proposal twice last night. Her follow-up is drafted.",
+      "Jane asked if her battery can go in the garage. Her reply is ready.",
+      "Adam's bill reads about 18 kWh a day. Want me to size his system?",
+    ],
+    charlie: ["Calling Adam Smith · 2:14", "Booked Tom a call for Thursday", "Answering: is a battery worth it?"],
+    alex: ["Offering Jane three install days", "Pencilled in Tuesday 26 November", "Calling Adam to book his install"],
+  },
+  feed: [
+    { who: "sol", text: "Drafted Priya's follow-up" },
+    { who: "charlie", text: "Booked Tom a 15-minute call" },
+    { who: "sol", text: "Read Adam Smith's bill: about 18 kWh a day" },
+    { who: "alex", text: "Pencilled in Jane Doe's install" },
+    { who: "sol", text: "Checked AS/NZS 5139 for a garage battery" },
+    { who: "charlie", text: "Texted Jane Doe her proposal link" },
+    { who: "sol", text: "Summed up a service case and drafted the reply" },
+    { who: "sol", text: "Strung 42 panels in two strings" },
+  ],
+  now: "just now",
+  ago: "min ago",
+  ask: {
+    placeholder: "Ask Sol anything about running your solar business",
+    send: "Ask Sol",
+    thinking: "Sol is thinking",
+    questions: [
+      {
+        ask: "What can you do for my business?",
+        keys: ["what can", "do for", "help", "who are you", "what are you"],
+        answer:
+          "I know your deals, your products and the rules. I tell you who to call next, draft every follow-up, answer the technical questions and help you design the roof. You decide what goes out.",
+      },
+      {
+        ask: "Will you call my customers?",
+        keys: ["call", "phone", "ring", "charlie", "alex", "voice"],
+        answer:
+          "Charlie rings your new leads, answers their questions and books them a call with your team. Alex books installs. You name them, choose their voices and can listen in live. They come with Calls & Texts.",
+      },
+      {
+        ask: "How do you know the rules?",
+        keys: ["rule", "standard", "as/nzs", "5139", "3000", "rebate", "regulation", "network", "export"],
+        answer:
+          "I read the official pages, the makers' datasheets and the standards in your library, and I show you my sources. A licensed electrician still signs off the work.",
+      },
+      {
+        ask: "Can I try you now?",
+        keys: ["try", "demo", "start", "test"],
+        answer:
+          "Yes. Press Start demo and you're in a solar business of your own with example deals. Ask me there and I'll answer from them.",
+      },
+    ],
+    price: {
+      keys: ["price", "cost", "how much", "plan", "pay"],
+      answer: "One price a user a month, with me in every plan. The plans are just below.",
+    },
+    fallback: "Good question. I answer from your own deals, so press Start demo and ask me there.",
+    note: "Written answers on this page. In RENUABL, Sol answers from your own business.",
+  },
+  film: { eyebrow: "See it work", headline: "A day with Sol, start to finish." },
+} as const;
+
 export const AI_TEAM = {
   eyebrow: "Meet your AI team",
   headline: ["Run your solar business", "on AI."],
@@ -640,6 +710,29 @@ export const FILM = {
     thanks: "Perfect, I'll mark it on her job card.",
     box: "Message #installations",
   },
+  /**
+   * Who is doing the work on each screen, in their own words (17 Nov 2026, Martin: "none of the answering looks like it
+   * comes from Sol as opposed to the software"). Keyed by the screen's file name; only screens where an agent really
+   * does the work carry a line.
+   */
+  narration: {
+    "service-case": { who: "sol", text: "Henry's inverter has an earth fault. I read his chat and his job, and wrote up what to do." },
+    "service-reply": { who: "sol", text: "I've drafted Henry's email. Check it, then send." },
+    "voice-call": {
+      who: "charlie",
+      text: "I'm on the phone with Doug, answering his battery questions. Watch live, or tell me what to say.",
+    },
+    "design-sol": { who: "sol", side: "right", text: "Doug spends $780 a quarter. I'd aim for 13.3 kW with a 17 kWh battery." },
+    "design-string-1": { who: "sol", side: "right", text: "21 panels aren't on a string yet. Want me to string them?" },
+    "design-string-2": {
+      who: "sol",
+      side: "right",
+      text: "Two strings, each checked against the inverter. A battery for the evenings next?",
+    },
+    "design-record": { who: "sol", side: "right", text: "Talk Doug through it. I'm writing the subtitles as you go." },
+    "design-share": { who: "sol", side: "right", text: "Subtitles tidied. Ready to share with Doug." },
+    marketing: { who: "sol", text: "I wrote the subject, preview and words from your brief. Change anything you like." },
+  },
   /** Over each chapter, as a launch film says it. */
   introducing: "Introducing",
   /** Beside a chapter that needs an add-on. */
@@ -657,6 +750,17 @@ export const CLOSING = {
 export function salesCopy(): string[] {
   return [
     ...Object.values(SALES_HERO).flat(),
+    ...Object.values(HERO_LIVE.says).flat(),
+    ...HERO_LIVE.feed.map((f) => f.text),
+    HERO_LIVE.ask.placeholder,
+    HERO_LIVE.ask.thinking,
+    ...HERO_LIVE.ask.questions.flatMap((q) => [q.ask, q.answer]),
+    HERO_LIVE.ask.price.answer,
+    HERO_LIVE.ask.fallback,
+    HERO_LIVE.ask.note,
+    HERO_LIVE.film.eyebrow,
+    HERO_LIVE.film.headline,
+    ...Object.values(FILM.narration).map((n) => n.text),
     AI_TEAM.eyebrow,
     ...AI_TEAM.headline,
     AI_TEAM.sub,

@@ -130,15 +130,23 @@ export function TeamScene({ ms, still }: { ms: number; still?: boolean }) {
 
               {shown(AT.joining) && (
                 <div data-focus="answer" className="film-pop flex max-w-[86%] gap-[0.8cqw]">
-                  <span className="grid size-[2.6cqw] shrink-0 place-items-center">
-                    <SolMark className="size-full" />
+                  {/* Sol arriving alive (17 Nov 2026, Martin): his sun glows and beats while he works out the answer. */}
+                  <span className="relative grid size-[3.4cqw] shrink-0 place-items-center">
+                    <span
+                      aria-hidden
+                      className={clsx(
+                        "absolute -inset-[0.9cqw] rounded-full bg-sun-line/45 blur-[1.2cqw]",
+                        !shown(AT.drawing) ? "film-pulse" : "opacity-40",
+                      )}
+                    />
+                    <SolMark className="relative size-full" />
                   </span>
                   <div className="min-w-0">
                     <p className={name}>
                       Sol <span className={when}>9:13 am</span>
                     </p>
                     {shown(AT.answer) ? (
-                      <div className="mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-sun px-[1.2cqw] py-[0.8cqw]">
+                      <div className="mt-[0.3cqw] rounded-[1cqw] rounded-tl-[0.3cqw] bg-sun px-[1.2cqw] py-[0.8cqw] ring-1 ring-sun-line/40">
                         <p className={text}>{typed(T.answer, t, AT.answer, TYPE_ANSWER)}</p>
                         {shown(AT.caveat) && <p className={clsx(text, "film-pop mt-[0.6cqw] text-ink-2")}>{T.caveat}</p>}
                       </div>

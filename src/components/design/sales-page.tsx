@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowRight, Check, Clock, Menu, Sparkles, X } from "lucide-react";
-import { AiTeam, BrandEyebrow, Sunrise } from "./business-brand";
+import { BrandEyebrow, Sunrise } from "./business-brand";
+import { LivingHero } from "./living-hero";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import {
@@ -20,6 +21,7 @@ import {
   FEATURES,
   PRICING,
   SALES_HERO,
+  HERO_LIVE,
   CRM_SHOT,
   SERVICE_SHOT,
   SOL,
@@ -47,8 +49,8 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
-      <Hero signedIn={signedIn} />
-      <AiTeam />
+      <LivingHero signedIn={signedIn} />
+      <FilmSection />
       <Upgrade />
       <BigThree />
       <Journey />
@@ -189,10 +191,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
           {open && (
             <>
               <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-0 cursor-default" onClick={() => setOpen(false)} />
-              <nav
-                id="page-menu"
-                className="absolute left-0 top-12 z-10 w-60 rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line"
-              >
+              <nav id="page-menu" className="absolute left-0 top-12 z-10 w-60 rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line">
                 {PAGE_LINKS.map((l) => (
                   <a
                     key={l.href}
@@ -365,46 +364,20 @@ function VisualOf({ visual }: { visual: Visual }) {
   );
 }
 
-function Hero({ signedIn }: { signedIn: boolean }) {
+/**
+ * The product film, under the living hero (17 Nov 2026, Martin: the agents are the marketing, so they lead; the film is
+ * the proof, each screen narrated by the agent doing the work).
+ */
+function FilmSection() {
   return (
-    <section
-      id="start"
-      className="relative isolate overflow-hidden snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
-      aria-labelledby="hero"
-    >
-      {/* The brand's sun rising behind the hero (16 Nov 2026, Martin: the page needed a brand feel, as xAI's and OpenAI's), on white (17 Nov 2026, Martin: the wordmark suits a white backdrop best). */}
-      <Sunrise light />
-      {/*
-        The words on the left and the film on the right, as large as the fold allows (16 Nov 2026, Martin: "i prefer when
-        solar just got a brain was on the left and the video on the right", and the film bigger). On a large screen the
-        hero is one fold; the film takes the column beside the words at its own 16:10, with room for its chapter rail.
-      */}
-      <div className="mx-auto grid w-full max-w-[100rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(18rem,28rem)_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-12 lg:pb-8 lg:pt-8">
-        <div className="text-center lg:text-left">
-          <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
-          <p className="mb-7 mt-3 text-balance text-[clamp(20px,1.9vw,28px)] font-medium leading-snug tracking-[-0.02em] text-ink">
-            {SALES_HERO.newWay}
-          </p>
-          <h1 id="hero" className="text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
-            {SALES_HERO.headline.map((part, i, all) => (
-              <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
-                {part}
-              </span>
-            ))}
-          </h1>
-          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.sub}</p>
-          <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
-            <div className="flex flex-col items-center gap-4 sm:flex-row">
-              <SignUpLink />
-              {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
-              {!signedIn && <TryDemoButton look="quiet" />}
-            </div>
-          </div>
-        </div>
-        <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:items-center lg:[container-type:size]">
-          <div className="w-full text-left lg:w-[min(80cqw,calc((100cqh-9rem)*1.6),48rem)]">
-            <ProductFilm />
-          </div>
+    <section className="snap-start scroll-mt-16 px-5 pb-20 pt-16 lg:px-8" aria-labelledby="film">
+      <div className="mx-auto max-w-[64rem] text-center">
+        <BrandEyebrow>{HERO_LIVE.film.eyebrow}</BrandEyebrow>
+        <h2 id="film" className="mt-4 text-[clamp(30px,3.6vw,52px)] font-semibold leading-[1.02] tracking-[-0.04em]">
+          {HERO_LIVE.film.headline}
+        </h2>
+        <div className="mt-10 text-left">
+          <ProductFilm />
         </div>
       </div>
     </section>
