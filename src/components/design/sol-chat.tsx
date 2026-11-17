@@ -49,7 +49,6 @@ import {
   DRAFT_KEY,
   SOL_CHANGED,
   askSol,
-  clearSolChat,
   forgetPref,
   forgetReminder,
   loadSol,
@@ -81,11 +80,11 @@ import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
 
-/** Two about the business's own work, then the oracle's (sol-knowledge.ts): networks, rebates, technical, wholesalers. */
+/** Three to start from (18 Nov 2026, Martin: fewer): two about the business's own work, one of the oracle's (sol-knowledge.ts). */
 const STARTERS = [
   "Which deals have sat at Proposal sent the longest?",
   "Write a friendly follow-up email to my newest lead.",
-  ...STARTER_QUESTIONS.filter((_, i) => [0, 2, 3, 5].includes(i)),
+  STARTER_QUESTIONS[0],
 ];
 
 const when = (iso: string) =>
@@ -389,82 +388,68 @@ export function SolChat({
             <span className="block text-[12px] text-muted">Your AI{!side && " · your conversation is yours alone"}</span>
           </span>
         </div>
-        <span className="ml-auto" />
-        {/* His usage this month, in a window of its own (16 Nov 2026, Martin). */}
-        <SolUsage />
-        {seeing && (
+        {/* The controls in one small group in the top right corner (18 Nov 2026, Martin: "the top bar is far too busy";
+            no Full page and no Clear: New chat files the conversation away, and History holds it). */}
+        <div className="-mr-2 ml-auto flex items-center gap-0.5 self-start">
+          {/* His usage this month, in a window of its own (16 Nov 2026, Martin). */}
+          <SolUsage />
+          {seeing && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={seePage}
+              aria-label="Sol can see the page beside this chat"
+              onClick={() => setSeePage(!seePage)}
+              title={
+                seePage
+                  ? `Sol can see the page beside this chat (${seeing}), shown by the orange frame. Press to ask without it.`
+                  : "Sol can't see the page beside this chat. Press to let him."
+              }
+              className={clsx(
+                "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-canvas",
+                seePage ? "text-sun-line" : "text-muted hover:text-ink",
+              )}
+            >
+              {seePage ? <Eye className="size-3.5" aria-hidden /> : <EyeOff className="size-3.5" aria-hidden />}
+            </button>
+          )}
+          {/* A new chat: a speech bubble with a plus (8 Nov 2026; 18 Nov 2026, Martin). The current one is filed away. */}
           <button
             type="button"
-            role="switch"
-            aria-checked={seePage}
-            aria-label="Sol can see the page beside this chat"
-            onClick={() => setSeePage(!seePage)}
-            title={
-              seePage
-                ? `Sol can see the page beside this chat (${seeing}), shown by the orange frame. Press to ask without it.`
-                : "Sol can't see the page beside this chat. Press to let him."
-            }
+            onClick={() => void run(newSolChat()).then((ok) => ok && setHistory(false))}
+            disabled={busy || turns.length === 0}
+            aria-label="New chat"
+            title="New chat"
+            className="inline-flex size-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
+          >
+            <MessageSquarePlus className="size-3.5" aria-hidden />
+          </button>
+          {/* Chat history (1 Nov 2026, Martin): the clock wound back. */}
+          <button
+            type="button"
+            onClick={() => setHistory(!history)}
+            aria-pressed={history}
+            aria-label="Chat history"
+            title="Chat history"
             className={clsx(
-              "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-canvas",
-              seePage ? "text-sun-line" : "text-muted hover:text-ink",
+              "inline-flex size-7 items-center justify-center rounded-full transition-colors",
+              history ? "bg-ink text-sun-line" : "text-muted hover:bg-canvas hover:text-ink",
             )}
           >
-            {seePage ? <Eye className="size-4" aria-hidden /> : <EyeOff className="size-4" aria-hidden />}
+            <History className="size-3.5" aria-hidden />
           </button>
-        )}
-        {/* A new chat in one press (8 Nov 2026, Martin): the current one is filed away under Past conversations. */}
-        <button
-          type="button"
-          onClick={() => void run(newSolChat()).then((ok) => ok && setHistory(false))}
-          disabled={busy || turns.length === 0}
-          aria-label="New chat"
-          title="New chat"
-          className="inline-flex h-7 items-center gap-1.5 rounded-full px-2 text-xs text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
-        >
-          <MessageSquarePlus className="size-4" aria-hidden />
-          New chat
-        </button>
-        {/* Past conversations (1 Nov 2026, Martin): the clock wound back, on the right. */}
-        <button
-          type="button"
-          onClick={() => setHistory(!history)}
-          aria-pressed={history}
-          aria-label="Past conversations"
-          title="Past conversations"
-          className={clsx(
-            "inline-flex size-7 items-center justify-center rounded-full transition-colors",
-            history ? "bg-ink text-sun-line" : "text-muted hover:bg-canvas hover:text-ink",
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close Sol"
+              title="Close Sol (Esc)"
+              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
           )}
-        >
-          <History className="size-4" aria-hidden />
-        </button>
-        {side && (
-          <a href="/design/sol" className="text-xs text-muted hover:text-ink">
-            Full page
-          </a>
-        )}
-        {turns.length > 0 && (
-          <button
-            type="button"
-            onClick={() =>
-              window.confirm("Clear your conversation with Sol? Your reminders and preferences stay.") && void run(clearSolChat())
-            }
-            className="text-xs text-muted hover:text-ink"
-          >
-            Clear
-          </button>
-        )}
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close Sol"
-            title="Close Sol (Esc)"
-            className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-          >
-            <X className="size-4" aria-hidden />
-          </button>
-        )}
+        </div>
       </div>
 
       {history && (
@@ -526,10 +511,7 @@ export function SolChat({
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
           <div className="space-y-2 text-ink-2">
-            <p>
-              I&apos;m Sol. Ask me about your deals, what to say to a customer, or where something is. Type # to bring in a deal. For
-              example:
-            </p>
+            <p>I&apos;m Sol. Ask me about your deals, a customer or anything solar. Type # to bring in a deal.</p>
             {STARTERS.map((s) => (
               <button
                 key={s}
@@ -538,7 +520,7 @@ export function SolChat({
                   setText(s);
                   box.current?.focus();
                 }}
-                className="block w-full rounded-2xl bg-surface px-3 py-2 text-left text-ink ring-1 ring-line hover:ring-sun-line"
+                className="block w-full rounded-xl bg-surface px-3 py-1.5 text-left text-[13px] text-ink ring-1 ring-line hover:ring-sun-line"
               >
                 {s}
               </button>
