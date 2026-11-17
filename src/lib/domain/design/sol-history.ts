@@ -26,8 +26,12 @@ export interface SolPastLine {
 
 /** The most past conversations a member keeps: the oldest goes first. */
 export const MAX_PAST = 40;
-/** After this long since the last message, opening Sol asks whether to carry on or start a new chat. */
-export const RETURN_GAP_HOURS = 4;
+/**
+ * After this long since the last message, Sol's chat opens clean, with the last conversation a press away (18 Nov 2026,
+ * Martin: "the sol chat should start as a new chat after say 15 minutes. i hate the busy ness of the previous chat"; it
+ * was 4 hours with a question over the old conversation).
+ */
+export const RETURN_GAP_MINUTES = 15;
 
 const ZONE = "Australia/Melbourne";
 
@@ -61,11 +65,11 @@ export const freshTurns = (turns: readonly SolTurn[]) => turns.filter((t) => t.p
 export const pastLines = (past: readonly SolPast[]): SolPastLine[] =>
   past.map(({ id, title, startedAt, endedAt, turns }) => ({ id, title, startedAt, endedAt, count: turns.length }));
 
-/** Whether opening Sol should ask to carry on or start afresh: something was said, and the last of it a while ago. */
-export function askToStartAfresh(turns: readonly SolTurn[], now: Date, gapHours = RETURN_GAP_HOURS): boolean {
+/** Whether Sol's chat opens clean: something was said, and the last of it a while ago. */
+export function askToStartAfresh(turns: readonly SolTurn[], now: Date, gapMinutes = RETURN_GAP_MINUTES): boolean {
   const last = turns[turns.length - 1];
   if (!last || !worthKeeping(turns)) return false;
-  return now.getTime() - Date.parse(last.at) > gapHours * 3_600_000;
+  return now.getTime() - Date.parse(last.at) > gapMinutes * 60_000;
 }
 
 const day = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: ZONE });

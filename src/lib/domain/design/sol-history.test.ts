@@ -36,10 +36,10 @@ describe("Sol's past conversations", () => {
     expect(titleOf([])).toBe("A conversation with Sol");
   });
 
-  it("asks to carry on or start afresh only after a while away", () => {
+  it("opens clean only after 15 minutes away", () => {
     const at = new Date("2026-11-01T05:00:05Z");
-    expect(askToStartAfresh(talk, new Date(at.getTime() + 3 * 3_600_000))).toBe(false);
-    expect(askToStartAfresh(talk, new Date(at.getTime() + 5 * 3_600_000))).toBe(true);
+    expect(askToStartAfresh(talk, new Date(at.getTime() + 10 * 60_000))).toBe(false);
+    expect(askToStartAfresh(talk, new Date(at.getTime() + 20 * 60_000))).toBe(true);
     expect(askToStartAfresh([], new Date(at.getTime() + 50 * 3_600_000))).toBe(false);
   });
 

@@ -25,6 +25,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-18",
+    area: "Sol",
+    words: "Back after 15 minutes, Sol's chat opens clean, with your last chat a press away.",
+  },
+  {
+    day: "2026-11-18",
     area: "Calls",
     words: "Hear a voice before you pick it: press play beside it. Six more voices, two of them Australian.",
   },

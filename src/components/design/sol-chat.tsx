@@ -60,7 +60,7 @@ import {
   rememberAnswer,
   retrySol,
 } from "@/lib/services/sol";
-import { askToStartAfresh, worthKeeping } from "@/lib/domain/design/sol-history";
+import { askToStartAfresh, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
 import { SolUsage } from "./sol-usage";
@@ -223,10 +223,18 @@ export function SolChat({
   const unread = state?.unread ?? 0;
   // Only a real answer (one that took credits) to the latest question can be tried again.
   const canRetry = Boolean(turns[turns.length - 1]?.credits) && withoutLastExchange(turns) !== null;
-  // Past conversations, and the question after a while away (sol-history.ts): asked once for the last message there
-  // was, until it's answered (kept for the tab).
+  // Past conversations, and a clean face after a while away (sol-history.ts, 18 Nov 2026, Martin): 15 minutes after
+  // the last message the chat opens as a new one, with the last conversation a press away; carrying on is kept for
+  // the tab, for that last message. Coming back to the tab looks again.
   const [history, setHistory] = useState(false);
-  const [opened] = useState(() => new Date());
+  const [opened, setOpened] = useState(() => new Date());
+  useEffect(() => {
+    const look = () => {
+      if (document.visibilityState === "visible") setOpened(new Date());
+    };
+    document.addEventListener("visibilitychange", look);
+    return () => document.removeEventListener("visibilitychange", look);
+  }, []);
   const [carried, setCarried] = useState<string | null>(() => {
     try {
       return typeof window === "undefined" ? null : sessionStorage.getItem(CARRIED_KEY);
@@ -235,6 +243,7 @@ export function SolChat({
     }
   });
   const lastAt = turns[turns.length - 1]?.at ?? null;
+  const resting = Boolean(!history && state && pending === null && lastAt && carried !== lastAt && askToStartAfresh(turns, opened));
   const carryOn = (at: string) => {
     setCarried(at);
     try {
@@ -282,6 +291,8 @@ export function SolChat({
     const shown = shownAs ?? (answering ? typed : undefined);
     const sending = over ? [] : files;
     if ((!said && !sending.length) || busy) return;
+    // Asked from the clean face: the last conversation is filed away first, so this starts a new chat.
+    if (resting && !(await run(newSolChat()))) return;
     let encoded: SolFile[];
     try {
       encoded = await Promise.all(sending.map(async (f) => ({ name: f.name, type: f.type as SolFile["type"], data: await base64Of(f) })));
@@ -474,7 +485,7 @@ export function SolChat({
         />
       )}
       {/* Pinned messages (1 Nov 2026, Martin: as Primero's): a strip at the top; a press goes to the message, the cross unpins it. */}
-      {!history && turns.some((t) => t.pinned) && (
+      {!history && !resting && turns.some((t) => t.pinned) && (
         <div className="max-h-28 shrink-0 overflow-y-auto border-b border-line bg-sun/40 px-5 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sun-ink">Pinned</p>
           <ul className="mt-1 space-y-1">
@@ -504,8 +515,20 @@ export function SolChat({
       )}
       <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
-        {state && turns.length === 0 && !pending && (
+        {state && (turns.length === 0 || resting) && !pending && (
           <div className="space-y-2 text-ink-2">
+            {resting && lastAt && (
+              <button
+                type="button"
+                onClick={() => carryOn(lastAt)}
+                className="mb-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-muted ring-1 ring-line transition hover:text-ink hover:ring-sun-line"
+              >
+                <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">
+                  Continue your last chat: <span className="text-ink-2">{titleOf(turns)}</span>
+                </span>
+              </button>
+            )}
             <p>I&apos;m Sol. Ask me about your deals, a customer or anything solar. Type # to bring in a deal.</p>
             {STARTERS.map((s) => (
               <button
@@ -522,7 +545,7 @@ export function SolChat({
             ))}
           </div>
         )}
-        {(redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
+        {(resting ? [] : redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
           <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn scroll-mt-3 space-y-2">
             <Bubble
               you={t.role === "you"}
@@ -620,31 +643,6 @@ export function SolChat({
         {problem && <p className="text-xs text-danger">{problem}</p>}
         <div ref={end} />
       </div>
-
-      {/* Back after a while: carry on, or start a new chat with the one before kept in the past conversations. */}
-      {!history && state && pending === null && lastAt && carried !== lastAt && askToStartAfresh(turns, opened) && (
-        <div className="mx-3 mb-2 rounded-2xl bg-canvas p-3 text-sm ring-1 ring-line">
-          <p className="text-ink">Welcome back. Pick up where you left off, or start a new chat?</p>
-          <p className="mt-0.5 text-xs text-muted">This one stays in your past conversations either way.</p>
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void run(newSolChat())}
-              disabled={busy}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-xs font-medium text-primary-ink hover:bg-forest"
-            >
-              <MessageSquarePlus className="size-3.5" aria-hidden /> Start a new chat
-            </button>
-            <button
-              type="button"
-              onClick={() => carryOn(lastAt)}
-              className="h-8 rounded-full px-3.5 text-xs font-medium text-ink-2 ring-1 ring-line hover:text-ink"
-            >
-              Carry on here
-            </button>
-          </div>
-        </div>
-      )}
 
       <form
         onSubmit={(e) => {
