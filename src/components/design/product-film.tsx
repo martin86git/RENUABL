@@ -188,7 +188,8 @@ const RAIL: { key: Key; title: string }[] = [
   { key: "market", title: FILM.marketplace.title },
 ];
 
-export function ProductFilm() {
+/** `dark`: on a dark section, the chapter rail in white. */
+export function ProductFilm({ dark = false }: { dark?: boolean }) {
   const stage = useRef<HTMLDivElement | null>(null);
   const [t, setT] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -445,13 +446,19 @@ export function ProductFilm() {
                 className="group w-full text-left"
               >
                 {/* On the hero's white ground: ink words, the progress in the signal orange. */}
-                <span className="block h-[3px] w-full overflow-hidden rounded-full bg-line">
+                <span className={clsx("block h-[3px] w-full overflow-hidden rounded-full", dark ? "bg-white/15" : "bg-line")}>
                   <span className="block h-full rounded-full bg-sun-line" style={{ width: `${share * 100}%` }} />
                 </span>
                 <span
                   className={clsx(
                     "mt-2 flex items-baseline gap-2 text-[12px] font-medium leading-snug transition-colors",
-                    i === index ? "text-ink" : "text-muted group-hover:text-ink-2",
+                    dark
+                      ? i === index
+                        ? "text-white"
+                        : "text-white/45 group-hover:text-white/80"
+                      : i === index
+                        ? "text-ink"
+                        : "text-muted group-hover:text-ink-2",
                   )}
                 >
                   <span className="tabular-nums text-[11px]">{String(i + 1).padStart(2, "0")}</span>

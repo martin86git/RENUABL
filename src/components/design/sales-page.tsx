@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
@@ -8,15 +7,14 @@ import { ArrowRight, Check, Menu, Sparkles, X } from "lucide-react";
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { LivingHero } from "./living-hero";
 import { SalesLoop } from "./sales-loop";
+import { KnowledgeOrbit, Manifesto } from "./business-slides";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
-import { CLOSING, COMING_SOON_LABEL, FAQ, PRICING, SALES_HERO, HERO_LIVE, UPGRADE } from "@/lib/domain/design/sales-page";
+import { CLOSING, FAQ, PRICING, SALES_HERO, HERO_LIVE } from "@/lib/domain/design/sales-page";
 import { askSales, startPlan } from "@/lib/services/billing";
 import { TryDemoButton } from "./business-demo";
-import { ListingRoofExample } from "./designer-showcase";
 import { Reveal } from "./front-hero";
 import { ProductFilm } from "./product-film";
-import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -33,9 +31,10 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
           your sales team, how it sells, the film, the old way and the new, pricing with the questions, the close. */}
       <LivingHero signedIn={signedIn} />
+      <Manifesto />
       <SalesLoop />
+      <KnowledgeOrbit />
       <FilmSection />
-      <Upgrade />
       <Pricing />
       <Faq />
       <Closing />
@@ -131,12 +130,12 @@ function useFoldScroll() {
 
 /** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
 const PAGE_LINKS = [
-  { href: "#start", label: "Your sales team" },
+  { href: "#start", label: "Meet Sol" },
+  { href: "#force", label: "Your new sales force" },
   { href: "#sales", label: "How it sells" },
+  { href: "#brain", label: "Ask him anything" },
   { href: "#film", label: "See it work" },
-  { href: "#upgrade", label: "What you get" },
   { href: "#pricing", label: "Pricing" },
-  { href: "#faq", label: "Questions" },
 ] as const;
 
 /**
@@ -298,14 +297,18 @@ function SignUpLink({ dark = false }: { dark?: boolean }) {
  */
 function FilmSection() {
   return (
-    <section className="snap-start scroll-mt-16 px-5 pb-20 pt-16 lg:px-8" aria-labelledby="film">
-      <div className="mx-auto max-w-[64rem] text-center">
-        <BrandEyebrow>{HERO_LIVE.film.eyebrow}</BrandEyebrow>
-        <h2 id="film" className="mt-4 text-[clamp(30px,3.6vw,52px)] font-semibold leading-[1.02] tracking-[-0.04em]">
+    <section
+      id="film"
+      className="snap-start scroll-mt-16 bg-[#0b0b0d] px-5 pb-20 pt-20 text-white lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:px-8"
+      aria-labelledby="film-head"
+    >
+      <div className="mx-auto w-full max-w-[64rem] text-center">
+        <BrandEyebrow dark>{HERO_LIVE.film.eyebrow}</BrandEyebrow>
+        <h2 id="film-head" className="mt-4 text-[clamp(34px,4.4vw,64px)] font-semibold leading-[1.0] tracking-[-0.045em]">
           {HERO_LIVE.film.headline}
         </h2>
         <div className="mt-10 text-left">
-          <ProductFilm />
+          <ProductFilm dark />
         </div>
       </div>
     </section>
@@ -316,238 +319,6 @@ function FilmSection() {
  * The three things RENUABL is known by, a band each under the hero (3 Nov 2026, Martin: the designer, Sol and the
  * Marketplace are huge features and must feel it): the design tool with AI over it, Sol, and the Marketplace.
  */
-
-/** How long each card of the upgrade stays on top before the next is dealt, ms. */
-const DECK_MS = 4500;
-/** The team card plays its conversation through before the next is dealt. */
-const holdOf = (key: string) => (key === "team" ? TEAM_SCENE_MS + 800 : DECK_MS);
-
-/** The team chat scene on its own clock, from the start each time its card comes to the top; still otherwise. */
-function LiveTeam({ live }: { live?: boolean }) {
-  const [ms, setMs] = useState(0);
-  useEffect(() => {
-    if (!live) return;
-    const from = performance.now();
-    const timer = window.setInterval(() => setMs(Math.min(TEAM_SCENE_MS, performance.now() - from)), 40);
-    return () => {
-      window.clearInterval(timer);
-      setMs(0);
-    };
-  }, [live]);
-  return <TeamScene ms={ms} still={!live} />;
-}
-
-/** What each card of the upgrade shows: a real screen where there is one, else the product drawn (made-up data). */
-function UpgradeVisual({ k, live }: { k: (typeof UPGRADE.items)[number]["key"]; live?: boolean }) {
-  const shot = (src: string, alt: string, position = "object-top") => (
-    <Image src={src} alt={alt} fill sizes="(min-width: 1024px) 720px, 100vw" className={clsx("object-cover", position)} />
-  );
-  switch (k) {
-    case "crm":
-      return shot("/design/landing/deals.webp", "The smart CRM's pipeline, with each deal's temperature and who to call first");
-    case "sol":
-      return shot("/design/landing/today-sol.webp", "Sol writing up the day, the most pressing thing at the top");
-    case "design":
-      return shot(
-        "/design/landing/film/design-sol.webp",
-        "Sol suggesting the system from the customer's bill in the designer",
-        "object-center",
-      );
-    case "proposals":
-      return <ProposalCardExample />;
-    case "service":
-      return shot("/design/landing/service-sol.webp", "A service case with Sol's summary and recommended next steps");
-    case "installs":
-      return shot("/design/landing/calendar.webp", "The install calendar with each week's capacity");
-    case "team":
-      return (
-        <div
-          className="absolute inset-0 [container-type:inline-size]"
-          aria-label="Team chat: a colleague asks about a battery in a garage and Sol is asked in"
-        >
-          <LiveTeam live={live} />
-        </div>
-      );
-    case "market":
-      return (
-        <div className="absolute inset-0 grid place-items-center bg-market p-6">
-          <ListingRoofExample className="h-full w-auto max-w-full rounded-xl" />
-        </div>
-      );
-  }
-}
-
-/** A proposal as a customer opens it, drawn small: the business's own name and colour (a made-up business). */
-function ProposalCardExample() {
-  return (
-    <div className="absolute inset-0 overflow-hidden bg-[#f4efe8] p-5 sm:p-7">
-      <div className="mx-auto h-full max-w-md overflow-hidden rounded-xl bg-white shadow-lift ring-1 ring-black/5">
-        <div className="flex items-center justify-between bg-[#1f4d3a] px-5 py-4 text-white">
-          <span className="text-[14px] font-semibold">Sunrise Solar (example)</span>
-          <span className="text-[11px] text-white/70">Proposal for Olivia</span>
-        </div>
-        <div className="space-y-3 p-5 text-[13px] text-ink">
-          <p className="text-[18px] font-semibold tracking-tight">Solar and a battery for your home</p>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            {[
-              ["8.07 kW", "solar"],
-              ["16 kWh", "battery"],
-              ["3", "systems to choose"],
-            ].map(([v, l]) => (
-              <div key={l} className="rounded-lg bg-[#1f4d3a]/5 px-2 py-2">
-                <p className="text-[15px] font-semibold tabular-nums">{v}</p>
-                <p className="text-[11px] text-muted">{l}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-baseline justify-between border-t border-line pt-3">
-            <span className="text-muted">You pay, after the rebate</span>
-            <span className="text-[18px] font-semibold tabular-nums">$14,980</span>
-          </div>
-          <span className="block rounded-lg bg-[#1f4d3a] py-2.5 text-center text-[13px] font-semibold text-white">
-            I&apos;d like to go ahead
-          </span>
-          <p className="text-[11px] text-muted">Example business and figures.</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Everything a business gets, straight after the hero (`UPGRADE`; 3 Nov 2026, Martin: a list or cards on a page
- * didn't show it, he wanted overlaid cards that show what each thing looks like). A deck of cards, each a real screen
- * (or the product drawn), dealt one after another with the next two peeking behind; the list beside it says which is
- * on top and jumps to any. Stops dealing while hovered, and doesn't move with reduced motion.
- */
-function Upgrade() {
-  const items = UPGRADE.items;
-  const [at, setAt] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [still, setStill] = useState(false);
-  useEffect(() => {
-    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const on = () => setStill(q.matches);
-    on();
-    q.addEventListener("change", on);
-    return () => q.removeEventListener("change", on);
-  }, []);
-  useEffect(() => {
-    if (paused || still) return;
-    const t = window.setTimeout(() => setAt((n) => (n + 1) % items.length), holdOf(items[at].key));
-    return () => window.clearTimeout(t);
-  }, [at, paused, still, items]);
-  const now = items[at];
-  return (
-    <section
-      className="relative isolate overflow-hidden bg-primary px-5 py-20 text-white lg:px-8 lg:py-24 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
-      aria-labelledby="upgrade"
-    >
-      {/* The bar under the card on top fills as it waits to be dealt. */}
-      <style>{"@keyframes upgrade-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}"}</style>
-      <div
-        aria-hidden
-        className="absolute -right-40 top-10 -z-10 size-[40rem] rounded-full"
-        style={{ background: "radial-gradient(closest-side, rgba(255,90,31,0.22), rgba(255,90,31,0))" }}
-      />
-      <div
-        className="mx-auto grid w-full max-w-[74rem] items-center gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-      >
-        <div>
-          <BrandEyebrow dark>{UPGRADE.eyebrow}</BrandEyebrow>
-          <h2 id="upgrade" className="mt-3 text-[clamp(36px,4.4vw,64px)] font-semibold leading-[0.95] tracking-[-0.045em]">
-            {UPGRADE.headline}
-          </h2>
-          <p className="mt-4 text-[16px] leading-relaxed text-white/70">{UPGRADE.sub}</p>
-          <ol className="mt-7 grid gap-1">
-            {items.map((item, i) => (
-              <li key={item.key}>
-                <button
-                  type="button"
-                  onClick={() => setAt(i)}
-                  aria-current={i === at}
-                  className={clsx(
-                    "relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left text-[15px] transition-colors",
-                    i === at ? "bg-white/10 text-white" : "text-white/55 hover:text-white",
-                  )}
-                >
-                  <span className={clsx("font-mono text-[12px]", i === at ? "text-sun-bright" : "text-white/35")}>
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="font-medium">{item.title}</span>
-                  {"soon" in item && item.soon && <span className="text-[11px] text-sun-bright">{COMING_SOON_LABEL}</span>}
-                  {i === at && !still && (
-                    <span
-                      key={`${at}-${paused}`}
-                      aria-hidden
-                      className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-sun-line"
-                      style={{
-                        animation: `upgrade-fill ${holdOf(item.key)}ms linear forwards`,
-                        animationPlayState: paused ? "paused" : "running",
-                      }}
-                    />
-                  )}
-                </button>
-              </li>
-            ))}
-          </ol>
-        </div>
-        {/* The deck: the card on top, the next two peeking up behind it. */}
-        <div className="relative min-w-0 pt-10">
-          <div className="relative aspect-[16/10] w-full">
-            {items.map((item, i) => {
-              const place = (i - at + items.length) % items.length;
-              const shown = place < 3;
-              return (
-                <div
-                  key={item.key}
-                  aria-hidden={place !== 0}
-                  className="absolute inset-0 transition-all duration-700 ease-out motion-reduce:transition-none"
-                  style={{
-                    transform: `translateY(${-place * 20}px) scale(${1 - place * 0.05})`,
-                    opacity: shown ? 1 - place * 0.25 : 0,
-                    zIndex: items.length - place,
-                    pointerEvents: place === 0 ? "auto" : "none",
-                  }}
-                >
-                  <div className="relative h-full w-full overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-25px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
-                    {shown && <UpgradeVisual k={item.key} live={place === 0 && !still} />}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {/* The old way and the new, side by side under the screen (16 Nov 2026, Martin: a crossed-out line over the
-              picture wasn't instantly read as the old way). */}
-          <div
-            key={now.key}
-            className="film-pop mt-6 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_auto_minmax(0,1.2fr)] sm:items-stretch"
-            aria-live="polite"
-          >
-            <div className="rounded-2xl bg-white/[0.04] px-5 py-4 ring-1 ring-white/10">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
-                <X className="size-3.5" aria-hidden />
-                {UPGRADE.before}
-              </p>
-              <p className="mt-2 text-[16px] leading-snug text-white/55">{now.was}</p>
-            </div>
-            <ArrowRight className="hidden size-5 self-center text-sun-bright sm:block" aria-hidden />
-            <div className="rounded-2xl bg-white px-5 py-4 text-ink">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-sun-line">
-                <Check className="size-3.5" aria-hidden />
-                {UPGRADE.after}
-              </p>
-              <p className="mt-2 text-[18px] font-semibold leading-snug tracking-tight">{now.title}</p>
-              <p className="mt-1 text-[14px] leading-snug text-ink-2">{now.body}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 /**
  * A sign-up that follows the reader down the page (3 Nov 2026, Martin: there are a lot of slides, so every one is a
@@ -823,7 +594,7 @@ function Faq() {
 function Closing() {
   return (
     <section
-      className="relative isolate overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white snap-start lg:px-8 lg:pb-56 lg:pt-36"
+      className="relative isolate overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white lg:px-8 lg:pb-56 lg:pt-36"
       aria-labelledby="closing"
     >
       <Sunrise size="small" />
