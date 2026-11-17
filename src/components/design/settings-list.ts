@@ -9,7 +9,6 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
     items: [
       { slug: "deal-fields", label: "Deal fields" },
       { slug: "targets", label: "Sales targets" },
-      { slug: "pylon", label: "Bring in from Pylon" },
     ],
   },
   {

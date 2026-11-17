@@ -6,7 +6,6 @@ import clsx from "clsx";
 import {
   ArrowLeft,
   ArrowUp,
-  AudioLines,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -14,21 +13,17 @@ import {
   Loader2,
   Lock,
   LockOpen,
-  MessageCircle,
   Minus,
   Pencil,
   Phone,
   PhoneCall,
   Plus,
-  ScrollText,
   Settings,
-  ShieldCheck,
   SquareKanban,
   Trash2,
   X,
 } from "lucide-react";
-import { setCallDocked, useWatchedCall } from "@/lib/services/assistant-call";
-import { CallPanel } from "./assistant-call";
+import { useWatchedCall } from "@/lib/services/assistant-call";
 import { callsToday, dayLine, type AssistantDeal } from "@/lib/domain/design/assistant-deals";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import {
@@ -45,7 +40,7 @@ import { currentChatLine, type CoachChatLine } from "@/lib/domain/design/coach-t
 import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { callerChanged, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
 import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
-import { DeliverySettings, RingMe, TrainingReview, TrainingStrip, useTraining, type Training } from "./coach-training";
+import { DeliverySettings, RingMe, TrainingCard } from "./coach-training";
 import { voiceLabel } from "@/lib/domain/design/caller";
 import {
   clearCoachCall,
@@ -372,14 +367,6 @@ function CoachWindowFor() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [turns.length, sending, isOpen, reveal?.shown, landing]);
 
-  const training = useTraining(isOpen);
-  // A call watched opens joined to this window, emerging from its side (17 Nov 2026, Martin), on a screen wide enough.
-  const dockCall = isOpen && Boolean(watching) && !small && view.width >= 1024;
-  useEffect(() => {
-    setCallDocked(dockCall);
-    return () => setCallDocked(false);
-  }, [dockCall]);
-
   if (!state || typeof document === "undefined") return null;
   const name = caller.name;
   const keep = (key: string, open: boolean) => {
@@ -482,332 +469,323 @@ function CoachWindowFor() {
     // Drawn on the page body, outside the shell: the wrapper brings the business theme's colours and draws nothing
     // (without it the window took the homeowner site's cream and green, and its parts ran together).
     <div className="theme-studio contents">
-      <div
+      <section
+        role="dialog"
+        aria-label={COACH_COPY.title(name)}
         style={
           small
             ? undefined
             : ({
+                width: `min(${layout.pane + layout.chat}px, calc(100vw - 2rem))`,
                 height: layout.height,
+                "--coach-pane": `${layout.pane}px`,
                 // On a wide screen the window's middle is the floating bar's (14 Nov 2026, Martin), never off the top.
                 "--coach-top": `max(1rem, calc(50dvh - ${layout.height / 2}px))`,
               } as React.CSSProperties)
         }
         className={clsx(
-          "fixed bottom-20 right-4 z-[86] flex max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-lift lg:bottom-6 print:hidden",
-          // A call on its own window bottom right (folded, or a narrow screen): this one stands beside it.
-          watching && !dockCall ? "lg:right-[25.5rem]" : "lg:right-20",
+          "fixed bottom-20 right-4 z-[86] flex flex-col overflow-hidden rounded-2xl bg-surface text-ink shadow-lift ring-1 ring-line lg:bottom-6 print:hidden",
+          watching ? "lg:right-[25.5rem]" : "lg:right-20",
           small ? "w-[min(19rem,calc(100vw-2rem))]" : "lg:bottom-auto lg:top-[var(--coach-top)]",
-          dockCall ? "ring-2 ring-call" : "ring-1 ring-line",
         )}
       >
-        {dockCall && <CallPanel docked />}
-        <section
-          role="dialog"
-          aria-label={COACH_COPY.title(name)}
-          style={
-            small
-              ? undefined
-              : ({
-                  width: `min(${layout.pane + layout.chat}px, calc(100vw - 2rem))`,
-                  "--coach-pane": `${layout.pane}px`,
-                } as React.CSSProperties)
-          }
-          className={clsx("relative flex min-w-0 shrink flex-col overflow-hidden bg-surface", small && "flex-1")}
-        >
-          {!small && (
+        {!small && (
+          <>
+            <DragEdge
+              label="Drag to make the window wider or narrower"
+              orientation="vertical"
+              className="absolute inset-y-0 left-0 z-10 hidden w-1.5 cursor-ew-resize hover:bg-sun-line/50 sm:block"
+              {...edge("left")}
+            />
+            <DragEdge
+              label="Drag to make the window taller or shorter"
+              orientation="horizontal"
+              className="absolute inset-x-0 top-0 z-10 hidden h-1.5 cursor-ns-resize hover:bg-sun-line/50 sm:block"
+              {...edge("top")}
+            />
+          </>
+        )}
+        <header className={clsx("flex items-center gap-3 bg-primary text-white", small ? "px-3 py-2" : "px-4 py-3")}>
+          {small ? (
+            <button type="button" onClick={() => setSmall(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+              <CallerAvatar caller={caller} size={30} className="ring-2 ring-white/20" />
+              <span className="truncate text-sm font-semibold">{COACH_COPY.title(name)}</span>
+            </button>
+          ) : (
             <>
-              <DragEdge
-                label="Drag to make the window wider or narrower"
-                orientation="vertical"
-                className="absolute inset-y-0 left-0 z-10 hidden w-1.5 cursor-ew-resize hover:bg-sun-line/50 sm:block"
-                {...edge("left")}
-              />
-              <DragEdge
-                label="Drag to make the window taller or shorter"
-                orientation="horizontal"
-                className="absolute inset-x-0 top-0 z-10 hidden h-1.5 cursor-ns-resize hover:bg-sun-line/50 sm:block"
-                {...edge("top")}
-              />
+              <AvatarEdit editable={mayCoach} onFailed={setFailed} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
+                <p className="truncate text-xs text-white/70">{day ?? "Your phone assistant"}</p>
+              </div>
+              {/* What the window can show and do, together by the title (14 Nov 2026, Martin: kept away from minimise and
+                close, so they aren't taken for window controls). */}
+              <div className="ml-1 flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 p-0.5">
+                {mayCoach && <RingMe caller={caller} />}
+                <button
+                  type="button"
+                  onClick={() => toggleDeals(!deals)}
+                  aria-pressed={deals}
+                  aria-label={deals ? `Close ${name}'s deals` : `${name}'s deals`}
+                  title={deals ? "Close deals" : `${name}'s deals`}
+                  className={clsx(
+                    "grid size-8 shrink-0 place-items-center rounded-full",
+                    deals ? "bg-white text-ink" : "hover:bg-white/10",
+                  )}
+                >
+                  <SquareKanban className="size-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSettings(!settings)}
+                  aria-pressed={settings}
+                  aria-label={settings ? `Close ${name}'s settings` : `${name}'s settings: voice and script`}
+                  title={settings ? "Close settings" : "Voice and script"}
+                  className={clsx(
+                    "grid size-8 shrink-0 place-items-center rounded-full",
+                    settings ? "bg-white text-ink" : "hover:bg-white/10",
+                  )}
+                >
+                  <Settings className="size-4" aria-hidden />
+                </button>
+              </div>
+              <span className="flex-1" aria-hidden />
             </>
           )}
-          <header className={clsx("flex items-center gap-3 bg-primary text-white", small ? "px-3 py-2" : "px-4 py-3")}>
-            {small ? (
-              <button type="button" onClick={() => setSmall(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                <CallerAvatar caller={caller} size={30} className="ring-2 ring-white/20" />
-                <span className="truncate text-sm font-semibold">{COACH_COPY.title(name)}</span>
-              </button>
-            ) : (
-              <>
-                <AvatarEdit editable={mayCoach} onFailed={setFailed} />
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
-                  <p className="truncate text-xs text-white/70">{day ?? "Your phone assistant"}</p>
-                </div>
-                {/* What the window can show and do, together by the title (14 Nov 2026, Martin: kept away from minimise and
-                close, so they aren't taken for window controls). */}
-                <div className="ml-1 flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 p-0.5">
-                  {mayCoach && <RingMe caller={caller} />}
-                  <button
-                    type="button"
-                    onClick={() => toggleDeals(!deals)}
-                    aria-pressed={deals}
-                    aria-label={deals ? `Close ${name}'s deals` : `${name}'s deals`}
-                    title={deals ? "Close deals" : `${name}'s deals`}
-                    className={clsx(
-                      "grid size-8 shrink-0 place-items-center rounded-full",
-                      deals ? "bg-white text-ink" : "hover:bg-white/10",
-                    )}
-                  >
-                    <SquareKanban className="size-4" aria-hidden />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleSettings(!settings)}
-                    aria-pressed={settings}
-                    aria-label={settings ? `Close ${name}'s settings` : `${name}'s settings: voice and script`}
-                    title={settings ? "Close settings" : "Voice and script"}
-                    className={clsx(
-                      "grid size-8 shrink-0 place-items-center rounded-full",
-                      settings ? "bg-white text-ink" : "hover:bg-white/10",
-                    )}
-                  >
-                    <Settings className="size-4" aria-hidden />
-                  </button>
-                </div>
-                <span className="flex-1" aria-hidden />
-              </>
-            )}
-            {/* The window's own controls, alone in the corner. */}
-            <div className={clsx("flex shrink-0 items-center gap-0.5", !small && "border-l border-white/15 pl-2")}>
-              <button
-                type="button"
-                onClick={() => setSmall((v) => !v)}
-                aria-label={small ? `Open ${name}'s chat` : "Minimise"}
-                title={small ? "Open" : "Minimise"}
-                className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
-              >
-                {small ? <ChevronUp className="size-4" aria-hidden /> : <Minus className="size-4" aria-hidden />}
-              </button>
-              <button
-                type="button"
-                onClick={closeCoach}
-                aria-label="Close"
-                title="Close"
-                className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            </div>
-          </header>
+          {/* The window's own controls, alone in the corner. */}
+          <div className={clsx("flex shrink-0 items-center gap-0.5", !small && "border-l border-white/15 pl-2")}>
+            <button
+              type="button"
+              onClick={() => setSmall((v) => !v)}
+              aria-label={small ? `Open ${name}'s chat` : "Minimise"}
+              title={small ? "Open" : "Minimise"}
+              className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
+            >
+              {small ? <ChevronUp className="size-4" aria-hidden /> : <Minus className="size-4" aria-hidden />}
+            </button>
+            <button
+              type="button"
+              onClick={closeCoach}
+              aria-label="Close"
+              title="Close"
+              className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+        </header>
 
-          <div className={clsx("flex min-h-0 flex-1", small && "hidden")}>
-            {settings && (
-              <CoachSettings
-                training={training}
-                onTrainingNotes={(next) => {
+        <div className={clsx("flex min-h-0 flex-1", small && "hidden")}>
+          {settings && (
+            <CoachSettings
+              notes={notes}
+              fixed={fixed}
+              fresh={fresh}
+              mayCoach={mayCoach}
+              delivery={delivery}
+              onDelivery={setDelivery}
+              onNotes={setNotes}
+              onBack={() => toggleSettings(false)}
+            />
+          )}
+          {deals && !settings && <CoachDeals picked={picked} onPick={setPicked} onBack={() => toggleDeals(false)} />}
+          {pane && (
+            <DragEdge
+              label="Drag to resize the two sides"
+              orientation="vertical"
+              className="hidden w-1.5 shrink-0 cursor-col-resize bg-line hover:bg-sun-line/60 active:bg-sun-line sm:block"
+              {...edge("divider")}
+            />
+          )}
+          <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", (settings || deals) && "hidden sm:flex")}>
+            <ContactReach open={reaching} onOpen={setReaching} />
+            {!reaching && (
+              <TrainingCard
+                caller={caller}
+                onNotes={(next) => {
                   const was = new Map(notes.map((n) => [n.id, n.text]));
                   setFresh(new Set(next.filter((n) => was.get(n.id) !== n.text).map((n) => n.id)));
                   setNotes(next);
                 }}
-                notes={notes}
-                fixed={fixed}
-                fresh={fresh}
-                mayCoach={mayCoach}
-                delivery={delivery}
-                onDelivery={setDelivery}
-                onNotes={setNotes}
-                onBack={() => toggleSettings(false)}
               />
             )}
-            {deals && !settings && <CoachDeals picked={picked} onPick={setPicked} onBack={() => toggleDeals(false)} />}
-            {pane && (
-              <DragEdge
-                label="Drag to resize the two sides"
-                orientation="vertical"
-                className="hidden w-1.5 shrink-0 cursor-col-resize bg-line hover:bg-sun-line/60 active:bg-sun-line sm:block"
-                {...edge("divider")}
-              />
+            {landing && !reaching && (
+              <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
+                {mayCoach && (
+                  <div className="mb-4">
+                    <RingMe caller={caller} row />
+                  </div>
+                )}
+                <CoachWelcome
+                  caller={caller}
+                  current={currentChatLine(turns)}
+                  past={past}
+                  onOpenChat={(id) => void chats(openCoachChat(id), true)}
+                  onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
+                  onPick={(d) => {
+                    setPicked(d);
+                    toggleDeals(true);
+                  }}
+                  onDeals={() => toggleDeals(true)}
+                  onTalk={() => {
+                    setLanding(false);
+                    setStartNew(false);
+                  }}
+                />
+              </div>
             )}
-            <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", (settings || deals) && "hidden sm:flex")}>
-              <ContactReach open={reaching} onOpen={setReaching} />
-              {!reaching && !settings && <TrainingStrip t={training} name={name} onReview={() => toggleSettings(true)} />}
-              {landing && !reaching && (
-                <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
-                  <CoachWelcome
-                    caller={caller}
-                    current={currentChatLine(turns)}
-                    past={past}
-                    onOpenChat={(id) => void chats(openCoachChat(id), true)}
-                    onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
-                    onPick={(d) => {
-                      setPicked(d);
-                      toggleDeals(true);
-                    }}
-                    onDeals={() => toggleDeals(true)}
-                    onTalk={() => {
-                      setLanding(false);
-                      setStartNew(false);
-                    }}
-                  />
-                </div>
-              )}
-              {!landing && !reaching && !state.call && (
-                <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
+            {!landing && !reaching && !state.call && (
+              <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLanding(true);
+                    setStartNew(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                >
+                  <ChevronLeft className="size-3.5" aria-hidden />
+                  {name}&apos;s day and chats
+                </button>
+                {mayCoach && turns.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setLanding(true);
-                      setStartNew(true);
-                    }}
+                    onClick={() => void chats(newCoachChat(), true)}
                     className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
                   >
-                    <ChevronLeft className="size-3.5" aria-hidden />
-                    {name}&apos;s day and chats
+                    <Plus className="size-3.5" aria-hidden />
+                    New chat
                   </button>
-                  {mayCoach && turns.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void chats(newCoachChat(), true)}
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
-                    >
-                      <Plus className="size-3.5" aria-hidden />
-                      New chat
-                    </button>
-                  )}
+                )}
+              </div>
+            )}
+            <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}>
+              {loaded && turns.length === 0 && (
+                <div className="flex items-start gap-2">
+                  <CallerAvatar caller={caller} size={28} />
+                  <p className="rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{COACH_COPY.hello(name)}</p>
                 </div>
               )}
-              <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}>
-                {loaded && turns.length === 0 && (
-                  <div className="flex items-start gap-2">
-                    <CallerAvatar caller={caller} size={28} />
-                    <p className="rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{COACH_COPY.hello(name)}</p>
-                  </div>
-                )}
-                {turns.map((t, i) =>
-                  t.role === "you" ? (
-                    <div key={i} className="flex flex-col items-end">
-                      {t.about && (
-                        <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
-                          {/deal$/.test(t.about) ? (
-                            <SquareKanban className="size-3" aria-hidden />
-                          ) : (
-                            <PhoneCall className="size-3" aria-hidden />
-                          )}
-                          {t.about}
-                        </span>
-                      )}
-                      <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary px-3 py-2 text-sm leading-snug text-white">
-                        {t.text}
-                      </p>
-                    </div>
-                  ) : (
-                    <div key={i} className="flex items-start gap-2">
-                      <CallerAvatar caller={caller} size={28} />
-                      <div className="min-w-0 max-w-[88%] flex-1">
-                        <Beanstalk
-                          packets={packetsOf(t.text)}
-                          shown={reveal?.turn === i ? reveal.shown : Infinity}
-                          label={`${name} says`}
-                        />
-                        {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
-                      </div>
-                    </div>
-                  ),
-                )}
-                {sending && (
-                  <div className="flex items-center gap-2 text-xs text-muted">
-                    <CallerAvatar caller={caller} size={28} />
-                    <span className="animate-pulse">{name} is thinking about it…</span>
-                  </div>
-                )}
-              </div>
-
-              <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
-                {state.call && (
-                  <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                    <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
-                    About {state.call.about.replace(/^A /, "a ")}
-                    <button
-                      type="button"
-                      onClick={clearCoachCall}
-                      className="ml-auto text-muted hover:text-ink"
-                      aria-label="Not about this call"
-                    >
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  </p>
-                )}
-                {about && (
-                  <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                    <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
-                    About {aboutFirst}&apos;s deal
-                    <button
-                      type="button"
-                      onClick={() => setPicked(null)}
-                      className="ml-auto text-muted hover:text-ink"
-                      aria-label="Not about this deal"
-                    >
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  </p>
-                )}
-                {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
-                {mayCoach ? (
-                  <div className="flex items-end gap-2">
-                    {/* The microphone sits inside the box, as in Sol's. */}
-                    <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
-                      <DictateButton
-                        label={`Speak to ${name}`}
-                        onHearing={setHeard}
-                        onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
-                      />
-                      <textarea
-                        ref={box}
-                        value={heard ? withSpoken(text, heard) : text}
-                        onChange={(e) => {
-                          setHeard("");
-                          setText(e.target.value);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            void send();
-                          }
-                        }}
-                        rows={2}
-                        maxLength={2000}
-                        placeholder={
-                          state.call
-                            ? COACH_COPY.callAbout(name)
-                            : about
-                              ? `Ask ${name} about ${aboutFirst}…`
-                              : landing && turns.length > 0
-                                ? `Start a new chat with ${name}…`
-                                : `Tell ${name} what to change…`
-                        }
-                        className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void send()}
-                      disabled={!text.trim() || sending}
-                      aria-label="Send"
-                      className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
-                    >
-                      <ArrowUp className="size-4" aria-hidden />
-                    </button>
+              {turns.map((t, i) =>
+                t.role === "you" ? (
+                  <div key={i} className="flex flex-col items-end">
+                    {t.about && (
+                      <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
+                        {/deal$/.test(t.about) ? (
+                          <SquareKanban className="size-3" aria-hidden />
+                        ) : (
+                          <PhoneCall className="size-3" aria-hidden />
+                        )}
+                        {t.about}
+                      </span>
+                    )}
+                    <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary px-3 py-2 text-sm leading-snug text-white">
+                      {t.text}
+                    </p>
                   </div>
                 ) : (
-                  loaded && (
-                    <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
-                  )
-                )}
-              </div>
+                  <div key={i} className="flex items-start gap-2">
+                    <CallerAvatar caller={caller} size={28} />
+                    <div className="min-w-0 max-w-[88%] flex-1">
+                      <Beanstalk packets={packetsOf(t.text)} shown={reveal?.turn === i ? reveal.shown : Infinity} label={`${name} says`} />
+                      {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
+                    </div>
+                  </div>
+                ),
+              )}
+              {sending && (
+                <div className="flex items-center gap-2 text-xs text-muted">
+                  <CallerAvatar caller={caller} size={28} />
+                  <span className="animate-pulse">{name} is thinking about it…</span>
+                </div>
+              )}
+            </div>
+
+            <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
+              {state.call && (
+                <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                  <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
+                  About {state.call.about.replace(/^A /, "a ")}
+                  <button
+                    type="button"
+                    onClick={clearCoachCall}
+                    className="ml-auto text-muted hover:text-ink"
+                    aria-label="Not about this call"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                </p>
+              )}
+              {about && (
+                <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                  <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
+                  About {aboutFirst}&apos;s deal
+                  <button
+                    type="button"
+                    onClick={() => setPicked(null)}
+                    className="ml-auto text-muted hover:text-ink"
+                    aria-label="Not about this deal"
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                </p>
+              )}
+              {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
+              {mayCoach ? (
+                <div className="flex items-end gap-2">
+                  {/* The microphone sits inside the box, as in Sol's. */}
+                  <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
+                    <DictateButton
+                      label={`Speak to ${name}`}
+                      onHearing={setHeard}
+                      onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
+                    />
+                    <textarea
+                      ref={box}
+                      value={heard ? withSpoken(text, heard) : text}
+                      onChange={(e) => {
+                        setHeard("");
+                        setText(e.target.value);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void send();
+                        }
+                      }}
+                      rows={2}
+                      maxLength={2000}
+                      placeholder={
+                        state.call
+                          ? COACH_COPY.callAbout(name)
+                          : about
+                            ? `Ask ${name} about ${aboutFirst}…`
+                            : landing && turns.length > 0
+                              ? `Start a new chat with ${name}…`
+                              : `Tell ${name} what to change…`
+                      }
+                      className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void send()}
+                    disabled={!text.trim() || sending}
+                    aria-label="Send"
+                    className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                  >
+                    <ArrowUp className="size-4" aria-hidden />
+                  </button>
+                </div>
+              ) : (
+                loaded && (
+                  <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
+                )
+              )}
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>,
     document.body,
   );
@@ -815,15 +793,12 @@ function CoachWindowFor() {
 
 /**
  * The assistant's settings beside its chat (13 Nov 2026, Martin: a cog slides out settings, side by side, so nothing
- * means going into Settings). Laid out as cards on the canvas (17 Nov 2026, Martin: it looked messy and overwhelming;
- * use colour for clarity): a training call to review first, in the sun; then **Voice** and **How it speaks**, folded
- * to a line each; then **Script**, what it has been told to say: its locked rules edged in the signal orange, its
- * notes plain, and what no note can change in grey at the foot. A note just added or reworded in the chat is lit. On a
- * phone it takes the window's place, with a way back to the chat.
+ * means going into Settings): **Voice**, folded until opened, the same picker as Settings → Phone assistant; then
+ * **Script**, everything it has been told to say, as notes it keeps for every call, to read, reword or take away, with
+ * what no note can change under it. A note just added or reworded in the chat is lit. On a phone it takes the window's
+ * place, with a way back to the chat.
  */
 function CoachSettings(props: {
-  training: Training;
-  onTrainingNotes: (n: CoachNote[]) => void;
   notes: CoachNote[];
   fixed: string[];
   fresh: Set<string>;
@@ -837,27 +812,23 @@ function CoachSettings(props: {
   const caller = useCoachCaller();
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
-  const [fixedOpen, setFixedOpen] = useState(false);
   const locked = props.notes.filter((n) => n.locked);
   const loose = props.notes.filter((n) => !n.locked);
+  const [scriptOpen, setScriptOpen] = useState(true);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const name = caller.name;
-  const card = "overflow-hidden rounded-2xl bg-surface ring-1 ring-line";
-  const head = (icon: React.ReactNode, tile: string, label: string, sub: string, open: boolean, toggle: () => void) => (
+  const head = (label: string, sub: string, open: boolean, toggle: () => void) => (
     <button
       type="button"
       onClick={toggle}
       aria-expanded={open}
-      className="flex w-full items-center gap-3 px-3.5 py-3 text-left hover:bg-canvas/60"
+      className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-2"
     >
-      <span className={clsx("grid size-8 shrink-0 place-items-center rounded-xl", tile)} aria-hidden>
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0">
         <span className="block text-sm font-semibold text-ink">{label}</span>
         <span className="block truncate text-xs text-muted">{sub}</span>
       </span>
-      <ChevronDown className={clsx("size-4 shrink-0 text-muted transition-transform", open && "rotate-180")} aria-hidden />
+      <ChevronDown className={clsx("size-4 shrink-0 text-ink-2 transition-transform", open && "rotate-180")} aria-hidden />
     </button>
   );
   return (
@@ -865,117 +836,76 @@ function CoachSettings(props: {
       <button
         type="button"
         onClick={props.onBack}
-        className="flex items-center gap-1.5 border-b border-line bg-surface px-4 py-2.5 text-xs font-medium text-ink-2 hover:text-ink sm:hidden"
+        className="flex items-center gap-1.5 border-b border-line px-4 py-2.5 text-xs font-medium text-ink-2 hover:text-ink sm:hidden"
       >
         <ArrowLeft className="size-3.5" aria-hidden /> Back to the chat
       </button>
-      <div className="space-y-3 p-3">
-        <TrainingReview t={props.training} caller={caller} onNotes={props.onTrainingNotes} />
-
-        <section className={card}>
-          {head(<AudioLines className="size-4" />, "bg-surface-2 text-ink", "Voice", voiceLabel(caller.voice), voiceOpen, () =>
-            setVoiceOpen((o) => !o),
-          )}
-          {voiceOpen && (
-            <div className="border-t border-line px-3.5 py-3">
-              {props.mayCoach ? (
-                <VoicePicker
-                  compact
-                  caller={caller}
-                  callsOn={callsOn}
-                  onSaved={() => undefined}
-                  onStatus={setStatus}
-                  role={caller.role ?? "sales"}
-                />
-              ) : (
-                <p className="text-xs text-muted">Only an admin can change the voice.</p>
-              )}
-              {status && <p className={clsx("mt-2 text-xs", status.ok ? "text-ink-2" : "text-danger")}>{status.text}</p>}
-            </div>
-          )}
-        </section>
-
-        <section className={card}>
-          {head(
-            <MessageCircle className="size-4" />,
-            "bg-surface-2 text-ink",
-            DELIVERY_COPY.title,
-            DELIVERY_COPY.summary(props.delivery),
-            speakOpen,
-            () => setSpeakOpen((o) => !o),
-          )}
-          {speakOpen && (
-            <div className="border-t border-line px-3.5 py-3">
-              <DeliverySettings delivery={props.delivery} editable={props.mayCoach} onSaved={props.onDelivery} />
-            </div>
-          )}
-        </section>
-
-        <section className={card}>
-          <div className="flex items-center gap-3 px-3.5 pt-3">
-            <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-sun text-sun-line" aria-hidden>
-              <ScrollText className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-ink">Script</span>
-              <span className="block text-xs text-muted">{COACH_COPY.script(name)}</span>
-            </span>
+      <section className="border-b border-line">
+        {head("Voice", voiceLabel(caller.voice), voiceOpen, () => setVoiceOpen((o) => !o))}
+        {voiceOpen && (
+          <div className="px-4 pb-4">
+            {props.mayCoach ? (
+              <VoicePicker
+                compact
+                caller={caller}
+                callsOn={callsOn}
+                onSaved={() => undefined}
+                onStatus={setStatus}
+                role={caller.role ?? "sales"}
+              />
+            ) : (
+              <p className="text-xs text-muted">Only an admin can change the voice.</p>
+            )}
+            {status && <p className={clsx("mt-2 text-xs", status.ok ? "text-ink-2" : "text-danger")}>{status.text}</p>}
           </div>
-          <div className="space-y-3 px-3.5 pb-3.5 pt-3">
-            {props.notes.length === 0 && <p className="rounded-xl bg-canvas px-3 py-2.5 text-xs text-muted">{COACH_COPY.empty(name)}</p>}
+        )}
+      </section>
+      <section className="border-b border-line">
+        {head(DELIVERY_COPY.title, DELIVERY_COPY.summary(props.delivery), speakOpen, () => setSpeakOpen((o) => !o))}
+        {speakOpen && <DeliverySettings delivery={props.delivery} editable={props.mayCoach} onSaved={props.onDelivery} />}
+      </section>
+      <section>
+        {head(
+          "Script",
+          `${locked.length ? `${locked.length} locked ${locked.length === 1 ? "rule" : "rules"}, ` : ""}${loose.length} ${loose.length === 1 ? "note" : "notes"}`,
+          scriptOpen,
+          () => setScriptOpen((o) => !o),
+        )}
+        {scriptOpen && (
+          <div className="space-y-1.5 px-4 pb-4">
+            <p className="text-xs text-muted">{COACH_COPY.script(name)}</p>
+            {props.notes.length === 0 && <p className="text-xs text-muted">{COACH_COPY.empty(name)}</p>}
             {locked.length > 0 && (
-              <div>
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-sun-ink">
-                  <Lock className="size-3" aria-hidden />
-                  {COACH_COPY.lockedTitle} · {locked.length}
+              <div className="rounded-xl bg-surface p-2 ring-1 ring-line">
+                <p className="flex items-center gap-1.5 px-1 text-[11px] font-medium uppercase tracking-[0.14em] text-ink">
+                  <Lock className="size-3 text-sun-line" aria-hidden />
+                  {COACH_COPY.lockedTitle}
                 </p>
-                <p className="mt-0.5 text-xs text-muted">{COACH_COPY.lockedNote(name)}</p>
-                <div className="mt-1.5 space-y-1 border-l-2 border-sun-line pl-2">
-                  {locked.map((n) => (
-                    <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
-                  ))}
-                </div>
+                <p className="px-1 pb-1 text-xs text-muted">{COACH_COPY.lockedNote(name)}</p>
+                {locked.map((n) => (
+                  <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
+                ))}
               </div>
             )}
-            {loose.length > 0 && (
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  {COACH_COPY.notesTitle} · {loose.length}
-                </p>
-                <div className="mt-1.5 space-y-1 border-l-2 border-line pl-2">
-                  {loose.map((n) => (
-                    <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
-                  ))}
-                </div>
-              </div>
+            {locked.length > 0 && loose.length > 0 && (
+              <p className="px-1 pt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{COACH_COPY.notesTitle}</p>
             )}
-          </div>
-          {props.fixed.length > 0 && (
-            <div className="border-t border-line bg-canvas/60">
-              <button
-                type="button"
-                onClick={() => setFixedOpen((o) => !o)}
-                aria-expanded={fixedOpen}
-                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-xs font-medium text-ink-2 hover:text-ink"
-              >
-                <ShieldCheck className="size-3.5 shrink-0 text-muted" aria-hidden />
-                <span className="flex-1">{COACH_COPY.fixedTitle}</span>
-                <ChevronDown className={clsx("size-3.5 shrink-0 transition-transform", fixedOpen && "rotate-180")} aria-hidden />
-              </button>
-              {fixedOpen && (
-                <ul className="space-y-1 px-3.5 pb-3 text-xs leading-snug text-ink-2">
+            {loose.map((n) => (
+              <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
+            ))}
+            {props.fixed.length > 0 && (
+              <div className="pt-3">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{COACH_COPY.fixedTitle}</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-ink-2">
                   {props.fixed.map((f) => (
-                    <li key={f} className="flex gap-2">
-                      <span className="mt-1.5 size-1 shrink-0 rounded-full bg-muted" aria-hidden />
-                      {f}
-                    </li>
+                    <li key={f}>· {f}</li>
                   ))}
                 </ul>
-              )}
-            </div>
-          )}
-        </section>
-      </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
     </aside>
   );
 }

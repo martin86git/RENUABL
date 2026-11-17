@@ -9,8 +9,6 @@ import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
 import { MarketplaceMark } from "./marketplace-bar";
 import { SolScene, SOL_SCENE_MS } from "./film-sol-scene";
 import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
-import { AgentWave } from "./living-hero";
-import { SolMark } from "./sol-icon";
 
 /**
  * The hero's product film (16 Nov 2026, Martin: a real film of how the product works today, not misleading, and not so
@@ -188,8 +186,7 @@ const RAIL: { key: Key; title: string }[] = [
   { key: "market", title: FILM.marketplace.title },
 ];
 
-/** `dark`: on a dark section, the chapter rail in white. */
-export function ProductFilm({ dark = false }: { dark?: boolean }) {
+export function ProductFilm() {
   const stage = useRef<HTMLDivElement | null>(null);
   const [t, setT] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -240,13 +237,6 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
   /** The chapter card says itself in full as the chapter begins, then folds to a small label out of the way. */
   const folded = !still && t - SPANS[key][0] > 2800;
 
-  const fileName =
-    shot.src
-      ?.split("/")
-      .pop()
-      ?.replace(/.webp$/, "") ?? "";
-  const narration = !market && fileName in FILM.narration ? FILM.narration[fileName as keyof typeof FILM.narration] : null;
-
   const goTo = (k: Key) => setT(still || paused ? STILL_AT[k] : SPANS[k][0]);
 
   return (
@@ -264,9 +254,30 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
       `}</style>
       <div
         ref={stage}
-        className="relative isolate aspect-[16/10] w-full select-none overflow-hidden rounded-[24px] [container-type:inline-size]"
+        className="relative isolate aspect-[16/10] w-full select-none overflow-hidden rounded-[28px] bg-[#0d0e11] shadow-[0_50px_120px_-40px_rgba(11,11,12,0.6)] ring-1 ring-black/10 [container-type:inline-size]"
       >
-        {/* No box round the film (17 Nov 2026, Martin): the window sits on the page itself. */}
+        {/* The stage: graphite, lit by a slow sun from the top right, fine grain over it. */}
+        <div aria-hidden className="absolute inset-0 overflow-hidden">
+          <div
+            className="film-sun absolute -right-[20%] -top-[45%] h-[120%] w-[85%] rounded-full opacity-90 blur-[6cqw]"
+            style={{
+              background: "radial-gradient(closest-side, rgba(255,110,40,0.75), rgba(255,90,31,0.25) 55%, rgba(255,90,31,0) 100%)",
+              animation: "film-sun 16s ease-in-out infinite",
+            }}
+          />
+          <div
+            className="absolute -bottom-[40%] -left-[15%] h-[90%] w-[70%] rounded-full blur-[6cqw]"
+            style={{ background: "radial-gradient(closest-side, rgba(120,140,255,0.16), rgba(120,140,255,0) 100%)" }}
+          />
+          <div
+            className="absolute inset-0 opacity-[0.08] mix-blend-overlay"
+            style={{
+              backgroundImage:
+                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+            }}
+          />
+        </div>
+
         {/* The window rising flat out of a tilt. */}
         <div
           className={clsx("absolute inset-0 transition-[transform,opacity] duration-[1400ms]", ease, market && "opacity-0")}
@@ -282,7 +293,7 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
             style={{ transform: cameraOf(move.light) }}
           >
             <div
-              className="absolute overflow-hidden rounded-[1.1cqw] bg-[#f7f7f8] shadow-[0_3cqw_7cqw_-2.5cqw_rgba(11,11,12,0.35)] ring-1 ring-black/10"
+              className="absolute overflow-hidden rounded-[1.1cqw] bg-[#f7f7f8] shadow-[0_3cqw_8cqw_-2cqw_rgba(0,0,0,0.75)] ring-1 ring-white/15"
               style={{ left: pct(SCREEN.left), top: pct(SCREEN.top - BAR), width: pct(SCREEN.size), height: pct(SCREEN.size + BAR) }}
             >
               <div className="flex items-center gap-[0.55cqw] px-[1.1cqw]" style={{ height: `${(BAR / (SCREEN.size + BAR)) * 100}%` }}>
@@ -363,9 +374,11 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
             <span className="mx-auto grid size-[7cqw] place-items-center rounded-full bg-market text-white shadow-[0_0_6cqw_rgba(40,90,255,0.45)]">
               <MarketplaceMark className="size-[3.6cqw]" />
             </span>
-            <p className="mt-[2.4cqw] text-[clamp(20px,3.6cqw,44px)] font-semibold tracking-[-0.03em] text-ink">{FILM.marketplace.title}</p>
-            <p className="mx-auto mt-[1cqw] max-w-[36ch] text-[clamp(12px,1.5cqw,18px)] text-ink-2">{FILM.marketplace.line}</p>
-            <span className="mt-[2cqw] inline-block rounded-full bg-surface-2 px-[1.6cqw] py-[0.5cqw] text-[clamp(11px,1.1cqw,14px)] font-medium text-ink ring-1 ring-line">
+            <p className="mt-[2.4cqw] text-[clamp(20px,3.6cqw,44px)] font-semibold tracking-[-0.03em] text-white">
+              {FILM.marketplace.title}
+            </p>
+            <p className="mx-auto mt-[1cqw] max-w-[36ch] text-[clamp(12px,1.5cqw,18px)] text-white/65">{FILM.marketplace.line}</p>
+            <span className="mt-[2cqw] inline-block rounded-full bg-white/10 px-[1.6cqw] py-[0.5cqw] text-[clamp(11px,1.1cqw,14px)] font-medium text-white ring-1 ring-white/20">
               {FILM.marketplace.soon}
             </span>
           </div>
@@ -408,18 +421,6 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
           </div>
         )}
 
-        {/* Who is doing the work, in their own words (17 Nov 2026, Martin: the answering should come from Sol, not the
-            software). On the side away from what is lit. */}
-        {narration && (
-          <Narrator
-            key={move.shot}
-            who={narration.who}
-            text={narration.text}
-            ms={still ? 1e9 : t - SHOT_AT[move.shot]}
-            side={"side" in narration ? narration.side : move.light && move.light[0] + move.light[2] / 2 < 0.5 ? "right" : "left"}
-          />
-        )}
-
         {!still && (
           <button
             type="button"
@@ -445,20 +446,14 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
                 aria-current={i === index ? "step" : undefined}
                 className="group w-full text-left"
               >
-                {/* On the hero's white ground: ink words, the progress in the signal orange. */}
-                <span className={clsx("block h-[3px] w-full overflow-hidden rounded-full", dark ? "bg-white/15" : "bg-line")}>
+                {/* On the hero's dark ground (16 Nov 2026): white words, the progress in the signal orange. */}
+                <span className="block h-[3px] w-full overflow-hidden rounded-full bg-white/15">
                   <span className="block h-full rounded-full bg-sun-line" style={{ width: `${share * 100}%` }} />
                 </span>
                 <span
                   className={clsx(
                     "mt-2 flex items-baseline gap-2 text-[12px] font-medium leading-snug transition-colors",
-                    dark
-                      ? i === index
-                        ? "text-white"
-                        : "text-white/45 group-hover:text-white/80"
-                      : i === index
-                        ? "text-ink"
-                        : "text-muted group-hover:text-ink-2",
+                    i === index ? "text-white" : "text-white/45 group-hover:text-white/80",
                   )}
                 >
                   <span className="tabular-nums text-[11px]">{String(i + 1).padStart(2, "0")}</span>
@@ -470,43 +465,5 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
         })}
       </ol>
     </figure>
-  );
-}
-
-/** An agent saying what it is doing on the screen: its face and a bubble, typed as it is said. */
-function Narrator({ who, text, ms, side }: { who: string; text: string; ms: number; side: "left" | "right" }) {
-  const n = Math.max(0, Math.floor((ms - 500) / 24));
-  const shown = text.slice(0, n);
-  const busy = ms >= 500 && n < text.length;
-  const name = who === "sol" ? "Sol" : who === "charlie" ? "Charlie" : "Alex";
-  return (
-    <div
-      className={clsx(
-        "film-pop pointer-events-none absolute bottom-[4%] flex max-w-[44%] items-end gap-[1cqw]",
-        side === "left" ? "left-[2.5%]" : "right-[2.5%] flex-row-reverse",
-      )}
-      aria-live="polite"
-    >
-      <span className="relative grid size-[5.5cqw] shrink-0 place-items-center">
-        <span
-          aria-hidden
-          className={clsx("absolute -inset-[1cqw] rounded-full bg-sun-line/40 blur-[1.5cqw]", busy ? "film-pulse" : "opacity-60")}
-        />
-        {who === "sol" ? (
-          <SolMark className="relative size-full" />
-        ) : (
-          <span className="relative">
-            <AgentWave who={who === "alex" ? "alex" : "charlie"} size={40} busy={busy} />
-          </span>
-        )}
-      </span>
-      <div className="rounded-[1.4cqw] bg-surface/95 px-[1.6cqw] py-[1cqw] shadow-[0_1.5cqw_4cqw_-1.5cqw_rgba(11,11,12,0.5)] ring-1 ring-sun-line/50 backdrop-blur">
-        <p className="text-[clamp(8px,0.85cqw,12px)] font-semibold uppercase tracking-[0.16em] text-sun-line">{name}</p>
-        <p className="mt-[0.2cqw] min-h-[2.6em] text-[clamp(10px,1.35cqw,17px)] leading-snug text-ink">
-          {shown}
-          {busy && <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.15em] bg-sun-line" aria-hidden />}
-        </p>
-      </div>
-    </div>
   );
 }

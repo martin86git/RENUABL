@@ -9,15 +9,7 @@ import { TEXT_MAX } from "@/lib/domain/design/contact-reach";
 import { callNowWords, clockWords, joinRuns, phaseWords, TEAM_NOTE_MAX, teamLineWords, type LiveLine } from "@/lib/domain/live-call";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { CALL_HEADLINES, TEAM_ASK_MAX } from "@/lib/domain/voice-agent";
-import {
-  callNowInstead,
-  endAssistantCall,
-  stopWatching,
-  tellAssistant,
-  useCallDocked,
-  useLiveCall,
-  useWatchedCall,
-} from "@/lib/services/assistant-call";
+import { callNowInstead, endAssistantCall, stopWatching, tellAssistant, useLiveCall, useWatchedCall } from "@/lib/services/assistant-call";
 import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState, callerFor } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { OtherCallsStrip } from "./live-calls";
@@ -32,27 +24,6 @@ import { CallerAvatar } from "./settings-caller";
  * (or, ticked, words to say as typed).
  */
 export function AssistantCallWindow() {
-  const watched = useWatchedCall();
-  const docked = useCallDocked();
-  if (!watched || docked || typeof document === "undefined") return null;
-  return createPortal(
-    // Drawn on the page body, outside the shell: the wrapper brings the business theme's colours and draws nothing.
-    <div className="theme-studio contents">
-      <div className="fixed bottom-20 right-4 z-[85] w-[min(23rem,calc(100vw-2rem))] lg:bottom-6 lg:right-6 print:hidden">
-        <CallPanel />
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-/**
- * The watched call itself (17 Nov 2026, Martin: a call should say it's in progress, pulse while it is, and be a colour
- * of its own so it's known at a glance; and open joined to the agent's chat). Its header is the call green while it
- * rings or is on, with "Call in progress" and the clock; graphite once over. `docked`, it fills the side of the
- * agent's chat window it emerged from (CoachWindow); else it is a window of its own, bottom right.
- */
-export function CallPanel({ docked = false }: { docked?: boolean }) {
   const watched = useWatchedCall();
   const assistants = useCallerInfo();
   const { call, loaded } = useLiveCall(watched?.jobId ?? null);
@@ -81,140 +52,130 @@ export function CallPanel({ docked = false }: { docked?: boolean }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [said, call?.partial?.text, folded]);
 
-  if (!watched) return null;
+  if (!watched || typeof document === "undefined") return null;
 
   // A practice call with the member themself (domain/design/practice-call.ts): no deal, so nothing to do after it.
   const practice = watched.jobId === PRACTICE_ID;
   const customer = call?.customer || watched.name || "the customer";
-  const other = practice ? "You" : customer;
   const phase = call?.phase ?? "lined-up";
   const live = phase === "ringing" || phase === "on-call";
   const onCall = phase === "on-call";
   const time = phase === "on-call" ? clockWords(elapsed) : phase === "ended" && call?.ranFor ? clockWords(call.ranFor) : null;
   const outcome = phase === "ended" && call?.outcome ? `${CALL_HEADLINES[call.outcome]}${call.booked ? ` · ${call.booked}` : ""}` : null;
-  const status = onCall
-    ? "Call in progress"
-    : phase === "ringing"
-      ? "Ringing"
-      : phase === "ended"
-        ? "Call ended"
-        : phase === "trying-again"
-          ? "Will try again"
-          : "Call lined up";
-  const open = docked || !folded;
 
-  return (
-    <section
-      aria-label={`${caller.name}'s call`}
-      className={clsx(
-        "flex flex-col overflow-hidden bg-surface",
-        docked ? "call-emerge h-full w-[22rem] shrink-0 border-r border-line" : "rounded-2xl shadow-lift",
-        !docked && (live ? "ring-2 ring-call" : "ring-1 ring-line"),
-      )}
-    >
-      <header className={clsx("relative shrink-0 px-4 py-3 text-white", live ? "bg-call" : "bg-primary")}>
-        {/* While it rings or is on, a slow pulse across the header: plain that a call is under way. */}
-        {live && <span className="pointer-events-none absolute inset-0 animate-pulse bg-white/15 motion-reduce:animate-none" aria-hidden />}
-        <div className="relative flex items-center gap-2">
-          <span className="flex min-w-0 flex-1 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em]">
-            <span className="relative flex size-2.5 shrink-0" aria-hidden>
-              {live && <span className="absolute inset-0 animate-ping rounded-full bg-white motion-reduce:animate-none" />}
-              <span className={clsx("relative size-2.5 rounded-full", live ? "bg-white" : "bg-white/40")} />
-            </span>
-            <span className="truncate">{status}</span>
+  return createPortal(
+    // Drawn on the page body, outside the shell: the wrapper brings the business theme's colours and draws nothing.
+    <div className="theme-studio contents">
+      <section
+        aria-label={`${caller.name}'s call`}
+        className={clsx(
+          "fixed bottom-20 right-4 z-[85] w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-surface shadow-lift lg:bottom-6 lg:right-6 print:hidden",
+          onCall ? "ring-2 ring-sun-line" : "ring-1 ring-line",
+        )}
+      >
+        <header className="relative flex items-center gap-3 bg-primary px-4 py-3 text-white">
+          {/* While the call is on, a slow pulse of the signal colour across the header: plain that it's under way. */}
+          {onCall && (
+            <span className="pointer-events-none absolute inset-0 animate-pulse bg-sun-line/25 motion-reduce:animate-none" aria-hidden />
+          )}
+          <span className="relative shrink-0">
+            {live && <span className="absolute -inset-1 animate-ping rounded-full bg-positive/40" aria-hidden />}
+            <CallerAvatar caller={caller} size={44} className="relative ring-2 ring-white/20" />
           </span>
-          {time && <span className="shrink-0 text-base font-semibold tabular-nums">{time}</span>}
-          {!docked && (
-            <button
-              type="button"
-              onClick={() => setFolded((f) => !f)}
-              aria-label={folded ? "Show the conversation" : "Fold away"}
-              className="grid size-7 shrink-0 place-items-center rounded-full hover:bg-white/15"
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">{caller.name}</p>
+            <p className="truncate text-xs text-white/70">{phaseWords(phase, customer)}</p>
+          </div>
+          {time && (
+            <span
+              className={clsx(
+                "relative flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold tabular-nums",
+                onCall ? "bg-sun-line text-white" : "bg-white/10",
+              )}
             >
-              {folded ? <ChevronUp className="size-4" aria-hidden /> : <ChevronDown className="size-4" aria-hidden />}
-            </button>
+              {onCall && (
+                <span className="relative flex size-2" aria-hidden>
+                  <span className="absolute inset-0 animate-ping rounded-full bg-white/80 motion-reduce:animate-none" />
+                  <span className="relative size-2 rounded-full bg-white" />
+                </span>
+              )}
+              {time}
+            </span>
           )}
           <button
             type="button"
+            onClick={() => setFolded((f) => !f)}
+            aria-label={folded ? "Show the conversation" : "Fold away"}
+            className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
+          >
+            {folded ? <ChevronUp className="size-4" aria-hidden /> : <ChevronDown className="size-4" aria-hidden />}
+          </button>
+          <button
+            type="button"
             onClick={stopWatching}
-            aria-label={live ? "Close (the call carries on)" : "Close"}
-            title={live ? "Close (the call carries on)" : "Close"}
-            className="grid size-7 shrink-0 place-items-center rounded-full hover:bg-white/15"
+            aria-label="Close (the call carries on)"
+            title="Close (the call carries on)"
+            className="grid size-8 shrink-0 place-items-center rounded-full hover:bg-white/10"
           >
             <X className="size-4" aria-hidden />
           </button>
-        </div>
-        <div className="relative mt-2.5 flex items-center gap-3">
-          <span className="relative shrink-0">
-            {live && <span className="absolute -inset-1 animate-ping rounded-full bg-white/30 motion-reduce:animate-none" aria-hidden />}
-            <CallerAvatar caller={caller} size={40} className="relative ring-2 ring-white/30" />
-          </span>
-          <div className="min-w-0">
-            <p className="truncate font-semibold">
-              {caller.name} <span className="font-normal text-white/75">with</span> {practice ? "you" : customer}
-            </p>
-            <p className="truncate text-xs text-white/75">{practice ? "Your practice call" : phaseWords(phase, customer)}</p>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      {open && (
-        <>
-          {!practice && <OtherCallsStrip jobId={watched.jobId} />}
-          {outcome && <p className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">{outcome}</p>}
-          <div
-            ref={list}
-            aria-live="polite"
-            className={clsx("min-h-24 space-y-2 overflow-y-auto px-4 py-3", docked ? "flex-1" : "max-h-[min(20rem,45dvh)]")}
-          >
-            {said === 0 ? (
-              <p className="py-4 text-center text-sm text-muted">
-                {!loaded
-                  ? "Lining up the call…"
-                  : phase === "lined-up"
-                    ? watched.message
-                    : phase === "ringing"
-                      ? `Waiting for ${practice ? "you" : customer} to answer…`
-                      : phase === "trying-again"
-                        ? `${caller.name} will try ${customer} again later.`
-                        : phase === "ended"
-                          ? "Nothing was said on this call."
-                          : "Listening…"}
+        {!folded && (
+          <>
+            {!practice && <OtherCallsStrip jobId={watched.jobId} />}
+            {outcome && <p className="border-b border-line bg-surface-2 px-4 py-2 text-sm font-semibold text-ink">{outcome}</p>}
+            <div ref={list} aria-live="polite" className="max-h-[min(20rem,45dvh)] min-h-24 space-y-2 overflow-y-auto px-4 py-3">
+              {said === 0 ? (
+                <p className="py-4 text-center text-sm text-muted">
+                  {!loaded
+                    ? "Lining up the call…"
+                    : phase === "lined-up"
+                      ? watched.message
+                      : phase === "ringing"
+                        ? `Waiting for ${customer} to answer…`
+                        : phase === "trying-again"
+                          ? `${caller.name} will try ${customer} again later.`
+                          : phase === "ended"
+                            ? "Nothing was said on this call."
+                            : "Listening…"}
+                </p>
+              ) : (
+                <>
+                  {lines.map((l, i) => (
+                    <Bubble key={i} line={l} assistant={caller.name} customer={customer} />
+                  ))}
+                  {call?.partial && <Bubble line={call.partial} assistant={caller.name} customer={customer} saying />}
+                </>
+              )}
+            </div>
+            {call?.canSteer && <TellBox jobId={watched.jobId} assistant={caller.name} />}
+            {call?.canCallNow && !practice && <CallNow jobId={watched.jobId} customer={customer} outOfHours={Boolean(call.outOfHours)} />}
+            {call?.canEnd && <HangUp jobId={watched.jobId} assistant={caller.name} customer={customer} />}
+            {!call?.canSteer && phase !== "ended" && (
+              <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
+                Words appear as they&apos;re said, transcribed by machine. Closing this leaves the call going.
               </p>
-            ) : (
-              <>
-                {lines.map((l, i) => (
-                  <Bubble key={i} line={l} assistant={caller.name} customer={other} />
-                ))}
-                {call?.partial && <Bubble line={call.partial} assistant={caller.name} customer={other} saying />}
-              </>
             )}
-          </div>
-          {call?.canSteer && <TellBox jobId={watched.jobId} assistant={caller.name} />}
-          {call?.canCallNow && !practice && <CallNow jobId={watched.jobId} customer={customer} outOfHours={Boolean(call.outOfHours)} />}
-          {call?.canEnd && <HangUp jobId={watched.jobId} assistant={caller.name} customer={practice ? "you" : customer} />}
-          {!call?.canSteer && phase !== "ended" && (
-            <p className="border-t border-line px-4 py-2 text-[11px] text-muted">
-              Words appear as they&apos;re said, transcribed by machine. Closing this leaves the call going.
-            </p>
-          )}
-          {!practice && (
-            <AfterCall
-              key={watched.jobId}
-              jobId={watched.jobId}
-              customer={customer}
-              caller={caller}
-              ended={phase === "ended"}
-              // Calling back and talking the call over are the sales assistant's, once it is set up.
-              sales={(call?.role ?? "sales") === "sales" && assistants.caller.named}
-              callsOn={assistants.callsOn}
-              textsOn={assistants.textsOn}
-              transcriptId={call?.transcriptId ?? null}
-            />
-          )}
-        </>
-      )}
-    </section>
+            {!practice && (
+              <AfterCall
+                key={watched.jobId}
+                jobId={watched.jobId}
+                customer={customer}
+                caller={caller}
+                ended={phase === "ended"}
+                // Calling back and talking the call over are the sales assistant's, once it is set up.
+                sales={(call?.role ?? "sales") === "sales" && assistants.caller.named}
+                callsOn={assistants.callsOn}
+                textsOn={assistants.textsOn}
+                transcriptId={call?.transcriptId ?? null}
+              />
+            )}
+          </>
+        )}
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -275,9 +236,9 @@ export function CallInPane({
   return (
     <section
       aria-label={`${caller.name}'s call with ${customer}`}
-      className={clsx("mb-3 overflow-hidden rounded-xl bg-surface", live ? "ring-2 ring-call" : "ring-1 ring-line")}
+      className={clsx("mb-3 overflow-hidden rounded-xl bg-surface", onCall ? "ring-2 ring-sun-line" : "ring-1 ring-line")}
     >
-      <header className={clsx("flex items-center gap-2.5 px-3 py-2 text-white", live ? "bg-call" : "bg-primary")}>
+      <header className={clsx("flex items-center gap-2.5 px-3 py-2", onCall ? "bg-sun-line text-white" : "bg-primary text-white")}>
         <span className="relative shrink-0">
           {live && <span className="absolute -inset-0.5 animate-ping rounded-full bg-white/40 motion-reduce:animate-none" aria-hidden />}
           <CallerAvatar caller={caller} size={26} className="relative ring-2 ring-white/20" />

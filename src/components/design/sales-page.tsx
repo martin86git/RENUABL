@@ -1,20 +1,39 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Menu, Sparkles, X } from "lucide-react";
-import { BrandEyebrow, Sunrise } from "./business-brand";
-import { LivingHero } from "./living-hero";
-import { SalesLoop } from "./sales-loop";
-import { KnowledgeOrbit, Manifesto } from "./business-slides";
+import { ArrowRight, Check, Clock, Sparkles, X } from "lucide-react";
+import { AiTeam, BrandEyebrow, Sunrise } from "./business-brand";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
-import { CLOSING, FAQ, PRICING, SALES_HERO, HERO_LIVE } from "@/lib/domain/design/sales-page";
-import { askSales, startPlan } from "@/lib/services/billing";
+import {
+  CLOSING,
+  COMING_SOON,
+  COMING_SOON_LABEL,
+  EVERYTHING,
+  FAQ,
+  JOURNEY,
+  MARKETPLACE,
+  BIG_THREE,
+  FEATURES,
+  PRICING,
+  SALES_HERO,
+  CRM_SHOT,
+  SERVICE_SHOT,
+  SOL,
+  UPGRADE,
+  type Visual,
+} from "@/lib/domain/design/sales-page";
+import { askSales, registerInterest, startPlan } from "@/lib/services/billing";
 import { TryDemoButton } from "./business-demo";
+import { AfterSigningDemo, AutomationDemo, ConversationDemo, ListingRoofExample, ThreeDesignsDemo } from "./designer-showcase";
 import { Reveal } from "./front-hero";
+import { SolIcon } from "./sol-icon";
+import { MarketplaceMark } from "./marketplace-bar";
 import { ProductFilm } from "./product-film";
+import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -28,13 +47,15 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
-      {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
-          your sales team, how it sells, the film, the old way and the new, pricing with the questions, the close. */}
-      <LivingHero signedIn={signedIn} />
-      <Manifesto />
-      <SalesLoop />
-      <KnowledgeOrbit />
-      <FilmSection />
+      <Hero signedIn={signedIn} />
+      <AiTeam />
+      <Upgrade />
+      <BigThree />
+      <Journey />
+      <SolSection />
+      <Everything />
+      <Soon />
+      <Marketplace />
       <Pricing />
       <Faq />
       <Closing />
@@ -128,75 +149,47 @@ function useFoldScroll() {
   }, []);
 }
 
-/** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
-const PAGE_LINKS = [
-  { href: "#start", label: "Meet Sol" },
-  { href: "#force", label: "Your new sales force" },
-  { href: "#sales", label: "How it sells" },
-  { href: "#brain", label: "Ask him anything" },
-  { href: "#film", label: "See it work" },
-  { href: "#pricing", label: "Pricing" },
-] as const;
-
-/**
- * The top bar (17 Nov 2026, Martin): the menu on the left, RENUABL alone in the middle (the wordmark, no "Business"
- * beside it), Start demo and Sign up on the right.
- */
 function Header({ signedIn }: { signedIn: boolean }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [open]);
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
-      {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
-      <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 lg:px-8">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-expanded={open}
-            aria-controls="page-menu"
-            aria-label={open ? "Close the menu" : "Open the menu"}
-            className="grid size-10 place-items-center rounded-full text-ink hover:bg-surface-2"
-          >
-            {open ? <X className="size-5" aria-hidden /> : <Menu className="size-5" aria-hidden />}
-          </button>
-          {open && (
-            <>
-              <button type="button" aria-hidden tabIndex={-1} className="fixed inset-0 z-0 cursor-default" onClick={() => setOpen(false)} />
-              <nav id="page-menu" className="absolute left-0 top-12 z-10 w-60 rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line">
-                {PAGE_LINKS.map((l) => (
-                  <a
-                    key={l.href}
-                    href={l.href}
-                    onClick={() => setOpen(false)}
-                    className="block rounded-xl px-3 py-2.5 text-[15px] text-ink-2 hover:bg-surface-2 hover:text-ink"
-                  >
-                    {l.label}
-                  </a>
-                ))}
-                <div className="my-1.5 h-px bg-line" />
-                <Link
-                  href={signedIn ? "/design" : "/design/sign-in"}
-                  className="block rounded-xl px-3 py-2.5 text-[15px] text-ink-2 hover:bg-surface-2 hover:text-ink"
-                >
-                  {signedIn ? "Open RENUABL" : "Sign in"}
-                </Link>
-              </nav>
-            </>
-          )}
-        </div>
-        <Link href="/business" aria-label="RENUABL Business" className="justify-self-center">
-          <Wordmark />
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0b0b0d]/85 text-white backdrop-blur-md">
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-5 lg:px-8">
+        {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
+        <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
+          <Wordmark tone="light" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
         </Link>
-        <div className="flex items-center justify-end gap-2 sm:gap-3">
-          <span className="hidden sm:inline-flex">
-            <TryDemoButton look="bar" label="Start demo" />
-          </span>
+        <nav className="hidden items-center gap-7 text-[14px] text-white/65 md:flex">
+          <a href="#step-design" className="hover:text-white">
+            Designer
+          </a>
+          <a href="#sol" className="hover:text-white">
+            Sol
+          </a>
+          <a href="#network" className="hover:text-white">
+            Marketplace
+          </a>
+          <a href="#journey" className="hover:text-white">
+            How it works
+          </a>
+          <a href="#pricing" className="hover:text-white">
+            Pricing
+          </a>
+        </nav>
+        <div className="flex items-center gap-3">
+          {signedIn ? (
+            <Link href="/design" className="whitespace-nowrap text-[14px] font-medium text-white hover:text-sun-line">
+              Open RENUABL
+            </Link>
+          ) : (
+            <Link href="/design/sign-in" className="whitespace-nowrap text-[14px] text-white/65 hover:text-white">
+              Sign in
+            </Link>
+          )}
+          {!signedIn && (
+            <span className="hidden sm:inline-flex">
+              <TryDemoButton look="bar" />
+            </span>
+          )}
           <a
             href="#pricing"
             className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
@@ -275,6 +268,39 @@ function TrialForm({
   );
 }
 
+function Screen({
+  src,
+  alt,
+  priority,
+  width = 2880,
+  height = 1800,
+}: {
+  src: string;
+  alt: string;
+  priority?: boolean;
+  width?: number;
+  height?: number;
+}) {
+  return (
+    <figure className="overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-30px_rgba(11,11,12,0.35)] ring-1 ring-line">
+      <div className="flex h-7 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
+        <span className="size-2.5 rounded-full bg-line-strong" />
+        <span className="size-2.5 rounded-full bg-line-strong" />
+        <span className="size-2.5 rounded-full bg-line-strong" />
+      </div>
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        sizes="(min-width: 1024px) 760px, 100vw"
+        priority={priority}
+        className="h-auto w-full"
+      />
+    </figure>
+  );
+}
+
 /** "Sign up": every one on the page goes to the pricing, where the plan is chosen (3 Nov 2026, Martin). */
 function SignUpLink({ dark = false }: { dark?: boolean }) {
   return (
@@ -291,24 +317,62 @@ function SignUpLink({ dark = false }: { dark?: boolean }) {
   );
 }
 
-/**
- * The product film, under the living hero (17 Nov 2026, Martin: the agents are the marketing, so they lead; the film is
- * the proof, each screen narrated by the agent doing the work).
- */
-function FilmSection() {
+function VisualOf({ visual }: { visual: Visual }) {
+  if (visual.kind === "shot") return <Screen src={visual.src} alt={visual.alt} />;
+  return (
+    <div className="overflow-hidden rounded-2xl">
+      {visual.demo === "automation" ? (
+        <AutomationDemo />
+      ) : visual.demo === "three" ? (
+        <ThreeDesignsDemo />
+      ) : visual.demo === "conversation" ? (
+        <ConversationDemo />
+      ) : (
+        <AfterSigningDemo />
+      )}
+    </div>
+  );
+}
+
+function Hero({ signedIn }: { signedIn: boolean }) {
   return (
     <section
-      id="film"
-      className="snap-start scroll-mt-16 bg-[#0b0b0d] px-5 pb-20 pt-20 text-white lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:px-8"
-      aria-labelledby="film-head"
+      id="start"
+      className="relative isolate overflow-hidden bg-[#0b0b0d] text-white snap-start lg:h-[calc(100dvh-4rem)] lg:min-h-[44rem]"
+      aria-labelledby="hero"
     >
-      <div className="mx-auto w-full max-w-[64rem] text-center">
-        <BrandEyebrow dark>{HERO_LIVE.film.eyebrow}</BrandEyebrow>
-        <h2 id="film-head" className="mt-4 text-[clamp(34px,4.4vw,64px)] font-semibold leading-[1.0] tracking-[-0.045em]">
-          {HERO_LIVE.film.headline}
-        </h2>
-        <div className="mt-10 text-left">
-          <ProductFilm dark />
+      {/* The brand's sun rising behind the hero (16 Nov 2026, Martin: the page needed a brand feel, as xAI's and OpenAI's). */}
+      <Sunrise />
+      {/*
+        The words on the left and the film on the right, as large as the fold allows (16 Nov 2026, Martin: "i prefer when
+        solar just got a brain was on the left and the video on the right", and the film bigger). On a large screen the
+        hero is one fold; the film takes the column beside the words at its own 16:10, with room for its chapter rail.
+      */}
+      <div className="mx-auto grid w-full max-w-[100rem] gap-10 px-5 pb-16 pt-12 lg:h-full lg:grid-cols-[minmax(18rem,28rem)_minmax(0,1fr)] lg:items-center lg:gap-16 lg:px-12 lg:pb-8 lg:pt-8">
+        <div className="text-center lg:text-left">
+          <BrandEyebrow dark className="mb-6">
+            {SALES_HERO.introducing}
+          </BrandEyebrow>
+          <h1 id="hero" className="text-[clamp(44px,4.6vw,76px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+            {SALES_HERO.headline.map((part, i, all) => (
+              <span key={part} className={clsx("block", i === all.length - 1 && "text-sun-line")}>
+                {part}
+              </span>
+            ))}
+          </h1>
+          <p className="mx-auto mt-5 max-w-sm text-[18px] leading-relaxed text-white/65 lg:mx-0">{SALES_HERO.sub}</p>
+          <div className="mt-8 flex flex-col items-center gap-4 lg:items-start">
+            <div className="flex flex-col items-center gap-4 sm:flex-row">
+              <SignUpLink />
+              {/* Try the demo (demo.ts): one press into a demo account, no form. Not for someone already signed in. */}
+              {!signedIn && <TryDemoButton look="quiet" />}
+            </div>
+          </div>
+        </div>
+        <div className="flex w-full justify-center lg:h-full lg:min-h-0 lg:items-center lg:[container-type:size]">
+          <div className="w-full text-left lg:w-[min(100cqw,calc((100cqh-4.25rem)*1.6),62rem)]">
+            <ProductFilm />
+          </div>
         </div>
       </div>
     </section>
@@ -319,6 +383,311 @@ function FilmSection() {
  * The three things RENUABL is known by, a band each under the hero (3 Nov 2026, Martin: the designer, Sol and the
  * Marketplace are huge features and must feel it): the design tool with AI over it, Sol, and the Marketplace.
  */
+/**
+ * The four big parts as cards in a grid under one heading (16 Nov 2026, Martin: "i like their layout much more than
+ * ours", xAI's Grok Bot page): each a large rounded card with its title, one line, and the product at work running off
+ * its foot. Each card keeps its anchor (#crm, #service, #network) for the links into it.
+ */
+function BigThree() {
+  return (
+    <section className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="features">
+      <Reveal className="mx-auto max-w-[96rem]">
+        <div className="mx-auto max-w-3xl text-center">
+          <h2 id="features" className="text-[clamp(34px,4.2vw,60px)] font-semibold leading-[1.02] tracking-[-0.04em]">
+            {FEATURES.headline}
+          </h2>
+          <p className="mx-auto mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{FEATURES.sub}</p>
+        </div>
+        <div className="mt-14 grid gap-6 lg:grid-cols-2">
+          {BIG_THREE.map((p) => {
+            const market = p.id === "marketplace";
+            const visual =
+              p.id === "crm" ? (
+                <CardShot src={CRM_SHOT.src} alt={CRM_SHOT.alt} />
+              ) : p.id === "service" ? (
+                <CardShot src={SERVICE_SHOT.src} alt={SERVICE_SHOT.alt} />
+              ) : p.id === "sol" ? (
+                <CardShot
+                  src="/design/landing/today-sol.webp"
+                  alt="RENUABL's Today screen: Sol writes up the day, the most pressing thing at the top (example data)"
+                />
+              ) : (
+                <div className="overflow-hidden rounded-t-2xl ring-1 ring-white/15">
+                  <ListingRoofExample className="block h-auto w-full" />
+                </div>
+              );
+            return (
+              <article
+                key={p.id}
+                id={market ? "network" : p.id === "crm" || p.id === "service" ? p.id : undefined}
+                className={clsx(
+                  "flex scroll-mt-20 flex-col overflow-hidden rounded-[32px] px-7 pt-9 sm:px-10 sm:pt-11",
+                  market ? "bg-market text-white" : "bg-surface ring-1 ring-line",
+                )}
+                aria-labelledby={`big-${p.id}`}
+              >
+                <p className={clsx("text-[12px] font-medium uppercase tracking-[0.18em]", market ? "text-white/70" : "text-muted")}>
+                  {p.eyebrow}
+                </p>
+                <h3 id={`big-${p.id}`} className="mt-3 text-[clamp(24px,2.1vw,32px)] font-semibold leading-[1.1] tracking-[-0.03em]">
+                  {p.title}
+                </h3>
+                <p className={clsx("mt-3 max-w-xl text-[16px] leading-relaxed", market ? "text-white/80" : "text-ink-2")}>{p.line}</p>
+                <div className="relative mt-9 h-[clamp(220px,24vw,380px)] overflow-hidden">{visual}</div>
+              </article>
+            );
+          })}
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+/** A real screen running off the foot of a card: its top, in a window. */
+function CardShot({ src, alt }: { src: string; alt: string }) {
+  return (
+    <figure className="overflow-hidden rounded-t-2xl bg-surface shadow-[0_20px_60px_-30px_rgba(11,11,12,0.4)] ring-1 ring-line">
+      <div className="flex h-6 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
+        <span className="size-2 rounded-full bg-line-strong" />
+        <span className="size-2 rounded-full bg-line-strong" />
+        <span className="size-2 rounded-full bg-line-strong" />
+      </div>
+      <Image src={src} alt={alt} width={2880} height={1800} sizes="(min-width: 1024px) 720px, 100vw" className="h-auto w-full" />
+    </figure>
+  );
+}
+
+/** How long each card of the upgrade stays on top before the next is dealt, ms. */
+const DECK_MS = 4500;
+/** The team card plays its conversation through before the next is dealt. */
+const holdOf = (key: string) => (key === "team" ? TEAM_SCENE_MS + 800 : DECK_MS);
+
+/** The team chat scene on its own clock, from the start each time its card comes to the top; still otherwise. */
+function LiveTeam({ live }: { live?: boolean }) {
+  const [ms, setMs] = useState(0);
+  useEffect(() => {
+    if (!live) return;
+    const from = performance.now();
+    const timer = window.setInterval(() => setMs(Math.min(TEAM_SCENE_MS, performance.now() - from)), 40);
+    return () => {
+      window.clearInterval(timer);
+      setMs(0);
+    };
+  }, [live]);
+  return <TeamScene ms={ms} still={!live} />;
+}
+
+/** What each card of the upgrade shows: a real screen where there is one, else the product drawn (made-up data). */
+function UpgradeVisual({ k, live }: { k: (typeof UPGRADE.items)[number]["key"]; live?: boolean }) {
+  const shot = (src: string, alt: string, position = "object-top") => (
+    <Image src={src} alt={alt} fill sizes="(min-width: 1024px) 720px, 100vw" className={clsx("object-cover", position)} />
+  );
+  switch (k) {
+    case "crm":
+      return shot("/design/landing/deals.webp", "The smart CRM's pipeline, with each deal's temperature and who to call first");
+    case "sol":
+      return shot("/design/landing/today-sol.webp", "Sol writing up the day, the most pressing thing at the top");
+    case "design":
+      return shot(
+        "/design/landing/film/design-sol.webp",
+        "Sol suggesting the system from the customer's bill in the designer",
+        "object-center",
+      );
+    case "proposals":
+      return <ProposalCardExample />;
+    case "service":
+      return shot("/design/landing/service-sol.webp", "A service case with Sol's summary and recommended next steps");
+    case "installs":
+      return shot("/design/landing/calendar.webp", "The install calendar with each week's capacity");
+    case "team":
+      return (
+        <div
+          className="absolute inset-0 [container-type:inline-size]"
+          aria-label="Team chat: a colleague asks about a battery in a garage and Sol is asked in"
+        >
+          <LiveTeam live={live} />
+        </div>
+      );
+    case "market":
+      return (
+        <div className="absolute inset-0 grid place-items-center bg-market p-6">
+          <ListingRoofExample className="h-full w-auto max-w-full rounded-xl" />
+        </div>
+      );
+  }
+}
+
+/** A proposal as a customer opens it, drawn small: the business's own name and colour (a made-up business). */
+function ProposalCardExample() {
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-[#f4efe8] p-5 sm:p-7">
+      <div className="mx-auto h-full max-w-md overflow-hidden rounded-xl bg-white shadow-lift ring-1 ring-black/5">
+        <div className="flex items-center justify-between bg-[#1f4d3a] px-5 py-4 text-white">
+          <span className="text-[14px] font-semibold">Sunrise Solar (example)</span>
+          <span className="text-[11px] text-white/70">Proposal for Olivia</span>
+        </div>
+        <div className="space-y-3 p-5 text-[13px] text-ink">
+          <p className="text-[18px] font-semibold tracking-tight">Solar and a battery for your home</p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              ["8.07 kW", "solar"],
+              ["16 kWh", "battery"],
+              ["3", "systems to choose"],
+            ].map(([v, l]) => (
+              <div key={l} className="rounded-lg bg-[#1f4d3a]/5 px-2 py-2">
+                <p className="text-[15px] font-semibold tabular-nums">{v}</p>
+                <p className="text-[11px] text-muted">{l}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-baseline justify-between border-t border-line pt-3">
+            <span className="text-muted">You pay, after the rebate</span>
+            <span className="text-[18px] font-semibold tabular-nums">$14,980</span>
+          </div>
+          <span className="block rounded-lg bg-[#1f4d3a] py-2.5 text-center text-[13px] font-semibold text-white">
+            I&apos;d like to go ahead
+          </span>
+          <p className="text-[11px] text-muted">Example business and figures.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Everything a business gets, straight after the hero (`UPGRADE`; 3 Nov 2026, Martin: a list or cards on a page
+ * didn't show it, he wanted overlaid cards that show what each thing looks like). A deck of cards, each a real screen
+ * (or the product drawn), dealt one after another with the next two peeking behind; the list beside it says which is
+ * on top and jumps to any. Stops dealing while hovered, and doesn't move with reduced motion.
+ */
+function Upgrade() {
+  const items = UPGRADE.items;
+  const [at, setAt] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [still, setStill] = useState(false);
+  useEffect(() => {
+    const q = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const on = () => setStill(q.matches);
+    on();
+    q.addEventListener("change", on);
+    return () => q.removeEventListener("change", on);
+  }, []);
+  useEffect(() => {
+    if (paused || still) return;
+    const t = window.setTimeout(() => setAt((n) => (n + 1) % items.length), holdOf(items[at].key));
+    return () => window.clearTimeout(t);
+  }, [at, paused, still, items]);
+  const now = items[at];
+  return (
+    <section
+      className="relative isolate overflow-hidden bg-primary px-5 py-20 text-white lg:px-8 lg:py-24 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
+      aria-labelledby="upgrade"
+    >
+      {/* The bar under the card on top fills as it waits to be dealt. */}
+      <style>{"@keyframes upgrade-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}"}</style>
+      <div
+        aria-hidden
+        className="absolute -right-40 top-10 -z-10 size-[40rem] rounded-full"
+        style={{ background: "radial-gradient(closest-side, rgba(255,90,31,0.22), rgba(255,90,31,0))" }}
+      />
+      <div
+        className="mx-auto grid w-full max-w-[74rem] items-center gap-x-16 gap-y-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div>
+          <BrandEyebrow dark>{UPGRADE.eyebrow}</BrandEyebrow>
+          <h2 id="upgrade" className="mt-3 text-[clamp(36px,4.4vw,64px)] font-semibold leading-[0.95] tracking-[-0.045em]">
+            {UPGRADE.headline}
+          </h2>
+          <p className="mt-4 text-[16px] leading-relaxed text-white/70">{UPGRADE.sub}</p>
+          <ol className="mt-7 grid gap-1">
+            {items.map((item, i) => (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  onClick={() => setAt(i)}
+                  aria-current={i === at}
+                  className={clsx(
+                    "relative flex w-full items-center gap-3 overflow-hidden rounded-xl px-3 py-2 text-left text-[15px] transition-colors",
+                    i === at ? "bg-white/10 text-white" : "text-white/55 hover:text-white",
+                  )}
+                >
+                  <span className={clsx("font-mono text-[12px]", i === at ? "text-sun-bright" : "text-white/35")}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="font-medium">{item.title}</span>
+                  {"soon" in item && item.soon && <span className="text-[11px] text-sun-bright">{COMING_SOON_LABEL}</span>}
+                  {i === at && !still && (
+                    <span
+                      key={`${at}-${paused}`}
+                      aria-hidden
+                      className="absolute inset-x-0 bottom-0 h-0.5 origin-left bg-sun-line"
+                      style={{
+                        animation: `upgrade-fill ${holdOf(item.key)}ms linear forwards`,
+                        animationPlayState: paused ? "paused" : "running",
+                      }}
+                    />
+                  )}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+        {/* The deck: the card on top, the next two peeking up behind it. */}
+        <div className="relative min-w-0 pt-10">
+          <div className="relative aspect-[16/10] w-full">
+            {items.map((item, i) => {
+              const place = (i - at + items.length) % items.length;
+              const shown = place < 3;
+              return (
+                <div
+                  key={item.key}
+                  aria-hidden={place !== 0}
+                  className="absolute inset-0 transition-all duration-700 ease-out motion-reduce:transition-none"
+                  style={{
+                    transform: `translateY(${-place * 20}px) scale(${1 - place * 0.05})`,
+                    opacity: shown ? 1 - place * 0.25 : 0,
+                    zIndex: items.length - place,
+                    pointerEvents: place === 0 ? "auto" : "none",
+                  }}
+                >
+                  <div className="relative h-full w-full overflow-hidden rounded-2xl bg-surface shadow-[0_30px_80px_-25px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+                    {shown && <UpgradeVisual k={item.key} live={place === 0 && !still} />}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* The old way and the new, side by side under the screen (16 Nov 2026, Martin: a crossed-out line over the
+              picture wasn't instantly read as the old way). */}
+          <div
+            key={now.key}
+            className="film-pop mt-6 grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_auto_minmax(0,1.2fr)] sm:items-stretch"
+            aria-live="polite"
+          >
+            <div className="rounded-2xl bg-white/[0.04] px-5 py-4 ring-1 ring-white/10">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                <X className="size-3.5" aria-hidden />
+                {UPGRADE.before}
+              </p>
+              <p className="mt-2 text-[16px] leading-snug text-white/55">{now.was}</p>
+            </div>
+            <ArrowRight className="hidden size-5 self-center text-sun-bright sm:block" aria-hidden />
+            <div className="rounded-2xl bg-white px-5 py-4 text-ink">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-sun-line">
+                <Check className="size-3.5" aria-hidden />
+                {UPGRADE.after}
+              </p>
+              <p className="mt-2 text-[18px] font-semibold leading-snug tracking-tight">{now.title}</p>
+              <p className="mt-1 text-[14px] leading-snug text-ink-2">{now.body}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /**
  * A sign-up that follows the reader down the page (3 Nov 2026, Martin: there are a lot of slides, so every one is a
@@ -374,6 +743,263 @@ function StickySignUp() {
         </button>
       </div>
     </div>
+  );
+}
+
+function Journey() {
+  return (
+    <section id="journey" className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="journey-title">
+      <Reveal className="mx-auto w-full max-w-4xl text-center">
+        <BrandEyebrow>How it works</BrandEyebrow>
+        <h2 id="journey-title" className="mt-5 text-[clamp(36px,5.5vw,72px)] font-semibold leading-[1] tracking-[-0.035em]">
+          One deal. Start to finish. One place.
+        </h2>
+        <p className="mt-6 text-[18px] leading-relaxed text-ink-2">
+          From the enquiry to the grid connection, every step of a solar job runs here. No exports, no double entry, no chasing.
+        </p>
+        <ol className="mx-auto mt-10 flex flex-wrap justify-center gap-2 text-[13px]">
+          {JOURNEY.map((j, i) => (
+            <li key={j.key}>
+              <a
+                href={`#step-${j.key}`}
+                className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-1.5 ring-1 ring-line hover:ring-ink-2"
+              >
+                <span className="tabular-nums text-sun-line">{String(i + 1).padStart(2, "0")}</span>
+                {j.step}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </Reveal>
+      <div className="mx-auto mt-20 w-full max-w-7xl space-y-24 lg:mt-0 lg:space-y-0">
+        {JOURNEY.map((j, i) => {
+          const label = (
+            <p className="text-[13px] font-medium tabular-nums tracking-[0.18em] text-sun-line">
+              {String(i + 1).padStart(2, "0")} · {j.step.toUpperCase()}
+            </p>
+          );
+          // The product drawn at work needs the whole width: its words go above it. A screenshot sits beside its words.
+          if (j.visual.kind === "demo")
+            return (
+              <article
+                key={j.key}
+                id={`step-${j.key}`}
+                className="snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center"
+              >
+                <Reveal className="mx-auto max-w-3xl text-center">
+                  {label}
+                  <h3 className="mt-4 text-[clamp(28px,3.6vw,46px)] font-semibold leading-[1.05] tracking-[-0.03em]">{j.title}</h3>
+                  <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{j.body}</p>
+                </Reveal>
+                <Reveal className="mt-12">
+                  <VisualOf visual={j.visual} />
+                </Reveal>
+              </article>
+            );
+          const flip = JOURNEY.slice(0, i).filter((x) => x.visual.kind === "shot").length % 2 === 1;
+          return (
+            <article
+              key={j.key}
+              id={`step-${j.key}`}
+              className="snap-start grid items-center gap-10 lg:min-h-[calc(100dvh-4rem)] lg:content-center lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-16"
+            >
+              <Reveal className={clsx(flip && "lg:order-2")}>
+                {label}
+                <h3 className="mt-4 text-[clamp(28px,3.6vw,46px)] font-semibold leading-[1.05] tracking-[-0.03em]">{j.title}</h3>
+                <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{j.body}</p>
+              </Reveal>
+              <Reveal className={clsx(flip && "lg:order-1")}>
+                <VisualOf visual={j.visual} />
+              </Reveal>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SolSection() {
+  return (
+    <section id="sol" className="snap-start relative isolate overflow-x-clip px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="sol-title">
+      <div aria-hidden className="absolute inset-0 -z-10 bg-sun/60" />
+      <div className="mx-auto grid w-full max-w-7xl items-center gap-12 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+        <Reveal>
+          <p className="inline-flex items-center gap-2 text-[13px] font-medium uppercase tracking-[0.18em] text-sun-ink">
+            <SolIcon className="size-4" aria-hidden />
+            {SOL.eyebrow}
+          </p>
+          <h2 id="sol-title" className="mt-5 text-[clamp(32px,4.4vw,56px)] font-semibold leading-[1.04] tracking-[-0.03em]">
+            {SOL.headline}
+          </h2>
+          <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{SOL.sub}</p>
+          <ul className="mt-8 grid gap-3 sm:grid-cols-2">
+            {SOL.points.map((p) => (
+              <li key={p} className="flex gap-2.5 text-[15px] leading-snug text-ink">
+                <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
+                {p}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-8 text-xs text-muted">{SOL.footnote}</p>
+        </Reveal>
+        <Reveal>
+          <Screen src={SOL.shot.src} alt={SOL.shot.alt} />
+        </Reveal>
+      </div>
+      <div className="mx-auto mt-20 grid w-full max-w-7xl items-center gap-12 lg:mt-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)]">
+        <Reveal className="lg:order-2">
+          <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-sun-ink">{SOL.example.eyebrow}</p>
+          <h3 className="mt-4 text-[clamp(26px,3.2vw,40px)] font-semibold leading-[1.08] tracking-[-0.025em]">{SOL.example.title}</h3>
+          <p className="mt-5 text-[17px] leading-relaxed text-ink-2">{SOL.example.body}</p>
+          <p className="mt-6 text-xs text-muted">{SOL.example.fine}</p>
+        </Reveal>
+        <Reveal className="mx-auto w-full max-w-[620px] lg:order-1">
+          <Screen {...SOL.example.shot} />
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+function Everything() {
+  return (
+    <section className="snap-start px-5 py-24 lg:px-8 lg:py-32" aria-labelledby="everything">
+      <Reveal className="mx-auto w-full max-w-6xl">
+        <BrandEyebrow>And all of this, included</BrandEyebrow>
+        <h2 id="everything" className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]">
+          The rest of the toolbox, in every plan.
+        </h2>
+        <div className="mt-12 grid gap-px overflow-hidden rounded-2xl bg-line ring-1 ring-line sm:grid-cols-2 lg:grid-cols-3">
+          {EVERYTHING.map((f) => (
+            <div key={f.title} className="bg-surface p-6">
+              <h3 className="text-[16px] font-semibold">{f.title}</h3>
+              <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{f.body}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {(["customers", "service"] as const).map((s) => (
+            <Screen
+              key={s}
+              src={`/design/landing/${s}.webp`}
+              alt={s === "customers" ? "RENUABL's customers list, with example data" : "RENUABL's service pipeline"}
+            />
+          ))}
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+function Soon() {
+  return (
+    <section className="snap-start px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="soon">
+      <Reveal className="mx-auto w-full max-w-6xl">
+        <h2 id="soon" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
+          On the way
+        </h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {COMING_SOON.map((f) => (
+            <div key={f.title} className="rounded-2xl bg-surface p-6 ring-1 ring-line">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-sun px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-sun-ink">
+                <Clock className="size-3" aria-hidden />
+                {COMING_SOON_LABEL}
+              </span>
+              <h3 className="mt-4 text-[16px] font-semibold">{f.title}</h3>
+              <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+function Marketplace() {
+  const [email, setEmail] = useState("");
+  const [state, setState] = useState<{ ok: boolean; message: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    const a = await registerInterest(email);
+    setBusy(false);
+    setState({ ok: a.ok, message: a.message ?? "" });
+  };
+  return (
+    <section
+      id="marketplace"
+      className="snap-start scroll-mt-16 bg-surface px-5 py-24 lg:px-8 lg:py-32"
+      aria-labelledby="marketplace-title"
+    >
+      <Reveal className="mx-auto w-full max-w-6xl">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <p className="flex items-center gap-4" aria-label="RENUABL Marketplace">
+            <span
+              className="grid size-16 place-items-center rounded-full bg-market text-white shadow-[0_8px_24px_rgba(24,73,169,0.3)]"
+              aria-hidden
+            >
+              <MarketplaceMark className="size-8" />
+            </span>
+            <span className="flex flex-col leading-none" aria-hidden>
+              <span className="text-[13px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
+              <span className="mt-1.5 text-[36px] font-semibold tracking-[-0.02em] text-sun-line">Marketplace</span>
+            </span>
+          </p>
+          <span className="rounded-full bg-canvas px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted ring-1 ring-line">
+            {COMING_SOON_LABEL}
+          </span>
+        </div>
+        <h2
+          id="marketplace-title"
+          className="mt-5 max-w-3xl text-[clamp(32px,4.6vw,60px)] font-semibold leading-[1.02] tracking-[-0.035em]"
+        >
+          {MARKETPLACE.headline}
+        </h2>
+        <p className="mt-5 max-w-2xl text-[18px] leading-relaxed text-ink-2">{MARKETPLACE.sub}</p>
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
+          {MARKETPLACE.sides.map((s) => (
+            <div key={s.title} className="rounded-2xl bg-canvas p-7 ring-1 ring-line">
+              <h3 className="text-[20px] font-semibold">{s.title}</h3>
+              <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{s.body}</p>
+            </div>
+          ))}
+        </div>
+        <Link
+          href="/design/marketplace"
+          className="mt-8 inline-flex items-center gap-1.5 text-[15px] font-semibold text-market hover:underline"
+        >
+          {MARKETPLACE.look}
+          <ArrowRight className="size-4" aria-hidden />
+        </Link>
+        {state?.ok ? (
+          <p className="mt-10 text-[16px] text-market">{state.message}</p>
+        ) : (
+          <form
+            onSubmit={(e) => void go(e)}
+            className="mt-10 flex max-w-lg flex-col gap-2 rounded-2xl bg-canvas p-1.5 ring-1 ring-line sm:flex-row"
+          >
+            <label className="sr-only" htmlFor="interest-email">
+              Email
+            </label>
+            <input
+              id="interest-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your work email"
+              className="h-12 min-w-0 flex-1 rounded-xl bg-transparent px-4 text-[16px] text-ink outline-none placeholder:text-muted"
+            />
+            <button disabled={busy} className="h-12 rounded-xl bg-market px-5 text-[15px] font-semibold text-white hover:brightness-110">
+              {busy ? "Adding you…" : MARKETPLACE.cta}
+            </button>
+          </form>
+        )}
+        {state && !state.ok && <p className="mt-2 text-sm text-danger">{state.message}</p>}
+      </Reveal>
+    </section>
   );
 }
 
@@ -566,7 +1192,7 @@ function PlanCard({
 
 function Faq() {
   return (
-    <section className="scroll-mt-20 px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
+    <section className="snap-start px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
       <Reveal className="mx-auto w-full max-w-3xl">
         <h2 id="faq" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
           Questions
@@ -594,7 +1220,7 @@ function Faq() {
 function Closing() {
   return (
     <section
-      className="relative isolate overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white lg:px-8 lg:pb-56 lg:pt-36"
+      className="relative isolate overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white snap-start lg:px-8 lg:pb-56 lg:pt-36"
       aria-labelledby="closing"
     >
       <Sunrise size="small" />

@@ -307,6 +307,19 @@ export function DesignDrawer(props: {
           >
             <FileText className="size-5" aria-hidden />
           </button>
+          {/* Record a walkthrough (15 Nov 2026, Martin: floating in the grey around the designer, not on the picture). */}
+          {tool.kind === "design" && dealJob && (
+            <button
+              type="button"
+              onClick={() => frameEl.current?.contentWindow?.postMessage({ renuablDesign: { record: true } }, window.location.origin)}
+              aria-label="Record a walkthrough of this design for the customer"
+              title="Record a walkthrough: talk the customer through their design, with Sol's subtitles"
+              className="mt-3 flex size-12 flex-col items-center justify-center gap-0.5 rounded-full bg-surface text-ink shadow-[0_6px_18px_rgba(11,11,12,0.18)] ring-1 ring-line transition hover:-translate-y-0.5 motion-reduce:transition-none"
+            >
+              <span className="size-3 rounded-full bg-[#ef4444]" aria-hidden />
+              <span className="text-[9px] font-semibold uppercase tracking-wide">Rec</span>
+            </button>
+          )}
         </nav>
       )}
       {/* Closed with work not saved: a way back to it, at the foot of the page. */}

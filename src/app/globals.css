@@ -17,12 +17,6 @@
      Here, not in the studio theme, because its window is drawn on the page body, outside that theme. */
   --colleague: #0f5f58;
   --colleague-soft: #e2f1ef;
-  /* A call under way (17 Nov 2026, Martin: a call should be a different colour, so it is known at a glance): a call
-     green, kept for a voice agent's call ringing or on, never for anything else. On :root because the call's window
-     is drawn on the page body. */
-  --call: #0e9f6e;
-  --call-soft: #e1f6ed;
-  --call-ink: #065f46;
   --canvas: #faf9f6;
   --surface: #ffffff;
   --surface-2: #f0ece7;
@@ -396,25 +390,6 @@ html.sol-resizing .team-pop {
     transform: none;
   }
 }
-/* A voice agent's call emerging from the side of its chat window (17 Nov 2026, Martin). */
-.call-emerge {
-  animation: call-emerge 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-@keyframes call-emerge {
-  from {
-    clip-path: inset(0 0 0 100%);
-    opacity: 0.4;
-  }
-  to {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .call-emerge {
-    animation: none;
-  }
-}
 /* Something unread in team chat: its round flashes on and off, filling with the signal orange and back (15 Nov 2026,
    Martin: "make the chat logo flash on and off to flag a notification"). Still, and lit, with reduced motion. */
 @keyframes team-flash {
@@ -767,9 +742,6 @@ button.team-flash:not([aria-pressed="true"]) {
   --color-market-ink: var(--market-ink);
   --color-colleague: var(--colleague);
   --color-colleague-soft: var(--colleague-soft);
-  --color-call: var(--call);
-  --color-call-soft: var(--call-soft);
-  --color-call-ink: var(--call-ink);
   --color-kind-install: var(--kind-install);
   --color-kind-install-soft: var(--kind-install-soft);
   --color-kind-message: var(--kind-message);

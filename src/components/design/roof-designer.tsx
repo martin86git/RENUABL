@@ -1280,20 +1280,6 @@ export function RoofDesigner(props: {
     return () => window.removeEventListener(PRESENTING_EVENT, on);
   }, []);
   const [recordOpen, setRecordOpen] = useState(false);
-  // Record pressed on a roof with no deal: Create deal opens first, and the recorder once the deal is made.
-  const recordWanted = useRef(false);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (props.jobId && recordWanted.current) setRecordOpen(true);
-    recordWanted.current = false;
-  }, [props.jobId]);
-  const startRecording = () => {
-    if (props.jobId) return setRecordOpen(true);
-    if (props.onNeedDeal) {
-      recordWanted.current = true;
-      props.onNeedDeal();
-    }
-  };
   const shown: SideView | null = side === "quote" && (costsHidden || presenting) ? "designer" : side;
   const shortQuote = (next: boolean) => {
     setQuoteShort(next);
@@ -5727,9 +5713,7 @@ export function RoofDesigner(props: {
           "z-40 text-ink",
           // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider; the buttons can run down one side):
           // a rail of rounds down the left, beside the picture, each saying what it is on hover.
-          props.tight
-            ? "absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center"
-            : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
+          props.tight ? "absolute left-2 top-2 w-11" : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
       >
         <BarRow
@@ -6011,21 +5995,6 @@ export function RoofDesigner(props: {
           )}
           {!props.tight && publishControl}
         </BarRow>
-        {/* Record a walkthrough (16 Nov 2026, Martin: in the grey pad on the left, towards its foot, on its own). On a roof
-            with no deal yet it opens Create deal first, then the recorder. */}
-        {props.tight && !props.sitesOnly && (props.jobId || props.onNeedDeal) && (
-          <button
-            type="button"
-            onClick={startRecording}
-            data-popup
-            title="Record a walkthrough: talk the customer through their design, with Sol's subtitles"
-            aria-label="Record a walkthrough of this design for the customer"
-            className="absolute bottom-0 left-1/2 flex size-12 -translate-x-1/2 flex-col items-center justify-center gap-0.5 rounded-full bg-surface text-ink shadow-lift ring-1 ring-line transition hover:ring-ink/30"
-          >
-            <span className="size-3 rounded-full bg-[#ef4444]" aria-hidden />
-            <span className="text-[9px] font-semibold uppercase tracking-wide">Rec</span>
-          </button>
-        )}
       </header>
 
       <div className={clsx("relative", props.tight ? "pl-[4.25rem] pr-11" : "mt-5")}>
@@ -9642,7 +9611,7 @@ export function RoofDesigner(props: {
               >
                 {/* Record a walkthrough, floating beside Ask Sol (14 Nov 2026, Martin: in sight, not in the bar): talk the
                     customer through their design, with Sol's subtitles; it plays on their proposal. */}
-                {props.jobId && !props.sitesOnly && !props.tight && (
+                {props.jobId && !props.sitesOnly && (
                   <button
                     type="button"
                     onClick={() => setRecordOpen(true)}
@@ -9651,8 +9620,8 @@ export function RoofDesigner(props: {
                     aria-label="Record a walkthrough of this design for the customer"
                     className={clsx(
                       "pointer-events-auto absolute bottom-0 flex items-center gap-2 rounded-full bg-surface pl-3 pr-4 text-[14px] font-medium text-ink shadow-[0_12px_32px_rgba(11,11,12,0.25)] ring-1 ring-line transition hover:-translate-y-0.5 motion-reduce:transition-none",
-                      // In the pop-up it sits at the foot of the rail on the left instead.
-                      "left-[calc(50%+9rem)] h-12",
+                      // In the pop-up on a wide screen it floats in the grey beside the window instead (design-drawer.tsx).
+                      props.tight ? "left-[calc(50%+6.75rem)] h-14 xl:hidden" : "left-[calc(50%+9rem)] h-12",
                     )}
                   >
                     <span className="relative flex size-3">

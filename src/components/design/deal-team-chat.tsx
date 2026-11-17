@@ -490,7 +490,11 @@ function Composer(props: {
         })
         .slice(0, 6)
     : [];
+  // The name lit in the list: Tab or Enter takes it, the arrows move it (16 Nov 2026, Martin: "press tab to select him").
+  const [hi, setHi] = useState(0);
+  const lit = offered.length ? Math.min(hi, offered.length - 1) : 0;
   const pick = (p: Person) => {
+    setHi(0);
     if (!tag) return;
     const put = p.email === SOL_WRITER ? "@Sol " : mentionText(p.email);
     const next = text.slice(0, tag.start) + put + text.slice(caret);
@@ -514,7 +518,7 @@ function Composer(props: {
     <div className="relative">
       {offered.length > 0 && (
         <ul className="absolute bottom-full left-0 z-20 mb-1 w-56 overflow-hidden rounded-xl bg-surface py-1 shadow-lg ring-1 ring-line">
-          {offered.map((p) => (
+          {offered.map((p, i) => (
             <li key={p.email}>
               <button
                 type="button"
@@ -522,7 +526,11 @@ function Composer(props: {
                   e.preventDefault();
                   pick(p);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink hover:bg-surface-2"
+                onMouseEnter={() => setHi(i)}
+                className={clsx(
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-ink",
+                  i === lit ? "bg-surface-2" : "hover:bg-surface-2",
+                )}
               >
                 {p.email === SOL_WRITER ? <SolIcon className="size-3.5 text-sun-line" /> : null}
                 <span className="font-medium">{p.name}</span>
@@ -553,10 +561,19 @@ function Composer(props: {
           }}
           onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
           onKeyDown={(e) => {
+            if (offered.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+              e.preventDefault();
+              setHi((h) => (Math.min(h, offered.length - 1) + (e.key === "ArrowDown" ? 1 : offered.length - 1)) % offered.length);
+              return;
+            }
+            if (offered.length && (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))) {
+              e.preventDefault();
+              pick(offered[lit]);
+              return;
+            }
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (offered.length) pick(offered[0]);
-              else void send();
+              void send();
             }
           }}
           className={clsx(
