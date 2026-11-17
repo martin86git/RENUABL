@@ -71,6 +71,29 @@ export function useWatchedCall(): Watched | null {
   );
 }
 
+/**
+ * Whether the agent's chat window is holding the watched call at its side (17 Nov 2026, Martin: a call opens as a
+ * window emerging from, and joined to, the agent's chat, not one on its own). While it is, the call's own window
+ * bottom right draws nothing.
+ */
+let docked = false;
+const dockListeners = new Set<() => void>();
+export function setCallDocked(next: boolean) {
+  if (docked === next) return;
+  docked = next;
+  dockListeners.forEach((l) => l());
+}
+export function useCallDocked(): boolean {
+  return useSyncExternalStore(
+    (l) => {
+      dockListeners.add(l);
+      return () => dockListeners.delete(l);
+    },
+    () => docked,
+    () => false,
+  );
+}
+
 /** Tells the assistant something while it's on the call (say: it says the words as typed). */
 export async function tellAssistant(jobId: string, text: string, say: boolean): Promise<{ ok: true } | { ok: false; message: string }> {
   try {

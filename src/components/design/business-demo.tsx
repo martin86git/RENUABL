@@ -12,9 +12,10 @@ const ICONS: readonly (LucideIcon | null)[] = [LayoutGrid, FileSignature, Calend
 
 /**
  * "Try the demo" (domain/design/demo.ts): one press opens a demo account of the visitor's own and goes to it. No form.
- * "quiet" is the outlined button, for beside a page's main one; "bar" the small one for a top bar.
+ * "quiet" is the outlined button, for beside a page's main one; "bar" the small one for a top bar. `label` words it
+ * otherwise (the /business top bar's "Start demo").
  */
-export function TryDemoButton({ look = "main" }: { look?: "main" | "quiet" | "bar" }) {
+export function TryDemoButton({ look = "main", label }: { look?: "main" | "quiet" | "bar"; label?: string }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -55,7 +56,7 @@ export function TryDemoButton({ look = "main" }: { look?: "main" | "quiet" | "ba
           look === "bar" && "h-9 border border-ink/25 bg-surface px-3.5 text-[13px] text-ink hover:border-ink",
         )}
       >
-        {busy ? DEMO_PAGE.opening : DEMO_PAGE.button}
+        {busy ? DEMO_PAGE.opening : (label ?? DEMO_PAGE.button)}
         {!busy && look !== "bar" && <ArrowRight className="size-4" aria-hidden />}
       </button>
       {problem && (
