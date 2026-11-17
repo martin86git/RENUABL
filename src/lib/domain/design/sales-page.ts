@@ -71,6 +71,49 @@ export const MANIFESTO = {
 } as const;
 
 /**
+ * The interface (17 Nov 2026, Martin: one slide that lets them see what the actual interface looks like). Real screens
+ * of the product on the made-up demo business, one a tab.
+ */
+export const INTERFACE = {
+  eyebrow: "The interface",
+  headline: "One place for the whole business.",
+  sub: "Your deals, the designer, proposals, installs and service, with Sol and the Rays at work in every part.",
+  screens: [
+    {
+      key: "today",
+      label: "Today",
+      src: "/design/landing/ui-today.webp",
+      alt: "RENUABL's Today screen: the deals being sold, a Ray on a call and what needs you (example data)",
+    },
+    {
+      key: "deals",
+      label: "Deals",
+      src: "/design/landing/deals.webp",
+      alt: "RENUABL's sales pipeline: deals by stage with their value and heat (example data)",
+    },
+    {
+      key: "designer",
+      label: "Designer",
+      src: "/design/landing/film/design-string-2.webp",
+      alt: "RENUABL's designer: panels strung on a real aerial photo, with the system and savings above (example data)",
+    },
+    {
+      key: "proposal",
+      label: "Proposal",
+      src: "/design/landing/film/proposal-customer.webp",
+      alt: "A customer's proposal in the business's brand, with three systems to choose from (example data)",
+    },
+    { key: "calendar", label: "Installs", src: "/design/landing/calendar.webp", alt: "RENUABL's install calendar by month (example data)" },
+    {
+      key: "service",
+      label: "Service",
+      src: "/design/landing/film/service-case.webp",
+      alt: "RENUABL's service screen: Sol's summary of a customer's fault and the steps to fix it (example data)",
+    },
+  ],
+} as const;
+
+/**
  * The assisted designer (17 Nov 2026, Martin: show it asking for confirmations and whether to string, the stringing
  * done, then the card that leads on to the quote). Sol's cards use the designer's own words (`sol-nudges.ts`): the
  * backup question, "N panels aren't on a string" with String them, and the next step to finalise the quote.
@@ -915,6 +958,10 @@ export function salesCopy(): string[] {
     ...MANIFESTO.statements,
     ...MANIFESTO.finale,
     KNOWLEDGE.eyebrow,
+    INTERFACE.eyebrow,
+    INTERFACE.headline,
+    INTERFACE.sub,
+    ...INTERFACE.screens.flatMap((x) => [x.label, x.alt]),
     DESIGNER.eyebrow,
     DESIGNER.headline,
     DESIGNER.sub,

@@ -8,6 +8,7 @@ import { BrandEyebrow, Sunrise } from "./business-brand";
 import { LivingHero } from "./living-hero";
 import { SalesLoop } from "./sales-loop";
 import { DesignerSlide } from "./designer-slide";
+import { InterfaceSlide } from "./interface-slide";
 import { KnowledgeOrbit } from "./business-slides";
 import { RaysSlide } from "./rays-slide";
 import { Wordmark } from "@/components/ui/primitives";
@@ -35,6 +36,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <RaysSlide />
       <SalesLoop />
       <DesignerSlide />
+      <InterfaceSlide />
       <KnowledgeOrbit />
       <FilmSection />
       <Pricing />
@@ -68,6 +70,7 @@ const PAGE_LINKS = [
   { href: "#rays", label: "Meet the Rays" },
   { href: "#sales", label: "How it sells" },
   { href: "#designer", label: "The assisted designer" },
+  { href: "#interface", label: "The interface" },
   { href: "#brain", label: "Ask him anything" },
   { href: "#film", label: "See it work" },
   { href: "#pricing", label: "Pricing" },
