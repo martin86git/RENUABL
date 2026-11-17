@@ -254,6 +254,7 @@ function FollowUpBox({
           <PreparedCard
             item={draft}
             showDeal={false}
+            open
             onGone={(sent) => {
               onDraftGone(draft.id);
               if (sent) {

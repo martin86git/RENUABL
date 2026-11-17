@@ -78,7 +78,8 @@ export function ReadyForYou({ jobId, compact = false }: { jobId?: string; compac
   );
 }
 
-type CardProps = { item: PreparedItem; onGone: (sent: boolean) => void; showDeal: boolean };
+/** `open`: the whole email shown from the start (17 Nov 2026, Martin: pressing "Sol drafted it" showed two lines, and he didn't see there was more). */
+type CardProps = { item: PreparedItem; onGone: (sent: boolean) => void; showDeal: boolean; open?: boolean };
 
 /**
  * One prepared item, to read, change, send or put aside; `onGone` once it has left the tray. While Sol is still
@@ -96,8 +97,8 @@ export function PreparedCard(props: CardProps) {
   return <ReadyCard key={`${props.item.by}:${props.item.subject}`} {...props} />;
 }
 
-function ReadyCard({ item, onGone, showDeal }: CardProps) {
-  const [open, setOpen] = useState(false);
+function ReadyCard({ item, onGone, showDeal, open: startOpen = false }: CardProps) {
+  const [open, setOpen] = useState(startOpen);
   const [editing, setEditing] = useState(false);
   const [why, setWhy] = useState(false);
   const [subject, setSubject] = useState(item.subject);
