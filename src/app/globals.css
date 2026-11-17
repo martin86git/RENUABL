@@ -643,13 +643,21 @@ button.team-flash:not([aria-pressed="true"]) {
    for text you and i write and just make the text white"): the interface's own face a size down and lighter than the
    interface sets it (Inter is a variable face, so 380 is a real weight), white on the charcoal, with a generous line.
    Names and headings step up from it in weight, not in size. */
+/* The quiet sans (18 Nov 2026, Martin, after Cognition's site and Devin's chat: "reads more intelligent and
+   sophisticated"): half a size smaller, a regular weight in a soft grey, so names, figures and the key point step up
+   to white rather than everything shouting at once; Inter's single-storey a and l with a tail (cv11, ss03) and even
+   figures (tnum) for a more precise read. */
 .sol-prose {
-  font-size: 13px;
-  font-weight: 380;
-  line-height: 1.6;
-  letter-spacing: -0.004em;
-  color: #f2f2f4;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.68;
+  letter-spacing: -0.008em;
+  color: #383a40;
+  font-feature-settings: "cv11", "ss03", "tnum";
   -webkit-font-smoothing: antialiased;
+}
+.sol-ground .sol-prose {
+  color: #d6d7db;
 }
 /* The key point: the conversation's one highlight and its only pad (no italics: Martin, 15 Nov 2026). A wash of the
    signal colour; on the charcoal it is a tint with a fine orange edge. */

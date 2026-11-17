@@ -940,7 +940,7 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? "max-w-[80%] whitespace-pre-wrap border-r border-ink/70 py-0.5 pr-3.5 text-[13px] font-[380] leading-[1.6] tracking-[-0.004em] text-ink"
+            ? "max-w-[80%] whitespace-pre-wrap border-r border-ink/70 py-0.5 pr-3.5 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] text-ink-2 [font-feature-settings:'cv11','ss03','tnum']"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}

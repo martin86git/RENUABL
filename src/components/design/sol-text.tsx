@@ -128,7 +128,7 @@ function Section({
               <div className="min-w-0 flex-1">
                 {row.name && (
                   <p className="flex items-baseline gap-3">
-                    <span className="min-w-0 font-[520] text-ink">{row.name}</span>
+                    <span className="min-w-0 font-medium text-ink">{row.name}</span>
                     {row.amount && <span className="ml-auto shrink-0 text-[0.94em] tabular-nums text-ink">{row.amount}</span>}
                   </p>
                 )}
@@ -166,13 +166,13 @@ function Runs({ text }: { text: string }) {
       {solRuns(text).map((r, i) => {
         if (r.kind === "strong")
           return (
-            <strong key={i} className="font-[520] text-ink">
+            <strong key={i} className="font-medium text-ink">
               {r.text}
             </strong>
           );
         if (r.kind === "figure")
           return (
-            <span key={i} className="whitespace-nowrap font-[520] text-ink">
+            <span key={i} className="whitespace-nowrap font-medium text-ink">
               {r.text}
             </span>
           );
@@ -181,7 +181,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`tel:${r.dial}`}
-              className="whitespace-nowrap font-[520] text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
+              className="whitespace-nowrap font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -193,7 +193,7 @@ function Runs({ text }: { text: string }) {
               href={r.text}
               target="_blank"
               rel="noopener noreferrer"
-              className="break-all font-[520] text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
+              className="break-all font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -203,7 +203,7 @@ function Runs({ text }: { text: string }) {
             <a
               key={i}
               href={`mailto:${r.text}`}
-              className="font-[520] text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
+              className="font-medium text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
             >
               {r.text}
             </a>
@@ -227,7 +227,7 @@ function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNo
                 <span className="min-w-0">
                   {named ? (
                     <>
-                      <strong className="font-[520] text-ink">{named.name}</strong>
+                      <strong className="font-medium text-ink">{named.name}</strong>
                       <span className="text-muted"> · </span>
                       <Runs text={named.rest} />
                     </>
@@ -248,7 +248,7 @@ function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNo
         // its words a size up. Nothing else in his answer is coloured.
         <div className="sol-key rounded-2xl px-4 py-3">
           <p className="text-[10px] font-[560] uppercase tracking-[0.18em] text-sun-line">Key point</p>
-          <p className="mt-1 font-[520] leading-[1.5] text-ink">
+          <p className="mt-1 font-[460] leading-[1.55] text-ink">
             <Runs text={block.text} />
             {tail}
           </p>
@@ -256,7 +256,7 @@ function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNo
       );
     case "ask":
       return (
-        <div className="rounded-2xl bg-surface px-3.5 py-3 font-[520] text-ink ring-1 ring-line-strong">
+        <div className="rounded-2xl bg-surface px-3.5 py-3 font-medium text-ink ring-1 ring-line-strong">
           <p className="flex gap-2.5">
             <CircleHelp className="mt-[0.2em] size-4 shrink-0 text-ink" aria-label="A question for you" />
             <span className="min-w-0">
