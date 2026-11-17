@@ -1,5 +1,7 @@
 "use client";
 
+import { ContextLine } from "./context-line";
+import { dealContext } from "@/lib/domain/design/sol-on-deal";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1133,6 +1135,8 @@ function DealCard(props: {
               {d.clock && OPEN_STAGES.includes(d.stage) ? ` · ${d.clock}` : ""}
               <span className="text-muted"> · {agoWords(d.events[0]?.at ?? d.createdAt, now)}</span>
             </p>
+            {/* Context, as on the deal page (18 Nov 2026, Martin): the deal behind the card in one line. */}
+            <ContextLine text={dealContext(d, now)} className="mt-1.5" />
             {held && (
               <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-0.5 text-[12px] text-ink-2">
                 {held.kind === "done" ? (

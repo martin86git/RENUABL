@@ -158,15 +158,25 @@ export function solProposes(d: FeedDeal, now = new Date()): SolProposal {
  * concise short and efficient contextual explainer" so a proposal can be judged at a glance): where the deal stands
  * and for how long, how warm it is, what last happened and when, and whether the roof is designed.
  */
+const CONTEXT_QUOTE_MAX = 60;
+
 export function dealContext(d: FeedDeal, now = new Date()): string {
   const days = Math.floor((now.getTime() - Date.parse(d.createdAt)) / 86_400_000);
   const stage = STAGE_LABELS[d.stage];
-  const age = !Number.isFinite(days) || days < 1 ? `${stage} since today` : `${stage} for ${days} ${days === 1 ? "day" : "days"}`;
+  // How old the deal is, not how long at its stage (that isn't kept).
+  const age = !Number.isFinite(days) || days < 1 ? `${stage} · new today` : `${stage} · ${days} ${days === 1 ? "day" : "days"} old`;
   const heat = d.heat ? d.heat[0].toUpperCase() + d.heat.slice(1) : null;
   const latest = d.events[0];
   const when = latest ? agoWords(latest.at, now) : "";
-  const at = /^\d/.test(when) ? when : when === "Just now" || when === "Yesterday" ? when.toLowerCase() : `on ${when}`;
-  const last = latest ? `${eventWords(latest, d.customer).replace(/\.$/, "")} ${at}` : "nothing on the record yet";
-  const design = d.projectId ? (d.kw ? `${d.kw.toFixed(1)} kW designed` : "designed") : "no design yet";
+  const at = / ago$/.test(when) ? when : when === "Just now" || when === "Yesterday" ? when.toLowerCase() : `on ${when}`;
+  const said = latest ? eventWords(latest, d.customer).replace(/\.$/, "") : "";
+  // A customer's words kept short: the line is a glance, the record has the rest.
+  const quote = said.endsWith("”");
+  const short =
+    said.length > CONTEXT_QUOTE_MAX ? `${said.slice(0, CONTEXT_QUOTE_MAX - 1 - (quote ? 1 : 0)).trimEnd()}…${quote ? "”" : ""}` : said;
+  const last = latest ? `${short} ${at}` : "nothing on the record yet";
+  // The design only matters while the deal is being sold.
+  const selling = d.stage === "lead" || d.stage === "designed" || d.stage === "proposal";
+  const design = d.kw ? `${d.kw.toFixed(1)} kW` : d.projectId ? "designed" : selling ? "no design yet" : null;
   return [age, heat, last, design].filter(Boolean).join(" · ");
 }

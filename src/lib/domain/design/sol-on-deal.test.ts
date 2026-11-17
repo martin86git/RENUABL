@@ -111,12 +111,43 @@ describe("Sol putting the next step to you", () => {
 
 describe("A deal's context in a line", () => {
   it("gives the stage and how long, the heat, the latest thing and the design", () => {
-    expect(dealContext(deal(), now)).toBe("Proposal sent for 8 days · Warm · Jo opened the proposal 2 h ago · 6.6 kW designed");
+    expect(dealContext(deal(), now)).toBe("Proposal sent · 8 days old · Warm · Jo opened the proposal 2 h ago · 6.6 kW");
   });
 
   it("reads for a lead made today with nothing designed", () => {
     expect(dealContext(deal({ stage: "lead", createdAt: ago(1), projectId: null, kw: null, heat: null, events: [] }), now)).toBe(
-      "Lead since today · nothing on the record yet · no design yet",
+      "Lead · new today · nothing on the record yet · no design yet",
     );
+  });
+});
+
+describe("A deal's context, kept short", () => {
+  it("cuts a long quote, dates an older event, and leaves the design out once sold", () => {
+    const line = dealContext(
+      deal({
+        stage: "won",
+        projectId: null,
+        kw: null,
+        heat: null,
+        events: [
+          {
+            kind: "message",
+            text: "Does the battery fit in the garage, or does it need to go outside? We park two cars in there.",
+            at: ago(24 * 8),
+            by: "Jo",
+          },
+        ],
+      }),
+      now,
+    );
+    expect(line).toMatch(/^Won · 8 days old · Jo wrote: “Does the battery fit in the garage, or does it.*…” on /);
+    expect(line).not.toMatch(/design/);
+  });
+});
+
+describe("A deal's context keeps a short quote whole", () => {
+  it("keeps the closing quote mark", () => {
+    const line = dealContext(deal({ events: [{ kind: "message", text: "How long does an install take?", at: ago(2), by: "Jo" }] }), now);
+    expect(line).toContain("Jo wrote: “How long does an install take?” 2 h ago");
   });
 });
