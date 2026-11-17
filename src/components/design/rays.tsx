@@ -5,138 +5,137 @@ import clsx from "clsx";
 
 /**
  * The Rays (17 Nov 2026, Martin: the voice agents as characters, "the army you wished you always had", their family
- * named as Bots and Dots are). Sol is the sun and the Rays are what he sends out, so every Ray is a sun (Martin: a
- * variation of the sun in different colours, each with a characteristic of its own, emblematic of solar): long rays,
- * a headset (they're voice agents), a bolt, a battery, a panel worn as a cap, a charge plug, a short corona. Each has two
- * eyes that blink now and then and glance towards the pointer, and bobs a little. Still with reduced motion.
+ * named as Bots and Dots are; then, after a first try with panels and plugs on them: "take the inspiration from grok bots
+ * but make them all more sun related… they dont all have to have rays… they can be like sol"). Sol is the sun and the
+ * Rays are what he sends out, so every Ray is a sun: glass orbs like Sol, one wearing his orbit, a sun rising, a sun with
+ * soft rays, an eclipse, a haloed sun, a sunset on the sea. What sets each apart is its colour and its eyes. They blink
+ * now and then, glance towards the pointer and bob a little. Still with reduced motion.
  */
 
-const INK = "#1b1d22";
+type EyeKind = "oval" | "dot" | "happy" | "tall";
 
-/** Tapered rays round the disc: `n` of them, reaching `to` out from the middle, `w` wide where they leave it. */
-function raysOf(n: number, _from: number, to: number, w: number, turn = 0) {
-  const base = 52 - 24;
-  return Array.from({ length: n }, (_, i) => (
-    <path
-      key={i}
-      d={`M${50 - w / 2} ${base} L50 ${52 - to} L${50 + w / 2} ${base} Z`}
-      strokeLinejoin="round"
-      transform={`rotate(${turn + (i * 360) / n} 50 52)`}
-    />
-  ));
-}
-
-/** Each sun: its colour, its body (the disc and its rays, lit as glass) and its emblem, drawn over it in its own colours. */
-const SUNS: { colour: string; body: (fill: string) => React.ReactNode; emblem?: React.ReactNode }[] = [
+/** Each sun: its colour, its body (lit as glass), what's drawn over it, and its eyes. */
+const SUNS: {
+  colour: string;
+  body: (fill: string) => React.ReactNode;
+  over?: (colour: string) => React.ReactNode;
+  /** Drawn on its face only, clipped to it: the eclipse's shadow. */
+  shade?: React.ReactNode;
+  eyes: { kind: EyeKind; at: [number, number] };
+}[] = [
   {
-    // The classic: long, even rays.
+    // A glass orb, Sol's little sibling.
     colour: "#F5B544",
-    body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(8, 30, 48, 13)}
-        <circle cx="50" cy="52" r="28" />
-      </g>
-    ),
+    body: (fill) => <circle cx="50" cy="52" r="34" fill={fill} />,
+    eyes: { kind: "oval", at: [50, 54] },
   },
   {
-    // The voice agent: a headset over the top, the microphone at its mouth.
-    colour: "#8B6CF0",
-    body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(10, 30, 42, 11, 18)}
-        <circle cx="50" cy="52" r="28" />
-      </g>
-    ),
-    emblem: (
-      <g>
-        <path d="M24 52 A26 26 0 0 1 76 52" fill="none" stroke={INK} strokeWidth="7" strokeLinecap="round" />
-        <path d="M24 52 A26 26 0 0 1 76 52" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" />
-        <path d="M78 61 Q78 74 62 74" fill="none" stroke={INK} strokeWidth="5.5" strokeLinecap="round" />
-        <path d="M78 61 Q78 74 62 74" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-        <rect x="16" y="44" width="12" height="18" rx="5" fill="#fff" stroke={INK} strokeWidth="2" />
-        <rect x="72" y="44" width="12" height="18" rx="5" fill="#fff" stroke={INK} strokeWidth="2" />
-        <circle cx="60" cy="74" r="4.5" fill="#fff" stroke={INK} strokeWidth="2" />
-      </g>
-    ),
-  },
-  {
-    // The bolt: a flash of charge on its brow.
+    // An orb wearing Sol's orbit, its node bright.
     colour: "#F0644B",
-    body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(8, 30, 45, 12, 22.5)}
-        <circle cx="50" cy="52" r="28" />
-      </g>
-    ),
-    emblem: <path d="M55 14 L43 31 L50 31 L46 44 L59 26 L52 26 Z" fill="#fff" stroke={INK} strokeWidth="2" strokeLinejoin="round" />,
-  },
-  {
-    // The battery: a charge badge at its side, filling up.
-    colour: "#2BB5A0",
-    body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(12, 30, 41, 9)}
-        <circle cx="50" cy="52" r="28" />
-      </g>
-    ),
-    emblem: (
-      <g transform="rotate(-12 74 78)">
-        <rect x="60" y="70" width="28" height="16" rx="4" fill={INK} stroke="#fff" strokeWidth="2" />
-        <rect x="88" y="75" width="4" height="6" rx="1.5" fill="#fff" />
-        <rect x="63.5" y="73.5" width="6" height="9" rx="1.5" fill="#7CF0B4" />
-        <rect x="71" y="73.5" width="6" height="9" rx="1.5" fill="#7CF0B4" />
-        <rect x="78.5" y="73.5" width="6" height="9" rx="1.5" fill="#7CF0B4" opacity="0.35" />
-      </g>
-    ),
-  },
-  {
-    // The panel: a solar panel worn as a cap.
-    colour: "#4F8EF7",
-    body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(8, 30, 45, 12, 22.5)}
-        <circle cx="50" cy="52" r="28" />
-      </g>
-    ),
-    emblem: (
-      <g transform="rotate(-8 50 26)">
-        <path d="M26 30 L74 30 L68 14 L32 14 Z" fill="#1e2b47" stroke="#cfe0ff" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M38.7 14 L36 30 M50 14 L50 30 M61.3 14 L64 30 M29 22 L71 22" stroke="#cfe0ff" strokeWidth="1.2" />
-      </g>
-    ),
-  },
-  {
-    // The plug: a charging cable trailing from it.
-    colour: "#E05A8A",
-    body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(9, 30, 44, 12)}
-        <circle cx="50" cy="52" r="28" />
-      </g>
-    ),
-    emblem: (
+    body: (fill) => <circle cx="50" cy="52" r="30" fill={fill} />,
+    over: () => (
       <g>
-        <path d="M66 74 Q76 92 90 84" fill="none" stroke={INK} strokeWidth="6" strokeLinecap="round" />
-        <path d="M66 74 Q76 92 90 84" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
-        <rect x="86" y="76" width="11" height="14" rx="3" fill="#fff" stroke={INK} strokeWidth="2" transform="rotate(-30 91 82)" />
-        <path d="M93 73 L97 69 M97 79 L101 75" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+        <ellipse
+          cx="50"
+          cy="52"
+          rx="44"
+          ry="15"
+          fill="none"
+          stroke="#fff"
+          strokeOpacity="0.55"
+          strokeWidth="2.4"
+          transform="rotate(-18 50 52)"
+        />
+        <circle cx="88" cy="38" r="4.5" fill="#fff" />
       </g>
     ),
+    eyes: { kind: "dot", at: [50, 52] },
   },
   {
-    // The corona: a ring of short sparks.
+    // A sun rising on the horizon.
     colour: "#FF7A2F",
+    body: (fill) => <path d="M12 78 A38 38 0 0 1 88 78 Z" fill={fill} />,
+    over: () => <rect x="4" y="77" width="92" height="3.5" rx="1.75" fill="#fff" fillOpacity="0.55" />,
+    eyes: { kind: "happy", at: [50, 60] },
+  },
+  {
+    // A sun with a few soft, round rays, like petals.
+    colour: "#FFC861",
     body: (fill) => (
-      <g fill={fill} stroke={fill} strokeWidth="4" strokeLinejoin="round">
-        {raysOf(16, 31, 40, 7)}
+      <g fill={fill}>
+        {Array.from({ length: 8 }, (_, i) => (
+          <ellipse key={i} cx="50" cy="16" rx="9" ry="11" transform={`rotate(${i * 45} 50 52)`} />
+        ))}
         <circle cx="50" cy="52" r="28" />
       </g>
     ),
+    eyes: { kind: "tall", at: [50, 53] },
+  },
+  {
+    // An eclipse: a shadow sliding across its face.
+    colour: "#E05A8A",
+    body: (fill) => <circle cx="50" cy="52" r="33" fill={fill} />,
+    shade: <circle cx="84" cy="44" r="30" fill="#2a0d1c" fillOpacity="0.5" />,
+    eyes: { kind: "oval", at: [44, 53] },
+  },
+  {
+    // A sun in a glowing halo.
+    colour: "#8B6CF0",
+    body: (fill) => <circle cx="50" cy="52" r="29" fill={fill} />,
+    over: (colour) => (
+      <g>
+        <circle cx="50" cy="52" r="39" fill="none" stroke={mix(colour, 0.45)} strokeOpacity="0.7" strokeWidth="4" />
+        <circle cx="50" cy="52" r="46" fill="none" stroke={mix(colour, 0.6)} strokeOpacity="0.35" strokeWidth="2.5" />
+      </g>
+    ),
+    eyes: { kind: "dot", at: [50, 53] },
+  },
+  {
+    // A sunset on the sea: its lower half in the water.
+    colour: "#3F7FE8",
+    body: (fill) => <circle cx="50" cy="50" r="33" fill={fill} />,
+    over: () => (
+      <g>
+        <path d="M17 62 L83 62 A33 33 0 0 1 17 62 Z" fill="#0b1a33" fillOpacity="0.4" />
+        <path d="M24 70 h52 M30 76 h40 M38 81 h24" stroke="#fff" strokeOpacity="0.45" strokeWidth="2" strokeLinecap="round" />
+      </g>
+    ),
+    eyes: { kind: "happy", at: [50, 49] },
   },
 ];
 const SHAPES = SUNS;
-/** Every sun's eyes sit on its face. */
-const EYES: [number, number] = [50, 54];
+
+/** The eyes, by kind, round where they sit. */
+function Eyes({ kind, at: [x, y] }: { kind: EyeKind; at: [number, number] }) {
+  const ink = "#141416";
+  if (kind === "dot")
+    return (
+      <>
+        <circle cx={x - 9} cy={y} r="5" fill={ink} />
+        <circle cx={x + 9} cy={y} r="5" fill={ink} />
+      </>
+    );
+  if (kind === "happy")
+    return (
+      <>
+        <path d={`M${x - 15} ${y + 2} q6 -9 12 0`} fill="none" stroke={ink} strokeWidth="4.5" strokeLinecap="round" />
+        <path d={`M${x + 3} ${y + 2} q6 -9 12 0`} fill="none" stroke={ink} strokeWidth="4.5" strokeLinecap="round" />
+      </>
+    );
+  if (kind === "tall")
+    return (
+      <>
+        <rect x={x - 12} y={y - 9} width="7" height="18" rx="3.5" fill={ink} />
+        <rect x={x + 5} y={y - 9} width="7" height="18" rx="3.5" fill={ink} />
+      </>
+    );
+  return (
+    <>
+      <ellipse cx={x - 9} cy={y} rx="5" ry="8" fill={ink} />
+      <ellipse cx={x + 9} cy={y} rx="5" ry="8" fill={ink} />
+    </>
+  );
+}
 
 export const RAY_COUNT = SHAPES.length;
 
@@ -168,7 +167,7 @@ export function Ray({
   // Glass, as Sol is (17 Nov 2026, Martin): lit from the top left, a deeper rim, a shine across the top, a soft glow.
   const id = useId().replace(/:/g, "");
   const fill = `url(#ray-${id})`;
-  const [ex, ey] = EYES;
+  const [ex, ey] = shape.eyes.at;
   const dx = look.x * 4;
   const dy = look.y * 3;
   return (
@@ -192,9 +191,10 @@ export function Ray({
         </defs>
         {shape.body(fill)}
         <g clipPath={`url(#ray-clip-${id})`}>
-          <path d="M30 42 Q38 30 54 28" fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="5" strokeLinecap="round" />
+          {shape.shade}
+          <path d="M28 40 Q36 26 54 24" fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="5" strokeLinecap="round" />
         </g>
-        {shape.emblem}
+        {shape.over?.(colour)}
         <g
           className="ray-blink"
           style={{
@@ -205,8 +205,7 @@ export function Ray({
             animationPlayState: live ? "running" : "paused",
           }}
         >
-          <ellipse cx={ex - 9} cy={ey} rx="5" ry="8" fill="#141416" />
-          <ellipse cx={ex + 9} cy={ey} rx="5" ry="8" fill="#141416" />
+          <Eyes kind={shape.eyes.kind} at={shape.eyes.at} />
         </g>
       </svg>
     </span>
