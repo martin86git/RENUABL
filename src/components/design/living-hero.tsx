@@ -9,6 +9,7 @@ const RAYS_SOON = RAYS.soon;
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { TryDemoButton } from "./business-demo";
 import { SolMark } from "./sol-icon";
+import { LiveSun } from "./live-sun";
 import { Ray, RayStyles } from "./rays";
 
 /**
@@ -104,15 +105,11 @@ export function BigSol({
       className={clsx("relative grid place-items-center transition-transform duration-700 ease-out", className)}
       style={{ transform: `translate(${lean.x}px, ${lean.y}px)` }}
     >
-      <span
-        aria-hidden
-        className={clsx(
-          "absolute -inset-8 rounded-full bg-sun-line/35 blur-3xl transition-opacity duration-700",
-          busy ? "opacity-100" : "opacity-50",
-        )}
-      />
-      <span aria-hidden className={clsx("absolute -inset-3 rounded-full ring-1 ring-sun-line/30", busy && "live-ring")} />
-      <SolMark className="live-breathe relative size-full" />
+      {/* The live sun (18 Nov 2026, Martin: the glossy orb read as an entry-level tool): its canvas twice the disc, for the
+          corona round it. */}
+      <span aria-hidden className="pointer-events-none absolute -inset-1/2">
+        <LiveSun energy={busy ? 1 : 0} />
+      </span>
     </span>
   );
 }

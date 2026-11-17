@@ -6,7 +6,7 @@ import { RotateCcw } from "lucide-react";
 import { LAUNCH } from "@/lib/domain/design/sales-page";
 import { TryDemoButton } from "./business-demo";
 import { useMotionOk } from "./living-hero";
-import { SolMark } from "./sol-icon";
+import { LiveSun } from "./live-sun";
 
 /**
  * The launch (18 Nov 2026, Martin: "it should feel like a landmark moment, somewhat like a rocket launching… joining
@@ -14,6 +14,32 @@ import { SolMark } from "./sol-icon";
  * glowing horizon on a long trail of light, and the line comes: "Today, your business runs on AI." It plays once when it
  * comes into view and can be watched again; with reduced motion it holds at the end.
  */
+
+/** Stars at three depths: far and faint, middle, near and bright; each layer drifts at its own speed. */
+const STARS = [
+  {
+    opacity: 0.45,
+    drift: "160s",
+    image:
+      "radial-gradient(1px 1px at 8% 12%, #fff, transparent), radial-gradient(1px 1px at 22% 38%, #fff, transparent), radial-gradient(1px 1px at 37% 9%, #fff, transparent), radial-gradient(1px 1px at 51% 27%, #fff, transparent), radial-gradient(1px 1px at 63% 6%, #fff, transparent), radial-gradient(1px 1px at 74% 33%, #fff, transparent), radial-gradient(1px 1px at 86% 19%, #fff, transparent), radial-gradient(1px 1px at 93% 44%, #fff, transparent), radial-gradient(1px 1px at 15% 55%, #fff, transparent), radial-gradient(1px 1px at 44% 50%, #fff, transparent), radial-gradient(1px 1px at 69% 58%, #fff, transparent), radial-gradient(1px 1px at 30% 70%, #fff, transparent)",
+  },
+  {
+    opacity: 0.6,
+    drift: "110s",
+    image:
+      "radial-gradient(1.4px 1.4px at 12% 24%, #fff, transparent), radial-gradient(1.4px 1.4px at 33% 16%, #fff, transparent), radial-gradient(1.4px 1.4px at 58% 40%, #fff, transparent), radial-gradient(1.4px 1.4px at 81% 11%, #fff, transparent), radial-gradient(1.4px 1.4px at 90% 52%, #fff, transparent), radial-gradient(1.4px 1.4px at 6% 46%, #fff, transparent)",
+  },
+  {
+    opacity: 0.85,
+    drift: "70s",
+    image:
+      "radial-gradient(2px 2px at 18% 30%, #ffe9d6, transparent), radial-gradient(2px 2px at 71% 22%, #fff, transparent), radial-gradient(1.8px 1.8px at 46% 14%, #dfe8ff, transparent)",
+  },
+] as const;
+
+/** Fine film grain: fractal noise, as an image. */
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
 /** When each part comes, ms from the start. */
 const AT = { three: 500, two: 1300, one: 2100, ignite: 2900, rise: 3100, liftoff: 3700, words: 5200, more: 6000 } as const;
@@ -70,24 +96,47 @@ export function LaunchSlide({ signedIn }: { signedIn: boolean }) {
       className="relative isolate flex min-h-[38rem] flex-col items-center overflow-hidden bg-[#030304] px-5 text-white snap-start lg:h-[calc(100dvh-4rem)]"
       aria-labelledby="launch-head"
     >
-      {/* A faint field of stars. */}
+      {/* Depth (18 Nov 2026, Martin: take the feel up a notch): stars at three depths drifting at their own speeds, the
+          curve of a planet with a thin atmosphere (blue, warming to the sun's orange where he rises), film grain and a
+          vignette over it all. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        {STARS.map((layer, i) => (
+          <div
+            key={i}
+            className="launch-stars absolute -inset-[10%]"
+            style={{ backgroundImage: layer.image, opacity: layer.opacity, animationDuration: layer.drift, animationDelay: `-${i * 13}s` }}
+          />
+        ))}
+      </div>
+
+      {/* The planet's curve and its atmosphere. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-[42%] overflow-hidden">
+        <div
+          className={clsx("absolute inset-x-0 bottom-0 h-full transition-opacity duration-[1600ms]", lit ? "opacity-100" : "opacity-30")}
+          style={{ background: "radial-gradient(55% 80% at 50% 100%, rgba(255,110,40,0.42), rgba(255,90,31,0.08) 50%, transparent 78%)" }}
+        />
+        <div
+          className="absolute left-1/2 top-[72%] aspect-square w-[640vw] -translate-x-1/2 rounded-full bg-[#040507]"
+          style={{
+            boxShadow: lit
+              ? "0 -1px 0 rgba(255,190,140,0.75), 0 -3px 14px rgba(255,140,60,0.45), 0 -18px 60px rgba(80,140,255,0.22), 0 -50px 120px rgba(255,110,40,0.18)"
+              : "0 -1px 0 rgba(160,200,255,0.45), 0 -16px 50px rgba(80,140,255,0.16)",
+            transition: "box-shadow 1600ms ease",
+          }}
+        />
+      </div>
+
+      {/* Grain and vignette, over everything. */}
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 opacity-60"
-        style={{
-          backgroundImage:
-            "radial-gradient(1px 1px at 12% 22%, #fff8, transparent), radial-gradient(1px 1px at 78% 14%, #fff6, transparent), radial-gradient(1.5px 1.5px at 64% 38%, #fff5, transparent), radial-gradient(1px 1px at 30% 64%, #fff4, transparent), radial-gradient(1px 1px at 88% 58%, #fff5, transparent), radial-gradient(1px 1px at 46% 12%, #fff6, transparent), radial-gradient(1.5px 1.5px at 20% 44%, #fff3, transparent), radial-gradient(1px 1px at 92% 30%, #fff4, transparent)",
-        }}
+        className="launch-grain pointer-events-none absolute -inset-[50%] z-20 opacity-[0.07] mix-blend-overlay"
+        style={{ backgroundImage: GRAIN }}
       />
-
-      {/* The horizon, glowing as it ignites. */}
-      <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-[45%]">
-        <div
-          className={clsx("absolute inset-x-0 bottom-0 h-full transition-opacity duration-[1400ms]", lit ? "opacity-100" : "opacity-25")}
-          style={{ background: "radial-gradient(60% 70% at 50% 100%, rgba(255,110,40,0.55), rgba(255,90,31,0.12) 45%, transparent 75%)" }}
-        />
-        <div className="absolute inset-x-0 bottom-[14%] h-px bg-gradient-to-r from-transparent via-[#ffb27a]/70 to-transparent" />
-      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-20"
+        style={{ background: "radial-gradient(120% 90% at 50% 45%, transparent 55%, rgba(0,0,0,0.55) 100%)" }}
+      />
 
       {/* The countdown. */}
       <div aria-live="polite" className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -110,8 +159,9 @@ export function LaunchSlide({ signedIn }: { signedIn: boolean }) {
         aria-hidden
       >
         <div className="relative grid size-28 place-items-center sm:size-36">
-          <span className="absolute -inset-10 rounded-full bg-[#ff7a2f]/40 blur-3xl" />
-          <SolMark className="relative size-full" />
+          <span className="absolute -inset-1/2">
+            <LiveSun energy={lit ? 1 : 0} />
+          </span>
           {/* The trail. */}
           <span
             className="absolute left-1/2 top-[70%] -z-10 w-6 -translate-x-1/2 rounded-full blur-md transition-[height,opacity] ease-out"
@@ -180,6 +230,11 @@ export function LaunchSlide({ signedIn }: { signedIn: boolean }) {
       <style>{`
         @keyframes launch-count { from { opacity: 0; transform: scale(1.25); filter: blur(6px); } 30% { opacity: 1; transform: scale(1); filter: blur(0); } to { opacity: 0; transform: scale(0.92); } }
         .launch-count { animation: launch-count 800ms ease-out both; }
+        @keyframes launch-stars { from { transform: translateY(0); } to { transform: translateY(8%); } }
+        .launch-stars { animation: launch-stars linear infinite alternate; }
+        @keyframes launch-grain { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-2%,1%); } 50% { transform: translate(1%,-2%); } 75% { transform: translate(2%,2%); } }
+        .launch-grain { animation: launch-grain 0.6s steps(3) infinite; }
+        @media (prefers-reduced-motion: reduce) { .launch-stars, .launch-grain { animation: none; } }
       `}</style>
     </section>
   );
