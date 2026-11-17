@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import Image from "next/image";
 import { Check } from "lucide-react";
 import { DESIGNER } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
@@ -10,26 +11,16 @@ import { SolMark } from "./sol-icon";
 
 /**
  * The assisted designer (17 Nov 2026, Martin: the page was missing the designer, "asking for confirmations and whether
- * to string, and then showing the stringing done, then with a card saying move on to quote"). A drawn roof with the
- * panels laid; Sol's cards come up one at a time in the designer's own words (`sol-nudges.ts`), each pressed, the
+ * to string, and then showing the stringing done, then with a card saying move on to quote"). A real roof from the
+ * design tool with the panels laid (the address is never shown); Sol's cards come up one at a time in the designer's own words (`sol-nudges.ts`), each pressed, the
  * panels strung into A and B, each string checked, then the next step to the quote. Still with reduced motion.
  */
 
 const LOOP = 15000;
-const ROWS = 3;
-const PER_ROW = 7;
-/** The panels in the order a string runs: along the first row, back along the second, along the third. */
-const SNAKE = Array.from({ length: ROWS * PER_ROW }, (_, k) => {
-  const row = Math.floor(k / PER_ROW);
-  const col = k % PER_ROW;
-  return { row, col: row % 2 === 0 ? col : PER_ROW - 1 - col };
-});
-const PANEL = { w: 34, h: 50, gap: 4, x0: 188, y0: 118 };
-const centre = (p: { row: number; col: number }) => ({
-  x: PANEL.x0 + p.col * (PANEL.w + PANEL.gap) + PANEL.w / 2,
-  y: PANEL.y0 + p.row * (PANEL.h + PANEL.gap) + PANEL.h / 2,
-});
-const STRING_TINT = ["#f472b6", "#34d399"];
+/** Where the panels sit across the roof picture, as shares of its width: the strung frame wipes in across them. */
+const PANELS_FROM = 0.22;
+const PANELS_TO = 0.56;
+const STRING_TINT = ["#f9a8d4", "#86efac"];
 
 function useSceneClock(root: React.RefObject<HTMLElement | null>, live: boolean) {
   const [t, setT] = useState(LOOP - 1);
@@ -60,14 +51,14 @@ export function DesignerSlide() {
   const live = useMotionOk();
   const t = useSceneClock(root, live);
   const C = DESIGNER.cards;
-  const aCount = DESIGNER.strings[0].panels;
-  const strung = Math.max(0, Math.min(SNAKE.length, Math.floor(((t - 6200) / 1800) * SNAKE.length)));
+  const strung = Math.max(0, Math.min(1, (t - 6200) / 1800));
   const card = t < 900 ? null : t < 4300 ? "backup" : t < 7200 ? "strings" : t < 8700 ? null : "next";
   const pressed = (card === "backup" && t >= 2800) || (card === "strings" && t >= 5800) || (card === "next" && t >= 12600);
   const backup = t >= 3000;
   const checked = t >= 8200;
   const step = t < 4300 ? 0 : t < 8000 ? 1 : t < 8700 ? 2 : 3;
-  const wire = SNAKE.slice(0, strung).map(centre);
+  // The strung frame shown up to here, from the left: across the panels as Sol strings them, then whole.
+  const reveal = strung >= 1 ? 1 : strung <= 0 ? 0 : PANELS_FROM + (PANELS_TO - PANELS_FROM) * strung;
   const go = card === "backup" ? C.backup.yes : card === "strings" ? C.strings.go : C.next.go;
 
   return (
@@ -81,81 +72,33 @@ export function DesignerSlide() {
       <div className="mx-auto grid w-full max-w-[84rem] items-center gap-10 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)] lg:gap-14">
         {/* The scene. */}
         <div className="relative order-2 overflow-hidden rounded-[32px] bg-[#1d2127] shadow-[0_40px_90px_-40px_rgba(11,11,12,0.6)] ring-1 ring-black/10 lg:order-1">
-          <svg viewBox="0 0 640 400" className="block h-auto w-full" role="img" aria-label={DESIGNER.headline}>
-            <defs>
-              <pattern id="designer-lawn" width="6" height="6" patternUnits="userSpaceOnUse">
-                <rect width="6" height="6" fill="#3a4a35" />
-                <circle cx="2" cy="2" r="0.8" fill="#46583f" />
-              </pattern>
-            </defs>
-            <rect width="640" height="400" fill="url(#designer-lawn)" />
-            <rect x="0" y="356" width="640" height="44" fill="#4a4d52" />
-            {/* A hip roof from above. */}
-            <polygon points="140,80 500,80 552,300 88,300" fill="#5d636c" />
-            <polygon points="140,80 500,80 440,190 200,190" fill="#6b727c" />
-            <line x1="200" y1="190" x2="440" y2="190" stroke="#7c848f" strokeWidth="2" />
-            <line x1="140" y1="80" x2="200" y2="190" stroke="#7c848f" strokeWidth="1.5" />
-            <line x1="500" y1="80" x2="440" y2="190" stroke="#7c848f" strokeWidth="1.5" />
-            <line x1="88" y1="300" x2="200" y2="190" stroke="#7c848f" strokeWidth="1.5" />
-            <line x1="552" y1="300" x2="440" y2="190" stroke="#7c848f" strokeWidth="1.5" />
-            {/* The panels, strung as they go. */}
-            {SNAKE.map((p, k) => {
-              const at = centre(p);
-              const on = !live || t >= 200 + p.row * 280;
-              const isStrung = k < strung;
-              return (
-                <rect
-                  key={k}
-                  x={at.x - PANEL.w / 2}
-                  y={at.y - PANEL.h / 2}
-                  width={PANEL.w}
-                  height={PANEL.h}
-                  rx="2"
-                  fill={isStrung ? STRING_TINT[k < aCount ? 0 : 1] : "#1a2230"}
-                  fillOpacity={isStrung ? 0.88 : 1}
-                  stroke={isStrung ? "#ffffff" : "#8b95a5"}
-                  strokeOpacity={isStrung ? 0.75 : 0.55}
-                  strokeWidth="1"
-                  style={{ opacity: on ? 1 : 0, transition: "opacity 400ms, fill 250ms" }}
-                />
-              );
-            })}
-            {wire.length > 1 && (
-              <polyline
-                points={wire.map((w) => `${w.x},${w.y}`).join(" ")}
-                fill="none"
-                stroke="#ffffff"
-                strokeWidth="1.6"
-                strokeDasharray="4 3"
-                strokeOpacity="0.85"
+          {/* The real roof (17 Nov 2026, Martin: the designer on a real aerial photo), from the design tool: the panels as
+              laid, then the same view strung. */}
+          <div className="relative aspect-[952/464] w-full">
+            <Image
+              src="/design/landing/designer-before.webp"
+              alt={DESIGNER.alt}
+              fill
+              sizes="(min-width: 1024px) 900px, 100vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-0" style={{ clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)` }}>
+              <Image
+                src="/design/landing/designer-after.webp"
+                alt=""
+                fill
+                sizes="(min-width: 1024px) 900px, 100vw"
+                className="object-cover"
+              />
+            </div>
+            {strung > 0 && strung < 1 && (
+              <span
+                aria-hidden
+                className="absolute inset-y-[18%] w-[2px] bg-white shadow-[0_0_12px_3px_rgba(255,255,255,0.8)]"
+                style={{ left: `${reveal * 100}%` }}
               />
             )}
-            {checked &&
-              DESIGNER.strings.map((s, i) => {
-                const first = centre(SNAKE[i === 0 ? 0 : aCount]);
-                return (
-                  <g key={s.letter}>
-                    <circle cx={first.x} cy={first.y} r="11" fill="#0b0b0d" stroke="#ffffff" strokeWidth="1.5" />
-                    <text x={first.x} y={first.y + 4} textAnchor="middle" fontSize="12" fontWeight="700" fill="#ffffff">
-                      {s.letter}
-                    </text>
-                  </g>
-                );
-              })}
-            {/* The kit on the wall. */}
-            <g transform="translate(470 318)">
-              <rect width="36" height="26" rx="4" fill="#0b0b0d" stroke="#ff5a1f" strokeWidth="1.5" />
-              <text x="18" y="17" textAnchor="middle" fontSize="10" fontWeight="700" fill="#ffffff">
-                INV
-              </text>
-            </g>
-            <g transform="translate(512 318)" style={{ opacity: backup ? 1 : 0, transition: "opacity 500ms" }}>
-              <rect width="36" height="26" rx="4" fill="#0b0b0d" stroke="#ff5a1f" strokeWidth="1.5" />
-              <text x="18" y="17" textAnchor="middle" fontSize="10" fontWeight="700" fill="#ffffff">
-                BAT
-              </text>
-            </g>
-          </svg>
+          </div>
 
           {/* The strings, checked. */}
           <div
@@ -177,13 +120,13 @@ export function DesignerSlide() {
             <span className="text-[11px] text-white/60">{DESIGNER.checked}</span>
           </div>
           {backup && (
-            <span className="absolute bottom-4 right-4 hidden rounded-full bg-[#0b0b0d]/85 px-3 py-1 text-[11px] text-white ring-1 ring-white/15 sm:inline">
+            <span className="live-in absolute left-4 top-4 hidden rounded-full bg-[#0b0b0d]/85 px-3 py-1 text-[11px] text-white ring-1 ring-white/15 sm:inline">
               {DESIGNER.battery}
             </span>
           )}
 
           {/* Sol's card, in the designer's own words. */}
-          <div className="absolute bottom-4 left-4 w-[min(22rem,calc(100%-2rem))]">
+          <div className="absolute bottom-4 right-4 w-[min(22rem,calc(100%-2rem))]">
             {card && (
               <div
                 key={card}

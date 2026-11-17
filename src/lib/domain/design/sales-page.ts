@@ -19,10 +19,11 @@ export const SALES_HERO = {
    * The announcement (17 Nov 2026, Martin: keep "Solar just got a brain", announce something huge in the direct style
    * of 90s advertising, as clean as Apple's product pages). Bold, but only what's true: no superlative we can't prove.
    */
-  introducing: "Introducing Sol",
+  introducing: "Introducing Sol and your voice agents",
   headline: ["Solar just", "got a brain."],
   sub: "The AI sales force for solar businesses.",
-  line: "Sol works every deal with you. Charlie rings your leads. Alex books your installs.",
+  /** Sol and the voice agents both named (17 Nov 2026, Martin: the home page shouldn't only be about Sol). */
+  line: "Sol, your AI sales assistant, works every deal with you. Your voice agents ring your leads, take their calls and book your installs.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
 } as const;
@@ -57,15 +58,16 @@ export const DESIGNER = {
   steps: ["Asks what the quote needs", "Strings the panels", "Checks every string", "Leads on to the quote"],
   cards: {
     backup: { kind: "For the quote", words: "Do they want blackout backup?", yes: "Yes, wire backup", no: "No" },
-    strings: { kind: "An option", words: "21 panels aren't on a string.", go: "String them" },
+    strings: { kind: "An option", words: "42 panels aren't on a string.", go: "String them" },
     next: { kind: "Next step", words: "The design is ready. Let's finalise the quote.", go: "Finalise the quote" },
   },
   strings: [
-    { letter: "A", panels: 11 },
-    { letter: "B", panels: 10 },
+    { letter: "A", panels: 21 },
+    { letter: "B", panels: 21 },
   ],
   checked: "Inside the inverter's limits",
-  battery: "17 kWh · backup",
+  battery: "Backup wired to the battery",
+  alt: "The RENUABL designer on a real aerial photo: 42 panels laid on a roof, with the inverter and battery",
 } as const;
 
 /**
@@ -229,7 +231,7 @@ export const HERO_LIVE = {
     note: "Written answers on this page. In RENUABL, Sol answers from your own business.",
   },
   film: { eyebrow: "See it work", headline: "A day with Sol, start to finish." },
-  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs" },
+  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs", voice: "Voice agent" },
 } as const;
 
 export const AI_TEAM = {
@@ -891,6 +893,7 @@ export function salesCopy(): string[] {
     ...Object.values(DESIGNER.cards).flatMap((c) => Object.values(c)),
     DESIGNER.checked,
     DESIGNER.battery,
+    DESIGNER.alt,
     KNOWLEDGE.headline,
     KNOWLEDGE.sub,
     ...KNOWLEDGE.orbit,

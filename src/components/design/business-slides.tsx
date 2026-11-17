@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { KNOWLEDGE, MANIFESTO } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
-import { AskBox, BigSol, Bubble, LiveStyles, useAsk, useLean, useMotionOk, useSaying, useTyped } from "./living-hero";
+import { AskBox, BigSol, Bubble, LiveStyles, useAsk, useLean, useMotionOk, useSaying, useTyped, useInView } from "./living-hero";
 import { SolMark } from "./sol-icon";
 
 /**
@@ -80,8 +80,9 @@ export function Manifesto() {
 }
 
 export function KnowledgeOrbit() {
-  const live = useMotionOk();
   const root = useRef<HTMLElement | null>(null);
+  const seen = useInView(root);
+  const live = useMotionOk() && seen;
   const lean = useLean(root, live, 10);
   const idle = useSaying(KNOWLEDGE.idle, live, 600, 4200);
   const { asked, ask } = useAsk();

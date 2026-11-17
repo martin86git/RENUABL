@@ -24,7 +24,6 @@ import { ProductFilm } from "./product-film";
  * the plan is an email here, then Stripe's own secure page for the card, then straight back.
  */
 export function SalesPage({ notice, signedIn = false }: { notice?: string | null; signedIn?: boolean }) {
-  useFoldScroll();
   return (
     <div className="theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
@@ -60,85 +59,6 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       </footer>
     </div>
   );
-}
-
-/**
- * One scroll, one fold (3 Nov 2026, Martin: "a scroll should push me into the next fold", the way Apple's pages move).
- * On a screen at least 1024px wide, a turn of the wheel or a swipe on the trackpad glides the page to the next section
- * (`.snap-start`, each a fold tall where it can be), clear of the 4rem top bar, and the rest of that gesture's
- * momentum is swallowed so it moves one fold, not three. A section taller than the screen scrolls as usual until its
- * end is in view. A box that scrolls inside the page keeps its own scrolling; keys, phones and pinch zoom are left
- * alone. CSS snapping alone didn't do it: it pulls back to the fold you were on after a small scroll.
- */
-function useFoldScroll() {
-  useEffect(() => {
-    const wide = window.matchMedia("(min-width: 1024px)");
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const TOP = 64;
-    const QUIET_MS = 220;
-    let gliding = false;
-    let lastWheel = 0;
-    let glideEnds = 0;
-
-    const sections = () =>
-      Array.from(document.querySelectorAll<HTMLElement>(".snap-start"))
-        .filter((el) => el.getClientRects().length > 0)
-        .map((el) => {
-          const r = el.getBoundingClientRect();
-          return { top: Math.round(r.top + window.scrollY - TOP), bottom: Math.round(r.bottom + window.scrollY) };
-        })
-        .sort((a, b) => a.top - b.top);
-
-    const scrollsInside = (target: EventTarget | null, down: boolean) => {
-      for (let el = target instanceof Element ? target : null; el && el !== document.body; el = el.parentElement) {
-        const { overflowY } = getComputedStyle(el);
-        if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 1) {
-          if (down ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0) return true;
-        }
-      }
-      return false;
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      if (!wide.matches || e.ctrlKey || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
-      const now = performance.now();
-      const quiet = now - lastWheel > QUIET_MS;
-      lastWheel = now;
-      // The tail of the gesture that moved the page: swallowed until the glide is done and the wheel goes quiet.
-      if (gliding) {
-        if (now < glideEnds || !quiet) {
-          e.preventDefault();
-          return;
-        }
-        gliding = false;
-      }
-      const down = e.deltaY > 0;
-      if (scrollsInside(e.target, down)) return;
-      const y = window.scrollY;
-      const fold = window.innerHeight - TOP;
-      const all = sections();
-      const tops = all.map((x) => x.top);
-      let target = down ? tops.find((t) => t > y + 2) : [...tops].reverse().find((t) => t < y - 2);
-      // A slide taller than the screen shows its foot before the next one comes (17 Nov 2026, Martin: the page swiped
-      // right past the lower tiles of the sales slide).
-      if (down) {
-        const here = [...all].reverse().find((x) => x.top <= y + 2);
-        const foot = here ? here.bottom - window.innerHeight : -1;
-        if (here && foot > y + 4) target = target === undefined ? foot : Math.min(target, foot);
-      }
-      if (target === undefined) return;
-      // Still inside a section well over a screen tall: let it scroll until its edge is within about a fold. A slide a
-      // little taller than the screen (its content a few pixels over) still moves as one.
-      if (Math.abs(target - y) > fold * 1.2) return;
-      e.preventDefault();
-      gliding = true;
-      glideEnds = now + (still.matches ? 150 : 700);
-      window.scrollTo({ top: target, behavior: still.matches ? "auto" : "smooth" });
-    };
-
-    window.addEventListener("wheel", onWheel, { passive: false });
-    return () => window.removeEventListener("wheel", onWheel);
-  }, []);
 }
 
 /** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
