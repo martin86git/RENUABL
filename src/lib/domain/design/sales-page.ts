@@ -138,6 +138,14 @@ export const LAUNCH = {
   cta: "Start your launch",
   plans: "See the plans",
   replay: "Watch the launch again",
+  /** Mission control, in the corners (18 Nov 2026, Martin). */
+  hud: {
+    control: "RENUABL · Launch control",
+    mission: "Solar · AI",
+    alt: "ALT",
+    vel: "VEL",
+    status: ["Sol · Online", "Voice agents · Online", "Your business · Go"],
+  },
 } as const;
 
 /**
@@ -1047,6 +1055,9 @@ export function salesCopy(): string[] {
     LAUNCH.cta,
     LAUNCH.plans,
     LAUNCH.replay,
+    LAUNCH.hud.control,
+    LAUNCH.hud.mission,
+    ...LAUNCH.hud.status,
     INTERFACE.headline,
     INTERFACE.sub,
     ...INTERFACE.screens.flatMap((x) => [x.label, x.alt]),
