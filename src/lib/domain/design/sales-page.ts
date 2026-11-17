@@ -21,6 +21,8 @@ export const SALES_HERO = {
    */
   introducing: "Introducing Sol and your voice agents",
   headline: ["Solar just", "got a brain."],
+  /** Under the headline, smaller (18 Nov 2026, Martin): Sol is the brain, the voice agents the voice. */
+  andVoice: "…and a voice.",
   sub: "The AI sales force for solar businesses.",
   /** Sol and the voice agents both named (17 Nov 2026, Martin: the home page shouldn't only be about Sol). */
   line: "Sol is the brain: he knows your deals and writes the work up. Your voice agents make the calls: sales, bookings and, soon, tech support.",

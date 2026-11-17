@@ -320,6 +320,11 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
             <span className="block">{SALES_HERO.headline[0]}</span>
             <span className="block text-sun-line">{SALES_HERO.headline[1]}</span>
           </h1>
+          {/* …and a voice: the voice agents, the sales agent's wave speaking beside it. */}
+          <p className="mt-4 inline-flex items-center gap-3 text-[clamp(28px,3.4vw,56px)] font-semibold leading-none tracking-[-0.04em] text-ink-2">
+            {SALES_HERO.andVoice}
+            <Ray i={0} size={48} live={live} />
+          </p>
           <p className="mt-7 text-[clamp(22px,2.3vw,36px)] font-medium leading-tight tracking-[-0.025em] text-ink">{SALES_HERO.sub}</p>
           <p className="mx-auto mt-3 max-w-xl text-[17px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.line}</p>
           <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
