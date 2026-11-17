@@ -323,6 +323,8 @@ export function DesignStudio() {
   // A deal can be made here by a signed-in retailer who sees costs; Proceed to proposal on a roof with none asks for one.
   const canMakeDeal = signedIn && !costsHidden() && cleanKind(account?.signedIn ? account.business?.kind : undefined) === "retailer";
   const [dealAsk, setDealAsk] = useState(0);
+  // Raised to open the address search under the picture (Sol's "Is this the home?" answered no).
+  const [searchAsk, setSearchAsk] = useState(0);
   // Run once the design is next saved (going on to the proposal after a deal is made for it).
   const afterSave = useRef<(() => void) | null>(null);
   const createDealHere = async (input: NewDealInput): Promise<{ ok: true } | { ok: false; message: string }> => {
@@ -416,6 +418,8 @@ export function DesignStudio() {
           // A different roof is a different designer: nothing from the last one carries over.
           key={`${roof.lat},${roof.lng},${fresh}`}
           address={roof.address}
+          onPickAddress={pick}
+          onSearchAddress={popped ? () => setSearchAsk((n) => n + 1) : undefined}
           image={pictureMissing ? "" : image}
           set={work.set}
           extras={work.extras}
@@ -605,6 +609,7 @@ export function DesignStudio() {
             deal={onJob ? { customerName: onJob.customerName } : null}
             onOpenDeal={onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
             askToCreate={dealAsk}
+            askToSearch={searchAsk}
             extra={signedIn ? <DesignCredits className="h-10 px-3.5 text-[13px]" /> : null}
             onCreate={canMakeDeal ? createDealHere : undefined}
           />

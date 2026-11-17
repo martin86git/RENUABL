@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { X } from "lucide-react";
 import { useState } from "react";
+import type { NearbyHome } from "@/lib/domain/design/property-lot";
 import type { GuideStepId, GuideTarget } from "@/lib/domain/design/sol-guide";
 import {
   FREE_HOURS,
@@ -25,6 +26,15 @@ type Roof = "tile" | "tin" | "flat";
  */
 export function SolGuide(props: {
   step: GuideStepId | null;
+  /**
+   * Is this the home? (18 Nov 2026, Martin): the lot outlined from the land register, by its address, why it may be in
+   * doubt, and the homes round about for a no.
+   */
+  house: { address: string; doubt: string | null; nearby: NearbyHome[] } | null;
+  /** Yes; another home round about; search for the address; or find it on the picture themselves. */
+  onHouse: (answer: "yes" | "self" | "search" | NearbyHome) => void;
+  /** Whether the address can be searched again from here (the strip under the picture). */
+  canSearch: boolean;
   /** Placing towards the target: how many are down, of how many. */
   placing: { panels: number; of: number | null; kw: number } | null;
   first: string | null;
@@ -83,6 +93,8 @@ export function SolGuide(props: {
     setTried(false);
   }
   const [tilt, setTilt] = useState<number | null | undefined>(undefined);
+  // "No, it isn't": the homes round about, a search, or finding it themselves.
+  const [notIt, setNotIt] = useState(false);
   // The kW box shows the size Sol suggests (it fills in once the bill arrives) until it is typed in.
   const start = props.target ?? props.suggested;
   const [typedKw, setKw] = useState<string | null>(null);
@@ -117,6 +129,44 @@ export function SolGuide(props: {
         </p>
       );
     switch (props.step) {
+      case "house":
+        if (!props.house) return null;
+        return notIt ? (
+          <>
+            <p>Which house is it?</p>
+            {props.house.nearby.length > 0 && (
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                {props.house.nearby.map((h) => (
+                  <button
+                    key={`${h.line}|${h.lat}`}
+                    type="button"
+                    onClick={() => props.onHouse(h)}
+                    className="flex items-baseline justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13px] text-white/90 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+                  >
+                    <span className="truncate">{h.line}</span>
+                    <span className="shrink-0 text-[11.5px] tabular-nums text-white/50">{h.metres} m</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <Actions>
+              {props.canSearch && <Quiet onClick={() => props.onHouse("search")}>Search the address</Quiet>}
+              <Quiet onClick={() => props.onHouse("self")}>I&apos;ll find the house myself</Quiet>
+              <Quiet onClick={() => setNotIt(false)}>Back</Quiet>
+            </Actions>
+          </>
+        ) : (
+          <>
+            <p>
+              Is this the home? <span className="text-sun-line">{props.house.address}</span>
+            </p>
+            {props.house.doubt && <p className="mt-1 text-[12.5px] text-white/70">{props.house.doubt}</p>}
+            <Actions>
+              <Main onClick={() => props.onHouse("yes")}>Yes</Main>
+              <Quiet onClick={() => setNotIt(true)}>No</Quiet>
+            </Actions>
+          </>
+        );
       case "home":
         return (
           <>

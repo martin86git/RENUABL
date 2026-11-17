@@ -354,6 +354,8 @@ const SHORTCUTS: [keys: string, does: string][] = [
 ];
 
 import { KnifeMenu, ToolFan } from "./tool-fan";
+import { lotDoubt, titleCase, type NearbyHome, type PropertyLot } from "@/lib/domain/design/property-lot";
+import type { Address } from "@/lib/domain/types";
 
 const GLASS = "rounded-2xl border border-line bg-surface/75 shadow-lift backdrop-blur-md backdrop-saturate-150";
 /**
@@ -994,6 +996,10 @@ const within = (at: number, size: number, whole: number) => Math.min(Math.max(-s
  */
 export function RoofDesigner(props: {
   address: string;
+  /** Open another address (a home round about picked when Sol asks "Is this the home?"). */
+  onPickAddress?: (address: Address) => void;
+  /** Open the address search under the picture. */
+  onSearchAddress?: () => void;
   image: string;
   /** The designs for this roof: up to five options, one of them the primary. */
   set: DesignSet;
@@ -4040,6 +4046,27 @@ export function RoofDesigner(props: {
   const [guideTarget, setGuideTarget] = useState<GuideTarget | null>(null);
   const [guideFlat, setGuideFlat] = useState<{ kliplok: boolean; tilt: number | null }>({ kliplok: true, tilt: null });
   const answerGuide = (id: GuideStepId) => setGuideAnswered((list) => (list.includes(id) ? list : [...list, id]));
+  /**
+   * Which house is the right one (18 Nov 2026, Martin, as Primero's designer): the lot the address is registered to on
+   * Victoria's land register, asked for as a blank roof opens with Sol leading. While Sol asks "Is this the home?" it is
+   * outlined in gold with everything off it dimmed; any answer takes the outline away.
+   */
+  const [lot, setLot] = useState<PropertyLot | null>(null);
+  useEffect(() => {
+    if (!guideOn) return;
+    let live = true;
+    const q = new URLSearchParams({ address: props.address, lat: String(spot.lat), lng: String(spot.lng) });
+    fetch(`/api/design/roof/lot?${q}`)
+      .then((r) => (r.ok ? (r.json() as Promise<PropertyLot>) : null))
+      .then((found) => {
+        if (live && found?.outlines?.length) setLot(found);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once a roof, while Sol leads
+  }, [props.address, spot.lat, spot.lng]);
   const adviceFrom = (fields: typeof bill, found: string[]): Opening | null => {
     const daily = dailyFromBillFields(fields);
     const size = daily ? quickSize({ kwhPerDay: daily }) : null;
@@ -4212,6 +4239,7 @@ export function RoofDesigner(props: {
     };
   })();
   const guideFacts: GuideFacts = {
+    ...(lot ? { lot: true } : {}),
     roof: quoteNow.form.roof,
     suggested: guideSuggested,
     target: guideTarget,
@@ -4275,6 +4303,19 @@ export function RoofDesigner(props: {
     pickTool("panel");
   };
   const guideHandlers = {
+    onHouse: (answer: "yes" | "self" | "search" | NearbyHome) => {
+      if (answer === "search") return props.onSearchAddress?.();
+      if (typeof answer === "object")
+        return props.onPickAddress?.({
+          line: answer.line,
+          suburb: answer.suburb,
+          state: "VIC",
+          postcode: answer.postcode,
+          lat: answer.lat,
+          lng: answer.lng,
+        });
+      answerGuide("house");
+    },
     onHome: (home: { phase: "single" | "three"; storeys: "single" | "double"; roof: "tile" | "tin" | "flat" }) => {
       setQuote({ ...quoteNow, form: { ...quoteNow.form, ...home } });
       answerGuide("home");
@@ -6939,6 +6980,66 @@ export function RoofDesigner(props: {
                       ))}
                     </g>
                   )}
+                  {/* Is this the home? The lot the address is registered to, outlined in gold with everything off it
+                      dimmed and its address over it, while Sol asks (18 Nov 2026, Martin, as Primero's designer). */}
+                  {lot &&
+                    guideNow === "house" &&
+                    (() => {
+                      const rings = lot.outlines.map((outline) => outline.map((p) => px(p)));
+                      const cut = rings.map((ring) => `M${ring.map((p) => p.join(",")).join(" L")} Z`).join(" ");
+                      const all = rings.flat();
+                      const midX = (Math.min(...all.map((p) => p[0])) + Math.max(...all.map((p) => p[0]))) / 2;
+                      const topY = Math.min(...all.map((p) => p[1]));
+                      const held = (n: number, least: number, most: number) => Math.min(Math.max(n, least), Math.max(least, most));
+                      const nameX = held(midX, view.x + 120 * u, view.x + view.w - 120 * u);
+                      const nameY = held(topY - 6 * u, view.y + 70 * u, view.y + view.h - 24 * u);
+                      const doubt = lotDoubt(lot);
+                      return (
+                        <g pointerEvents="none">
+                          <path
+                            d={`M${view.x - view.w},${view.y - view.h} H${view.x + 2 * view.w} V${view.y + 2 * view.h} H${view.x - view.w} Z ${cut}`}
+                            fillRule="evenodd"
+                            fill="#0b0c0e"
+                            fillOpacity="0.55"
+                          />
+                          <path
+                            d={cut}
+                            fill="none"
+                            stroke={doubt ? "#ffffff" : "#e6b84a"}
+                            strokeWidth={1.8 * u}
+                            strokeLinejoin="round"
+                            strokeDasharray={doubt ? `${5 * u} ${3 * u}` : undefined}
+                            style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.9))` }}
+                          />
+                          {/* Where Google put the address: the middle of the picture. */}
+                          <circle
+                            cx={ROOF_IMAGE.width / 2}
+                            cy={ROOF_IMAGE.height / 2}
+                            r={5 * u}
+                            fill="none"
+                            stroke="#ffffff"
+                            strokeWidth={u}
+                          >
+                            <animate attributeName="r" values={`${3 * u};${9 * u};${3 * u}`} dur="2.4s" repeatCount="indefinite" />
+                            <animate attributeName="opacity" values="1;0.2;1" dur="2.4s" repeatCount="indefinite" />
+                          </circle>
+                          <circle cx={ROOF_IMAGE.width / 2} cy={ROOF_IMAGE.height / 2} r={1.8 * u} fill="#ffffff" />
+                          <text
+                            x={nameX}
+                            y={nameY}
+                            textAnchor="middle"
+                            fontSize={9 * u}
+                            fontWeight="700"
+                            fill="#e6b84a"
+                            stroke="#0b0c0e"
+                            strokeWidth={2.6 * u}
+                            paintOrder="stroke"
+                          >
+                            {lot.registered ?? props.address.split(",")[0].toUpperCase()}
+                          </text>
+                        </g>
+                      );
+                    })()}
                   {faces.map((f) => {
                     const on = f.id === selected;
                     const off = new Set(f.off);
@@ -9551,6 +9652,16 @@ export function RoofDesigner(props: {
                 >
                   <SolGuide
                     step={guideNow}
+                    house={
+                      lot
+                        ? {
+                            address: lot.registered ? titleCase(lot.registered) : props.address.split(",")[0],
+                            doubt: lotDoubt(lot),
+                            nearby: props.onPickAddress ? lot.nearby : [],
+                          }
+                        : null
+                    }
+                    canSearch={Boolean(props.onSearchAddress)}
                     placing={
                       guideAnswered.includes("place") && !guideAnswered.includes("reached")
                         ? {

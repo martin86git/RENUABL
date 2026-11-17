@@ -3,7 +3,8 @@
  * whilst I do the physical placement"; and "the key to this product is also what it does when I say no: it should
  * still allow me down the next path"). Pure, tested.
  *
- * A design is led through a fixed run of steps, each a question with its answers: the home (phase, storeys, roof),
+ * A design is led through a fixed run of steps, each a question with its answers: whether the lot outlined from the land
+ * register is the home (18 Nov 2026, Martin), the home (phase, storeys, roof),
  * on a flat roof the Kliplok interfaces and the tilt, the size to aim for (from the customer's bill when it is known),
  * the panel, placing the panels, the target reached, the inverter, the strings, the battery, and blackout backup.
  * Each step is answered once, yes or no alike, and the next applicable one comes up; a step the design has already
@@ -13,7 +14,19 @@
 import { ASSUMPTIONS } from "../recommendation";
 
 export type GuideStepId =
-  "home" | "flat" | "target" | "existing" | "panel" | "place" | "reached" | "inverter" | "string" | "unstrung" | "battery" | "backup";
+  | "house"
+  | "home"
+  | "flat"
+  | "target"
+  | "existing"
+  | "panel"
+  | "place"
+  | "reached"
+  | "inverter"
+  | "string"
+  | "unstrung"
+  | "battery"
+  | "backup";
 
 /** The size aimed for: kW of panels, and kWh of battery (0: none). */
 export interface GuideTarget {
@@ -79,6 +92,8 @@ export function batteryWords(b: GuideBattery): string {
 
 /** What the design and the deal say right now. */
 export interface GuideFacts {
+  /** The land register has a lot for the address, outlined on the picture: Sol asks "Is this the home?" first. */
+  lot?: boolean;
   roof: "tile" | "tin" | "flat";
   /** The size Sol suggests from the bill (null without one), and the bill in words for the line. */
   suggested: (GuideTarget & { spend: string | null }) | null;
@@ -102,6 +117,8 @@ export type GuideAnswered = readonly GuideStepId[];
 /** The step to show now, or null when the run is done. */
 export function guideStep(answered: GuideAnswered, facts: GuideFacts): GuideStepId | null {
   const open = (id: GuideStepId) => !answered.includes(id);
+  // Is this the home? Only while the home itself hasn't been answered: a lot found late doesn't step back.
+  if (facts.lot && open("house") && open("home")) return "house";
   if (open("home")) return "home";
   if (facts.roof === "flat" && open("flat")) return "flat";
   if (open("target")) return "target";
