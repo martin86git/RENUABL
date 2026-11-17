@@ -23,6 +23,10 @@
   --call: #0e9f6e;
   --call-soft: #e1f6ed;
   --call-ink: #065f46;
+  /* Context (18 Nov 2026, Martin: a recognisable "Context" in a persistent colour, across RENUABL, saying in a line
+     what lies behind a proposal): a violet kept for that label alone. */
+  --context: #6e56cf;
+  --context-soft: #f0edfc;
   --canvas: #faf9f6;
   --surface: #ffffff;
   --surface-2: #f0ece7;
@@ -394,6 +398,30 @@ html.sol-resizing .team-pop {
   to {
     opacity: 1;
     transform: none;
+  }
+}
+/* Sol on a deal (18 Nov 2026, Martin: show he's there, live): his sun turning slowly in a ring, and a caret while
+   his words come. Still with reduced motion. */
+.sol-live-ring {
+  animation: sol-live-turn 6s linear infinite;
+}
+@keyframes sol-live-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sol-caret {
+  animation: sol-caret 1s steps(1) infinite;
+}
+@keyframes sol-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-live-ring,
+  .sol-caret {
+    animation: none;
   }
 }
 /* A voice agent's call emerging from the side of its chat window (17 Nov 2026, Martin). */
@@ -785,6 +813,8 @@ button.team-flash:not([aria-pressed="true"]) {
   --color-call: var(--call);
   --color-call-soft: var(--call-soft);
   --color-call-ink: var(--call-ink);
+  --color-context: var(--context);
+  --color-context-soft: var(--context-soft);
   --color-kind-install: var(--kind-install);
   --color-kind-install-soft: var(--kind-install-soft);
   --color-kind-message: var(--kind-message);

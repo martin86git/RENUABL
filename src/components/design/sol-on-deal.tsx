@@ -1,22 +1,27 @@
 "use client";
 
 /**
- * Sol's line at the top of a deal (16 Nov 2026, Martin: make Sol a more active player on the CRM page): what last
- * happened, what Sol does next (his lined-up email, counting down, with Read it and Stop), and the one thing the deal
- * needs from a person, with its button. Rules in domain/design/sol-on-deal.ts; the deal's card from the deal feed.
+ * Sol on a deal, as a live terminal (18 Nov 2026, Martin: "I almost missed that Sol was there"; it blended in, read as
+ * someone reporting what Sol had done, and took too much room). His sun turns in a ring to show he's there; he puts
+ * the next step to you in the first person ("I've drafted an email to Roberto. Want me to send it?"), typed out as he
+ * says it, with **Yes / No / Something else**; his draft is already open under it to change; and a violet **Context**
+ * line says in one go what lies behind it. Rules in domain/design/sol-on-deal.ts; the deal's card from the deal feed.
  */
 import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
-import type { MoveKind } from "@/lib/domain/design/deal-feed";
-import type { FeedDeal } from "@/lib/domain/design/deal-feed";
-import { solOnDeal } from "@/lib/domain/design/sol-on-deal";
-import { actOnOutbox } from "@/lib/services/sol-agents";
+import { ArrowUp, Loader2 } from "lucide-react";
+import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
+import { dealContext, solProposes } from "@/lib/domain/design/sol-on-deal";
+import { countdownWords } from "@/lib/domain/design/sol-agents";
+import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { loadFeedDeal } from "@/lib/services/deal-feed";
 import { leadPageFor } from "@/lib/services/hello";
-import { Countdown, ReviewSol } from "./deal-feed";
+import { askSolInPanel } from "@/lib/services/sol";
+import { ContextLine } from "./context-line";
 import { SolMark } from "./sol-icon";
 
 const REFRESH_MS = 60_000;
+const TYPE_MS = 14;
 
 export function SolOnDealCard(props: {
   jobId: string;
@@ -28,8 +33,6 @@ export function SolOnDealCard(props: {
 }) {
   const [deal, setDeal] = useState<FeedDeal | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [reviewing, setReviewing] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const read = useCallback(async () => {
     const r = await loadFeedDeal(props.jobId);
@@ -57,113 +60,257 @@ export function SolOnDealCard(props: {
   }, [read]);
 
   if (!deal) return null;
-  const line = solOnDeal(deal, now);
-  const name = deal.customer.split(/\s+/)[0] || "them";
-  const quiet = "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2";
+  // Keyed by what Sol is putting to you (not the clock), so a new proposal starts afresh: typed again, its draft read again.
+  const key = `${solProposes(deal, now).yes?.kind ?? "none"}|${deal.sol?.id ?? ""}|${deal.sol?.subject ?? ""}`;
+  return <SolTerminal key={key} {...props} deal={deal} now={now} onRead={() => void read()} />;
+}
 
-  const act = async (what: "hold" | "release") => {
-    if (!deal.sol?.id) return;
-    setBusy(true);
-    await actOnOutbox(deal.sol.id, what);
-    setBusy(false);
-    void read();
+function SolTerminal(props: {
+  jobId: string;
+  phone: string | null;
+  deal: FeedDeal;
+  now: Date;
+  onRead: () => void;
+  onMove: (kind: Exclude<MoveKind, "review" | "call">) => void;
+}) {
+  const { deal, now } = props;
+  const p = solProposes(deal, now);
+  const name = deal.customer.split(/\s+/)[0] || "them";
+  const sol = deal.sol;
+  const [subject, setSubject] = useState(sol?.subject ?? "");
+  const [body, setBody] = useState(sol?.body ?? "");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [said, setSaid] = useState<string | null>(null);
+  const [other, setOther] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [leftIt, setLeftIt] = useState(false);
+  const typed = useTyped(leftIt ? "Okay, I'll leave that for now." : p.say);
+  const changed = Boolean(sol) && (subject !== (sol?.subject ?? "") || body !== (sol?.body ?? ""));
+
+  // Words changed in the draft go with whatever is pressed next.
+  const run = async (key: string, fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    setBusy(key);
+    setSaid(null);
+    if (changed && sol?.id) {
+      const saved = await editOutbox(sol.id, { subject, body });
+      if (!saved.ok) {
+        setBusy(null);
+        return setSaid("message" in saved && typeof saved.message === "string" ? saved.message : "It couldn't be saved. Try again.");
+      }
+    }
+    const r = await fn();
+    setBusy(null);
+    if (!r.ok) return setSaid(r.message ?? "That couldn't be done. Try again.");
+    props.onRead();
   };
 
-  const move = line.need?.move ?? null;
-  const moveButton = move ? (
-    move.kind === "call" ? (
-      props.phone ? (
-        <a href={`tel:${props.phone.replace(/\s+/g, "")}`} className={MOVE}>
-          {move.label}
-        </a>
-      ) : null
-    ) : (
-      <button
-        type="button"
-        className={MOVE}
-        aria-expanded={move.kind === "review" ? reviewing : undefined}
-        onClick={() => (move.kind === "review" ? setReviewing((r) => !r) : props.onMove(move.kind as Exclude<MoveKind, "review" | "call">))}
-      >
-        {move.label}
-      </button>
-    )
-  ) : null;
+  const yes = () => {
+    if (!p.yes) return;
+    if (p.yes.kind === "send") {
+      if (sol?.id) void run("yes", () => actOnOutbox(sol.id!, "send"));
+      return;
+    }
+    if (p.yes.kind === "call") {
+      if (props.phone) window.location.href = `tel:${props.phone.replace(/\s+/g, "")}`;
+      return;
+    }
+    if (p.yes.kind !== "review") props.onMove(p.yes.kind);
+  };
+  const state = sol ? (sol.state ?? (sol.held ? "held" : "counting")) : null;
+  const no = () => {
+    if (p.draft && sol?.id) return void run("no", () => actOnOutbox(sol.id!, state === "counting" ? "hold" : "skip"));
+    setLeftIt(true);
+  };
+  const tellSol = () => {
+    const t = ask.trim();
+    if (!t) return;
+    askSolInPanel({ text: `On ${deal.customer}'s deal (#${props.jobId}): ${t}`, shown: t });
+    setAsk("");
+    setOther(false);
+  };
+
+  const quiet =
+    "inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
 
   return (
-    <section aria-label="Sol on this deal" className="rounded-2xl bg-surface p-4 ring-1 ring-line sm:p-5">
-      <div className="mb-3 flex items-center gap-2.5">
-        <span className="sol-orb relative inline-flex size-7 shrink-0 items-center justify-center rounded-full" aria-hidden>
-          <SolMark className="size-6" glow={false} />
-        </span>
-        <span className="text-[11.5px] font-semibold tracking-[0.08em] text-muted uppercase">Sol · on this deal</span>
-      </div>
+    <section
+      aria-label="Sol"
+      className="overflow-hidden rounded-2xl bg-surface shadow-[0_14px_36px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70"
+    >
+      <div className="flex gap-3.5 p-4 sm:gap-4 sm:p-5">
+        <SolLive />
+        <div className="min-w-0 flex-1">
+          <p className="min-h-[1.5em] text-[16px] font-medium leading-snug text-ink" aria-live="polite">
+            {typed.text}
+            <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
+          </p>
+          <ContextLine text={dealContext(deal, now)} className="mt-2" />
 
-      <dl className="grid gap-x-4 gap-y-3 text-[14px] leading-relaxed sm:grid-cols-[8.5rem_minmax(0,1fr)]">
-        <dt className="text-[12.5px] text-muted sm:pt-0.5">What happened</dt>
-        <dd className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 text-ink">
-          <span className="min-w-0">{line.happened?.text}</span>
-          {line.happened && <span className="shrink-0 text-[12px] text-muted">{line.happened.ago}</span>}
-        </dd>
-
-        <dt className="text-[12.5px] text-muted sm:pt-0.5">I&apos;ll do next</dt>
-        <dd className="min-w-0 text-ink">
-          {line.next && deal.sol ? (
-            <>
-              <p>{line.next.text}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span
-                  className={clsx(
-                    "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium",
-                    line.next.state === "counting" ? "text-sun-ink ring-1 ring-sun-line" : "text-ink-2 ring-1 ring-line",
-                  )}
-                >
-                  {line.next.state === "counting" && <Countdown sol={deal.sol} now={now} />}
-                  {line.next.when}
-                </span>
-                {move?.kind !== "review" && (
-                  <button type="button" className={quiet} aria-expanded={reviewing} onClick={() => setReviewing((r) => !r)}>
-                    {reviewing ? "Close" : "Read it"}
-                  </button>
-                )}
-                {line.next.state === "counting" && (
-                  <button type="button" disabled={busy} className={quiet} onClick={() => void act("hold")}>
-                    Stop
-                  </button>
-                )}
-                {line.next.state === "held" && (
-                  <button type="button" disabled={busy} className={quiet} onClick={() => void act("release")}>
-                    Let Sol send it
-                  </button>
-                )}
+          {!leftIt && p.draft && sol && (
+            <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+              <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-2 text-[12px] text-muted">
+                <span>To {sol.to ?? `${name} (no email on file)`}</span>
+                {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
+                {state === "held" && <span>· held</span>}
               </div>
-            </>
-          ) : (
-            <p className="text-ink-2">Nothing lined up for {name} yet.</p>
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                aria-label="Subject"
+                className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
+              />
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={6}
+                aria-label="The email"
+                className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
+              />
+            </div>
           )}
-        </dd>
 
-        <dt className="text-[12.5px] text-muted sm:pt-0.5">Needs you</dt>
-        <dd className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <span className={line.need ? "text-ink" : "text-ink-2"}>{line.need ? line.need.text : "Nothing right now."}</span>
-          {moveButton}
-        </dd>
-      </dl>
+          {!leftIt && typed.done && (
+            <div className="mt-3.5 flex flex-wrap items-center gap-2">
+              {p.yes && !(p.yes.kind === "call" && !props.phone) && (
+                <button
+                  type="button"
+                  onClick={yes}
+                  disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                >
+                  {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+                  {p.yes.label}
+                </button>
+              )}
+              {p.no && (
+                <button type="button" onClick={no} disabled={busy !== null} className={quiet}>
+                  {busy === "no" && <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />}
+                  {p.no}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setOther((o) => !o)}
+                aria-expanded={other}
+                className={clsx(quiet, other && "bg-surface-2")}
+              >
+                Something else
+              </button>
+              {changed && <span className="text-[12px] text-muted">Your changes go with it.</span>}
+            </div>
+          )}
 
+          {other && !leftIt && (
+            <div className="mt-2.5 space-y-2">
+              {p.draft && sol?.id && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    className={quiet}
+                    onClick={() => void run("hour", () => putOffOutbox(sol.id!, "hour"))}
+                  >
+                    Send it in an hour
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    className={quiet}
+                    onClick={() => void run("tomorrow", () => putOffOutbox(sol.id!, "tomorrow"))}
+                  >
+                    Tomorrow at 9
+                  </button>
+                  {changed && (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      className={quiet}
+                      onClick={() => void run("save", async () => ({ ok: true }))}
+                    >
+                      Keep my changes
+                    </button>
+                  )}
+                </div>
+              )}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  tellSol();
+                }}
+                className="flex items-center gap-2 rounded-full bg-canvas py-1 pl-4 pr-1 ring-1 ring-line focus-within:ring-sun-line"
+              >
+                <span className="font-mono text-[13px] text-sun-line" aria-hidden>
+                  {">"}
+                </span>
+                <input
+                  value={ask}
+                  onChange={(e) => setAsk(e.target.value)}
+                  autoFocus
+                  placeholder={`Tell Sol what to do for ${name} instead…`}
+                  aria-label="Tell Sol what to do instead"
+                  className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-muted"
+                />
+                <button
+                  type="submit"
+                  disabled={!ask.trim()}
+                  aria-label="Send to Sol"
+                  className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                >
+                  <ArrowUp className="size-4" aria-hidden />
+                </button>
+              </form>
+            </div>
+          )}
+          {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
+        </div>
+      </div>
       {(deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
-
-      {reviewing && deal.sol && (
-        <ReviewSol
-          deal={deal}
-          now={now}
-          onClose={() => setReviewing(false)}
-          onDone={() => {
-            setReviewing(false);
-            void read();
-          }}
-        />
-      )}
     </section>
   );
+}
+
+/** Sol's sun with a thin ring turning round it: he's here, and on it. */
+function SolLive() {
+  return (
+    <span className="relative grid size-11 shrink-0 place-items-center" aria-hidden>
+      <svg viewBox="0 0 44 44" className="sol-live-ring absolute inset-0 size-11">
+        <circle
+          cx="22"
+          cy="22"
+          r="20.5"
+          fill="none"
+          stroke="var(--sun-line)"
+          strokeOpacity="0.85"
+          strokeWidth="1.5"
+          strokeDasharray="22 10 4 10"
+          strokeLinecap="round"
+        />
+      </svg>
+      <SolMark className="size-8" glow={false} />
+    </span>
+  );
+}
+
+/** Words typed out as Sol says them, as a terminal would (all at once with reduced motion). */
+function useTyped(text: string): { text: string; done: boolean } {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    /* eslint-disable react-hooks/set-state-in-effect -- the words start again when they change */
+    if (still) {
+      setShown(text.length);
+      return;
+    }
+    setShown(0);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    const t = window.setInterval(() => setShown((n) => (n >= text.length ? n : n + 1)), TYPE_MS);
+    const stop = window.setTimeout(() => window.clearInterval(t), TYPE_MS * (text.length + 2));
+    return () => {
+      window.clearInterval(t);
+      window.clearTimeout(stop);
+    };
+  }, [text]);
+  return { text: text.slice(0, shown), done: shown >= text.length };
 }
 
 /**
@@ -183,15 +330,15 @@ function LeadPage({ jobId, name }: { jobId: string; name: string }) {
     }
     return `${window.location.origin}${r.path}`;
   };
-  const quiet = "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2";
+  const link = "font-medium text-ink underline decoration-line underline-offset-2 hover:decoration-ink disabled:text-muted";
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
-      <span className="text-[12.5px] text-muted">{name}&apos;s page: their home, the design and a chat with Sol</span>
-      <div className="ml-auto flex gap-1.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-canvas/60 px-4 py-2 text-[12.5px] sm:px-5">
+      <span className="text-muted">{name}&apos;s page: their home, the design and a chat with Sol</span>
+      <span className="ml-auto flex gap-3">
         <button
           type="button"
           disabled={busy}
-          className={quiet}
+          className={link}
           onClick={async () => {
             const url = await get();
             if (!url) return;
@@ -206,7 +353,7 @@ function LeadPage({ jobId, name }: { jobId: string; name: string }) {
         <button
           type="button"
           disabled={busy}
-          className={quiet}
+          className={link}
           onClick={async () => {
             const tab = window.open("", "_blank");
             const url = await get();
@@ -216,11 +363,8 @@ function LeadPage({ jobId, name }: { jobId: string; name: string }) {
         >
           Open
         </button>
-      </div>
-      {said && <p className="w-full text-[12.5px] break-all text-ink-2">{said}</p>}
+      </span>
+      {said && <p className="w-full break-all text-ink-2">{said}</p>}
     </div>
   );
 }
-
-const MOVE =
-  "inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-ink hover:brightness-125";
