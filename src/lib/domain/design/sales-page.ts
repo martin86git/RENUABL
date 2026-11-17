@@ -46,6 +46,29 @@ export const MANIFESTO = {
 } as const;
 
 /**
+ * The assisted designer (17 Nov 2026, Martin: show it asking for confirmations and whether to string, the stringing
+ * done, then the card that leads on to the quote). Sol's cards use the designer's own words (`sol-nudges.ts`): the
+ * backup question, "N panels aren't on a string" with String them, and the next step to finalise the quote.
+ */
+export const DESIGNER = {
+  eyebrow: "The assisted designer",
+  headline: "It designs with you.",
+  sub: "Lay the panels on today's aerial photo. Sol asks what the quote needs, strings the panels in one press and checks every string against the inverter.",
+  steps: ["Asks what the quote needs", "Strings the panels", "Checks every string", "Leads on to the quote"],
+  cards: {
+    backup: { kind: "For the quote", words: "Do they want blackout backup?", yes: "Yes, wire backup", no: "No" },
+    strings: { kind: "An option", words: "21 panels aren't on a string.", go: "String them" },
+    next: { kind: "Next step", words: "The design is ready. Let's finalise the quote.", go: "Finalise the quote" },
+  },
+  strings: [
+    { letter: "A", panels: 11 },
+    { letter: "B", panels: 10 },
+  ],
+  checked: "Inside the inverter's limits",
+  battery: "17 kWh · backup",
+} as const;
+
+/**
  * What Sol knows, circling him (17 Nov 2026): the sources he reads and the business's own records, with the box to ask
  * him. The lines he says while nobody has asked are true of him today.
  */
@@ -861,6 +884,13 @@ export function salesCopy(): string[] {
     ...MANIFESTO.statements,
     ...MANIFESTO.finale,
     KNOWLEDGE.eyebrow,
+    DESIGNER.eyebrow,
+    DESIGNER.headline,
+    DESIGNER.sub,
+    ...DESIGNER.steps,
+    ...Object.values(DESIGNER.cards).flatMap((c) => Object.values(c)),
+    DESIGNER.checked,
+    DESIGNER.battery,
     KNOWLEDGE.headline,
     KNOWLEDGE.sub,
     ...KNOWLEDGE.orbit,

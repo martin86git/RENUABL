@@ -196,8 +196,8 @@ function SignedScene({ t }: { t: number }) {
   );
 }
 
-/** The first and last tiles span two columns. */
-const wide = (i: number) => i === 0 || i === 3;
+/** Every tile lays its words beside its scene on a wide screen, in a 2 × 2 grid that fits one fold. */
+const wide = (i: number) => i >= 0;
 
 const SCENES = { call: CallScene, follow: FollowScene, callme: CallMeScene, signed: SignedScene } as const;
 
@@ -217,19 +217,19 @@ export function SalesLoop() {
     <section
       ref={root}
       id="sales"
-      className="snap-start scroll-mt-16 px-5 py-20 lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:px-8"
+      className="snap-start scroll-mt-16 px-5 py-14 lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:px-8"
       aria-labelledby="sales-loop"
     >
       <div className="mx-auto w-full max-w-[84rem]">
         <div className="text-center">
           <BrandEyebrow>{SALES_LOOP.eyebrow}</BrandEyebrow>
-          <h2 id="sales-loop" className="mt-4 text-[clamp(36px,4.6vw,68px)] font-semibold leading-[0.98] tracking-[-0.045em]">
+          <h2 id="sales-loop" className="mt-3 text-[clamp(34px,4vw,60px)] font-semibold leading-[0.98] tracking-[-0.045em]">
             {SALES_LOOP.headline}
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-[18px] leading-relaxed text-ink-2">{SALES_LOOP.sub}</p>
+          <p className="mx-auto mt-3 max-w-xl text-[17px] leading-relaxed text-ink-2">{SALES_LOOP.sub}</p>
         </div>
-        {/* A grid of two sizes (17 Nov 2026, Martin: no two slides alike): the wide tiles lay words beside the scene. */}
-        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+        {/* Two by two, each tile a colour of its own, so the slide holds in one fold (17 Nov 2026, Martin). */}
+        <div className="mt-8 grid gap-4 lg:grid-cols-2">
           {SALES_LOOP.tiles.map((tile, i) => {
             const Scene = SCENES[tile.key];
             // Each tile on the same clock, a step behind the one before, so they don't all move at once.
@@ -239,25 +239,26 @@ export function SalesLoop() {
                 key={tile.key}
                 className={clsx(
                   "flex flex-col overflow-hidden rounded-[32px] ring-1",
-                  wide(i) ? "lg:col-span-2 lg:flex-row lg:items-center" : "",
-                  i === 0 ? "bg-[#0b0b0d] text-white ring-white/10" : i === 3 ? "bg-sun/60 ring-sun-line/30" : "bg-surface ring-line",
+                  wide(i) ? "lg:flex-row lg:items-center" : "",
+                  i === 0
+                    ? "bg-[#0b0b0d] text-white ring-white/10"
+                    : i === 3
+                      ? "bg-sun/60 ring-sun-line/30"
+                      : i === 1
+                        ? "bg-surface ring-line"
+                        : "bg-[#eef0f4] ring-line",
                 )}
               >
-                <div className={clsx("px-7 pt-7", wide(i) && "lg:w-[46%] lg:py-8 lg:pl-10 lg:pr-4")}>
+                <div className={clsx("px-7 pt-7", wide(i) && "lg:w-[46%] lg:py-6 lg:pl-8 lg:pr-2")}>
                   <p className={clsx("font-mono text-[12px]", i === 0 ? "text-white/50" : "text-muted")}>
                     {String(i + 1).padStart(2, "0")}
                   </p>
-                  <h3
-                    className={clsx(
-                      "mt-2 font-semibold leading-[1.02] tracking-[-0.035em]",
-                      wide(i) ? "text-[clamp(30px,3vw,46px)]" : "text-[clamp(26px,2.2vw,34px)]",
-                    )}
-                  >
+                  <h3 className={clsx("mt-2 font-semibold leading-[1.02] tracking-[-0.035em]", "text-[clamp(26px,2.2vw,36px)]")}>
                     {tile.title}
                   </h3>
-                  <p className={clsx("mt-3 text-[16px] leading-relaxed", i === 0 ? "text-white/70" : "text-ink-2")}>{tile.body}</p>
+                  <p className={clsx("mt-2 text-[15px] leading-relaxed", i === 0 ? "text-white/70" : "text-ink-2")}>{tile.body}</p>
                 </div>
-                <div className={clsx("mt-auto px-6 pb-7 pt-6", wide(i) && "lg:flex-1 lg:py-7 lg:pl-2 lg:pr-8")}>
+                <div className={clsx("mt-auto px-6 pb-7 pt-6", wide(i) && "lg:flex-1 lg:py-5 lg:pl-2 lg:pr-5")}>
                   <div className="h-[12.5rem] rounded-2xl bg-canvas p-3 text-ink ring-1 ring-line">
                     <Scene t={motion ? at : LOOP_MS - 1} />
                   </div>

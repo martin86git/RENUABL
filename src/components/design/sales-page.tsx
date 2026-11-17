@@ -7,6 +7,7 @@ import { ArrowRight, Check, Menu, Sparkles, X } from "lucide-react";
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { LivingHero } from "./living-hero";
 import { SalesLoop } from "./sales-loop";
+import { DesignerSlide } from "./designer-slide";
 import { KnowledgeOrbit, Manifesto } from "./business-slides";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
@@ -33,6 +34,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       <LivingHero signedIn={signedIn} />
       <Manifesto />
       <SalesLoop />
+      <DesignerSlide />
       <KnowledgeOrbit />
       <FilmSection />
       <Pricing />
@@ -78,11 +80,14 @@ function useFoldScroll() {
     let lastWheel = 0;
     let glideEnds = 0;
 
-    const tops = () =>
+    const sections = () =>
       Array.from(document.querySelectorAll<HTMLElement>(".snap-start"))
         .filter((el) => el.getClientRects().length > 0)
-        .map((el) => Math.round(el.getBoundingClientRect().top + window.scrollY - TOP))
-        .sort((a, b) => a - b);
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return { top: Math.round(r.top + window.scrollY - TOP), bottom: Math.round(r.bottom + window.scrollY) };
+        })
+        .sort((a, b) => a.top - b.top);
 
     const scrollsInside = (target: EventTarget | null, down: boolean) => {
       for (let el = target instanceof Element ? target : null; el && el !== document.body; el = el.parentElement) {
@@ -111,8 +116,16 @@ function useFoldScroll() {
       if (scrollsInside(e.target, down)) return;
       const y = window.scrollY;
       const fold = window.innerHeight - TOP;
-      const all = tops();
-      const target = down ? all.find((t) => t > y + 2) : [...all].reverse().find((t) => t < y - 2);
+      const all = sections();
+      const tops = all.map((x) => x.top);
+      let target = down ? tops.find((t) => t > y + 2) : [...tops].reverse().find((t) => t < y - 2);
+      // A slide taller than the screen shows its foot before the next one comes (17 Nov 2026, Martin: the page swiped
+      // right past the lower tiles of the sales slide).
+      if (down) {
+        const here = [...all].reverse().find((x) => x.top <= y + 2);
+        const foot = here ? here.bottom - window.innerHeight : -1;
+        if (here && foot > y + 4) target = target === undefined ? foot : Math.min(target, foot);
+      }
       if (target === undefined) return;
       // Still inside a section well over a screen tall: let it scroll until its edge is within about a fold. A slide a
       // little taller than the screen (its content a few pixels over) still moves as one.
@@ -133,6 +146,7 @@ const PAGE_LINKS = [
   { href: "#start", label: "Meet Sol" },
   { href: "#force", label: "Your new sales force" },
   { href: "#sales", label: "How it sells" },
+  { href: "#designer", label: "The assisted designer" },
   { href: "#brain", label: "Ask him anything" },
   { href: "#film", label: "See it work" },
   { href: "#pricing", label: "Pricing" },
