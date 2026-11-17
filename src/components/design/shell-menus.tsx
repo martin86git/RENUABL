@@ -30,6 +30,8 @@ import type { Sky } from "@/lib/domain/weather";
 import clsx from "clsx";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import type { Notification } from "@/lib/server/design-notifications-repo";
+import type { FeedNote } from "@/lib/domain/design/feed-social";
+import { FeedNoteLink } from "./feed-social";
 import type { ChatThread } from "@/lib/domain/design/chat";
 import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from "@/lib/services/crm";
 import { lineTime, loadMessages } from "@/lib/services/chat";
@@ -224,6 +226,7 @@ export function NotificationsMenu(props: {
 }) {
   const [open, setOpen, box] = useWindow();
   const [items, setItems] = useState<Notification[] | null>(null);
+  const [feed, setFeed] = useState<FeedNote[]>([]);
   const [threads, setThreads] = useState<ChatThread[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const told = () => window.dispatchEvent(new Event("renuabl:notifications"));
@@ -231,16 +234,21 @@ export function NotificationsMenu(props: {
     setOpen(to);
     if (!to) return;
     setProblem(null);
-    void loadNotifications().then((res) => (res.ok ? setItems(res.notifications) : setProblem(res.message)));
+    void loadNotifications().then((res) => {
+      if (!res.ok) return setProblem(res.message);
+      setItems(res.notifications);
+      setFeed(res.feed ?? []);
+    });
     void loadMessages().then((res) => setThreads(res.ok ? res.threads : []));
   };
   const read = async (which: { ids?: string[]; all?: boolean }) => {
     const res = await markNotificationsRead(which);
     if (!res.ok) return setProblem(res.message);
     setItems((all) => (all ?? []).map((n) => (which.all || which.ids?.includes(n.id) ? { ...n, read: true } : n)));
+    setFeed((all) => all.map((n) => (which.all || which.ids?.includes(n.id) ? { ...n, read: true } : n)));
     told();
   };
-  const unread = (items ?? []).filter((n) => !n.read).length;
+  const unread = (items ?? []).filter((n) => !n.read).length + feed.filter((n) => !n.read).length;
   const badge = props.messages + props.mentions;
   // Those waiting on a reply first, then the latest few, so the window stays short.
   const recent = threads ? [...threads.filter((t) => t.unread > 0), ...threads.filter((t) => !t.unread)].slice(0, 5) : null;
@@ -272,7 +280,7 @@ export function NotificationsMenu(props: {
                 onClick={() => void read({ all: true })}
                 className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs text-ink-2 hover:bg-canvas hover:text-ink"
               >
-                <CheckCheck className="size-3.5" aria-hidden /> Mark mentions read
+                <CheckCheck className="size-3.5" aria-hidden /> Mark all read
               </button>
             )}
           </div>
@@ -321,6 +329,14 @@ export function NotificationsMenu(props: {
                 </div>
               </div>
             ))}
+            {feed.length > 0 && (
+              <>
+                <Heading label="Industry feed" href="/design/news" more="Open News" />
+                {feed.slice(0, 6).map((n) => (
+                  <FeedNoteLink key={n.id} note={n} onRead={() => void read({ ids: [n.id] })} />
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}

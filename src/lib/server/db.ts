@@ -787,6 +787,50 @@ create table if not exists design_feed_votes (
   at timestamptz not null default now(),
   primary key (post_id, member_email)
 );
+-- The feed as the industry's network (17 Nov 2026, domain/design/feed-social.ts): what a post is (post, question, win,
+-- Sol's weekly poll and its results; Sol's have no business), a question marked answered and Sol's answer under it, a
+-- win's facts and its job (one win a job), the week of Sol's poll, and the results he posted.
+alter table design_feed_posts alter column business_id drop not null;
+alter table design_feed_posts add column if not exists kind text not null default 'post';
+alter table design_feed_posts add column if not exists answered_at timestamptz;
+alter table design_feed_posts add column if not exists sol_answer jsonb;
+alter table design_feed_posts add column if not exists win jsonb;
+alter table design_feed_posts add column if not exists job_id text;
+alter table design_feed_posts add column if not exists week text;
+alter table design_feed_posts add column if not exists results jsonb;
+create unique index if not exists design_feed_posts_sol_week on design_feed_posts(kind, week) where week is not null;
+create unique index if not exists design_feed_posts_win_job on design_feed_posts(business_id, job_id)
+  where job_id is not null and removed_at is null;
+-- A member's notifications from the feed: likes, comments, replies, votes and Sol's answers, one row a kind and place
+-- until read (later ones add to its count).
+create table if not exists design_feed_notes (
+  id text primary key,
+  to_email text not null,
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  post_id text references design_feed_posts(id) on delete cascade,
+  story_id text references industry_news(id) on delete cascade,
+  last_by text not null,
+  count integer not null default 1,
+  at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists design_feed_notes_to on design_feed_notes(to_email, at desc);
+-- What a member follows (businesses, words) and mutes (topics) in the feed.
+create table if not exists design_feed_follows (
+  member_email text not null,
+  business_id text not null references businesses(id) on delete cascade,
+  kind text not null,
+  target text not null,
+  at timestamptz not null default now(),
+  primary key (member_email, kind, target)
+);
+-- The Monday digest: who has turned it off, and the last week each address was sent.
+create table if not exists design_feed_digest (
+  email text primary key,
+  off_at timestamptz,
+  last_week text
+);
 create table if not exists design_feed_reports (
   post_id text not null references design_feed_posts(id) on delete cascade,
   business_id text not null references businesses(id) on delete cascade,

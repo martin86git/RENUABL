@@ -13,6 +13,7 @@ import { publicWords } from "./marketplace";
 import { hostOf } from "./sol-knowledge";
 import { fetchableUrl } from "../net";
 import type { NewsItem } from "./industry-news";
+import type { PollResults, PostKind, SolAnswer, WinFacts } from "./feed-social";
 
 export const POST_LIMITS = {
   /** Words in a post and a comment. */
@@ -115,6 +116,22 @@ export interface FeedPost {
   reports?: number;
   /** A poll asked with it (16 Nov 2026), as this reader may see it. */
   poll?: FeedPoll | null;
+  /** What it is (17 Nov 2026, feed-social.ts): a post, a question, a win, Sol's poll or its results. */
+  postKind?: PostKind;
+  /** The writing business's key in the network, for its page (null for Sol). */
+  businessKey?: string | null;
+  /** Written by Sol. */
+  sol?: boolean;
+  /** The reader wrote it (only they mark a question answered). */
+  writer?: boolean;
+  /** A question its writer has marked answered. */
+  answered?: boolean;
+  /** Sol's answer under a question. */
+  solAnswer?: SolAnswer | null;
+  /** A win's facts. */
+  win?: WinFacts | null;
+  /** The results Sol posted of a poll. */
+  results?: PollResults | null;
 }
 
 export interface FeedComment {

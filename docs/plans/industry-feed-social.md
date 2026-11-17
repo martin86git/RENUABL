@@ -19,7 +19,14 @@ feed as an internal social network, and room for advertising later.
 - **Most talked about this week**: up to three stories or posts with the most likes, comments and votes, at the top of
   All, each taking you to it.
 
-## Next, in the order I'd build them
+## Built next (17 Nov 2026, all seven)
+
+All seven below were built on 17 Nov 2026 (CLAUDE.md has the details). Changes from the plan: Connect works from a
+business's page even when it isn't listed in the directory (it posted where everyone sees it); the Monday email is
+turned off in the News tab's settings rather than by a link; Sol's poll questions come from a fixed list in turn, and
+its results are a post of Sol's rather than a story.
+
+## The seven, as planned
 
 1. **A business's page in the network.** Pressing a post's author opens a small card: the business, its kind and suburb
    (from the opt-in directory), its posts, and **Connect** (Connections already exists). This turns the feed into the way

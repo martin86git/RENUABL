@@ -3,6 +3,10 @@ import { cleanPoll, cleanPostLink, cleanPostText, postProblem, POST_LIMITS } fro
 import { answer, requireMember } from "@/lib/server/design-context";
 import { safeImage } from "@/lib/server/design-images";
 import { createPost, listPosts, readerOf, setLinkPreview } from "@/lib/server/design-feed-posts-repo";
+import { cleanMemberKind } from "@/lib/domain/design/feed-social";
+import { viewerOf } from "@/lib/server/design-context";
+import { answerQuestion } from "@/lib/server/design-feed-sol";
+import { postWin } from "@/lib/server/design-feed-social-repo";
 import { staffBehind } from "@/lib/server/design-staff-view";
 import { linkPreview } from "@/lib/server/industry-news";
 import { allow } from "@/lib/server/rate-limit";
@@ -37,6 +41,18 @@ export async function POST(request: Request) {
     const form = await request.formData().catch(() => null);
     if (!form) return Response.json({ ok: false, message: "Send the post as a form." }, { status: 400 });
     const text = cleanPostText(form.get("text"));
+    // What it is (17 Nov 2026, feed-social.ts): a post, a question to the industry, or a win shared from an installed job.
+    const kind = cleanMemberKind(form.get("kind"));
+    if (kind === "win") {
+      const jobId = String(form.get("job") ?? "").slice(0, 80);
+      if (!/^job_[a-f0-9]{8,64}$/.test(jobId))
+        return Response.json({ ok: false, message: "Choose the installed job to share." }, { status: 400 });
+      const done = await postWin(who.member, viewerOf(who.member), jobId, text);
+      return done.ok
+        ? Response.json({ ok: true, id: done.id })
+        : Response.json({ ok: false, message: done.message }, { status: done.status });
+    }
+    if (kind === "question" && !text) return Response.json({ ok: false, message: "Write your question first." }, { status: 400 });
     const typed = String(form.get("link") ?? "").trim();
     const link = cleanPostLink(typed);
     const file = form.get("photo");
@@ -59,7 +75,10 @@ export async function POST(request: Request) {
       }
     const problem = postProblem(text, link, Boolean(photo), Boolean(typed), { asked, choices: poll });
     if (problem) return Response.json({ ok: false, message: problem }, { status: 400 });
-    const id = await createPost(who.member, text, link, photo, poll);
+    const id = await createPost(who.member, text, link, photo, poll, { kind });
+    // Sol offers an answer under a question, from a short search, paid from the asker's Sol credits.
+    if (kind === "question")
+      after(() => answerQuestion(id, who.member, text).catch((e) => console.error("feed question", e instanceof Error ? e.message : e)));
     if (link)
       after(async () => {
         const preview = await linkPreview(link).catch(() => null);

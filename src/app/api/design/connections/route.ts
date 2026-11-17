@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     } else if (b.do === "ask") {
       if (!allow(request, "connection-ask", 30))
         return Response.json({ ok: false, message: "Try again in a little while." }, { status: 429 });
-      const done = await askToConnect(m, typeof b.key === "string" ? b.key.slice(0, 40) : "");
+      const done = await askToConnect(m, typeof b.key === "string" ? b.key.slice(0, 40) : "", { fromFeed: b.fromFeed === true });
       if (!done.ok) return Response.json({ ok: false, message: done.message }, { status: done.status });
       await tell(done.tell, requestEmail({ from: m.businessName, kind: await kindOf(m.businessId), link: link ?? "" }));
     } else if (b.do === "accept" || b.do === "decline" || b.do === "cancel" || b.do === "disconnect") {

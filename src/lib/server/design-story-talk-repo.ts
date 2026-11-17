@@ -9,6 +9,7 @@ import { POST_LIMITS, authorWords, type FeedComment, type StoryTalk } from "@/li
 import { newId, query } from "./db";
 import type { Member } from "./design-repo";
 import type { Reader } from "./design-feed-posts-repo";
+import { addNote } from "./design-feed-social-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -58,14 +59,22 @@ export async function listStoryComments(id: string, reader: Reader): Promise<Fee
 
 export async function addStoryComment(id: string, m: Member, reader: Reader, body: string): Promise<boolean> {
   if (!(await storyThere(id))) return false;
+  const by = authorWords(m.firstName, m.businessName);
   await query(`insert into design_story_comments (id, story_id, business_id, member_email, author, body) values ($1, $2, $3, $4, $5, $6)`, [
     newId("scm", 8),
     id,
     m.businessId,
     reader.email,
-    authorWords(m.firstName, m.businessName),
+    by,
     body,
   ]);
+  // Everyone else who has commented on the story is told (17 Nov 2026, feed-social.ts).
+  const others = await query<{ email: string; businessId: string }>(
+    `select distinct on (member_email) member_email as email, business_id as "businessId" from design_story_comments
+      where story_id = $1 and removed_at is null and member_email <> $2 limit 20`,
+    [id, reader.email],
+  );
+  for (const o of others) await addNote(o, "reply", { storyId: id }, by).catch(() => undefined);
   return true;
 }
 

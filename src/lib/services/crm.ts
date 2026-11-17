@@ -188,7 +188,12 @@ export const updateService = (id: string, change: { state?: string; text?: strin
 
 /** The signed-in member's notifications (their @mentions), newest first, and how many are unread. */
 export const loadNotifications = () =>
-  ask<{ notifications: import("@/lib/server/design-notifications-repo").Notification[]; unread: number }>("/api/design/notifications");
+  ask<{
+    notifications: import("@/lib/server/design-notifications-repo").Notification[];
+    unread: number;
+    /** The industry feed's notifications (17 Nov 2026). */
+    feed?: import("@/lib/domain/design/feed-social").FeedNote[];
+  }>("/api/design/notifications");
 /** How many of the member's notifications are unread, for the nav. */
 export const notificationCount = () => ask<{ unread: number }>("/api/design/notifications?count=1");
 /** Marks the member's own notifications read: those named, those on a deal, or all. */

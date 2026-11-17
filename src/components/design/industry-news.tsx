@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import {
   ArrowUpRight,
@@ -45,6 +45,9 @@ import { loadNews, type NewsAnswer } from "@/lib/services/industry-news";
 import { mergeFeed, talkWords, talkedAbout, type FeedEntry, type FeedPost, type Talked } from "@/lib/domain/design/feed-posts";
 import { commentOnStory, likeStory, loadPosts, loadStoryComments, removeStoryComment } from "@/lib/services/feed-posts";
 import { PostCard, PostComposer, Talk } from "./feed-posts";
+import { BusinessSheet, FeedActivity, FollowSettings } from "./feed-social";
+import { NO_FOLLOWS, postFollowed, storyFollowed, type Follows } from "@/lib/domain/design/feed-social";
+import { loadFollows } from "@/lib/services/feed-posts";
 import { SolBadge } from "./sol-icon";
 import { listWords, moveShare, priceMovesWords, systemsWords, type PriceMovesNote } from "@/lib/domain/design/product-watch";
 
@@ -70,8 +73,21 @@ export function NewsPage() {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [staff, setStaff] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [filter, setFilter] = useState<NewsTopic | NewsPart | "all" | "yours" | "posts" | "reported">("all");
+  const [filter, setFilter] = useState<NewsTopic | NewsPart | "all" | "yours" | "posts" | "following" | "reported">("all");
   const [tick, setTick] = useState(0);
+  // What this member follows and mutes, and the business whose page is open (17 Nov 2026, feed-social.ts).
+  const [follows, setFollows] = useState<Follows>(NO_FOLLOWS);
+  const [business, setBusiness] = useState<string | null>(null);
+  const went = useRef(false);
+  useEffect(() => {
+    let gone = false;
+    void loadFollows().then((r) => {
+      if (!gone && r.ok) setFollows(r.follows);
+    });
+    return () => {
+      gone = true;
+    };
+  }, [tick]);
 
   useEffect(() => {
     let gone = false;
@@ -118,15 +134,38 @@ export function NewsPage() {
   const refresh = () => setTick((n) => n + 1);
 
   const today = todayInMarket();
+  const muted = new Set(follows.muted);
   const stories =
     data && filter !== "posts" && filter !== "reported"
       ? filter === "yours"
         ? newsShown(data.items, "all").filter(touches)
-        : filter === "solar" || filter === "wider"
-          ? newsShown(data.items, "all").filter((n) => partOf(n.topic) === filter)
-          : newsShown(data.items, filter === "all" ? "all" : filter)
+        : filter === "following"
+          ? newsShown(data.items, "all").filter((n) => storyFollowed(n, follows.words))
+          : filter === "solar" || filter === "wider"
+            ? newsShown(data.items, "all").filter((n) => partOf(n.topic) === filter)
+            : filter === "all"
+              ? newsShown(data.items, "all").filter((n) => !muted.has(n.topic))
+              : newsShown(data.items, filter)
       : [];
-  const shownPosts = filter === "all" || filter === "posts" || filter === "reported" ? posts : [];
+  const shownPosts =
+    filter === "following"
+      ? posts.filter((p) => postFollowed(p, follows))
+      : filter === "all" || filter === "posts" || filter === "reported"
+        ? posts
+        : [];
+  const followsAny = follows.words.length > 0 || follows.businesses.length > 0;
+  // A link to a post or story (the bell, the Monday email) takes the reader to it once the feed is in.
+  const go = (id: string) => {
+    if (!id) return;
+    setFilter("all");
+    window.setTimeout(() => document.getElementById(`feed-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+  useEffect(() => {
+    if (went.current || !data) return;
+    const id = window.location.hash.match(/^#feed-(.+)$/)?.[1];
+    went.current = true;
+    if (id) window.setTimeout(() => document.getElementById(`feed-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+  }, [data]);
   const notes = filter === "all" || filter === "yours" ? (data?.priceMoves ?? []) : [];
   const entries: Entry[] = [
     ...mergeFeed(stories, shownPosts),
@@ -158,6 +197,7 @@ export function NewsPage() {
     { id: "all", label: "All" },
     ...(touching || data?.priceMoves.length ? [{ id: "yours" as const, label: "Your products" }] : []),
     { id: "posts", label: "Posts" },
+    ...(followsAny ? [{ id: "following" as const, label: "Following" }] : []),
     { id: "solar", label: PART_LABELS.solar },
     ...(wider ? [{ id: "wider" as const, label: PART_LABELS.wider }] : []),
     ...(staff ? [{ id: "reported" as const, label: "Reported" }] : []),
@@ -168,7 +208,7 @@ export function NewsPage() {
     <div className="mx-auto w-full max-w-3xl rounded-[28px] bg-market/[0.04] px-4 pb-8 pt-5 ring-2 ring-market sm:px-6">
       <div className="flex items-start gap-3">
         <SolBadge className="mt-0.5 size-6 shrink-0" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-[17px] font-semibold text-ink">
             Industry news
             <span className="rounded-full bg-market px-2 py-0.5 text-[11px] font-medium text-white">Across RENUABL</span>
@@ -181,7 +221,12 @@ export function NewsPage() {
                 : "Sol reads the solar news each morning, and what's happening beyond it: EVs, clean energy and business."}
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <FeedActivity onGo={go} />
+          <FollowSettings follows={follows} onChange={setFollows} />
+        </div>
       </div>
+      {business && <BusinessSheet businessKey={business} staff={staff} onClose={() => setBusiness(null)} onFollow={refresh} />}
 
       <div className="mt-4">
         <PostComposer
@@ -231,7 +276,7 @@ export function NewsPage() {
 
       {talked.length > 0 && <TalkedAbout talked={talked} />}
 
-      {looks > 0 && filter !== "posts" && filter !== "reported" && part !== "wider" && (
+      {looks > 0 && filter !== "posts" && filter !== "reported" && filter !== "following" && part !== "wider" && (
         <button
           type="button"
           onClick={() => setFilter("yours")}
@@ -244,12 +289,18 @@ export function NewsPage() {
           </span>
         </button>
       )}
-      {!looks && touching > 0 && filter !== "posts" && filter !== "reported" && filter !== "yours" && part !== "wider" && (
-        <p className="mt-4 flex items-center gap-2 text-[13px] text-ink">
-          <PackageSearch className="size-4 text-sun-line" aria-hidden />
-          {touching === 1 ? "One story names" : `${touching} stories name`} your products. They&apos;re marked below.
-        </p>
-      )}
+      {!looks &&
+        touching > 0 &&
+        filter !== "posts" &&
+        filter !== "reported" &&
+        filter !== "yours" &&
+        filter !== "following" &&
+        part !== "wider" && (
+          <p className="mt-4 flex items-center gap-2 text-[13px] text-ink">
+            <PackageSearch className="size-4 text-sun-line" aria-hidden />
+            {touching === 1 ? "One story names" : `${touching} stories name`} your products. They&apos;re marked below.
+          </p>
+        )}
 
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
@@ -273,20 +324,24 @@ export function NewsPage() {
         <div className="mt-16 text-center">
           <Newspaper className={clsx("mx-auto size-6 text-muted", data.reading && "animate-pulse")} aria-hidden />
           <p className="mt-3 text-[15px] text-ink">
-            {filter === "posts" || filter === "reported"
+            {filter === "posts" || filter === "reported" || filter === "following"
               ? filter === "reported"
                 ? "Nothing reported."
-                : "No posts yet."
+                : filter === "following"
+                  ? "Nothing here yet."
+                  : "No posts yet."
               : data.reading
                 ? "Reading the news…"
                 : "No news yet."}
           </p>
           <p className="mt-1 text-[13px] text-muted">
-            {filter === "posts"
-              ? "Be the first to share something with solar businesses on RENUABL."
-              : data.reading
-                ? "This takes a minute or two. Stories appear here as soon as Sol has them."
-                : "Stories show here after Sol's morning read."}
+            {filter === "following"
+              ? "Nothing from what you follow yet. Follow words and businesses from the settings button above."
+              : filter === "posts"
+                ? "Be the first to share something with solar businesses on RENUABL."
+                : data.reading
+                  ? "This takes a minute or two. Stories appear here as soon as Sol has them."
+                  : "Stories show here after Sol's morning read."}
           </p>
         </div>
       )}
@@ -301,7 +356,14 @@ export function NewsPage() {
               ) : e.kind === "prices" ? (
                 <PriceMovesCard key={e.note.id} note={e.note} />
               ) : (
-                <PostCard key={e.post.id} post={e.post} staff={staff} onChange={refresh} />
+                <PostCard
+                  key={e.post.id}
+                  post={e.post}
+                  staff={staff}
+                  onChange={refresh}
+                  onBusiness={setBusiness}
+                  followed={postFollowed(e.post, follows)}
+                />
               ),
             )}
           </ul>

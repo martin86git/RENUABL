@@ -22,7 +22,7 @@ import { newId, query, transaction } from "./db";
 const pair = (x: string, y: string) => (x < y ? [x, y] : [y, x]);
 
 /** This business's key, made the first time it is asked for. */
-async function keyOf(businessId: string): Promise<string> {
+export async function keyOf(businessId: string): Promise<string> {
   await query(`insert into design_directory (business_id, key) values ($1, $2) on conflict (business_id) do nothing`, [
     businessId,
     randomBytes(12).toString("hex"),
@@ -68,7 +68,7 @@ const entry = (r: Row): DirectoryEntry => ({
 });
 
 /** Where this business stands with each other business it has a connection row with, by the other's id. */
-async function standings(businessId: string): Promise<Map<string, { id: string; standing: Standing; since: string }>> {
+export async function standings(businessId: string): Promise<Map<string, { id: string; standing: Standing; since: string }>> {
   const rows = await query<{ id: string; other: string; status: string; asker: string; since: string }>(
     `select id, case when a_business = $1 then b_business else a_business end as other, status, asked_by_business as asker,
             to_char(coalesce(answered_at, created_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as since
@@ -155,11 +155,13 @@ export async function incomingCount(businessId: string): Promise<number> {
 export async function askToConnect(
   member: { businessId: string; email: string },
   key: string,
+  /** Asked from the business's own posts in the industry feed (17 Nov 2026): it posted where every business sees it, so it may be asked though not listed. */
+  opts: { fromFeed?: boolean } = {},
 ): Promise<{ ok: true; tell: string | null } | { ok: false; status: number; message: string }> {
   const target = await query<{ business_id: string; owner: string | null }>(
     `select d.business_id, (select m.email from business_members m where m.business_id = d.business_id and m.role = 'owner' limit 1) as owner
-       from design_directory d where d.key = $1 and d.listed`,
-    [key],
+       from design_directory d where d.key = $1 and (d.listed or $2)`,
+    [key, opts.fromFeed === true],
   );
   const t = target[0];
   if (!t) return { ok: false, status: 404, message: "That business isn't in the directory." };

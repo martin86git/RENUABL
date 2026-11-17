@@ -1,10 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import {
   BarChart3,
   Check,
+  CircleHelp,
+  Trophy,
+  Star,
   Flag,
   Heart,
   ImagePlus,
@@ -28,11 +31,15 @@ import {
   type FeedPoll,
   type FeedPost,
 } from "@/lib/domain/design/feed-posts";
+import { SOL_ANSWER_NOTE, winHeadline, type PollResults, type PostKind } from "@/lib/domain/design/feed-social";
+import { SolBadge } from "./sol-icon";
 import {
   commentOn,
   keepPost,
   likePost,
   loadComments,
+  loadWinnable,
+  markAnswered,
   postPictureUrl,
   removeComment,
   removePost,
@@ -61,16 +68,32 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
   const [showLink, setShowLink] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [choices, setChoices] = useState<string[] | null>(null);
+  // A question to the industry, or a win shared from an installed job (17 Nov 2026, feed-social.ts).
+  const [kind, setKind] = useState<PostKind>("post");
+  const [wins, setWins] = useState<{ jobId: string; label: string }[]>([]);
+  const [job, setJob] = useState("");
+  useEffect(() => {
+    let gone = false;
+    void loadWinnable().then((r) => {
+      if (!gone && r.ok) setWins(r.jobs);
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const open = text.length > 0 || showLink || photo !== null || choices !== null;
+  const open = text.length > 0 || showLink || photo !== null || choices !== null || kind !== "post";
   const pollReady = !choices || choices.filter((c) => c.trim()).length >= POLL_LIMITS.min;
 
   const post = async () => {
     setBusy(true);
     setProblem(null);
-    const r = await sendPost({ text, link, photo, poll: choices?.map((c) => c.trim()).filter(Boolean) ?? null });
+    const r =
+      kind === "win"
+        ? await sendPost({ text, link: "", photo: null, kind, job })
+        : await sendPost({ text, link, photo, kind, poll: choices?.map((c) => c.trim()).filter(Boolean) ?? null });
     setBusy(false);
     if (!r.ok) return setProblem(r.message);
     setText("");
@@ -78,6 +101,9 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
     setShowLink(false);
     setPhoto(null);
     setChoices(null);
+    if (kind === "win") setWins((w) => w.filter((x) => x.jobId !== job));
+    setKind("post");
+    setJob("");
     onPosted();
   };
 
@@ -87,10 +113,42 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
         value={text}
         onChange={(e) => setText(e.target.value.slice(0, POST_LIMITS.text))}
         rows={open ? 3 : 1}
-        placeholder={choices ? "Ask your question…" : "Share something with solar businesses on RENUABL…"}
+        placeholder={
+          kind === "question"
+            ? "Ask the industry a question…"
+            : kind === "win"
+              ? "Say something about the install (optional)…"
+              : choices
+                ? "Ask your question…"
+                : "Share something with solar businesses on RENUABL…"
+        }
         className="w-full resize-none bg-transparent px-1 text-[14px] text-ink outline-none placeholder:text-muted"
       />
-      {showLink && (
+      {kind === "question" && (
+        <p className="mt-1 flex items-center gap-1.5 px-1 text-[12px] text-muted">
+          <SolBadge className="size-3.5" /> Sol offers an answer underneath, and other businesses can answer too. You mark it answered.
+        </p>
+      )}
+      {kind === "win" && (
+        <div className="mt-2 grid gap-1.5">
+          <select
+            value={job}
+            onChange={(e) => setJob(e.target.value)}
+            className="w-full rounded-lg bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-line outline-none"
+          >
+            <option value="">Choose an installed job…</option>
+            {wins.map((w) => (
+              <option key={w.jobId} value={w.jobId}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+          <p className="px-1 text-[12px] text-muted">
+            Others see the roof drawn with its panels (the rest blurred), the system and the suburb. Never the address or the customer.
+          </p>
+        </div>
+      )}
+      {showLink && kind !== "win" && (
         <input
           value={link}
           onChange={(e) => setLink(e.target.value)}
@@ -98,7 +156,7 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
           className="mt-2 w-full rounded-lg bg-canvas px-3 py-2 text-[13px] text-ink ring-1 ring-line outline-none"
         />
       )}
-      {choices && (
+      {choices && kind === "post" && (
         <div className="mt-2 grid gap-1.5">
           {choices.map((c, i) => (
             <div key={i} className="flex items-center gap-1.5">
@@ -154,34 +212,72 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
           className="hidden"
           onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
         />
+        {kind !== "win" && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-2 hover:bg-canvas hover:text-ink"
+            >
+              <ImagePlus className="size-4" aria-hidden /> Photo
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLink((v) => !v)}
+              aria-pressed={showLink}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-2 hover:bg-canvas hover:text-ink"
+            >
+              <Link2 className="size-4" aria-hidden /> Link
+            </button>
+          </>
+        )}
+        {kind === "post" && (
+          <button
+            type="button"
+            onClick={() => setChoices((cs) => (cs ? null : ["", ""]))}
+            aria-pressed={choices !== null}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-2 hover:bg-canvas hover:text-ink"
+          >
+            <BarChart3 className="size-4" aria-hidden /> Poll
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => fileRef.current?.click()}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-2 hover:bg-canvas hover:text-ink"
+          onClick={() => {
+            setKind((k) => (k === "question" ? "post" : "question"));
+            setChoices(null);
+          }}
+          aria-pressed={kind === "question"}
+          className={clsx(
+            "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] hover:bg-canvas hover:text-ink",
+            kind === "question" ? "bg-canvas text-ink ring-1 ring-line" : "text-ink-2",
+          )}
         >
-          <ImagePlus className="size-4" aria-hidden /> Photo
+          <CircleHelp className="size-4" aria-hidden /> Question
         </button>
-        <button
-          type="button"
-          onClick={() => setShowLink((v) => !v)}
-          aria-pressed={showLink}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-2 hover:bg-canvas hover:text-ink"
-        >
-          <Link2 className="size-4" aria-hidden /> Link
-        </button>
-        <button
-          type="button"
-          onClick={() => setChoices((cs) => (cs ? null : ["", ""]))}
-          aria-pressed={choices !== null}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] text-ink-2 hover:bg-canvas hover:text-ink"
-        >
-          <BarChart3 className="size-4" aria-hidden /> Poll
-        </button>
+        {wins.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setKind((k) => (k === "win" ? "post" : "win"));
+              setChoices(null);
+              setShowLink(false);
+              setPhoto(null);
+            }}
+            aria-pressed={kind === "win"}
+            className={clsx(
+              "inline-flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[12px] hover:bg-canvas hover:text-ink",
+              kind === "win" ? "bg-canvas text-ink ring-1 ring-line" : "text-ink-2",
+            )}
+          >
+            <Trophy className="size-4" aria-hidden /> Win
+          </button>
+        )}
         <span className="ml-auto" />
         <button
           type="button"
           onClick={post}
-          disabled={busy || !pollReady || (!text.trim() && !link.trim() && !photo)}
+          disabled={busy || !pollReady || (kind === "win" ? !job : !text.trim() && (kind === "question" || (!link.trim() && !photo)))}
           className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-ink disabled:bg-line disabled:text-muted"
         >
           <Send className="size-3.5" aria-hidden /> {busy ? "Posting…" : "Post"}
@@ -193,7 +289,21 @@ export function PostComposer({ onPosted }: { onPosted: () => void }) {
 }
 
 /** One post: who and when, the words, its photo or link, then like, comments and the menu (report, remove). */
-export function PostCard({ post, staff, onChange }: { post: FeedPost; staff: boolean; onChange: () => void }) {
+export function PostCard({
+  post,
+  staff,
+  onChange,
+  onBusiness,
+  followed,
+}: {
+  post: FeedPost;
+  staff: boolean;
+  onChange: () => void;
+  /** Opens the writing business's page (17 Nov 2026). */
+  onBusiness?: (key: string) => void;
+  /** Why it is under Following, when it is: "business" or the word followed. */
+  followed?: string | null;
+}) {
   const [menu, setMenu] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [reason, setReason] = useState("");
@@ -214,6 +324,13 @@ export function PostCard({ post, staff, onChange }: { post: FeedPost; staff: boo
     const r = await keepPost(post.id);
     if (r.ok) onChange();
   };
+  const answered = async () => {
+    const r = await markAnswered(post.id, !post.answered);
+    if (r.ok) onChange();
+    else setNote(r.message);
+  };
+  const key = post.businessKey;
+  const open = key && onBusiness ? () => onBusiness(key) : null;
 
   return (
     <li
@@ -221,13 +338,44 @@ export function PostCard({ post, staff, onChange }: { post: FeedPost; staff: boo
       className="scroll-mt-24 rounded-2xl bg-surface px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)] ring-1 ring-line"
     >
       <div className="flex items-start gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-ink">
-          {initials(post.author)}
-        </span>
+        {post.sol ? (
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-sun">
+            <SolBadge className="size-5" />
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={open ?? undefined}
+            disabled={!open}
+            aria-label={open ? `See ${post.businessName} on RENUABL` : undefined}
+            className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-ink"
+          >
+            {initials(post.author)}
+          </button>
+        )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-medium text-ink">{post.author}</p>
-          <p className="text-[12px] text-muted">
-            {post.kind} · {agoShort(post.at, new Date())}
+          {open ? (
+            <button
+              type="button"
+              onClick={open}
+              className="block max-w-full truncate text-left text-[13.5px] font-medium text-ink hover:underline"
+            >
+              {post.author}
+            </button>
+          ) : (
+            <p className="truncate text-[13.5px] font-medium text-ink">{post.author}</p>
+          )}
+          <p className="flex flex-wrap items-center gap-x-1.5 text-[12px] text-muted">
+            <span>
+              {post.kind} · {agoShort(post.at, new Date())}
+            </span>
+            <KindMark post={post} />
+            {followed && (
+              <span className="inline-flex items-center gap-0.5 rounded-full bg-market/10 px-1.5 py-0.5 text-[11px] font-medium text-market">
+                <Star className="size-2.5 fill-current" aria-hidden />
+                {followed === "business" ? "Following" : followed}
+              </span>
+            )}
           </p>
         </div>
         <div className="relative">
@@ -285,11 +433,22 @@ export function PostCard({ post, staff, onChange }: { post: FeedPost; staff: boo
         </p>
       )}
 
+      {post.win && (
+        <p className="mt-2.5 flex items-start gap-2 rounded-xl bg-sun px-3 py-2 text-[14px] font-medium text-sun-ink">
+          <Trophy className="mt-0.5 size-4 shrink-0" aria-hidden /> {winHeadline(post.win)}
+        </p>
+      )}
       {post.text && (
-        <p className={clsx("mt-2.5 whitespace-pre-wrap leading-relaxed text-ink", post.poll ? "text-[15.5px] font-medium" : "text-[14px]")}>
+        <p
+          className={clsx(
+            "mt-2.5 whitespace-pre-wrap leading-relaxed text-ink",
+            post.poll || post.postKind === "question" ? "text-[15.5px] font-medium" : "text-[14px]",
+          )}
+        >
           {post.text}
         </p>
       )}
+      {post.results && <Results results={post.results} />}
       {post.poll && <Poll postId={post.id} poll={post.poll} at={post.at} onVoted={onChange} />}
       {post.hasPhoto && (
         // eslint-disable-next-line @next/next/no-img-element -- the post's own photo, redrawn and kept by us
@@ -317,6 +476,8 @@ export function PostCard({ post, staff, onChange }: { post: FeedPost; staff: boo
           </span>
         </a>
       )}
+
+      {post.postKind === "question" && <QuestionFoot post={post} onAnswered={() => void answered()} />}
 
       <Talk
         liked={post.liked}
@@ -545,6 +706,102 @@ function Poll({ postId, poll, at, onVoted }: { postId: string; poll: FeedPoll; a
         {!votes && poll.open ? " · Vote to see the results" : poll.open && poll.mine !== null ? " · You can change your vote" : ""}
       </p>
       {problem && <p className="text-[12px] text-warning">{problem}</p>}
+    </div>
+  );
+}
+
+/** Under a question: Sol's answer with its sources, and Mark answered for whoever asked. */
+function QuestionFoot({ post, onAnswered }: { post: FeedPost; onAnswered: () => void }) {
+  const [now] = useState(() => Date.now());
+  const fresh = now - Date.parse(post.at) < 5 * 60_000;
+  return (
+    <div className="mt-3 grid gap-2">
+      {post.solAnswer ? (
+        <div className="rounded-xl bg-sun/50 px-3.5 py-3 ring-1 ring-sun-line/30">
+          <p className="flex items-center gap-1.5 text-[12px] font-medium text-sun-ink">
+            <SolBadge className="size-3.5" /> Sol&apos;s answer
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-relaxed text-ink">{post.solAnswer.text}</p>
+          {post.solAnswer.sources.length > 0 && (
+            <p className="mt-1.5 flex flex-wrap gap-1.5">
+              {post.solAnswer.sources.map((src) => (
+                <a
+                  key={src.url}
+                  href={src.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-surface px-2 py-0.5 text-[11.5px] text-ink-2 ring-1 ring-line hover:text-ink"
+                >
+                  {src.site}
+                </a>
+              ))}
+            </p>
+          )}
+          <p className="mt-1.5 text-[11.5px] italic text-muted">{SOL_ANSWER_NOTE}</p>
+        </div>
+      ) : (
+        fresh && (
+          <p className="flex items-center gap-1.5 text-[12.5px] text-muted">
+            <SolBadge className="size-3.5 animate-pulse" /> Sol is looking into it…
+          </p>
+        )
+      )}
+      {post.writer && (
+        <button
+          type="button"
+          onClick={onAnswered}
+          className={clsx(
+            "inline-flex h-8 w-fit items-center gap-1.5 rounded-full px-3 text-[12.5px] ring-1",
+            post.answered ? "bg-positive-soft text-positive ring-positive/30" : "bg-surface text-ink-2 ring-line hover:text-ink",
+          )}
+        >
+          <Check className="size-3.5" aria-hidden /> {post.answered ? "Answered · undo" : "Mark answered"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** The small mark beside when it was posted: Question (Answered), Win, Sol's poll or results. */
+function KindMark({ post }: { post: FeedPost }) {
+  const k = post.postKind;
+  if (k === "question")
+    return post.answered ? (
+      <span className="inline-flex items-center gap-0.5 rounded-full bg-positive-soft px-1.5 py-0.5 text-[11px] font-medium text-positive">
+        <Check className="size-2.5" aria-hidden /> Answered
+      </span>
+    ) : (
+      <span className="rounded-full bg-kind-message-soft px-1.5 py-0.5 text-[11px] font-medium text-kind-message">Question</span>
+    );
+  if (k === "win") return <span className="rounded-full bg-sun px-1.5 py-0.5 text-[11px] font-medium text-sun-ink">Win</span>;
+  if (k === "sol-poll")
+    return <span className="rounded-full bg-sun px-1.5 py-0.5 text-[11px] font-medium text-sun-ink">This week&apos;s poll</span>;
+  if (k === "sol-results")
+    return <span className="rounded-full bg-sun px-1.5 py-0.5 text-[11px] font-medium text-sun-ink">Poll results</span>;
+  return null;
+}
+
+/** Last week's poll as Sol posted its results: each choice's share, the largest first. */
+function Results({ results }: { results: PollResults }) {
+  const rows = results.choices.map((c, i) => ({ c, v: results.votes[i] ?? 0 })).sort((a, b) => b.v - a.v);
+  return (
+    <div className="mt-3 grid gap-1.5">
+      <p className="text-[13px] font-medium text-ink">{results.question}</p>
+      {rows.map((r, i) => {
+        const share = pollShare(r.v, results.total);
+        return (
+          <div key={r.c} className="relative flex h-9 items-center overflow-hidden rounded-xl px-3 text-[13px] ring-1 ring-line">
+            <span
+              aria-hidden
+              className={clsx("absolute inset-y-0 left-0", i === 0 ? "bg-sun-line/25" : "bg-canvas")}
+              style={{ width: `${share}%` }}
+            />
+            <span className="relative min-w-0 flex-1 truncate text-ink">{r.c}</span>
+            <span className="relative ml-2 tabular-nums text-ink-2">{share}%</span>
+          </div>
+        );
+      })}
+      <p className="text-[12px] text-muted">{results.total} votes · only votes are counted, no business is named</p>
     </div>
   );
 }

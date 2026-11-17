@@ -15,6 +15,36 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-17",
+    area: "Today",
+    words: "Press a business's name on a News post to see its page, follow it, or ask to connect.",
+  },
+  {
+    day: "2026-11-17",
+    area: "Today",
+    words: "Ask the industry a question on News. Sol offers an answer, and you mark it answered.",
+  },
+  {
+    day: "2026-11-17",
+    area: "Today",
+    words: "Share a finished install on News as a win: the system and suburb, never the customer.",
+  },
+  {
+    day: "2026-11-17",
+    area: "Today",
+    words: "News tells you when someone likes, comments or votes on your posts.",
+  },
+  {
+    day: "2026-11-17",
+    area: "Today",
+    words: "Sol asks the industry a poll each Monday and posts last week's results.",
+  },
+  {
+    day: "2026-11-17",
+    area: "Today",
+    words: "Follow words and businesses on News, mute topics, and get a Monday email of the week.",
+  },
+  {
+    day: "2026-11-17",
     area: "Calendar",
     words: "Days with something on are washed in orange in your calendar, and each event sits on its own orange card.",
   },

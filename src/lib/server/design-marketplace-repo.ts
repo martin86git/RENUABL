@@ -46,7 +46,7 @@ const num = (v: string | null | undefined) => {
  * What a listing says of a job's system, from the deal and its design: words and sizes only, nothing of the customer;
  * and the primary design itself, for the roof picture.
  */
-async function systemOf(member: Who, jobId: string): Promise<{ system: ListingSystem; design: RoofDesign | null } | null> {
+export async function systemOf(member: Who, jobId: string): Promise<{ system: ListingSystem; design: RoofDesign | null } | null> {
   const saved = await savedFor(member.businessId, member.businessName, jobId);
   if (!saved) return null;
   const found = saved === NO_DESIGN ? await jobById(member.businessId, jobId) : saved;

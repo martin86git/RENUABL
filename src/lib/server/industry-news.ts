@@ -263,7 +263,7 @@ export async function newsPicture(id: string): Promise<{ bytes: Buffer; contentT
 }
 
 /** Every page a search result or a fetched page carried, with its title, however the web tools nest them. */
-function pagesIn(blocks: readonly unknown[]): string[] {
+export function pagesIn(blocks: readonly unknown[]): string[] {
   const out: string[] = [];
   const walk = (v: unknown) => {
     // The search tool often runs inside Sol's own code (16 Nov 2026: most results came back only as the code's printed

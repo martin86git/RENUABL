@@ -1,9 +1,10 @@
-import { cleanCommentText, cleanReason } from "@/lib/domain/design/feed-posts";
+import { authorWords, cleanCommentText, cleanReason } from "@/lib/domain/design/feed-posts";
 import { answer, requireMember } from "@/lib/server/design-context";
 import {
   addComment,
   keepPost,
   listComments,
+  markAnswered,
   readerOf,
   removeComment,
   removePost,
@@ -33,7 +34,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/post
 }
 
 /**
- * POST { do: like | unlike | vote (choice) | comment (text) | uncomment (comment) | report (reason) | remove | keep }: what a member does
+ * POST { do: like | unlike | answered | unanswered | vote (choice) | comment (text) | uncomment (comment) | report (reason) | remove | keep }: what a member does
  * to a post. Remove is its writer, their business's owner or staff; keep (clearing its reports) is staff only.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/posts/[id]">) {
@@ -52,12 +53,18 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/post
     };
     const staff = await isStaff();
     const reader = readerOf(who.member, staff);
+    const by = authorWords(who.member.firstName, who.member.businessName);
     switch (body.do) {
       case "like":
       case "unlike":
-        return (await setLike(id, reader, body.do === "like")) ? ok() : notFound();
+        return (await setLike(id, reader, body.do === "like", by)) ? ok() : notFound();
+      case "answered":
+      case "unanswered":
+        return (await markAnswered(id, reader, body.do === "answered"))
+          ? ok()
+          : refuse(403, "Only the person who asked can mark it answered.");
       case "vote":
-        return (await votePoll(id, reader, Number(body.choice))) ? ok() : refuse(400, "That poll has closed.");
+        return (await votePoll(id, reader, Number(body.choice), by)) ? ok() : refuse(400, "That poll has closed.");
       case "comment": {
         if (!allow(request, "feed-comment", 120)) return refuse(429, "Too many comments this hour.");
         const text = cleanCommentText(body.text);
