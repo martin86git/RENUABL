@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BatteryCharging, Bell, Check, Download, Eye, Mail, PenTool, Phone, Plug, Send, Sun } from "lucide-react";
+import { BatteryCharging, Bell, Check, Download, Eye, FileText, Mail, MessageSquare, PenTool, Phone, Plug, Send, Sun } from "lucide-react";
+import { askSolInPanel } from "@/lib/services/sol";
+import { CallChooser } from "./call-choice";
 import clsx from "clsx";
 import {
   FOLLOW_UP_WORDS,
@@ -168,18 +170,79 @@ function SentList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
                   />
                 )}
                 {!r.due && r.followUps.length > 0 && <Touches line={r} now={now} />}
+                <ReachOut line={r} />
               </div>
               <div className="flex items-start gap-3 sm:flex-col sm:items-end">
                 <SentOn at={r.publishedAt} now={now} />
-                <Link href={`${PATHS.deals}/${r.jobId}?design=1`} className={clsx(ui.quiet, "h-8 rounded-full px-3 text-xs")}>
-                  <PenTool className="size-3.5" aria-hidden /> Open the design
-                </Link>
+                <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
+                  <ProposalLink line={r} />
+                  <Link href={`${PATHS.deals}/${r.jobId}?design=1`} className={clsx(ui.quiet, "h-8 rounded-full px-3 text-xs")}>
+                    <PenTool className="size-3.5" aria-hidden /> Open the design
+                  </Link>
+                </div>
               </div>
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The proposal exactly as the customer has it (17 Nov 2026, Martin: "I should see the exact proposal sent"): their own
+ * link, in a new tab. Opened by someone of the business, it isn't counted as the customer opening it.
+ */
+function ProposalLink({ line }: { line: ProposalLine }) {
+  return (
+    <a href={line.path} target="_blank" rel="noopener noreferrer" className={clsx(ui.quiet, "h-8 rounded-full px-3 text-xs")}>
+      <FileText className="size-3.5" aria-hidden /> View proposal
+    </a>
+  );
+}
+
+/**
+ * Get in touch from the list (17 Nov 2026, Martin: "buttons to action an email or call or text, using Sol or any other
+ * agent"): Email and Text open the deal where each is written (Text sits in its team chat's To the team | Text switch),
+ * Call offers the business's phone agents and calling yourself, and Sol drafts the follow-up email in his panel.
+ */
+function ReachOut({ line }: { line: ProposalLine }) {
+  const [calling, setCalling] = useState(false);
+  const first = line.customer.split(" ")[0] || line.customer;
+  const deal = `${PATHS.deals}/${line.jobId}`;
+  const round = "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-ink ring-1 ring-line hover:ring-ink-2";
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label={`Get in touch with ${first}`}>
+      <button
+        type="button"
+        className={round}
+        onClick={() =>
+          askSolInPanel({
+            text: `Draft a follow-up email to ${line.customer} about the proposal we sent them (deal ${line.jobId}). Read the deal first and keep it short.`,
+            shown: `Write a follow-up to ${first}`,
+          })
+        }
+        title={`Sol drafts an email to ${first} from the deal, for you to check and send`}
+      >
+        <SolIcon className="size-3.5" /> Sol writes it
+      </button>
+      <Link href={`${deal}?tab=email`} className={round}>
+        <Mail className="size-3.5" aria-hidden /> Email
+      </Link>
+      <button
+        type="button"
+        className={clsx(round, !line.phone && "pointer-events-none opacity-50")}
+        disabled={!line.phone}
+        onClick={() => setCalling(true)}
+        title={line.phone ? `Call ${first}: yourself, or hand it to your phone agent` : "No phone on their record"}
+      >
+        <Phone className="size-3.5" aria-hidden /> Call
+      </button>
+      <Link href={`${deal}?tab=team`} className={clsx(round, !line.phone && "pointer-events-none opacity-50")}>
+        <MessageSquare className="size-3.5" aria-hidden /> Text
+      </Link>
+      {calling && <CallChooser jobId={line.jobId} phone={line.phone} name={first} onClose={() => setCalling(false)} />}
+    </div>
   );
 }
 
@@ -369,6 +432,7 @@ function SignedList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
                         <a href={r.pdf} className={clsx(ui.primary, "h-8 rounded-full px-3 text-xs")}>
                           <Download className="size-3.5" aria-hidden /> Signed PDF
                         </a>
+                        <ProposalLink line={r} />
                         <Link href={`${PATHS.deals}/${r.jobId}?design=1`} className={clsx(ui.quiet, "h-8 rounded-full px-3 text-xs")}>
                           <PenTool className="size-3.5" aria-hidden /> Open the design
                         </Link>

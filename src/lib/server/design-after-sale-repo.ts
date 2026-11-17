@@ -83,6 +83,8 @@ export interface ProposalLine {
   jobId: string;
   customerId: string;
   customer: string;
+  /** The customer's phone as kept on their record, for calling or texting them from the list. */
+  phone: string;
   title: string;
   address: string;
   version: number;
@@ -124,6 +126,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     jobId: string;
     customerId: string;
     customer: string;
+    phone: string;
     title: string;
     address: string;
     version: number;
@@ -142,7 +145,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
     lastWord: string | null;
     lastTouch: string | null;
   }>(
-    `select distinct on (p.job_id) p.job_id as "jobId", c.id as "customerId", c.name as customer, j.title, j.address, v.version, v.view, v.accepted_option as option,
+    `select distinct on (p.job_id) p.job_id as "jobId", c.id as "customerId", c.name as customer, c.phone, j.title, j.address, v.version, v.view, v.accepted_option as option,
             p.token, p.withdrawn_at is not null as withdrawn, ${moment("v.published_at")} as "publishedAt",
             ${moment("v.opened_at")} as "openedAt", ${moment("v.accepted_at")} as "acceptedAt", v.accepted_name as "acceptedName",
             v.published_by as by, v.deposit_received_at is not null as received, v.deposit_said_at is not null as said,
@@ -170,6 +173,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
         jobId: r.jobId,
         customerId: r.customerId,
         customer: r.customer,
+        phone: r.phone ?? "",
         title: r.title,
         address: r.address,
         version: r.version,

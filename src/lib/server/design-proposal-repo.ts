@@ -624,10 +624,12 @@ export async function publicRoof(token: string): Promise<{ lat: number; lng: num
 }
 
 /** The first time a customer opens their proposal is written on their record, once for each version. */
-export async function markOpened(token: string): Promise<void> {
+export async function markOpened(token: string, notBusiness?: string): Promise<void> {
   await transaction(async (q) => {
     const row = await behind(q, token, true);
     if (!row || row.withdrawn || row.openedAt) return;
+    // Someone of the business itself looking at what was sent (Proposals sent, View proposal) isn't the customer opening it.
+    if (notBusiness && row.businessId === notBusiness) return;
     await q(`update design_proposal_versions set opened_at = now() where business_id = $1 and id = $2`, [row.businessId, row.versionId]);
     await record(q, row.businessId, {
       customerId: row.customerId,

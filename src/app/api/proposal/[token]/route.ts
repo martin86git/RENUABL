@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { todayInMarket } from "@/lib/domain/market";
 import { NO_DEPOSIT, NOT_ACCEPTED, PAID_WAY_WRONG, PAID_WAYS, type PaidWay } from "@/lib/domain/design/deposit";
 import { INDICATIVE_NOT_ACCEPTABLE, cleanAcceptance } from "@/lib/domain/design/proposal";
-import { answer, readBody } from "@/lib/server/design-context";
+import { answer, designAccess, readBody } from "@/lib/server/design-context";
 import { CARDS_OFF, NOT_NEXT, NOTHING_DUE, isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
 import { acceptProposal, cardPaymentFor, markOpened, proposalJob, publicProposal, sayPaid } from "@/lib/server/design-proposal-repo";
 import { stripeClient } from "@/lib/server/stripe";
@@ -50,7 +50,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
     const today = todayInMarket();
 
     if (read.body.action === "opened") {
-      if (allow(request, "proposal-opened", 60)) await markOpened(token);
+      if (allow(request, "proposal-opened", 60)) {
+        const access = await designAccess().catch(() => null);
+        await markOpened(token, access?.state === "ready" ? access.member.businessId : undefined);
+      }
       return Response.json({ ok: true }, { headers: PRIVATE });
     }
     if (read.body.action === "accept") {
