@@ -27,7 +27,7 @@ describe("a design Sol shows", () => {
   });
 
   it("opens the deal with its design", () => {
-    expect(designHref("job_1")).toBe("/design/deals/job_1?design=1");
+    expect(designHref("job_1")).toBe("/design/roof?job=job_1");
   });
 
   it("is kept on Sol's turn, even with no words", () => {

@@ -37,5 +37,8 @@ export function cleanDesignsShown(raw: unknown): SolDesignShown[] {
   return out;
 }
 
-/** Where the design opens: the deal with its design drawer open. */
-export const designHref = (jobId: string) => `/design/deals/${encodeURIComponent(jobId)}?design=1`;
+/**
+ * Where the design opens: the designer on the deal, which every page shows as its pop-up (18 Nov 2026, Martin: Start the
+ * design did nothing: it linked to the deal page with ?design=1, and on that very page nothing changes).
+ */
+export const designHref = (jobId: string) => `/design/roof?job=${encodeURIComponent(jobId)}`;

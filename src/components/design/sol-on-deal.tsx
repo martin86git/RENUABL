@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowUp, Loader2 } from "lucide-react";
 import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
+import { boxMove } from "@/lib/domain/design/deal-box";
 import { dealContext, solProposes } from "@/lib/domain/design/sol-on-deal";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
@@ -128,6 +129,15 @@ function SolTerminal(props: {
   const tellSol = () => {
     const t = ask.trim();
     if (!t) return;
+    // A plain wish for one of the deal's tools opens it here and now (18 Nov 2026, Martin: "lets start the design" sent
+    // him to Sol's panel to say it again); anything with more to it goes to Sol.
+    const move = boxMove(t, name);
+    if (move) {
+      setAsk("");
+      setHeard("");
+      setOther(false);
+      return props.onMove(move);
+    }
     askSolInPanel({ text: `On ${deal.customer}'s deal (#${props.jobId}): ${t}`, shown: t });
     setAsk("");
     setHeard("");
