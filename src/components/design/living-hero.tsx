@@ -33,7 +33,7 @@ export function useMotionOk() {
 }
 
 /** Types each line out, holds it, then the next; `busy` while typing. */
-function useSaying(lines: readonly string[], live: boolean, offset: number, hold = 3200) {
+export function useSaying(lines: readonly string[], live: boolean, offset: number, hold = 3200) {
   const [state, setState] = useState({ line: 0, n: -1 });
   useEffect(() => {
     if (!live) return;
@@ -87,10 +87,18 @@ export function AgentWave({ who, size, busy }: { who: Exclude<Who, "sol">; size:
 }
 
 /** Sol, large: his sun breathing, glowing brighter while he talks or thinks, leaning a touch towards the pointer. */
-function BigSol({ busy, lean }: { busy: boolean; lean: { x: number; y: number } }) {
+export function BigSol({
+  busy,
+  lean,
+  className = "size-28 sm:size-36",
+}: {
+  busy: boolean;
+  lean: { x: number; y: number };
+  className?: string;
+}) {
   return (
     <span
-      className="relative grid size-28 place-items-center transition-transform duration-700 ease-out sm:size-36"
+      className={clsx("relative grid place-items-center transition-transform duration-700 ease-out", className)}
       style={{ transform: `translate(${lean.x}px, ${lean.y}px)` }}
     >
       <span
@@ -107,7 +115,7 @@ function BigSol({ busy, lean }: { busy: boolean; lean: { x: number; y: number } 
 }
 
 /** A speech bubble, typed as it is said. */
-function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy: boolean; tail: "down" | "up" }) {
+export function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy: boolean; tail: "down" | "up" }) {
   return (
     <div
       className={clsx(
@@ -132,7 +140,7 @@ function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy: boole
   );
 }
 
-function answerFor(q: string) {
+export function answerFor(q: string) {
   const words = q.toLowerCase();
   const A = HERO_LIVE.ask;
   if (A.price.keys.some((k) => words.includes(k))) return A.price.answer;
@@ -140,41 +148,8 @@ function answerFor(q: string) {
   return hit ? hit.answer : A.fallback;
 }
 
-/** The feed of work just done: a new line every few seconds at the top, the older ones ageing below. */
-function Feed({ live }: { live: boolean }) {
-  const items = HERO_LIVE.feed;
-  const [head, setHead] = useState(0);
-  useEffect(() => {
-    if (!live) return;
-    const timer = window.setInterval(() => setHead((h) => (h + 1) % items.length), 3400);
-    return () => window.clearInterval(timer);
-  }, [live, items.length]);
-  const rows = [0, 1, 2].map((k) => ({ ...items[(head - k + items.length) % items.length], k }));
-  return (
-    <ul className="mx-auto flex w-full max-w-md flex-col items-stretch gap-2" aria-label="Work just done">
-      {rows.map((r) => (
-        <li
-          key={`${head}-${r.k}`}
-          className={clsx(
-            "flex items-center gap-2.5 rounded-full bg-surface/80 py-1.5 pl-1.5 pr-4 text-left text-[13px] text-ink-2 ring-1 ring-line backdrop-blur transition-opacity",
-            r.k === 0 && live && "live-in",
-            r.k === 1 && "opacity-75",
-            r.k === 2 && "opacity-45",
-          )}
-        >
-          {r.who === "sol" ? <SolMark className="size-6 shrink-0" /> : <AgentWave who={r.who as Exclude<Who, "sol">} size={24} />}
-          <span className="min-w-0 flex-1 truncate">
-            <span className="font-medium text-ink">{NAMES[r.who as Who]}</span> · {r.text}
-          </span>
-          <span className="shrink-0 text-[12px] text-muted">{r.k === 0 ? HERO_LIVE.now : `${r.k * 2} ${HERO_LIVE.ago}`}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 /** Ask Sol: a box and four questions; he thinks, then types his answer in his bubble. */
-function useAsk() {
+export function useAsk() {
   const [asked, setAsked] = useState<{ q: string; a: string; at: number } | null>(null);
   const ask = (q: string) => {
     const clean = q.trim().slice(0, 200);
@@ -184,7 +159,7 @@ function useAsk() {
   return { asked, ask };
 }
 
-function useTyped(text: string | null, key: number, live: boolean) {
+export function useTyped(text: string | null, key: number, live: boolean) {
   const [n, setN] = useState(0);
   const [thinking, setThinking] = useState(false);
   useEffect(() => {
@@ -214,42 +189,57 @@ function useTyped(text: string | null, key: number, live: boolean) {
   return { shown: text ? text.slice(0, n) : "", thinking, busy: !!text && (thinking || n < text.length) };
 }
 
-export function LivingHero({ signedIn }: { signedIn: boolean }) {
-  const live = useMotionOk();
-  const root = useRef<HTMLElement | null>(null);
-  const [lean, setLean] = useState({ x: 0, y: 0 });
+/** The box to ask Sol, with the ready questions under it. */
+export function AskBox({ onAsk, asked }: { onAsk: (q: string) => void; asked: boolean }) {
   const [input, setInput] = useState("");
-  const sol = useSaying(HERO_LIVE.says.sol, live, 0, 3600);
-  const charlie = useSaying(HERO_LIVE.says.charlie, live, 1400);
-  const alex = useSaying(HERO_LIVE.says.alex, live, 2600);
-  const { asked, ask } = useAsk();
-  const answer = useTyped(asked?.a ?? null, asked?.at ?? 0, live);
-
-  useEffect(() => {
-    if (!live) return;
-    const el = root.current;
-    if (!el) return;
-    const move = (e: PointerEvent) => {
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - (r.left + r.width / 2)) / r.width;
-      const y = (e.clientY - (r.top + r.height / 2)) / r.height;
-      setLean({ x: Math.max(-1, Math.min(1, x)) * 14, y: Math.max(-1, Math.min(1, y)) * 10 });
-    };
-    window.addEventListener("pointermove", move);
-    return () => window.removeEventListener("pointermove", move);
-  }, [live]);
-
-  const solText = asked ? answer.shown : sol.shown;
-  const solBusy = asked ? answer.busy : sol.busy;
-
   return (
-    <section
-      ref={root}
-      id="start"
-      className="relative isolate overflow-hidden px-5 pb-14 pt-12 snap-start lg:min-h-[calc(100dvh-4rem)] lg:pt-14"
-      aria-labelledby="hero"
-    >
-      <style>{`
+    <div className="flex w-full flex-col items-center">
+      <form
+        className="flex w-full max-w-xl items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[0_16px_40px_-20px_rgba(11,11,12,0.45)] ring-1 ring-line focus-within:ring-sun-line"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onAsk(input);
+          setInput("");
+        }}
+      >
+        <SolMark className="size-5 shrink-0" />
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={HERO_LIVE.ask.placeholder}
+          aria-label={HERO_LIVE.ask.placeholder}
+          maxLength={200}
+          className="min-w-0 flex-1 bg-transparent py-2 text-[15px] text-ink outline-none placeholder:text-muted"
+        />
+        <button
+          type="submit"
+          aria-label={HERO_LIVE.ask.send}
+          className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white hover:brightness-105"
+        >
+          <ArrowUp className="size-4" aria-hidden />
+        </button>
+      </form>
+      <div className="mt-3 flex max-w-2xl flex-wrap justify-center gap-2">
+        {HERO_LIVE.ask.questions.map((q) => (
+          <button
+            key={q.ask}
+            type="button"
+            onClick={() => onAsk(q.ask)}
+            className="rounded-full bg-surface/70 px-3.5 py-1.5 text-[13px] text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink/30"
+          >
+            {q.ask}
+          </button>
+        ))}
+      </div>
+      {asked && <p className="mt-2 text-[12px] text-muted">{HERO_LIVE.ask.note}</p>}
+    </div>
+  );
+}
+
+/** The motion the living parts share: Sol breathing, his ring, the waves, the caret. Put once per section. */
+export function LiveStyles() {
+  return (
+    <style>{`
         @keyframes live-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.045); } }
         @keyframes live-ring { 0% { transform: scale(0.9); opacity: 0.9; } 100% { transform: scale(1.35); opacity: 0; } }
         @keyframes live-wave { 0%,100% { transform: scaleY(0.45); } 50% { transform: scaleY(1.1); } }
@@ -264,102 +254,74 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
         .live-dot { animation: live-dots 1.2s ease-in-out infinite; }
         @media (prefers-reduced-motion: reduce) { .live-breathe, .live-ring, .live-wave, .live-caret, .live-in, .live-dot { animation: none; } }
       `}</style>
+  );
+}
+
+/** Follows the pointer over an element, for Sol to lean towards it. */
+export function useLean(root: React.RefObject<HTMLElement | null>, live: boolean, reach = 14) {
+  const [lean, setLean] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    if (!live) return;
+    const move = (e: PointerEvent) => {
+      const el = root.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - (r.left + r.width / 2)) / r.width;
+      const y = (e.clientY - (r.top + r.height / 2)) / r.height;
+      setLean({ x: Math.max(-1, Math.min(1, x)) * reach, y: Math.max(-1, Math.min(1, y)) * reach * 0.7 });
+    };
+    window.addEventListener("pointermove", move);
+    return () => window.removeEventListener("pointermove", move);
+  }, [live, root, reach]);
+  return lean;
+}
+
+/**
+ * The announcement (17 Nov 2026, Martin: keep "Solar just got a brain", announce something huge, as clean as Apple's
+ * product pages): "Introducing Sol", the headline as large as the screen allows, what he is in one line, and Sol
+ * himself, large and alive, saying what he's doing.
+ */
+export function LivingHero({ signedIn }: { signedIn: boolean }) {
+  const live = useMotionOk();
+  const root = useRef<HTMLElement | null>(null);
+  const lean = useLean(root, live, 18);
+  const sol = useSaying(HERO_LIVE.says.sol, live, 900, 3600);
+  return (
+    <section
+      ref={root}
+      id="start"
+      className="relative isolate overflow-hidden px-5 pb-16 pt-14 snap-start lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:pt-10"
+      aria-labelledby="hero"
+    >
+      <LiveStyles />
       <Sunrise light />
-      <div className="mx-auto flex max-w-6xl flex-col items-center text-center">
-        <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
-        <h1 id="hero" className="mt-5 text-[clamp(48px,6.4vw,104px)] font-semibold leading-[0.92] tracking-[-0.05em]">
-          {SALES_HERO.headline[0]} <span className="text-sun-line">{SALES_HERO.headline[1]}</span>
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-balance text-[clamp(17px,1.5vw,21px)] leading-relaxed text-ink-2">{SALES_HERO.sub}</p>
-
-        {/* The team at work: Charlie, Sol, Alex. */}
-        <div className="mt-8 grid w-full items-end gap-6 sm:grid-cols-[1fr_auto_1fr] lg:mt-12">
-          <div className="hidden flex-col items-center gap-3 sm:flex">
-            <Bubble who="charlie" text={charlie.shown} busy={charlie.busy} tail="down" />
-            <AgentWave who="charlie" size={64} busy={charlie.busy || live} />
-            <p className="text-[13px] text-muted">
-              <span className="font-medium text-ink">Charlie</span> · {HERO_LIVE.jobs.charlie}
-            </p>
-          </div>
-          <div className="flex flex-col items-center gap-4">
-            <div aria-live="polite">
-              {answer.thinking ? (
-                <div className="flex items-center gap-1.5 rounded-2xl bg-surface px-4 py-3 text-[14px] text-muted ring-1 ring-sun-line/40">
-                  {HERO_LIVE.ask.thinking}
-                  {[0, 1, 2].map((i) => (
-                    <span key={i} className="live-dot size-1.5 rounded-full bg-sun-line" style={{ animationDelay: `${i * 160}ms` }} />
-                  ))}
-                </div>
-              ) : (
-                <Bubble who="sol" text={solText} busy={solBusy} tail="down" />
-              )}
-            </div>
-            <BigSol busy={solBusy || answer.thinking} lean={lean} />
-            <p className="text-[13px] text-muted">
-              <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
-            </p>
-          </div>
-          <div className="hidden flex-col items-center gap-3 sm:flex">
-            <Bubble who="alex" text={alex.shown} busy={alex.busy} tail="down" />
-            <AgentWave who="alex" size={64} busy={alex.busy || live} />
-            <p className="text-[13px] text-muted">
-              <span className="font-medium text-ink">Alex</span> · {HERO_LIVE.jobs.alex}
-            </p>
-          </div>
-        </div>
-
-        {/* Ask Sol. */}
-        <form
-          className="mt-8 flex w-full max-w-xl items-center gap-2 rounded-full bg-surface p-1.5 pl-5 shadow-[0_16px_40px_-20px_rgba(11,11,12,0.45)] ring-1 ring-line focus-within:ring-sun-line"
-          onSubmit={(e) => {
-            e.preventDefault();
-            ask(input);
-            setInput("");
-          }}
-        >
-          <SolMark className="size-5 shrink-0" />
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={HERO_LIVE.ask.placeholder}
-            aria-label={HERO_LIVE.ask.placeholder}
-            maxLength={200}
-            className="min-w-0 flex-1 bg-transparent py-2 text-[15px] text-ink outline-none placeholder:text-muted"
-          />
-          <button
-            type="submit"
-            aria-label={HERO_LIVE.ask.send}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-sun-line text-white hover:brightness-105"
-          >
-            <ArrowUp className="size-4" aria-hidden />
-          </button>
-        </form>
-        <div className="mt-3 flex max-w-2xl flex-wrap justify-center gap-2">
-          {HERO_LIVE.ask.questions.map((q) => (
-            <button
-              key={q.ask}
-              type="button"
-              onClick={() => ask(q.ask)}
-              className="rounded-full bg-surface/70 px-3.5 py-1.5 text-[13px] text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink/30"
+      <div className="mx-auto grid max-w-[90rem] items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
+        <div className="text-center lg:text-left">
+          <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
+          <h1 id="hero" className="mt-6 text-[clamp(56px,8vw,148px)] font-semibold leading-[0.88] tracking-[-0.055em]">
+            <span className="block">{SALES_HERO.headline[0]}</span>
+            <span className="block text-sun-line">{SALES_HERO.headline[1]}</span>
+          </h1>
+          <p className="mt-7 text-[clamp(22px,2.3vw,36px)] font-medium leading-tight tracking-[-0.025em] text-ink">{SALES_HERO.sub}</p>
+          <p className="mx-auto mt-3 max-w-xl text-[17px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.line}</p>
+          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
+            <a
+              href="#pricing"
+              className="inline-flex h-12 items-center gap-2 rounded-full bg-sun-line px-7 text-[16px] font-semibold text-white shadow-lift hover:brightness-105"
             >
-              {q.ask}
-            </button>
-          ))}
+              {SALES_HERO.cta}
+            </a>
+            {!signedIn && <TryDemoButton look="quiet" label="Start demo" />}
+          </div>
         </div>
-        {asked && <p className="mt-2 text-[12px] text-muted">{HERO_LIVE.ask.note}</p>}
-
-        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-          <a
-            href="#pricing"
-            className="inline-flex h-12 items-center gap-2 rounded-full bg-sun-line px-7 text-[16px] font-semibold text-white shadow-lift hover:brightness-105"
-          >
-            {SALES_HERO.cta}
-          </a>
-          {!signedIn && <TryDemoButton look="quiet" label="Start demo" />}
-        </div>
-
-        <div className="mt-10 w-full">
-          <Feed live={live} />
+        <div className="flex flex-col items-center gap-6">
+          <div aria-live="polite">
+            <Bubble who="sol" text={sol.shown} busy={sol.busy} tail="down" />
+          </div>
+          <BigSol busy={sol.busy} lean={lean} className="size-48 sm:size-64 lg:size-[22rem]" />
+          <p className="text-[14px] text-muted">
+            <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
+          </p>
         </div>
       </div>
     </section>
