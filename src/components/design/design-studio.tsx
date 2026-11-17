@@ -32,6 +32,7 @@ import {
 } from "@/lib/services/design-store";
 import { createCustomer, loadJob, saveJob } from "@/lib/services/crm";
 import { AddressStrip, type NewDealInput } from "./address-strip";
+import { onStreetWords } from "@/lib/domain/address";
 import { CREDITS_EVENT, DesignCredits } from "./design-credits";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
 import { useChatWaiting } from "./chat-panel";
@@ -126,6 +127,11 @@ export function DesignStudio() {
     return () => stop.abort();
   }, []);
   const [problem, setProblem] = useState<string | null>(null);
+  // An address Google could only put on its street (18 Nov 2026, Martin: a house number that doesn't exist opened on the
+  // middle of the court), and the deal whose roof was just moved to another address, to ask whether the deal moves too.
+  const [onStreet, setOnStreet] = useState<string | null>(null);
+  const [moved, setMoved] = useState<{ jobId: string; name: string; address: string; lat: number; lng: number } | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
   // Where saved work is kept (this device, or the business's account), for the designer's "Saved" line.
   const [kept, setKept] = useState<string | undefined>(undefined);
   useEffect(() => {
@@ -286,6 +292,14 @@ export function DesignStudio() {
       lat: address.lat,
       lng: address.lng,
     };
+    setOnStreet(address.approximate ? onStreetWords(address) : null);
+    // A deal's roof opened somewhere else: Sol asks whether the deal's address should follow (18 Nov 2026, Martin).
+    setMoving(null);
+    setMoved(
+      onJob && (onJob.lat !== next.lat || onJob.lng !== next.lng)
+        ? { jobId: onJob.id, name: onJob.customerName.split(" ")[0] || onJob.customerName, ...next }
+        : null,
+    );
     if (roof || jobId) open(next);
     else openOver(next);
   };
@@ -353,6 +367,51 @@ export function DesignStudio() {
     return (
       <div className={popped ? "theme-studio" : "theme-studio pb-10"}>
         {jobId && askId && <DesignBrief jobId={jobId} askId={askId} />}
+        {onStreet && (
+          <div className="mb-2 flex items-start gap-3 rounded-xl bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
+            <span className="flex-1">{onStreet}</span>
+            <button type="button" onClick={() => setOnStreet(null)} className="text-[12px] font-medium underline underline-offset-2">
+              Dismiss
+            </button>
+          </div>
+        )}
+        {moved && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-ink" role="status">
+            <span className="min-w-0 flex-1">
+              {moving ?? (
+                <>
+                  Update the address on {moved.name}&apos;s deal to <strong className="font-semibold">{moved.address}</strong>?
+                </>
+              )}
+            </span>
+            {!moving && (
+              <>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setMoving("Updating the deal…");
+                    const res = await saveJob(moved.jobId, { address: moved.address, lat: moved.lat, lng: moved.lng });
+                    if (!res.ok) return setMoving(res.message);
+                    // The roof open now is the deal's own again, so its tools (proposal, chat, Record) follow it.
+                    setJob((j) => (j && j.id === moved.jobId ? { ...j, lat: moved.lat, lng: moved.lng } : j));
+                    setMoving(`Done: ${moved.name}'s deal is at ${moved.address}.`);
+                    window.setTimeout(() => setMoved(null), 2500);
+                  }}
+                  className="rounded-full bg-sun-line px-3 py-1 text-[13px] font-medium text-white hover:brightness-105"
+                >
+                  Yes, update it
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMoved(null)}
+                  className="rounded-full px-3 py-1 text-[13px] font-medium ring-1 ring-white/30 hover:bg-white/10"
+                >
+                  No
+                </button>
+              </>
+            )}
+          </div>
+        )}
         <RoofDesigner
           // A different roof is a different designer: nothing from the last one carries over.
           key={`${roof.lat},${roof.lng},${fresh}`}

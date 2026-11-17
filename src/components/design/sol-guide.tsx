@@ -75,6 +75,13 @@ export function SolGuide(props: {
     roof: null,
   });
   const [kliplok, setKliplok] = useState<boolean | null>(null);
+  // Next stays pressable (18 Nov 2026, Martin: a greyed Next didn't say a row was still unpicked); pressed early, it says what.
+  const [tried, setTried] = useState(false);
+  const [triedStep, setTriedStep] = useState(props.step);
+  if (triedStep !== props.step) {
+    setTriedStep(props.step);
+    setTried(false);
+  }
   const [tilt, setTilt] = useState<number | null | undefined>(undefined);
   // The kW box shows the size Sol suggests (it fills in once the bill arrives) until it is typed in.
   const start = props.target ?? props.suggested;
@@ -143,13 +150,23 @@ export function SolGuide(props: {
             </div>
             <Actions>
               <Main
-                disabled={!home.phase || !home.storeys || !home.roof}
                 onClick={() =>
-                  home.phase && home.storeys && home.roof && props.onHome({ phase: home.phase, storeys: home.storeys, roof: home.roof })
+                  home.phase && home.storeys && home.roof
+                    ? props.onHome({ phase: home.phase, storeys: home.storeys, roof: home.roof })
+                    : setTried(true)
                 }
               >
                 Next
               </Main>
+              {tried && (!home.phase || !home.storeys || !home.roof) && (
+                <span role="status" className="self-center text-[12.5px] text-sun-line">
+                  Pick{" "}
+                  {[!home.phase && "single or three phase", !home.storeys && "single or double storey", !home.roof && "the roof"]
+                    .filter(Boolean)
+                    .join(", ")}{" "}
+                  first.
+                </span>
+              )}
             </Actions>
           </>
         );
@@ -180,12 +197,12 @@ export function SolGuide(props: {
               />
             </div>
             <Actions>
-              <Main
-                disabled={kliplok === null || tilt === undefined}
-                onClick={() => kliplok !== null && tilt !== undefined && props.onFlat({ kliplok, tilt })}
-              >
-                Next
-              </Main>
+              <Main onClick={() => (kliplok !== null && tilt !== undefined ? props.onFlat({ kliplok, tilt }) : setTried(true))}>Next</Main>
+              {tried && (kliplok === null || tilt === undefined) && (
+                <span role="status" className="self-center text-[12.5px] text-sun-line">
+                  Pick {[kliplok === null && "Kliplok or not", tilt === undefined && "flat or a tilt"].filter(Boolean).join(", ")} first.
+                </span>
+              )}
             </Actions>
           </>
         );

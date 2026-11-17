@@ -65,7 +65,23 @@ describe("addresses", () => {
     vi.stubGlobal("fetch", fetchMock);
     const address = await placeAddress("abc", "s1", "key");
     expect(address).toMatchObject({ line: "2 Hanwell Court", state: "VIC", lat: -37.88, lng: 145.16 });
-    expect(new Headers(fetchMock.mock.calls[0][1]!.headers).get("X-Goog-FieldMask")).toBe("id,addressComponents,location");
+    expect(new Headers(fetchMock.mock.calls[0][1]!.headers).get("X-Goog-FieldMask")).toBe("id,addressComponents,location,types");
+    expect(address?.approximate).toBeUndefined();
+  });
+
+  it("says when Google only placed the address on its street (18 Nov 2026, Martin: a house number that doesn't exist)", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) =>
+      String(input).includes("geocode")
+        ? Response.json({ status: "OK", results: [{ geometry: { location_type: "RANGE_INTERPOLATED" } }] })
+        : Response.json({
+            id: "abc",
+            addressComponents: components,
+            location: { latitude: -37.88, longitude: 145.16 },
+            types: ["street_address"],
+          }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await placeAddress("abc", "s1", "key"))?.approximate).toBe(true);
   });
 });
 

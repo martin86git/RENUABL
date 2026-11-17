@@ -35,6 +35,23 @@ export function addressFromComponents(
   return { line, suburb, state, postcode, ...extra };
 }
 
+/**
+ * Whether Google only placed an address on its street, not on a home: the place is a street, not an address, or the
+ * point was worked out along the street's numbers (Geocoding's RANGE_INTERPOLATED or GEOMETRIC_CENTER) rather than
+ * found on the building (ROOFTOP). Unknown answers say nothing.
+ */
+export function placedOnStreet(found: { types?: readonly string[]; locationType?: string | null }): boolean {
+  const types = found.types ?? [];
+  const isHome = types.some((t) => t === "street_address" || t === "premise" || t === "subpremise");
+  if (types.length && types.includes("route") && !isHome) return true;
+  return found.locationType === "RANGE_INTERPOLATED" || found.locationType === "GEOMETRIC_CENTER";
+}
+
+/** What the designer says when an address was only placed on its street. */
+export function onStreetWords(address: Pick<Address, "line" | "suburb">): string {
+  return `Google can't find ${address.line}${address.suburb ? `, ${address.suburb}` : ""} as a home, so this is a point on the street, not the roof. Check the house number.`;
+}
+
 const STATE_NAMES: Record<string, string> = {
   NSW: "New South Wales",
   QLD: "Queensland",

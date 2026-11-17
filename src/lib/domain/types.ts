@@ -18,6 +18,11 @@ export interface Address {
   lat?: number;
   lng?: number;
   placeId?: string;
+  /**
+   * Google placed it on the street, not on a home (18 Nov 2026, Martin: 15 Hanwell Court doesn't exist, and the roof opened
+   * on the middle of the court): the number wasn't found, so the point is guessed along the street.
+   */
+  approximate?: true;
 }
 
 // ---------------------------------------------------------------------------
