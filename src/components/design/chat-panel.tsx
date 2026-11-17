@@ -33,6 +33,7 @@ import {
   sendCustomerLine,
   sendReply,
   unreadChanged,
+  type ChatPlace,
   type DealChat as DealChatData,
 } from "@/lib/services/chat";
 import { useDesignAccount } from "./design-account";
@@ -362,7 +363,18 @@ export interface CustomerConversation {
   thinking: boolean;
 }
 
-export function useCustomerChat({ token, business, phone }: { token?: string; business: string; phone?: string }): CustomerConversation {
+export function useCustomerChat({
+  token,
+  business,
+  phone,
+  place,
+}: {
+  token?: string;
+  business: string;
+  phone?: string;
+  /** The page the customer is on: their proposal (the default) or their lead page. */
+  place?: ChatPlace;
+}): CustomerConversation {
   const [lines, setLines] = useState<PublicLine[]>([]);
   const [names, setNames] = useState({ customer: "You", business: teamName(business) });
   const [problem, setProblem] = useState<string | null>(null);
@@ -376,7 +388,7 @@ export function useCustomerChat({ token, business, phone }: { token?: string; bu
     let gone = false;
     const timer = window.setInterval(async () => {
       if (Date.now() - asked > SOL_WAIT) return setAsked(null);
-      const res = await loadCustomerChat(token);
+      const res = await loadCustomerChat(token, place);
       if (gone || !res.ok) return;
       setLines(res.messages);
       const last = res.messages[res.messages.length - 1];
@@ -386,12 +398,12 @@ export function useCustomerChat({ token, business, phone }: { token?: string; bu
       gone = true;
       window.clearInterval(timer);
     };
-  }, [token, asked]);
+  }, [token, asked, place]);
   useEffect(() => {
     if (!token) return;
     let gone = false;
     const look = async () => {
-      const res = await loadCustomerChat(token);
+      const res = await loadCustomerChat(token, place);
       if (gone || !res.ok) return;
       setLines(res.messages);
       setNames(res.names);
@@ -408,7 +420,7 @@ export function useCustomerChat({ token, business, phone }: { token?: string; bu
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", whenSeen);
     };
-  }, [token]);
+  }, [token, place]);
   // The link in an email ends in #chat: open the chat on arrival (the page itself stays at the top, on the greeting).
   useEffect(() => {
     // Read from the address once the page is in a browser, which the server's render can't know.
@@ -417,7 +429,7 @@ export function useCustomerChat({ token, business, phone }: { token?: string; bu
   }, []);
   const send = async (text: string) => {
     if (!token) return false;
-    const res = await sendCustomerLine(token, text);
+    const res = await sendCustomerLine(token, text, place);
     if (!res.ok) {
       setProblem(res.message);
       return false;

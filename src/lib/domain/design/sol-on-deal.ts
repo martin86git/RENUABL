@@ -40,7 +40,8 @@ export function eventWords(e: FeedEvent, customer: string): string {
     case "call":
       return `${by} logged a call with ${name}.`;
     case "note":
-      return `${by} added a note.`;
+      // A line the customer made happen (opening their page, saying the home is theirs) says what it is.
+      return e.by === "Customer" ? `${quoted(e.text).replace(/\.$/, "")}.` : `${by} added a note.`;
     case "proposal":
     case "stage": {
       const t = quoted(e.text).replace(/\.$/, "");

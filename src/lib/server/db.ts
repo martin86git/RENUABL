@@ -1020,6 +1020,18 @@ create table if not exists design_live (
   ended_at timestamptz
 );
 create index if not exists design_live_business on design_live(business_id, lat, lng);
+-- A new lead's own page (server/design-hello.ts): one private link a deal, for good, and whether they said the home is theirs.
+create table if not exists design_hello (
+  token text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  home text,
+  home_at timestamptz,
+  seen_at timestamptz,
+  created_by text not null,
+  created_at timestamptz not null default now(),
+  unique (business_id, job_id)
+);
 -- Nearmap pictures a business fetched for a roof (server/nearmap.ts), each capture once, and which picture is in use.
 create table if not exists design_nearmap (
   business_id text not null references businesses(id) on delete cascade,

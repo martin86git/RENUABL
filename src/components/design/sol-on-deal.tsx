@@ -12,6 +12,7 @@ import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { solOnDeal } from "@/lib/domain/design/sol-on-deal";
 import { actOnOutbox } from "@/lib/services/sol-agents";
 import { loadFeedDeal } from "@/lib/services/deal-feed";
+import { leadPageFor } from "@/lib/services/hello";
 import { Countdown, ReviewSol } from "./deal-feed";
 import { SolMark } from "./sol-icon";
 
@@ -148,6 +149,8 @@ export function SolOnDealCard(props: {
         </dd>
       </dl>
 
+      {(deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
+
       {reviewing && deal.sol && (
         <ReviewSol
           deal={deal}
@@ -160,6 +163,62 @@ export function SolOnDealCard(props: {
         />
       )}
     </section>
+  );
+}
+
+/**
+ * The lead's own page (domain/design/first-contact.ts): their home from above with the design on it, "Is this your
+ * home?" and a chat Sol answers. Made on the first press; Copy the link to send it, or Open to see it as they will.
+ */
+function LeadPage({ jobId, name }: { jobId: string; name: string }) {
+  const [said, setSaid] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const get = async (): Promise<string | null> => {
+    setBusy(true);
+    const r = await leadPageFor(jobId);
+    setBusy(false);
+    if (!r.ok) {
+      setSaid(r.message);
+      return null;
+    }
+    return `${window.location.origin}${r.path}`;
+  };
+  const quiet = "inline-flex h-8 items-center rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2";
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
+      <span className="text-[12.5px] text-muted">{name}&apos;s page: their home, the design and a chat with Sol</span>
+      <div className="ml-auto flex gap-1.5">
+        <button
+          type="button"
+          disabled={busy}
+          className={quiet}
+          onClick={async () => {
+            const url = await get();
+            if (!url) return;
+            await navigator.clipboard.writeText(url).then(
+              () => setSaid("Link copied. Send it to " + name + "."),
+              () => setSaid(url),
+            );
+          }}
+        >
+          Copy link
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          className={quiet}
+          onClick={async () => {
+            const tab = window.open("", "_blank");
+            const url = await get();
+            if (url && tab) tab.location.href = url;
+            else tab?.close();
+          }}
+        >
+          Open
+        </button>
+      </div>
+      {said && <p className="w-full text-[12.5px] break-all text-ink-2">{said}</p>}
+    </div>
   );
 }
 

@@ -50,6 +50,10 @@ describe("Sol's line on a deal", () => {
   it("names who did it, and Sol when it was him", () => {
     expect(eventWords({ kind: "email", text: "x", at: ago(1), by: "sam" }, "Jo Citizen")).toBe("sam emailed Jo.");
     expect(eventWords({ kind: "sol", text: "x", at: ago(1), by: "Sol" }, "Jo Citizen")).toBe("Sol wrote to Jo.");
+    expect(eventWords({ kind: "note", text: "Jo opened their page.", at: ago(1), by: "Customer" }, "Jo Citizen")).toBe(
+      "Jo opened their page.",
+    );
+    expect(eventWords({ kind: "note", text: "x", at: ago(1), by: "sam" }, "Jo Citizen")).toBe("sam added a note.");
   });
 
   it("gives Sol's lined-up email as what's next, with its countdown, and asks nothing of the team", () => {

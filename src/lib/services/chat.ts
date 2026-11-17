@@ -34,9 +34,12 @@ async function ask<T>(path: string, init?: { method: string; body?: unknown }): 
 }
 
 // The customer's side.
-const linkChat = (token: string) => `/api/proposal/${encodeURIComponent(token)}/chat`;
-export const loadCustomerChat = (token: string) => ask<PublicChat>(linkChat(token));
-export const sendCustomerLine = (token: string, text: string) => ask<PublicChat>(linkChat(token), { method: "POST", body: { text } });
+/** Which page the customer writes from: their proposal, or (before one) their lead page (`/hello/<token>`). Both carry the same conversation. */
+export type ChatPlace = "proposal" | "hello";
+const linkChat = (token: string, place: ChatPlace = "proposal") => `/api/${place}/${encodeURIComponent(token)}/chat`;
+export const loadCustomerChat = (token: string, place?: ChatPlace) => ask<PublicChat>(linkChat(token, place));
+export const sendCustomerLine = (token: string, text: string, place?: ChatPlace) =>
+  ask<PublicChat>(linkChat(token, place), { method: "POST", body: { text } });
 
 // The business's side.
 export interface DealChat {

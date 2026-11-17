@@ -15,59 +15,17 @@ import { SOL_PER_USER } from "./sol-credits";
  */
 export const SALES_HERO = {
   eyebrow: "RENUABL Business · Powered by AI",
+  /** Over the headline (16 Nov 2026, Martin: as xAI and OpenAI introduce theirs). */
+  introducing: "Introducing RENUABL",
   /**
-   * The announcement (17 Nov 2026, Martin: keep "Solar just got a brain", announce something huge in the direct style
-   * of 90s advertising, as clean as Apple's product pages). Bold, but only what's true: no superlative we can't prove.
+   * Lead with the sales team (17 Nov 2026, Martin: "ultimately what's going to really drive willingness to try is the
+   * potential to increase sales… we should instantly lead with YOUR SALES TEAM"). The second part lit in orange.
    */
-  introducing: "Introducing Sol",
-  headline: ["Solar just", "got a brain."],
-  sub: "The AI sales force for solar businesses.",
-  line: "Sol works every deal with you. Charlie rings your leads. Alex books your installs.",
+  headline: ["Your new", "sales team."],
+  /** What Sol is, said plainly (Martin: a prospect won't know what, let alone who, Sol is). */
+  sub: "Sol is AI built for solar sales. He works every deal beside you, follows up every lead and tells you who to call next. Charlie and Alex work the phones.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
-} as const;
-
-/**
- * The manifesto (17 Nov 2026, Martin: "90's style direct statement style advertising… its super intelligent and its
- * here to give you an incredible sales force"). One statement at a time, huge, on black. Each is something RENUABL
- * does; none claims a result or a rank.
- */
-export const MANIFESTO = {
-  eyebrow: "Your new sales force",
-  statements: [
-    "It rings every new lead.",
-    "It follows up every proposal.",
-    "It writes up your calls.",
-    "It checks the standards. With sources.",
-    "It never forgets a follow-up.",
-    "It never takes a sick day.",
-  ],
-  finale: ["That's not software.", "That's a sales force."],
-} as const;
-
-/**
- * What Sol knows, circling him (17 Nov 2026): the sources he reads and the business's own records, with the box to ask
- * him. The lines he says while nobody has asked are true of him today.
- */
-export const KNOWLEDGE = {
-  eyebrow: "The brain",
-  headline: "Ask him anything.",
-  sub: "Networks, rebates, standards, datasheets and your own deals. He reads the source and shows it to you.",
-  orbit: [
-    "AS/NZS 5139",
-    "AS/NZS 4777",
-    "AS/NZS 3000",
-    "CER rebates",
-    "Solar Victoria",
-    "Network export limits",
-    "Pre-approvals",
-    "Datasheets",
-    "Your price lists",
-    "Your deals",
-    "Your call notes",
-    "Power bills",
-  ],
-  idle: ["Ask me about export limits, rebates or where a battery can go.", "I read the official page and show you my sources."],
 } as const;
 
 /**
@@ -857,14 +815,6 @@ export const CLOSING = {
 export function salesCopy(): string[] {
   return [
     ...Object.values(SALES_HERO).flat(),
-    MANIFESTO.eyebrow,
-    ...MANIFESTO.statements,
-    ...MANIFESTO.finale,
-    KNOWLEDGE.eyebrow,
-    KNOWLEDGE.headline,
-    KNOWLEDGE.sub,
-    ...KNOWLEDGE.orbit,
-    ...KNOWLEDGE.idle,
     SALES_LOOP.eyebrow,
     SALES_LOOP.headline,
     SALES_LOOP.sub,
