@@ -5,7 +5,8 @@ import clsx from "clsx";
 import { Check, Eye, Phone } from "lucide-react";
 import { SALES_LOOP } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
-import { AgentWave, useMotionOk } from "./living-hero";
+import { useMotionOk } from "./living-hero";
+import { Ray, RayStyles } from "./rays";
 import { SolMark } from "./sol-icon";
 
 /**
@@ -50,9 +51,9 @@ function CallScene({ t }: { t: number }) {
         {s.lead}
       </div>
       <div className={clsx(pop, shown(t >= 1200), "flex items-center gap-3 rounded-xl bg-[#202227] px-3.5 py-3 text-white")}>
-        <AgentWave who="charlie" size={36} busy={ringing || talking} />
+        <Ray i={1} size={36} live={ringing || talking} />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-bright">Charlie</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-bright">A Ray</p>
           <p className="text-[13px]">{ringing ? s.ringing : s.talking}</p>
         </div>
         {ringing ? (
@@ -137,7 +138,7 @@ function CallMeScene({ t }: { t: number }) {
         </span>
       </div>
       <div className={clsx(pop, shown(pressed), "flex items-start gap-3 rounded-xl bg-[#202227] px-3.5 py-3 text-white")}>
-        <AgentWave who="charlie" size={34} busy={ringing || talking} />
+        <Ray i={3} size={34} live={ringing || talking} />
         <p className="min-w-0 flex-1 text-[13px] leading-snug">
           {talking ? said : s.ringing}
           {talking && said.length < s.said.length && (
@@ -220,6 +221,7 @@ export function SalesLoop() {
       className="snap-start scroll-mt-16 px-5 py-14 lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:px-8"
       aria-labelledby="sales-loop"
     >
+      <RayStyles />
       <div className="mx-auto w-full max-w-[84rem]">
         <div className="text-center">
           <BrandEyebrow>{SALES_LOOP.eyebrow}</BrandEyebrow>

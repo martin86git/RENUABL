@@ -9,7 +9,7 @@ import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
 import { MarketplaceMark } from "./marketplace-bar";
 import { SolScene, SOL_SCENE_MS } from "./film-sol-scene";
 import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
-import { AgentWave } from "./living-hero";
+import { Ray, RayStyles } from "./rays";
 import { SolMark } from "./sol-icon";
 
 /**
@@ -410,6 +410,7 @@ export function ProductFilm({ dark = false }: { dark?: boolean }) {
 
         {/* Who is doing the work, in their own words (17 Nov 2026, Martin: the answering should come from Sol, not the
             software). On the side away from what is lit. */}
+        <RayStyles />
         {narration && (
           <Narrator
             key={move.shot}
@@ -478,7 +479,7 @@ function Narrator({ who, text, ms, side }: { who: string; text: string; ms: numb
   const n = Math.max(0, Math.floor((ms - 500) / 24));
   const shown = text.slice(0, n);
   const busy = ms >= 500 && n < text.length;
-  const name = who === "sol" ? "Sol" : who === "charlie" ? "Charlie" : "Alex";
+  const name = who === "sol" ? "Sol" : "A Ray";
   return (
     <div
       className={clsx(
@@ -496,7 +497,7 @@ function Narrator({ who, text, ms, side }: { who: string; text: string; ms: numb
           <SolMark className="relative size-full" />
         ) : (
           <span className="relative">
-            <AgentWave who={who === "alex" ? "alex" : "charlie"} size={40} busy={busy} />
+            <Ray i={1} size={40} live={busy} />
           </span>
         )}
       </span>

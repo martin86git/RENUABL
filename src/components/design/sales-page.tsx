@@ -8,7 +8,8 @@ import { BrandEyebrow, Sunrise } from "./business-brand";
 import { LivingHero } from "./living-hero";
 import { SalesLoop } from "./sales-loop";
 import { DesignerSlide } from "./designer-slide";
-import { KnowledgeOrbit, Manifesto } from "./business-slides";
+import { KnowledgeOrbit } from "./business-slides";
+import { RaysSlide } from "./rays-slide";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import { CLOSING, FAQ, PRICING, SALES_HERO, HERO_LIVE } from "@/lib/domain/design/sales-page";
@@ -31,7 +32,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
           your sales team, how it sells, the film, the old way and the new, pricing with the questions, the close. */}
       <LivingHero signedIn={signedIn} />
-      <Manifesto />
+      <RaysSlide />
       <SalesLoop />
       <DesignerSlide />
       <KnowledgeOrbit />
@@ -64,7 +65,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
 /** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
 const PAGE_LINKS = [
   { href: "#start", label: "Meet Sol" },
-  { href: "#force", label: "Your new sales force" },
+  { href: "#rays", label: "Meet the Rays" },
   { href: "#sales", label: "How it sells" },
   { href: "#designer", label: "The assisted designer" },
   { href: "#brain", label: "Ask him anything" },

@@ -7,6 +7,7 @@ import { HERO_LIVE, SALES_HERO } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { TryDemoButton } from "./business-demo";
 import { SolMark } from "./sol-icon";
+import { Ray, RayStyles, useLook } from "./rays";
 
 /**
  * The living hero (17 Nov 2026, Martin: "the bots themselves are the marketing… it makes the software feel alive",
@@ -301,8 +302,7 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
   const live = motion && seen;
   const lean = useLean(root, live, 18);
   const sol = useSaying(HERO_LIVE.says.sol, live, 900, 3600);
-  const charlie = useSaying(HERO_LIVE.says.charlie, live, 1800, 3000);
-  const alex = useSaying(HERO_LIVE.says.alex, live, 3000, 3000);
+  const look = useLook(root, live);
   return (
     <section
       ref={root}
@@ -339,30 +339,15 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
           <p className="text-[14px] text-muted">
             <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
           </p>
-          {/* The voice agents beside him, each saying what they are doing (17 Nov 2026, Martin). */}
-          <div className="mt-2 grid w-full max-w-[34rem] gap-3 sm:grid-cols-2">
-            {(
-              [
-                ["charlie", charlie],
-                ["alex", alex],
-              ] as const
-            ).map(([who, said]) => (
-              <div key={who} className="flex items-center gap-3 rounded-2xl bg-surface/80 p-3 text-left ring-1 ring-line backdrop-blur">
-                <AgentWave who={who} size={48} busy={said.busy || live} />
-                <div className="min-w-0">
-                  <p className="text-[13px] text-muted">
-                    <span className="font-medium text-ink">{NAMES[who]}</span> · {HERO_LIVE.jobs.voice}
-                  </p>
-                  <p className="mt-0.5 min-h-[2.6em] text-[13px] leading-snug text-ink">
-                    {said.shown}
-                    {said.busy && (
-                      <span className="live-caret ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.15em] bg-sun-line" aria-hidden />
-                    )}
-                  </p>
-                </div>
-              </div>
+          {/* The Rays beside him: his voice agents, as a crew (17 Nov 2026, Martin: never lead with the names a business
+              gives them). */}
+          <RayStyles />
+          <div className="mt-1 flex items-end justify-center gap-2 sm:gap-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Ray key={i} i={i} size={i % 2 ? 46 : 54} look={look} live={live} />
             ))}
           </div>
+          <p className="text-[14px] text-muted">{HERO_LIVE.jobs.rays}</p>
         </div>
       </div>
     </section>

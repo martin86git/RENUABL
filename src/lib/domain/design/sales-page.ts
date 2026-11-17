@@ -19,13 +19,37 @@ export const SALES_HERO = {
    * The announcement (17 Nov 2026, Martin: keep "Solar just got a brain", announce something huge in the direct style
    * of 90s advertising, as clean as Apple's product pages). Bold, but only what's true: no superlative we can't prove.
    */
-  introducing: "Introducing Sol and your voice agents",
+  introducing: "Introducing Sol and the Rays",
   headline: ["Solar just", "got a brain."],
   sub: "The AI sales force for solar businesses.",
   /** Sol and the voice agents both named (17 Nov 2026, Martin: the home page shouldn't only be about Sol). */
-  line: "Sol, your AI sales assistant, works every deal with you. Your voice agents ring your leads, take their calls and book your installs.",
+  line: "Sol is the brain. The Rays are his voice agents: they ring your leads, answer your line and book your installs.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
+} as const;
+
+/**
+ * The Rays (17 Nov 2026, Martin: after xAI's Grok Bots, "make sol and the voice ai feel like the army you wished you always
+ * had", and never lead with the names a business gives them). The voice agents' family name, as Bots and Dots are:
+ * Sol is the sun, the Rays are what he sends out. Each job is one a voice agent does today.
+ */
+export const RAYS = {
+  eyebrow: "Meet the Rays",
+  headline: ["The sales force", "you always wished you had."],
+  body: [
+    "Rays are voice agents that work beside Sol. They ring your new leads, answer the customers who call back and book your installs.",
+    "You name each one and choose its voice. They keep your calling hours, follow your script and tell you when a person is needed.",
+  ],
+  jobs: [
+    "Rings new leads",
+    "Answers your line",
+    "Calls when asked",
+    "Meets objections",
+    "Texts the link",
+    "Books installs",
+    "Calls back to ask",
+  ],
+  note: "Rays come with Calls & Texts. Sol is in every plan.",
 } as const;
 
 /**
@@ -109,7 +133,7 @@ export const SALES_LOOP = {
       key: "call",
       who: "charlie",
       title: "Speed to lead.",
-      body: "A new lead comes in and Charlie rings them, answers their questions and books them in with your team.",
+      body: "A new lead comes in and a Ray rings them, answers their questions and books them in with your team.",
       scene: {
         lead: "New lead · Olivia Hart",
         ringing: "Calling Olivia",
@@ -133,12 +157,12 @@ export const SALES_LOOP = {
       key: "callme",
       who: "charlie",
       title: "A voice agent on every proposal.",
-      body: "Reading their proposal, the customer presses Call me. Charlie rings, goes through it with them and meets their worries.",
+      body: "Reading their proposal, the customer presses Call me. A Ray rings, goes through it with them and meets their worries.",
       scene: {
         title: "Solar and battery for Jane Doe",
         button: "Call me",
-        ringing: "Charlie is calling Jane",
-        said: "Hi Jane, it's Charlie. Happy to go through your battery questions.",
+        ringing: "A Ray is calling Jane",
+        said: "Hi Jane, I'm calling about your proposal. Happy to go through your battery questions.",
       },
     },
     {
@@ -206,9 +230,9 @@ export const HERO_LIVE = {
       },
       {
         ask: "Will you call my customers?",
-        keys: ["call", "phone", "ring", "charlie", "alex", "voice"],
+        keys: ["call", "phone", "ring", "ray", "voice"],
         answer:
-          "Charlie rings your new leads, answers their questions and books them a call with your team. Alex books installs. You name them, choose their voices and can listen in live. They come with Calls & Texts.",
+          "The Rays do. They're voice agents: they ring your new leads, answer their questions, book them a call with your team and book your installs. You name each one, choose its voice and can listen in live. They come with Calls & Texts.",
       },
       {
         ask: "How do you know the rules?",
@@ -231,7 +255,7 @@ export const HERO_LIVE = {
     note: "Written answers on this page. In RENUABL, Sol answers from your own business.",
   },
   film: { eyebrow: "See it work", headline: "A day with Sol, start to finish." },
-  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs", voice: "Voice agent" },
+  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs", rays: "The Rays · your voice agents" },
 } as const;
 
 export const AI_TEAM = {
@@ -851,7 +875,7 @@ export const FILM = {
     "service-case": { who: "sol", text: "Henry's inverter has an earth fault. I read his chat and his job, and wrote up what to do." },
     "service-reply": { who: "sol", text: "I've drafted Henry's email. Check it, then send." },
     "voice-call": {
-      who: "charlie",
+      who: "ray",
       text: "I'm on the phone with Doug, answering his battery questions. Watch live, or tell me what to say.",
     },
     "design-sol": { who: "sol", side: "right", text: "Doug spends $780 a quarter. I'd aim for 13.3 kW with a 17 kWh battery." },
@@ -882,6 +906,11 @@ export const CLOSING = {
 export function salesCopy(): string[] {
   return [
     ...Object.values(SALES_HERO).flat(),
+    RAYS.eyebrow,
+    ...RAYS.headline,
+    ...RAYS.body,
+    ...RAYS.jobs,
+    RAYS.note,
     MANIFESTO.eyebrow,
     ...MANIFESTO.statements,
     ...MANIFESTO.finale,
