@@ -168,8 +168,9 @@ export function Ray({
   const id = useId().replace(/:/g, "");
   const fill = `url(#ray-${id})`;
   const [ex, ey] = shape.eyes.at;
-  const dx = look.x * 4;
-  const dy = look.y * 3;
+  // A small glance, calm rather than cute (17 Nov 2026, Martin).
+  const dx = look.x * 2;
+  const dy = look.y * 1.5;
   return (
     <span
       className={clsx("ray-bob inline-block", className)}
@@ -200,7 +201,7 @@ export function Ray({
           style={{
             transform: `translate(${dx}px, ${dy}px)`,
             transformOrigin: `${ex}px ${ey}px`,
-            transition: "transform 400ms ease-out",
+            transition: "transform 700ms ease-out",
             animationDelay: `${1200 + ((i * 1630) % 5200)}ms`,
             animationPlayState: live ? "running" : "paused",
           }}
@@ -216,10 +217,10 @@ export function Ray({
 export function RayStyles() {
   return (
     <style>{`
-      @keyframes ray-bob { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6%) rotate(-3deg); } }
-      @keyframes ray-blink { 0%,94%,100% { scale: 1 1; } 97% { scale: 1 0.1; } }
-      .ray-bob { animation: ray-bob 3.6s ease-in-out infinite; }
-      .ray-blink { animation: ray-blink 6.5s ease-in-out infinite; }
+      @keyframes ray-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2.5%); } }
+      @keyframes ray-blink { 0%,96%,100% { scale: 1 1; } 98% { scale: 1 0.1; } }
+      .ray-bob { animation: ray-bob 5.5s ease-in-out infinite; }
+      .ray-blink { animation: ray-blink 9s ease-in-out infinite; }
       @media (prefers-reduced-motion: reduce) { .ray-bob, .ray-blink { animation: none; } }
     `}</style>
   );

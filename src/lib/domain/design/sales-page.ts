@@ -53,6 +53,41 @@ export const RAYS = {
 } as const;
 
 /**
+ * A Ray on a call (17 Nov 2026, Martin: "add a real call clip"). Calls keep no audio, so until a real recording is
+ * supplied (`audio`, a file in public/, from a Test call on Martin's own phone) this is an example written to show how
+ * a Ray talks, and says so. It keeps a Ray's rules: says it's the business's automated assistant, answers only from the
+ * customer's own facts, promises no saving, and books the call with the team.
+ */
+export const RAY_CALL = {
+  label: "Listen in",
+  title: "A Ray rings a new lead",
+  who: "Olivia Hart · new lead · solar and battery",
+  example: "An example call, written to show how a Ray talks. Every call says it's automated.",
+  real: "A real practice call, recorded on our own phone.",
+  audio: null as string | null,
+  play: "Play the call",
+  pause: "Pause",
+  lines: [
+    { by: "ray", text: "Hi, is that Olivia?" },
+    { by: "lead", text: "Yes, speaking." },
+    {
+      by: "ray",
+      text: "Hi Olivia, it's Sunrise Solar's automated assistant. You asked about solar and a battery this morning. Is now a good time?",
+    },
+    { by: "lead", text: "Sure. Is a battery actually worth it for us?" },
+    {
+      by: "ray",
+      text: "It depends on how much you use after dark. Your bill says about fifteen kilowatt hours, so a battery could carry the panels' spare into the evening. The team can go through the numbers with you.",
+    },
+    { by: "lead", text: "Okay, that'd be good." },
+    { by: "ray", text: "Would Thursday at ten suit for a fifteen-minute call?" },
+    { by: "lead", text: "Thursday at ten works." },
+    { by: "ray", text: "Done. You'll get an email to confirm. Thanks, Olivia." },
+  ],
+  outcome: "Booked a 15-minute call · Thursday 10:00 am",
+} as const;
+
+/**
  * The manifesto (17 Nov 2026, Martin: "90's style direct statement style advertising… its super intelligent and its
  * here to give you an incredible sales force"). One statement at a time, huge, on black. Each is something RENUABL
  * does; none claims a result or a rank.
@@ -954,6 +989,13 @@ export function salesCopy(): string[] {
     ...RAYS.body,
     ...RAYS.jobs,
     RAYS.note,
+    RAY_CALL.label,
+    RAY_CALL.title,
+    RAY_CALL.who,
+    RAY_CALL.example,
+    RAY_CALL.real,
+    ...RAY_CALL.lines.map((l) => l.text),
+    RAY_CALL.outcome,
     MANIFESTO.eyebrow,
     ...MANIFESTO.statements,
     ...MANIFESTO.finale,
