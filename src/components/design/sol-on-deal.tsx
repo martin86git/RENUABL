@@ -245,9 +245,10 @@ function SolTerminal(props: {
               e.preventDefault();
               tellSol();
             }}
-            className="mt-3 flex items-center gap-1 rounded-full bg-canvas py-1 pl-4 pr-1 ring-1 ring-line focus-within:ring-sun-line"
+            // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
+            className="mt-5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
           >
-            <span className="font-mono text-[13px] text-sun-line" aria-hidden>
+            <span className="font-mono text-[12px] text-sun-line" aria-hidden>
               {">"}
             </span>
             <input
@@ -259,7 +260,7 @@ function SolTerminal(props: {
               }}
               placeholder={p.yes ? `Or tell Sol what to do for ${name}…` : `Tell Sol what to do for ${name}…`}
               aria-label={`Tell Sol what to do for ${name}`}
-              className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-muted"
+              className="min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
             />
             <DictateButton
               label={`Speak to Sol about ${name}`}
@@ -270,9 +271,9 @@ function SolTerminal(props: {
               type="submit"
               disabled={!ask.trim()}
               aria-label="Send to Sol"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+              className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
             >
-              <ArrowUp className="size-4" aria-hidden />
+              <ArrowUp className="size-3.5" aria-hidden />
             </button>
           </form>
           {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
