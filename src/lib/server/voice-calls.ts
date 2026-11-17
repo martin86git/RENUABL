@@ -20,6 +20,7 @@
  */
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { outOfCallCredit } from "@/lib/domain/call-credit";
+import { placeVapiCall } from "./vapi-call";
 import { normaliseMobile } from "@/lib/domain/contact";
 import {
   MAX_LINES,
@@ -370,15 +371,9 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
     ...(scheduled ? { schedulePlan: { earliestAt: window.from.toISOString(), latestAt: window.until.toISOString() } } : {}),
   };
   try {
-    const res = await fetch(`${VAPI}/call`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${s.key}`, "content-type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
-    });
-    const json = (await res.json().catch(() => ({}))) as { id?: unknown; message?: unknown };
-    if (!res.ok || typeof json.id !== "string") {
-      const why = `Vapi ${res.status}: ${String(json.message ?? "").slice(0, 200)}`;
+    const { ok, status, json } = await placeVapiCall(s.key, body);
+    if (!ok || typeof json.id !== "string") {
+      const why = `Vapi ${status}: ${String(json.message ?? "").slice(0, 200)}`;
       console.error("voice call not placed", why);
       await finish(row.id, "stopped", { stop_reason: why });
       return false;

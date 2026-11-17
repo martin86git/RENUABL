@@ -39,8 +39,7 @@ import { numberOf } from "./business-numbers";
 import { callerOf, coachingOf, saveCoaching, scriptFor } from "./design-caller-repo";
 import { loadBrand } from "./design-proposal-repo";
 import { voiceOnFor, voiceSettings } from "./voice-calls";
-
-const VAPI = "https://api.vapi.ai";
+import { placeVapiCall } from "./vapi-call";
 
 interface PracticeRow {
   id: string;
@@ -129,20 +128,14 @@ export async function startPracticeCall(
       `insert into design_practice_calls (id, business_id, member_email, first_name, role, kind) values ($1, $2, lower($3), $4, $5, $6)`,
       [id, member.businessId, member.email, firstName, role, kind],
     );
-    const res = await fetch(`${VAPI}/call`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${s.key}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        phoneNumberId: (await numberOf(member.businessId))?.vapiId ?? s.phoneNumberId,
-        customer: { number: mobile },
-        name: kind === "training" ? "Training call" : "Practice call",
-        assistant,
-      }),
-      signal: AbortSignal.timeout(15_000),
+    const { ok, status, json } = await placeVapiCall(s.key, {
+      phoneNumberId: (await numberOf(member.businessId))?.vapiId ?? s.phoneNumberId,
+      customer: { number: mobile },
+      name: kind === "training" ? "Training call" : "Practice call",
+      assistant,
     });
-    const json = (await res.json().catch(() => ({}))) as { id?: unknown; message?: unknown; monitor?: { controlUrl?: unknown } };
-    if (!res.ok || typeof json.id !== "string") {
-      console.error("practice call not placed", `Vapi ${res.status}: ${String(json.message ?? "").slice(0, 200)}`);
+    if (!ok || typeof json.id !== "string") {
+      console.error("practice call not placed", `Vapi ${status}: ${String(json.message ?? "").slice(0, 200)}`);
       await query(`update design_practice_calls set live_status = 'ended', ended_at = now() where id = $1`, [id]);
       // Out of credit at the phone service: trying again can't help, so the member is told (call-credit.ts).
       return { result: "failed", credit: outOfCallCredit(json.message) };

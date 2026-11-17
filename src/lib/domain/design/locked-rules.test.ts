@@ -15,7 +15,7 @@ import {
 } from "./coaching";
 import { NATURAL_DELIVERY } from "./delivery";
 import { installSystemPrompt } from "../install-call";
-import { assistantConfig, openingBlock, voiceSystemPrompt, type CallBrief } from "../voice-agent";
+import { assistantConfig, openingBlock, voiceSystemPrompt, withoutSpeedSettings, type CallBrief } from "../voice-agent";
 
 const note = (id: string, text: string, locked = false): CoachNote => ({
   id,
@@ -130,11 +130,22 @@ describe("a natural delivery on a call", () => {
     expect(voiceSystemPrompt(brief(), [], { canTransfer: false })).not.toContain("How you sound");
   });
 
-  it("sends Vapi the pause only when one was chosen", () => {
+  it("sends Vapi a quick answer on every call, and ElevenLabs' quick model", () => {
     const base = { slots: [], serverUrl: "https://x.example/api", secret: "s".repeat(24), model: "m" };
-    expect(assistantConfig({ ...base, brief: brief() })).not.toHaveProperty("startSpeakingPlan");
-    expect(assistantConfig({ ...base, brief: brief({ delivery: NATURAL_DELIVERY }) })).toMatchObject({
-      startSpeakingPlan: { waitSeconds: 0.8 },
+    expect(assistantConfig({ ...base, brief: brief() })).toMatchObject({
+      startSpeakingPlan: { waitSeconds: 0.2, smartEndpointingPlan: { provider: "livekit" } },
     });
+    expect(assistantConfig({ ...base, brief: brief({ delivery: NATURAL_DELIVERY }) })).toMatchObject({
+      startSpeakingPlan: { waitSeconds: 0.2 },
+    });
+    const eleven = assistantConfig({ ...base, brief: brief(), voice: { provider: "11labs", voiceId: "abc" } });
+    expect(eleven).toMatchObject({ voice: { provider: "11labs", voiceId: "abc", model: "eleven_flash_v2_5" } });
+    expect(assistantConfig({ ...base, brief: brief(), voice: { provider: "vapi", voiceId: "Elliot" } })).toMatchObject({
+      voice: { provider: "vapi", voiceId: "Elliot" },
+    });
+    // If Vapi turns the call away as badly formed, it goes again with the pause alone.
+    const plain = withoutSpeedSettings(eleven as unknown as Record<string, unknown>);
+    expect(plain.startSpeakingPlan).toEqual({ waitSeconds: 0.2 });
+    expect(plain.voice).toEqual({ provider: "11labs", voiceId: "abc" });
   });
 });

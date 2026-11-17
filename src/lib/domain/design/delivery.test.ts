@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DELIVERY,
   DELIVERY_COPY,
+  END_OF_TURN,
   NATURAL_DELIVERY,
+  PAUSE_SECONDS,
   cleanDelivery,
   defaultDelivery,
   deliveryBlock,
@@ -11,11 +13,19 @@ import {
 } from "./delivery";
 
 describe("how a voice agent speaks", () => {
-  it("changes nothing until something is chosen", () => {
+  it("adds no instructions until something is chosen, and always answers quickly", () => {
     expect(deliveryBlock(null)).toBe("");
-    expect(deliveryParams(null)).toEqual({});
     expect(deliveryBlock(DEFAULT_DELIVERY)).toBe("");
-    expect(deliveryParams(DEFAULT_DELIVERY)).toEqual({});
+    expect(deliveryParams(null)).toEqual({ startSpeakingPlan: { waitSeconds: 0.2, ...END_OF_TURN } });
+    expect(deliveryParams(DEFAULT_DELIVERY)).toEqual(deliveryParams(null));
+  });
+
+  it("never leaves a second of silence before the agent starts to answer", () => {
+    for (const pause of ["quick", "considered", "unhurried"] as const) expect(PAUSE_SECONDS[pause]).toBeLessThanOrEqual(1);
+    expect(NATURAL_DELIVERY.pause).toBe("quick");
+    expect(END_OF_TURN.transcriptionEndpointingPlan.onNoPunctuationSeconds).toBeLessThan(1);
+    // The longest Vapi's model may wait when it thinks they're still talking: 900 ms.
+    expect(END_OF_TURN.smartEndpointingPlan.waitFunction.startsWith("900 /")).toBe(true);
   });
 
   it("has a sales agent speak naturally until someone chooses, and the post-sale one plainly", () => {
@@ -43,10 +53,11 @@ describe("how a voice agent speaks", () => {
     expect(deliveryBlock({ ...DEFAULT_DELIVERY, pace: "brisk" })).toContain("keep it moving");
   });
 
-  it("sends Vapi only what differs from its defaults", () => {
-    expect(deliveryParams(NATURAL_DELIVERY)).toEqual({ startSpeakingPlan: { waitSeconds: 0.8 } });
+  it("sends Vapi the pause chosen and the room behind it", () => {
+    expect(deliveryParams(NATURAL_DELIVERY)).toMatchObject({ startSpeakingPlan: { waitSeconds: 0.2 } });
+    expect(deliveryParams(NATURAL_DELIVERY)).not.toHaveProperty("backgroundSound");
     expect(deliveryParams({ ...DEFAULT_DELIVERY, pause: "unhurried", room: "silent" })).toEqual({
-      startSpeakingPlan: { waitSeconds: 1.2 },
+      startSpeakingPlan: { waitSeconds: 1, ...END_OF_TURN },
       backgroundSound: "off",
     });
   });

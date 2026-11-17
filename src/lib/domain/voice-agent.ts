@@ -599,7 +599,7 @@ export function assistantConfig(o: {
       messages: [{ role: "system", content: voiceSystemPrompt(b, o.slots, { canTransfer: Boolean(o.transferNumber) }) }],
       tools,
     },
-    ...(o.voice ? { voice: o.voice } : {}),
+    ...(o.voice ? { voice: fastVoice(o.voice) } : {}),
     // How long it leaves before answering, and the room behind it, when the business chose other than Vapi's defaults.
     ...deliveryParams(b.delivery),
     transcriber: transcriberFor([b.assistant, b.business, b.firstName ?? ""]),
@@ -643,6 +643,29 @@ export const SOLAR_KEYTERMS = [
   "Fronius",
   "Sungrow",
 ] as const;
+
+/**
+ * The voice as sent: an ElevenLabs voice is spoken by its quickest model (Flash v2.5, the one Vapi's own example uses),
+ * so the first word comes sooner (17 Nov 2026, Martin: reply within 1.2 seconds). Other providers go as they are.
+ */
+export function fastVoice<V extends { provider: string }>(voice: V): V & { model?: string } {
+  return voice.provider === "11labs" ? { ...voice, model: "eleven_flash_v2_5" } : voice;
+}
+
+/**
+ * The assistant without what makes it answer quickly, for one more try when Vapi turns a call away as badly formed
+ * (server/vapi-call.ts): the pause alone is kept, and the voice goes as its provider's usual model.
+ */
+export function withoutSpeedSettings(assistant: Record<string, unknown>): Record<string, unknown> {
+  const { startSpeakingPlan, voice, ...rest } = assistant;
+  const wait = (startSpeakingPlan as { waitSeconds?: unknown } | undefined)?.waitSeconds;
+  const plainVoice = voice && typeof voice === "object" ? Object.fromEntries(Object.entries(voice).filter(([k]) => k !== "model")) : voice;
+  return {
+    ...rest,
+    ...(typeof wait === "number" ? { startSpeakingPlan: { waitSeconds: wait } } : {}),
+    ...(plainVoice ? { voice: plainVoice } : {}),
+  };
+}
 
 /** The transcriber for a call: Deepgram nova-3 in Australian English, told the names and solar words to expect. */
 export function transcriberFor(names: readonly string[]) {

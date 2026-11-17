@@ -30,8 +30,8 @@ export interface Delivery {
 /** The calls as they were before anything was chosen. */
 export const DEFAULT_DELIVERY: Delivery = { manner: "plain", pace: "steady", opening: "word", pause: "quick", room: "office" };
 
-/** One press: a natural phone call. */
-export const NATURAL_DELIVERY: Delivery = { manner: "natural", pace: "relaxed", opening: "easy", pause: "considered", room: "office" };
+/** One press: a natural phone call. It answers quickly: a silence on the line reads as awkward, not as thought. */
+export const NATURAL_DELIVERY: Delivery = { manner: "natural", pace: "relaxed", opening: "easy", pause: "quick", room: "office" };
 
 /** How an agent speaks while nobody has chosen: a sales agent naturally, the post-sale one plainly. */
 export const defaultDelivery = (sales: boolean): Delivery => (sales ? NATURAL_DELIVERY : DEFAULT_DELIVERY);
@@ -53,19 +53,34 @@ export function cleanDelivery(raw: unknown): Delivery {
 export const sameDelivery = (a: Delivery, b: Delivery): boolean =>
   a.manner === b.manner && a.pace === b.pace && a.opening === b.opening && a.pause === b.pause && a.room === b.room;
 
-/** Seconds Vapi waits after the customer stops before the agent speaks (its own default is 0.4). */
-export const PAUSE_SECONDS: Record<Delivery["pause"], number> = { quick: 0.4, considered: 0.8, unhurried: 1.2 };
+/**
+ * Seconds Vapi waits, once it has decided the customer has finished, before the agent speaks (its own default is 0.4;
+ * its docs give 0 to 0.2 for a real-time feel). 17 Nov 2026, Martin: "he's waiting 2 to 3 seconds before replying which
+ * creates awkward silences. He needs to reply within 1.2 seconds", so quick is 0.2 and the others came down with it.
+ */
+export const PAUSE_SECONDS: Record<Delivery["pause"], number> = { quick: 0.2, considered: 0.5, unhurried: 1.0 };
 
 /**
- * Vapi's settings for the call (`startSpeakingPlan.waitSeconds`, `backgroundSound`, both on the transient assistant;
- * read from docs.vapi.ai on 16 Nov 2026). Only what differs from Vapi's own defaults is sent, so an agent nobody has
- * changed sends nothing new.
+ * How Vapi decides the customer has finished speaking (startSpeakingPlan, read from docs.vapi.ai on 17 Nov 2026). Left
+ * to its defaults a sentence the transcriber gave no punctuation waits 1.5 seconds. Here: Vapi's own model for English
+ * (LiveKit) reads how likely they are to carry on (x, 0 to 1) and waits from next to nothing when they have plainly
+ * finished up to 0.9 of a second when they haven't; and where the transcriber's punctuation is used instead, the wait
+ * with none is 0.8.
+ */
+export const END_OF_TURN = {
+  smartEndpointingPlan: { provider: "livekit", waitFunction: "900 / (1 + exp(-10 * (x - 0.5)))" },
+  transcriptionEndpointingPlan: { onPunctuationSeconds: 0.1, onNoPunctuationSeconds: 0.8, onNumberSeconds: 0.4 },
+} as const;
+
+/**
+ * Vapi's settings for the call (`startSpeakingPlan`, `backgroundSound`, both on the transient assistant; read from
+ * docs.vapi.ai on 16 and 17 Nov 2026). Every call carries the quick end-of-turn settings, chosen or not, so the agent
+ * answers without a silence; the pause the business chose sits on top of them.
  */
 export function deliveryParams(d: Delivery | null | undefined): Record<string, unknown> {
-  if (!d) return {};
   return {
-    ...(d.pause !== "quick" ? { startSpeakingPlan: { waitSeconds: PAUSE_SECONDS[d.pause] } } : {}),
-    ...(d.room === "silent" ? { backgroundSound: "off" } : {}),
+    startSpeakingPlan: { waitSeconds: PAUSE_SECONDS[d?.pause ?? "quick"], ...END_OF_TURN },
+    ...(d?.room === "silent" ? { backgroundSound: "off" } : {}),
   };
 }
 
@@ -130,7 +145,7 @@ export const DELIVERY_COPY = {
     pause: {
       label: "Before it answers",
       options: {
-        quick: ["Quick", "Answers straight away"],
+        quick: ["Quick", "Answers straight away, like a person on the phone"],
         considered: ["A moment", "Lets them finish their thought"],
         unhurried: ["Unhurried", "Never talks over a slow talker"],
       },
