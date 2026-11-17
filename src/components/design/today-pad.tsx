@@ -264,7 +264,7 @@ export function TodayPad(props: {
               ) : (
                 <div key={t.id} className="space-y-4">
                   <div className="flex justify-end">
-                    <p className="max-w-[75%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-sun px-4 py-2 text-[14px] leading-[1.5] text-ink ring-1 ring-sun-line/25">
+                    <p className="max-w-[75%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-sun px-4 py-2 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] [font-feature-settings:'cv11','ss03','tnum'] text-ink ring-1 ring-sun-line/25">
                       {t.q}
                     </p>
                   </div>
@@ -272,7 +272,7 @@ export function TodayPad(props: {
                     {!t.a ? (
                       <SolThinking />
                     ) : (
-                      <div className="text-[15px] leading-relaxed text-ink">
+                      <div className="sol-prose">
                         <Typed text={t.a.text} onDone={follow} onAnswer={asking ? undefined : answer} />
                         {t.a.designs?.length ? (
                           <div className="mt-3 max-w-2xl space-y-3">
@@ -718,7 +718,7 @@ function SolDay(props: {
           const done = live ? next : noop;
           if ("say" in b)
             return (
-              <div key={i} className="text-[15.5px] leading-relaxed text-ink">
+              <div key={i} className="sol-prose">
                 <Typed text={b.say} onDone={done} instant={instant || !live} />
               </div>
             );
