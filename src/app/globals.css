@@ -582,7 +582,10 @@ button.team-flash:not([aria-pressed="true"]) {
    joined to the one before. The one colour, and the one pad, is the key point's. */
 .sol-ground {
   --canvas: #45484f;
-  --surface: #3a3d43;
+  /* Cards (a draft email, a question, a choice, a design, sources) are lifted off the charcoal in a lighter one, so
+     they read as things to act on (17 Nov 2026, Martin: "really hard to tell these cards when all the background is
+     the same without contrast"). Words still sit straight on the ground. */
+  --surface: #50545c;
   --surface-2: rgb(255 255 255 / 0.09);
   --ink: #ffffff;
   --ink-2: #e6e7ea;
@@ -595,6 +598,18 @@ button.team-flash:not([aria-pressed="true"]) {
   --sun-ink: #ffb08a;
   background: #3a3d43;
   color: var(--ink);
+}
+/* A lifted card sits on the charcoal with a soft shadow and a faint light top edge. */
+.sol-ground .rounded-2xl.bg-surface,
+.sol-ground .rounded-xl.bg-surface {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 10px 28px -8px rgb(0 0 0 / 0.45);
+}
+/* The fields inside a card (the draft's Cc, subject and words) go a step darker than the card, as wells to type in. */
+.sol-ground :is(input, textarea, select).bg-surface {
+  background-color: #2f3237;
+  border-color: rgb(255 255 255 / 0.1);
 }
 /* His answers' type (15 Nov 2026, Martin: "the font is too thick - and the font is too big"; then "remove the pads
    for text you and i write and just make the text white"): the interface's own face a size down and lighter than the
