@@ -28,7 +28,7 @@ import { SOL_CHANGED, SOL_TOGGLE, askSol } from "@/lib/services/sol";
 import { PATHS, ui } from "./design-shell";
 import { SolMark, SolStars } from "./sol-icon";
 import { SolDesignView } from "./sol-design-view";
-import { SolThinking } from "./sol-thinking";
+import { SolThinking, SolWorking } from "./sol-thinking";
 import type { SolFile } from "@/lib/domain/design/sol";
 import { SolBox, SolSays, Typed } from "./today-pad";
 import type { NewCaseAsk } from "@/lib/domain/design/sol-rooms";
@@ -342,9 +342,8 @@ export function ServicePlanner() {
                       </p>
                     </div>
                     <SolSays>
-                      {!t.a ? (
-                        <SolThinking />
-                      ) : (
+                      <SolWorking busy={!t.a} />
+                      {!t.a ? null : (
                         <div className="text-[15px] leading-relaxed text-ink">
                           <Typed text={t.a.text} onDone={follow} />
                           {t.a.newCase && <div className="mt-3">{newCard(t.a.newCase)}</div>}

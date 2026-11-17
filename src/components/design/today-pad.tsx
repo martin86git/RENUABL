@@ -44,7 +44,7 @@ import { SolText, type OnAnswer } from "./sol-text";
 import { answerFor } from "@/lib/domain/design/sol-format";
 import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-attach";
 import { DictateButton, withSpoken } from "./dictate";
-import { SolThinking } from "./sol-thinking";
+import { SolThinking, SolWorking } from "./sol-thinking";
 
 /** Items under To action before "N more". */
 const SHOWN = 5;
@@ -269,9 +269,8 @@ export function TodayPad(props: {
                     </p>
                   </div>
                   <SolSays>
-                    {!t.a ? (
-                      <SolThinking />
-                    ) : (
+                    <SolWorking busy={!t.a} />
+                    {!t.a ? null : (
                       <div className="sol-prose">
                         <Typed text={t.a.text} onDone={follow} onAnswer={asking ? undefined : answer} />
                         {t.a.designs?.length ? (

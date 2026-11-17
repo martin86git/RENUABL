@@ -70,7 +70,7 @@ import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
 import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
 import { SolMark } from "./sol-icon";
-import { SolThinking } from "./sol-thinking";
+import { SolThinking, SolWorking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { MeetingCard } from "./meeting-card";
@@ -523,7 +523,7 @@ export function SolChat({
         </div>
       )}
       <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
-        {!state && !problem && <SolThinking say="Opening your conversation…" />}
+        {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
         {state && turns.length === 0 && !pending && (
           <div className="space-y-2 text-ink-2">
             <p>
@@ -638,12 +638,8 @@ export function SolChat({
             )}
           </div>
         ))}
-        {pending !== null && (
-          <>
-            <Bubble you text={pending} at="" />
-            <SolThinking />
-          </>
-        )}
+        {pending !== null && <Bubble you text={pending} at="" />}
+        <SolWorking busy={pending !== null} />
         {problem && <p className="text-xs text-danger">{problem}</p>}
         <div ref={end} />
       </div>

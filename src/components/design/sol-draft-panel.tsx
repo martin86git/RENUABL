@@ -6,7 +6,7 @@ import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { emailDeal } from "@/lib/services/crm";
 import { writeWithSol } from "@/lib/services/deal-feed";
 import { SolIcon } from "./sol-icon";
-import { SolThinking } from "./sol-thinking";
+import { SolThinking, useSolLaunch } from "./sol-thinking";
 
 /**
  * Sol's email for a deal, written when a suggestion in the Deals list is pressed, in the feed's place (16 Nov 2026,
@@ -20,6 +20,8 @@ export function SolDraftPanel(props: { deal: FeedDeal; label: string; ask: strin
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [writing, setWriting] = useState(true);
+  // The thinking takes off once the draft is in, before the draft shows.
+  const writingShown = useSolLaunch(writing);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -90,9 +92,9 @@ export function SolDraftPanel(props: { deal: FeedDeal; label: string; ask: strin
           >
             <Check className="size-4" aria-hidden /> Sent to {name}. It&apos;s on the deal&apos;s record.
           </p>
-        ) : writing ? (
+        ) : writingShown.showing ? (
           <div className="mt-5">
-            <SolThinking say={`Writing to ${name} from what's on the deal…`} />
+            <SolThinking say={`Writing to ${name} from what's on the deal…`} launching={writingShown.launching} />
           </div>
         ) : (
           <div className="mt-4 space-y-2.5">

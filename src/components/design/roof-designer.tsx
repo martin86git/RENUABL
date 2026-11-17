@@ -149,7 +149,7 @@ import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/e
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
-import { SolThinking } from "./sol-thinking";
+import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
@@ -4431,6 +4431,8 @@ export function RoofDesigner(props: {
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandText, setCommandText] = useState("");
   const [commandBusy, setCommandBusy] = useState(false);
+  // Sol's thinking stays a moment once he has answered, to take off (sol-thinking.tsx).
+  const commandShown = useSolLaunch(commandBusy);
   // What was just asked, shown with Sol thinking until he answers (9 Nov 2026, Martin: pressing Enter gave no sign he had it).
   const [asked, setAsked] = useState<string | null>(null);
   // Sol's question with options, when a request could mean different things; the request of the one chosen is run.
@@ -6463,11 +6465,11 @@ export function RoofDesigner(props: {
                       />
                     )
                   )}
-                  {commandBusy && asked && (
+                  {commandShown.showing && asked && (
                     <div className="flex flex-col gap-2 px-2.5 pt-1.5">
                       <p className="max-w-[85%] self-end rounded-2xl bg-white/10 px-3 py-1.5 text-[13.5px] text-white/85">{asked}</p>
                       <div className="[&_.text-muted]:text-white/65">
-                        <SolThinking />
+                        <SolThinking launching={commandShown.launching} />
                       </div>
                     </div>
                   )}
@@ -6691,10 +6693,10 @@ export function RoofDesigner(props: {
                       <X className="size-4" aria-hidden />
                     </button>
                   </form>
-                  {commandBusy && asked && (
+                  {commandShown.showing && asked && (
                     <div className={clsx(GLASS, "mt-2 flex flex-col gap-1.5 px-4 py-2.5")}>
                       <p className="text-sm text-ink-2">{asked}</p>
-                      <SolThinking />
+                      <SolThinking launching={commandShown.launching} />
                     </div>
                   )}
                   {commandReply && (

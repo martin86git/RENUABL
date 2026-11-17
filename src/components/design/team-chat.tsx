@@ -91,7 +91,7 @@ import { DictateButton, withSpoken } from "./dictate";
 import { SolChat } from "./sol-chat";
 import { SolBadge } from "./sol-icon";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
-import { SolThinking } from "./sol-thinking";
+import { SolThinking, useSolLaunch } from "./sol-thinking";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
@@ -179,6 +179,7 @@ export function TeamChatPanel({
   const [emojis, setEmojis] = useState(false);
   const [dropping, setDropping] = useState(false);
   const [solSince, setSolSince] = useState<number | null>(null);
+  const solShown = useSolLaunch(solSince !== null);
   const [dealAt, setDealAt] = useState<{ start: number; query: string } | null>(null);
   const [tagAt, setTagAt] = useState<{ start: number; query: string } | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
@@ -828,9 +829,9 @@ export function TeamChatPanel({
         </div>
 
         {error && <p className="px-4 pb-1 text-xs text-danger">{error}</p>}
-        {solSince !== null && (
+        {solShown.showing && (
           <div className="px-4 pb-1">
-            <SolThinking say="Sol is answering…" />
+            <SolThinking say="Sol is answering…" launching={solShown.launching} />
           </div>
         )}
         {offers.length > 0 && (

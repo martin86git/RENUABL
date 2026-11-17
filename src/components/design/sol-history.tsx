@@ -96,7 +96,7 @@ export function SolHistory(props: {
       >
         <MessageSquarePlus className="size-4 text-sun-line" aria-hidden /> Start a new chat
       </button>
-      {!list && !problem && <SolThinking say="Finding your past conversations…" />}
+      {!list && !problem && <SolThinking plain say="Finding your past conversations…" />}
       {problem && <p className="mt-3 text-xs text-danger">{problem}</p>}
       {list && list.length === 0 && (
         <p className="mt-4 text-ink-2">
