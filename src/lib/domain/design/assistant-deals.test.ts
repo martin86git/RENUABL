@@ -8,6 +8,7 @@ import {
   dealGroups,
   dealsSummary,
   headlineOf,
+  lineTime,
   searchDeals,
   standingOf,
   type AssistantDeal,
@@ -155,5 +156,17 @@ describe("the calls on for today", () => {
     // One whose time has passed is still today's, but nothing is said to be next.
     expect(dayLine([deal({ standing: "lined-up", dueAt: "2026-11-14T01:00:00.000Z" })], at, timeOf)).toBe("1 call today");
     expect(dayLine([deal({ standing: "lined-up" })], at, timeOf)).toBe("1 call today");
+  });
+});
+
+describe("the time on a deal's line", () => {
+  it("is the assistant's last contact, else when its call is due, else when it was lined up", () => {
+    const at = "2026-11-18T01:00:00.000Z";
+    expect(lineTime({ lastContact: "2026-11-16T03:00:00.000Z", dueAt: "2026-11-19T22:00:00.000Z", at })).toEqual({
+      at: "2026-11-16T03:00:00.000Z",
+      what: "last",
+    });
+    expect(lineTime({ lastContact: null, dueAt: "2026-11-19T22:00:00.000Z", at })).toEqual({ at: "2026-11-19T22:00:00.000Z", what: "due" });
+    expect(lineTime({ at })).toEqual({ at, what: "lined" });
   });
 });

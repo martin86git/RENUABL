@@ -208,7 +208,7 @@ type IconProps = { className?: string };
 const LINE = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
 /** The kit's icons, in the brand's line (a 24 box, 2-unit round-capped strokes, as the Marketplace's mark). */
-function PanelIcon({ className }: IconProps) {
+export function PanelIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" {...LINE} className={className}>
       <path d="M5 4h14l2 12H3z" />
@@ -217,7 +217,7 @@ function PanelIcon({ className }: IconProps) {
     </svg>
   );
 }
-function BatteryIcon({ className }: IconProps) {
+export function BatteryIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" {...LINE} className={className}>
       <rect x="6" y="4" width="12" height="17" rx="2.5" />
@@ -234,7 +234,7 @@ function InverterIcon({ className }: IconProps) {
     </svg>
   );
 }
-function ChargerIcon({ className }: IconProps) {
+export function ChargerIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" {...LINE} className={className}>
       <path d="M9 3v4M15 3v4" />

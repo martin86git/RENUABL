@@ -8,6 +8,7 @@ import {
   dealGroups,
   dealsSummary,
   DEALS_SEARCH_FROM,
+  lineTime,
   searchDeals,
   type AssistantDeal,
   type AssistantDealCall,
@@ -17,6 +18,7 @@ import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
 import { useCallerInfo } from "@/lib/services/caller";
 import { loadAssistantDeals, loadDealCalls, useCoachCaller } from "@/lib/services/coaching";
 import { AfterCall, CallInPane } from "./assistant-call";
+import { BatteryIcon, ChargerIcon, PanelIcon } from "./deal-banner";
 
 const POLL_MS = 20_000;
 const DEALS_CHANGED = "renuabl:assistant-deals";
@@ -48,12 +50,39 @@ const when = (iso: string) => {
  * open the deal) and the chat beside it is then about that deal; pressing it again folds it. On a phone the pane takes
  * the window's place.
  */
-/** " · Solar and a battery · Rowville": what tells one customer's deals apart in the list. */
-const dealTag = (d: AssistantDeal) =>
-  [d.deal, suburbOfAddress(d.address)]
-    .filter(Boolean)
-    .map((w) => ` · ${w}`)
-    .join("");
+/** The deal's mark in its standing's colour: the group's dot says the same above it. */
+const MARK: Record<DealStanding, string> = {
+  "needs-you": "text-danger",
+  live: "text-sun-line animate-pulse motion-reduce:animate-none",
+  "lined-up": "text-sun-line",
+  spoke: "text-positive",
+  "no-answer": "text-muted",
+};
+
+const WHEN_WORDS = { last: "Last contact", due: "Call due", lined: "Lined up" } as const;
+
+/**
+ * What the deal is, as icons (18 Nov 2026, Martin: "because the text doesnt fit replace the solar and battery text
+ * with the icons of a solar panel and a battery. where its solar only.. then only a panel"): a panel, a battery, a
+ * charger, only those the deal has. A deal that is none of them keeps its name in words.
+ */
+function DealKit({ deal }: { deal: AssistantDeal }) {
+  const has = deal.has;
+  const parts = [
+    has?.solar && { label: "Solar", Icon: PanelIcon },
+    has?.battery && { label: "Battery", Icon: BatteryIcon },
+    has?.ev && { label: "EV charger", Icon: ChargerIcon },
+  ].filter((p): p is { label: string; Icon: typeof PanelIcon } => Boolean(p));
+  if (!parts.length) return deal.deal ? <span className="min-w-0 truncate text-xs text-muted">{deal.deal}</span> : null;
+  const words = parts.map((p) => p.label).join(", ");
+  return (
+    <span role="img" aria-label={words} title={words} className="flex shrink-0 items-center gap-1 text-ink-2">
+      {parts.map((p) => (
+        <p.Icon key={p.label} className="size-4" />
+      ))}
+    </span>
+  );
+}
 
 export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: AssistantDeal | null) => void; onBack: () => void }) {
   const { callsOn, textsOn } = useCallerInfo();
@@ -141,13 +170,23 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
                       aria-expanded={open}
                       className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-surface-2"
                     >
-                      <span className={clsx("size-2 shrink-0 rounded-full", DOT[d.standing])} aria-hidden />
-                      <span className="min-w-0 flex-1 truncate text-sm">
-                        <span className="font-semibold text-ink">{d.customer}</span>
-                        {/* What the deal is and where, so two deals of one name read apart. */}
-                        <span className="text-xs text-muted">{dealTag(d)}</span>
-                      </span>
-                      <span className="shrink-0 text-[11px] tabular-nums text-muted">{when(d.dueAt ?? d.at)}</span>
+                      {/* Every deal carries the deal mark (18 Nov 2026, Martin), in its standing's colour. */}
+                      <SquareKanban className={clsx("size-4 shrink-0", MARK[d.standing])} aria-hidden />
+                      <span className="min-w-0 shrink truncate text-sm font-semibold text-ink">{d.customer}</span>
+                      {/* What the deal is, as icons, and where, so two deals of one name read apart. */}
+                      <DealKit deal={d} />
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted">{suburbOfAddress(d.address)}</span>
+                      {(() => {
+                        const t = lineTime(d);
+                        return (
+                          <span
+                            title={`${WHEN_WORDS[t.what]}: ${new Date(t.at).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}`}
+                            className="shrink-0 text-[11px] tabular-nums text-muted"
+                          >
+                            {when(t.at)}
+                          </span>
+                        );
+                      })()}
                       <ChevronDown className={clsx("size-4 shrink-0 text-ink-2 transition-transform", open && "rotate-180")} aria-hidden />
                     </button>
                     {open && (

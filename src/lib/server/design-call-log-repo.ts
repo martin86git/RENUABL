@@ -16,6 +16,7 @@ import {
   type AssistantDealCall,
 } from "@/lib/domain/design/assistant-deals";
 import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { jobHas } from "@/lib/domain/design/customers";
 import { CALL_HEADLINES, type CallOutcome } from "@/lib/domain/voice-agent";
 import { callTranscriptsFor } from "./call-transcripts";
 import { cleanCallerKey, type CallerKey } from "@/lib/domain/install-call";
@@ -216,8 +217,10 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
     summary: string | null;
     ended_at: Date | null;
     calls: number;
+    kw: string | number | null;
+    details: Record<string, string> | null;
   }>(
-    `select j.id as job_id, cu.name as customer, j.title as deal, j.stage, j.address,
+    `select j.id as job_id, cu.name as customer, j.title as deal, j.stage, j.address, j.kw, j.details,
             c.status, c.live_status, c.attempts, c.updated_at, c.due_at, e.outcome, e.summary, e.at as ended_at,
             coalesce(n.calls, 0) as calls
        from design_jobs j
@@ -261,6 +264,8 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
         calls: r.calls,
         at: new Date(Math.max(...at)).toISOString(),
         dueAt: open && r.due_at ? new Date(r.due_at).toISOString() : null,
+        has: jobHas({ kw: r.kw === null ? null : Number(r.kw), title: r.deal ?? "", details: r.details ?? {} }),
+        lastContact: r.ended_at ? new Date(r.ended_at).toISOString() : null,
       };
     }),
   );

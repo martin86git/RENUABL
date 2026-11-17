@@ -42,6 +42,19 @@ export interface AssistantDeal {
   at: string;
   /** When the call lined up is due to ring (ISO), where that was kept: the start of its calling window. */
   dueAt?: string | null;
+  /** What the deal puts in (solar, a battery, an EV charger), drawn as icons in the list. */
+  has?: { solar: boolean; battery: boolean; ev: boolean };
+  /** When the assistant's latest call on the deal ended (ISO): its last contact. Null while it hasn't rung yet. */
+  lastContact?: string | null;
+}
+
+/**
+ * The time a deal's line carries (18 Nov 2026, Martin: "the date of last contact made by charlie"): the assistant's
+ * last call that ended; a deal it hasn't rung yet shows when its call is due, else when it was lined up.
+ */
+export function lineTime(d: Pick<AssistantDeal, "lastContact" | "dueAt" | "at">): { at: string; what: "last" | "due" | "lined" } {
+  if (d.lastContact) return { at: d.lastContact, what: "last" };
+  return d.dueAt ? { at: d.dueAt, what: "due" } : { at: d.at, what: "lined" };
 }
 
 /** A call the assistant made on a deal, as the pane shows it under the deal picked. */

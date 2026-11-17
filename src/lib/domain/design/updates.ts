@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
+    area: "Phone assistant",
+    words: "Each deal in your phone assistant's list shows the deal mark, icons for solar, battery and EV charger, and when it last rang them.",
+  },
+  {
+    day: "2026-11-18",
     area: "Deals",
     words: "Type \"start the design\" in Sol's box on a deal and the designer opens at once. Start the design in his chat works too.",
   },
