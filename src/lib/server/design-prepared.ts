@@ -34,6 +34,7 @@ import { withSolCredit } from "./sol-credits";
 import { newId, query } from "./db";
 import { listProposals } from "./design-after-sale-repo";
 import { listJobs } from "./design-crm-repo";
+import { lineUpHellos } from "./design-hello";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -117,6 +118,10 @@ export async function readyFor(
     const all = await rows(businessId);
     return { items: all.map((r) => ({ ...r.item, id: r.id, status: r.status })).filter((i) => !seen || seen.has(i.jobId)), pending: [] };
   }
+  // A new lead's hello is lined up here too (first-contact.ts), so it shows with the rest.
+  await lineUpHellos({ id: businessId, name: member.businessName }).catch((e) =>
+    console.error("Sol couldn't line up a hello", e instanceof Error ? e.message : e),
+  );
   const [proposals, seenJobs, existing] = await Promise.all([
     listProposals(businessId, todayInMarket(now)),
     viewer.all ? Promise.resolve(null) : listJobs(businessId, viewer),

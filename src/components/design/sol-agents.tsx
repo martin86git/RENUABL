@@ -386,7 +386,9 @@ export function AgentCard({
               </ul>
             ) : (
               <p className="mt-2 text-[13px] text-ink-2">
-                Nothing lined up. He writes a follow-up when one falls due, 2, 7 and 14 days after a proposal.
+                {agent.stage === "lead"
+                  ? "Nothing lined up. He writes a hello when a new lead comes in with an email and an address."
+                  : "Nothing lined up. He writes a follow-up when one falls due, 2, 7 and 14 days after a proposal."}
               </p>
             )}
           </section>

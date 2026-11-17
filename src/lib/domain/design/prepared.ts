@@ -16,7 +16,7 @@ import type { DetailKey } from "./crm";
 import { FOLLOW_UP_WORDS } from "./proposal-lists";
 import { nextWorkingDay } from "./today-pad";
 
-export type PreparedKind = "follow-up" | "recap";
+export type PreparedKind = "follow-up" | "recap" | "hello";
 /** Preparing while Sol writes it; ready to send; then sent or put aside; stale once the reason for it has gone. */
 export type PreparedStatus = "preparing" | "ready" | "sent" | "dismissed" | "stale";
 

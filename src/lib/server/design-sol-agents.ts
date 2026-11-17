@@ -11,6 +11,7 @@ import {
   AGENTS,
   SOL_SENDER,
   agentFor,
+  agentOfItem,
   cleanAgentSettings,
   firesAtFor,
   outboxState,
@@ -91,7 +92,7 @@ export interface Outbox {
 type Held = PreparedItem & { held?: boolean; notBefore?: string };
 
 const entryOf = (item: Held, stage: JobStage | undefined, settings: AgentSettings, now = new Date()): OutboxEntry => {
-  const agent = stage ? agentFor(stage) : null;
+  const agent = agentOfItem(item.kind, stage);
   const held = item.held === true;
   return {
     ...item,

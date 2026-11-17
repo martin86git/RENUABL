@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { cleanHomeAnswer, helloFacts, helloPath, helloSystem, homeRecordLine, isHelloToken, type HelloView } from "./first-contact";
+import {
+  cleanHomeAnswer,
+  helloEmail,
+  helloFacts,
+  helloKey,
+  helloPath,
+  helloSystem,
+  homeRecordLine,
+  isHelloToken,
+  stillNew,
+  type HelloView,
+} from "./first-contact";
 import { HANDOVER } from "./sol-customer";
 
 const view = (over: Partial<HelloView> = {}): HelloView => ({
@@ -56,5 +67,29 @@ describe("what Sol is told on a lead's page", () => {
     expect(system).toContain(HANDOVER);
     expect(system).toMatch(/ONE easy next step/);
     expect(system).toMatch(/You are an AI/);
+  });
+});
+
+describe("the first hello to a new lead", () => {
+  it("is the same for everyone but the names and the link, with no price", () => {
+    const e = helloEmail({ firstName: "Jo", business: "Sunrise Solar", url: "https://example.com/hello/abc" });
+    expect(e.body).toContain("Hi Jo,");
+    expect(e.body).toContain("https://example.com/hello/abc");
+    expect(e.body).toContain("The Sunrise Solar team");
+    expect(e.body).not.toMatch(/\$|\d+\s?kW|guarantee/i);
+  });
+
+  it("is said once a lead", () => {
+    expect(helloKey("job_1")).toBe("hello:job_1");
+  });
+
+  it("goes only to a new lead with an email and a home, nobody yet in touch", () => {
+    const lead = { stage: "lead", email: "jo@example.com", hasPlace: true, reachedOut: false };
+    expect(stillNew(lead)).toBe(true);
+    expect(stillNew({ ...lead, stage: "designed" })).toBe(true);
+    expect(stillNew({ ...lead, stage: "proposal" })).toBe(false);
+    expect(stillNew({ ...lead, email: "" })).toBe(false);
+    expect(stillNew({ ...lead, hasPlace: false })).toBe(false);
+    expect(stillNew({ ...lead, reachedOut: true })).toBe(false);
   });
 });

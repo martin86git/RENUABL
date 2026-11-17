@@ -9,6 +9,7 @@
  */
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
 import type { JobStage } from "./crm";
+import { HELLO_REVIEW_MINUTES } from "./first-contact";
 import { isWorkingDay, nextWorkingDay } from "./today-pad";
 
 export const AGENT_STAGES = ["lead", "designed", "proposal", "won"] as const;
@@ -32,9 +33,8 @@ export const AGENTS: Record<AgentStage, Agent> = {
     stage: "lead",
     name: "Sol · Leads",
     what: "Sol, looking after new leads before there's a design.",
-    job: "Gets the bill in, answers first questions and books the call.",
-    working: false,
-    soon: "Coming next: a first hello to new leads, and a nudge for the bill.",
+    job: "Emails each new lead a short hello within minutes, with a link to their own page: their home from above, and a chat Sol answers.",
+    working: true,
   },
   designed: {
     stage: "designed",
@@ -60,6 +60,16 @@ export const AGENTS: Record<AgentStage, Agent> = {
     soon: "Coming next: deposit reminders and the welcome to the install.",
   },
 };
+
+/**
+ * Which agent an email in the outbox is for: a new lead's hello is Sol · Leads' at lead or designed (an automatic
+ * design moves a lead on, and that's no reason to stop the hello); anything else follows the deal's stage.
+ */
+export function agentOfItem(kind: string, stage: JobStage | undefined): AgentStage | null {
+  if (!stage) return null;
+  if (kind === "hello") return stage === "lead" || stage === "designed" ? "lead" : null;
+  return agentFor(stage);
+}
 
 /** The board's column a deal's stage answers to, or null for one no agent works on. */
 export function agentFor(stage: JobStage): AgentStage | null {
@@ -139,9 +149,9 @@ export function nextOpen(from: Date, hours: SendHours): string {
  * open after that. One whose time passed out of hours (nobody had RENUABL open and the cron hadn't run) waits for
  * the hours to open again, so nothing reaches a customer at night.
  */
-export function sendAt(readyAt: string, hours: SendHours, now = new Date()): string {
+export function sendAt(readyAt: string, hours: SendHours, now = new Date(), wait = MIN_REVIEW_MINUTES): string {
   const ready = Date.parse(readyAt);
-  const earliest = new Date((Number.isNaN(ready) ? now.getTime() : ready) + MIN_REVIEW_MINUTES * 60_000);
+  const earliest = new Date((Number.isNaN(ready) ? now.getTime() : ready) + wait * 60_000);
   const at = nextOpen(earliest, hours);
   return now.getTime() > Date.parse(at) && !withinHours(now, hours) ? nextOpen(now, hours) : at;
 }
@@ -159,9 +169,10 @@ export function laterAt(later: Later, now = new Date()): string {
  * When an outbox email goes: the usual time after it was ready, or, when someone put it off, the first open time
  * from then (8 Nov 2026, Martin: the countdown is the person's to change).
  */
-export function firesAtFor(item: { createdAt: string; notBefore?: string }, hours: SendHours, now = new Date()): string {
+export function firesAtFor(item: { createdAt: string; notBefore?: string; kind?: string }, hours: SendHours, now = new Date()): string {
   if (item.notBefore && !Number.isNaN(Date.parse(item.notBefore))) return nextOpen(new Date(item.notBefore), hours);
-  return sendAt(item.createdAt, hours, now);
+  // A new lead's hello waits only minutes: speed to lead (first-contact.ts).
+  return sendAt(item.createdAt, hours, now, item.kind === "hello" ? HELLO_REVIEW_MINUTES : MIN_REVIEW_MINUTES);
 }
 
 /** A clock time in the market as people say it: "10 am", "2:30 pm". */

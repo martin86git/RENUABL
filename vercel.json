@@ -16,7 +16,7 @@
     },
     {
       "path": "/api/cron/sol-outbox",
-      "schedule": "0 * * * *"
+      "schedule": "*/10 * * * *"
     },
     {
       "path": "/api/cron/marketing",

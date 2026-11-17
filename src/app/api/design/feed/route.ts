@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { fireDue } from "@/lib/server/design-sol-agents";
+import { lineUpHellos } from "@/lib/server/design-hello";
 import { solAsksForDesigns } from "@/lib/server/design-deal-team-repo";
 import { dayDone, dealFeed, exampleCount, feedExtras, markDeal, unmarkDeal } from "@/lib/server/design-feed";
 import { cleanLeadRule, type LaterChoice, type MarkKind } from "@/lib/domain/design/deal-feed";
@@ -43,7 +44,11 @@ export async function GET(request: Request) {
     // What has come due in Sol's outbox goes after the answer, as when the board is read (not while viewing as someone).
     if (!who.member.viewedBy) {
       const business = { id: who.member.businessId, name: who.member.businessName };
-      after(() => fireDue(business).catch((e) => console.error("Sol's outbox couldn't send", e instanceof Error ? e.message : e)));
+      // A new lead's hello is lined up first (first-contact.ts), then whatever has come due goes.
+      after(async () => {
+        await lineUpHellos(business).catch((e) => console.error("Sol couldn't line up a hello", e instanceof Error ? e.message : e));
+        await fireDue(business).catch((e) => console.error("Sol's outbox couldn't send", e instanceof Error ? e.message : e));
+      });
     }
     // Who is reading, so Today follows the team (10 Nov 2026): the owner opens on everyone's deals, others on their own.
     return Response.json({

@@ -18,7 +18,20 @@ import {
   teamName,
   type PublicChat,
 } from "@/lib/domain/design/chat";
-import { helloSystem, homeRecordLine, type HelloView, type HomeAnswer } from "@/lib/domain/design/first-contact";
+import {
+  HELLO_BASIS,
+  HELLO_WHY,
+  HELLO_WINDOW_DAYS,
+  helloEmail,
+  helloKey,
+  helloPath,
+  helloSystem,
+  homeRecordLine,
+  stillNew,
+  type HelloView,
+  type HomeAnswer,
+} from "@/lib/domain/design/first-contact";
+import { firstNameOf as firstWord, type PreparedItem } from "@/lib/domain/design/prepared";
 import { jobDrawing } from "@/lib/domain/design/job-card";
 import { FROM_CUSTOMER } from "@/lib/domain/design/proposal";
 import { designSummary } from "@/lib/domain/design/roof-design";
@@ -28,7 +41,7 @@ import { usageOf } from "@/lib/domain/ai-costs";
 import { chatMessageEmail } from "@/lib/domain/emails";
 import { siteUrl } from "@/lib/domain/sms";
 import { redactSecrets } from "./bill-reader";
-import { query, transaction } from "./db";
+import { newId, query, transaction } from "./db";
 import { addCustomerLine, addSolLine, chatLines } from "./design-chat-repo";
 import { jobById, record } from "./design-crm-repo";
 import { NO_DESIGN, loadBrand, savedFor } from "./design-proposal-repo";
@@ -239,4 +252,105 @@ export async function solAnswersHello(token: string): Promise<void> {
     await record(q, f.businessId, { ...line, text: solReplied(reply.text) });
     if (reply.handover) await record(q, f.businessId, { ...line, text: SOL_HANDED_OVER });
   }).catch(() => console.error("sol's answer to a lead was kept, but writing it on the record failed"));
+}
+
+// ---------------------------------------------------------------------------
+// Step 2: the first hello (domain/design/first-contact.ts). Sol · Leads lines up a short email with the link to the
+// lead's page in the outbox (design_prepared, kind "hello"), where it counts down and goes as his follow-ups do
+// (design-sol-agents.ts). Run when the outbox or the deal feed is read, and by the outbox cron.
+
+/** Whether anyone from the business (or its phone assistant) has been in touch on the deal: then no hello. */
+const REACHED_OUT = `(exists (select 1 from design_activity a where a.business_id = j.business_id and a.job_id = j.id
+                          and a.kind in ('email', 'call', 'message', 'proposal') and lower(a.by_email) <> 'customer')
+                 or exists (select 1 from design_messages m where m.business_id = j.business_id and m.job_id = j.id and not m.from_customer)
+                 or exists (select 1 from design_proposals p where p.business_id = j.business_id and p.job_id = j.id))`;
+
+interface Lead {
+  jobId: string;
+  customerId: string;
+  customer: string;
+  email: string;
+  title: string;
+  stage: string;
+  hasPlace: boolean;
+  reachedOut: boolean;
+}
+
+/**
+ * Lines up a hello for each new lead not yet said hello to, and sets aside any lined up whose lead isn't new any more
+ * (someone from the business got in touch first, or the deal moved on). Needs the site's address for the link. Answers
+ * how many were lined up.
+ */
+export async function lineUpHellos(business: { id: string; name: string }): Promise<number> {
+  const site = siteUrl();
+  if (!site) return 0;
+  // Those lined up already and still waiting: still new?
+  const waiting = await query<{ id: string; stage: string; email: string; hasPlace: boolean; reachedOut: boolean }>(
+    `select p.id, j.stage, coalesce(c.email, '') as email, (j.lat is not null and j.lng is not null) as "hasPlace", ${REACHED_OUT} as "reachedOut"
+       from design_prepared p
+       join design_jobs j on j.business_id = p.business_id and j.id = p.job_id
+       join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
+      where p.business_id = $1 and p.kind = 'hello' and p.status in ('preparing', 'ready')`,
+    [business.id],
+  );
+  const gone = waiting.filter((w) => !stillNew(w)).map((w) => w.id);
+  if (gone.length)
+    await query(
+      `update design_prepared set status = 'stale', item = jsonb_set(item, '{status}', '"stale"'), done_at = now()
+        where business_id = $1 and id = any($2::text[])`,
+      [business.id, gone],
+    );
+
+  // New leads from the last days, never example or sample ones, not said hello to before.
+  const leads = await query<Lead>(
+    `select j.id as "jobId", j.customer_id as "customerId", c.name as customer, coalesce(c.email, '') as email, j.title, j.stage,
+            (j.lat is not null and j.lng is not null) as "hasPlace", ${REACHED_OUT} as "reachedOut"
+       from design_jobs j join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
+      where j.business_id = $1 and j.stage in ('lead', 'designed')
+        and j.created_at > now() - make_interval(days => $2)
+        and not c.sample and c.source <> 'Example deal'
+        and not exists (select 1 from design_prepared p where p.business_id = j.business_id and p.key = 'hello:' || j.id)
+      order by j.created_at limit 20`,
+    [business.id, HELLO_WINDOW_DAYS],
+  );
+  const fresh = leads.filter(stillNew);
+  if (!fresh.length) return 0;
+  const brand = await loadBrand(business.id, business.name);
+  const name = brand.name || business.name;
+  let made = 0;
+  for (const lead of fresh) {
+    const link = await query<{ token: string }>(
+      `insert into design_hello (token, business_id, job_id, created_by) values ($1, $2, $3, 'sol')
+       on conflict (business_id, job_id) do update set business_id = excluded.business_id returning token`,
+      [randomBytes(24).toString("hex"), business.id, lead.jobId],
+    );
+    const token = link[0]?.token;
+    if (!token) continue;
+    const words = helloEmail({ firstName: firstWord(lead.customer), business: name, url: `${site}${helloPath(token)}` });
+    const id = newId("prep", 10);
+    const item: PreparedItem = {
+      id,
+      kind: "hello",
+      jobId: lead.jobId,
+      customerId: lead.customerId,
+      customer: lead.customer,
+      title: lead.title,
+      why: HELLO_WHY,
+      to: lead.email,
+      subject: words.subject,
+      body: words.body,
+      basis: HELLO_BASIS,
+      day: 0,
+      by: "plain",
+      status: "ready",
+      createdAt: new Date().toISOString(),
+    };
+    const kept = await query(
+      `insert into design_prepared (id, business_id, job_id, key, kind, status, item) values ($1, $2, $3, $4, 'hello', 'ready', $5::jsonb)
+       on conflict (business_id, key) do nothing returning id`,
+      [id, business.id, lead.jobId, helloKey(lead.jobId), JSON.stringify(item)],
+    );
+    made += kept.length;
+  }
+  return made;
 }

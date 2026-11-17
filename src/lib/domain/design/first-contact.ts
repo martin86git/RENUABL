@@ -106,3 +106,55 @@ export function helloSystem(view: HelloView): string {
     helloFacts(view),
   ].join("\n");
 }
+
+// ---------------------------------------------------------------------------
+// Step 2: the first hello (17 Nov 2026, Martin: "build the next step"). When a lead arrives, Sol · Leads lines up a
+// short email with the link to the lead's own page, and it goes on the outbox's countdown (sol-agents.ts) like his
+// follow-ups: sent by Sol while the Leads agent is on, else waiting for a press. Reward first, one easy ask.
+
+/** Each lead is said hello to once. */
+export const helloKey = (jobId: string) => `hello:${jobId}`;
+
+/** Only leads this new are said hello to, so switching the agent on never emails a backlog of old enquiries. */
+export const HELLO_WINDOW_DAYS = 2;
+
+/** A hello waits this long once lined up, so it can be read, changed or held: speed to lead, minutes not half an hour. */
+export const HELLO_REVIEW_MINUTES = 5;
+
+/** Why it is in the outbox, in a line. */
+export const HELLO_WHY = "New lead · hello with a link to their page";
+
+/** What it was based on, for "Why this?". */
+export const HELLO_BASIS = [
+  "The same short hello for every new lead: only the names and the link change",
+  "Their page shows their home from above and a chat; never a price",
+];
+
+/** The hello, the same for everyone but the names and the link. No price, figure, date or promise. */
+export function helloEmail(input: { firstName: string; business: string; url: string }): { subject: string; body: string } {
+  const first = input.firstName.trim();
+  return {
+    subject: "Your home from above",
+    body: [
+      `Hi${first ? ` ${first}` : ""},`,
+      `Thanks for getting in touch with ${input.business}. We've put your home on a page of its own, seen from above, so we can start working out what would suit it.`,
+      `Have a look here: ${input.url}`,
+      "One quick thing: tap to tell us whether we've found the right home. If you have any questions, ask them on the page and we'll answer there.",
+      `Kind regards,\nThe ${input.business} team`,
+    ].join("\n\n"),
+  };
+}
+
+/**
+ * Whether a lead is still one to say hello to (or whether a hello lined up should still go): at lead or designed, with
+ * an email, a place on the map, and nobody from the business in touch yet. The deal gets a design and moves to
+ * designed: that's no reason to stop.
+ */
+export function stillNew(lead: { stage: string; email: string; hasPlace: boolean; reachedOut: boolean }): boolean {
+  return (
+    (lead.stage === "lead" || lead.stage === "designed") &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email) &&
+    lead.hasPlace &&
+    !lead.reachedOut
+  );
+}
