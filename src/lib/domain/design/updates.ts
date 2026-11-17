@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-17",
     area: "Calls",
+    words: "When a call can't go out because the phone service is out of call credit, you're told so.",
+  },
+  {
+    day: "2026-11-17",
+    area: "Calls",
     words: "Sales voice agents now speak as a natural phone call unless you choose otherwise under How it speaks.",
   },
   {

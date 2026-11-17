@@ -19,6 +19,7 @@
  * assistant answers. It speaks under the name the business gave it (design_caller, Settings → Phone assistant).
  */
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
+import { outOfCallCredit } from "@/lib/domain/call-credit";
 import { normaliseMobile } from "@/lib/domain/contact";
 import {
   MAX_LINES,
@@ -171,7 +172,8 @@ export interface VoiceRow {
   updated_at: string;
 }
 
-export type QueueResult = { result: "off" | "missing" | "no-number" | "already" | "failed" } | { result: "placed"; when: string };
+export type QueueResult =
+  { result: "off" | "missing" | "no-number" | "already" } | { result: "failed"; credit?: boolean } | { result: "placed"; when: string };
 
 /**
  * Calls a deal's customer: a new lead (`mode: "lead"`), or a customer who asked about their proposal (`"proposal"`,
@@ -244,7 +246,13 @@ export async function queueCall(o: {
         `${o.teamAsk.by} asked for a call back to ask: ${o.teamAsk.text}`,
       );
     const window = nextCallWindow(new Date());
-    if (!(await placeCall(s, rows[0], window)) || !window) return { result: "failed" };
+    if (!(await placeCall(s, rows[0], window)) || !window) {
+      // Why it was turned away is kept on the call: out of credit is said as that (call-credit.ts).
+      const why = await query<{ stop_reason: string | null }>(`select stop_reason from voice_calls where id = $1`, [rows[0].id]).catch(
+        () => [],
+      );
+      return { result: "failed", credit: outOfCallCredit(why[0]?.stop_reason) };
+    }
     return { result: "placed", when: whenWords(window, new Date()) };
   } catch (e) {
     console.error("voice call not queued", e instanceof Error ? e.message : e);

@@ -1,5 +1,6 @@
 import { answer, requireMember } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
+import { OUT_OF_CALL_CREDIT } from "@/lib/domain/call-credit";
 import { cleanCallerKey } from "@/lib/domain/install-call";
 import { practicePlacedWords } from "@/lib/domain/design/practice-call";
 import { cleanCallKind, trainingPlacedWords } from "@/lib/domain/design/training-call";
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
     const out = await startPracticeCall(who.member, cleanCallerKey(at.get("role")), kind);
     if (out.result === "placed")
       return Response.json({ ok: true, message: (kind === "training" ? trainingPlacedWords : practicePlacedWords)(out.assistant) });
+    if (out.result === "failed" && out.credit) return Response.json({ ok: false, message: OUT_OF_CALL_CREDIT }, { status: 502 });
     return Response.json({ ok: false, message: WORDS[out.result] }, { status: out.result === "failed" ? 502 : 409 });
   });
 }

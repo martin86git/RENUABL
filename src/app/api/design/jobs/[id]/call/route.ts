@@ -1,3 +1,4 @@
+import { OUT_OF_CALL_CREDIT } from "@/lib/domain/call-credit";
 import { gateOf } from "@/lib/domain/design/approvals";
 import { PRE_INSTALL_STAGES } from "@/lib/domain/design/crm";
 import { INSTALL_REFUSAL_WORDS, cleanCallerKey, installCallRefusal, roleOfKey } from "@/lib/domain/install-call";
@@ -100,6 +101,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       });
     // A call already lined up: the window opens on it rather than failing.
     if (placed.result === "already") return Response.json({ ok: true, already: true, message: WORDS.already });
+    if (placed.result === "failed" && placed.credit) return Response.json({ ok: false, message: OUT_OF_CALL_CREDIT }, { status: 502 });
     return Response.json({ ok: false, message: WORDS[placed.result] }, { status: placed.result === "off" ? 409 : 422 });
   });
 }

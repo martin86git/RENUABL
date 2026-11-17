@@ -5,6 +5,7 @@
  * call window shows the call with its clock and transcript, and the member can type to the assistant or hang up.
  */
 import { normaliseMobile } from "@/lib/domain/contact";
+import { outOfCallCredit } from "@/lib/domain/call-credit";
 import { cleanTeamNote, END_CALL_COMMAND, isControlUrl, livePhase, mayEndCall, MAX_LINES, teamCommand } from "@/lib/domain/live-call";
 import type { LiveCallView, LiveEvent, LiveLine } from "@/lib/domain/live-call";
 import { PRACTICE_SECONDS, PRACTICE_STALE_MINUTES, practiceBlock, practiceBrief } from "@/lib/domain/design/practice-call";
@@ -74,7 +75,7 @@ export async function startPracticeCall(
   member: { businessId: string; email: string },
   role: CallerKey = "sales",
   kind: CallKind = "practice",
-): Promise<{ result: "placed"; assistant: string } | { result: "off" | "no-number" | "failed" }> {
+): Promise<{ result: "placed"; assistant: string } | { result: "off" | "no-number" } | { result: "failed"; credit?: boolean }> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(member.businessId).catch(() => false))) return { result: "off" };
   const me = await query<{ mobile: string | null; first_name: string | null }>(
@@ -143,7 +144,8 @@ export async function startPracticeCall(
     if (!res.ok || typeof json.id !== "string") {
       console.error("practice call not placed", `Vapi ${res.status}: ${String(json.message ?? "").slice(0, 200)}`);
       await query(`update design_practice_calls set live_status = 'ended', ended_at = now() where id = $1`, [id]);
-      return { result: "failed" };
+      // Out of credit at the phone service: trying again can't help, so the member is told (call-credit.ts).
+      return { result: "failed", credit: outOfCallCredit(json.message) };
     }
     const control = typeof json.monitor?.controlUrl === "string" && isControlUrl(json.monitor.controlUrl) ? json.monitor.controlUrl : null;
     await query(`update design_practice_calls set vapi_call_id = $2, control_url = coalesce($3, control_url) where id = $1`, [
