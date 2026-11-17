@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import type { Address } from "@/lib/domain/types";
 import { CUSTOMER_EMAIL_WRONG } from "@/lib/domain/design/crm";
+import { AssignTo } from "./assign-to";
 
 /** The details a deal needs to start, as typed in the Create deal window. */
 export interface NewDealInput {
@@ -13,6 +14,8 @@ export interface NewDealInput {
   lastName: string;
   phone: string;
   email: string;
+  /** Who the deal is assigned to (a member's email); empty, the business's lead rule decides. */
+  owner: string;
 }
 
 /**
@@ -124,7 +127,7 @@ function NewDealWindow({
   onCreate: (input: NewDealInput) => Promise<{ ok: true } | { ok: false; message: string }>;
   onClose: () => void;
 }) {
-  const [input, setInput] = useState<NewDealInput>({ firstName: "", lastName: "", phone: "", email: "" });
+  const [input, setInput] = useState<NewDealInput>({ firstName: "", lastName: "", phone: "", email: "", owner: "" });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   useEffect(() => {
@@ -144,6 +147,7 @@ function NewDealWindow({
       lastName: input.lastName.trim(),
       phone: input.phone.trim(),
       email: input.email.trim(),
+      owner: input.owner,
     });
     setBusy(false);
     if (res.ok) onClose();
@@ -211,6 +215,12 @@ function NewDealWindow({
               <input value={input.email} onChange={set("email")} type="email" autoComplete="off" className={field} />
             </label>
           </div>
+          <AssignTo
+            value={input.owner}
+            onChange={(owner) => setInput({ ...input, owner })}
+            className="grid gap-1 text-[12.5px] font-medium text-ink-2"
+            selectClassName={clsx(field, "appearance-auto")}
+          />
           {!emailOk && <p className="text-[12.5px] text-danger">{CUSTOMER_EMAIL_WRONG}</p>}
           {problem && <p className="text-[12.5px] text-danger">{problem}</p>}
         </div>

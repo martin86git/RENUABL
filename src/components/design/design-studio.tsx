@@ -324,6 +324,7 @@ export function DesignStudio() {
       lng: roof.lng,
       source: "Design tool",
       notes: "",
+      owner: input.owner || null,
     });
     if (!res.ok) return { ok: false, message: res.message };
     if (!res.job) return { ok: false, message: "The customer was kept, but their deal couldn't be made: add it from their page." };

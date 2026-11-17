@@ -76,7 +76,7 @@ export interface Overview {
 
 export const listCustomers = () => ask<{ customers: CustomerLine[] }>("/api/design/customers");
 /** A new customer. `deal: false` adds them alone, without the first job an address otherwise starts. */
-export const createCustomer = (input: CustomerInput & { deal?: boolean }) =>
+export const createCustomer = (input: CustomerInput & { deal?: boolean; owner?: string | null }) =>
   ask<{ customer: Customer; job: Job | null }>("/api/design/customers", { method: "POST", body: input });
 export const loadCustomer = (id: string) =>
   ask<{ customer: Customer; jobs: Job[]; activity: Activity[] }>(`/api/design/customers/${encodeURIComponent(id)}`);
@@ -90,8 +90,15 @@ export const addActivity = (customerId: string, entry: { kind: "note" | "call" |
   });
 
 export const listJobs = () => ask<{ jobs: JobLine[] }>("/api/design/jobs");
-export const createJob = (input: { customerId: string; title: string; address: string; lat: number | null; lng: number | null }) =>
-  ask<{ job: Job }>("/api/design/jobs", { method: "POST", body: input });
+export const createJob = (input: {
+  customerId: string;
+  title: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+  /** Who the deal is assigned to (a member's email); left out, the business's lead rule decides. */
+  owner?: string | null;
+}) => ask<{ job: Job }>("/api/design/jobs", { method: "POST", body: input });
 export const loadJob = (id: string) => ask<{ job: Job; customer: Customer }>(`/api/design/jobs/${encodeURIComponent(id)}`);
 export const saveJob = (
   id: string,

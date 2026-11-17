@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/crm";
 import { ACTIVITY_WORD, StageTag } from "./design-home";
 import { GroupEmail, HasMarks } from "./people";
+import { AssignTo } from "./assign-to";
 import { HAS_FILTERS, PEOPLE_TABS, matchesHas, stepFilter, type HasFilter, type PeopleTab } from "@/lib/domain/design/customers";
 import { PATHS, PageHead, ui } from "./design-shell";
 
@@ -195,9 +196,14 @@ export function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [addProblem, setAddProblem] = useState<string | null>(null);
   // The customer just added, and the deal being offered for them.
-  const [deal, setDeal] = useState<{ customer: Customer; title: string; address: string; lat: number | null; lng: number | null } | null>(
-    null,
-  );
+  const [deal, setDeal] = useState<{
+    customer: Customer;
+    title: string;
+    address: string;
+    lat: number | null;
+    lng: number | null;
+    owner: string;
+  } | null>(null);
 
   useEffect(() => {
     let gone = false;
@@ -249,7 +255,7 @@ export function CustomersPage() {
         : now,
     );
     const c = res.customer;
-    setDeal({ customer: c, title: "Solar", address: c.address, lat: c.lat, lng: c.lng });
+    setDeal({ customer: c, title: "Solar", address: c.address, lat: c.lat, lng: c.lng, owner: "" });
   };
   const startDeal = async () => {
     if (!deal) return;
@@ -260,6 +266,7 @@ export function CustomersPage() {
       address: deal.address,
       lat: deal.lat,
       lng: deal.lng,
+      owner: deal.owner || null,
     });
     setSaving(false);
     if (!res.ok) return setAddProblem(res.message);
@@ -321,6 +328,12 @@ export function CustomersPage() {
               Where
               <AddressField value={deal.address} placed={deal.lat !== null} onChange={(place) => setDeal({ ...deal, ...place })} />
             </div>
+            <AssignTo
+              value={deal.owner}
+              onChange={(owner) => setDeal({ ...deal, owner })}
+              className={clsx(ui.label, "block max-w-md")}
+              selectClassName={clsx(ui.input, "mt-1 appearance-auto")}
+            />
           </div>
           {addProblem && (
             <p className="mt-3 text-sm text-danger" role="alert">
@@ -602,7 +615,13 @@ export function CustomerPage({ id }: { id: string }) {
   const [status, setStatus] = useState("");
   const [kind, setKind] = useState<"note" | "call" | "email">("note");
   const [text, setText] = useState("");
-  const [newJob, setNewJob] = useState<{ title: string; address: string; lat: number | null; lng: number | null } | null>(null);
+  const [newJob, setNewJob] = useState<{
+    title: string;
+    address: string;
+    lat: number | null;
+    lng: number | null;
+    owner?: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     const res = await loadCustomer(id);
@@ -650,7 +669,7 @@ export function CustomerPage({ id }: { id: string }) {
   };
   const startJob = async () => {
     if (!newJob) return;
-    const res = await createJob({ customerId: id, ...newJob, title: newJob.title.trim() || "Solar" });
+    const res = await createJob({ customerId: id, ...newJob, title: newJob.title.trim() || "Solar", owner: newJob.owner || null });
     if (!res.ok) return setStatus(res.message);
     setJobs([res.job, ...jobs]);
     setNewJob(null);
@@ -718,6 +737,12 @@ export function CustomerPage({ id }: { id: string }) {
                       onChange={(place) => setNewJob({ ...newJob, ...place })}
                     />
                   </div>
+                  <AssignTo
+                    value={newJob.owner ?? ""}
+                    onChange={(owner) => setNewJob({ ...newJob, owner })}
+                    className={clsx(ui.label, "block max-w-md")}
+                    selectClassName={clsx(ui.input, "mt-1 appearance-auto")}
+                  />
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button className={ui.primary} onClick={startJob}>
@@ -846,6 +871,7 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
   });
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [owner, setOwner] = useState("");
 
   useEffect(() => {
     void listCustomers().then((res) => (res.ok ? setCustomers(res.customers) : setProblem(res.message)));
@@ -886,6 +912,7 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
       address: where.address,
       lat: where.lat,
       lng: where.lng,
+      owner: owner || null,
     });
     setSaving(false);
     if (!res.ok) return setProblem(res.message);
@@ -962,6 +989,12 @@ export function NewDeal({ onClose }: { onClose: () => void }) {
               onChange={(place) => setDeal({ ...deal, ...place, own: true })}
             />
           </div>
+          <AssignTo
+            value={owner}
+            onChange={setOwner}
+            className={clsx(ui.label, "block max-w-md")}
+            selectClassName={clsx(ui.input, "mt-1 appearance-auto")}
+          />
         </div>
       )}
 

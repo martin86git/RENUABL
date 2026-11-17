@@ -230,11 +230,25 @@ async function newLeadOwner(q: Q, businessId: string, by: string): Promise<strin
   return leadOwnerFor(by, members, rule, Object.fromEntries(given.map((g) => [g.owner.toLowerCase(), g.at])));
 }
 
-async function insertJob(q: Q, businessId: string, customerId: string, job: JobInput, by: string): Promise<Job> {
+/** A member of the business by email, as kept, or null: who a new deal is assigned to must be one of its own people. */
+async function memberEmail(q: Q, businessId: string, email: string | null | undefined): Promise<string | null> {
+  const want = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!want) return null;
+  const rows = await q<{ email: string }>(`select email from business_members where business_id = $1 and lower(email) = $2`, [
+    businessId,
+    want,
+  ]);
+  return rows[0] ? rows[0].email.toLowerCase() : null;
+}
+
+async function insertJob(q: Q, businessId: string, customerId: string, job: JobInput, by: string, assign?: string | null): Promise<Job> {
   const id = newId("job");
+  // Assigned in the new deal's form (18 Nov 2026, Martin: "Assign to:" with who to give the lead to), when it names one
+  // of the business's people; else as below.
+  const chosen = await memberEmail(q, businessId, assign);
   // A lead the owner adds goes to the business's one salesperson when there is exactly one (deal-feed.ts, 10 Nov 2026).
   // Once there are more salespeople, the business's rule decides (Today → New in): kept by whoever adds them, or in turns.
-  const owner = job.stage === "lead" ? await newLeadOwner(q, businessId, by) : by;
+  const owner = chosen ?? (job.stage === "lead" ? await newLeadOwner(q, businessId, by) : by);
   await q(
     `insert into design_jobs (id, business_id, customer_id, title, address, lat, lng, roof_key, stage, value, install_date, created_by, details, owner_email)
      values ($2,$1,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14)`,
@@ -270,6 +284,7 @@ export async function createCustomer(
   input: CustomerInput,
   firstJob: JobInput | null,
   by: string,
+  assign?: string | null,
 ): Promise<{ customer: Customer; job: Job | null } | "full"> {
   const who = by.toLowerCase();
   return transaction(async (q) => {
@@ -295,7 +310,7 @@ export async function createCustomer(
         input.lastName ?? splitName(input.name).lastName,
       ],
     );
-    const job = firstJob ? await insertJob(q, businessId, id, firstJob, who) : null;
+    const job = firstJob ? await insertJob(q, businessId, id, firstJob, who, assign) : null;
     const customer = await customerRow(q, businessId, id);
     if (!customer) throw new Error("the customer couldn't be kept");
     return { customer, job };
@@ -433,7 +448,13 @@ export async function setJobOwner(businessId: string, id: string, owner: string 
 }
 
 /** A new job for one of the business's customers. "missing" when it has no such customer, "full" at the limit. */
-export async function createJob(businessId: string, customerId: string, input: JobInput, by: string): Promise<Job | "missing" | "full"> {
+export async function createJob(
+  businessId: string,
+  customerId: string,
+  input: JobInput,
+  by: string,
+  assign?: string | null,
+): Promise<Job | "missing" | "full"> {
   return transaction(async (q) => {
     if (!(await customerRow(q, businessId, customerId))) return "missing";
     const count = await q<{ n: string }>(`select count(*) as n from design_jobs where business_id = $1 and customer_id = $2`, [
@@ -441,7 +462,7 @@ export async function createJob(businessId: string, customerId: string, input: J
       customerId,
     ]);
     if (Number(count[0]?.n ?? 0) >= MAX_JOBS_PER_CUSTOMER) return "full";
-    return insertJob(q, businessId, customerId, input, by.toLowerCase());
+    return insertJob(q, businessId, customerId, input, by.toLowerCase(), assign);
   });
 }
 
