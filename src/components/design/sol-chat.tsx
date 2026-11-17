@@ -378,16 +378,11 @@ export function SolChat({
     >
       <div className="flex items-center gap-3 px-5 py-3">
         {/* Sol large at the head of his chat (16 Nov 2026, Martin: "make sols icon in the chat large like the
-            example"): the lit sun with its glow, his name and what he is under it. */}
-        <div className="flex items-center gap-3">
-          <span className="sol-orb inline-flex size-14 shrink-0 items-center justify-center rounded-full">
-            <SolMark className="size-14" />
-          </span>
-          <span className="leading-tight">
-            <span className="block text-[15px] font-semibold text-ink">Sol</span>
-            <span className="block text-[12px] text-muted">Your AI{!side && " · your conversation is yours alone"}</span>
-          </span>
-        </div>
+            example"): the lit sun with its glow, and no words beside it (18 Nov 2026, Martin: "we dont need it to say
+            Sol your AI"). */}
+        <span className="sol-orb inline-flex size-14 shrink-0 items-center justify-center rounded-full" title="Sol">
+          <SolMark className="size-14" />
+        </span>
         {/* The controls in one small group in the top right corner (18 Nov 2026, Martin: "the top bar is far too busy";
             no Full page and no Clear: New chat files the conversation away, and History holds it). */}
         <div className="-mr-2 ml-auto flex items-center gap-0.5 self-start">
@@ -907,13 +902,8 @@ function Bubble({
     <div className={clsx("flex flex-col", you ? "items-end" : "items-stretch")}>
       {/* No pads for what is written (15 Nov 2026, Martin: "remove the pads for text you and i write and just make
           the text white"): the member's words sit right, white on the charcoal, with one fine rule down their right
-          side so the two sides are told apart; Sol's answer is named and reads across the column in mini threads
-          (sol-text.tsx `threads`). */}
-      {!you && (
-        <p className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-          <SolMark className="size-3.5" glow={false} /> Sol
-        </p>
-      )}
+          side so the two sides are told apart; Sol's answer reads across the column in mini threads (sol-text.tsx
+          `threads`), with no "SOL" over it (18 Nov 2026, Martin: his messages "dont need to be prefaced with Sol"). */}
       <div
         className={clsx(
           "[overflow-wrap:anywhere]",

@@ -6,7 +6,7 @@ import type { SolState } from "@/lib/domain/design/sol";
 import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
-import { SolMark, SolStars } from "./sol-icon";
+import { SolMark } from "./sol-icon";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";
@@ -228,20 +228,14 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
       className={clsx(
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
         phone ? "size-12" : "-my-2 size-12",
-        open && "ring-2 ring-sun-line/50 ring-offset-2 ring-offset-surface",
       )}
     >
-      {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. */}
+      {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
+          panel is open and no stars (18 Nov 2026, Martin: "lose its halo ring and resemble the same as the sol icon in
+          the right hand chat"). */}
       <span className="sol-heartbeat inline-flex">
         <SolMark className={clsx("transition-transform duration-300 group-hover:scale-110", phone ? "size-10" : "size-[38px]")} />
       </span>
-      {/* The AI's stars, floating diagonally above the round and outside it (3 Nov 2026, Martin). */}
-      <SolStars
-        className={clsx(
-          "pointer-events-none absolute transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5",
-          phone ? "-right-3.5 -top-4 size-6" : "-right-3 -top-3.5 size-[22px]",
-        )}
-      />
       {waiting && (
         <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
           {unread}
