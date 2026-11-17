@@ -37,8 +37,15 @@ export function callerIntro(name: string, business: string): string {
 
 /** A voice for the phone assistant, as Vapi takes it on a call (`voice: { provider, voiceId }`). */
 export interface CallerVoice {
-  provider: "vapi" | "11labs";
+  provider: "vapi" | "11labs" | "deepgram";
   voiceId: string;
+}
+
+const PROVIDERS: readonly CallerVoice["provider"][] = ["vapi", "11labs", "deepgram"];
+
+/** A provider as kept in the database or sent from a browser, or null when it isn't one we send to Vapi. */
+export function voiceProvider(raw: unknown): CallerVoice["provider"] | null {
+  return PROVIDERS.find((p) => p === raw) ?? null;
 }
 
 export interface VoiceChoice extends CallerVoice {
@@ -53,9 +60,21 @@ export interface VoiceChoice extends CallerVoice {
  * docs.vapi.ai/providers/voice/vapi-voices (read 12 Nov 2026; none is Australian), and ElevenLabs' Charlie, an
  * Australian voice Vapi can use. VERIFY each on a test call before relying on it, and again when Vapi retires voices
  * (it retired eight in 2026). Any other ElevenLabs or Vapi voice can be typed in by its ID.
+ *
+ * 18 Nov 2026 (Martin: "more australian voices"): Deepgram's two Australian Aura-2 voices (developers.deepgram.com/docs/
+ * tts-models, in Vapi's own list of Deepgram voice IDs) and ElevenLabs' four British ready-made voices, the nearest it
+ * has without an ElevenLabs account of the business's own (its ready-made voices are every account's; Charlie is its only
+ * Australian one). More Australian voices are in ElevenLabs' library, which Vapi reaches only through an ElevenLabs key
+ * added in Vapi; one of those is typed in by its ID. None of the six has been tried on a call: VERIFY.
  */
 export const CALLER_VOICES: readonly VoiceChoice[] = [
   { provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie", words: "Australian, relaxed and natural", sex: "male" },
+  { provider: "deepgram", voiceId: "hyperion", label: "Hyperion", words: "Australian, caring and warm", sex: "male" },
+  { provider: "deepgram", voiceId: "theia", label: "Theia", words: "Australian, polite and sincere", sex: "female" },
+  { provider: "11labs", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George", words: "British, warm", sex: "male" },
+  { provider: "11labs", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", words: "British, steady", sex: "male" },
+  { provider: "11labs", voiceId: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice", words: "British, clear", sex: "female" },
+  { provider: "11labs", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily", words: "British, soft", sex: "female" },
   { provider: "vapi", voiceId: "Elliot", label: "Elliot", words: "Canadian, young and calm (Vapi's default)", sex: "male" },
   { provider: "vapi", voiceId: "Dan", label: "Dan", words: "British", sex: "male" },
   { provider: "vapi", voiceId: "Kai", label: "Kai", words: "American, adult", sex: "male" },
@@ -70,17 +89,53 @@ export const CALLER_VOICES: readonly VoiceChoice[] = [
 export const VOICE_PROVIDERS: { id: CallerVoice["provider"]; label: string }[] = [
   { id: "11labs", label: "ElevenLabs" },
   { id: "vapi", label: "Vapi" },
+  { id: "deepgram", label: "Deepgram" },
 ];
 
 /** A voice sent from the browser, checked: a known provider and an ID of letters and digits. Null is "the default". */
 export function cleanVoice(raw: unknown): CallerVoice | null | "bad" {
   if (raw === null || raw === undefined || raw === "") return null;
   const v = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const provider = v.provider === "vapi" || v.provider === "11labs" ? v.provider : null;
+  const provider = voiceProvider(v.provider);
   const voiceId = typeof v.voiceId === "string" ? v.voiceId.trim() : "";
   if (!provider || !/^[A-Za-z0-9_-]{2,40}$/.test(voiceId)) return "bad";
   return { provider, voiceId };
 }
+
+/**
+ * Where a voice's sample clip is, for the play button beside it (18 Nov 2026, Martin: hear a voice without a call):
+ * Deepgram publishes one for each Aura-2 voice at a fixed address; ElevenLabs lists one for each of its ready-made
+ * voices (its address changes, so the server asks ElevenLabs' public list for it); Vapi publishes none we can fetch.
+ * The clip is the maker's own recording of the voice, not the agent's words.
+ */
+export function voiceSample(v: CallerVoice | null): { from: "deepgram"; url: string } | { from: "11labs"; voiceId: string } | null {
+  if (!v) return null;
+  if (v.provider === "deepgram")
+    return /^[a-z]{3,20}$/.test(v.voiceId)
+      ? { from: "deepgram", url: `https://static.deepgram.com/examples/Aura-2-${v.voiceId}.wav` }
+      : null;
+  if (v.provider === "11labs") return /^[A-Za-z0-9]{12,40}$/.test(v.voiceId) ? { from: "11labs", voiceId: v.voiceId } : null;
+  return null;
+}
+
+/** The address the picker plays a voice's sample from, or null when it has none. */
+export function voiceSampleUrl(v: CallerVoice | null): string | null {
+  return v && voiceSample(v) ? `/api/design/caller/voice-sample?provider=${v.provider}&id=${encodeURIComponent(v.voiceId)}` : null;
+}
+
+/** Where ElevenLabs keeps the clips its list points to: nothing else is fetched on its say-so. */
+export function isElevenLabsClip(url: unknown): url is string {
+  if (typeof url !== "string") return false;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return false;
+    return u.hostname === "elevenlabs.io" || u.hostname.endsWith(".elevenlabs.io") || u.hostname === "storage.googleapis.com";
+  } catch {
+    return false;
+  }
+}
+
+export const NO_SAMPLE = "No sample for this one: use Test call to hear it.";
 
 export const VOICE_BAD = "That isn't a voice ID we can use: letters and numbers only, as Vapi or ElevenLabs show it.";
 
@@ -89,7 +144,7 @@ export function voiceLabel(v: CallerVoice | null): string {
   if (!v) return "Vapi's default voice";
   const ours = CALLER_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId);
   if (ours) return ours.label;
-  return `${v.provider === "11labs" ? "ElevenLabs" : "Vapi"} voice ${v.voiceId.length > 12 ? `${v.voiceId.slice(0, 8)}…` : v.voiceId}`;
+  return `${VOICE_PROVIDERS.find((p) => p.id === v.provider)?.label ?? "Vapi"} voice ${v.voiceId.length > 12 ? `${v.voiceId.slice(0, 8)}…` : v.voiceId}`;
 }
 
 /** What the test call says, so the business hears the voice with its own name in it. */

@@ -12,6 +12,10 @@ import {
   DEFAULT_TINT,
   testCallWords,
   voiceLabel,
+  voiceProvider,
+  voiceSample,
+  voiceSampleUrl,
+  isElevenLabsClip,
 } from "./caller";
 
 describe("the phone assistant's name", () => {
@@ -61,6 +65,43 @@ describe("the phone assistant's voice", () => {
     for (const v of CALLER_VOICES)
       expect(cleanVoice({ provider: v.provider, voiceId: v.voiceId })).toEqual({ provider: v.provider, voiceId: v.voiceId });
     expect(new Set(CALLER_VOICES.map((v) => v.label)).size).toBe(CALLER_VOICES.length);
+  });
+
+  it("offers more than one Australian voice, of both sexes", () => {
+    const australian = CALLER_VOICES.filter((v) => v.words.startsWith("Australian"));
+    expect(australian.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(australian.map((v) => v.sex)).size).toBe(2);
+    expect(voiceProvider("deepgram")).toBe("deepgram");
+    expect(voiceProvider("azure")).toBeNull();
+    expect(voiceLabel({ provider: "deepgram", voiceId: "orion" })).toBe("Deepgram voice orion");
+  });
+
+  it("knows where a voice's sample is, and which voices have none", () => {
+    expect(voiceSample({ provider: "deepgram", voiceId: "theia" })).toEqual({
+      from: "deepgram",
+      url: "https://static.deepgram.com/examples/Aura-2-theia.wav",
+    });
+    expect(voiceSample({ provider: "deepgram", voiceId: "../x" })).toBeNull();
+    expect(voiceSample({ provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD" })).toEqual({
+      from: "11labs",
+      voiceId: "IKne3meq5aSn9XLyUdCD",
+    });
+    expect(voiceSample({ provider: "vapi", voiceId: "Clara" })).toBeNull();
+    expect(voiceSampleUrl({ provider: "vapi", voiceId: "Clara" })).toBeNull();
+    expect(voiceSampleUrl({ provider: "deepgram", voiceId: "hyperion" })).toBe(
+      "/api/design/caller/voice-sample?provider=deepgram&id=hyperion",
+    );
+    // Every voice that isn't Vapi's own has a sample to play.
+    for (const v of CALLER_VOICES) expect(Boolean(voiceSampleUrl(v))).toBe(v.provider !== "vapi");
+  });
+
+  it("fetches a clip only from ElevenLabs' own places", () => {
+    expect(isElevenLabsClip("https://api.us.elevenlabs.io/v1/voices/abc/previews/audio?payload=x")).toBe(true);
+    expect(isElevenLabsClip("https://storage.googleapis.com/eleven-public-prod/premade/voices/a/b.mp3")).toBe(true);
+    expect(isElevenLabsClip("http://api.elevenlabs.io/x.mp3")).toBe(false);
+    expect(isElevenLabsClip("https://elevenlabs.io.example.com/x.mp3")).toBe(false);
+    expect(isElevenLabsClip("https://169.254.169.254/latest")).toBe(false);
+    expect(isElevenLabsClip(null)).toBe(false);
   });
 
   it("takes another voice by its ID, and nothing else", () => {

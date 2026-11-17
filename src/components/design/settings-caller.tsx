@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Camera, Check, GraduationCap, MessageCircle, Phone, PhoneCall, Trash2 } from "lucide-react";
+import { Camera, Check, GraduationCap, MessageCircle, Phone, PhoneCall, Play, Square, Trash2, VolumeX } from "lucide-react";
 import {
   CALLER_COPY,
   CALLER_NAME_MAX,
@@ -11,9 +11,11 @@ import {
   callerIntro,
   cleanCallerName,
   cleanVoice,
+  NO_SAMPLE,
   VOICE_BAD,
   VOICE_PROVIDERS,
   voiceLabel,
+  voiceSampleUrl,
   type CallerVoice,
 } from "@/lib/domain/design/caller";
 import {
@@ -288,6 +290,20 @@ const same = (a: CallerVoice | null, b: CallerVoice | null) => a?.provider === b
  * one, or any voice by its ID; saved on a press, and heard on a short call to the member's own mobile. `compact` is the
  * same picker in one column with no card, for the assistant's own chat (13 Nov 2026, Martin).
  */
+/** The one sample clip playing, wherever the picker is shown: starting another stops it. */
+let sampleNow: HTMLAudioElement | null = null;
+function stopSample() {
+  sampleNow?.pause();
+  sampleNow = null;
+}
+function startSample(url: string, over: () => void, failed: () => void) {
+  const clip = new Audio(url);
+  sampleNow = clip;
+  clip.onended = over;
+  clip.onerror = failed;
+  void clip.play().catch(over);
+}
+
 export function VoicePicker({
   caller,
   callsOn,
@@ -309,6 +325,50 @@ export function VoicePicker({
   const [provider, setProvider] = useState<CallerVoice["provider"]>(caller.voice?.provider ?? "11labs");
   const [typedId, setTypedId] = useState(caller.voice && !ours ? caller.voice.voiceId : "");
   const [busy, setBusy] = useState(false);
+  // The sample playing now, by its voice ("11labs:…"): one at a time, stopped when the picker goes.
+  const [playing, setPlaying] = useState<string | null>(null);
+  useEffect(() => stopSample, []);
+
+  const play = (v: CallerVoice) => {
+    const key = `${v.provider}:${v.voiceId}`;
+    stopSample();
+    if (playing === key) return setPlaying(null);
+    const url = voiceSampleUrl(v);
+    if (!url) return onStatus({ ok: false, text: NO_SAMPLE });
+    setPlaying(key);
+    const over = () => setPlaying((now) => (now === key ? null : now));
+    startSample(url, over, () => {
+      over();
+      onStatus({ ok: false, text: NO_SAMPLE });
+    });
+  };
+
+  /** The round beside a voice: its maker's sample, played here with no call. */
+  const sampleButton = (v: CallerVoice, label: string) => {
+    const key = `${v.provider}:${v.voiceId}`;
+    const on = playing === key;
+    if (!voiceSampleUrl(v))
+      return (
+        <span className="grid size-9 shrink-0 place-items-center text-muted" title={NO_SAMPLE}>
+          <VolumeX className="size-4" aria-hidden />
+          <span className="sr-only">{NO_SAMPLE}</span>
+        </span>
+      );
+    return (
+      <button
+        type="button"
+        onClick={() => play(v)}
+        aria-label={on ? `Stop ${label}'s sample` : `Hear ${label}`}
+        title={on ? "Stop" : `Hear ${label}: a sample of the voice, no call`}
+        className={clsx(
+          "grid size-9 shrink-0 place-items-center rounded-full ring-1",
+          on ? "bg-primary text-primary-ink ring-primary" : "text-ink ring-line hover:ring-ink-2",
+        )}
+      >
+        {on ? <Square className="size-3.5" aria-hidden /> : <Play className="size-3.5 translate-x-px" aria-hidden />}
+      </button>
+    );
+  };
 
   const choose = async (voice: CallerVoice | null) => {
     setBusy(true);
@@ -316,7 +376,7 @@ export function VoicePicker({
     setBusy(false);
     if (!res.ok) return onStatus({ ok: false, text: res.message });
     onSaved(res.caller);
-    onStatus({ ok: true, text: `Voice saved: ${voiceLabel(res.caller.voice)}. Ring yourself to hear it.` });
+    onStatus({ ok: true, text: `Voice saved: ${voiceLabel(res.caller.voice)}. Test call rings you in it.` });
   };
 
   const saveOwn = () => {
@@ -332,14 +392,20 @@ export function VoicePicker({
     onStatus(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.message });
   };
 
-  const row = (label: string, words: string, picked: boolean, onPick: () => void, key: string) => (
+  const row = (label: string, words: string, picked: boolean, onPick: () => void, key: string, voice?: CallerVoice) => (
+    <div key={key} className="flex min-w-0 items-center gap-1.5">
+      {pickButton(label, words, picked, onPick)}
+      {voice && sampleButton(voice, label)}
+    </div>
+  );
+
+  const pickButton = (label: string, words: string, picked: boolean, onPick: () => void) => (
     <button
-      key={key}
       type="button"
       disabled={busy}
       onClick={onPick}
       className={clsx(
-        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm ring-1",
+        "flex min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2 text-left text-sm ring-1",
         picked ? "bg-surface-2 ring-ink" : "ring-line hover:ring-ink-2",
       )}
       aria-pressed={picked}
@@ -380,7 +446,8 @@ export function VoicePicker({
         </span>
       </div>
       <p className={clsx("mt-1 text-xs text-muted", compact && "hidden")}>
-        Pick one that suits the name. Train and Test call both ring the mobile on your account, in the voice saved here.
+        Pick one that suits the name, and press play to hear a voice&apos;s sample. Train and Test call both ring the mobile on your
+        account, in the voice saved here.
       </p>
       {(["female", "male"] as const).map((sex) => (
         <div key={sex} className="mt-3">
@@ -396,6 +463,7 @@ export function VoicePicker({
                   void choose({ provider: v.provider, voiceId: v.voiceId });
                 },
                 `${v.provider}:${v.voiceId}`,
+                { provider: v.provider, voiceId: v.voiceId },
               ),
             )}
           </div>
@@ -436,6 +504,9 @@ export function VoicePicker({
               if (e.key === "Enter") saveOwn();
             }}
           />
+          {typedId.trim() &&
+            cleanVoice({ provider, voiceId: typedId }) !== "bad" &&
+            sampleButton({ provider, voiceId: typedId.trim() }, "this voice")}
           <button type="button" className={ui.primary} disabled={busy || !typedId.trim()} onClick={saveOwn}>
             Use this voice
           </button>

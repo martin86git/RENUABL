@@ -3,7 +3,7 @@
  * (domain/design/caller.ts). One row a business a role in `design_caller` (sales, and the admin assistant that books
  * installations: domain/install-call.ts), business id first as everywhere; no row is Sol with no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
-import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
+import { DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
 import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
@@ -30,7 +30,7 @@ export async function callerOf(businessId: string, role: CallerKey = "sales"): P
     [businessId, role],
   );
   const row = rows[0];
-  const provider = row?.voice_provider === "vapi" || row?.voice_provider === "11labs" ? row.voice_provider : null;
+  const provider = voiceProvider(row?.voice_provider);
   return {
     role,
     name: row?.name || DEFAULT_CALLER,

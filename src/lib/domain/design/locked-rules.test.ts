@@ -147,5 +147,13 @@ describe("a natural delivery on a call", () => {
     const plain = withoutSpeedSettings(eleven as unknown as Record<string, unknown>);
     expect(plain.startSpeakingPlan).toEqual({ waitSeconds: 0.2 });
     expect(plain.voice).toEqual({ provider: "11labs", voiceId: "abc" });
+    // A Deepgram voice goes with the model its Australian voices are in, and keeps it on the second try.
+    const deepgram = assistantConfig({ ...base, brief: brief(), voice: { provider: "deepgram", voiceId: "theia" } });
+    expect(deepgram).toMatchObject({ voice: { provider: "deepgram", voiceId: "theia", model: "aura-2" } });
+    expect(withoutSpeedSettings(deepgram as unknown as Record<string, unknown>).voice).toEqual({
+      provider: "deepgram",
+      voiceId: "theia",
+      model: "aura-2",
+    });
   });
 });

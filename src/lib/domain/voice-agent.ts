@@ -649,7 +649,10 @@ export const SOLAR_KEYTERMS = [
  * so the first word comes sooner (17 Nov 2026, Martin: reply within 1.2 seconds). Other providers go as they are.
  */
 export function fastVoice<V extends { provider: string }>(voice: V): V & { model?: string } {
-  return voice.provider === "11labs" ? { ...voice, model: "eleven_flash_v2_5" } : voice;
+  if (voice.provider === "11labs") return { ...voice, model: "eleven_flash_v2_5" };
+  // Deepgram's Australian voices are Aura-2's; left unsaid, Vapi takes the older Aura, which hasn't got them.
+  if (voice.provider === "deepgram") return { ...voice, model: "aura-2" };
+  return voice;
 }
 
 /**
@@ -659,7 +662,11 @@ export function fastVoice<V extends { provider: string }>(voice: V): V & { model
 export function withoutSpeedSettings(assistant: Record<string, unknown>): Record<string, unknown> {
   const { startSpeakingPlan, voice, ...rest } = assistant;
   const wait = (startSpeakingPlan as { waitSeconds?: unknown } | undefined)?.waitSeconds;
-  const plainVoice = voice && typeof voice === "object" ? Object.fromEntries(Object.entries(voice).filter(([k]) => k !== "model")) : voice;
+  // Only ElevenLabs' model is a speed setting: a Deepgram voice needs its model to be found at all.
+  const plainVoice =
+    voice && typeof voice === "object" && (voice as { provider?: unknown }).provider === "11labs"
+      ? Object.fromEntries(Object.entries(voice).filter(([k]) => k !== "model"))
+      : voice;
   return {
     ...rest,
     ...(typeof wait === "number" ? { startSpeakingPlan: { waitSeconds: wait } } : {}),

@@ -7,7 +7,7 @@
  * member's own mobile and a spoken PIN), and it only reads: the deals that member may see, as Sol does. It never calls,
  * emails, texts or changes anything for a customer. Pure, tested.
  */
-import { NO_AUDIO, speakableName, transcriberFor, VOICE_SECRET_HEADER } from "../voice-agent";
+import { fastVoice, NO_AUDIO, speakableName, transcriberFor, VOICE_SECRET_HEADER } from "../voice-agent";
 import { CALLER_VOICES } from "./caller";
 
 /** What it is called until the business names it. */
@@ -80,7 +80,9 @@ const DEFAULT_ORDER = ["Clara", "Savannah", "Emma", "Layla", "Tara", "Dan", "Kai
  */
 export function colleagueVoice(chosen: AnyVoice | null, taken: readonly AnyVoice[]): AnyVoice {
   if (chosen && !isCustomerVoice(chosen, taken)) return chosen;
-  const ordered = [...CALLER_VOICES].sort((a, b) => DEFAULT_ORDER.indexOf(a.voiceId) - DEFAULT_ORDER.indexOf(b.voiceId));
+  // A voice not among its defaults comes after them.
+  const place = (id: string) => DEFAULT_ORDER.indexOf(id) + 1 || DEFAULT_ORDER.length + 1;
+  const ordered = [...CALLER_VOICES].sort((a, b) => place(a.voiceId) - place(b.voiceId));
   const free = ordered.filter((v) => !isCustomerVoice(v, taken));
   const theirs = CALLER_VOICES.find((v) => taken.some((t) => sameVoice(t, v)))?.sex;
   const pick = (theirs && free.find((v) => v.sex !== theirs)) || free[0];
@@ -239,7 +241,7 @@ export function colleagueAssistantConfig(o: {
       messages: [{ role: "system", content: colleagueSystemPrompt(b) }],
       tools,
     },
-    ...(o.voice ? { voice: o.voice } : {}),
+    ...(o.voice ? { voice: fastVoice(o.voice) } : {}),
     transcriber: transcriberFor([b.name ?? "", b.business, b.firstName ?? ""]),
     endCallMessage: "Talk soon.",
     artifactPlan: NO_AUDIO,

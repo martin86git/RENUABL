@@ -7,7 +7,7 @@
  */
 import { createHash } from "node:crypto";
 import { canvasFacts } from "@/lib/domain/design/canvas";
-import type { CallerVoice } from "@/lib/domain/design/caller";
+import { voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
 import {
   colleagueAssistantConfig,
   colleagueVoice,
@@ -80,7 +80,7 @@ export async function colleagueOf(businessId: string): Promise<ColleagueSettings
     [businessId],
   );
   const r = rows[0];
-  const provider = r?.voice_provider === "vapi" || r?.voice_provider === "11labs" ? r.voice_provider : null;
+  const provider = voiceProvider(r?.voice_provider);
   return { name: r?.name || null, voice: provider && r?.voice_id ? { provider, voiceId: r.voice_id } : null };
 }
 
