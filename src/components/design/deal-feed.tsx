@@ -87,6 +87,8 @@ import { PATHS } from "./design-shell";
 import { DealTeamChat } from "./deal-team-chat";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { CallChooser } from "./call-choice";
+import { LeadOpening } from "./lead-opening";
+import { opensWithOptions } from "@/lib/domain/design/lead-opening";
 import { SolIcon } from "./sol-icon";
 import { TodayCalls, type CallsSummary } from "./today-calls";
 import { TodayNews } from "./today-news";
@@ -430,6 +432,7 @@ export function DealFeed(props: {
                   installDays={data?.installDays}
                   signOff={data?.signOff}
                   stacked
+                  opening
                 />
               </div>
             </div>
@@ -1061,6 +1064,8 @@ function DealCard(props: {
   signOff?: { sender: string; business: string };
   /** In a column of cards: the team chat goes under the deal, not beside it. */
   stacked?: boolean;
+  /** Picked from the deals panel: a new lead opens with Sol's ways in under it (lead-opening.ts). */
+  opening?: boolean;
 }) {
   const { deal: d, now } = props;
   const need = needsYou(d, now);
@@ -1236,9 +1241,15 @@ function DealCard(props: {
                 <MessageCircle className="size-4" aria-hidden />
               </Tool>
             )}
-            <Tool quiet={Boolean(move)} label="Deal" title={`${d.customer}'s deal`} href={`${PATHS.deals}/${d.jobId}`}>
+            {/* Always in words, so the way into the deal is plain to find (18 Nov 2026, Martin: "Open Deal then the icon"). */}
+            <Link
+              href={`${PATHS.deals}/${d.jobId}`}
+              title={`${d.customer}'s deal`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+            >
+              Open deal
               <Handshake className="size-4" aria-hidden />
-            </Tool>
+            </Link>
             {need && (
               <span className="ml-auto">
                 <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />
@@ -1246,6 +1257,17 @@ function DealCard(props: {
             )}
           </div>
         </div>
+        {props.opening && opensWithOptions(d) && (
+          <div className="mt-4 border-t border-line pt-4">
+            <LeadOpening
+              deal={d}
+              business={props.signOff?.business ?? ""}
+              onReviewEmail={() => setReviewing(true)}
+              onCallMyself={call}
+              onChanged={props.onChanged}
+            />
+          </div>
+        )}
         <CallNotetaker handle={notetaker} button={false} jobId={d.jobId} customerId="" phone={d.phone ?? ""} onAdded={props.onChanged} />
         {calling && (
           <CallChooser
