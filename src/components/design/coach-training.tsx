@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ChevronDown, GraduationCap, Loader2, Lock, PhoneCall, RotateCcw, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, GraduationCap, Loader2, Lock, PhoneCall, RotateCcw, Sparkles, X } from "lucide-react";
 import type { CoachNote } from "@/lib/domain/design/coaching";
 import { DEFAULT_DELIVERY, DELIVERY_COPY, NATURAL_DELIVERY, sameDelivery, type Delivery } from "@/lib/domain/design/delivery";
 import { TRAINING_COPY, openProposals, type TrainingProposal, type TrainingView } from "@/lib/domain/design/training-call";
@@ -20,11 +20,12 @@ const seenId = (): string | null => {
 
 /**
  * Ring me (16 Nov 2026, Martin: "allow requesting a call from an agent to be training mode and test mode (calling a
- * lead)"): one round in the agent's window that opens the two calls it can make to the member's own mobile. **Train**:
- * the member is its trainer (training-call.ts). **Test call**: it rings as it would a new lead and the member plays
- * the customer (practice-call.ts). `row` draws the two as buttons side by side, for the agent's day.
+ * lead)"): the phone round in the agent's window header, opening the two calls it can make to the member's own mobile.
+ * **Train**: the member is its trainer (training-call.ts). **Test call**: it rings as it would a new lead and the member
+ * plays the customer (practice-call.ts). The only place they are offered in the window (17 Nov 2026, Martin: the pads
+ * on the chat repeated the header's menu and took its room).
  */
-export function RingMe({ caller, row = false }: { caller: CallerState; row?: boolean }) {
+export function RingMe({ caller }: { caller: CallerState }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<"train" | "test" | null>(null);
   const [said, setSaid] = useState<string | null>(null);
@@ -63,17 +64,9 @@ export function RingMe({ caller, row = false }: { caller: CallerState; row?: boo
       type="button"
       onClick={() => void ring(which)}
       disabled={busy !== null}
-      className={clsx(
-        "flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left ring-1 ring-line hover:ring-ink disabled:opacity-60",
-        which === "train" ? "bg-sun" : "bg-surface",
-      )}
+      className="flex w-full items-start gap-2.5 rounded-xl bg-surface px-3 py-2.5 text-left ring-1 ring-line hover:bg-call-soft hover:ring-call disabled:opacity-60"
     >
-      <span
-        className={clsx(
-          "mt-0.5 grid size-8 shrink-0 place-items-center rounded-full",
-          which === "train" ? "bg-primary text-white" : "bg-surface-2 text-ink",
-        )}
-      >
+      <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-call text-white">
         {busy === which ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
         ) : which === "train" ? (
@@ -88,24 +81,6 @@ export function RingMe({ caller, row = false }: { caller: CallerState; row?: boo
       </span>
     </button>
   );
-
-  if (row)
-    return (
-      <div className="space-y-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Have {name} ring you</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {choice("train", train)}
-          {choice("test", test)}
-        </div>
-        {said ? (
-          <p className="text-xs text-danger">{said}</p>
-        ) : (
-          <p className="text-xs text-muted">
-            {TRAINING_COPY.rings} On a training call, try: {TRAINING_COPY.tryThese.join(" · ")}
-          </p>
-        )}
-      </div>
-    );
 
   return (
     <span ref={wrap} className="relative shrink-0">
@@ -124,15 +99,150 @@ export function RingMe({ caller, row = false }: { caller: CallerState; row?: boo
         <div
           role="dialog"
           aria-label={TRAINING_COPY.modeTitle}
-          className="absolute left-0 top-10 z-20 w-72 space-y-2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line"
+          className="absolute left-0 top-10 z-20 w-80 space-y-2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line"
         >
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Have {name} ring you</p>
           {choice("train", train)}
           {choice("test", test)}
-          {said ? <p className="text-xs text-danger">{said}</p> : <p className="text-xs text-muted">{TRAINING_COPY.rings}</p>}
+          {said ? (
+            <p className="text-xs text-danger">{said}</p>
+          ) : (
+            <p className="text-xs leading-snug text-muted">
+              {TRAINING_COPY.rings} On a training call, try: {TRAINING_COPY.tryThese.join(" · ")}
+            </p>
+          )}
         </div>
       )}
     </span>
+  );
+}
+
+/**
+ * The agent's latest training call (training-call.ts), read once for its window and shared by the strip over the
+ * chat and the review in its settings. Asked about again while the call is on or being written up.
+ */
+export function useTraining(on: boolean) {
+  const [training, setTraining] = useState<TrainingView | null>(null);
+  const [mayKeep, setMayKeep] = useState(false);
+  const [seen, setSeen] = useState<string | null>(seenId);
+
+  const read = useCallback(async () => {
+    const res = await loadTraining();
+    if (!res.ok) return;
+    setTraining(res.training);
+    setMayKeep(res.mayKeep);
+  }, []);
+
+  useEffect(() => {
+    if (!on) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the window reads its training call as it opens
+    void read();
+    const placed = () => window.setTimeout(() => void read(), 1500);
+    window.addEventListener(TRAINING_PLACED, placed);
+    return () => window.removeEventListener(TRAINING_PLACED, placed);
+  }, [read, on]);
+
+  const waiting = training?.standing === "live" || training?.standing === "working";
+  useEffect(() => {
+    if (!waiting || !on) return;
+    const t = window.setInterval(() => void read(), 4000);
+    return () => window.clearInterval(t);
+  }, [waiting, read, on]);
+
+  const open = training ? openProposals(training.outcome) : [];
+  const handled = training?.standing === "done" && open.length === 0;
+  // A call fully dealt with has nothing left to show, and one put away stays away for the visit.
+  const shown = Boolean(
+    training &&
+    !(handled && seen === training.id) &&
+    !(handled && training.outcome?.state === "ready" && training.lockedOnCall.length === 0),
+  );
+
+  const dismiss = () => {
+    if (!training) return;
+    try {
+      sessionStorage.setItem(SEEN_KEY, training.id);
+    } catch {
+      // Private window: it goes for this look only.
+    }
+    setSeen(training.id);
+  };
+
+  return { training, setTraining, mayKeep, shown, open, dismiss };
+}
+export type Training = ReturnType<typeof useTraining>;
+
+/**
+ * The training call in one line over the chat (17 Nov 2026, Martin: the results came in a block above the chat and
+ * pushed it down): on the call now (in the call green, beating), being written up, or what there is to review, with
+ * Review opening it in the settings beside the chat.
+ */
+export function TrainingStrip({ t, name, onReview }: { t: Training; name: string; onReview: () => void }) {
+  if (!t.shown || !t.training) return null;
+  const training = t.training;
+  const live = training.standing === "live";
+  const working = training.standing === "working";
+  const failed = training.outcome && training.outcome.state !== "ready";
+  const count = t.open.length;
+  const words = live
+    ? `On a training call with ${name} now`
+    : working
+      ? TRAINING_COPY.working(name)
+      : count > 0
+        ? `Your training call: ${count} ${count === 1 ? "change" : "changes"} to review`
+        : failed
+          ? "Your training call couldn't be written up"
+          : `Your training call: ${training.lockedOnCall.length} locked in`;
+  return (
+    <div
+      className={clsx(
+        "mx-3 mt-2.5 flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2 text-sm ring-1",
+        live
+          ? "bg-call-soft text-call-ink ring-call/30"
+          : count > 0
+            ? "bg-sun text-sun-ink ring-sun-line/30"
+            : "bg-canvas text-ink-2 ring-line",
+      )}
+    >
+      <span
+        className={clsx(
+          "grid size-6 shrink-0 place-items-center rounded-full text-white",
+          live ? "bg-call" : count > 0 ? "bg-sun-line" : "bg-primary",
+        )}
+      >
+        {working ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <GraduationCap className="size-3.5" aria-hidden />}
+      </span>
+      <span className="min-w-0 flex-1 truncate font-medium">{words}</span>
+      {live && (
+        <span className="relative flex size-2.5 shrink-0" aria-hidden>
+          <span className="absolute inset-0 animate-ping rounded-full bg-call motion-reduce:animate-none" />
+          <span className="relative size-2.5 rounded-full bg-call" />
+        </span>
+      )}
+      {!live && !working && (
+        <button
+          type="button"
+          onClick={onReview}
+          className={clsx(
+            "inline-flex shrink-0 items-center gap-0.5 rounded-full px-2.5 py-1 text-xs font-semibold",
+            count > 0 ? "bg-sun-line text-white" : "bg-surface text-ink ring-1 ring-line hover:ring-ink",
+          )}
+        >
+          Review <ChevronRight className="size-3.5" aria-hidden />
+        </button>
+      )}
+      {training.standing === "done" && count === 0 && (
+        <button
+          type="button"
+          onClick={t.dismiss}
+          aria-label="Put this away"
+          title="Put this away"
+          className="shrink-0 text-muted hover:text-ink"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -143,58 +253,20 @@ const KIND_TONE: Record<TrainingProposal["kind"], string> = {
 };
 
 /**
- * What came of the agent's latest training call, above its chat (training-call.ts): on the call now, being written
- * up, then the rules locked in on the call and each change it suggests, to **lock in** as a rule, keep as a note or
- * drop. Nothing reaches its script from here without a press.
+ * What came of the agent's latest training call, at the top of its settings (training-call.ts): the rules locked in
+ * on the call, the agent's summary, and each change it suggests, to **lock in** as a rule, keep as a note or drop.
+ * Nothing reaches its script from here without a press.
  */
-export function TrainingCard({ caller, onNotes }: { caller: CallerState; onNotes: (notes: CoachNote[]) => void }) {
-  const [training, setTraining] = useState<TrainingView | null>(null);
-  const [mayKeep, setMayKeep] = useState(false);
+export function TrainingReview({ t, caller, onNotes }: { t: Training; caller: CallerState; onNotes: (notes: CoachNote[]) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [said, setSaid] = useState<string | null>(null);
-  const [seen, setSeen] = useState<string | null>(seenId);
   const [heard, setHeard] = useState(false);
+  const [why, setWhy] = useState(false);
+  const training = t.training;
+  if (!training || (!t.shown && !said)) return null;
   const name = caller.name;
-
-  const read = useCallback(async () => {
-    const res = await loadTraining();
-    if (!res.ok) return;
-    setTraining(res.training);
-    setMayKeep(res.mayKeep);
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the card reads its call as it appears
-    void read();
-    const placed = () => window.setTimeout(() => void read(), 1500);
-    window.addEventListener(TRAINING_PLACED, placed);
-    return () => window.removeEventListener(TRAINING_PLACED, placed);
-  }, [read]);
-
-  // While the call is on or being written up, it is asked about again; once written up it stays as it is.
-  const waiting = training?.standing === "live" || training?.standing === "working";
-  useEffect(() => {
-    if (!waiting) return;
-    const t = window.setInterval(() => void read(), 4000);
-    return () => window.clearInterval(t);
-  }, [waiting, read]);
-
-  if (!training) return null;
   const outcome = training.outcome;
-  const open = openProposals(outcome);
-  const handled = training.standing === "done" && open.length === 0;
-  if (handled && seen === training.id) return null;
-  // A call fully dealt with has nothing left to show unless it has only just been dealt with in this visit.
-  if (handled && outcome?.state === "ready" && training.lockedOnCall.length === 0 && !said) return null;
-
-  const dismiss = () => {
-    try {
-      sessionStorage.setItem(SEEN_KEY, training.id);
-    } catch {
-      // Private window: it goes for this look only.
-    }
-    setSeen(training.id);
-  };
+  const open = t.open;
 
   const answer = async (p: TrainingProposal, what: "lock" | "keep" | "drop") => {
     setBusy(`${p.id}:${what}`);
@@ -202,7 +274,7 @@ export function TrainingCard({ caller, onNotes }: { caller: CallerState; onNotes
     const res = await answerProposal(training.id, p.id, what);
     setBusy(null);
     if (!res.ok) return setSaid(res.message);
-    setTraining(res.training);
+    t.setTraining(res.training);
     onNotes(res.notes);
     if (res.full) setSaid(TRAINING_COPY.full);
     else if (res.gone) setSaid(TRAINING_COPY.gone);
@@ -216,7 +288,7 @@ export function TrainingCard({ caller, onNotes }: { caller: CallerState; onNotes
         setSaid(res.message);
         break;
       }
-      setTraining(res.training);
+      t.setTraining(res.training);
       onNotes(res.notes);
       if (res.full) {
         setSaid(TRAINING_COPY.full);
@@ -230,7 +302,7 @@ export function TrainingCard({ caller, onNotes }: { caller: CallerState; onNotes
     setBusy("retry");
     const res = await retryTraining(training.id);
     setBusy(null);
-    if (res.ok) setTraining(res.training);
+    if (res.ok) t.setTraining(res.training);
     else setSaid(res.message);
   };
 
@@ -238,158 +310,181 @@ export function TrainingCard({ caller, onNotes }: { caller: CallerState; onNotes
   const lockable = open.filter((p) => p.kind !== "remove").length;
 
   return (
-    <section aria-label={TRAINING_COPY.heading} className="max-h-[55%] shrink-0 overflow-y-auto border-b border-line bg-canvas px-4 py-3">
-      <div className="flex items-center gap-2">
-        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-white">
-          <GraduationCap className="size-3.5" aria-hidden />
+    <section aria-label={TRAINING_COPY.heading} className="overflow-hidden rounded-2xl bg-surface ring-1 ring-sun-line/40">
+      <div className="flex items-center gap-2.5 bg-sun px-3.5 py-2.5">
+        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-sun-line text-white">
+          <GraduationCap className="size-4" aria-hidden />
         </span>
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-sun-ink">
           {TRAINING_COPY.heading}
-          {training.by ? <span className="font-normal text-muted"> · with {training.by}</span> : null}
+          {training.by ? <span className="font-normal"> · with {training.by}</span> : null}
         </p>
         {training.standing === "done" && (
-          <button type="button" onClick={dismiss} aria-label="Put this away" title="Put this away" className="text-muted hover:text-ink">
+          <button
+            type="button"
+            onClick={t.dismiss}
+            aria-label="Put this away"
+            title="Put this away"
+            className="text-sun-ink/70 hover:text-sun-ink"
+          >
             <X className="size-4" aria-hidden />
           </button>
         )}
       </div>
 
-      {training.standing === "live" && <p className="mt-2 text-xs text-ink-2">{TRAINING_COPY.live(name)}</p>}
-      {training.standing === "working" && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-ink-2">
-          <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          {TRAINING_COPY.working(name)}
-        </p>
-      )}
-
-      {training.lockedOnCall.length > 0 && (
-        <div className="mt-2.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{TRAINING_COPY.lockedOnCall}</p>
-          <ul className="mt-1 space-y-1">
-            {training.lockedOnCall.map((t) => (
-              <li key={t} className="flex items-start gap-1.5 rounded-lg bg-surface px-2.5 py-1.5 text-sm text-ink ring-1 ring-line">
-                <Lock className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
-                {t}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {outcome?.summary && training.standing === "done" && <p className="mt-2 text-sm leading-snug text-ink-2">{outcome.summary}</p>}
-      {failed && (
-        <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-2">
-          {failed}
-          {(outcome?.state === "failed" || outcome?.state === "out") && mayKeep && (
-            <button
-              type="button"
-              onClick={() => void again()}
-              disabled={busy !== null}
-              className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-1 font-medium text-ink ring-1 ring-line hover:ring-ink"
-            >
-              <RotateCcw className="size-3" aria-hidden /> Try again
-            </button>
-          )}
-        </p>
-      )}
-
-      {open.length > 0 && (
-        <ul className="mt-2.5 space-y-2">
-          {open.map((p) => (
-            <li key={p.id} className="rounded-xl bg-surface p-2.5 ring-1 ring-line">
-              <div className="flex items-start gap-2">
-                <span className={clsx("mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium", KIND_TONE[p.kind])}>
-                  {TRAINING_COPY.words[p.kind]}
-                </span>
-                <div className="min-w-0 flex-1 text-sm leading-snug">
-                  <p className={clsx(p.kind === "remove" ? "text-muted line-through" : "text-ink")}>{p.text}</p>
-                  {p.kind === "change" && p.was && <p className="mt-0.5 text-xs text-muted line-through">{p.was}</p>}
-                </div>
-              </div>
-              {mayKeep && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {p.kind !== "remove" && (
-                    <button
-                      type="button"
-                      onClick={() => void answer(p, "lock")}
-                      disabled={busy !== null}
-                      className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-medium text-white disabled:bg-surface-2 disabled:text-muted"
-                    >
-                      {busy === `${p.id}:lock` ? (
-                        <Loader2 className="size-3 animate-spin" aria-hidden />
-                      ) : (
-                        <Lock className="size-3" aria-hidden />
-                      )}
-                      {TRAINING_COPY.lock}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void answer(p, "keep")}
-                    disabled={busy !== null}
-                    className={clsx(
-                      "rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-line hover:ring-ink disabled:text-muted",
-                      p.kind === "remove" ? "bg-primary text-white ring-0" : "bg-surface text-ink",
-                    )}
-                  >
-                    {p.kind === "remove" ? "Remove it" : TRAINING_COPY.keep}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void answer(p, "drop")}
-                    disabled={busy !== null}
-                    className="rounded-full px-2.5 py-1 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-muted"
-                  >
-                    {TRAINING_COPY.drop}
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {said && <p className="mt-2 text-xs text-warning">{said}</p>}
-      {open.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {mayKeep && lockable > 1 && (
-            <button
-              type="button"
-              onClick={() => void lockAll()}
-              disabled={busy !== null}
-              className="text-xs font-medium text-ink underline decoration-sun-line underline-offset-2 disabled:text-muted"
-            >
-              {TRAINING_COPY.lockAll}
-            </button>
-          )}
-          <p className="min-w-0 flex-1 text-[11px] leading-snug text-muted">
-            {mayKeep ? TRAINING_COPY.note : "Only an admin can keep these."}
+      <div className="space-y-3 p-3.5">
+        {training.standing === "live" && <p className="text-xs text-ink-2">{TRAINING_COPY.live(name)}</p>}
+        {training.standing === "working" && (
+          <p className="flex items-center gap-1.5 text-xs text-ink-2">
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            {TRAINING_COPY.working(name)}
           </p>
-        </div>
-      )}
+        )}
 
-      {training.lines.length > 0 && training.standing !== "live" && (
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={() => setHeard((h) => !h)}
-            aria-expanded={heard}
-            className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink"
-          >
-            <ChevronDown className={clsx("size-3.5 transition-transform", heard && "rotate-180")} aria-hidden />
-            {TRAINING_COPY.transcript}
-          </button>
-          {heard && (
-            <ol className="mt-1.5 space-y-1 rounded-xl bg-surface p-2.5 text-xs leading-snug ring-1 ring-line">
-              {training.lines.map((l, i) => (
-                <li key={i} className={l.role === "assistant" ? "text-ink-2" : "text-ink"}>
-                  <span className="font-medium">{l.role === "assistant" ? name : "You"}:</span> {l.text}
+        {training.lockedOnCall.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{TRAINING_COPY.lockedOnCall}</p>
+            <ul className="mt-1.5 space-y-1.5">
+              {training.lockedOnCall.map((l) => (
+                <li
+                  key={l}
+                  className="flex items-start gap-2 rounded-lg border-l-2 border-sun-line bg-canvas px-2.5 py-1.5 text-[13px] leading-snug text-ink"
+                >
+                  <Lock className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+                  {l}
                 </li>
               ))}
-            </ol>
-          )}
-        </div>
-      )}
+            </ul>
+          </div>
+        )}
+
+        {outcome?.summary && training.standing === "done" && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setWhy((w) => !w)}
+              aria-expanded={why}
+              className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink"
+            >
+              <ChevronDown className={clsx("size-3.5 transition-transform", why && "rotate-180")} aria-hidden />
+              What {name} took from it
+            </button>
+            {why && <p className="mt-1 text-[13px] leading-snug text-ink-2">{outcome.summary}</p>}
+          </div>
+        )}
+        {failed && (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-ink-2">
+            {failed}
+            {(outcome?.state === "failed" || outcome?.state === "out") && t.mayKeep && (
+              <button
+                type="button"
+                onClick={() => void again()}
+                disabled={busy !== null}
+                className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-1 font-medium text-ink ring-1 ring-line hover:ring-ink"
+              >
+                <RotateCcw className="size-3" aria-hidden /> Try again
+              </button>
+            )}
+          </p>
+        )}
+
+        {open.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">To review · {open.length}</p>
+              {t.mayKeep && lockable > 1 && (
+                <button
+                  type="button"
+                  onClick={() => void lockAll()}
+                  disabled={busy !== null}
+                  className="text-xs font-semibold text-sun-ink hover:underline disabled:text-muted"
+                >
+                  {TRAINING_COPY.lockAll}
+                </button>
+              )}
+            </div>
+            <ul className="mt-1.5 space-y-2">
+              {open.map((p) => (
+                <li key={p.id} className="rounded-xl bg-canvas p-2.5">
+                  <div className="flex items-start gap-2">
+                    <span className={clsx("mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium", KIND_TONE[p.kind])}>
+                      {TRAINING_COPY.words[p.kind]}
+                    </span>
+                    <div className="min-w-0 flex-1 text-[13px] leading-snug">
+                      <p className={clsx(p.kind === "remove" ? "text-muted line-through" : "text-ink")}>{p.text}</p>
+                      {p.kind === "change" && p.was && <p className="mt-0.5 text-xs text-muted line-through">{p.was}</p>}
+                    </div>
+                  </div>
+                  {t.mayKeep && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {p.kind !== "remove" && (
+                        <button
+                          type="button"
+                          onClick={() => void answer(p, "lock")}
+                          disabled={busy !== null}
+                          className="inline-flex items-center gap-1 rounded-full bg-sun-line px-2.5 py-1 text-xs font-semibold text-white disabled:bg-surface-2 disabled:text-muted"
+                        >
+                          {busy === `${p.id}:lock` ? (
+                            <Loader2 className="size-3 animate-spin" aria-hidden />
+                          ) : (
+                            <Lock className="size-3" aria-hidden />
+                          )}
+                          {TRAINING_COPY.lock}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void answer(p, "keep")}
+                        disabled={busy !== null}
+                        className={clsx(
+                          "rounded-full px-2.5 py-1 text-xs font-medium disabled:text-muted",
+                          p.kind === "remove" ? "bg-primary text-white" : "bg-surface text-ink ring-1 ring-line hover:ring-ink",
+                        )}
+                      >
+                        {p.kind === "remove" ? "Remove it" : TRAINING_COPY.keep}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void answer(p, "drop")}
+                        disabled={busy !== null}
+                        className="rounded-full px-2.5 py-1 text-xs font-medium text-muted hover:text-ink disabled:text-muted"
+                      >
+                        {TRAINING_COPY.drop}
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1.5 text-[11px] leading-snug text-muted">{t.mayKeep ? TRAINING_COPY.note : "Only an admin can keep these."}</p>
+          </div>
+        )}
+
+        {said && <p className="text-xs text-warning">{said}</p>}
+
+        {training.lines.length > 0 && training.standing !== "live" && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setHeard((h) => !h)}
+              aria-expanded={heard}
+              className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink"
+            >
+              <ChevronDown className={clsx("size-3.5 transition-transform", heard && "rotate-180")} aria-hidden />
+              {TRAINING_COPY.transcript}
+            </button>
+            {heard && (
+              <ol className="mt-1.5 space-y-1 rounded-xl bg-canvas p-2.5 text-xs leading-snug">
+                {training.lines.map((l, i) => (
+                  <li key={i} className={l.role === "assistant" ? "text-ink-2" : "text-ink"}>
+                    <span className="font-medium">{l.role === "assistant" ? name : "You"}:</span> {l.text}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -398,8 +493,9 @@ type Part = keyof typeof DELIVERY_COPY.parts;
 const PARTS: Part[] = ["manner", "pace", "opening", "pause", "room"];
 
 /**
- * How the agent speaks (delivery.ts), in its settings beside the chat: one press for a natural phone call, or each
- * part chosen. Saved as it is pressed and used from the next call.
+ * How the agent speaks (delivery.ts), in its settings beside the chat (17 Nov 2026, Martin: a cleaner layout): one
+ * press for a natural phone call, then each part as a row with its choices side by side and what the chosen one does
+ * under it. Saved as it is pressed and used from the next call.
  */
 export function DeliverySettings(props: { delivery: Delivery | null; editable: boolean; onSaved: (d: Delivery | null) => void }) {
   const [busy, setBusy] = useState(false);
@@ -417,50 +513,69 @@ export function DeliverySettings(props: { delivery: Delivery | null; editable: b
   const natural = sameDelivery(now, NATURAL_DELIVERY);
   const usual = sameDelivery(now, DEFAULT_DELIVERY);
   return (
-    <div className="space-y-3 px-4 pb-4">
+    <div className="space-y-4">
       {props.editable && (
-        <div className="rounded-xl bg-sun p-3 ring-1 ring-sun-line/30">
-          <button
-            type="button"
-            onClick={() => void save(NATURAL_DELIVERY)}
-            disabled={busy || natural}
-            className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-white disabled:bg-surface-2 disabled:text-muted"
+        <div className={clsx("flex items-center gap-3 rounded-xl px-3 py-2.5", natural ? "bg-positive-soft" : "bg-canvas")}>
+          <span
+            className={clsx(
+              "grid size-7 shrink-0 place-items-center rounded-full",
+              natural ? "bg-positive text-white" : "bg-surface text-sun-line ring-1 ring-line",
+            )}
           >
-            {natural ? "It's a natural phone call" : DELIVERY_COPY.preset}
-          </button>
-          <p className="mt-1.5 text-xs leading-snug text-sun-ink">{DELIVERY_COPY.presetNote}</p>
+            {natural ? <Check className="size-4" aria-hidden /> : <Sparkles className="size-3.5" aria-hidden />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-semibold text-ink">{natural ? "A natural phone call" : DELIVERY_COPY.preset}</p>
+            <p className="text-xs leading-snug text-ink-2">{DELIVERY_COPY.presetNote}</p>
+          </div>
+          {!natural && (
+            <button
+              type="button"
+              onClick={() => void save(NATURAL_DELIVERY)}
+              disabled={busy}
+              className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white disabled:bg-surface-2 disabled:text-muted"
+            >
+              Use it
+            </button>
+          )}
         </div>
       )}
-      {PARTS.map((part) => {
-        const copy = DELIVERY_COPY.parts[part];
-        const options = Object.entries(copy.options) as [string, readonly [string, string]][];
-        return (
-          <fieldset key={part} disabled={!props.editable || busy}>
-            <legend className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{copy.label}</legend>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {options.map(([value, [label, what]]) => {
-                const on = now[part] === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={on}
-                    title={what}
-                    onClick={() => !on && void save({ ...now, [part]: value } as Delivery)}
-                    className={clsx(
-                      "rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset",
-                      on ? "bg-surface text-ink ring-ink" : "bg-surface text-ink-2 ring-line hover:ring-ink",
-                    )}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-1 text-xs text-muted">{(copy.options as Record<string, readonly [string, string]>)[now[part]][1]}</p>
-          </fieldset>
-        );
-      })}
+      <div className="divide-y divide-line">
+        {PARTS.map((part) => {
+          const copy = DELIVERY_COPY.parts[part];
+          const options = Object.entries(copy.options) as [string, readonly [string, string]][];
+          return (
+            <fieldset key={part} disabled={!props.editable || busy} className="py-2.5 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                <legend className="float-left text-[13px] font-medium text-ink">{copy.label}</legend>
+                <div className="inline-flex rounded-full bg-surface-2 p-0.5">
+                  {options.map(([value, [label, what]]) => {
+                    const on = now[part] === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={on}
+                        title={what}
+                        onClick={() => !on && void save({ ...now, [part]: value } as Delivery)}
+                        className={clsx(
+                          "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                          on ? "bg-surface text-ink shadow-soft" : "text-ink-2 hover:text-ink",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <p className="clear-both mt-1 text-xs text-muted">
+                {(copy.options as Record<string, readonly [string, string]>)[now[part]][1]}
+              </p>
+            </fieldset>
+          );
+        })}
+      </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {props.editable && !usual && (
           <button
@@ -472,7 +587,7 @@ export function DeliverySettings(props: { delivery: Delivery | null; editable: b
             {DELIVERY_COPY.reset}
           </button>
         )}
-        {said && <p className="text-xs text-ink-2">{said}</p>}
+        {said && <p className="text-xs text-positive">{said}</p>}
       </div>
       <p className="text-[11px] leading-snug text-muted">{DELIVERY_COPY.note}</p>
       {!props.editable && <p className="text-xs text-muted">Only an admin can change how it speaks.</p>}
