@@ -19,37 +19,55 @@ export const SALES_HERO = {
    * The announcement (17 Nov 2026, Martin: keep "Solar just got a brain", announce something huge in the direct style
    * of 90s advertising, as clean as Apple's product pages). Bold, but only what's true: no superlative we can't prove.
    */
-  introducing: "Introducing Sol and the Rays",
+  introducing: "Introducing Sol and your voice agents",
   headline: ["Solar just", "got a brain."],
   sub: "The AI sales force for solar businesses.",
   /** Sol and the voice agents both named (17 Nov 2026, Martin: the home page shouldn't only be about Sol). */
-  line: "Sol is the brain. The Rays are his voice agents: they ring your leads, answer your line and book your installs.",
+  line: "Sol is the brain: he knows your deals and writes the work up. Your voice agents make the calls: sales, bookings and, soon, tech support.",
   cta: "Sign up",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
 } as const;
 
 /**
- * The Rays (17 Nov 2026, Martin: after xAI's Grok Bots, "make sol and the voice ai feel like the army you wished you always
- * had", and never lead with the names a business gives them). The voice agents' family name, as Bots and Dots are:
- * Sol is the sun, the Rays are what he sends out. Each job is one a voice agent does today.
+ * The voice agents (18 Nov 2026, Martin: RENUABL takes itself seriously, not playful: the product's own audio icons in a
+ * circle, a colour for each role, "sales / bookings / tech support"). Sales and Bookings are the two phone assistants a
+ * business has today; Tech support isn't built, so it's marked coming soon and claims nothing more.
  */
+export const VOICE_AGENTS = [
+  {
+    key: "sales",
+    role: "Sales",
+    colour: "#FF5A1F",
+    does: [
+      "Rings every new lead",
+      "Answers questions and meets objections",
+      "Books the call with your team",
+      "Calls when a customer presses Call me",
+    ],
+  },
+  {
+    key: "bookings",
+    role: "Bookings",
+    colour: "#2BB5A0",
+    does: ["Calls signed customers to book the install", "Offers only the days you have room for", "Pencils the day in for you to confirm"],
+  },
+  {
+    key: "support",
+    role: "Tech support",
+    colour: "#4F8EF7",
+    soon: true,
+    does: ["Answers customers after the install", "Knows their system from the job", "Hands faults to your team"],
+  },
+] as const;
+
 export const RAYS = {
-  eyebrow: "Meet the Rays",
+  eyebrow: "Voice agents",
   headline: ["The sales force", "you always wished you had."],
   body: [
-    "Rays are voice agents that work beside Sol. They ring your new leads, answer the customers who call back and book your installs.",
-    "You name each one and choose its voice. They keep your calling hours, follow your script and tell you when a person is needed.",
+    "Voice agents make the calls while Sol does the thinking. Each has one role and one colour, and each keeps your calling hours, follows your script and tells you when a person is needed.",
   ],
-  jobs: [
-    "Rings new leads",
-    "Answers your line",
-    "Calls when asked",
-    "Meets objections",
-    "Texts the link",
-    "Books installs",
-    "Calls back to ask",
-  ],
-  note: "Rays come with Calls & Texts. Sol is in every plan.",
+  soon: "Coming soon",
+  note: "Voice agents come with Calls & Texts. You name each one and choose its voice. Sol is in every plan.",
 } as const;
 
 /**
@@ -60,9 +78,9 @@ export const RAYS = {
  */
 export const RAY_CALL = {
   label: "Listen in",
-  title: "A Ray rings a new lead",
+  title: "Your sales agent rings a new lead",
   who: "Olivia Hart · new lead · solar and battery",
-  example: "An example call, written to show how a Ray talks. Every call says it's automated.",
+  example: "An example call, written to show how a voice agent talks. Every call says it's automated.",
   real: "A real practice call, recorded on our own phone.",
   audio: null as string | null,
   play: "Play the call",
@@ -112,13 +130,13 @@ export const MANIFESTO = {
 export const INTERFACE = {
   eyebrow: "The interface",
   headline: "One place for the whole business.",
-  sub: "Your deals, the designer, proposals, installs and service, with Sol and the Rays at work in every part.",
+  sub: "Your deals, the designer, proposals, installs and service, with Sol and your voice agents at work in every part.",
   screens: [
     {
       key: "today",
       label: "Today",
       src: "/design/landing/ui-today.webp",
-      alt: "RENUABL's Today screen: the deals being sold, a Ray on a call and what needs you (example data)",
+      alt: "RENUABL's Today screen: the deals being sold, a voice agent on a call and what needs you (example data)",
     },
     {
       key: "deals",
@@ -211,7 +229,7 @@ export const SALES_LOOP = {
       key: "call",
       who: "charlie",
       title: "Speed to lead.",
-      body: "A new lead comes in and a Ray rings them, answers their questions and books them in with your team.",
+      body: "A new lead comes in and your sales agent rings them, answers their questions and books them in with your team.",
       scene: {
         lead: "New lead · Olivia Hart",
         ringing: "Calling Olivia",
@@ -235,11 +253,11 @@ export const SALES_LOOP = {
       key: "callme",
       who: "charlie",
       title: "A voice agent on every proposal.",
-      body: "Reading their proposal, the customer presses Call me. A Ray rings, goes through it with them and meets their worries.",
+      body: "Reading their proposal, the customer presses Call me. Your sales agent rings, goes through it with them and meets their worries.",
       scene: {
         title: "Solar and battery for Jane Doe",
         button: "Call me",
-        ringing: "A Ray is calling Jane",
+        ringing: "Your sales agent is calling Jane",
         said: "Hi Jane, I'm calling about your proposal. Happy to go through your battery questions.",
       },
     },
@@ -308,9 +326,9 @@ export const HERO_LIVE = {
       },
       {
         ask: "Will you call my customers?",
-        keys: ["call", "phone", "ring", "ray", "voice"],
+        keys: ["call", "phone", "ring", "voice", "agent"],
         answer:
-          "The Rays do. They're voice agents: they ring your new leads, answer their questions, book them a call with your team and book your installs. You name each one, choose its voice and can listen in live. They come with Calls & Texts.",
+          "Your voice agents do. They ring your new leads, answer their questions, book them a call with your team and book your installs. You name each one, choose its voice and can listen in live. They come with Calls & Texts.",
       },
       {
         ask: "How do you know the rules?",
@@ -333,7 +351,7 @@ export const HERO_LIVE = {
     note: "Written answers on this page. In RENUABL, Sol answers from your own business.",
   },
   film: { eyebrow: "See it work", headline: "A day with Sol, start to finish." },
-  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs", rays: "The Rays · your voice agents" },
+  jobs: { sol: "AI sales assistant", charlie: "Rings your leads", alex: "Books your installs", rays: "Your voice agents" },
 } as const;
 
 export const AI_TEAM = {
@@ -987,8 +1005,9 @@ export function salesCopy(): string[] {
     RAYS.eyebrow,
     ...RAYS.headline,
     ...RAYS.body,
-    ...RAYS.jobs,
+    RAYS.soon,
     RAYS.note,
+    ...VOICE_AGENTS.flatMap((v) => [v.role, ...v.does]),
     RAY_CALL.label,
     RAY_CALL.title,
     RAY_CALL.who,

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Check, Pause, Play } from "lucide-react";
 import { RAY_CALL } from "@/lib/domain/design/sales-page";
-import { Ray } from "./rays";
+import { Ray, RayStyles } from "./rays";
 
 /**
  * A Ray on a call (17 Nov 2026, Martin: "add a real call clip"). The call as it's said: the Ray's face and its voice
@@ -82,9 +82,10 @@ export function CallClip({ live }: { live: boolean }) {
 
   return (
     <div className="rounded-[28px] bg-white/[0.06] p-5 ring-1 ring-white/10 sm:p-6">
+      <RayStyles />
       <div className="flex items-center gap-3">
         <span className="shrink-0">
-          <Ray i={1} size={44} live={talking} />
+          <Ray i={0} size={44} live={talking} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sun-bright">{RAY_CALL.label}</p>

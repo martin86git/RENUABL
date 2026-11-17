@@ -51,9 +51,9 @@ function CallScene({ t }: { t: number }) {
         {s.lead}
       </div>
       <div className={clsx(pop, shown(t >= 1200), "flex items-center gap-3 rounded-xl bg-[#202227] px-3.5 py-3 text-white")}>
-        <Ray i={1} size={36} live={ringing || talking} />
+        <Ray i={0} size={36} live={ringing || talking} />
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-bright">A Ray</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-bright">Sales agent</p>
           <p className="text-[13px]">{ringing ? s.ringing : s.talking}</p>
         </div>
         {ringing ? (
@@ -138,7 +138,7 @@ function CallMeScene({ t }: { t: number }) {
         </span>
       </div>
       <div className={clsx(pop, shown(pressed), "flex items-start gap-3 rounded-xl bg-[#202227] px-3.5 py-3 text-white")}>
-        <Ray i={3} size={34} live={ringing || talking} />
+        <Ray i={0} size={34} live={ringing || talking} />
         <p className="min-w-0 flex-1 text-[13px] leading-snug">
           {talking ? said : s.ringing}
           {talking && said.length < s.said.length && (

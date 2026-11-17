@@ -479,7 +479,7 @@ function Narrator({ who, text, ms, side }: { who: string; text: string; ms: numb
   const n = Math.max(0, Math.floor((ms - 500) / 24));
   const shown = text.slice(0, n);
   const busy = ms >= 500 && n < text.length;
-  const name = who === "sol" ? "Sol" : "A Ray";
+  const name = who === "sol" ? "Sol" : "Sales agent";
   return (
     <div
       className={clsx(
@@ -497,7 +497,7 @@ function Narrator({ who, text, ms, side }: { who: string; text: string; ms: numb
           <SolMark className="relative size-full" />
         ) : (
           <span className="relative">
-            <Ray i={1} size={40} live={busy} />
+            <Ray i={0} size={40} live={busy} />
           </span>
         )}
       </span>

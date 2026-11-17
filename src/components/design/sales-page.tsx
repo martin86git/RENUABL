@@ -67,7 +67,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
 /** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
 const PAGE_LINKS = [
   { href: "#start", label: "Meet Sol" },
-  { href: "#rays", label: "Meet the Rays" },
+  { href: "#rays", label: "Voice agents" },
   { href: "#sales", label: "How it sells" },
   { href: "#designer", label: "The assisted designer" },
   { href: "#interface", label: "The interface" },

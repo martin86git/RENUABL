@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowUp } from "lucide-react";
-import { HERO_LIVE, SALES_HERO } from "@/lib/domain/design/sales-page";
+import { HERO_LIVE, RAYS, SALES_HERO, VOICE_AGENTS } from "@/lib/domain/design/sales-page";
+
+const RAYS_SOON = RAYS.soon;
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { TryDemoButton } from "./business-demo";
 import { SolMark } from "./sol-icon";
-import { Ray, RayStyles, useLook } from "./rays";
+import { Ray, RayStyles } from "./rays";
 
 /**
  * The living hero (17 Nov 2026, Martin: "the bots themselves are the marketing… it makes the software feel alive",
@@ -302,7 +304,6 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
   const live = motion && seen;
   const lean = useLean(root, live, 18);
   const sol = useSaying(HERO_LIVE.says.sol, live, 900, 3600);
-  const look = useLook(root, live);
   return (
     <section
       ref={root}
@@ -339,12 +340,15 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
           <p className="text-[14px] text-muted">
             <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
           </p>
-          {/* The Rays beside him: his voice agents, as a crew (17 Nov 2026, Martin: never lead with the names a business
-              gives them). */}
+          {/* His voice agents beside him, one a role (18 Nov 2026, Martin: the product's audio icons, a colour each). */}
           <RayStyles />
-          <div className="mt-1 flex items-end justify-center gap-2 sm:gap-3">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <Ray key={i} i={i} size={i % 2 ? 46 : 54} look={look} live={live} />
+          <div className="mt-2 flex items-start justify-center gap-6">
+            {VOICE_AGENTS.map((v, i) => (
+              <div key={v.key} className="flex w-24 flex-col items-center text-center">
+                <Ray i={i} size={52} live={live && i === 0} />
+                <p className="mt-2 text-[13px] font-medium text-ink">{v.role}</p>
+                {"soon" in v && v.soon && <p className="text-[11px] text-muted">{RAYS_SOON}</p>}
+              </div>
             ))}
           </div>
           <p className="text-[14px] text-muted">{HERO_LIVE.jobs.rays}</p>
