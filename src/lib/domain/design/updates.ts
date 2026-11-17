@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-17",
+    area: "Calendar",
+    words: "Days with something on are washed in orange in your calendar, and each event sits on its own orange card.",
+  },
+  {
+    day: "2026-11-17",
     area: "Calls",
     words: "Voice agents answer sooner: far less silence between you finishing and them starting to speak.",
   },

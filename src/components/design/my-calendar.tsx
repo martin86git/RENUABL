@@ -199,11 +199,14 @@ export function MyCalendar(props: { note?: string | null }) {
                     "relative mx-auto flex size-9 flex-col items-center justify-center rounded-full text-[13px] tabular-nums transition-colors",
                     picked
                       ? "bg-ink text-white"
-                      : isToday
-                        ? "text-sun-line ring-1 ring-sun-line"
-                        : inMonth(d)
-                          ? "hover:bg-canvas"
-                          : "text-muted/60 hover:bg-canvas",
+                      : busy.has(d)
+                        ? // A day with something on is washed in the signal orange, so it is seen at a glance (17 Nov 2026, Martin).
+                          clsx("bg-sun-line/15 font-semibold text-sun-ink hover:bg-sun-line/25", isToday && "ring-1 ring-sun-line")
+                        : isToday
+                          ? "text-sun-line ring-1 ring-sun-line"
+                          : inMonth(d)
+                            ? "hover:bg-canvas"
+                            : "text-muted/60 hover:bg-canvas",
                     isToday && "font-semibold",
                   )}
                 >
@@ -276,7 +279,7 @@ export function MyCalendar(props: { note?: string | null }) {
             ) : (
               <ul className="mt-1.5 max-h-60 space-y-1 overflow-y-auto">
                 {onDay.map((e) => (
-                  <li key={e.id} className="flex gap-2.5 rounded-xl px-1 py-1.5">
+                  <li key={e.id} className="flex gap-2.5 rounded-xl bg-sun-line/10 px-2.5 py-2 ring-1 ring-inset ring-sun-line/25">
                     <span className="mt-1 w-1 shrink-0 self-stretch rounded-full bg-sun-line" aria-hidden />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-medium">{e.title}</p>
