@@ -7,7 +7,7 @@
  * says it, with **Yes / No / Something else**; his draft is already open under it to change; and a violet **Context**
  * line says in one go what lies behind it. Rules in domain/design/sol-on-deal.ts; the deal's card from the deal feed.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowUp, Loader2 } from "lucide-react";
 import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
@@ -18,6 +18,7 @@ import { loadFeedDeal } from "@/lib/services/deal-feed";
 import { leadPageFor } from "@/lib/services/hello";
 import { askSolInPanel } from "@/lib/services/sol";
 import { ContextLine } from "./context-line";
+import { DictateButton, withSpoken } from "./dictate";
 import { SolMark } from "./sol-icon";
 
 const REFRESH_MS = 60_000;
@@ -83,6 +84,9 @@ function SolTerminal(props: {
   const [said, setSaid] = useState<string | null>(null);
   const [other, setOther] = useState(false);
   const [ask, setAsk] = useState("");
+  // What the microphone is hearing, shown in the box as it comes.
+  const [heard, setHeard] = useState("");
+  const box = useRef<HTMLInputElement>(null);
   const [leftIt, setLeftIt] = useState(false);
   const typed = useTyped(leftIt ? "Okay, I'll leave that for now." : p.say);
   const changed = Boolean(sol) && (subject !== (sol?.subject ?? "") || body !== (sol?.body ?? ""));
@@ -126,6 +130,7 @@ function SolTerminal(props: {
     if (!t) return;
     askSolInPanel({ text: `On ${deal.customer}'s deal (#${props.jobId}): ${t}`, shown: t });
     setAsk("");
+    setHeard("");
     setOther(false);
   };
 
@@ -190,7 +195,10 @@ function SolTerminal(props: {
               )}
               <button
                 type="button"
-                onClick={() => setOther((o) => !o)}
+                onClick={() => {
+                  setOther((o) => !o);
+                  box.current?.focus();
+                }}
                 aria-expanded={other}
                 className={clsx(quiet, other && "bg-surface-2")}
               >
@@ -200,67 +208,73 @@ function SolTerminal(props: {
             </div>
           )}
 
-          {other && !leftIt && (
-            <div className="mt-2.5 space-y-2">
-              {p.draft && sol?.id && (
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    className={quiet}
-                    onClick={() => void run("hour", () => putOffOutbox(sol.id!, "hour"))}
-                  >
-                    Send it in an hour
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    className={quiet}
-                    onClick={() => void run("tomorrow", () => putOffOutbox(sol.id!, "tomorrow"))}
-                  >
-                    Tomorrow at 9
-                  </button>
-                  {changed && (
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      className={quiet}
-                      onClick={() => void run("save", async () => ({ ok: true }))}
-                    >
-                      Keep my changes
-                    </button>
-                  )}
-                </div>
-              )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  tellSol();
-                }}
-                className="flex items-center gap-2 rounded-full bg-canvas py-1 pl-4 pr-1 ring-1 ring-line focus-within:ring-sun-line"
-              >
-                <span className="font-mono text-[13px] text-sun-line" aria-hidden>
-                  {">"}
-                </span>
-                <input
-                  value={ask}
-                  onChange={(e) => setAsk(e.target.value)}
-                  autoFocus
-                  placeholder={`Tell Sol what to do for ${name} instead…`}
-                  aria-label="Tell Sol what to do instead"
-                  className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-muted"
-                />
+          {other && !leftIt && p.draft && sol?.id && (
+            <div className="mt-2.5">
+              <div className="flex flex-wrap gap-1.5">
                 <button
-                  type="submit"
-                  disabled={!ask.trim()}
-                  aria-label="Send to Sol"
-                  className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                  type="button"
+                  disabled={busy !== null}
+                  className={quiet}
+                  onClick={() => void run("hour", () => putOffOutbox(sol.id!, "hour"))}
                 >
-                  <ArrowUp className="size-4" aria-hidden />
+                  Send it in an hour
                 </button>
-              </form>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  className={quiet}
+                  onClick={() => void run("tomorrow", () => putOffOutbox(sol.id!, "tomorrow"))}
+                >
+                  Tomorrow at 9
+                </button>
+                {changed && (
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    className={quiet}
+                    onClick={() => void run("save", async () => ({ ok: true }))}
+                  >
+                    Keep my changes
+                  </button>
+                )}
+              </div>
             </div>
           )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              tellSol();
+            }}
+            className="mt-3 flex items-center gap-1 rounded-full bg-canvas py-1 pl-4 pr-1 ring-1 ring-line focus-within:ring-sun-line"
+          >
+            <span className="font-mono text-[13px] text-sun-line" aria-hidden>
+              {">"}
+            </span>
+            <input
+              ref={box}
+              value={heard ? withSpoken(ask, heard) : ask}
+              onChange={(e) => {
+                setHeard("");
+                setAsk(e.target.value);
+              }}
+              placeholder={p.yes ? `Or tell Sol what to do for ${name}…` : `Tell Sol what to do for ${name}…`}
+              aria-label={`Tell Sol what to do for ${name}`}
+              className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink outline-none placeholder:text-muted"
+            />
+            <DictateButton
+              label={`Speak to Sol about ${name}`}
+              onHearing={setHeard}
+              onWords={(w) => setAsk((was) => withSpoken(was, w).slice(0, 2000))}
+            />
+            <button
+              type="submit"
+              disabled={!ask.trim()}
+              aria-label="Send to Sol"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </button>
+          </form>
           {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
         </div>
       </div>
