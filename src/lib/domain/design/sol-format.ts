@@ -145,11 +145,14 @@ export type SolRun =
   | { kind: "figure"; text: string }
   /** A phone number to ring, with the digits to dial. */
   | { kind: "phone"; text: string; dial: string }
-  | { kind: "email"; text: string };
+  | { kind: "email"; text: string }
+  /** A web address to press (17 Nov 2026, Martin: a Meet link he had to copy and paste). Only https. */
+  | { kind: "link"; text: string };
 
 const RUNS = new RegExp(
   [
     String.raw`\*\*([^*\n]{1,200})\*\*`,
+    String.raw`(https:\/\/[^\s<>()"]+[^\s<>()".,;:!?'])`,
     String.raw`([\w.+-]+@[\w-]+(?:\.[\w-]+)+)`,
     String.raw`((?<![\d-])(?:1[38]00 ?\d{3} ?\d{3}|13 ?\d{2} ?\d{2}|0[2-478](?: ?\d){8})(?![\d-]))`,
     String.raw`(\$\d[\d,]*(?:\.\d+)?|(?<![\w.])\d[\d,]*(?:\.\d+)?(?:–\d[\d,]*(?:\.\d+)?)? ?(?:kWh|kW|kVA|MW|mm|cm|m²|GHz|Hz|%|°C|°)(?![A-Za-z]))`,
@@ -169,12 +172,13 @@ export function solRuns(text: string): SolRun[] {
     const i = m.index ?? 0;
     if (i > at) out.push({ kind: "text", text: text.slice(at, i) });
     if (m[1] !== undefined) out.push({ kind: "strong", text: m[1] });
-    else if (m[2] !== undefined) out.push({ kind: "email", text: m[2].replace(/\.$/, "") });
-    else if (m[3] !== undefined) out.push({ kind: "phone", text: m[3], dial: m[3].replace(/\s+/g, "") });
-    else out.push({ kind: "figure", text: m[4] });
+    else if (m[2] !== undefined) out.push({ kind: "link", text: m[2] });
+    else if (m[3] !== undefined) out.push({ kind: "email", text: m[3].replace(/\.$/, "") });
+    else if (m[4] !== undefined) out.push({ kind: "phone", text: m[4], dial: m[4].replace(/\s+/g, "") });
+    else out.push({ kind: "figure", text: m[5] });
     at = i + m[0].length;
     // An address that ended a sentence gives its full stop back.
-    if (m[2] !== undefined && m[2].endsWith(".")) out.push({ kind: "text", text: "." });
+    if (m[3] !== undefined && m[3].endsWith(".")) out.push({ kind: "text", text: "." });
   }
   if (at < text.length) out.push({ kind: "text", text: text.slice(at) });
   return out;

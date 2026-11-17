@@ -186,6 +186,18 @@ function Runs({ text }: { text: string }) {
               {r.text}
             </a>
           );
+        if (r.kind === "link")
+          return (
+            <a
+              key={i}
+              href={r.text}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all font-[520] text-ink underline decoration-ink/25 underline-offset-[3px] hover:decoration-ink"
+            >
+              {r.text}
+            </a>
+          );
         if (r.kind === "email")
           return (
             <a

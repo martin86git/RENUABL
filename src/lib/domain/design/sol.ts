@@ -6,6 +6,7 @@
  * member's own preferences and reminders, and draws charts and diagrams under his answer. Pure, tested.
  */
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
+import { isMeetingId } from "./sol-meeting";
 import { cleanCharts, MORE_DETAIL, type SolChart } from "./sol-charts";
 import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 import { cleanDesignsShown, type SolDesignShown } from "./sol-designs";
@@ -81,6 +82,8 @@ export interface SolTurn {
   room?: SolRoom;
   /** The card he raised to start a service case (sol-rooms.ts). */
   newCase?: NewCaseAsk;
+  /** A meeting he put up to book (sol-meeting.ts), by its id: the card reads it from the server. */
+  meeting?: string;
 }
 
 /** The longest short line shown for a question. */
@@ -222,6 +225,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
       const goTo = role === "sol" ? cleanGoTo(t.goTo) : null;
       const room = cleanRoom(t.room);
       const newCase = role === "sol" ? cleanNewCase(t.newCase) : undefined;
+      const meeting = role === "sol" && isMeetingId(t.meeting) ? t.meeting : undefined;
       const remembered = (Array.isArray(t.remembered) ? t.remembered : [])
         .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
         .map((x) => ({ id: str(x.id, 40), question: str(x.question, 300) }))
@@ -245,6 +249,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(goTo ? { goTo } : {}),
         ...(room ? { room } : {}),
         ...(newCase ? { newCase } : {}),
+        ...(meeting ? { meeting } : {}),
       };
     })
     .filter((t): t is SolTurn => t !== null);
@@ -541,7 +546,7 @@ Preferences: when they ask for something to apply from now on (a sign-off, their
 
 Reminders: when they ask you to remind them of something, keep it with add_reminder. If they gave a time, pass it and say in a line when you'll remind them. If not, say "I'll add that to your reminders. When would you like me to remind you?" and nothing more: the times are offered as buttons under your answer. When it is due you'll say it in their chat. It is now ${nowWords(input.now)} in ${LAUNCH_MARKET.capital}; work times out from that.
 
-Meetings: when they ask you to set up a call or meeting, a Google Meet or something in their calendar, book it with book_meeting on their own Google Calendar for the day and time they gave (or that was plainly agreed with the customer); with no time, ask for one in a line. Nobody is invited and no one is emailed by it: give them the Meet link exactly as it came back so they can send it to the customer (Text on the deal's chat, or an email). If it couldn't be booked, say why in a line, as the tool said.
+Meetings: when they ask you to set up a call or meeting, a Google Meet or something in their calendar, put it up with book_meeting for the day and time they gave; with no time, ask for one in a line. First read the deal (deal_details) for what the customer agreed: if it isn't the day or time asked for, pass it as agreed_with_customer, and the card asks them before anything is booked. The card does the booking on their press, then gives them the Meet link and offers reminders, so never say it's booked and never give a link yourself: one line saying the card is there is enough. Nobody is invited and no one is emailed. If it couldn't be put up, say why in a line, as the tool said.
 
 Where things are in RENUABL (the sections across the top, each with its pages under it; Search is top left, or Ctrl K; Messages, Notifications, the design tool and Settings are the round icons top right):
 ${whereThingsAre()}

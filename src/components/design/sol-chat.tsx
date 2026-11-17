@@ -73,6 +73,7 @@ import { SolMark } from "./sol-icon";
 import { SolThinking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
+import { MeetingCard } from "./meeting-card";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer, type OnPick } from "./sol-text";
 import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
@@ -597,6 +598,7 @@ export function SolChat({
             {t.drafts?.map((d, k) => (
               <SolDraftCard key={k} draft={d} onOpen={openDraft} />
             ))}
+            {t.meeting && <MeetingCard id={t.meeting} />}
             {t.reminder && (
               <ReminderCard
                 ask={t.reminder}

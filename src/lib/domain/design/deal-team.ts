@@ -78,6 +78,8 @@ export interface DealLine {
   text: string;
   at: string;
   ask?: DealAsk;
+  /** A meeting card Sol put up with this line (sol-meeting.ts), by its id. */
+  meeting?: string;
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");

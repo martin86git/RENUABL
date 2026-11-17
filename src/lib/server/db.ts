@@ -919,6 +919,28 @@ create table if not exists design_deal_lines (
 );
 create index if not exists design_deal_lines_job on design_deal_lines(business_id, job_id, at);
 create index if not exists design_deal_lines_open on design_deal_lines(business_id, job_id) where kind = 'ask' and not (ask ? 'done');
+-- A meeting Sol put to a member as a card (domain/design/sol-meeting.ts): booked in their own calendar only when they
+-- press, then the reminder they chose. A deal chat line carries the card by its id.
+alter table design_deal_lines add column if not exists meeting text;
+create table if not exists design_meetings (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  email text not null,
+  job_id text,
+  title text not null,
+  start_at timestamptz not null,
+  minutes integer not null,
+  meet boolean not null default true,
+  notes text not null default '',
+  agreed text,
+  agreed_day text,
+  state text not null default 'asked',
+  meet_link text,
+  event_link text,
+  remind integer,
+  created_at timestamptz not null default now(),
+  primary key (business_id, id)
+);
 -- Who follows a deal's chat by their own choice or by taking part (wrote in it, was @mentioned, a request was for
 -- them); the owner follows without a row unless they chose not to. And when each member last had it open.
 create table if not exists design_deal_follows (

@@ -6,6 +6,7 @@
  * through a member's functions.
  */
 import { can, cleanPermissions, type DealViewer, type MemberRole } from "@/lib/domain/design/account";
+import { isMeetingId } from "@/lib/domain/design/sol-meeting";
 import { mentionsIn } from "@/lib/domain/design/mentions";
 import {
   DEAL_LINES_SHOWN,
@@ -49,10 +50,11 @@ interface Row {
   kind: string;
   text: string;
   ask: unknown;
+  meeting?: string | null;
   at: string;
 }
 
-const LINE = `id, job_id as job, by_email as by, kind, text, ask, ${moment("at")} as at`;
+const LINE = `id, job_id as job, by_email as by, kind, text, ask, meeting, ${moment("at")} as at`;
 
 function lineOf(r: Row): DealLine {
   const ask = r.kind === "ask" ? cleanAsk(r.ask) : null;
@@ -61,7 +63,16 @@ function lineOf(r: Row): DealLine {
   if (reply !== null) return { id: r.id, jobId: r.job, by: CUSTOMER_WRITER, kind: "text", text: reply, at: r.at };
   // A text a member sent the customer from this chat keeps its kind, so it reads as a text and not a note to the team.
   const kind: DealLineKind = ask ? "ask" : r.kind === "note" ? "note" : r.kind === "text" ? "text" : "line";
-  return { id: r.id, jobId: r.job, by: r.by, kind, text: r.text, at: r.at, ...(ask ? { ask } : {}) };
+  return {
+    id: r.id,
+    jobId: r.job,
+    by: r.by,
+    kind,
+    text: r.text,
+    at: r.at,
+    ...(ask ? { ask } : {}),
+    ...(isMeetingId(r.meeting) ? { meeting: r.meeting } : {}),
+  };
 }
 
 /** The deal, as this member may see it; refused as if it weren't there otherwise. */
@@ -147,7 +158,7 @@ export async function sayOnDeal(me: DealTeamMe, jobId: string, text: string): Pr
 export async function solPostsOnDeal(
   businessId: string,
   jobId: string,
-  post: { kind: "note" | "ask" | "line"; text: string; ask?: DealAsk },
+  post: { kind: "note" | "ask" | "line"; text: string; ask?: DealAsk; meeting?: string },
 ): Promise<DealLine | null> {
   const ask = post.kind === "ask" ? cleanAsk(post.ask) : null;
   if (post.kind === "ask" && !ask) return null;
@@ -168,15 +179,19 @@ export async function solPostsOnDeal(
       );
       if (open.length) return false;
     }
-    await q(`insert into design_deal_lines (business_id, id, job_id, by_email, kind, text, ask) values ($1,$2,$3,$4,$5,$6,$7::jsonb)`, [
-      businessId,
-      id,
-      jobId,
-      SOL_WRITER,
-      ask ? "ask" : post.kind,
-      text,
-      ask ? JSON.stringify(ask) : null,
-    ]);
+    await q(
+      `insert into design_deal_lines (business_id, id, job_id, by_email, kind, text, ask, meeting) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)`,
+      [
+        businessId,
+        id,
+        jobId,
+        SOL_WRITER,
+        ask ? "ask" : post.kind,
+        text,
+        ask ? JSON.stringify(ask) : null,
+        isMeetingId(post.meeting) ? post.meeting : null,
+      ],
+    );
     if (post.kind !== "line")
       await q(
         `insert into design_activity (id, business_id, customer_id, job_id, kind, text, by_email) values ($1,$2,$3,$4,'note',$5,$6)`,

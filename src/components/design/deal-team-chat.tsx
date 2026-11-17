@@ -6,6 +6,8 @@ import { textCustomer } from "@/lib/services/caller";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { linkRuns } from "@/lib/domain/design/sol-meeting";
+import { MeetingCard } from "./meeting-card";
 import { Bell, Check, MessageSquare, PencilRuler, RotateCcw, SendHorizonal, Users } from "lucide-react";
 import {
   ASK_TYPES,
@@ -324,7 +326,25 @@ function Line({ line: l, pad, customer, onReply }: { line: DealLine; pad?: boole
             {agoWords(l.at)}
           </span>
         </p>
-        <p className={clsx("whitespace-pre-wrap break-words", sent ? "text-primary-ink" : "text-ink", pad && "line-clamp-3")}>{l.text}</p>
+        <p className={clsx("whitespace-pre-wrap break-words", sent ? "text-primary-ink" : "text-ink", pad && "line-clamp-3")}>
+          {/* A web address in it can be pressed (17 Nov 2026, Martin: a Meet link he had to copy and paste). */}
+          {linkRuns(l.text).map((r, i) =>
+            r.href ? (
+              <a
+                key={i}
+                href={r.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all underline decoration-sun-line underline-offset-2 hover:no-underline"
+              >
+                {r.text}
+              </a>
+            ) : (
+              <span key={i}>{r.text}</span>
+            ),
+          )}
+        </p>
+        {l.meeting && !pad && <MeetingCard id={l.meeting} />}
         {onReply && !pad && (
           <button
             type="button"

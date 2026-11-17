@@ -47,10 +47,10 @@ import {
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
-import { addActivity, customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
-import { asksForMeeting, cleanMeeting, meetingDescription } from "@/lib/domain/design/sol-meeting";
-import { CalendarOff, bookMeeting } from "./my-calendar";
-import { siteUrl } from "@/lib/domain/sms";
+import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { asksForMeeting, cleanAgreed, cleanMeeting } from "@/lib/domain/design/sol-meeting";
+import { connectedCalendar } from "./my-calendar";
+import { proposeMeeting } from "./design-meetings";
 import { listMembers, loadLists, type Member } from "./design-repo";
 import { seesAllDeals, type DealViewer } from "@/lib/domain/design/account";
 
@@ -72,8 +72,6 @@ interface ToolGuard {
   files: readonly SolFile[];
   /** The member's own words this answer is for: a meeting is booked only when they ask for one (sol-meeting.ts). */
   asked: string;
-  /** Meetings booked in this answer (at most two). */
-  booked: number;
 }
 import { casesForJob, casesToResolve } from "./design-service-repo";
 import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
@@ -190,7 +188,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "book_meeting",
     description:
-      "Put a meeting on this person's own Google Calendar, with a Google Meet link unless they don't want one, and get the link back to give them. Nobody is invited and Google emails no one: they send the link to the customer themselves. Only when they asked for a meeting, and only for a day and time they gave or that was plainly agreed (the market's local time); with no time, ask them for one instead of booking.",
+      "Put up a card for a meeting on this person's own Google Calendar, with a Google Meet link unless they don't want one. Nothing is booked until they press Book it on the card, which then gives them the Meet link and offers reminders. Nobody is invited and Google emails no one: they send the link to the customer themselves. Only when they asked for a meeting, and only for a day and time they gave or that was plainly agreed (the market's local time); with no time, ask them for one instead. Before calling it, check the deal (deal_details) for what the customer agreed; if it isn't the day or time asked for, give it in agreed_with_customer so the card asks them first.",
     input_schema: {
       type: "object",
       properties: {
@@ -203,6 +201,12 @@ const TOOLS: Anthropic.Tool[] = [
         meet: { type: "boolean", description: "Make a Google Meet link (true unless they said otherwise)." },
         deal_id: { type: "string", description: "The deal it is about, if any." },
         notes: { type: "string", description: "A line on what it's for. Never a customer's phone or email." },
+        agreed_with_customer: {
+          type: "string",
+          description:
+            'Only when the customer agreed a different day or time from the one asked for: what they agreed, short ("a call on Wednesday 18 Nov").',
+        },
+        agreed_day: { type: "string", description: "That agreed day as YYYY-MM-DD, when it is a clear day." },
       },
       required: ["title", "when_local"],
     },
@@ -407,6 +411,8 @@ interface Turn {
   remembered: { id: string; question: string }[];
   /** Datasheets swapped in this answer (at most two). */
   sheetsChanged: number;
+  /** The meeting card put up in this answer (sol-meeting.ts), by its id. */
+  meeting?: string;
 }
 
 const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -502,51 +508,25 @@ async function runTool(
   }
   if (name === "book_meeting") {
     // Only on the member's own say-so: never because of something a customer wrote.
-    if (!asksForMeeting(guard.asked)) return "Not booked: they didn't ask for a meeting. Offer to book one instead.";
-    if (member.viewedBy) return "Not booked: this is someone else's view.";
-    if (guard.booked >= 2) return "That's two meetings booked in this answer: book more when they ask again.";
+    if (!asksForMeeting(guard.asked)) return "Not put up: they didn't ask for a meeting. Offer to set one up instead.";
+    if (member.viewedBy) return "Not put up: this is someone else's view.";
+    if (shown.meeting) return "One meeting card an answer: the one you put up stands.";
+    const cal = await connectedCalendar({ businessId, email });
+    if (!cal) return "Their calendar isn't connected: say they connect Google Calendar from the date tile at the top, then ask again.";
+    if (cal.provider !== "google") return "Their calendar is Outlook, and meetings can only be put in Google Calendar so far: say so.";
     const clean = cleanMeeting(input);
     if (!clean.ok) return clean.message;
     const dealId = s(input.deal_id);
     const deal = dealId ? await jobById(businessId, dealId, viewer) : null;
     if (dealId && !deal) return "There's no such deal, or this person can't see it.";
-    const site = siteUrl();
-    const description = meetingDescription({
-      notes: clean.value.notes,
-      deal: deal ? `${deal.customer.name} · ${deal.job.title}` : undefined,
-      dealUrl: deal && site ? `${site}/design/deals/${deal.job.id}` : null,
-      by: email,
-    });
-    try {
-      const booked = await bookMeeting({ businessId, email }, clean.value, description);
-      guard.booked += 1;
-      if (deal)
-        await addActivity(
-          businessId,
-          deal.customer.id,
-          {
-            jobId: deal.job.id,
-            kind: "note",
-            text: `Meeting booked by Sol in ${email}'s calendar: ${clean.value.title}, ${dueWords(clean.value.start)}${booked.meet ? ` · ${booked.meet}` : ""}`,
-          },
-          "sol",
-        ).catch(() => undefined);
-      return [
-        `Booked in their Google Calendar: "${clean.value.title}", ${dueWords(clean.value.start)}, ${clean.value.minutes} minutes. Nobody was invited.`,
-        booked.meet
-          ? `Google Meet link (give it to them exactly): ${booked.meet}`
-          : clean.value.meet
-            ? "Google didn't make a Meet link for it: say so."
-            : "",
-        "Say it's booked and give the link, and that they can send it to the customer (Text on the deal's chat, or an email).",
-      ]
-        .filter(Boolean)
-        .join("\n");
-    } catch (e) {
-      if (e instanceof CalendarOff) return `Not booked. ${e.message}`;
-      console.error("sol book_meeting failed", e instanceof Error ? e.message : e);
-      return "Not booked: Google Calendar didn't answer. Say so and suggest trying again shortly.";
-    }
+    const agreed = cleanAgreed(input);
+    shown.meeting = await proposeMeeting({ businessId, email }, clean.value, { jobId: deal?.job.id ?? null, ...agreed });
+    return [
+      `A card is shown under your answer for "${clean.value.title}", ${dueWords(clean.value.start)}, ${clean.value.minutes} minutes${clean.value.meet ? ", with a Google Meet link" : ""}. Nothing is booked until they press Book it on it; then it gives them the Meet link to press and asks when they'd like reminding.`,
+      agreed.agreed
+        ? `The card first asks whether to keep this time, since the customer agreed ${agreed.agreed}. Say that in one line and nothing more.`
+        : "Say in one line that it's ready to book on the card. Don't say it's booked, and give no link.",
+    ].join("\n");
   }
   if (name === "draft_email") {
     if (shown.drafts.length >= DRAFTS_PER_TURN) return `Only ${DRAFTS_PER_TURN} drafts an answer.`;
@@ -764,7 +744,7 @@ export async function askSol(
   if (!credit) return asItWas(SOL_OUT);
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
-  const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text, booked: 0 };
+  const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text };
   const [state, jobs, customers, serviceOpen] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
@@ -951,6 +931,7 @@ export async function askSol(
     ...(answer ? { credits, ...(tier === "deep" ? { deep: true } : {}) } : {}),
     ...(shown.goTo ? { goTo: shown.goTo } : {}),
     ...(shown.newCase ? { newCase: shown.newCase } : {}),
+    ...(shown.meeting ? { meeting: shown.meeting } : {}),
     ...inRoom,
   };
   // Asked again: the new answer takes the old one's place, only once there is one (a failure leaves the old answer).
@@ -1081,11 +1062,13 @@ export async function solAnswersOnDeal(member: Member, jobId: string, asked: str
       : "") +
     (earlier.length ? `\n\nThe deal's team chat before it:\n${lines(earlier)}` : "");
   let said: string;
+  let meetingCard: string | undefined;
   try {
     const shown = `@Sol on ${customer.name}'s deal: ${asked}`;
     const state = await askSol(member, { text: prompt, files: [], routeOn: asked, shared: true, shown }, apiKey, "channel");
     const last = [...state.turns].reverse().find((t) => t.role === "sol");
     said = solPlain(last?.text ?? "").trim() || "I couldn't answer that just now.";
+    meetingCard = last?.meeting;
     const sources = sourcesLine(last?.sources ?? []);
     if (sources) said += `\n\n${sources}`;
     if (last?.drafts?.length)
@@ -1094,5 +1077,5 @@ export async function solAnswersOnDeal(member: Member, jobId: string, asked: str
     console.error("sol in a deal's chat failed", e instanceof Error ? e.message : e);
     said = "I couldn't answer that just now. Try me again in a moment.";
   }
-  await solPostsOnDeal(member.businessId, jobId, { kind: "line", text: said });
+  await solPostsOnDeal(member.businessId, jobId, { kind: "line", text: said, meeting: meetingCard });
 }

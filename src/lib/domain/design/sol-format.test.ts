@@ -197,3 +197,13 @@ describe("mini threads", () => {
     expect(threadDepths(many)).toEqual([0, 1, 2, 3, 3, 3]);
   });
 });
+
+describe("a web address in Sol's words", () => {
+  it("is a link to press, an https one only", async () => {
+    const { solRuns } = await import("./sol-format");
+    expect(solRuns("Meet link: https://meet.google.com/rsk-tcab-iwk").filter((r) => r.kind === "link")).toEqual([
+      { kind: "link", text: "https://meet.google.com/rsk-tcab-iwk" },
+    ]);
+    expect(solRuns("Email sam@x.au or ring 0412 345 678").map((r) => r.kind)).toEqual(["text", "email", "text", "phone"]);
+  });
+});
