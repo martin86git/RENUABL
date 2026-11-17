@@ -78,8 +78,8 @@ export const MANIFESTO = {
 export const DESIGNER = {
   eyebrow: "The assisted designer",
   headline: "It designs with you.",
-  sub: "Lay the panels on today's aerial photo. Sol asks what the quote needs, strings the panels in one press and checks every string against the inverter.",
-  steps: ["Asks what the quote needs", "Strings the panels", "Checks every string", "Leads on to the quote"],
+  sub: "Lay the panels on today's aerial photo. Sol strings them in one press, checks every string against the inverter and asks what the quote needs.",
+  steps: ["Strings the panels", "Checks every string", "Asks what the quote needs", "Leads on to the quote"],
   cards: {
     backup: { kind: "For the quote", words: "Do they want blackout backup?", yes: "Yes, wire backup", no: "No" },
     strings: { kind: "An option", words: "42 panels aren't on a string.", go: "String them" },

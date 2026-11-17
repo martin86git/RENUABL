@@ -51,12 +51,14 @@ export function DesignerSlide() {
   const live = useMotionOk();
   const t = useSceneClock(root, live);
   const C = DESIGNER.cards;
-  const strung = Math.max(0, Math.min(1, (t - 6200) / 1800));
-  const card = t < 900 ? null : t < 4300 ? "backup" : t < 7200 ? "strings" : t < 8700 ? null : "next";
-  const pressed = (card === "backup" && t >= 2800) || (card === "strings" && t >= 5800) || (card === "next" && t >= 12600);
-  const backup = t >= 3000;
-  const checked = t >= 8200;
-  const step = t < 4300 ? 0 : t < 8000 ? 1 : t < 8700 ? 2 : 3;
+  // The solar first (17 Nov 2026, Martin: don't open on backup when the panels are in focus): string them, check the
+  // strings, then the question the quote needs, then on to the quote.
+  const strung = Math.max(0, Math.min(1, (t - 2600) / 1800));
+  const card = t < 900 ? null : t < 3200 ? "strings" : t < 5200 ? null : t < 8800 ? "backup" : "next";
+  const pressed = (card === "strings" && t >= 2300) || (card === "backup" && t >= 7200) || (card === "next" && t >= 12600);
+  const backup = t >= 7400;
+  const checked = t >= 4600;
+  const step = t < 4600 ? 0 : t < 5200 ? 1 : t < 8800 ? 2 : 3;
   // The strung frame shown up to here, from the left: across the panels as Sol strings them, then whole.
   const reveal = strung >= 1 ? 1 : strung <= 0 ? 0 : PANELS_FROM + (PANELS_TO - PANELS_FROM) * strung;
   const go = card === "backup" ? C.backup.yes : card === "strings" ? C.strings.go : C.next.go;
@@ -76,7 +78,7 @@ export function DesignerSlide() {
               laid, then the same view strung. */}
           <div className="relative aspect-[952/464] w-full">
             <Image
-              src="/design/landing/designer-before.webp"
+              src="/design/landing/designer-laid.webp"
               alt={DESIGNER.alt}
               fill
               sizes="(min-width: 1024px) 900px, 100vw"
@@ -84,7 +86,7 @@ export function DesignerSlide() {
             />
             <div className="absolute inset-0" style={{ clipPath: `inset(0 ${(1 - reveal) * 100}% 0 0)` }}>
               <Image
-                src="/design/landing/designer-after.webp"
+                src="/design/landing/designer-strung.webp"
                 alt=""
                 fill
                 sizes="(min-width: 1024px) 900px, 100vw"

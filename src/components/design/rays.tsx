@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import clsx from "clsx";
 
 /**
@@ -81,6 +81,15 @@ const SHAPES: { body: (fill: string) => React.ReactNode; eyes: [number, number] 
 
 export const RAY_COUNT = SHAPES.length;
 
+/** A colour mixed towards white (t > 0) or black (t < 0), for the glass's light and rim. */
+function mix(hex: string, t: number) {
+  const n = parseInt(hex.slice(1), 16);
+  const to = t > 0 ? 255 : 0;
+  const k = Math.abs(t);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => Math.round(v + (to - v) * k));
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
 /** One Ray. `look` is where the pointer is, -1 to 1 each way; `blinkAt` staggers the blinks. */
 export function Ray({
   i,
@@ -96,7 +105,10 @@ export function Ray({
   className?: string;
 }) {
   const shape = SHAPES[i % SHAPES.length];
-  const fill = COLOURS[i % COLOURS.length];
+  const colour = COLOURS[i % COLOURS.length];
+  // Glass, as Sol is (17 Nov 2026, Martin): lit from the top left, a deeper rim, a shine across the top, a soft glow.
+  const id = useId().replace(/:/g, "");
+  const fill = `url(#ray-${id})`;
   const [ex, ey] = shape.eyes;
   const dx = look.x * 4;
   const dy = look.y * 3;
@@ -105,8 +117,24 @@ export function Ray({
       className={clsx("ray-bob inline-block", className)}
       style={{ width: size, height: size, animationDelay: `${(i * 370) % 2200}ms`, animationPlayState: live ? "running" : "paused" }}
     >
-      <svg viewBox="0 0 100 100" className="size-full overflow-visible" aria-hidden>
+      <svg
+        viewBox="0 0 100 100"
+        className="size-full overflow-visible"
+        style={{ filter: `drop-shadow(0 6px 10px ${colour}55)` }}
+        aria-hidden
+      >
+        <defs>
+          <radialGradient id={`ray-${id}`} cx="34%" cy="28%" r="78%">
+            <stop offset="0%" stopColor={mix(colour, 0.6)} />
+            <stop offset="45%" stopColor={colour} />
+            <stop offset="100%" stopColor={mix(colour, -0.28)} />
+          </radialGradient>
+          <clipPath id={`ray-clip-${id}`}>{shape.body("#000")}</clipPath>
+        </defs>
         {shape.body(fill)}
+        <g clipPath={`url(#ray-clip-${id})`}>
+          <path d="M26 34 Q36 20 56 18" fill="none" stroke="#fff" strokeOpacity="0.6" strokeWidth="6" strokeLinecap="round" />
+        </g>
         <g
           className="ray-blink"
           style={{
