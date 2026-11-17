@@ -126,6 +126,21 @@ export const MANIFESTO = {
 } as const;
 
 /**
+ * The launch (18 Nov 2026, Martin: RENUABL is inspired by Tesla, SpaceX and Apple; joining should feel like a landmark
+ * moment, "somewhat like a rocket launching", a step that marks something about the business). Straight after the hero
+ * so it isn't missed: a countdown, Sol lifting off, and the line. Nothing claimed but what the product is.
+ */
+export const LAUNCH = {
+  countdown: "T-minus",
+  liftoff: "Lift-off",
+  headline: ["Today, your business", "runs on AI."],
+  sub: "Sol, the brain. Your voice agents, the voice. The solar business you run tomorrow starts here.",
+  cta: "Start your launch",
+  plans: "See the plans",
+  replay: "Watch the launch again",
+} as const;
+
+/**
  * The interface (17 Nov 2026, Martin: one slide that lets them see what the actual interface looks like). Real screens
  * of the product on the made-up demo business, one a tab.
  */
@@ -133,6 +148,8 @@ export const INTERFACE = {
   eyebrow: "The interface",
   headline: "One place for the whole business.",
   sub: "Your deals, the designer, proposals, installs and service, with Sol and your voice agents at work in every part.",
+  /** The film folded in as a second way to see it (18 Nov 2026, Martin: collapse slides, never lose what's in them). */
+  views: { screens: "Screens", film: "The film" },
   screens: [
     {
       key: "today",
@@ -1022,6 +1039,14 @@ export function salesCopy(): string[] {
     ...MANIFESTO.finale,
     KNOWLEDGE.eyebrow,
     INTERFACE.eyebrow,
+    ...Object.values(INTERFACE.views),
+    LAUNCH.countdown,
+    LAUNCH.liftoff,
+    ...LAUNCH.headline,
+    LAUNCH.sub,
+    LAUNCH.cta,
+    LAUNCH.plans,
+    LAUNCH.replay,
     INTERFACE.headline,
     INTERFACE.sub,
     ...INTERFACE.screens.flatMap((x) => [x.label, x.alt]),

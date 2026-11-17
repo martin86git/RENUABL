@@ -9,15 +9,15 @@ import { LivingHero } from "./living-hero";
 import { SalesLoop } from "./sales-loop";
 import { DesignerSlide } from "./designer-slide";
 import { InterfaceSlide } from "./interface-slide";
+import { LaunchSlide } from "./launch-slide";
 import { KnowledgeOrbit } from "./business-slides";
 import { RaysSlide } from "./rays-slide";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
-import { CLOSING, FAQ, PRICING, SALES_HERO, HERO_LIVE } from "@/lib/domain/design/sales-page";
+import { CLOSING, FAQ, PRICING, SALES_HERO } from "@/lib/domain/design/sales-page";
 import { askSales, startPlan } from "@/lib/services/billing";
 import { TryDemoButton } from "./business-demo";
 import { Reveal } from "./front-hero";
-import { ProductFilm } from "./product-film";
 
 /**
  * The sign-up page for solar businesses (`/design` signed out; copy in `domain/design/sales-page.ts`, prices in
@@ -33,12 +33,12 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
           your sales team, how it sells, the film, the old way and the new, pricing with the questions, the close. */}
       <LivingHero signedIn={signedIn} />
+      <LaunchSlide signedIn={signedIn} />
       <RaysSlide />
       <SalesLoop />
       <DesignerSlide />
       <InterfaceSlide />
       <KnowledgeOrbit />
-      <FilmSection />
       <Pricing />
       <Faq />
       <Closing />
@@ -67,12 +67,12 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
 /** The page's sections, behind the top bar's menu (17 Nov 2026, Martin: the titles across the bar go into a menu). */
 const PAGE_LINKS = [
   { href: "#start", label: "Meet Sol" },
+  { href: "#launch", label: "The launch" },
   { href: "#rays", label: "Voice agents" },
   { href: "#sales", label: "How it sells" },
   { href: "#designer", label: "The assisted designer" },
   { href: "#interface", label: "The interface" },
   { href: "#brain", label: "Ask him anything" },
-  { href: "#film", label: "See it work" },
   { href: "#pricing", label: "Pricing" },
 ] as const;
 
@@ -226,30 +226,6 @@ function SignUpLink({ dark = false }: { dark?: boolean }) {
       {SALES_HERO.cta}
       <ArrowRight className="size-4" aria-hidden />
     </a>
-  );
-}
-
-/**
- * The product film, under the living hero (17 Nov 2026, Martin: the agents are the marketing, so they lead; the film is
- * the proof, each screen narrated by the agent doing the work).
- */
-function FilmSection() {
-  return (
-    <section
-      id="film"
-      className="snap-start scroll-mt-16 bg-[#0b0b0d] px-5 pb-20 pt-20 text-white lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col lg:justify-center lg:px-8"
-      aria-labelledby="film-head"
-    >
-      <div className="mx-auto w-full max-w-[64rem] text-center">
-        <BrandEyebrow dark>{HERO_LIVE.film.eyebrow}</BrandEyebrow>
-        <h2 id="film-head" className="mt-4 text-[clamp(34px,4.4vw,64px)] font-semibold leading-[1.0] tracking-[-0.045em]">
-          {HERO_LIVE.film.headline}
-        </h2>
-        <div className="mt-10 text-left">
-          <ProductFilm dark />
-        </div>
-      </div>
-    </section>
   );
 }
 
