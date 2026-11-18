@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { GATES, atGate, daysWaiting, preApprovalOf, solarVicOf, type Gate, type Tone } from "@/lib/domain/design/approvals";
+import { GATES, atGate, daysWaiting, networkOf, preApprovalOf, solarVicOf, type Gate, type Tone } from "@/lib/domain/design/approvals";
 import { PRE_APPROVAL, SOLAR_VIC_STATUS } from "@/lib/domain/design/deal-sections";
 import { loadApprovals, saveJob, type JobLine } from "@/lib/services/crm";
 import { PATHS, PageHead, ui } from "./design-shell";
@@ -63,6 +63,9 @@ export function ApprovalsPage({ gate }: { gate: Gate }) {
             const pre = preApprovalOf(j);
             const vic = solarVicOf(j);
             const days = daysWaiting(j, now);
+            // Who to apply to (19 Nov 2026, Martin), and a deal not sold yet whose pre-approval was asked for said as such.
+            const net = gate === "preapproval" ? networkOf(j) : null;
+            const sold = Boolean(j.wonAt) || !["lead", "designed", "proposal"].includes(j.stage);
             return (
               <li
                 key={j.id}
@@ -77,8 +80,15 @@ export function ApprovalsPage({ gate }: { gate: Gate }) {
                   </Link>
                   <p className="truncate text-xs text-muted">
                     {j.address || "No address"}
-                    {j.kw ? ` · ${j.kw.toFixed(2)} kW` : ""} · sold {days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"} ago`}
+                    {j.kw ? ` · ${j.kw.toFixed(2)} kW` : ""} ·{" "}
+                    {sold ? `sold ${days === 0 ? "today" : `${days} ${days === 1 ? "day" : "days"} ago`}` : "not sold yet"}
                   </p>
+                  {net && (
+                    <p className="truncate text-xs text-ink-2">
+                      Network: <span className="font-medium text-ink">{net.name}</span>
+                      {net.guessed ? " (from the postcode: check the NMI)" : ""}
+                    </p>
+                  )}
                 </div>
                 <label className="text-xs text-muted">
                   Network pre-approval <span className={clsx("font-medium", TONE[pre.tone])}>· {pre.words}</span>

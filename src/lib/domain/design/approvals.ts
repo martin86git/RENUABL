@@ -8,14 +8,19 @@
 import { todayInMarket } from "../market";
 import { addDaysISO } from "../scheduling";
 import type { ISODate } from "../types";
-import { PRE_INSTALL_STAGES, type Job } from "./crm";
+import { OPEN_STAGES, PRE_INSTALL_STAGES, type Job } from "./crm";
+import { distributorFor } from "./networks";
 import { mondayOf } from "./design-home";
 
 export type Gate = "preapproval" | "solarvic" | "book";
 export type Tone = "through" | "waiting" | "missing";
 
 export const GATES: { id: Gate; label: string; what: string }[] = [
-  { id: "preapproval", label: "Pre-approvals", what: "Sold jobs waiting on the network's pre-approval." },
+  {
+    id: "preapproval",
+    label: "Pre-approvals",
+    what: "Sold jobs waiting on the network's pre-approval, and deals still being sold whose pre-approval was asked for.",
+  },
   { id: "solarvic", label: "Solar Victoria", what: "Sold jobs with a Solar Victoria application to check or in hand." },
   { id: "book", label: "Book an installation", what: "Sold jobs with both approvals through and no installation date yet." },
 ];
@@ -27,6 +32,7 @@ export function preApprovalOf(j: Pick<Job, "details">): { words: string; tone: T
   const v = j.details.preApproval || "Not submitted";
   if (v === "Approved" || v === "Approved, export limited" || v === "Not required") return { words: v, tone: "through" };
   if (v === "Declined") return { words: "Declined", tone: "missing" };
+  if (v === PRE_APPROVAL_REQUESTED) return { words: "Requested: to submit", tone: "missing" };
   return { words: v, tone: v === "Submitted" ? "waiting" : "missing" };
 }
 
@@ -40,10 +46,45 @@ export function solarVicOf(j: Pick<Job, "details">): { words: string; tone: Tone
 
 /** The first gate a sold job hasn't passed; null when it isn't waiting at one (not sold, already booked, or installed). */
 export function gateOf(j: GateJob): Gate | null {
-  if (!PRE_INSTALL_STAGES.includes(j.stage) || j.installDate) return null;
+  if (j.installDate) return null;
+  // A deal still being sold is filed here only once its pre-approval is asked for (19 Nov 2026, Martin: raised from Sol's
+  // card in the designer), until it is through; Solar Victoria and booking wait for the sale.
+  if (OPEN_STAGES.includes(j.stage)) return preApprovalAsked(j) && preApprovalOf(j).tone !== "through" ? "preapproval" : null;
+  if (!PRE_INSTALL_STAGES.includes(j.stage)) return null;
   if (preApprovalOf(j).tone !== "through") return "preapproval";
   if (solarVicOf(j).tone !== "through") return "solarvic";
   return "book";
+}
+
+/** What a pre-approval asked for from the designer is set to, before anyone has submitted it to the network. */
+export const PRE_APPROVAL_REQUESTED = "Requested";
+
+/** Whether a deal's pre-approval has been asked for or is under way (anything but nothing yet). */
+export function preApprovalAsked(j: Pick<Job, "details">): boolean {
+  const v = j.details.preApproval;
+  return Boolean(v) && v !== "Not submitted";
+}
+
+/** The deal's network: the Distributor typed on it, else worked out from its NMI or address (networks.ts). */
+export function networkOf(j: Pick<Job, "details" | "address">): { name: string; guessed: boolean } | null {
+  const typed = j.details.distributor?.trim();
+  if (typed) return { name: typed, guessed: false };
+  const found = distributorFor({ address: j.address, nmi: j.details.nmi });
+  return found ? { name: found.name, guessed: found.how === "postcode" } : null;
+}
+
+/**
+ * The deal's details once a pre-approval is asked for: marked Requested, and the network it goes to filled in when
+ * nothing was typed (so the Pre-approvals list and the deal say who to apply to). Null when it was already asked for.
+ */
+export function withPreApprovalRequest(j: Pick<Job, "details" | "address">): Job["details"] | null {
+  if (preApprovalAsked(j)) return null;
+  const net = networkOf(j);
+  return {
+    ...j.details,
+    preApproval: PRE_APPROVAL_REQUESTED,
+    ...(net && !j.details.distributor?.trim() ? { distributor: net.name } : {}),
+  };
 }
 
 /** How many jobs wait at each gate. */

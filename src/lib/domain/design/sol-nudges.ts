@@ -21,9 +21,11 @@ export type NudgeAct =
   | "show-shade"
   | "backup-yes"
   | "backup-no"
+  | "backup-both"
   | "line-on"
   | "line-off"
-  | "finalise";
+  | "finalise"
+  | "request-preapproval";
 
 export interface NudgeAction {
   label: string;
@@ -47,6 +49,8 @@ export interface Nudge {
    * show a battery on a wall and what the thing is).
    */
   picture?: BatteryPicture;
+  /** A count asked with the answer (19 Nov 2026, Martin: "on the question about adding RCBO's - it should ask me for a quantity"). */
+  count?: { label: string; start: number };
   /** The ways open to the designer, said only: Sol can't do them himself (12 Nov 2026, Martin). */
   options?: string[];
   actions: NudgeAction[];
@@ -83,6 +87,11 @@ export interface NudgeState {
   backupAnswered: boolean;
   /** The member can't see costs: no questions about cost lines. */
   costsHidden: boolean;
+  /**
+   * The deal's network and where its pre-approval stands (19 Nov 2026, Martin: say who the distributor is and offer to
+   * raise the pre-approval request). Left out off a deal, or before the deal is read.
+   */
+  network?: { name: string | null; guessed: boolean; preApproval: string | null; mayRequest: boolean };
 }
 
 /** Evenings at least this many kWh make a battery worth suggesting. */
@@ -97,10 +106,10 @@ const EVENING_SHARE = 0.6;
 const SELF_USE = 0.4;
 const USABLE = 0.9;
 
-/** The question each cost decided on each job is asked as. */
-const LINE_QUESTIONS: [RegExp, string, string, BatteryPicture?][] = [
+/** The question each cost decided on each job is asked as, and the count asked with it when it is counted. */
+const LINE_QUESTIONS: [RegExp, string, string, BatteryPicture?, string?][] = [
   [/^Switchboard upgrade/i, "Does the switchboard need upgrading?", "Old fuses, or no room for the new breakers, mean it does."],
-  [/^RCBO/i, "Does it need RCBOs (safety switches)?", "Usually yes when the board has none on the circuits."],
+  [/^RCBO/i, "Does it need RCBOs (safety switches)? How many?", "Usually yes when the board has none on the circuits.", undefined, "RCBOs"],
   [/^Protective bollard/i, "Does the battery need a protective bollard?", "Where a car could reach it, in a garage or a drive.", "bollard"],
   [
     /^Fireproofing/i,
@@ -148,6 +157,8 @@ export function nudgesFor(s: NudgeState): Nudge[] {
       actions: [
         { label: "Yes, wire backup", act: "backup-yes" },
         { label: "No", act: "backup-no" },
+        // Two options on the proposal, one each (19 Nov 2026, Martin: "one with battery black out back up and one without").
+        { label: "Both, as two options", act: "backup-both" },
       ],
     });
   if (!s.costsHidden)
@@ -159,6 +170,7 @@ export function nudgesFor(s: NudgeState): Nudge[] {
         words: q?.[1] ?? `Include “${label}”?`,
         ...(q ? { why: q[2] } : {}),
         ...(q?.[3] ? { picture: q[3] } : {}),
+        ...(q?.[4] ? { count: { label: q[4], start: 1 } } : {}),
         actions: [
           { label: "Yes, include it", act: "line-on", line: label },
           { label: "No", act: "line-off", line: label },
@@ -202,13 +214,10 @@ export function nudgesFor(s: NudgeState): Nudge[] {
     });
   }
   if (s.shaded > 0) out.push(shadeNudge(s));
-  if (s.phase === "single" && s.kw > SINGLE_PHASE_KW)
-    out.push({
-      id: "export",
-      kind: "option",
-      words: `Over ${SINGLE_PHASE_KW} kW on single phase: the network's pre-approval or export limiting is likely needed.`,
-      actions: [],
-    });
+  if (s.phase === "single" && s.kw > SINGLE_PHASE_KW) {
+    const exportNudge = preApprovalNudge(s);
+    if (exportNudge) out.push(exportNudge);
+  }
   // The way on (15 Nov 2026, Martin: once the panels are laid and the battery added, Sol leads on to the quote, then the
   // proposal): last, once the panels are on an inverter and all strung.
   if (!s.costsHidden && s.panels > 0 && s.inverters > 0 && s.unstrung === 0)
@@ -220,6 +229,43 @@ export function nudgesFor(s: NudgeState): Nudge[] {
       actions: [{ label: "Finalise the quote", act: "finalise" }],
     });
   return out;
+}
+
+/**
+ * Over the single-phase size (19 Nov 2026, Martin: "it should be able to tell me who the network distributor is - and ask
+ * me whether i want to raise a request for a network pre approval. that request would then flow into the pre approvals
+ * bucket"): the network by name, how sure that is, and a press that asks for the pre-approval on the deal. Nothing is
+ * sent to the network: the request lands in Pre-approvals for someone to submit. Gone once the network has approved.
+ */
+function preApprovalNudge(s: NudgeState): Nudge | null {
+  const net = s.network;
+  const who = net?.name ?? "the network";
+  const over = `Over ${SINGLE_PHASE_KW} kW on single phase`;
+  const where = net?.name
+    ? net.guessed
+      ? `${net.name} going by the postcode: the NMI on the bill settles it.`
+      : `The home is on ${net.name}'s network.`
+    : undefined;
+  const v = net?.preApproval ?? null;
+  if (v === "Approved" || v === "Approved, export limited" || v === "Not required") return null;
+  if (v && v !== "Not submitted")
+    return {
+      id: "export",
+      kind: "option",
+      words: `${over}. Pre-approval with ${who}: ${v === "Requested" ? "requested, waiting in Pre-approvals to be submitted" : v.toLowerCase()}.`,
+      ...(where ? { why: where } : {}),
+      actions: [],
+    };
+  const ask = Boolean(net && s.onDeal && net.mayRequest);
+  return {
+    id: "export",
+    kind: "option",
+    words: `${over}, so ${who} will likely need to pre-approve it, or limit its exports.${ask ? " Raise a pre-approval request?" : ""}`,
+    why:
+      where ??
+      (s.onDeal ? "Add the home's NMI to the deal to know its network." : "Put the design on a deal to raise a pre-approval request."),
+    actions: ask ? [{ label: "Yes, raise the request", act: "request-preapproval" }] : [],
+  };
 }
 
 /**

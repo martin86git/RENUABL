@@ -42,7 +42,7 @@ export const TAB_LABELS: Record<BuiltinTab, string> = {
 
 export const BOOKING_STATUS = ["Not booked", "Tentative", "Booked", "Confirmed", "Rescheduled"];
 export const SITE_INSPECTION = ["Not needed", "To book", "Booked", "Done"];
-export const PRE_APPROVAL = ["Not submitted", "Submitted", "Approved", "Approved, export limited", "Declined"];
+export const PRE_APPROVAL = ["Not submitted", "Requested", "Submitted", "Approved", "Approved, export limited", "Declined"];
 export const SOLAR_VIC_STATUS = ["Not applying", "Eligibility to check", "Applied", "Approved", "Claimed", "Not eligible"];
 export const FINANCE = ["None", "Solar Victoria loan", "Green loan", "Bank or broker", "Other"];
 

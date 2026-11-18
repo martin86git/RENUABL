@@ -128,6 +128,7 @@ import {
 import type { RebateRates } from "@/lib/domain/rebates";
 import { DesignQuote, HomeToggles } from "./design-quote";
 import { SOL_TOGGLE } from "@/lib/services/sol";
+import { useDealNetwork } from "@/lib/services/deal-network";
 import {
   endLive as endLiveLink,
   liveLink,
@@ -3575,6 +3576,8 @@ export function RoofDesigner(props: {
    */
   const [nudgesAside, setNudgesAside] = useState<string[]>([]);
   const [backupAnswered, setBackupAnswered] = useState(false);
+  // The deal's network and its pre-approval, for Sol's card over the single-phase size (19 Nov 2026, Martin).
+  const dealNetwork = useDealNetwork(props.jobId);
   const nudges = (() => {
     const strung = new Set(strings.flatMap((x) => x.panels));
     const keys = Object.keys(centres);
@@ -3621,6 +3624,7 @@ export function RoofDesigner(props: {
         : undecidedLines(costSystem(spec, quoteNow.form, props.workspace).lines, quoteNow.edits).map((l) => l.label),
       backupAnswered,
       costsHidden,
+      ...(dealNetwork.network ? { network: dealNetwork.network } : {}),
     }).filter((n) => !nudgesAside.includes(n.id));
   })();
   const [readyOpen, setReadyOpen] = useState(false);
@@ -4250,6 +4254,10 @@ export function RoofDesigner(props: {
       case "finalise":
         if (quoteShort) shortQuote(false);
         return showSide("quote");
+      case "request-preapproval":
+        // Filed in Pre-approvals on the deal; the card then says it is requested (19 Nov 2026, Martin).
+        void dealNetwork.request(summary.kw).then((why) => why && console.warn(`Pre-approval request not raised: ${why}`));
+        return;
       case "line-on":
       case "line-off": {
         const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === action.line);

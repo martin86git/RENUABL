@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Design tool",
+    words: "Over 5 kW on single phase, Sol names the network and offers to raise the pre-approval request.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Procurement",
+    words: "Pre-approvals lists deals still being sold once their pre-approval is requested, with the network to apply to.",
+  },
+  {
+    day: "2026-11-19",
     area: "Phone assistant",
     words: "Press a voice agent's picture in its chat to choose its colour, or upload a picture as before.",
   },
