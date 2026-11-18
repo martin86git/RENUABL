@@ -431,16 +431,21 @@ function StoryPicture({ item }: { item: NewsItem }) {
         />
       </a>
     );
-  const art = TOPIC_ART[item.topic];
+  return <TopicArt topic={item.topic} />;
+}
+
+/** The drawn band for a story with no picture of its own: the topic's colour and mark. Also on Today's strip (today-news.tsx). */
+export function TopicArt({ topic, className = "h-24" }: { topic: NewsTopic; className?: string }) {
+  const art = TOPIC_ART[topic];
   const Icon = art.icon;
   return (
-    <div aria-hidden className={clsx("relative flex h-24 items-center overflow-hidden px-5", art.soft)}>
+    <div aria-hidden className={clsx("relative flex items-center overflow-hidden px-5", className, art.soft)}>
       <Icon className={clsx("absolute -right-3 -top-4 size-36 opacity-15", art.ink)} strokeWidth={1.2} />
       <Icon className={clsx("absolute right-36 top-12 size-10 opacity-10", art.ink)} strokeWidth={1.2} />
       <span className={clsx("grid size-11 place-items-center rounded-full bg-surface shadow-sm", art.ink)}>
         <Icon className="size-5" />
       </span>
-      <span className={clsx("ml-3 text-[13px] font-medium", art.ink)}>{NEWS_TOPIC_LABELS[item.topic]}</span>
+      <span className={clsx("ml-3 text-[13px] font-medium", art.ink)}>{NEWS_TOPIC_LABELS[topic]}</span>
     </div>
   );
 }

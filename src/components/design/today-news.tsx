@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Newspaper } from "lucide-react";
 import { NEWS_TOPIC_LABELS, newsShown, type NewsItem } from "@/lib/domain/design/industry-news";
 import { loadNews } from "@/lib/services/industry-news";
+import { TopicArt } from "./industry-news";
 
 /** How many of the newest stories Today shows. */
 const SHOWN = 3;
@@ -51,10 +52,7 @@ export function TodayNews({ onCount }: { onCount?: (fresh: number) => void } = {
             rel="noopener noreferrer"
             className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-surface ring-1 ring-line transition hover:ring-ink-2"
           >
-            {n.hasImage && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={`/api/design/news/${encodeURIComponent(n.id)}/image`} alt="" loading="lazy" className="h-28 w-full object-cover" />
-            )}
+            <CardPicture item={n} />
             <div className="flex flex-1 flex-col gap-1.5 p-3.5">
               <p className="text-[11.5px] text-muted">
                 {NEWS_TOPIC_LABELS[n.topic]} · {n.site}
@@ -66,5 +64,24 @@ export function TodayNews({ onCount }: { onCount?: (fresh: number) => void } = {
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * The story's own picture, else the topic's drawn band as the full feed has (18 Nov 2026, Martin: a card with no picture
+ * looked broken beside the others), also when the picture fails to load.
+ */
+function CardPicture({ item }: { item: NewsItem }) {
+  const [failed, setFailed] = useState(false);
+  if (!item.hasImage || failed) return <TopicArt topic={item.topic} className="h-28" />;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- the story page's preview picture, redrawn and kept by us
+    <img
+      src={`/api/design/news/${encodeURIComponent(item.id)}/image`}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-28 w-full object-cover"
+    />
   );
 }
