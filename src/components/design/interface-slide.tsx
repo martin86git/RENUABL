@@ -6,27 +6,23 @@ import clsx from "clsx";
 import { INTERFACE } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
 import { useInView, useMotionOk } from "./living-hero";
-import { ProductFilm } from "./product-film";
 
-/** How long each screen stays before the next, ms. */
-const HOLD_MS = 4500;
+/** How long each screen stays before the next, ms (18 Nov 2026, Martin: 1.5 seconds a slide). */
+const HOLD_MS = 1500;
 
 /**
  * The interface (17 Nov 2026, Martin: "one slide that allows the user to see what the actual interface looks like").
- * Real screens of the product, large in a browser window, one a tab: Today, Deals, the designer, a proposal, installs
- * and service. They step on by themselves while the slide is in view (a bar under the tab fills as each waits); a press
- * on a tab, or a pointer over the window, holds it there. The film is folded in as a second view (18 Nov 2026, Martin:
- * collapse slides into each other so nothing is lost): Screens | The film.
+ * Real screens of the product, large in a browser window: Today, Deals, the designer, a proposal, installs and service.
+ * They carousel by themselves while the slide is in view (18 Nov 2026, Martin: no clicking through, no film), the name of
+ * the one on show lit above the window with a bar filling as it waits.
  */
 export function InterfaceSlide() {
   const root = useRef<HTMLElement | null>(null);
   const seen = useInView(root);
   const motion = useMotionOk();
   const [at, setAt] = useState(0);
-  const [held, setHeld] = useState(false);
-  const [view, setView] = useState<"screens" | "film">("screens");
   const screens = INTERFACE.screens;
-  const playing = motion && seen && !held && view === "screens";
+  const playing = motion && seen;
   useEffect(() => {
     if (!playing) return;
     const timer = window.setTimeout(() => setAt((n) => (n + 1) % screens.length), HOLD_MS);
@@ -50,97 +46,59 @@ export function InterfaceSlide() {
           <p className="mx-auto mt-3 max-w-2xl text-[17px] leading-relaxed text-ink-2">{INTERFACE.sub}</p>
         </div>
 
-        {/* Screens or the film. */}
-        <div className="mt-5 flex justify-center">
-          <div className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
-            {(["screens", "film"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={view === v}
-                onClick={() => setView(v)}
-                className={clsx(
-                  "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-                  view === v ? "bg-sun-line text-white" : "text-ink-2 hover:text-ink",
-                )}
+        {/* Which screen is on show: names, not buttons. */}
+        <div className="mt-6 flex flex-wrap justify-center gap-1.5" aria-hidden>
+          {screens.map((s, i) => (
+            <span
+              key={s.key}
+              className={clsx(
+                "relative overflow-hidden rounded-full px-4 py-2 text-[14px] font-medium transition-colors duration-300",
+                i === at ? "bg-ink text-white" : "bg-surface text-ink-2 ring-1 ring-line",
+              )}
+            >
+              {s.label}
+              {i === at && playing && (
+                <span
+                  key={at}
+                  aria-hidden
+                  className="absolute inset-x-3 bottom-1 h-0.5 origin-left rounded-full bg-sun-line"
+                  style={{ animation: `ui-fill ${HOLD_MS}ms linear forwards` }}
+                />
+              )}
+            </span>
+          ))}
+        </div>
+
+        {/* The window, its screen on top. */}
+        <div
+          style={{ maxWidth: "min(100%, calc((100dvh - 25rem) * 1.6))" }}
+          className="mx-auto mt-6 w-full overflow-hidden rounded-2xl bg-surface shadow-[0_40px_90px_-40px_rgba(11,11,12,0.5)] ring-1 ring-line"
+        >
+          <div className="flex h-8 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
+            <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+            <span className="size-2.5 rounded-full bg-[#febc2e]" />
+            <span className="size-2.5 rounded-full bg-[#28c840]" />
+            <span className="mx-auto rounded-full bg-black/[0.05] px-6 py-0.5 text-[11px] text-black/45">renuabl.com.au</span>
+          </div>
+          <div className="relative aspect-[16/10] w-full bg-canvas">
+            {screens.map((s, i) => (
+              <div
+                key={s.key}
+                aria-hidden={i !== at}
+                className={clsx("absolute inset-0 transition-opacity duration-500", i === at ? "opacity-100" : "opacity-0")}
               >
-                {INTERFACE.views[v]}
-              </button>
+                <Image
+                  src={s.src}
+                  alt={s.alt}
+                  fill
+                  sizes="(min-width: 1024px) 1200px, 100vw"
+                  className="object-cover object-top"
+                  loading="lazy"
+                />
+              </div>
             ))}
           </div>
         </div>
-
-        {view === "film" ? (
-          <div className="mx-auto mt-5 w-full text-left" style={{ maxWidth: "min(100%, calc((100dvh - 25rem) * 1.6))" }}>
-            <ProductFilm />
-          </div>
-        ) : (
-          <>
-            {/* The tabs. */}
-            <div className="mt-4 flex flex-wrap justify-center gap-1.5" role="tablist" aria-label={INTERFACE.eyebrow}>
-              {screens.map((s, i) => (
-                <button
-                  key={s.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={i === at}
-                  onClick={() => {
-                    setAt(i);
-                    setHeld(true);
-                  }}
-                  className={clsx(
-                    "relative overflow-hidden rounded-full px-4 py-2 text-[14px] font-medium transition-colors",
-                    i === at ? "bg-ink text-white" : "bg-surface text-ink-2 ring-1 ring-line hover:text-ink",
-                  )}
-                >
-                  {s.label}
-                  {i === at && playing && (
-                    <span
-                      key={at}
-                      aria-hidden
-                      className="absolute inset-x-3 bottom-1 h-0.5 origin-left rounded-full bg-sun-line"
-                      style={{ animation: `ui-fill ${HOLD_MS}ms linear forwards` }}
-                    />
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* The window, its screen on top. */}
-            <div
-              style={{ maxWidth: "min(100%, calc((100dvh - 25rem) * 1.6))" }}
-              className="mx-auto mt-6 w-full overflow-hidden rounded-2xl bg-surface shadow-[0_40px_90px_-40px_rgba(11,11,12,0.5)] ring-1 ring-line"
-              onPointerEnter={() => setHeld(true)}
-              onPointerLeave={() => setHeld(false)}
-            >
-              <div className="flex h-8 items-center gap-1.5 border-b border-line bg-surface-2 px-3" aria-hidden>
-                <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-                <span className="size-2.5 rounded-full bg-[#febc2e]" />
-                <span className="size-2.5 rounded-full bg-[#28c840]" />
-                <span className="mx-auto rounded-full bg-black/[0.05] px-6 py-0.5 text-[11px] text-black/45">renuabl.com.au</span>
-              </div>
-              <div className="relative aspect-[16/10] w-full bg-canvas">
-                {screens.map((s, i) => (
-                  <div
-                    key={s.key}
-                    role="tabpanel"
-                    aria-hidden={i !== at}
-                    className={clsx("absolute inset-0 transition-opacity duration-700", i === at ? "opacity-100" : "opacity-0")}
-                  >
-                    <Image
-                      src={s.src}
-                      alt={s.alt}
-                      fill
-                      sizes="(min-width: 1024px) 1200px, 100vw"
-                      className="object-cover object-top"
-                      loading="lazy"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
       </div>
     </section>
   );

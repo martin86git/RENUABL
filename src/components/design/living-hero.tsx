@@ -408,7 +408,9 @@ export function LivingHero() {
             {SALES_HERO.andVoice}
             <Ray i={0} size={40} live={live} />
           </p>
-          <p className="mt-6 text-[clamp(20px,2.3vw,36px)] font-medium leading-tight tracking-[-0.025em] text-ink">{SALES_HERO.sub}</p>
+          <p className="mt-8 text-[clamp(20px,2.3vw,36px)] lg:mt-16 font-medium leading-tight tracking-[-0.025em] text-ink">
+            {SALES_HERO.sub}
+          </p>
         </div>
 
         {/* Sol over the horizon, his bubble off his shoulder on a wide screen (xl), above him otherwise. */}
@@ -429,7 +431,7 @@ export function LivingHero() {
           </p>
         </div>
 
-        <div className="relative z-[2] order-2 mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:col-start-1 lg:row-start-2 lg:mt-9 lg:justify-start lg:self-start">
+        <div className="relative z-[2] order-2 mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:col-start-1 lg:row-start-2 lg:mt-12 lg:justify-start lg:self-start">
           <a
             href="#pricing"
             className="inline-flex h-12 items-center gap-2 rounded-full bg-sun-line px-7 text-[16px] font-semibold text-white shadow-lift hover:brightness-105"

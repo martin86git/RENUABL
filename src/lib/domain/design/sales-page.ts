@@ -158,8 +158,6 @@ export const INTERFACE = {
   eyebrow: "The interface",
   headline: "One place for the whole business.",
   sub: "Your deals, the designer, proposals, installs and service, with Sol and your voice agents at work in every part.",
-  /** The film folded in as a second way to see it (18 Nov 2026, Martin: collapse slides, never lose what's in them). */
-  views: { screens: "Screens", film: "The film" },
   screens: [
     {
       key: "today",
@@ -1057,7 +1055,6 @@ export function salesCopy(): string[] {
     ...MANIFESTO.finale,
     KNOWLEDGE.eyebrow,
     INTERFACE.eyebrow,
-    ...Object.values(INTERFACE.views),
     LAUNCH.countdown,
     LAUNCH.liftoff,
     ...LAUNCH.headline,
