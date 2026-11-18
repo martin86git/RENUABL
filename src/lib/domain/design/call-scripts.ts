@@ -115,7 +115,7 @@ export const SCRIPT_PROBLEMS = {
 export function startScript(
   live: LiveScript,
   saved: readonly SavedScript[],
-  o: { name: unknown; copy: boolean; fileId: string; at: string },
+  o: { name: unknown; copy: boolean; audience?: unknown; fileId: string; at: string },
 ): ScriptChange {
   const name = cleanScriptName(o.name);
   if (!name) return { ok: false, message: SCRIPT_PROBLEMS.name };
@@ -126,7 +126,10 @@ export function startScript(
     live: {
       name,
       notes: o.copy ? live.notes : [],
-      setup: o.copy ? live.setup : { ...DEFAULT_CALL_SETUP, saidAs: live.setup.saidAs },
+      // A blank one rings who it was made for (18 Nov 2026, Martin: a script named Cold calls opened as an enquiry call).
+      setup: o.copy
+        ? live.setup
+        : { ...DEFAULT_CALL_SETUP, saidAs: live.setup.saidAs, audience: CALL_AUDIENCES.find((a) => a === o.audience) ?? "enquired" },
     },
     saved: [fileAway(live, o.fileId, o.at), ...saved],
   };
@@ -168,6 +171,9 @@ export function forgetScript(live: LiveScript, saved: readonly SavedScript[], id
   if (!saved.some((s) => s.id === id)) return { ok: false, message: SCRIPT_PROBLEMS.gone };
   return { ok: true, live, saved: saved.filter((s) => s.id !== id) };
 }
+
+/** Whether a script's name says it is for cold calls, so the form can start on that choice. */
+export const namedForColdCalls = (name: string) => /\bcold\b/i.test(name);
 
 /** The scripts as the picker lists them: the one in use first. */
 export function scriptLines(live: LiveScript, saved: readonly SavedScript[]): ScriptLine[] {

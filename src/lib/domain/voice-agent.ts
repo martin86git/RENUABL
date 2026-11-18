@@ -290,6 +290,9 @@ const who = (b: CallBrief) => `${sayName(b)}, ${spoken(b.business) || "the team"
  * the transcript is kept, `NO_AUDIO`), so it no longer says the call is recorded.
  */
 export function firstMessage(b: CallBrief): string {
+  // A cold call never opens by asking for someone by name (18 Nov 2026, Martin: "when its a cold call they wont know
+  // my name"): whoever answers isn't expecting it.
+  if (isCold(b)) return `Hi, it's ${who(b)}, calling ${reasonWords(b)}. Have you got a minute?`;
   const name = speakableName(b.firstName);
   if (b.mode === "install") return installFirstMessage(b);
   if (b.inbound)
@@ -312,7 +315,7 @@ export function firstMessage(b: CallBrief): string {
  * callers, and the assistant launched into its whole opening at the screener): one sentence, as a person would.
  */
 export function screeningAnswer(b: CallBrief): string {
-  const name = speakableName(b.firstName);
+  const name = isCold(b) ? "" : speakableName(b.firstName);
   const about =
     b.mode === "install"
       ? "booking their installation"
@@ -347,6 +350,15 @@ export const HELLO_AFTER_SECONDS = 4;
  */
 export function openingBlock(b: CallBrief): string {
   const { ask, then } = openingParts(b);
+  // The script's own opening (18 Nov 2026, Martin: "i provided an opening in the script. it just wasnt followed"): on
+  // the call the business's own script is for, a locked rule or note that says how to open is the opening. Who it is
+  // and that it's automated still come first, whatever the script says.
+  const scripted =
+    ownReason(b) && (b.coaching?.length || b.locked?.length)
+      ? `\nThe script's own opening: if a locked rule or a note in your script says how to open this call (what to say or ask first), that is your opening. Use it in place of the wording quoted above, keeping its words as closely as you can; "word for word" above then means the script's words. Two things no script changes: your first sentence still says your name, that you're ${spoken(b.business) || "the team"}'s assistant and that you're automated, and ${
+          isCold(b) ? "you never ask for anyone by name" : "you still wait for them to answer before going on"
+        }.`
+      : "";
   const name = speakableName(b.firstName);
   // An easy opening (delivery.ts): who it is in a few words, a beat for them to take it in, then why it's ringing,
   // in its own words. It still says its name, whose assistant it is and that it's automated, every time.
@@ -372,12 +384,12 @@ ${person}
 - A call screening service answers: an automated voice, often the phone's own assistant, saying the person uses call screening and asking you to say your name and why you're calling. This is not voicemail and not the person. Answer only what it asked, with exactly this and nothing more: "${screeningAnswer(b)}" Then stop and wait quietly. Don't give your opening, ask it questions, make small talk or carry on the conversation with it. If it tells you to hold or stay on the line, say only "Thanks." and keep waiting. If it asks something else, answer in a few words.
 - When the person then picks up after screening (a new voice, "Hello?", or they answer what you told the screener): start from the top with your opening above, as if the call had just begun. They haven't heard it.
 - Voicemail (a recorded greeting that ends with a beep, or "leave a message"): leave the voicemail message from your rules and end the call. Never leave it for a call screener.
-If you can't tell which it is, say only "Hello?" and listen again.`;
+If you can't tell which it is, say only "Hello?" and listen again.${scripted}`;
 }
 
 export function voicemailMessage(b: CallBrief): string {
   if (b.mode === "install") return installVoicemail(b);
-  const name = speakableName(b.firstName);
+  const name = isCold(b) ? "" : speakableName(b.firstName);
   // Their own reason, or a cold call: say why we rang and nothing about an enquiry or a text that may not follow.
   if (ownReason(b) && !usualCalls(b))
     return `Hi${name ? ` ${name}` : ""}, it's ${who(b)}, calling ${reasonWords(b)}. We'll try you again another time. Thanks, bye.`;
@@ -462,7 +474,7 @@ export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTran
         `(they open it, choose their system if there's a choice, type their name and tick the box under "I'd like to go ahead"). ` +
         `If the proposal is INDICATIVE it can't be signed: the next step is the team's final proposal, so offer a call back from the team instead.`
       : isCold(b)
-        ? `You are on a phone call with ${name || "someone"} who has NOT been in touch with ${business}: this is a first call out of the blue, and they aren't expecting it. ` +
+        ? `You are on a phone call with ${name || "someone"} who has NOT been in touch with ${business}: this is a first call out of the blue, and they aren't expecting it. Never open by asking for anyone by name, and don't use their name unless they give it. ` +
           `Why you are ringing, in ${business}'s own words: "calling ${reasonWords(b)}". ` +
           `Your job: say who you are and why you're ringing, then ask whether it's something they'd like to hear about. Only if they say yes: find out what they're after, answer their questions, ` +
           `and explain that the team can design a system for their home and send a proposal to look over. ${b.canBook ? "Then book them a free 15-minute call with the team from the times below." : "Then offer a call back from the team at a time that suits them."} ` +

@@ -118,6 +118,8 @@ export function sayNameNote(o: { assistant: string; assistantSaid?: string | nul
 export function openingPreview(o: { name: string; saidAs: string; business: string; audience: CallAudience; reason: string }): string {
   const who = sayName({ assistant: o.name, assistantSaid: o.saidAs });
   const business = o.business.trim() || "your business";
+  // A cold call never asks for anyone by name (voice-agent.ts firstMessage).
+  if (o.audience === "cold") return `Hi, it's ${who}, ${business}'s automated assistant, calling ${reasonWords(o)}. Have you got a minute?`;
   return `Hi, is that Sam? … It's ${who}, ${business}'s automated assistant, calling ${reasonWords(o)}. Have you got a few minutes?`;
 }
 

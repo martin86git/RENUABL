@@ -976,7 +976,16 @@ function CoachSettings(props: {
               <ScriptPicker
                 name={name}
                 sales={roleOfKey(caller.role ?? "sales") === "sales"}
-                scripts={props.scripts}
+                scripts={props.scripts.map((s) =>
+                  s.id === null
+                    ? {
+                        ...s,
+                        lines: props.notes.length,
+                        locked: props.notes.filter((n) => n.locked).length,
+                        audience: props.setup.audience,
+                      }
+                    : s,
+                )}
                 editable={props.mayCoach}
                 onChanged={(r) => {
                   props.onNotes(r.notes);

@@ -180,7 +180,7 @@ export async function PUT(request: Request) {
       const o = { fileId: `sc_${randomBytes(8).toString("hex")}`, at: new Date().toISOString() };
       const next: ScriptChange =
         s.do === "new"
-          ? startScript(book.live, book.saved, { name: s.name, copy: s.copy === true, ...o })
+          ? startScript(book.live, book.saved, { name: s.name, copy: s.copy === true, audience: s.audience, ...o })
           : s.do === "use"
             ? chooseScript(book.live, book.saved, s.id, o)
             : s.do === "rename"

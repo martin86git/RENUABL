@@ -9,7 +9,8 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Check, Loader2, Pencil, Plus, X } from "lucide-react";
-import { SCRIPTS_COPY as COPY, SCRIPT_NAME_MAX, scriptWords, type ScriptLine } from "@/lib/domain/design/call-scripts";
+import { SCRIPTS_COPY as COPY, SCRIPT_NAME_MAX, namedForColdCalls, scriptWords, type ScriptLine } from "@/lib/domain/design/call-scripts";
+import { CALL_AUDIENCES, CALL_SETUP_COPY, type CallAudience } from "@/lib/domain/design/call-setup";
 import type { CallSetup } from "@/lib/domain/design/call-setup";
 import type { CoachNote } from "@/lib/domain/design/coaching";
 import { changeScript } from "@/lib/services/coaching";
@@ -32,6 +33,9 @@ export function ScriptPicker(props: {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [copy, setCopy] = useState(false);
+  // Who a blank script rings: chosen here, else read from its name ("Cold calls").
+  const [picked, setPicked] = useState<CallAudience | null>(null);
+  const audience: CallAudience = picked ?? (namedForColdCalls(newName) ? "cold" : "enquired");
   const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -152,10 +156,11 @@ export function ScriptPicker(props: {
             onSubmit={(e) => {
               e.preventDefault();
               if (newName.trim())
-                void run("new", { do: "new", name: newName, copy }, () => {
+                void run("new", { do: "new", name: newName, copy, audience }, () => {
                   setAdding(false);
                   setNewName("");
                   setCopy(false);
+                  setPicked(null);
                 });
             }}
           >
@@ -186,6 +191,24 @@ export function ScriptPicker(props: {
                   </button>
                 ))}
               </div>
+              {props.sales && !copy && (
+                <div className="inline-flex rounded-full bg-surface-2 p-0.5" role="group" aria-label={CALL_SETUP_COPY.audience}>
+                  {CALL_AUDIENCES.map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      aria-pressed={audience === a}
+                      onClick={() => setPicked(a)}
+                      className={clsx(
+                        "rounded-full px-2.5 py-1 text-[11.5px] font-medium",
+                        audience === a ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
+                      )}
+                    >
+                      {CALL_SETUP_COPY.audiences[a][0]}
+                    </button>
+                  ))}
+                </div>
+              )}
               <span className="flex-1" />
               <button type="button" onClick={() => setAdding(false)} className="text-[11.5px] font-medium text-ink-2 hover:text-ink">
                 Cancel

@@ -126,6 +126,34 @@ describe("the reason for the call", () => {
 
   it("shows the opening the call is given", () => {
     const shown = openingPreview({ name: "Charlie", saidAs: "", business: "Star Solar", audience: "cold", reason: "" });
-    expect(shown).toContain(firstMessage(brief({ audience: "cold" })).replace("Hi, is that Sam? ", ""));
+    expect(shown).toBe(firstMessage(brief({ audience: "cold" })));
+  });
+
+  it("never asks for anyone by name on a cold call", () => {
+    const b = brief({ audience: "cold", reason: "to ask whether you've thought about a battery" });
+    expect(firstMessage(b)).toBe(
+      "Hi, it's Charlie, Star Solar's automated assistant, calling to ask whether you've thought about a battery. Have you got a minute?",
+    );
+    expect(openingParts(b).ask).toBeNull();
+    expect([firstMessage(b), screeningAnswer(b), voicemailMessage(b)].join(" ")).not.toContain("Sam");
+    expect(voiceSystemPrompt(b, [], { canTransfer: false })).toContain("Never open by asking for anyone by name");
+  });
+
+  it("opens the way the script says, still saying who it is and that it's automated", () => {
+    const scripted = voiceSystemPrompt(brief({ audience: "cold", coaching: ["On cold calls, open by asking about a battery."] }), [], {
+      canTransfer: false,
+    });
+    expect(scripted).toContain("The script's own opening");
+    expect(scripted).toContain("that is your opening");
+    expect(scripted).toContain("that you're automated");
+    expect(scripted).toContain("you never ask for anyone by name");
+    // An enquiry call's script may set the opening too, but the wait for an answer stays.
+    const enquiry = voiceSystemPrompt(brief({ locked: ["Open by thanking them for their enquiry."] }), [], { canTransfer: false });
+    expect(enquiry).toContain("you still wait for them to answer before going on");
+    // With no script, and on calls the script isn't for, the opening stays as given.
+    expect(voiceSystemPrompt(brief(), [], { canTransfer: false })).not.toContain("The script's own opening");
+    expect(voiceSystemPrompt(brief({ mode: "proposal", coaching: ["Open warmly."] }), [], { canTransfer: false })).not.toContain(
+      "The script's own opening",
+    );
   });
 });

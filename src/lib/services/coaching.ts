@@ -117,7 +117,9 @@ export const saveDelivery = (delivery: Delivery | null) => ask<{ delivery: Deliv
 /** The agent's scripts (call-scripts.ts): start one, use one, rename one (id null: the one in use) or remove one. */
 export const changeScript = (
   script:
-    { do: "new"; name: string; copy: boolean } | { do: "use" | "forget"; id: string } | { do: "rename"; id: string | null; name: string },
+    | { do: "new"; name: string; copy: boolean; audience?: "enquired" | "cold" }
+    | { do: "use" | "forget"; id: string }
+    | { do: "rename"; id: string | null; name: string },
 ) => ask<{ notes: CoachNote[]; setup: CallSetup; scripts: ScriptLine[] }>(at(), json("PUT", { script }));
 /** The agent's name as said, who it rings and why (call-setup.ts). */
 export const saveCallSetup = (setup: CallSetup) => ask<{ setup: CallSetup }>(at(), json("PUT", { setup }));

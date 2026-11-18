@@ -8,6 +8,7 @@ import {
   cleanScripts,
   forgetScript,
   liveName,
+  namedForColdCalls,
   renameScript,
   scriptLines,
   scriptWords,
@@ -45,6 +46,15 @@ describe("a voice agent's scripts", () => {
     if (!r.ok) throw new Error(r.message);
     expect(r.live).toEqual({ name: "Cold calls", notes: [], setup: { saidAs: "Shar-lee", audience: "enquired", reason: "" } });
     expect(r.saved).toEqual([{ id: "sc_00000001", name: DEFAULT_SCRIPT_NAME, notes: live.notes, audience: "enquired", reason: "", at }]);
+  });
+
+  it("starts a blank script ringing who it was made for", () => {
+    const r = startScript(live, [], { name: "Cold calls", copy: false, audience: "cold", fileId: "sc_00000001", at });
+    expect(r.ok && r.live.setup).toEqual({ saidAs: "Shar-lee", audience: "cold", reason: "" });
+    const odd = startScript(live, [], { name: "Other", copy: false, audience: "nonsense", fileId: "sc_00000001", at });
+    expect(odd.ok && odd.live.setup.audience).toBe("enquired");
+    expect(namedForColdCalls("Cold Calls")).toBe(true);
+    expect(namedForColdCalls("Scolding")).toBe(false);
   });
 
   it("copies the one in use, locked rules and all", () => {

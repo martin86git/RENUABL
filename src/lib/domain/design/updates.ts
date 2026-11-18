@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
     area: "Phone assistant",
+    words: "Cold calls no longer ask for anyone by name, and a voice agent opens the way its script says.",
+  },
+  {
+    day: "2026-11-18",
+    area: "Phone assistant",
     words: "A voice agent can keep several scripts: make a new one and choose which it uses. Eight more Australian voices to pick.",
   },
   {
