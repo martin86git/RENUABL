@@ -27,6 +27,9 @@
      what lies behind a proposal): a violet kept for that label alone. */
   --context: #6e56cf;
   --context-soft: #f0edfc;
+  /* Deal note (18 Nov 2026, Martin: as Context has its violet, a deal note has its own): a deep cyan for that label alone. */
+  --note: #0e7490;
+  --note-soft: #e0f2f7;
   --canvas: #faf9f6;
   --surface: #ffffff;
   --surface-2: #f0ece7;
@@ -823,6 +826,8 @@ button.team-flash:not([aria-pressed="true"]) {
   --color-call-ink: var(--call-ink);
   --color-context: var(--context);
   --color-context-soft: var(--context-soft);
+  --color-note: var(--note);
+  --color-note-soft: var(--note-soft);
   --color-kind-install: var(--kind-install);
   --color-kind-install-soft: var(--kind-install-soft);
   --color-kind-message: var(--kind-message);
