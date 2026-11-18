@@ -94,10 +94,13 @@ export function AgentWave({ who, size, busy }: { who: Exclude<Who, "sol">; size:
 export function BigSol({
   busy,
   lean,
+  brain = false,
   className = "size-28 sm:size-36",
 }: {
   busy: boolean;
   lean: { x: number; y: number };
+  /** A faint brain drawn in the sun: a sun that thinks (18 Nov 2026, Martin). */
+  brain?: boolean;
   className?: string;
 }) {
   return (
@@ -110,7 +113,64 @@ export function BigSol({
       <span aria-hidden className="pointer-events-none absolute -inset-1/2">
         <LiveSun energy={busy ? 1 : 0} />
       </span>
+      {brain && <SunBrain busy={busy} />}
     </span>
+  );
+}
+
+/**
+ * The brain in the sun (18 Nov 2026, Martin: "Sol in its current form but add in a feint brain outline, to show it's a
+ * sun brain"): two hemispheres seen from above, a few folds, in fine light lines laid softly over the disc. It
+ * brightens a little while he talks.
+ */
+function SunBrain({ busy }: { busy: boolean }) {
+  const half = (
+    <>
+      <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85" />
+      <path d="M45 25C37 24 31 28 32 35" />
+      <path d="M22 40C29 37 36 41 35 48" />
+      <path d="M44 38C39 41 43 47 38 51" />
+      <path d="M19 59C26 56 32 60 30 67" />
+      <path d="M45 57C37 57 33 63 36 70" />
+      <path d="M33 78C37 74 43 76 44 72" />
+    </>
+  );
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      aria-hidden
+      className={clsx(
+        "pointer-events-none absolute inset-[17%] mix-blend-soft-light transition-opacity duration-700",
+        busy ? "opacity-90" : "opacity-60",
+      )}
+      fill="none"
+      stroke="white"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {half}
+      <g transform="translate(100 0) scale(-1 1)">{half}</g>
+      <path d="M50 18C51 30 49 42 50 54C51 66 49 76 50 84" strokeOpacity={0.7} />
+    </svg>
+  );
+}
+
+/**
+ * The launch's horizon, in light grey (18 Nov 2026, Martin): the edge of a planet curving under Sol, as if he is rising
+ * over it. A wide circle with a fine rim and a faint warm and blue glow along its edge; the hero clips it.
+ */
+function Horizon({ className }: { className: string }) {
+  return (
+    <span
+      aria-hidden
+      className={clsx("pointer-events-none absolute left-1/2 z-[1] aspect-square -translate-x-1/2 rounded-full", className)}
+      style={{
+        background: "linear-gradient(180deg, #ebebee 0%, #f2f2f4 6%, #f6f6f7 18%)",
+        boxShadow:
+          "0 -1px 0 rgba(11,11,12,0.10), 0 -6px 18px rgba(255,120,50,0.10), 0 -24px 70px rgba(255,110,40,0.08), 0 -60px 140px rgba(80,140,255,0.06)",
+      }}
+    />
   );
 }
 
@@ -320,8 +380,13 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
     >
       <LiveStyles />
       <Sunrise light />
-      <div className="mx-auto grid max-w-[90rem] items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
-        <div className="text-center lg:text-left">
+      {/* On a wide screen it runs across the whole hero, centred on the page, a gentle curve Sol rises over. */}
+      <Horizon className="top-[51%] hidden w-[700vw] lg:block" />
+      {/* Four parts in a grid (18 Nov 2026, Martin: the phone was lack-lustre; the paragraph under the headline went, and
+          Sol rises over the launch's horizon, drawn in light grey, in its place). On a phone: the words, Sol, the
+          buttons, the voice agents. On a wide screen: the words and buttons on the left, Sol and his agents on the right. */}
+      <div className="mx-auto grid max-w-[90rem] gap-x-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="relative z-[2] text-center lg:col-start-1 lg:row-start-1 lg:self-end lg:text-left">
           <h1 id="hero" className="text-[clamp(48px,6.4vw,116px)] font-semibold leading-[0.88] tracking-[-0.055em]">
             <span className="block">{SALES_HERO.headline[0]}</span>
             <span className="block text-sun-line">{SALES_HERO.headline[1]}</span>
@@ -331,34 +396,41 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
             {SALES_HERO.andVoice}
             <Ray i={0} size={40} live={live} />
           </p>
-          <p className="mt-7 text-[clamp(22px,2.3vw,36px)] font-medium leading-tight tracking-[-0.025em] text-ink">{SALES_HERO.sub}</p>
-          <p className="mx-auto mt-3 max-w-xl text-[17px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.line}</p>
-          <div className="mt-9 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
-            <a
-              href="#pricing"
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-sun-line px-7 text-[16px] font-semibold text-white shadow-lift hover:brightness-105"
-            >
-              {SALES_HERO.cta}
-            </a>
-            {!signedIn && <TryDemoButton look="quiet" label="Start demo" />}
-          </div>
+          <p className="mt-6 text-[clamp(20px,2.3vw,36px)] font-medium leading-tight tracking-[-0.025em] text-ink">{SALES_HERO.sub}</p>
         </div>
-        <div className="flex flex-col items-center gap-6 xl:pt-24">
-          {/* Sol a touch smaller, and his bubble off his shoulder rather than over his head (18 Nov 2026, Martin: above
-              him "seems weird"): on a wide screen (xl) it sits up and to his right, its tail pointing back to him; on a phone
-              it stays above him. */}
+
+        {/* Sol over the horizon, his bubble off his shoulder on a wide screen (xl), above him otherwise. */}
+        <div className="relative mt-8 flex flex-col items-center lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:self-center xl:pt-24">
           <div className="relative">
-            <div aria-live="polite" className="mb-6 xl:absolute xl:bottom-[90%] xl:left-[58%] xl:mb-0 xl:[&>div]:w-[17.5rem]">
+            <div
+              aria-live="polite"
+              className="relative z-[2] mb-6 xl:absolute xl:bottom-[90%] xl:left-[58%] xl:mb-0 xl:[&>div]:w-[17.5rem]"
+            >
               <Bubble who="sol" text={sol.shown} busy={sol.busy} tail="shoulder" />
             </div>
-            <BigSol busy={sol.busy} lean={lean} className="mx-auto size-40 sm:size-48 lg:size-[13.5rem]" />
+            <BigSol busy={sol.busy} lean={lean} brain className="mx-auto size-40 sm:size-48 lg:size-[13.5rem]" />
+            {/* On a phone the horizon curves under Sol himself. */}
+            <Horizon className="top-[78%] w-[420vw] lg:hidden" />
           </div>
-          <p className="text-[14px] text-muted">
+          <p className="relative z-[2] mt-6 text-[14px] text-muted">
             <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
           </p>
-          {/* His voice agents beside him, one a role (18 Nov 2026, Martin: the product's audio icons, a colour each). */}
+        </div>
+
+        <div className="relative z-[2] mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:col-start-1 lg:row-start-2 lg:mt-9 lg:justify-start lg:self-start">
+          <a
+            href="#pricing"
+            className="inline-flex h-12 items-center gap-2 rounded-full bg-sun-line px-7 text-[16px] font-semibold text-white shadow-lift hover:brightness-105"
+          >
+            {SALES_HERO.cta}
+          </a>
+          {!signedIn && <TryDemoButton look="quiet" label="Start demo" />}
+        </div>
+
+        {/* His voice agents, one a role (18 Nov 2026, Martin: the product's audio icons, a colour each). */}
+        <div className="relative z-[2] mt-10 flex flex-col items-center gap-3 lg:col-start-2 lg:row-start-3 lg:mt-6">
           <RayStyles />
-          <div className="mt-2 flex items-start justify-center gap-6">
+          <div className="flex items-start justify-center gap-6">
             {VOICE_AGENTS.map((v, i) => (
               <div key={v.key} className="flex w-24 flex-col items-center text-center">
                 <Ray i={i} size={52} live={live && i === 0} />
