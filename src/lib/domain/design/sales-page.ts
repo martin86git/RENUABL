@@ -223,7 +223,7 @@ export const DESIGNER = {
  */
 export const KNOWLEDGE = {
   eyebrow: "The brain",
-  headline: "Ask him anything.",
+  headline: "Ask anything about your business.",
   sub: "Networks, rebates, standards, datasheets and your own deals. He reads the source and shows it to you.",
   orbit: [
     "AS/NZS 5139",

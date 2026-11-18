@@ -73,7 +73,7 @@ const PAGE_LINKS = [
   { href: "#sales", label: "How it sells" },
   { href: "#designer", label: "The assisted designer" },
   { href: "#interface", label: "The interface" },
-  { href: "#brain", label: "Ask him anything" },
+  { href: "#brain", label: "Ask anything" },
   { href: "#pricing", label: "Pricing" },
 ] as const;
 
