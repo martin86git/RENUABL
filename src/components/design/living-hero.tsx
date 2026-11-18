@@ -172,7 +172,16 @@ function Horizon({ className, solid = false }: { className: string; solid?: bool
         background: solid
           ? "linear-gradient(180deg, #ececef 0%, #f4f4f5 3%)"
           : "linear-gradient(180deg, rgba(236,236,239,0.95) 0%, rgba(244,244,245,0.9) 3%, rgba(244,244,245,0.55) 22%)",
-        boxShadow: "0 -1px 0 rgba(11,11,12,0.05), 0 -6px 18px rgba(255,120,50,0.05), 0 -40px 110px rgba(80,140,255,0.04)",
+        boxShadow: "0 -1px 0 rgba(11,11,12,0.04), 0 -6px 18px rgba(255,120,50,0.04), 0 -40px 110px rgba(80,140,255,0.03)",
+        // On a wide screen it shows only under Sol, fading out before the words (18 Nov 2026, Martin: it cut through
+        // "The AI sales force for solar businesses"). The circle is seven screens wide, so a screen is a seventh of it:
+        // 49.5% is about 47% of the way across the screen, 52% about 64%.
+        ...(solid
+          ? {}
+          : {
+              maskImage: "linear-gradient(90deg, transparent 49.5%, black 52%)",
+              WebkitMaskImage: "linear-gradient(90deg, transparent 49.5%, black 52%)",
+            }),
       }}
     />
   );
