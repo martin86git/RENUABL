@@ -110,6 +110,9 @@ export function DesignStudio() {
   // Bumped after publishing, so the Proposal view's timeline reads again.
   const [published, setPublished] = useState(0);
   const [theirs, setTheirs] = useState<{ jobId: string; address: string; lat: number; lng: number } | null>(null);
+  // A deal opened in the designer with no place on the map (18 Nov 2026, Martin: the warning named no one and Sol's
+  // brief for it floated over the other deals): its customer, so the address can be found for it here.
+  const [noPlace, setNoPlace] = useState<{ jobId: string; name: string } | null>(null);
   const [job, setJob] = useState<{ id: string; customerId: string; customerName: string; lat: number; lng: number } | null>(null);
   // The business's price lists and settings; and the STC rules, today's when they can be had.
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
@@ -225,7 +228,8 @@ export function DesignStudio() {
           setJob({ id: asked.job.id, customerId: asked.customer.id, customerName: asked.customer.name, lat: forJob.lat, lng: forJob.lng });
           rememberRoof(forJob);
         } else if (jobId) {
-          setProblem(asked && !asked.ok ? asked.message : "That job has no address on the map yet. Add one on the customer's page.");
+          if (asked?.ok) setNoPlace({ jobId: asked.job.id, name: asked.customer.name });
+          else setProblem(asked ? asked.message : "That deal couldn't be opened.");
           // The deal has no place of its own, but its customer does: offered in one press (as Primero's).
           if (asked?.ok && asked.customer.lat !== null && asked.customer.lng !== null && asked.customer.address)
             setTheirs({ jobId: asked.job.id, address: asked.customer.address, lat: asked.customer.lat, lng: asked.customer.lng });
@@ -631,11 +635,24 @@ export function DesignStudio() {
   if (signedIn)
     return (
       <div className="theme-studio">
-        {/* The brief stays in view when the deal has no roof to open yet, so the designer can start from it. */}
-        {jobId && askId && <DesignBrief jobId={jobId} askId={askId} />}
-        {problem && (
-          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
-            <span>{problem}</span>
+        {/* A deal with no place yet: find its address here, and its roof opens (with Sol's brief, if one came with it). */}
+        {noPlace && (
+          <div className="mx-auto mb-4 max-w-3xl rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-line" role="status">
+            <p className="text-[15px] font-semibold text-ink">{noPlace.name}&apos;s deal has no address on the map yet.</p>
+            <p className="mt-1 text-[13.5px] text-muted">Find it here to open their roof and start the design.</p>
+            <div className="mt-3">
+              <AddressEntry
+                compact
+                placeholder={`Search ${noPlace.name.split(" ")[0]}'s address`}
+                onPick={async (a) => {
+                  if (typeof a.lat !== "number" || typeof a.lng !== "number") return;
+                  const address = [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(", ");
+                  const res = await saveJob(noPlace.jobId, { address, lat: a.lat, lng: a.lng });
+                  if (res.ok) window.location.reload();
+                  else setProblem(res.message);
+                }}
+              />
+            </div>
             {theirs && (
               <button
                 type="button"
@@ -644,11 +661,16 @@ export function DesignStudio() {
                   if (res.ok) window.location.reload();
                   else setProblem(res.message);
                 }}
-                className="rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
+                className="mt-3 rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
               >
-                Design it at the customer&apos;s address: {theirs.address}
+                Use the customer&apos;s address: {theirs.address}
               </button>
             )}
+          </div>
+        )}
+        {problem && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
+            <span>{problem}</span>
           </div>
         )}
         {ready && <DesignToolHome onPick={pick} onOpen={openOver} />}
