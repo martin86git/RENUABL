@@ -7,7 +7,6 @@ import { HERO_LIVE, RAYS, SALES_HERO, VOICE_AGENTS } from "@/lib/domain/design/s
 
 const RAYS_SOON = RAYS.soon;
 import { Sunrise } from "./business-brand";
-import { TryDemoButton } from "./business-demo";
 import { SolMark } from "./sol-icon";
 import { LiveSun } from "./live-sun";
 import { Ray, RayStyles } from "./rays";
@@ -377,7 +376,7 @@ export function useLean(root: React.RefObject<HTMLElement | null>, live: boolean
  * product pages): "Introducing Sol", the headline as large as the screen allows, what he is in one line, and Sol
  * himself, large and alive, saying what he's doing.
  */
-export function LivingHero({ signedIn }: { signedIn: boolean }) {
+export function LivingHero() {
   const motion = useMotionOk();
   const root = useRef<HTMLElement | null>(null);
   const seen = useInView(root);
@@ -437,7 +436,6 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
           >
             {SALES_HERO.cta}
           </a>
-          {!signedIn && <TryDemoButton look="quiet" label="Start demo" />}
         </div>
 
         {/* His voice agents, one a role (18 Nov 2026, Martin: the product's audio icons, a colour each). */}

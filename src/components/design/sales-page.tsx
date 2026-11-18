@@ -17,7 +17,6 @@ import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import { CLOSING, FAQ, PRICING, SALES_HERO, STICKY } from "@/lib/domain/design/sales-page";
 import { askSales, startPlan } from "@/lib/services/billing";
-import { TryDemoButton } from "./business-demo";
 import { Reveal } from "./front-hero";
 
 /**
@@ -33,7 +32,7 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
           your sales team, how it sells, the film, the old way and the new, pricing with the questions, the close. */}
-      <LivingHero signedIn={signedIn} />
+      <LivingHero />
       <LaunchSlide signedIn={signedIn} />
       <RaysSlide />
       <SalesLoop />
@@ -132,16 +131,15 @@ function Header({ signedIn }: { signedIn: boolean }) {
         <Link href="/business" aria-label="RENUABL Business" className="justify-self-center">
           <Wordmark />
         </Link>
-        <div className="flex items-center justify-end gap-2 sm:gap-3">
-          <span className="hidden sm:inline-flex">
-            <TryDemoButton look="bar" label="Start demo" />
-          </span>
-          <a
-            href="#pricing"
-            className="inline-flex h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-105 sm:px-4"
+        {/* Top right is for people who already have an account (18 Nov 2026, Martin): Sign in, or straight back into
+            RENUABL when signed in. Getting started is the page's one button, in the hero and the bar that follows. */}
+        <div className="flex items-center justify-end">
+          <Link
+            href={signedIn ? "/design" : "/design/sign-in"}
+            className="inline-flex h-9 items-center whitespace-nowrap rounded-full px-4 text-[13px] font-semibold text-ink ring-1 ring-line-strong hover:bg-surface"
           >
-            {SALES_HERO.cta}
-          </a>
+            {signedIn ? "Open RENUABL" : "Sign in"}
+          </Link>
         </div>
       </div>
     </header>
