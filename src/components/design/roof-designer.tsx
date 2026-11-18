@@ -354,7 +354,7 @@ const SHORTCUTS: [keys: string, does: string][] = [
 ];
 
 import { KnifeMenu, ToolFan } from "./tool-fan";
-import { lotDoubt, titleCase, type NearbyHome, type PropertyLot } from "@/lib/domain/design/property-lot";
+import { lotDoubt, registerWarning, titleCase, type NearbyHome, type PropertyLot } from "@/lib/domain/design/property-lot";
 import type { Address } from "@/lib/domain/types";
 
 const GLASS = "rounded-2xl border border-line bg-surface/75 shadow-lift backdrop-blur-md backdrop-saturate-150";
@@ -1000,6 +1000,8 @@ export function RoofDesigner(props: {
   onPickAddress?: (address: Address) => void;
   /** Open the address search under the picture. */
   onSearchAddress?: () => void;
+  /** The land register has no such address, or Google's pin is on another lot: the words to warn with. */
+  onAddressDoubt?: (words: string) => void;
   image: string;
   /** The designs for this roof: up to five options, one of them the primary. */
   set: DesignSet;
@@ -4053,19 +4055,21 @@ export function RoofDesigner(props: {
    */
   const [lot, setLot] = useState<PropertyLot | null>(null);
   useEffect(() => {
-    if (!guideOn) return;
     let live = true;
     const q = new URLSearchParams({ address: props.address, lat: String(spot.lat), lng: String(spot.lng) });
     fetch(`/api/design/roof/lot?${q}`)
       .then((r) => (r.ok ? (r.json() as Promise<PropertyLot>) : null))
       .then((found) => {
-        if (live && found?.outlines?.length) setLot(found);
+        if (!live || !found?.outlines?.length) return;
+        setLot(found);
+        const doubt = registerWarning(found, props.address);
+        if (doubt) props.onAddressDoubt?.(doubt);
       })
       .catch(() => undefined);
     return () => {
       live = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once a roof, while Sol leads
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once a roof
   }, [props.address, spot.lat, spot.lng]);
   const adviceFrom = (fields: typeof bill, found: string[]): Opening | null => {
     const daily = dailyFromBillFields(fields);

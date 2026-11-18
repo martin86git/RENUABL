@@ -147,6 +147,18 @@ export interface PropertyLot {
   nearby: NearbyHome[];
 }
 
+/**
+ * The warning over the designer when the land register has no such address (18 Nov 2026, Martin: 15 Hanwell Court
+ * opened with nothing said), or Google's pin is on another lot. Null when the two agree.
+ */
+export function registerWarning(lot: Pick<PropertyLot, "pinOnLot" | "registered">, address: string): string | null {
+  const line = address.split(",")[0].trim() || address;
+  if (!lot.registered)
+    return `${line} isn't on Victoria's land register, so that house number may not exist. The outline is the lot under Google's pin: check the address.`;
+  if (!lot.pinOnLot) return `Google has put ${line} on a different lot from the land register. Check it's the right house.`;
+  return null;
+}
+
 /** What Sol says when the outline's answer is in doubt, or null when the register and Google agree. */
 export function lotDoubt(lot: Pick<PropertyLot, "pinOnLot" | "registered">): string | null {
   if (!lot.pinOnLot) return "Google's pin isn't on this lot, so check it's the right house.";

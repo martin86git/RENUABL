@@ -20,10 +20,11 @@ describe("Sol leads the design", () => {
     expect(guideStep(["home"], facts())).toBe("target");
     expect(guideStep(["home"], facts({ roof: "flat" }))).toBe("flat");
   });
-  it("asks whether the outlined lot is the home first, only when the register found one, and never after the home", () => {
+  it("asks whether the outlined lot is the home first, only when the register found one, until panels go down", () => {
     expect(guideStep([], facts({ lot: true }))).toBe("house");
     expect(guideStep(["house"], facts({ lot: true }))).toBe("home");
-    expect(guideStep(["home"], facts({ lot: true }))).toBe("target");
+    expect(guideStep(["home"], facts({ lot: true }))).toBe("house");
+    expect(guideStep(["home"], facts({ lot: true, panels: 4 }))).toBe("target");
   });
   it("goes on whatever the answer: each step answered once moves to the next", () => {
     expect(guideStep(["home", "target"], facts())).toBe("panel");

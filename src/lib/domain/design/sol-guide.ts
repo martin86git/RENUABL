@@ -117,8 +117,8 @@ export type GuideAnswered = readonly GuideStepId[];
 /** The step to show now, or null when the run is done. */
 export function guideStep(answered: GuideAnswered, facts: GuideFacts): GuideStepId | null {
   const open = (id: GuideStepId) => !answered.includes(id);
-  // Is this the home? Only while the home itself hasn't been answered: a lot found late doesn't step back.
-  if (facts.lot && open("house") && open("home")) return "house";
+  // Is this the home? Asked first, and still asked when the register answers late, until panels go down.
+  if (facts.lot && open("house") && open("place") && facts.panels === 0) return "house";
   if (open("home")) return "home";
   if (facts.roof === "flat" && open("flat")) return "flat";
   if (open("target")) return "target";

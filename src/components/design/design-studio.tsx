@@ -419,6 +419,7 @@ export function DesignStudio() {
           key={`${roof.lat},${roof.lng},${fresh}`}
           address={roof.address}
           onPickAddress={pick}
+          onAddressDoubt={setOnStreet}
           onSearchAddress={popped ? () => setSearchAsk((n) => n + 1) : undefined}
           image={pictureMissing ? "" : image}
           set={work.set}

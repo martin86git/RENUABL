@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { lotDoubt, matchAddress, nearbyHomes, onPicture, streetParts, titleCase, type RegisteredAddress } from "./property-lot";
+import {
+  lotDoubt,
+  registerWarning,
+  matchAddress,
+  nearbyHomes,
+  onPicture,
+  streetParts,
+  titleCase,
+  type RegisteredAddress,
+} from "./property-lot";
 
 const spot = { lat: -37.8896, lng: 145.165 };
 const reg = (n: number, dLat: number, lot: string, road = "HANWELL"): RegisteredAddress => ({
@@ -41,6 +50,12 @@ describe("which house is the right one", () => {
   it("writes the register's capitals as people do", () => {
     expect(titleCase("2 HANWELL COURT")).toBe("2 Hanwell Court");
     expect(titleCase("GLEN WAVERLEY")).toBe("Glen Waverley");
+  });
+  it("warns when the register has no such house number, naming it", () => {
+    expect(registerWarning({ pinOnLot: true, registered: null }, "15 Hanwell Court, Glen Waverley, VIC, 3150")).toMatch(
+      /^15 Hanwell Court isn't on Victoria's land register/,
+    );
+    expect(registerWarning({ pinOnLot: true, registered: "12 HANWELL COURT" }, "12 Hanwell Court")).toBeNull();
   });
   it("says when the register and Google disagree", () => {
     expect(lotDoubt({ pinOnLot: true, registered: "X" })).toBeNull();
