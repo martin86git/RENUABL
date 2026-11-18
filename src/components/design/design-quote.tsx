@@ -5,6 +5,7 @@ import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/domain/design/pricing";
+import { PriceCart } from "./price-cart";
 import {
   COST_GROUPS,
   costSystem,
@@ -77,9 +78,13 @@ export function DesignQuote(props: {
    * Shown under the totals; held back while a cost decided on each job is still to decide.
    */
   onProceed?: () => void;
+  /** The workspace once a price list or a price is kept from the cart, so the quote is costed with it at once. */
+  onWorkspace?: (next: Workspace) => void;
 }) {
   const { form, edits } = props.value;
   const { spec, workspace, rates } = props;
+  // The cart: upload a price list, or set a price for each part with none on file (18 Nov 2026, Martin).
+  const [cartOpen, setCartOpen] = useState(false);
   const empty = spec.panels === 0;
   const costing = costSystem(spec, form, workspace);
   const stc = stcValue(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
@@ -707,6 +712,9 @@ export function DesignQuote(props: {
                 Short view
               </button>
             )}
+            {!costing.lines.length ? null : (
+              <PriceCart workspace={workspace} lines={costing.lines} onWorkspace={props.onWorkspace} open={cartOpen} onOpen={setCartOpen} />
+            )}
             <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
               Prices and settings
             </Link>
@@ -778,9 +786,9 @@ export function DesignQuote(props: {
               <p className="mb-3 rounded-md bg-warning-soft p-2.5 text-xs text-warning" role="status">
                 {missing} {missing === 1 ? "line has" : "lines have"} no cost on file, so {missing === 1 ? "it counts" : "they count"} as
                 $0. Each is highlighted below: type a cost over it, leave it at $0, or{" "}
-                <Link href="/design/settings" className="font-semibold underline underline-offset-2">
-                  upload a price list or set the part&apos;s cost
-                </Link>
+                <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setCartOpen(true)}>
+                  upload a price list or set a price in the cart
+                </button>
                 .
               </p>
             )}
@@ -830,6 +838,9 @@ export function DesignQuote(props: {
               Short view
             </button>
           )}
+          {!costing.lines.length ? null : (
+            <PriceCart workspace={workspace} lines={costing.lines} onWorkspace={props.onWorkspace} open={cartOpen} onOpen={setCartOpen} />
+          )}
           <Link href="/design/settings" className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink">
             Prices and settings
           </Link>
@@ -845,9 +856,9 @@ export function DesignQuote(props: {
             <p className="mb-3 rounded-md bg-warning-soft p-2.5 text-xs text-warning" role="status">
               {missing} {missing === 1 ? "line has" : "lines have"} no cost on file, so {missing === 1 ? "it counts" : "they count"} as $0.
               Each is highlighted below: type a cost over it, leave it at $0, or{" "}
-              <Link href="/design/settings" className="font-semibold underline underline-offset-2">
-                upload a price list or set the part&apos;s cost
-              </Link>
+              <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setCartOpen(true)}>
+                upload a price list or set a price in the cart
+              </button>
               .
             </p>
           )}

@@ -475,6 +475,7 @@ export function DesignStudio() {
           }}
           chargers={catalogue.chargers}
           workspace={workspace}
+          onWorkspace={setWorkspace}
           rates={rates}
           postcode={postcodeIn(roof.address)}
           catalogue={catalogue.panels}

@@ -1020,6 +1020,8 @@ export function RoofDesigner(props: {
   yieldPerKwDay: number;
   /** The business's price lists, parts, installation rates and margin: what the quote is worked out from. */
   workspace: Workspace;
+  /** The workspace once a price list or a price is kept from the quote builder's cart. */
+  onWorkspace?: (next: Workspace) => void;
   /** The STC rules, as last read. */
   rates: RebateRates;
   /** For the quote's rebate zone. */
@@ -10498,6 +10500,7 @@ export function RoofDesigner(props: {
                 onDesign={designs.length > 1 ? (step) => show(everyDesign(), (active + step + designs.length) % designs.length) : undefined}
                 spec={spec}
                 workspace={props.workspace}
+                onWorkspace={props.onWorkspace}
                 rates={props.rates}
                 value={quoteNow}
                 onChange={setQuote}
