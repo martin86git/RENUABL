@@ -27,7 +27,7 @@ import { Reveal } from "./front-hero";
  */
 export function SalesPage({ notice, signedIn = false }: { notice?: string | null; signedIn?: boolean }) {
   return (
-    <div className="theme-studio min-h-dvh bg-canvas text-ink">
+    <div className="sales-snap theme-studio min-h-dvh bg-canvas text-ink">
       <Header signedIn={signedIn} />
       {notice && <p className="mx-auto max-w-3xl px-5 pt-4 text-center text-sm text-danger">{notice}</p>}
       {/* Six slides at most (17 Nov 2026, Martin: "there is just too much and the power of the features is being lost"):
@@ -506,7 +506,7 @@ function PlanCard({
 
 function Faq() {
   return (
-    <section className="scroll-mt-20 px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
+    <section className="snap-start scroll-mt-20 px-5 pb-24 lg:px-8 lg:pb-32" aria-labelledby="faq">
       <Reveal className="mx-auto w-full max-w-3xl">
         <h2 id="faq" className="text-[clamp(26px,3.4vw,40px)] font-semibold tracking-[-0.03em]">
           Questions
@@ -534,7 +534,7 @@ function Faq() {
 function Closing() {
   return (
     <section
-      className="relative isolate overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white lg:px-8 lg:pb-56 lg:pt-36"
+      className="relative isolate snap-start overflow-hidden bg-[#0b0b0d] px-5 pb-40 pt-28 text-white lg:px-8 lg:pb-56 lg:pt-36"
       aria-labelledby="closing"
     >
       <Sunrise size="small" />

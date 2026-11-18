@@ -1139,3 +1139,17 @@ html[data-curtain] body {
 html[data-curtain] [data-design-popup] {
   visibility: visible;
 }
+
+/* The /business page scrolls slide to slide (18 Nov 2026, Martin: "a magnetic scroll, where scrolling takes you into the
+   next page"; the launch slide's film only starts once it's on screen). Each slide is a snap point under the sticky
+   header. On a wide screen every slide is a screen tall, so it snaps firmly; on a phone the slides are their content's
+   height, so it only pulls when near one, never trapping a long slide. A slide taller than the screen still scrolls freely. */
+html:has(.sales-snap) {
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 4rem;
+}
+@media (min-width: 1024px) and (min-height: 640px) {
+  html:has(.sales-snap) {
+    scroll-snap-type: y mandatory;
+  }
+}

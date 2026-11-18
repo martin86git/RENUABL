@@ -120,7 +120,7 @@ export function LaunchSlide({ signedIn }: { signedIn: boolean }) {
     <section
       ref={root}
       id="launch"
-      className="relative isolate flex min-h-[38rem] flex-col items-center overflow-hidden bg-[#030304] px-5 text-white snap-start lg:h-[calc(100dvh-4rem)]"
+      className="relative isolate flex min-h-[38rem] flex-col items-center overflow-hidden bg-[#030304] px-5 text-white snap-start snap-always lg:h-[calc(100dvh-4rem)]"
       aria-labelledby="launch-head"
     >
       {/* Depth (18 Nov 2026, Martin: take the feel up a notch): stars at three depths drifting at their own speeds, the
