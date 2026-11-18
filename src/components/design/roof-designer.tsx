@@ -391,11 +391,6 @@ const DIAL_STEPS: [step: number, at: number][] = [
   [5, 40],
 ];
 
-/** Narrower than this, the pop-up is a phone's: the picture across the screen, the controls in bands above and below it. */
-const PHONE_BELOW = 640;
-/** The bands on a phone: above the picture the kit, the tools and Publish; below it the picture's switch and Ask Sol, then the rail as a toolbar at the foot. */
-const PHONE_BANDS = { above: 214, below: 204, rail: 56 };
-
 /** What was read of a face's slope from Google's data, with the way to read it again. */
 /**
  * The designer's bar; in the pop-up (8 Nov 2026, Martin: "so many it's overwhelming") its controls fold into one round that
@@ -403,8 +398,6 @@ const PHONE_BANDS = { above: 214, below: 204, rail: 56 };
  */
 function BarRow(props: {
   tight?: boolean;
-  /** On a phone: the rail lies across, and the knife's card comes up from the foot of the screen. */
-  row?: boolean;
   panel?: { title: string; body: React.ReactNode; back: () => void };
   hold: boolean;
   unsaved: boolean;
@@ -417,9 +410,8 @@ function BarRow(props: {
 }) {
   if (!props.tight) return <div className="flex flex-wrap items-center gap-x-5 gap-y-2 py-2.5 lg:flex-nowrap">{props.children}</div>;
   return (
-    <div className={clsx("flex items-center gap-2.5", props.row ? "flex-row" : "flex-col")}>
+    <div className="flex flex-col items-center gap-2.5">
       <KnifeMenu
-        sheet={props.row}
         label="Save, publish, the designs and the checks; stringing, tracing, the guide line, undo and redo"
         hold={props.hold}
         panel={props.panel}
@@ -445,11 +437,7 @@ function BarRow(props: {
         )}
       />
       {props.quick && (
-        <div
-          className={clsx("flex items-center gap-2 border-line", props.row ? "flex-row border-l pl-2.5" : "flex-col border-t pt-2.5")}
-          role="toolbar"
-          aria-label="Quick tools"
-        >
+        <div className="flex flex-col items-center gap-2 border-t border-line pt-2.5" role="toolbar" aria-label="Quick tools">
           {props.quick}
         </div>
       )}
@@ -1579,31 +1567,12 @@ export function RoofDesigner(props: {
   const footRoomNow = useRef(props.footRoom);
   // The first fold from the top of the figures strip, which the column beside the picture keeps within.
   const [foldPx, setFoldPx] = useState<number | null>(null);
-  // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
-  // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
-  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number } | null>(null);
-  const tightNow = useRef(props.tight);
-  useEffect(() => {
-    // Whether this is the pop-up is known a moment after the page: measured again then.
-    tightNow.current = props.tight;
-    window.dispatchEvent(new Event("resize"));
-  }, [props.tight]);
   const stripBox = useCallback((strip: HTMLElement | null) => {
     if (!strip) return;
     const measure = () => {
       const box = strip.getBoundingClientRect();
       const top = box.top + window.scrollY;
       const room = window.innerHeight - top - box.height - 8 - 16 - (footRoomNow.current ?? 0);
-      // (A frame not yet shown has no width: that isn't a phone.)
-      if (tightNow.current && window.innerWidth > 0 && window.innerWidth < PHONE_BELOW) {
-        const across = strip.parentElement?.clientWidth ?? window.innerWidth;
-        const photoH = Math.round((across * ROOF_IMAGE.height) / ROOF_IMAGE.width);
-        const pb = Math.max(PHONE_BANDS.below, Math.round(room - photoH - PHONE_BANDS.above - PHONE_BANDS.rail));
-        const stripH = Math.round(box.height);
-        setStage((was) =>
-          was && was.photoH === photoH && was.pb === pb && was.top === stripH ? was : { top: stripH, pt: PHONE_BANDS.above, pb, photoH },
-        );
-      } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
       setFoldPx(Math.max(320, Math.round(window.innerHeight - top - 16)));
     };
@@ -1618,11 +1587,7 @@ export function RoofDesigner(props: {
       window.removeEventListener("resize", measure);
     };
   }, []);
-  const phone = Boolean(props.tight && stage);
-  const fit = phone ? "100%" : fitPx ? `${fitPx}px` : FIT;
-  /** A place down the picture, as a share of its height: on a phone the picture starts under the band above it. */
-  const picY = (percent: number) =>
-    props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
+  const fit = fitPx ? `${fitPx}px` : FIT;
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
     | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
@@ -4249,6 +4214,22 @@ export function RoofDesigner(props: {
    * demo that reads as a failure). If the next product is short of figures too, its sheet is looked for in turn.
    */
   const sheetFlow = useRef<{ step: "idle" | "restring" | "chain"; tries: number }>({ step: "idle", tries: 0 });
+  // One search a product at a time: the one started in the background below and the one stringing asks for are the
+  // same, so pressing String them while it runs waits for it rather than starting again. One that failed is let go,
+  // so a press can try once more.
+  const sheetSearches = useRef(new Map<string, Promise<{ ok: boolean; message: string }>>());
+  const lookUpSheet = (missing: { kind: "panel" | "inverter"; sku: string; name: string }) => {
+    const running = sheetSearches.current.get(missing.sku);
+    if (running) return running;
+    const search = (props.onFindSheet ? props.onFindSheet(missing) : Promise.resolve({ ok: false, message: "" }))
+      .catch(() => ({ ok: false, message: "Its datasheet couldn't be looked for just now. Try again in a moment." }))
+      .then((res) => {
+        if (!res.ok) sheetSearches.current.delete(missing.sku);
+        return res;
+      });
+    sheetSearches.current.set(missing.sku, search);
+    return search;
+  };
   const findSheet = async (missing: { kind: "panel" | "inverter"; sku: string; name: string }) => {
     if (!props.onFindSheet) return;
     setFindingSheet(true);
@@ -4257,7 +4238,7 @@ export function RoofDesigner(props: {
       note: `The ${missing.kind}'s figures aren't on file (${missing.name}), so I'm finding its datasheet online.`,
       missing,
     });
-    const res = await props.onFindSheet(missing);
+    const res = await lookUpSheet(missing);
     setFindingSheet(false);
     if (!res.ok) {
       sheetFlow.current = { step: "idle", tries: 0 };
@@ -4288,6 +4269,27 @@ export function RoofDesigner(props: {
     setWiring(null);
     changed();
   };
+  // A product on the design with no figures has its datasheet looked for as soon as there are panels to string, quietly
+  // and while anything else goes on (18 Nov 2026, Martin: the search began only after String them failed a second
+  // time; "it could be searching for it whilst the questions are being answered"). Once a product, never on its own
+  // again; the figures reach the lists by themselves, so String them then strings at once.
+  const sheetsAhead = useRef(new Set<string>());
+  const lackingSheets = summary.panels
+    ? [
+        ...(chosenPanel && !chosenPanel.electrical ? [{ kind: "panel" as const, sku: chosenPanel.sku, name: chosenPanel.name }] : []),
+        ...fittedItems.flatMap((i) => (i && !i.electrical ? [{ kind: "inverter" as const, sku: i.sku, name: i.name }] : [])),
+      ]
+    : [];
+  const lackingKey = lackingSheets.map((s) => s.sku).join("|");
+  useEffect(() => {
+    if (!props.onFindSheet) return;
+    for (const sheet of lackingSheets) {
+      if (sheetsAhead.current.has(sheet.sku)) continue;
+      sheetsAhead.current.add(sheet.sku);
+      void lookUpSheet(sheet);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once for each product found short of figures
+  }, [lackingKey]);
   // The figures found have reached the lists: string the panels now (or after a short wait, should they not change).
   const sheetFigures = `${chosenPanel?.electrical ? 1 : 0}|${fittedItems.map((i) => (i?.electrical ? 1 : 0)).join("")}`;
   useEffect(() => {
@@ -5861,17 +5863,12 @@ export function RoofDesigner(props: {
           "z-40 text-ink",
           // In the pop-up (8 Nov 2026, Martin: no menu bar, the map taller and wider; the buttons can run down one side):
           // a rail of rounds down the left, beside the picture, each saying what it is on hover.
-          // On a phone the rail lies across the foot, under Ask Sol: a toolbar in reach of a thumb.
           props.tight
-            ? phone
-              ? "absolute inset-x-3 flex h-12 flex-row items-center"
-              : "absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center"
+            ? "absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center"
             : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
-        style={phone && stage ? { top: 8 + stage.top + 6 + stage.pt + stage.photoH + stage.pb + 4 } : undefined}
       >
         <BarRow
-          row={phone}
           quick={
             props.tight ? (
               <>
@@ -6159,10 +6156,7 @@ export function RoofDesigner(props: {
             data-popup
             title="Record a walkthrough: talk the customer through their design, with Sol's subtitles"
             aria-label="Record a walkthrough of this design for the customer"
-            className={clsx(
-              phone ? "ml-auto" : "absolute bottom-0 left-1/2 -translate-x-1/2",
-              "flex size-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full bg-surface text-ink shadow-lift ring-1 ring-line transition hover:ring-ink/30",
-            )}
+            className="absolute bottom-0 left-1/2 flex size-12 -translate-x-1/2 flex-col items-center justify-center gap-0.5 rounded-full bg-surface text-ink shadow-lift ring-1 ring-line transition hover:ring-ink/30"
           >
             <span className="size-3 rounded-full bg-[#ef4444]" aria-hidden />
             <span className="text-[9px] font-semibold uppercase tracking-wide">Rec</span>
@@ -6170,7 +6164,7 @@ export function RoofDesigner(props: {
         )}
       </header>
 
-      <div className={clsx("relative", props.tight ? (phone ? "" : "pl-[4.25rem] pr-11") : "mt-5")}>
+      <div className={clsx("relative", props.tight ? "pl-[4.25rem] pr-11" : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -6179,8 +6173,7 @@ export function RoofDesigner(props: {
               ref={stripBox}
               className={clsx(
                 "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
-                // On a phone it wraps, and keeps clear of the window's close round in the corner.
-                props.tight ? (phone ? "mb-1.5 mr-11 flex-wrap" : "mb-1.5 flex-nowrap") : "mb-2 flex-wrap",
+                props.tight ? "mb-1.5 flex-nowrap" : "mb-2 flex-wrap",
               )}
               style={{ maxWidth: fit }}
               aria-label="This design in figures"
@@ -6188,12 +6181,7 @@ export function RoofDesigner(props: {
               {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
               {props.tight ? (
-                <div
-                  className={clsx(
-                    "flex items-center gap-x-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums text-white/60",
-                    phone ? "flex-wrap" : "shrink-0",
-                  )}
-                >
+                <div className="flex shrink-0 items-center gap-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums text-white/60">
                   <span className="whitespace-nowrap" title={`${summary.panels} panels of ${panelOf(design).watts} W`}>
                     <b className="text-[15px] font-semibold text-sun-bright">{summary.kw.toFixed(2)}</b> kW · {summary.panels} ×{" "}
                     {panelOf(design).watts} W
@@ -6530,15 +6518,6 @@ export function RoofDesigner(props: {
                 {
                   maxWidth: fit,
                   ...(fitPx ? { "--pic-h": `${Math.round((fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width)}px` } : {}),
-                  // A phone: a band above the picture and one below, where the controls stand.
-                  ...(phone && stage
-                    ? {
-                        paddingTop: stage.pt,
-                        paddingBottom: stage.pb,
-                        marginBottom: PHONE_BANDS.rail,
-                        "--pic-h": `${stage.photoH + stage.pb}px`,
-                      }
-                    : {}),
                 } as React.CSSProperties
               }
             >
@@ -7971,16 +7950,11 @@ export function RoofDesigner(props: {
 
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
-              {props.tight && publishControl && (
-                <div className={clsx("pointer-events-auto absolute z-30", phone ? "right-3 top-[6.75rem]" : "right-4 top-4")}>
-                  {publishControl}
-                </div>
-              )}
+              {props.tight && publishControl && <div className="pointer-events-auto absolute right-4 top-4 z-30">{publishControl}</div>}
               <div
                 className={clsx(
                   "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
-                  // On a phone it stands over Ask Sol, not beside it.
-                  props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
+                  props.tight ? "bottom-10" : "bottom-3",
                   // The day's bar takes the foot of the picture while it plays.
                   homeDay.on && "hidden",
                 )}
@@ -8117,7 +8091,7 @@ export function RoofDesigner(props: {
                   />
                   <div
                     className="absolute z-50 w-56 overflow-hidden rounded-xl bg-surface p-1 text-sm text-ink shadow-[var(--shadow-lift)] ring-1 ring-line"
-                    style={{ left: `min(${toolMenu.x}%, calc(100% - 14.5rem))`, top: `min(${picY(toolMenu.y)}, calc(100% - 27rem))` }}
+                    style={{ left: `min(${toolMenu.x}%, calc(100% - 14.5rem))`, top: `min(${toolMenu.y}%, calc(100% - 27rem))` }}
                     role="menu"
                     onKeyDown={(e) => e.key === "Escape" && setToolMenu(null)}
                   >
@@ -8211,7 +8185,7 @@ export function RoofDesigner(props: {
                       className={clsx(GLASS, "absolute z-30 flex -translate-x-1/2 items-center gap-1 py-0.5 pl-3 pr-0.5")}
                       style={{
                         left: `clamp(7rem, ${left}%, calc(100% - 7rem))`,
-                        top: top < 22 ? `calc(${picY(top)} + 2.75rem)` : `calc(${picY(top)} - 4.25rem)`,
+                        top: top < 22 ? `calc(${top}% + 2.75rem)` : `calc(${top}% - 4.25rem)`,
                       }}
                       role="toolbar"
                       aria-label={`${name}, picked`}
@@ -8247,7 +8221,7 @@ export function RoofDesigner(props: {
                       className="pointer-events-none absolute z-30 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-primary py-1.5 pl-2 pr-3.5 text-primary-ink shadow-lift"
                       style={{
                         left: `clamp(8rem, ${left}%, calc(100% - 8rem))`,
-                        top: top < 16 ? `calc(${picY(low)} + 2.5rem)` : `calc(${picY(top)} - 4rem)`,
+                        top: top < 16 ? `calc(${low}% + 2.5rem)` : `calc(${top}% - 4rem)`,
                       }}
                       role="status"
                       aria-live="polite"
@@ -8312,7 +8286,7 @@ export function RoofDesigner(props: {
                       className="pointer-events-none absolute z-20 w-[19rem] max-w-[calc(100%-1rem)] rounded-lg bg-forest p-3 text-white shadow-lift ring-1 ring-white/15"
                       style={{
                         left: `clamp(0.5rem, calc(${left}% + 2.5rem), calc(100% - 19.5rem))`,
-                        top: `clamp(0.5rem, calc(${picY(top)} - 3rem), calc(100% - 14rem))`,
+                        top: `clamp(0.5rem, calc(${top}% - 3rem), calc(100% - 14rem))`,
                       }}
                       role="status"
                     >
@@ -8364,8 +8338,8 @@ export function RoofDesigner(props: {
                       style={{
                         left: `clamp(0.5rem, calc(${middle}% - ${half}rem), calc(100% - ${half * 2 + 0.5}rem))`,
                         top: low
-                          ? `max(0.5rem, calc(${picY(Math.min(...ys))} - 6.5rem))`
-                          : `min(calc(100% - 3rem), calc(${picY(Math.max(...ys))} + 4.5rem))`,
+                          ? `max(0.5rem, calc(${Math.min(...ys)}% - 6.5rem))`
+                          : `min(calc(100% - 3rem), calc(${Math.max(...ys)}% + 4.5rem))`,
                       }}
                       role="toolbar"
                       aria-label="Turn what is picked"
@@ -8431,7 +8405,7 @@ export function RoofDesigner(props: {
                       style={{
                         // Kept clear of the strings box on the right where the picture is wide enough.
                         left: `clamp(0.5rem, calc(${left}% + 2rem), calc(100% - 41.5rem))`,
-                        top: `clamp(0.5rem, calc(${picY(top)} + 1.5rem), calc(100% - 15rem))`,
+                        top: `clamp(0.5rem, calc(${top}% + 1.5rem), calc(100% - 15rem))`,
                       }}
                       role="status"
                     >
@@ -8496,7 +8470,7 @@ export function RoofDesigner(props: {
                   className="absolute z-20 w-72 max-w-[calc(100%-1rem)] space-y-3 rounded-lg border-2 border-sun-line bg-surface p-4 shadow-lift"
                   style={{
                     left: `clamp(0.5rem, calc(${threadSpot.left}% + 1rem), calc(100% - 18.5rem))`,
-                    top: `clamp(0.5rem, ${picY(threadSpot.top)}, calc(100% - 6rem))`,
+                    top: `clamp(0.5rem, ${threadSpot.top}%, calc(100% - 6rem))`,
                   }}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -8899,7 +8873,7 @@ export function RoofDesigner(props: {
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
                   the customer's bill in the figures above the picture.) */}
               <div
-                className={clsx("absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center", phone ? "top-2" : "top-4")}
+                className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 flex-col items-center"
                 role="group"
                 aria-label="System"
                 data-menu-host
@@ -9440,11 +9414,7 @@ export function RoofDesigner(props: {
               {/* The pad, in the top left corner: the select arrow in a circle of its own, since it is the tool every other
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
-              <div
-                className={clsx("absolute z-20 size-[6.25rem]", phone ? "left-3 top-[4.9rem]" : "left-4 top-4")}
-                role="toolbar"
-                aria-label="Select, add a panel, landscape, erase"
-              >
+              <div className="absolute left-4 top-4 z-20 size-[6.25rem]" role="toolbar" aria-label="Select, add a panel, landscape, erase">
                 <button
                   onClick={() => {
                     const wasOpen = fanOpen;
@@ -9761,11 +9731,8 @@ export function RoofDesigner(props: {
                   className={clsx(
                     "pointer-events-none absolute inset-x-0 flex justify-center",
                     // Above Sol's box while it is open (16 Nov 2026, Martin: the box hid the step at hand).
-                    props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
-                    !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
+                    props.tight && !solAway && commandOpen ? "bottom-[10.5rem] z-[56]" : "bottom-[6.25rem] z-30",
                   )}
-                  // On a phone it starts just under the picture, so the roof it asks about stays in view.
-                  style={phone && stage ? { top: stage.pt + stage.photoH + 6 } : undefined}
                 >
                   <SolGuide
                     step={guideNow}
@@ -9918,8 +9885,8 @@ export function RoofDesigner(props: {
                       </span>
                       <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
                     </span>
-                    <span className="whitespace-nowrap text-[15px] font-medium">Ask Sol</span>
-                    <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
+                    <span className="text-[15px] font-medium">Ask Sol</span>
+                    <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60">/</kbd>
                   </button>
                 ) : (
                   <div
