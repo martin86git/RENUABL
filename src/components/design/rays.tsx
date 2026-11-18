@@ -50,7 +50,7 @@ export function Ray({
               width: Math.max(2, size * 0.06),
               height: `${v * 100}%`,
               background: tint,
-              animationDelay: `${k * 110}ms`,
+              animationDelay: `${k * 110 + (i % VOICE_AGENTS.length) * 370}ms`,
             }}
           />
         ))}

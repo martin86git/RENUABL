@@ -325,21 +325,23 @@ function StickySignUp() {
 function Pricing() {
   const [open, setOpen] = useState<string | null>(null);
   return (
-    <section id="pricing" className="snap-start scroll-mt-16 px-5 py-24 lg:px-8 lg:py-28" aria-labelledby="pricing-title">
+    <section id="pricing" className="snap-start scroll-mt-16 px-5 py-20 lg:px-8 lg:py-12" aria-labelledby="pricing-title">
       <Reveal className="mx-auto w-full max-w-7xl">
         <div className="text-center">
           <BrandEyebrow>{PRICING.eyebrow}</BrandEyebrow>
-          <h2 id="pricing-title" className="mt-5 text-[clamp(36px,5vw,64px)] font-semibold leading-[1] tracking-[-0.035em]">
+          <h2 id="pricing-title" className="mt-4 text-[clamp(32px,3.6vw,48px)] font-semibold leading-[1] tracking-[-0.035em]">
             {PRICING.headline}
           </h2>
-          <p className="mx-auto mt-5 max-w-xl text-[18px] text-ink-2">{PRICING.sub}</p>
+          <p className="mx-auto mt-3 max-w-xl text-[16px] text-ink-2">{PRICING.sub}</p>
         </div>
 
         {/*
           Three even cards, as xAI prices Grok Bot (16 Nov 2026, Martin: "i love the way they make the $30 pricing look so
           cheap"): the price large, one button, then what it includes, each plan building on the one before.
         */}
-        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+        {/* Smaller, so the heading and the three cards are seen in one screen (18 Nov 2026, Martin), and in colour: the
+            12-month plan dark with the sun's glow and what it saves, the ticks and its button in the signal orange. */}
+        <div className="mt-8 grid gap-4 lg:grid-cols-3">
           {PRICING.plans.map((p) => (
             <PlanCard
               key={p.key}
@@ -349,6 +351,8 @@ function Pricing() {
               note={p.note}
               listHead={p.listHead}
               list={"list" in p ? p.list : PRICING.includes}
+              featured={p.featured}
+              badge={"badge" in p ? p.badge : undefined}
             >
               {open === p.key ? (
                 <TrialForm id={p.key} label="Continue" />
@@ -356,7 +360,10 @@ function Pricing() {
                 <button
                   type="button"
                   onClick={() => setOpen(p.key)}
-                  className="h-12 w-full rounded-full bg-primary text-[16px] font-medium text-white hover:brightness-110"
+                  className={clsx(
+                    "h-11 w-full rounded-full text-[15px] font-semibold text-white hover:brightness-110",
+                    p.featured ? "bg-sun-line shadow-[0_10px_30px_-10px_rgba(255,90,31,0.7)]" : "bg-primary",
+                  )}
                 >
                   {SALES_HERO.cta}
                 </button>
@@ -366,7 +373,7 @@ function Pricing() {
           <Enterprise />
         </div>
 
-        <p className="mt-5 text-center text-[14px] text-ink-2">{PRICING.firstMonth}</p>
+        <p className="mt-4 text-center text-[13px] text-ink-2">{PRICING.firstMonth}</p>
 
         {/* What's charged beside a plan: the designer by the job, and the two add-ons, one price for the business. */}
         <div className="mt-16 text-center">
@@ -448,7 +455,7 @@ function Enterprise() {
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="h-12 w-full rounded-full bg-surface text-[16px] font-medium text-ink ring-1 ring-line-strong hover:bg-canvas"
+          className="h-11 w-full rounded-full bg-surface text-[15px] font-semibold text-ink ring-1 ring-line-strong hover:bg-canvas"
         >
           {PRICING.enterprise.cta}
         </button>
@@ -457,7 +464,8 @@ function Enterprise() {
   );
 }
 
-/** One plan, as xAI sets theirs out: its name, the price large with what it's per, a line, the button, what it includes. */
+/** One plan, as xAI sets theirs out: its name, the price large with what it's per, a line, the button, what it includes.
+ * The featured plan is dark with the sun's glow behind its price and what it saves in a pill. */
 function PlanCard({
   name,
   price,
@@ -465,6 +473,8 @@ function PlanCard({
   note,
   listHead,
   list,
+  featured = false,
+  badge,
   children,
 }: {
   name: string;
@@ -473,29 +483,50 @@ function PlanCard({
   note: string;
   listHead: string;
   list: readonly string[];
+  featured?: boolean;
+  badge?: string;
   children: React.ReactNode;
 }) {
+  const quiet = featured ? "text-white/65" : "text-ink-2";
   return (
-    <div className="flex flex-col rounded-[32px] bg-surface p-8 ring-1 ring-line sm:p-10">
-      <p className="text-[17px] text-ink-2">{name}</p>
-      <p className="mt-6 flex items-baseline gap-2">
+    <div
+      className={clsx(
+        "relative isolate flex flex-col overflow-hidden rounded-[28px] p-6 sm:p-7",
+        featured ? "bg-[#0b0b0c] text-white shadow-[0_30px_70px_-30px_rgba(255,90,31,0.45)]" : "bg-surface ring-1 ring-line",
+      )}
+    >
+      {featured && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-20 -top-24 -z-10 size-72 rounded-full bg-[radial-gradient(circle,rgba(255,110,40,0.55)_0%,rgba(255,90,31,0.18)_40%,transparent_70%)]"
+        />
+      )}
+      <div className="flex h-7 items-center justify-between gap-3">
+        <p className={clsx("text-[14px] font-medium", quiet)}>{name}</p>
+        {badge && (
+          <span className="rounded-full bg-sun-line/15 px-2.5 py-1 text-[12px] font-semibold text-sun-line ring-1 ring-sun-line/40">
+            {badge}
+          </span>
+        )}
+      </div>
+      <p className="mt-4 flex items-baseline gap-2">
         <span
           className={clsx(
-            "text-[clamp(48px,4.4vw,64px)] font-semibold leading-none tracking-[-0.04em]",
+            "text-[clamp(36px,3.2vw,48px)] font-semibold leading-none tracking-[-0.04em]",
             price.startsWith("$") && "tabular-nums",
           )}
         >
           {price}
         </span>
-        {per && <span className="text-[17px] text-ink-2">{per}</span>}
+        {per && <span className={clsx("text-[14px]", quiet)}>{per}</span>}
       </p>
-      <p className="mt-3 min-h-[3em] text-[16px] leading-[1.5] text-ink-2">{note}</p>
-      <div className="mt-8">{children}</div>
-      <p className="mt-10 text-[16px] font-semibold">{listHead}</p>
-      <ul className="mt-4 space-y-3">
+      <p className={clsx("mt-2 min-h-[2.9em] text-[14px] leading-[1.45]", quiet)}>{note}</p>
+      <div className="mt-4">{children}</div>
+      <p className="mt-6 text-[14px] font-semibold">{listHead}</p>
+      <ul className="mt-3 space-y-2">
         {list.map((l) => (
-          <li key={l} className="flex gap-3 text-[16px] text-ink-2">
-            <Check className="mt-1 size-4 shrink-0 text-ink-2" aria-hidden />
+          <li key={l} className={clsx("flex gap-2.5 text-[14px] leading-snug", quiet)}>
+            <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
             {l}
           </li>
         ))}

@@ -448,7 +448,7 @@ export function LivingHero() {
           <div className="flex items-start justify-center gap-6">
             {VOICE_AGENTS.map((v, i) => (
               <div key={v.key} className="flex w-24 flex-col items-center text-center">
-                <Ray i={i} size={52} live={live && i === 0} />
+                <Ray i={i} size={52} live={live} />
                 <p className="mt-2 text-[13px] font-medium text-ink">{v.role}</p>
                 {"soon" in v && v.soon && <p className="text-[11px] text-muted">{RAYS_SOON}</p>}
               </div>

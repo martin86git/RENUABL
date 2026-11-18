@@ -43,7 +43,7 @@ export function RaysSlide() {
             {VOICE_AGENTS.map((v, i) => (
               <li key={v.key} className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
                 <div className="flex items-center gap-3">
-                  <Ray i={i} size={40} live={live && i === 0} />
+                  <Ray i={i} size={40} live={live} />
                   <div className="min-w-0">
                     <p className="text-[15px] font-semibold" style={{ color: v.colour }}>
                       {v.role}

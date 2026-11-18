@@ -819,6 +819,8 @@ export const PRICING = {
       per: "a user a month",
       note: `Billed monthly for ${COMMIT_MONTHS} months. Choose it in Billing.`,
       featured: true,
+      /** What it saves a user over the twelve months, on the card (18 Nov 2026, Martin: the pricing lacked colour). */
+      badge: `Save ${dollars((SEAT_MONTHLY_CENTS - COMMIT_SEAT_CENTS) * COMMIT_MONTHS)} a user a year`,
       listHead: "Everything in Monthly, plus:",
       list: [
         `${dollars(SEAT_MONTHLY_CENTS - COMMIT_SEAT_CENTS)} less a user, every month`,
@@ -1117,7 +1119,7 @@ export function salesCopy(): string[] {
     PRICING.perShort,
     ...PRICING.enterprise.list,
     PRICING.enterprise.listHead,
-    ...PRICING.plans.flatMap((p) => [p.listHead, ...("list" in p ? p.list : [])]),
+    ...PRICING.plans.flatMap((p) => [p.listHead, ...("list" in p ? p.list : []), ...("badge" in p ? [p.badge] : [])]),
     ...BIG_THREE.flatMap((p) => [p.eyebrow, p.title, p.line, p.body, ...p.points, p.link.label]),
     ...JOURNEY.flatMap((j) => [j.step, j.title, j.body]),
     SOL.eyebrow,
