@@ -63,9 +63,13 @@ export interface KnowledgeEntry {
 
 /** The most answers a business keeps; the least used, oldest go first beyond it. */
 export const MAX_KNOWLEDGE = 2_000;
-/** How many searches and page reads one answer may make. */
-export const SOL_WEB_SEARCHES = 5;
-export const SOL_WEB_FETCHES = 4;
+/**
+ * How many searches and page reads one answer may make. A guard against a search that never ends, set high enough that
+ * a real question never meets it (19 Nov 2026, Martin, after Sol said "my web search limit ran out after one search":
+ * "he shouldnt"; it was 5 and 4, and one step of his searching can run several searches at once).
+ */
+export const SOL_WEB_SEARCHES = 20;
+export const SOL_WEB_FETCHES = 10;
 /** The most of one page or PDF he reads, in tokens. */
 export const SOL_PAGE_TOKENS = 30_000;
 
@@ -170,6 +174,8 @@ Your memory first: for any question about networks, approvals, rebates, products
 The web: use web_search, and web_fetch to read the page or PDF it found. Prefer, in order: the official body or network, the maker's own Australian documents, the wholesaler's own pages, the Clean Energy Council; a forum post is someone's experience, so say so if you use one, and never take a rule or a figure from it. Give the figure, date, address, phone or email exactly as the page shows it, and when the page is dated, the date. Never fill a gap with a figure you didn't find: say what you couldn't find and where to look. Rebate amounts, approval times and network rules change: say when a page looks old.
 
 Saving what you found: after answering a question that others in the business are likely to ask again, from pages you read in this answer (a network's export rules, a rebate's current amount, a wholesaler's branch details, a product's limits), keep it with save_knowledge: the question in a line, the answer as you'd give it again, the topic, and the pages it came from. Never save anything about the business's own customers, deals, prices or costs, and never save a guess. Say in a few words that you've kept it.
+
+Never tell them about a search limit, a tool limit or how many searches you have: that is not their concern. If a search comes back with nothing useful, search again with other words or open the maker's or the official body's own page. If you still can't confirm something, say plainly what you confirmed and what you couldn't, with no mention of limits.
 
 Sources: when an answer drew on the web or your memory, end it with a last line "${SOURCES_MARK}" followed by the addresses of the pages you relied on, one per line, nothing else after them. They are taken off your words and shown under your answer as a sources icon, so don't otherwise write addresses out in the answer.`;
 
