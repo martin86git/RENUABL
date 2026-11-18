@@ -38,6 +38,9 @@ export function practiceBrief(o: {
   coaching: string[];
   locked?: string[];
   delivery?: Delivery | null;
+  assistantSaid?: string | null;
+  audience?: CallBrief["audience"];
+  reason?: string | null;
 }): CallBrief {
   return {
     mode: "lead",
@@ -53,6 +56,10 @@ export function practiceBrief(o: {
     coaching: o.coaching,
     locked: o.locked ?? [],
     delivery: o.delivery ?? null,
+    // Its name as said, who it rings and why (call-setup.ts), so the practice call opens as a real one would.
+    assistantSaid: o.assistantSaid ?? null,
+    audience: o.audience,
+    reason: o.reason ?? null,
   };
 }
 

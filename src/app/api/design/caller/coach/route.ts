@@ -10,6 +10,9 @@ import {
   COACH_COPY,
 } from "@/lib/domain/design/coaching";
 import { cleanDelivery } from "@/lib/domain/design/delivery";
+import { cleanCallSetup } from "@/lib/domain/design/call-setup";
+import { query } from "@/lib/server/db";
+import { loadBrand } from "@/lib/server/design-proposal-repo";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
 import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
@@ -17,7 +20,16 @@ import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log
 import { callTranscriptsFor } from "@/lib/server/call-transcripts";
 import { chatLines, fileChatAway, forgetChat, isChatId, reopenChat } from "@/lib/domain/design/coach-threads";
 import { coachAssistant, newChatId, newNoteId } from "@/lib/server/design-caller-coach";
-import { coachChatsOf, coachingOf, deliveryOf, saveCoachChats, saveCoaching, saveDelivery } from "@/lib/server/design-caller-repo";
+import {
+  callSetupOf,
+  coachChatsOf,
+  coachingOf,
+  deliveryOf,
+  saveCallSetup,
+  saveCoachChats,
+  saveCoaching,
+  saveDelivery,
+} from "@/lib/server/design-caller-repo";
 import { ADMIN_FIXED_RULES, cleanCallerKey } from "@/lib/domain/install-call";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
@@ -34,14 +46,27 @@ export async function GET(request: Request) {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const role = roleIn(request);
-    const [c, chats, delivery] = await Promise.all([
+    const [c, chats, delivery, setup, biz] = await Promise.all([
       coachingOf(who.member.businessId, role),
       coachChatsOf(who.member.businessId, role),
       deliveryOf(who.member.businessId, role),
+      // Its name as said, who it rings and why (call-setup.ts), with the business's name for the opening shown.
+      callSetupOf(who.member.businessId, role),
+      query<{ name: string }>(`select name from businesses where id = $1`, [who.member.businessId]),
     ]);
+    const business = (await loadBrand(who.member.businessId, biz[0]?.name ?? "").catch(() => null))?.name || biz[0]?.name || "";
     const mayCoach = can(who.member.role, "prices", who.member.permissions);
     return Response.json(
-      { ok: true, ...c, past: chatLines(chats), fixed: role === "admin" ? ADMIN_FIXED_RULES : FIXED_RULES, mayCoach, delivery },
+      {
+        ok: true,
+        ...c,
+        past: chatLines(chats),
+        fixed: role === "admin" ? ADMIN_FIXED_RULES : FIXED_RULES,
+        mayCoach,
+        delivery,
+        setup,
+        business,
+      },
       { headers: PRIVATE },
     );
   });
@@ -141,6 +166,11 @@ export async function PUT(request: Request) {
     const read = await readBody(request, 2_000);
     if ("refuse" in read) return read.refuse;
     const role = roleIn(request);
+    if (read.body.setup !== undefined) {
+      // How its name is said, who it rings and why: cleaned here, used from the next call.
+      await saveCallSetup(who.member.businessId, cleanCallSetup(read.body.setup), who.member.email, role);
+      return Response.json({ ok: true, setup: await callSetupOf(who.member.businessId, role) });
+    }
     if (read.body.delivery !== undefined) {
       // What was chosen is kept as chosen (a plain manner too, since a sales agent's own way is natural); null goes
       // back to the agent's own way.

@@ -10,6 +10,7 @@ import type { AssistantDeal, AssistantDealCall } from "@/lib/domain/design/assis
 import type { CoachChatLine } from "@/lib/domain/design/coach-threads";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
 import type { Delivery } from "@/lib/domain/design/delivery";
+import type { CallSetup } from "@/lib/domain/design/call-setup";
 import type { TrainingView } from "@/lib/domain/design/training-call";
 import type { CallerKey } from "@/lib/domain/install-call";
 import { callerFor, useCallerInfo, type CallerState } from "./caller";
@@ -77,9 +78,16 @@ const json = (method: string, body: unknown): RequestInit => ({
 });
 
 export const loadCoaching = () =>
-  ask<{ notes: CoachNote[]; turns: CoachTurn[]; past: CoachChatLine[]; fixed: string[]; mayCoach: boolean; delivery?: Delivery | null }>(
-    at(),
-  );
+  ask<{
+    notes: CoachNote[];
+    turns: CoachTurn[];
+    past: CoachChatLine[];
+    fixed: string[];
+    mayCoach: boolean;
+    delivery?: Delivery | null;
+    setup?: CallSetup;
+    business?: string;
+  }>(at());
 
 type Chats = { turns: CoachTurn[]; past: CoachChatLine[] };
 /** An earlier chat becomes the one going; the one that was going is filed away in its place. */
@@ -104,6 +112,8 @@ export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[]
 export const lockNote = (id: string, locked: boolean) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, locked }));
 /** How the agent speaks; null goes back to how it was. */
 export const saveDelivery = (delivery: Delivery | null) => ask<{ delivery: Delivery | null }>(at(), json("PUT", { delivery }));
+/** The agent's name as said, who it rings and why (call-setup.ts). */
+export const saveCallSetup = (setup: CallSetup) => ask<{ setup: CallSetup }>(at(), json("PUT", { setup }));
 export const removeNote = (id: string) => ask<{ notes: CoachNote[] }>(at("", `&id=${encodeURIComponent(id)}`), { method: "DELETE" });
 
 /** The agent's latest training call: still on, being written up, or the changes it proposes (training-call.ts). */

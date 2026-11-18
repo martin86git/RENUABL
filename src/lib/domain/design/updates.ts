@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
+    area: "Phone assistant",
+    words: "Set your voice agent's name, how it's said, and the reason for its calls, beside its chat. Cold calls are a choice.",
+  },
+  {
+    day: "2026-11-18",
     area: "Proposals",
     words: "The proposal screen has Sol's price check too: your price and margin against your own signed jobs, before you publish.",
   },

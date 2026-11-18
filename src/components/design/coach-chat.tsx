@@ -45,6 +45,8 @@ import { currentChatLine, type CoachChatLine } from "@/lib/domain/design/coach-t
 import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { callerChanged, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
 import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
+import { CALL_SETUP_COPY, DEFAULT_CALL_SETUP, type CallSetup } from "@/lib/domain/design/call-setup";
+import { CallSetupSettings } from "./coach-call-setup";
 import { DeliverySettings, RingMe, TrainingReview, TrainingStrip, useTraining, type Training } from "./coach-training";
 import { voiceLabel } from "@/lib/domain/design/caller";
 import {
@@ -263,6 +265,9 @@ function CoachWindowFor() {
   const [mayCoach, setMayCoach] = useState(false);
   // How it speaks (delivery.ts): null until the business has chosen.
   const [delivery, setDelivery] = useState<Delivery | null>(null);
+  // Its name as said, who it rings and why (call-setup.ts), and the business it speaks for.
+  const [setup, setSetup] = useState<CallSetup>(DEFAULT_CALL_SETUP);
+  const [business, setBusiness] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState("");
   // What the microphone is hearing, shown in the box as it comes (14 Nov 2026, Martin: talk into the chat field).
@@ -350,6 +355,8 @@ function CoachWindowFor() {
       setFixed(res.fixed);
       setMayCoach(res.mayCoach);
       setDelivery(res.delivery ?? null);
+      setSetup(res.setup ?? DEFAULT_CALL_SETUP);
+      setBusiness(res.business ?? "");
     });
     const t = window.setTimeout(() => box.current?.focus(), 50);
     const key = (e: KeyboardEvent) => e.key === "Escape" && closeCoach();
@@ -615,6 +622,10 @@ function CoachWindowFor() {
                 mayCoach={mayCoach}
                 delivery={delivery}
                 onDelivery={setDelivery}
+                setup={setup}
+                onSetup={setSetup}
+                business={business}
+                loaded={loaded}
                 onNotes={setNotes}
                 onBack={() => toggleSettings(false)}
               />
@@ -830,11 +841,17 @@ function CoachSettings(props: {
   mayCoach: boolean;
   delivery: Delivery | null;
   onDelivery: (d: Delivery | null) => void;
+  setup: CallSetup;
+  onSetup: (s: CallSetup) => void;
+  business: string;
+  loaded: boolean;
   onNotes: (n: CoachNote[]) => void;
   onBack: () => void;
 }) {
   const { callsOn } = useCallerInfo();
   const caller = useCoachCaller();
+  // Open to start: its name and why it rings are the first things a business sets (18 Nov 2026, Martin).
+  const [whoOpen, setWhoOpen] = useState(true);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
   const [fixedOpen, setFixedOpen] = useState(false);
@@ -871,6 +888,29 @@ function CoachSettings(props: {
       </button>
       <div className="space-y-3 p-3">
         <TrainingReview t={props.training} caller={caller} onNotes={props.onTrainingNotes} />
+
+        <section className={card}>
+          {head(
+            <Phone className="size-4" />,
+            "bg-sun text-sun-line",
+            CALL_SETUP_COPY.title,
+            CALL_SETUP_COPY.summary(name, props.setup),
+            whoOpen,
+            () => setWhoOpen((o) => !o),
+          )}
+          {whoOpen && props.loaded && (
+            <div className="border-t border-line px-3.5 py-3">
+              <CallSetupSettings
+                key={`${caller.role ?? "sales"}|${caller.name}`}
+                caller={caller}
+                business={props.business}
+                setup={props.setup}
+                editable={props.mayCoach}
+                onSaved={props.onSetup}
+              />
+            </div>
+          )}
+        </section>
 
         <section className={card}>
           {head(<AudioLines className="size-4" />, "bg-surface-2 text-ink", "Voice", voiceLabel(caller.voice), voiceOpen, () =>

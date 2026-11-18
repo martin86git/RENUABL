@@ -8,6 +8,7 @@ import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { cleanDelivery, defaultDelivery, type Delivery } from "@/lib/domain/design/delivery";
+import { DEFAULT_CALL_SETUP, cleanCallSetup, type CallAudience, type CallSetup } from "@/lib/domain/design/call-setup";
 import { dbConfigured, query } from "./db";
 
 export interface Caller {
@@ -133,6 +134,24 @@ export async function saveDelivery(businessId: string, delivery: Delivery | null
   );
 }
 
+/** How the agent's name is said, who it rings and why (domain/design/call-setup.ts); the calls as they were until set. */
+export async function callSetupOf(businessId: string, role: CallerKey = "sales"): Promise<CallSetup> {
+  if (!dbConfigured()) return DEFAULT_CALL_SETUP;
+  const rows = await query<{ call_setup: unknown }>(`select call_setup from design_caller where business_id = $1 and role = $2`, [
+    businessId,
+    role,
+  ]);
+  return rows[0]?.call_setup ? cleanCallSetup(rows[0].call_setup) : DEFAULT_CALL_SETUP;
+}
+
+export async function saveCallSetup(businessId: string, setup: CallSetup, by: string, role: CallerKey = "sales"): Promise<void> {
+  await query(
+    `insert into design_caller (business_id, name, call_setup, updated_by, role) values ($1, $2, $3, $4, $5)
+     on conflict (business_id, role) do update set call_setup = excluded.call_setup, updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, DEFAULT_CALLER, JSON.stringify(setup), by, role],
+  );
+}
+
 /**
  * The agent's script as every call is given it, read fresh: the notes that guide how it talks, the rules locked in,
  * and how it speaks. Never throws: a call goes ahead with what could be read.
@@ -140,13 +159,28 @@ export async function saveDelivery(businessId: string, delivery: Delivery | null
 export async function scriptFor(
   businessId: string,
   role: CallerKey = "sales",
-): Promise<{ coaching: string[]; locked: string[]; delivery: Delivery | null }> {
-  const [c, delivery] = await Promise.all([
+): Promise<{
+  coaching: string[];
+  locked: string[];
+  delivery: Delivery | null;
+  assistantSaid: string | null;
+  audience: CallAudience;
+  reason: string | null;
+}> {
+  const [c, delivery, setup] = await Promise.all([
     coachingOf(businessId, role).catch(() => null),
     // If it can't be read, the call goes as calls always did.
     deliveryOf(businessId, role).catch(() => null),
+    callSetupOf(businessId, role).catch(() => DEFAULT_CALL_SETUP),
   ]);
-  return { ...scriptLines(c?.notes ?? []), delivery };
+  return {
+    ...scriptLines(c?.notes ?? []),
+    delivery,
+    // Its name as the voice says it, who it rings and why (call-setup.ts).
+    assistantSaid: setup.saidAs || null,
+    audience: setup.audience,
+    reason: setup.reason || null,
+  };
 }
 
 /** The chats before the one going (domain/design/coach-threads.ts), newest first. */

@@ -8,6 +8,7 @@
  * in** on the install calendar as a tentative install: it never sets the deal's install date. The team confirms it, and
  * the assistant says so on the call. Pure rules here; the call is placed by server/voice-calls.ts.
  */
+import { sayName } from "./design/call-setup";
 import { coachingBlock } from "./design/coaching";
 import { deliveryBlock } from "./design/delivery";
 import { saidAs, saidAsNote } from "./said-as";
@@ -138,16 +139,16 @@ const firstNameOf = (raw: string | null | undefined) =>
     .trim()
     .slice(0, 40);
 
-const whoIs = (b: Pick<CallBrief, "assistant" | "business">) =>
-  `${plain(b.assistant, 20) || "Sol"}, ${saidAs(plain(b.business, 60)) || "the team"}'s automated assistant`;
+const whoIs = (b: Pick<CallBrief, "assistant" | "assistantSaid" | "business">) =>
+  `${sayName(b)}, ${saidAs(plain(b.business, 60)) || "the team"}'s automated assistant`;
 
 /** The first words. Always who is calling and that it's automated (no audio is recorded: voice-agent.ts `NO_AUDIO`). */
-export function installFirstMessage(b: Pick<CallBrief, "assistant" | "business" | "firstName">): string {
+export function installFirstMessage(b: Pick<CallBrief, "assistant" | "assistantSaid" | "business" | "firstName">): string {
   const name = firstNameOf(b.firstName);
   return `Hi${name ? `, is that ${name}` : ""}? It's ${whoIs(b)}, ${ROLE_WORDS.admin.opens}. Have you got a couple of minutes?`;
 }
 
-export function installVoicemail(b: Pick<CallBrief, "assistant" | "business" | "firstName">): string {
+export function installVoicemail(b: Pick<CallBrief, "assistant" | "assistantSaid" | "business" | "firstName">): string {
   const name = firstNameOf(b.firstName);
   return `Hi${name ? ` ${name}` : ""}, it's ${whoIs(b)}, calling to book in your installation. We'll try you again soon, or you can ring us back on this number. Thanks, bye.`;
 }
@@ -170,7 +171,7 @@ export function installSystemPrompt(b: CallBrief, days: readonly InstallDay[], o
     "- endCall: to finish once you've said goodbye.",
   ].filter(Boolean);
   const coached = [deliveryBlock(b.delivery), coachingBlock(b.coaching ?? [], business, b.locked ?? [])].filter(Boolean).join("\n\n");
-  return `You are ${plain(b.assistant, 20) || "Sol"}, ${business}'s automated phone assistant for bookings.
+  return `You are ${sayName(b)}, ${business}'s automated phone assistant for bookings.
 
 You are on a phone call with ${name || "a customer"}, who has gone ahead with ${business}. Their job is ready to be booked in. Your one job: find a day for the installation that suits them from the days below, and pencil it in.
 

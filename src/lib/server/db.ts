@@ -1641,6 +1641,8 @@ alter table design_caller add column if not exists coach_chat jsonb;
 alter table design_caller add column if not exists coach_past jsonb;
 -- How a voice agent speaks (domain/design/delivery.ts): null is the calls as they were.
 alter table design_caller add column if not exists delivery jsonb;
+-- How its name is said, who it rings and why (domain/design/call-setup.ts): null is the calls as they were.
+alter table design_caller add column if not exists call_setup jsonb;
 -- A business has two phone assistants (domain/install-call.ts CALLER_ROLES): 'sales' (every row made before) and
 -- 'admin', which rings sold customers to book their installation. One row a business a role.
 alter table design_caller add column if not exists role text not null default 'sales';
