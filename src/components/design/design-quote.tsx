@@ -12,6 +12,8 @@ import {
   undecidedLines,
   lineKey,
   MAX_LINE_QTY,
+  MAX_RATE_PER_WATT,
+  centsWords,
   MARGIN_KEY,
   MAX_ADDED_LABEL,
   MAX_ADDED_LINES,
@@ -304,6 +306,7 @@ export function DesignQuote(props: {
               {rows.map((l, i) => {
                 const typed = edits[lineKey(l)]?.amount;
                 const typedQty = edits[lineKey(l)]?.qty;
+                const typedRate = edits[lineKey(l)]?.rate;
                 // The line as it stands with any hand changes: a quantity typed over it prices it again.
                 const shown = editedLines([l], edits)[0] ?? l;
                 const unset = l.missing && typed === undefined;
@@ -324,7 +327,33 @@ export function DesignQuote(props: {
                     }
                   >
                     <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
-                      {l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label}
+                      {l.watts ? (
+                        // Priced by the watt (18 Nov 2026, Martin): the cents a watt is a box to type over, always shown as one.
+                        <span className="inline-flex flex-wrap items-center gap-1">
+                          {l.label.replace(/ at [\d.]+c a watt$/, " at")}
+                          <span className="inline-flex items-center rounded-md bg-surface px-1 ring-1 ring-line focus-within:ring-forest">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={Math.round((typedRate ?? (typed !== undefined ? typed / l.watts : l.amount / l.watts)) * 1000) / 10}
+                              onChange={(e) =>
+                                edit(l, {
+                                  rate: Math.max(0, Math.min(MAX_RATE_PER_WATT, (Number(e.target.value) || 0) / 100)),
+                                  amount: undefined,
+                                })
+                              }
+                              aria-label="Cents a watt for the solar installation"
+                              className="w-12 bg-transparent py-0.5 text-right font-semibold tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                            <span className="pl-0.5 text-xs text-muted">c/W</span>
+                          </span>
+                        </span>
+                      ) : l.qty && /^\d+ × /.test(l.label) ? (
+                        l.label.replace(/^\d+ × /, "")
+                      ) : (
+                        l.label
+                      )}
                       {l.confirm && split && (
                         <span
                           className={
@@ -378,7 +407,7 @@ export function DesignQuote(props: {
                           </button>
                         </span>
                       )}
-                      {(typed !== undefined || typedQty !== undefined) &&
+                      {(typed !== undefined || typedQty !== undefined || typedRate !== undefined) &&
                         (l.missing && typed === 0 && typedQty === undefined ? (
                           <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
                             Left at $0 (no cost on file): undo
@@ -386,6 +415,7 @@ export function DesignQuote(props: {
                         ) : (
                           <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
                             Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
+                            {typedRate !== undefined && l.watts ? `${centsWords(l.amount / l.watts)}c a watt, ` : ""}
                             {l.missing ? "no cost" : money(l.amount)}
                           </button>
                         ))}

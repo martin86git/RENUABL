@@ -50,6 +50,8 @@ export interface CostLine {
   sku?: string;
   /** No cost is on file for it: the line is $0 until one is set. */
   missing?: boolean;
+  /** Watts the line is priced by (the solar installation, at so many cents a watt): its rate can be typed over (`LineEdit.rate`). */
+  watts?: number;
   /**
    * A cost that sometimes applies (as Primero's): decided on each job, outside the price until included (`LineEdit.on`),
    * and nothing is published until it is included or left out (`undecidedLines`).
@@ -210,7 +212,12 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     const r = workspace.install;
     const install = (label: string, amount: number, qty?: number) =>
       lines.push({ group: "Installation", label, amount, ...(qty ? { qty } : {}) });
-    install(`Solar installation: ${pvKw} kW at ${Math.round(r.pvPerWatt * 1000) / 10}c a watt`, pvKw * 1000 * r.pvPerWatt);
+    lines.push({
+      group: "Installation",
+      label: `Solar installation: ${pvKw} kW at ${centsWords(r.pvPerWatt)}c a watt`,
+      amount: pvKw * 1000 * r.pvPerWatt,
+      watts: Math.round(pvKw * 1000),
+    });
     if (form.storeys === "double") install("Double storey", r.doubleStorey);
     install(
       arrays > 2 ? `Split arrays: ${arrays} on the roof, ${arrays - 2} more than the 2 allowed for` : `Arrays: ${arrays} on the roof`,
@@ -280,6 +287,11 @@ export interface LineEdit {
   removed?: boolean;
   /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
   on?: boolean;
+  /**
+   * A rate typed over a line priced by the watt (`CostLine.watts`), in dollars a watt (18 Nov 2026, Martin: the solar
+   * installation's 30c a watt must be clearly editable): the line is priced again at it, unless a cost is typed too.
+   */
+  rate?: number;
   /** A line of the business's own, added by hand (kept under an `addedKey`): its name and group. Its `amount` is the cost each. */
   label?: string;
   group?: CostGroup;
@@ -344,6 +356,14 @@ export interface QuoteFields {
  * A line's name with its figures taken out, so an edit made to "Rails (23 lengths for 42 panels)" still belongs
  * to that line once the design has grown and it reads "(25 lengths for 46 panels)".
  */
+/** The most a rate typed over a line priced by the watt may be, dollars a watt. */
+export const MAX_RATE_PER_WATT = 5;
+
+/** Dollars a watt as cents, as a label says them: 0.3 → "30", 0.325 → "32.5". */
+export function centsWords(perWatt: number): string {
+  return String(Math.round(perWatt * 1000) / 10);
+}
+
 export function lineKey(line: Pick<CostLine, "group" | "label">): string {
   return `${line.group}|${line.label.replace(/[\d.,]+/g, "#")}`.slice(0, 160);
 }
@@ -359,6 +379,14 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
       if (edit?.qty !== undefined && l.qty !== undefined) {
         const each = l.qty > 0 ? l.amount / l.qty : 0;
         line = { ...line, qty: edit.qty, amount: Math.round(each * edit.qty * 100) / 100 };
+      }
+      // A rate typed over a line priced by the watt prices it again, and says the new rate.
+      if (edit?.rate !== undefined && l.watts) {
+        line = {
+          ...line,
+          amount: Math.round(l.watts * edit.rate * 100) / 100,
+          label: l.label.replace(/at [\d.]+c a watt/, `at ${centsWords(edit.rate)}c a watt`),
+        };
       }
       // A cost typed over a line settles it, and wins over the quantity's.
       return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
@@ -663,7 +691,15 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
     const edits: Record<string, LineEdit> = {};
     for (const [key, value] of Object.entries(q.edits && typeof q.edits === "object" ? q.edits : {}).slice(0, 60)) {
       if (key.length > 160 || !value || typeof value !== "object") continue;
-      const v = value as { amount?: unknown; qty?: unknown; removed?: unknown; on?: unknown; label?: unknown; group?: unknown };
+      const v = value as {
+        amount?: unknown;
+        qty?: unknown;
+        removed?: unknown;
+        on?: unknown;
+        label?: unknown;
+        group?: unknown;
+        rate?: unknown;
+      };
       const money = (x: unknown) =>
         typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1_000_000 ? Math.round(x * 100) / 100 : undefined;
       if (key === MARGIN_KEY) {
@@ -690,8 +726,17 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
           ? Math.round(v.amount * 100) / 100
           : undefined;
       const qty = typeof v.qty === "number" && Number.isInteger(v.qty) && v.qty >= 0 && v.qty <= MAX_LINE_QTY ? v.qty : undefined;
-      if (amount !== undefined || qty !== undefined || on)
-        edits[key] = { ...(amount !== undefined ? { amount } : {}), ...(qty !== undefined ? { qty } : {}), ...(on ? { on: true } : {}) };
+      const rate =
+        typeof v.rate === "number" && Number.isFinite(v.rate) && v.rate >= 0 && v.rate <= MAX_RATE_PER_WATT
+          ? Math.round(v.rate * 10_000) / 10_000
+          : undefined;
+      if (amount !== undefined || qty !== undefined || rate !== undefined || on)
+        edits[key] = {
+          ...(amount !== undefined ? { amount } : {}),
+          ...(qty !== undefined ? { qty } : {}),
+          ...(rate !== undefined ? { rate } : {}),
+          ...(on ? { on: true } : {}),
+        };
     }
     quotes.push({
       form: {

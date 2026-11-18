@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addedLines, cleanExtras, editedLines, MARGIN_KEY, marginOf, quoteTotals, type Costing, type LineEdit } from "./quote";
+import { addedLines, lineKey, cleanExtras, editedLines, MARGIN_KEY, marginOf, quoteTotals, type Costing, type LineEdit } from "./quote";
 
 const costing: Costing = {
   panels: 10,
@@ -63,5 +63,16 @@ describe("the margin typed over, and lines of the business's own", () => {
     expect(out["added|x2"]).toBeUndefined();
     expect(out["added|bad key!"]).toBeUndefined();
     expect(out["added|x3"]).toEqual({ label: "No group", group: "Installation", qty: 1, amount: 0 });
+  });
+  it("prices the solar installation again at a rate typed over its cents a watt, and keeps the rate", () => {
+    const line = { group: "Installation" as const, label: "Solar installation: 6.65 kW at 30c a watt", amount: 1995, watts: 6650 };
+    const out = editedLines([line], { [lineKey(line)]: { rate: 0.35 } })[0];
+    expect(out.amount).toBe(2327.5);
+    expect(out.label).toBe("Solar installation: 6.65 kW at 35c a watt");
+    const raw = { quotes: [{ form: {}, edits: { [lineKey(line)]: { rate: 0.35 }, "Installation|x": { rate: 99 } } }] };
+    const bill = { interval: "quarterly", amount: "", supplyPerDay: "1", rate: "0.3", feedIn: "0.05" } as const;
+    const kept = cleanExtras(raw, 1, { bill, postcode: "3150" }).quotes[0].edits;
+    expect(kept[lineKey(line)]).toEqual({ rate: 0.35 });
+    expect(kept["Installation|x"]).toBeUndefined();
   });
 });
