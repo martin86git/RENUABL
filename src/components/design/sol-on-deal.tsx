@@ -426,7 +426,7 @@ function SolTerminal(props: {
 }
 
 /** Sol's sun with a thin ring turning round it: he's here, and on it. */
-function SolLive() {
+export function SolLive() {
   return (
     <span className="relative grid size-11 shrink-0 place-items-center" aria-hidden>
       <svg viewBox="0 0 44 44" className="sol-live-ring absolute inset-0 size-11">
@@ -448,7 +448,7 @@ function SolLive() {
 }
 
 /** Words typed out as Sol says them, as a terminal would (all at once with reduced motion). */
-function useTyped(text: string): { text: string; done: boolean } {
+export function useTyped(text: string): { text: string; done: boolean } {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;

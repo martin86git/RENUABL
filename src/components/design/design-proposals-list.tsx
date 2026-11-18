@@ -1,8 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { BatteryCharging, Bell, Check, Download, Eye, FileText, Mail, MessageSquare, PenTool, Phone, Plug, Send, Sun } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowUp,
+  BatteryCharging,
+  Bell,
+  Check,
+  Download,
+  Eye,
+  FileText,
+  Loader2,
+  Mail,
+  MessageSquare,
+  PenTool,
+  Phone,
+  Plug,
+  Send,
+  Sun,
+} from "lucide-react";
+import { writeWithSol } from "@/lib/services/deal-feed";
+import { emailDeal } from "@/lib/services/crm";
+import { dismissPrepared, sendPrepared } from "@/lib/services/prepared";
+import { WRITE_ASK_MAX } from "@/lib/domain/design/deal-write";
+import { ContextLine } from "./context-line";
+import { DictateButton, withSpoken } from "./dictate";
+import { SolLive, useTyped } from "./sol-on-deal";
 import { askSolInPanel } from "@/lib/services/sol";
 import { CallChooser } from "./call-choice";
 import clsx from "clsx";
@@ -21,7 +44,7 @@ import {
 import { listProposals, markFollowUp, type ProposalLine } from "@/lib/services/after-sale";
 import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { PATHS, PageHead, ui } from "./design-shell";
-import { PreparedCard, usePrepared } from "./ready-for-you";
+import { usePrepared } from "./ready-for-you";
 import { SolIcon } from "./sol-icon";
 
 /**
@@ -259,9 +282,15 @@ function Status({ state }: { state: ProposalLine["state"] }) {
 }
 
 /**
- * The follow-up due, marked called or emailed here, with what the customer has had so far beneath it; and when Sol has
- * drafted it (Ready for you), "Sol drafted it" opens his draft to check and send.
+ * The follow-up due, as Sol putting it to you (18 Nov 2026, Martin: "do the same for proposals sent that need a follow
+ * up", as Sol's card on a deal): his line typed out, the violet Context, his follow-up email already written and open to
+ * change, then **Yes, send it** / **Not now**, and a box (with the microphone) to tell him what to change, which he
+ * writes again. His draft is the one he prepared (Ready for you), else he writes one as the row opens, at most
+ * `AUTO_WRITES` on a page so a long list doesn't run up credits. Not now leaves the old way: mark it Called or Emailed.
  */
+const AUTO_WRITES = 3;
+let autoWritten = 0;
+
 function FollowUpBox({
   line,
   due,
@@ -275,8 +304,46 @@ function FollowUpBox({
   draft: PreparedItem | null;
   onDraftGone: (id: string) => void;
 }) {
+  const first = line.customer.split(" ")[0] || line.customer;
+  const word = FOLLOW_UP_WORDS[due.step - 1];
+  const now = new Date();
   const [state, setState] = useState<"idle" | "saving" | "error" | { how: "call" | "email" }>("idle");
-  const [reading, setReading] = useState(false);
+  const [mine, setMine] = useState<{ subject: string; body: string } | null>(null);
+  const prepared = draft && draft.status === "ready" ? draft : null;
+  const preparing = draft?.status === "preparing";
+  const [subject, setSubject] = useState<string | null>(null);
+  const [body, setBody] = useState<string | null>(null);
+  const shown = mine ?? (prepared ? { subject: prepared.subject, body: prepared.body } : null);
+  const words = shown ? { subject: subject ?? shown.subject, body: body ?? shown.body } : null;
+  const [writing, setWriting] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [later, setLater] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [heard, setHeard] = useState("");
+
+  const write = async (asked: string) => {
+    setWriting(true);
+    setProblem(null);
+    const r = await writeWithSol(line.jobId, asked.slice(0, WRITE_ASK_MAX));
+    setWriting(false);
+    if (!r.ok) return setProblem(r.message);
+    setMine({ subject: r.subject, body: r.body });
+    setSubject(null);
+    setBody(null);
+  };
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current || draft || mine) return;
+    if (autoWritten >= AUTO_WRITES) return;
+    started.current = true;
+    autoWritten += 1;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Sol writes it once as the row opens
+    void write(
+      `The ${word.toLowerCase()} follow-up on the proposal we sent ${first} ${due.age} days ago${line.openedAt ? " (they've opened it)" : " (not opened yet)"}. Short and warm, one easy next step.`,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the row opens with nothing drafted
+  }, [draft?.id]);
+
   const mark = async (how: "call" | "email") => {
     setState("saving");
     const res = await markFollowUp(line.jobId, due.day, how);
@@ -284,51 +351,193 @@ function FollowUpBox({
     setState({ how });
     onDone(how);
   };
-  const word = FOLLOW_UP_WORDS[due.step - 1];
-  return (
-    <div className="mt-3 rounded-md border border-sun-line/50 bg-sun/40 px-3 py-2.5">
-      {typeof state === "object" ? (
-        <p className="flex items-center gap-1.5 text-[13px] text-positive">
-          <Check className="size-4" aria-hidden /> {word} follow-up done: {state.how === "call" ? "called" : "emailed"}
+  const send = async () => {
+    if (!words) return;
+    setState("saving");
+    setProblem(null);
+    if (prepared && !mine) {
+      const r = await sendPrepared(prepared, words);
+      if (!r.ok) {
+        setState("idle");
+        return setProblem(r.message);
+      }
+      onDraftGone(prepared.id);
+    } else {
+      const r = await emailDeal(line.jobId, { ...words, toCustomer: true });
+      if (!r.ok) {
+        setState("idle");
+        return setProblem(r.message);
+      }
+      await markFollowUp(line.jobId, due.day, "email");
+      // Sol's own prepared one, if he had one, isn't needed now.
+      if (prepared) {
+        void dismissPrepared(prepared.id);
+        onDraftGone(prepared.id);
+      }
+    }
+    setState({ how: "email" });
+    onDone("email");
+  };
+  const tell = () => {
+    const t = ask.trim();
+    if (!t || !words) return;
+    setAsk("");
+    setHeard("");
+    void write(
+      `Write the ${word.toLowerCase()} follow-up to ${first} again: ${t}. The last draft began: "${words.body.replace(/\s+/g, " ").slice(0, 220)}"`,
+    );
+  };
+
+  const opened = line.openedAt ? `opened ${sentStamp(line.openedAt, now).day}` : "not opened yet";
+  const say = words
+    ? `It's ${due.age} days since ${first} had the proposal, and it's ${opened}. I've written the ${word.toLowerCase()} follow-up. Want me to send it?`
+    : writing || preparing
+      ? `It's ${due.age} days since ${first} had the proposal. I'm writing the ${word.toLowerCase()} follow-up…`
+      : problem
+        ? `I couldn't write the ${word.toLowerCase()} follow-up just now (${problem.replace(/\.$/, "")}).`
+        : `It's ${due.age} days since ${first} had the proposal. Want me to write the ${word.toLowerCase()} follow-up?`;
+  const typed = useTyped(say);
+  const quiet = "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-ink ring-1 ring-line hover:bg-surface-2";
+
+  if (typeof state === "object")
+    return (
+      <p className="mt-3 flex items-center gap-1.5 text-[13px] text-positive">
+        <Check className="size-4" aria-hidden /> {word} follow-up done: {state.how === "call" ? "called" : "emailed"}
+      </p>
+    );
+
+  if (later)
+    return (
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-sun-line/50 bg-sun/40 px-3 py-2.5">
+        <p className="flex items-center gap-1.5 text-[13px] font-medium text-sun-ink">
+          <Bell className="size-4" aria-hidden /> {followUpLine(due)}
         </p>
-      ) : (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-[13px] font-medium text-sun-ink">
-            <Bell className="size-4" aria-hidden /> {followUpLine(due)}
+        <div className="flex gap-1.5">
+          <button className={clsx(ui.quiet, "h-7 bg-surface px-2.5 text-xs")} onClick={() => setLater(false)}>
+            <SolIcon className="size-3.5" aria-hidden /> Sol&apos;s draft
+          </button>
+          <button className={clsx(ui.quiet, "h-7 bg-surface px-2.5 text-xs")} onClick={() => mark("call")} disabled={state === "saving"}>
+            <Phone className="size-3.5" aria-hidden /> Called
+          </button>
+          <button className={clsx(ui.quiet, "h-7 bg-surface px-2.5 text-xs")} onClick={() => mark("email")} disabled={state === "saving"}>
+            <Send className="size-3.5" aria-hidden /> Emailed
+          </button>
+        </div>
+        {state === "error" && <p className="w-full text-xs text-danger">Couldn&apos;t be saved. Try again.</p>}
+      </div>
+    );
+
+  return (
+    <div className="mt-3 rounded-2xl bg-surface p-3.5 shadow-[0_10px_28px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70">
+      <div className="flex gap-3">
+        <SolLive />
+        <div className="min-w-0 flex-1">
+          <p className="min-h-[1.4em] text-[14.5px] font-medium leading-snug text-ink" aria-live="polite">
+            {typed.text}
+            <span className="sol-caret ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
           </p>
-          <div className="flex gap-1.5">
-            {draft && draft.status === "ready" && (
-              <button className={clsx(ui.primary, "h-7 px-2.5 text-xs")} onClick={() => setReading(!reading)} aria-expanded={reading}>
-                <SolIcon className="size-3.5" aria-hidden /> Sol drafted it
-              </button>
-            )}
-            <button className={clsx(ui.quiet, "h-7 bg-surface px-2.5 text-xs")} onClick={() => mark("call")} disabled={state === "saving"}>
-              <Phone className="size-3.5" aria-hidden /> Called
-            </button>
-            <button className={clsx(ui.quiet, "h-7 bg-surface px-2.5 text-xs")} onClick={() => mark("email")} disabled={state === "saving"}>
-              <Send className="size-3.5" aria-hidden /> Emailed
-            </button>
-          </div>
-        </div>
-      )}
-      {state === "error" && <p className="mt-1 text-xs text-danger">Couldn&apos;t be saved. Try again.</p>}
-      {draft && reading && typeof state !== "object" && (
-        <div className="mt-2">
-          <PreparedCard
-            item={draft}
-            showDeal={false}
-            open
-            onGone={(sent) => {
-              onDraftGone(draft.id);
-              if (sent) {
-                setState({ how: "email" });
-                onDone("email");
-              }
-            }}
+          <ContextLine
+            className="mt-1.5"
+            text={`${followUpLine(due)} · sent ${sentStamp(line.publishedAt, now).day} · ${opened}${line.followUps.length ? ` · ${line.followUps.length} follow-up${line.followUps.length === 1 ? "" : "s"} so far` : ""}`}
           />
+          {words && (
+            <div className="mt-3 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+              <div className="border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
+                Email to {first}
+                {writing && <span className="text-sun-ink"> · writing it again…</span>}
+              </div>
+              <input
+                value={words.subject}
+                onChange={(e) => setSubject(e.target.value)}
+                aria-label="Subject"
+                className="w-full border-b border-line bg-surface px-3 py-1.5 text-[13.5px] font-semibold text-ink focus:outline-none"
+              />
+              <textarea
+                value={words.body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={5}
+                aria-label={`The follow-up to ${first}`}
+                className="block w-full resize-y bg-surface px-3 py-2 text-[13px] leading-relaxed text-ink focus:outline-none"
+              />
+            </div>
+          )}
+          {typed.done && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {words ? (
+                <button
+                  type="button"
+                  onClick={() => void send()}
+                  disabled={state === "saving" || writing}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-xs font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                >
+                  {state === "saving" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+                  Yes, send it
+                </button>
+              ) : (
+                !writing &&
+                !preparing && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void write(
+                        `The ${word.toLowerCase()} follow-up on the proposal we sent ${first} ${due.age} days ago. Short and warm, one easy next step.`,
+                      )
+                    }
+                    className="inline-flex h-8 items-center rounded-full bg-sun-line px-3.5 text-xs font-semibold text-white hover:brightness-105"
+                  >
+                    Yes, write it
+                  </button>
+                )
+              )}
+              <button type="button" onClick={() => setLater(true)} className={quiet}>
+                Not now
+              </button>
+              <button type="button" onClick={() => void mark("call")} disabled={state === "saving"} className={quiet}>
+                <Phone className="size-3.5" aria-hidden /> I called instead
+              </button>
+            </div>
+          )}
+          {problem && words && <p className="mt-2 text-xs text-warning">{problem}</p>}
+          {state === "error" && <p className="mt-2 text-xs text-danger">Couldn&apos;t be saved. Try again.</p>}
+          {words && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                tell();
+              }}
+              className="mt-3 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+            >
+              <span className="font-mono text-[12px] text-sun-line" aria-hidden>
+                {">"}
+              </span>
+              <input
+                value={heard ? withSpoken(ask, heard) : ask}
+                onChange={(e) => {
+                  setHeard("");
+                  setAsk(e.target.value);
+                }}
+                placeholder="Tell Sol what to change…"
+                aria-label={`Tell Sol what to change in the follow-up to ${first}`}
+                className="min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
+              />
+              <DictateButton
+                label={`Speak to Sol about the follow-up to ${first}`}
+                onHearing={setHeard}
+                onWords={(w) => setAsk((was) => withSpoken(was, w).slice(0, 2000))}
+              />
+              <button
+                type="submit"
+                disabled={!ask.trim() || writing}
+                aria-label="Send to Sol"
+                className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+              >
+                <ArrowUp className="size-3.5" aria-hidden />
+              </button>
+            </form>
+          )}
+          <Touches line={line} now={now} />
         </div>
-      )}
-      <Touches line={line} now={new Date()} />
+      </div>
     </div>
   );
 }
