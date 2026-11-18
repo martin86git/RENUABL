@@ -220,8 +220,7 @@ export function LaunchSlide({ signedIn }: { signedIn: boolean }) {
             words ? "translate-y-0 opacity-100 blur-0" : "translate-y-4 opacity-0 blur-sm",
           )}
         >
-          <span className="block">{LAUNCH.headline[0]}</span>
-          <span className="block text-sun-line">{LAUNCH.headline[1]}</span>
+          {LAUNCH.headline[0]} <span className="text-sun-line">{LAUNCH.headline[1]}</span>
         </h2>
         <div className={clsx("transition-all duration-700", more ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>
           <p className="mx-auto mt-5 max-w-xl text-[clamp(16px,1.3vw,19px)] leading-relaxed text-white/70">{LAUNCH.sub}</p>

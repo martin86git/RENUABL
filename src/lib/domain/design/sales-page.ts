@@ -133,11 +133,13 @@ export const MANIFESTO = {
 export const LAUNCH = {
   countdown: "T-minus",
   liftoff: "Lift-off",
-  headline: ["Today, your business", "runs on AI."],
-  sub: "Sol, the brain. Your voice agents, the voice. The solar business you run tomorrow starts here.",
-  cta: "Start your launch",
+  /** Where they could go, not what hurts (18 Nov 2026, Martin: "Today, your business runs on AI" read as a fact, and
+   * "launch" as a startup). */
+  headline: ["Go", "further."],
+  sub: "Supercharge your business with AI. Sol thinks, your voice agents call, and you take it to the next level.",
+  cta: "See it for yourself",
   plans: "See the plans",
-  replay: "Watch the launch again",
+  replay: "Watch it again",
   /** Mission control, in the corners (18 Nov 2026, Martin). */
   hud: {
     control: "RENUABL · Launch control",
