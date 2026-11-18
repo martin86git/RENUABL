@@ -30,7 +30,7 @@ export function SolGuide(props: {
    * Is this the home? (18 Nov 2026, Martin): the lot outlined from the land register, by its address, why it may be in
    * doubt, and the homes round about for a no.
    */
-  house: { address: string; doubt: string | null; nearby: NearbyHome[] } | null;
+  house: { address: string; doubt: string | null; nearby: NearbyHome[]; found: boolean } | null;
   /** Yes; another home round about; search for the address; or find it on the picture themselves. */
   onHouse: (answer: "yes" | "self" | "search" | NearbyHome) => void;
   /** Whether the address can be searched again from here (the strip under the picture). */
@@ -131,9 +131,18 @@ export function SolGuide(props: {
     switch (props.step) {
       case "house":
         if (!props.house) return null;
-        return notIt ? (
+        return notIt || !props.house.found ? (
           <>
-            <p>Which house is it?</p>
+            <p>
+              {props.house.found ? (
+                "Which house is it?"
+              ) : (
+                <>
+                  I can&apos;t find <span className="text-sun-line">{props.house.address}</span>: it isn&apos;t on the land register, and
+                  Google&apos;s pin is on the street. Which house is it?
+                </>
+              )}
+            </p>
             {props.house.nearby.length > 0 && (
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {props.house.nearby.map((h) => (
@@ -152,7 +161,7 @@ export function SolGuide(props: {
             <Actions>
               {props.canSearch && <Quiet onClick={() => props.onHouse("search")}>Search the address</Quiet>}
               <Quiet onClick={() => props.onHouse("self")}>I&apos;ll find the house myself</Quiet>
-              <Quiet onClick={() => setNotIt(false)}>Back</Quiet>
+              {props.house.found && <Quiet onClick={() => setNotIt(false)}>Back</Quiet>}
             </Actions>
           </>
         ) : (

@@ -4060,7 +4060,7 @@ export function RoofDesigner(props: {
     fetch(`/api/design/roof/lot?${q}`)
       .then((r) => (r.ok ? (r.json() as Promise<PropertyLot>) : null))
       .then((found) => {
-        if (!live || !found?.outlines?.length) return;
+        if (!live || !found?.nearby) return;
         setLot(found);
         const doubt = registerWarning(found, props.address);
         if (doubt) props.onAddressDoubt?.(doubt);
@@ -6987,6 +6987,7 @@ export function RoofDesigner(props: {
                   {/* Is this the home? The lot the address is registered to, outlined in gold with everything off it
                       dimmed and its address over it, while Sol asks (18 Nov 2026, Martin, as Primero's designer). */}
                   {lot &&
+                    lot.outlines.length > 0 &&
                     guideNow === "house" &&
                     (() => {
                       const rings = lot.outlines.map((outline) => outline.map((p) => px(p)));
@@ -9660,6 +9661,7 @@ export function RoofDesigner(props: {
                       lot
                         ? {
                             address: lot.registered ? titleCase(lot.registered) : props.address.split(",")[0],
+                            found: lot.outlines.length > 0,
                             doubt: lotDoubt(lot),
                             nearby: props.onPickAddress ? lot.nearby : [],
                           }

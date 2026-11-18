@@ -151,8 +151,13 @@ export interface PropertyLot {
  * The warning over the designer when the land register has no such address (18 Nov 2026, Martin: 15 Hanwell Court
  * opened with nothing said), or Google's pin is on another lot. Null when the two agree.
  */
-export function registerWarning(lot: Pick<PropertyLot, "pinOnLot" | "registered">, address: string): string | null {
+export function registerWarning(
+  lot: Pick<PropertyLot, "pinOnLot" | "registered"> & { outlines?: unknown[] },
+  address: string,
+): string | null {
   const line = address.split(",")[0].trim() || address;
+  if (lot.outlines && !lot.outlines.length)
+    return `${line} isn't on Victoria's land register, and Google has put it on the street, not on a home. Check the house number, or pick the house from Sol's list.`;
   if (!lot.registered)
     return `${line} isn't on Victoria's land register, so that house number may not exist. The outline is the lot under Google's pin: check the address.`;
   if (!lot.pinOnLot) return `Google has put ${line} on a different lot from the land register. Check it's the right house.`;
@@ -160,7 +165,8 @@ export function registerWarning(lot: Pick<PropertyLot, "pinOnLot" | "registered"
 }
 
 /** What Sol says when the outline's answer is in doubt, or null when the register and Google agree. */
-export function lotDoubt(lot: Pick<PropertyLot, "pinOnLot" | "registered">): string | null {
+export function lotDoubt(lot: Pick<PropertyLot, "pinOnLot" | "registered"> & { outlines?: unknown[] }): string | null {
+  if (lot.outlines && !lot.outlines.length) return "It isn't on the land register, and Google's pin is on the street.";
   if (!lot.pinOnLot) return "Google's pin isn't on this lot, so check it's the right house.";
   if (!lot.registered) return "I couldn't find this address on the land register: this is the lot under Google's pin.";
   return null;

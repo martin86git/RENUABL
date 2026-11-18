@@ -56,6 +56,9 @@ describe("which house is the right one", () => {
       /^15 Hanwell Court isn't on Victoria's land register/,
     );
     expect(registerWarning({ pinOnLot: true, registered: "12 HANWELL COURT" }, "12 Hanwell Court")).toBeNull();
+    expect(registerWarning({ pinOnLot: false, registered: null, outlines: [] }, "15 Hanwell Court, Glen Waverley")).toMatch(
+      /on the street, not on a home/,
+    );
   });
   it("says when the register and Google disagree", () => {
     expect(lotDoubt({ pinOnLot: true, registered: "X" })).toBeNull();

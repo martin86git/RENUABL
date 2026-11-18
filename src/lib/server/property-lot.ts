@@ -72,7 +72,13 @@ export async function propertyLot(address: string, spot: { lat: number; lng: num
     const at = registered ?? spot;
     const lots = await features("property_view", `INTERSECTS(geom,POINT(${coordinate(at.lat)} ${coordinate(at.lng)}))`);
     const shape = lots[0]?.geometry;
-    if (!shape) return null;
+    // No lot under the pin (18 Nov 2026, Martin: 15 Hanwell Court, a number that doesn't exist, put the pin on the court
+    // itself): nothing to outline, but the register's homes round about still answer "which house is it?".
+    const onStreet = (): PropertyLot | null => {
+      const homes = nearbyHomes(nearby, spot, registered);
+      return homes.length ? { outlines: [], registered: registered?.text || null, pinOnLot: false, nearby: homes } : null;
+    };
+    if (!shape) return onStreet();
     const pieces = (
       shape.type === "MultiPolygon" ? shape.coordinates : shape.type === "Polygon" ? [shape.coordinates] : []
     ) as number[][][][];
@@ -81,7 +87,7 @@ export async function propertyLot(address: string, spot: { lat: number; lng: num
       .map((piece) => (piece[0] ?? []).slice(0, 200).map(([lng, lat]) => onPicture({ lat, lng }, spot)))
       .filter((outline) => outline.length >= 3)
       .slice(0, 4);
-    if (!outlines.length) return null;
+    if (!outlines.length) return onStreet();
     // The lot outlined, by the register's own number for it, so the homes offered leave it out.
     const outlined = registered ?? nearby.find((a) => outlines.some((o) => inside(onPicture(a, spot), o))) ?? null;
     return {
