@@ -33,6 +33,7 @@ export function AddressStrip({
   extra,
   askToCreate,
   askToSearch,
+  attachTo,
 }: {
   address: string;
   onPick: (address: Address) => void;
@@ -47,6 +48,8 @@ export function AddressStrip({
   askToCreate?: number;
   /** Raised (counted up) to open the address search from elsewhere: Sol's "Is this the home?" answered no. */
   askToSearch?: number;
+  /** The designer was opened for a deal but this roof isn't on it: put it there, in place of Create deal. */
+  attachTo?: { name: string; onAttach: () => Promise<{ ok: true } | { ok: false; message: string }> };
 }) {
   const [searching, setSearching] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -107,6 +110,8 @@ export function AddressStrip({
           {deal.customerName}
           <span className="text-muted">· Open deal</span>
         </button>
+      ) : attachTo ? (
+        <AttachButton {...attachTo} />
       ) : onCreate ? (
         <button
           type="button"
@@ -248,5 +253,28 @@ function NewDealWindow({
         </div>
       </form>
     </div>
+  );
+}
+
+/** Put the open roof on the deal the designer was opened for (its address follows the roof). */
+function AttachButton({ name, onAttach }: { name: string; onAttach: () => Promise<{ ok: true } | { ok: false; message: string }> }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      title={problem ?? `Move ${name}'s deal to this address, so this design is on it`}
+      onClick={async () => {
+        setBusy(true);
+        setProblem(null);
+        const res = await onAttach();
+        setBusy(false);
+        if (!res.ok) setProblem(res.message);
+      }}
+      className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-sun-line px-4 text-[14px] font-semibold text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] hover:brightness-105 disabled:opacity-70"
+    >
+      <UserRound className="size-4" aria-hidden /> {busy ? "Putting it on the deal…" : problem ? "Try again" : `Put it on ${name}'s deal`}
+    </button>
   );
 }

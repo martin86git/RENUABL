@@ -4206,6 +4206,29 @@ export function RoofDesigner(props: {
       }
     }
   };
+  /**
+   * A product's datasheet found online, then the panels strung by themselves once its figures are in (18 Nov 2026,
+   * Martin: it found the sheet, then still said it wasn't on file until String automatically was pressed again; in a
+   * demo that reads as a failure). If the next product is short of figures too, its sheet is looked for in turn.
+   */
+  const sheetFlow = useRef<{ step: "idle" | "restring" | "chain"; tries: number }>({ step: "idle", tries: 0 });
+  const findSheet = async (missing: { kind: "panel" | "inverter"; sku: string; name: string }) => {
+    if (!props.onFindSheet) return;
+    setFindingSheet(true);
+    setAutoNote({
+      ok: false,
+      note: `The ${missing.kind}'s figures aren't on file (${missing.name}), so I'm finding its datasheet online.`,
+      missing,
+    });
+    const res = await props.onFindSheet(missing);
+    setFindingSheet(false);
+    if (!res.ok) {
+      sheetFlow.current = { step: "idle", tries: 0 };
+      return setAutoNote({ ok: false, note: res.message, missing });
+    }
+    sheetFlow.current = { step: "restring", tries: sheetFlow.current.tries + 1 };
+    setAutoNote({ ok: true, note: `${res.message.replace(/s*Press String automatically again.?$/, "")} Stringing the panels now…` });
+  };
   /** Strings the panels by rule (`auto-string.ts`) in place of the strings drawn, and says what it did. */
   const stringForMe = () => {
     const done = autoStringDesign(
@@ -4228,6 +4251,33 @@ export function RoofDesigner(props: {
     setWiring(null);
     changed();
   };
+  // The figures found have reached the lists: string the panels now (or after a short wait, should they not change).
+  const sheetFigures = `${chosenPanel?.electrical ? 1 : 0}|${fittedItems.map((i) => (i?.electrical ? 1 : 0)).join("")}`;
+  useEffect(() => {
+    if (sheetFlow.current.step !== "restring") return;
+    const go = () => {
+      if (sheetFlow.current.step !== "restring") return;
+      sheetFlow.current = { ...sheetFlow.current, step: "chain" };
+      stringForMe();
+    };
+    const t = window.setTimeout(go, 400);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run when the figures change, with the design as it is then
+  }, [sheetFigures, autoNote]);
+  // A product short of figures stops the stringing: its sheet is looked for at once, with no button to press (18 Nov 2026,
+  // Martin: "rather than asking me whether to find it, he just goes ahead and starts"), then the next one in turn, at
+  // most three in a row. A product whose sheet couldn't be found isn't tried again by itself (its button stays).
+  const sheetsTried = useRef(new Set<string>());
+  useEffect(() => {
+    if (findingSheet || sheetFlow.current.step === "restring") return;
+    const missing = autoNote?.missing;
+    if (missing && props.onFindSheet && !sheetsTried.current.has(missing.sku) && sheetFlow.current.tries < 3) {
+      sheetsTried.current.add(missing.sku);
+      return void findSheet(missing);
+    }
+    sheetFlow.current = { step: "idle", tries: 0 };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the note stringing leaves
+  }, [autoNote]);
   // The guide's facts: what the design and the bill say now.
   const guideSuggested = (() => {
     const daily = dailyFromBillFields(bill);
@@ -8593,17 +8643,7 @@ export function RoofDesigner(props: {
                         <button
                           type="button"
                           disabled={findingSheet}
-                          onClick={async () => {
-                            const missing = autoNote.missing!;
-                            setFindingSheet(true);
-                            const res = await props.onFindSheet!(missing);
-                            setFindingSheet(false);
-                            setAutoNote({
-                              ok: res.ok,
-                              note: res.ok ? `${res.message} Press String automatically again.` : res.message,
-                              ...(res.ok ? {} : { missing }),
-                            });
-                          }}
+                          onClick={() => void findSheet(autoNote.missing!)}
                           aria-busy={findingSheet}
                           className={clsx(
                             "relative mt-2 flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-md bg-surface px-2.5 py-1.5 font-medium text-ink ring-1 hover:bg-surface-2",

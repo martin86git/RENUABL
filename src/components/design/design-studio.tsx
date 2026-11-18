@@ -314,6 +314,32 @@ export function DesignStudio() {
   // The window round the designer learns the deal this roof is on, however it was opened (by its address from the design
   // home too), so its tools beside the window (Record, the proposal) show (16 Nov 2026, Martin: no Record on a deal's roof).
   const onJobId = onJob?.id ?? null;
+  // The designer opened for a deal, but the roof open is somewhere else (18 Nov 2026, Martin: the deal's address landed on
+  // the street, the house next to it was designed, and the proposal then found no design; a failed demo). The deal stays
+  // the one in hand: it is asked whether it moves here for as long as that is so, Create deal becomes Put it on the deal,
+  // and Proceed to proposal puts it there first.
+  const stray =
+    job && roof && !onJob
+      ? { jobId: job.id, name: job.customerName.split(" ")[0] || job.customerName, address: roof.address, lat: roof.lat, lng: roof.lng }
+      : null;
+  const strayKey = stray ? `${stray.jobId}@${stray.lat},${stray.lng}` : null;
+  const [strayNo, setStrayNo] = useState<string | null>(null);
+  const putOnDeal = async (then?: "proposal"): Promise<{ ok: true } | { ok: false; message: string }> => {
+    if (!stray) return { ok: false, message: "This roof is already on its deal." };
+    window.dispatchEvent(new Event("renuabl:design-save"));
+    const res = await saveJob(stray.jobId, { address: stray.address, lat: stray.lat, lng: stray.lng });
+    if (!res.ok) return { ok: false, message: res.message };
+    setJob((j) => (j && j.id === stray.jobId ? { ...j, lat: stray.lat, lng: stray.lng } : j));
+    setMoved(null);
+    tellDeal({ job: stray.jobId, saved: true });
+    // On to the proposal once the design has had a moment to save and join the deal.
+    if (then === "proposal")
+      window.setTimeout(() => {
+        if (inDrawer()) tellDeal({ proposal: true });
+        else router.push(`/design/deals/${encodeURIComponent(stray.jobId)}/proposal`);
+      }, 1500);
+    return { ok: true };
+  };
   useEffect(() => {
     if (onJobId && inDrawer()) tellDeal({ job: onJobId });
   }, [onJobId]);
@@ -381,12 +407,13 @@ export function DesignStudio() {
             </button>
           </div>
         )}
-        {moved && (
+        {(moved ?? (stray && strayNo !== strayKey ? stray : null)) && (
           <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-ink" role="status">
             <span className="min-w-0 flex-1">
               {moving ?? (
                 <>
-                  Update the address on {moved.name}&apos;s deal to <strong className="font-semibold">{moved.address}</strong>?
+                  Update the address on {(moved ?? stray)!.name}&apos;s deal to{" "}
+                  <strong className="font-semibold">{(moved ?? stray)!.address}</strong>?
                 </>
               )}
             </span>
@@ -395,13 +422,19 @@ export function DesignStudio() {
                 <button
                   type="button"
                   onClick={async () => {
+                    const it = (moved ?? stray)!;
                     setMoving("Updating the deal…");
-                    const res = await saveJob(moved.jobId, { address: moved.address, lat: moved.lat, lng: moved.lng });
+                    const res = await saveJob(it.jobId, { address: it.address, lat: it.lat, lng: it.lng });
                     if (!res.ok) return setMoving(res.message);
                     // The roof open now is the deal's own again, so its tools (proposal, chat, Record) follow it.
-                    setJob((j) => (j && j.id === moved.jobId ? { ...j, lat: moved.lat, lng: moved.lng } : j));
-                    setMoving(`Done: ${moved.name}'s deal is at ${moved.address}.`);
-                    window.setTimeout(() => setMoved(null), 2500);
+                    window.dispatchEvent(new Event("renuabl:design-save"));
+                    setJob((j) => (j && j.id === it.jobId ? { ...j, lat: it.lat, lng: it.lng } : j));
+                    tellDeal({ job: it.jobId, saved: true });
+                    setMoving(`Done: ${it.name}'s deal is at ${it.address}.`);
+                    window.setTimeout(() => {
+                      setMoved(null);
+                      setMoving(null);
+                    }, 2500);
                   }}
                   className="rounded-full bg-sun-line px-3 py-1 text-[13px] font-medium text-white hover:brightness-105"
                 >
@@ -409,7 +442,10 @@ export function DesignStudio() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMoved(null)}
+                  onClick={() => {
+                    setMoved(null);
+                    setStrayNo(strayKey);
+                  }}
                   className="rounded-full px-3 py-1 text-[13px] font-medium ring-1 ring-white/30 hover:bg-white/10"
                 >
                   No
@@ -535,7 +571,7 @@ export function DesignStudio() {
           onUnsaved={noteUnsaved}
           tight={popped}
           footRoom={popped ? 52 : 0}
-          onNeedDeal={popped && canMakeDeal ? () => setDealAsk((n) => n + 1) : undefined}
+          onNeedDeal={stray ? () => void putOnDeal("proposal") : popped && canMakeDeal ? () => setDealAsk((n) => n + 1) : undefined}
           bar={
             <>
               {/* In the pop-up the frame around it says where you are: no wordmark, every bit of width for the work. */}
@@ -616,7 +652,8 @@ export function DesignStudio() {
             askToCreate={dealAsk}
             askToSearch={searchAsk}
             extra={signedIn ? <DesignCredits className="h-10 px-3.5 text-[13px]" /> : null}
-            onCreate={canMakeDeal ? createDealHere : undefined}
+            onCreate={canMakeDeal && !stray ? createDealHere : undefined}
+            attachTo={stray ? { name: stray.name, onAttach: () => putOnDeal() } : undefined}
           />
         )}
         {pictureMissing && (
