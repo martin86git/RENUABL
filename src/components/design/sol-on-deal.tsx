@@ -134,7 +134,7 @@ function SolTerminal(props: {
     if (!waiting || answer || asked.current) return;
     asked.current = true;
     void writeAnswer(
-      `Answer ${name}'s latest message (${byChat ? "a reply in their proposal's chat" : "by email"}). Answer what they asked from what the record says; where it doesn't say, tell them we'll check and come back to them.`,
+      `Answer ${name}'s latest message (${byChat ? "a reply in their proposal's chat" : "by email"}). Answer what they asked from what the record says and what you know about installing solar and batteries: give the usual figures and what they depend on, and say the installer confirms it on site. Only where neither covers it, tell them we'll check and come back to them.`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the card opens on a message waiting
   }, [waiting?.at]);

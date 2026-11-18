@@ -14,6 +14,11 @@ describe("write with Sol", () => {
     const s = writeSystem("Example Solar");
     expect(s).toMatch(/Never invent or promise a price/);
     expect(s).toMatch(/The Example Solar team/);
+    // It knows where a battery can go: the garage bollard, the room it takes, the distances from doors and exits.
+    expect(s).toMatch(/bollard/);
+    expect(s).toMatch("AS/NZS 5139");
+    expect(s).toMatch(/doors and exits/);
+    expect(s).toMatch(/installer confirms it on site/);
     expect(
       writeAsk(
         { business: "Example Solar", customerFirst: "Jo", title: "Solar", stage: "Proposal sent", suburb: "Kew", recent: [] },
