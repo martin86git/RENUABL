@@ -123,8 +123,17 @@ export function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy
         who === "sol" && "w-[min(22rem,calc(100vw-2.5rem))] ring-sun-line/40",
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sun-line">{NAMES[who]}</p>
-      <p className="mt-1 min-h-[2.8em] text-[14px] leading-snug text-ink sm:text-[15px]">
+      {/* Sol's words speak for themselves (18 Nov 2026, Martin: the SOL label and the font weren't right): no name over
+          them, set in the CRM's quiet sans (Inter, regular, soft grey, single-storey a, even figures), a size smaller. */}
+      {who !== "sol" && <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sun-line">{NAMES[who]}</p>}
+      <p
+        className={clsx(
+          "min-h-[2.8em]",
+          who === "sol"
+            ? "text-[13px] font-normal leading-[1.6] tracking-[-0.008em] text-[#383a40] antialiased [font-feature-settings:'cv11','ss03','tnum'] sm:text-[14px]"
+            : "mt-1 text-[14px] leading-snug text-ink sm:text-[15px]",
+        )}
+      >
         {text}
         {busy && <span className="live-caret ml-0.5 inline-block h-[1em] w-[2px] translate-y-[0.15em] bg-sun-line" aria-hidden />}
       </p>
