@@ -3,7 +3,7 @@
  * (domain/design/caller.ts). One row a business a role in `design_caller` (sales, and the admin assistant that books
  * installations: domain/install-call.ts), business id first as everywhere; no row is Sol with no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
-import { DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
+import { cleanHiddenVoices, DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
 import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
@@ -101,6 +101,19 @@ export async function callerPhoto(businessId: string, role: CallerKey = "sales")
   );
   const row = rows[0];
   return row?.photo && row.photo_type ? { bytes: row.photo, contentType: row.photo_type } : null;
+}
+
+/** The voices the business has taken off its list (caller.ts), for every agent's picker. */
+export async function hiddenVoicesOf(businessId: string): Promise<string[]> {
+  if (!dbConfigured()) return [];
+  const rows = await query<{ hidden_voices: unknown }>(`select hidden_voices from businesses where id = $1`, [businessId]);
+  return cleanHiddenVoices(rows[0]?.hidden_voices);
+}
+
+export async function saveHiddenVoices(businessId: string, hidden: string[]): Promise<string[]> {
+  const clean = cleanHiddenVoices(hidden);
+  await query(`update businesses set hidden_voices = $2 where id = $1`, [businessId, JSON.stringify(clean)]);
+  return clean;
 }
 
 /** How the business has coached its assistant: the notes it keeps for every call, and the conversation so far. */

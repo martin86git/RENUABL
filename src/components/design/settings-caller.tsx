@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Camera, Check, GraduationCap, MessageCircle, Phone, PhoneCall, Play, Square, Trash2, VolumeX } from "lucide-react";
+import { Camera, Check, GraduationCap, MessageCircle, Phone, PhoneCall, Play, RotateCcw, Square, Trash2, VolumeX, X } from "lucide-react";
 import {
   CALLER_COPY,
   CALLER_NAME_MAX,
@@ -14,12 +14,17 @@ import {
   NO_SAMPLE,
   VOICE_BAD,
   VOICE_PROVIDERS,
+  voiceKey,
   voiceLabel,
+  voicesRemoved,
+  voicesShown,
   voiceSampleUrl,
   type CallerVoice,
 } from "@/lib/domain/design/caller";
 import {
   callerPhotoUrl,
+  changeHiddenVoices,
+  loadHiddenVoices,
   loadCaller,
   removeCallerPhoto,
   ringMeToHear,
@@ -325,6 +330,23 @@ export function VoicePicker({
   const [provider, setProvider] = useState<CallerVoice["provider"]>(caller.voice?.provider ?? "11labs");
   const [typedId, setTypedId] = useState(caller.voice && !ours ? caller.voice.voiceId : "");
   const [busy, setBusy] = useState(false);
+  // The voices the business has taken off its list (18 Nov 2026, Martin: "remove the voices i dont like").
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [removedOpen, setRemovedOpen] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void loadHiddenVoices().then((h) => live && setHidden(h));
+    return () => {
+      live = false;
+    };
+  }, []);
+  const changeHidden = async (change: Parameters<typeof changeHiddenVoices>[0]) => {
+    const res = await changeHiddenVoices(change);
+    if (!res.ok) return onStatus({ ok: false, text: res.message });
+    setHidden(res.hiddenVoices);
+    if (res.hiddenVoices.length === 0) setRemovedOpen(false);
+  };
+  const removed = voicesRemoved(hidden, caller.voice);
   // The sample playing now, by its voice ("11labs:…"): one at a time, stopped when the picker goes.
   const [playing, setPlaying] = useState<string | null>(null);
   useEffect(() => stopSample, []);
@@ -396,6 +418,17 @@ export function VoicePicker({
     <div key={key} className="flex min-w-0 items-center gap-1.5">
       {pickButton(label, words, picked, onPick)}
       {voice && sampleButton(voice, label)}
+      {voice && !picked && (
+        <button
+          type="button"
+          onClick={() => void changeHidden({ hide: voiceKey(voice) })}
+          aria-label={`Remove ${label} from the list`}
+          title="Remove from the list"
+          className="grid size-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+        >
+          <X className="size-3.5" aria-hidden />
+        </button>
+      )}
     </div>
   );
 
@@ -453,19 +486,21 @@ export function VoicePicker({
         <div key={sex} className="mt-3">
           <p className={ui.eyebrow}>{sex === "female" ? "Female voices" : "Male voices"}</p>
           <div className={clsx("mt-1.5 grid gap-1.5", !compact && "sm:grid-cols-2")}>
-            {CALLER_VOICES.filter((v) => v.sex === sex).map((v) =>
-              row(
-                v.label,
-                v.words,
-                !own && same(v, caller.voice),
-                () => {
-                  setOwn(false);
-                  void choose({ provider: v.provider, voiceId: v.voiceId });
-                },
-                `${v.provider}:${v.voiceId}`,
-                { provider: v.provider, voiceId: v.voiceId },
-              ),
-            )}
+            {voicesShown(hidden, caller.voice)
+              .filter((v) => v.sex === sex)
+              .map((v) =>
+                row(
+                  v.label,
+                  v.words,
+                  !own && same(v, caller.voice),
+                  () => {
+                    setOwn(false);
+                    void choose({ provider: v.provider, voiceId: v.voiceId });
+                  },
+                  `${v.provider}:${v.voiceId}`,
+                  { provider: v.provider, voiceId: v.voiceId },
+                ),
+              )}
           </div>
         </div>
       ))}
@@ -482,6 +517,39 @@ export function VoicePicker({
         )}
         {row("Another voice", "By its ID from Vapi or ElevenLabs", own, () => setOwn(true), "own")}
       </div>
+      {removed.length > 0 && (
+        <div className="mt-3 rounded-md bg-canvas px-3 py-2">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <button
+              type="button"
+              className="font-medium text-ink underline-offset-2 hover:underline"
+              onClick={() => setRemovedOpen((o) => !o)}
+            >
+              {removed.length} voice{removed.length === 1 ? "" : "s"} removed
+            </button>
+            <button type="button" className="text-ink-2 hover:text-ink" onClick={() => void changeHidden({ all: true })}>
+              Bring them all back
+            </button>
+          </div>
+          {removedOpen && (
+            <ul className="mt-2 space-y-1">
+              {removed.map((v) => (
+                <li key={voiceKey(v)} className="flex items-center gap-2 text-xs">
+                  <span className="font-medium text-ink">{v.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted">{v.words}</span>
+                  <button
+                    type="button"
+                    onClick={() => void changeHidden({ show: voiceKey(v) })}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-medium text-ink ring-1 ring-line hover:bg-surface"
+                  >
+                    <RotateCcw className="size-3" aria-hidden /> Bring back
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {own && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <select

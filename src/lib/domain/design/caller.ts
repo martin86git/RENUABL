@@ -143,6 +143,36 @@ export const CALLER_VOICES: readonly VoiceChoice[] = [
   { provider: "vapi", voiceId: "Tara", label: "Tara", words: "American", sex: "female" },
 ];
 
+/**
+ * Voices a business has taken off its list (18 Nov 2026, Martin: "i need to be able to remove the voices i dont
+ * like"). The list is the whole business's, for every agent: a voice removed is only put away, brought back in one
+ * press, and the voice an agent speaks in now always stays on its own list.
+ */
+export const voiceKey = (v: CallerVoice) => `${v.provider}:${v.voiceId}`;
+
+/** The removed voices as kept or sent: only voices we offer, each once. */
+export function cleanHiddenVoices(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const known = new Set(CALLER_VOICES.map(voiceKey));
+  return [...new Set(raw.filter((k): k is string => typeof k === "string" && known.has(k)))];
+}
+
+export const hideVoice = (hidden: readonly string[], key: unknown): string[] => cleanHiddenVoices([...hidden, key]);
+export const showVoice = (hidden: readonly string[], key: unknown): string[] => cleanHiddenVoices(hidden.filter((k) => k !== key));
+
+/** The voices on the list: all but those removed, the one in use always among them. */
+export function voicesShown(hidden: readonly string[], inUse: CallerVoice | null): VoiceChoice[] {
+  const gone = new Set(hidden);
+  const using = inUse ? voiceKey(inUse) : "";
+  return CALLER_VOICES.filter((v) => !gone.has(voiceKey(v)) || voiceKey(v) === using);
+}
+
+/** The voices put away, to bring back. */
+export const voicesRemoved = (hidden: readonly string[], inUse: CallerVoice | null): VoiceChoice[] => {
+  const shown = new Set(voicesShown(hidden, inUse).map(voiceKey));
+  return CALLER_VOICES.filter((v) => !shown.has(voiceKey(v)));
+};
+
 export const VOICE_PROVIDERS: { id: CallerVoice["provider"]; label: string }[] = [
   { id: "11labs", label: "ElevenLabs" },
   { id: "vapi", label: "Vapi" },

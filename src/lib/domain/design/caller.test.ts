@@ -3,6 +3,12 @@ import {
   CALLER_NAME_MAX,
   CALLER_TINTS,
   CALLER_VOICES,
+  cleanHiddenVoices,
+  hideVoice,
+  showVoice,
+  voiceKey,
+  voicesRemoved,
+  voicesShown,
   callerInitial,
   callerTint,
   callerIntro,
@@ -98,6 +104,21 @@ describe("the phone assistant's voice", () => {
     );
     // Deepgram's and ElevenLabs' voices have a sample to play; Vapi's and Microsoft's publish none.
     for (const v of CALLER_VOICES) expect(Boolean(voiceSampleUrl(v))).toBe(v.provider === "deepgram" || v.provider === "11labs");
+  });
+
+  it("takes voices off the list and brings them back, never the one in use", () => {
+    const ken = "azure:en-AU-KenNeural";
+    const tara = "vapi:Tara";
+    expect(cleanHiddenVoices([ken, ken, "nonsense:x", 7])).toEqual([ken]);
+    const hidden = hideVoice(hideVoice([], ken), tara);
+    expect(hidden).toEqual([ken, tara]);
+    expect(voicesShown(hidden, null).some((v) => v.label === "Ken" || v.label === "Tara")).toBe(false);
+    expect(voicesShown(hidden, null)).toHaveLength(CALLER_VOICES.length - 2);
+    // The voice an agent speaks in stays on its list though it was removed.
+    expect(voicesShown(hidden, { provider: "azure", voiceId: "en-AU-KenNeural" }).some((v) => v.label === "Ken")).toBe(true);
+    expect(voicesRemoved(hidden, { provider: "azure", voiceId: "en-AU-KenNeural" }).map((v) => v.label)).toEqual(["Tara"]);
+    expect(showVoice(hidden, ken)).toEqual([tara]);
+    expect(voiceKey({ provider: "vapi", voiceId: "Tara" })).toBe(tara);
   });
 
   it("fetches a clip only from ElevenLabs' own places", () => {

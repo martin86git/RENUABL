@@ -72,6 +72,18 @@ export async function saveCallerVoice(voice: CallerVoice | null, role: CallerKey
 }
 
 /** Tells every place showing the assistant that it changed (a name or voice changed in its chat). */
+/** The voices the business has taken off its list, and taking one off or bringing it back (who may change settings). */
+export const loadHiddenVoices = async (): Promise<string[]> => {
+  const r = await loadCaller();
+  return r.ok ? ((r as { hiddenVoices?: string[] }).hiddenVoices ?? []) : [];
+};
+export const changeHiddenVoices = (voices: { hide: string } | { show: string } | { all: true }) =>
+  ask<{ hiddenVoices: string[] }>("/api/design/caller", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ voices }),
+  });
+
 export const callerChanged = (caller: CallerState) => window.dispatchEvent(new CustomEvent(CHANGED, { detail: caller }));
 
 /** Rings the member's own mobile so they hear the voice. */

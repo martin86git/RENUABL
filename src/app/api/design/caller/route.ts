@@ -1,7 +1,14 @@
 import { can } from "@/lib/domain/design/account";
-import { cleanCallerName, cleanVoice, VOICE_BAD } from "@/lib/domain/design/caller";
+import { cleanCallerName, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
 import { cleanCallerKey } from "@/lib/domain/install-call";
-import { callerOf, moreSalesAgents, setCallerName, setCallerVoice } from "@/lib/server/design-caller-repo";
+import {
+  callerOf,
+  hiddenVoicesOf,
+  moreSalesAgents,
+  saveHiddenVoices,
+  setCallerName,
+  setCallerVoice,
+} from "@/lib/server/design-caller-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
@@ -15,7 +22,7 @@ export async function GET() {
     if ("refuse" in who) return who.refuse;
     const id = who.member.businessId;
     const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [id]);
-    const [caller, admin, more, callsOn, textsOn, brand] = await Promise.all([
+    const [caller, admin, more, callsOn, textsOn, brand, hiddenVoices] = await Promise.all([
       callerOf(id),
       // The admin assistant, which rings sold customers to book their installation (domain/install-call.ts).
       callerOf(id, "admin"),
@@ -24,10 +31,22 @@ export async function GET() {
       voiceOnFor(id).catch(() => false),
       textsOnFor(id).catch(() => false),
       loadBrand(id, biz[0]?.name ?? ""),
+      // The voices the business has taken off its list.
+      hiddenVoicesOf(id).catch(() => []),
     ]);
     // Setting it up is for an admin: whoever may change the business's settings.
     const mayChange = can(who.member.role, "prices", who.member.permissions);
-    return Response.json({ ok: true, caller, admin, more, callsOn, textsOn, mayChange, business: brand.name || biz[0]?.name || "" });
+    return Response.json({
+      ok: true,
+      caller,
+      admin,
+      more,
+      callsOn,
+      textsOn,
+      mayChange,
+      business: brand.name || biz[0]?.name || "",
+      hiddenVoices,
+    });
   });
 }
 
@@ -39,6 +58,13 @@ export async function PUT(request: Request) {
     const read = await readBody(request, 1_000);
     if ("refuse" in read) return read.refuse;
     const role = cleanCallerKey(read.body.role);
+    if (read.body.voices && typeof read.body.voices === "object") {
+      // A voice taken off the business's list, or brought back (caller.ts): put away, never deleted.
+      const v = read.body.voices as Record<string, unknown>;
+      const was = await hiddenVoicesOf(who.member.businessId);
+      const next = v.all === true ? [] : typeof v.hide === "string" ? hideVoice(was, v.hide) : showVoice(was, v.show);
+      return Response.json({ ok: true, hiddenVoices: await saveHiddenVoices(who.member.businessId, next) });
+    }
     if ("voice" in read.body) {
       const voice = cleanVoice(read.body.voice);
       if (voice === "bad") return Response.json({ ok: false, message: VOICE_BAD }, { status: 422 });
