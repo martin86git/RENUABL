@@ -396,10 +396,10 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
       {/* On a wide screen it runs across the whole hero, centred on the page, a gentle curve Sol rises over. */}
       <Horizon className="top-[51%] hidden w-[700vw] lg:block" />
       {/* Four parts in a grid (18 Nov 2026, Martin: the phone was lack-lustre; the paragraph under the headline went, and
-          Sol rises over the launch's horizon, drawn in light grey, in its place). On a phone: the words, Sol, the
-          buttons, the voice agents. On a wide screen: the words and buttons on the left, Sol and his agents on the right. */}
+          Sol rises over the launch's horizon, drawn in light grey, in its place). On a phone: the words, the buttons, Sol, the
+          voice agents. On a wide screen: the words and buttons on the left, Sol and his agents on the right. */}
       <div className="mx-auto grid max-w-[90rem] gap-x-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-        <div className="relative z-[2] text-center lg:col-start-1 lg:row-start-1 lg:self-end lg:text-left">
+        <div className="relative z-[2] order-1 text-center lg:col-start-1 lg:row-start-1 lg:self-end lg:text-left">
           <h1 id="hero" className="text-[clamp(48px,6.4vw,116px)] font-semibold leading-[0.88] tracking-[-0.055em]">
             <span className="block">{SALES_HERO.headline[0]}</span>
             <span className="block text-sun-line">{SALES_HERO.headline[1]}</span>
@@ -413,7 +413,7 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
         </div>
 
         {/* Sol over the horizon, his bubble off his shoulder on a wide screen (xl), above him otherwise. */}
-        <div className="relative mt-8 flex flex-col items-center lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:self-center xl:pt-24">
+        <div className="relative order-3 mt-8 flex flex-col items-center lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0 lg:self-center xl:pt-24">
           <div className="relative">
             <div
               aria-live="polite"
@@ -430,7 +430,7 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
           </p>
         </div>
 
-        <div className="relative z-[2] mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:col-start-1 lg:row-start-2 lg:mt-9 lg:justify-start lg:self-start">
+        <div className="relative z-[2] order-2 mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:col-start-1 lg:row-start-2 lg:mt-9 lg:justify-start lg:self-start">
           <a
             href="#pricing"
             className="inline-flex h-12 items-center gap-2 rounded-full bg-sun-line px-7 text-[16px] font-semibold text-white shadow-lift hover:brightness-105"
@@ -441,7 +441,7 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
         </div>
 
         {/* His voice agents, one a role (18 Nov 2026, Martin: the product's audio icons, a colour each). */}
-        <div className="relative z-[2] mt-10 flex flex-col items-center gap-3 lg:col-start-2 lg:row-start-3 lg:mt-6">
+        <div className="relative z-[2] order-4 mt-10 flex flex-col items-center gap-3 lg:col-start-2 lg:row-start-3 lg:mt-6">
           <RayStyles />
           <div className="flex items-start justify-center gap-6">
             {VOICE_AGENTS.map((v, i) => (

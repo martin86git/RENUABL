@@ -166,7 +166,9 @@ export function Reveal({ children, className }: { children: React.ReactNode; cla
           io.disconnect();
         }
       },
-      { threshold: 0.18 },
+      // Any part coming on screen (18 Nov 2026: a tall block on a phone, pricing, never showed 18% of itself at once on
+      // an iPhone, so it stayed invisible and the page looked blank).
+      { threshold: 0, rootMargin: "0px 0px -8% 0px" },
     );
     io.observe(el);
     return () => io.disconnect();
