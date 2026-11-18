@@ -32,6 +32,10 @@ import {
 } from "@/lib/domain/design/quote";
 import { todayInMarket } from "@/lib/domain/market";
 import type { RebateRates } from "@/lib/domain/rebates";
+import { priceAdvice, typedCostFlags, type Advice } from "@/lib/domain/design/price-check";
+import { usePricePoints } from "@/lib/services/price-check";
+import { askSolInPanel } from "@/lib/services/sol";
+import { SolBadge } from "./sol-icon";
 
 const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
 const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
@@ -102,8 +106,31 @@ export function DesignQuote(props: {
   const undecided = undecidedLines(all, edits);
   const missing = lines.filter((l) => l.missing).length;
   const net = empty ? null : totals.priceIncGst - stc;
+  // Sol's price check (18 Nov 2026, Martin): by rule, from the business's own proposals, the quote's own deal left out.
+  const points = usePricePoints(!empty);
+  // The deal the designer is open on (its own proposal isn't compared with itself). Only read in the browser, where the
+  // history it filters arrives; on the server there is none, so nothing differs.
+  const jobId = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("job");
+  const marginShare = totals.priceExGst > 0 ? totals.margin / totals.priceExGst : 0;
+  const advice =
+    empty || net === null
+      ? []
+      : priceAdvice(
+          { kw: costing.pvKw, batteryKwh: costing.batteryKwh ?? 0, youPay: net, marginShare },
+          points,
+          workspace.settings.margin.floor ?? 0,
+          new Date(),
+          jobId,
+        );
+  const typedFlags = typedCostFlags(all, edits, jobId ? points.filter((p) => p.jobId !== jobId) : points);
+  const underFloor = advice.find((a) => a.text.includes("floor"));
   const proceedBox = props.onProceed && !empty && (
     <div className="mt-3 border-t border-line pt-3">
+      {underFloor && (
+        <p className="mb-2 rounded-md bg-warning-soft px-2.5 py-1.5 text-center text-xs text-warning" role="status">
+          {underFloor.text} You can still go ahead.
+        </p>
+      )}
       <button
         type="button"
         onClick={props.onProceed}
@@ -424,6 +451,12 @@ export function DesignQuote(props: {
                             {l.missing ? "no cost" : money(l.amount)}
                           </button>
                         ))}
+                      {typedFlags[lineKey(l)] && (
+                        <span className="mt-0.5 flex items-start gap-1 text-xs text-warning">
+                          <SolBadge className="mt-px size-3.5 shrink-0" />
+                          {typedFlags[lineKey(l)]}
+                        </span>
+                      )}
                     </td>
                     <td className="py-1 text-right tabular-nums text-ink-2">
                       {l.qty === undefined ? (
@@ -633,6 +666,7 @@ export function DesignQuote(props: {
       ))}
     </dl>
   );
+  const priceCheckBox = advice.length > 0 && <PriceCheck advice={advice} typed={Object.keys(typedFlags).length} />;
   const solarVicBlock = solarVic && (
     <div className="mt-2 rounded-md border border-sun-line bg-sun p-3 text-sm">
       <dl className="space-y-1">
@@ -793,6 +827,7 @@ export function DesignQuote(props: {
               </p>
             )}
             {totalsBox}
+            {priceCheckBox}
             {proceedBox}
             {solarVicBlock}
             {changedBox}
@@ -872,6 +907,7 @@ export function DesignQuote(props: {
           {tableBlock}
           {changedBox}
           {totalsBox}
+          {priceCheckBox}
           {solarVicBlock}
           {footBox}
           {proceedBox}
@@ -965,5 +1001,54 @@ export function HomeToggles(props: {
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * Sol's price check under the totals (18 Nov 2026, Martin): what the quote's price and margin are against the business's
+ * own signed and quiet proposals, worked out by rule (no credit). Asking Sol about it opens his panel with the figures.
+ */
+function PriceCheck({ advice, typed }: { advice: Advice[]; typed: number }) {
+  const ask = () => {
+    const lines = advice.map((a) => `- ${a.text}`).join("\n");
+    askSolInPanel({
+      text:
+        "Look at the price on the quote I have open. Your price check says:\n" +
+        lines +
+        (typed ? `\n- ${typed} cost${typed === 1 ? "" : "s"} typed by hand differ from the price list or what we costed before.` : "") +
+        "\nWhat would you do with this price, and why? Advise only: I set the price.",
+      shown: "Sol, what would you do with this price?",
+    });
+  };
+  return (
+    <section className="mt-3 rounded-md border border-line bg-surface p-3" aria-label="Sol's price check">
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">
+        <SolBadge className="size-4" /> Price check
+      </p>
+      <ul className="mt-2 space-y-1.5 text-xs leading-snug">
+        {advice.map((a) => (
+          <li key={a.text} className="flex gap-2">
+            <span
+              aria-hidden
+              className={clsx(
+                "mt-1.5 size-1.5 shrink-0 rounded-full",
+                a.tone === "warn" ? "bg-warning" : a.tone === "ok" ? "bg-positive" : "bg-line",
+              )}
+            />
+            <span className={a.tone === "warn" ? "text-ink" : "text-ink-2"}>{a.text}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <p className="text-[10px] leading-snug text-muted">From your own proposals, by rule. A guide: you set the price.</p>
+        <button
+          type="button"
+          onClick={ask}
+          className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
+        >
+          Ask Sol
+        </button>
+      </div>
+    </section>
   );
 }

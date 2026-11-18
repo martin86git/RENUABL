@@ -259,6 +259,8 @@ export interface QuoteSettings {
     baseKw: number;
     perKwAbove: number;
     perBatteryKwh: number;
+    /** The least margin, as a share of the price ex GST, before Sol warns on a quote (0 to 1; 0 is none set). Never enforced. */
+    floor: number;
   };
   /** Sales commission, counted as a cost before margin. */
   commission: { perPvKw: number; perBatteryKwh: number };
@@ -297,6 +299,15 @@ export const SETTING_GROUPS: { title: string; intro: string; fields: SettingFiel
       { path: "margin.baseKw", label: "Solar size the base covers", unit: "kW", min: 0, max: 100, step: 0.1 },
       { path: "margin.perKwAbove", label: "Added per kW above that", unit: "$", min: 0, max: 5000, step: 10 },
       { path: "margin.perBatteryKwh", label: "Added per kWh of battery", unit: "$", min: 0, max: 2000, step: 5 },
+      {
+        path: "margin.floor",
+        label: "Margin floor",
+        unit: "%",
+        min: 0,
+        max: 0.6,
+        step: 0.01,
+        help: "Sol warns on a quote below it, before it is published. 0 for none.",
+      },
     ],
   },
   {
@@ -363,7 +374,7 @@ export const DEFAULT_WORKSPACE: Workspace = {
     sunshade: 220,
   },
   settings: {
-    margin: { base: 2000, solarOnlyBase: 1000, baseKw: 6.6, perKwAbove: 100, perBatteryKwh: 60 },
+    margin: { base: 2000, solarOnlyBase: 1000, baseKw: 6.6, perKwAbove: 100, perBatteryKwh: 60, floor: 0 },
     commission: { perPvKw: 0, perBatteryKwh: 0 },
     stcPrice: 38,
     sundries: 120,

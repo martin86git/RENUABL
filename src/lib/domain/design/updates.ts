@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
+    area: "Quote builder",
+    words: "Sol checks a quote's price and margin against your own signed jobs, and flags costs typed far from your price list.",
+  },
+  {
+    day: "2026-11-18",
+    area: "Settings",
+    words: "Set a margin floor under Margin: Sol warns on a quote below it before you send the proposal.",
+  },
+  {
+    day: "2026-11-18",
     area: "Phone assistant",
     words: "Each deal in your phone assistant's list shows the deal mark, icons for solar, battery and EV charger, and when it last rang them.",
   },
