@@ -94,7 +94,7 @@ export function solOnDeal(d: FeedDeal, now = new Date()): SolOnDeal {
 export interface SolProposal {
   say: string;
   /** What Yes does: send Sol's email, or one of the deal's moves. Null when there is nothing to agree to. */
-  yes: { label: string; kind: NextMove["kind"] | "send" } | null;
+  yes: { label: string; kind: NextMove["kind"] | "send" | "email" } | null;
   /** What No is: not sending the email, or putting the move aside for now. */
   no: string | null;
   draft: boolean;
@@ -103,6 +103,15 @@ export interface SolProposal {
 export function solProposes(d: FeedDeal, now = new Date()): SolProposal {
   const name = first(d.customer);
   const move = nextMove(d, now);
+  // Written in, but with no proposal out they have nowhere to read a chat reply (18 Nov 2026, Martin: Open the chat
+  // did nothing there): an email answers them instead.
+  if (move?.kind === "reply" && !d.proposal)
+    return {
+      say: `${name} has written in and is waiting on you, but has no proposal to read a reply on. Want to email ${name} back?`,
+      yes: d.canEmail ? { label: `Email ${name}`, kind: "email" } : null,
+      no: "Not now",
+      draft: false,
+    };
   if (move?.kind === "reply")
     return {
       say: `${name} has written in and is waiting on you. Want to answer them in the chat?`,

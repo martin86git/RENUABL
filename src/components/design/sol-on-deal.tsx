@@ -15,7 +15,10 @@ import { boxMove } from "@/lib/domain/design/deal-box";
 import { dealContext, solProposes } from "@/lib/domain/design/sol-on-deal";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
-import { loadFeedDeal } from "@/lib/services/deal-feed";
+import { loadFeedDeal, writeWithSol } from "@/lib/services/deal-feed";
+import { emailDeal } from "@/lib/services/crm";
+import { sendReply } from "@/lib/services/chat";
+import { WRITE_ASK_MAX } from "@/lib/domain/design/deal-write";
 import { leadPageFor } from "@/lib/services/hello";
 import { askSolInPanel } from "@/lib/services/sol";
 import { ContextLine } from "./context-line";
@@ -31,7 +34,7 @@ export function SolOnDealCard(props: {
   /** Changes when something happens on the page (a note added, a design saved), so Sol's line is read again. */
   refresh: number;
   /** The deal page acts on a move it has a place for: the chat, the designer, the proposal, the details. */
-  onMove: (kind: Exclude<MoveKind, "review" | "call">) => void;
+  onMove: (kind: Exclude<MoveKind, "review" | "call"> | "email") => void;
 }) {
   const [deal, setDeal] = useState<FeedDeal | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -73,7 +76,7 @@ function SolTerminal(props: {
   deal: FeedDeal;
   now: Date;
   onRead: () => void;
-  onMove: (kind: Exclude<MoveKind, "review" | "call">) => void;
+  onMove: (kind: Exclude<MoveKind, "review" | "call"> | "email") => void;
 }) {
   const { deal, now } = props;
   const p = solProposes(deal, now);
@@ -89,7 +92,74 @@ function SolTerminal(props: {
   const [heard, setHeard] = useState("");
   const box = useRef<HTMLInputElement>(null);
   const [leftIt, setLeftIt] = useState(false);
-  const typed = useTyped(leftIt ? "Okay, I'll leave that for now." : p.say);
+
+  // The customer is waiting on an answer (18 Nov 2026, Martin: "sol should already be proposing the response to Priya,
+  // i should be able to approve or provide feedback"): Sol drafts it as the card opens, in their chat when they have a
+  // proposal to read it on, else by email; Yes sends it, and the box under it tells him what to change. One draft a
+  // message, kept for the tab, so reading the page again spends nothing.
+  const waiting =
+    !leftIt && (p.yes?.kind === "reply" || p.yes?.kind === "email") ? deal.events.find((e) => e.kind === "message") : undefined;
+  const byChat = Boolean(deal.proposal);
+  const keepKey = waiting ? `renuabl.design.sol-reply.${props.jobId}.${waiting.at}` : null;
+  const [answer, setAnswer] = useState<{ subject: string; body: string } | null>(() => {
+    try {
+      return keepKey ? (JSON.parse(sessionStorage.getItem(keepKey) ?? "null") as { subject: string; body: string } | null) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [writing, setWriting] = useState(false);
+  const [unwritten, setUnwritten] = useState<string | null>(null);
+  const keep = (a: { subject: string; body: string } | null) => {
+    setAnswer(a);
+    try {
+      if (keepKey) {
+        if (a) sessionStorage.setItem(keepKey, JSON.stringify(a));
+        else sessionStorage.removeItem(keepKey);
+      }
+    } catch {
+      // Private window: kept for this look only.
+    }
+  };
+  const writeAnswer = async (words: string) => {
+    setWriting(true);
+    setUnwritten(null);
+    const r = await writeWithSol(props.jobId, words.slice(0, WRITE_ASK_MAX));
+    setWriting(false);
+    if (r.ok) keep({ subject: r.subject, body: r.body });
+    else setUnwritten(r.message);
+  };
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!waiting || answer || asked.current) return;
+    asked.current = true;
+    void writeAnswer(
+      `Answer ${name}'s latest message (${byChat ? "a reply in their proposal's chat" : "by email"}). Answer what they asked from what the record says; where it doesn't say, tell them we'll check and come back to them.`,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, as the card opens on a message waiting
+  }, [waiting?.at]);
+  const asking = waiting ? `${name} asked: “${waiting.text.length > 90 ? `${waiting.text.slice(0, 89).trimEnd()}…` : waiting.text}”` : "";
+  const sayNow = !waiting
+    ? p.say
+    : answer
+      ? `${asking} I've drafted a reply${byChat ? " for their chat" : " by email"}. Want me to send it?`
+      : unwritten && !writing
+        ? `${asking} I couldn't write a reply just now (${unwritten.replace(/\.$/, "")}).`
+        : `${asking} I'm writing a reply…`;
+  const sendAnswer = async () => {
+    if (!answer) return;
+    setBusy("yes");
+    setSaid(null);
+    const r = byChat
+      ? await sendReply(props.jobId, answer.body)
+      : await emailDeal(props.jobId, { subject: answer.subject, body: answer.body, toCustomer: true });
+    setBusy(null);
+    if (!r.ok) return setSaid(r.message);
+    keep(null);
+    props.onRead();
+  };
+
+  const typed = useTyped(leftIt ? "Okay, I'll leave that for now." : sayNow);
   const changed = Boolean(sol) && (subject !== (sol?.subject ?? "") || body !== (sol?.body ?? ""));
 
   // Words changed in the draft go with whatever is pressed next.
@@ -138,6 +208,13 @@ function SolTerminal(props: {
       setOther(false);
       return props.onMove(move);
     }
+    if (waiting && answer) {
+      setAsk("");
+      setHeard("");
+      return void writeAnswer(
+        `Write the reply to ${name} again: ${t}. The last draft began: "${answer.body.replace(/\s+/g, " ").slice(0, 220)}"`,
+      );
+    }
     askSolInPanel({ text: `On ${deal.customer}'s deal (#${props.jobId}): ${t}`, shown: t });
     setAsk("");
     setHeard("");
@@ -184,7 +261,55 @@ function SolTerminal(props: {
             </div>
           )}
 
-          {!leftIt && typed.done && (
+          {waiting && answer && (
+            <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+              <div className="border-b border-line px-3 py-2 text-[12px] text-muted">
+                {byChat ? `Reply in ${name}'s chat` : `Email to ${name}`}
+                {writing && <span className="text-sun-ink"> · writing it again…</span>}
+              </div>
+              {!byChat && (
+                <input
+                  value={answer.subject}
+                  onChange={(e) => keep({ ...answer, subject: e.target.value })}
+                  aria-label="Subject"
+                  className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
+                />
+              )}
+              <textarea
+                value={answer.body}
+                onChange={(e) => keep({ ...answer, body: e.target.value })}
+                rows={6}
+                aria-label={`The reply to ${name}`}
+                className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
+              />
+            </div>
+          )}
+
+          {!leftIt && typed.done && waiting && (answer || unwritten) && (
+            <div className="mt-3.5 flex flex-wrap items-center gap-2">
+              {answer && (
+                <button
+                  type="button"
+                  onClick={() => void sendAnswer()}
+                  disabled={busy !== null || writing}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                >
+                  {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+                  Yes, send it
+                </button>
+              )}
+              <button type="button" onClick={() => setLeftIt(true)} disabled={busy !== null} className={quiet}>
+                Not now
+              </button>
+              {p.yes && (
+                <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
+                  {byChat ? "Write it myself" : `Email ${name} myself`}
+                </button>
+              )}
+            </div>
+          )}
+
+          {!leftIt && typed.done && !waiting && (
             <div className="mt-3.5 flex flex-wrap items-center gap-2">
               {p.yes && !(p.yes.kind === "call" && !props.phone) && (
                 <button
@@ -268,7 +393,13 @@ function SolTerminal(props: {
                 setHeard("");
                 setAsk(e.target.value);
               }}
-              placeholder={p.yes ? `Or tell Sol what to do for ${name}…` : `Tell Sol what to do for ${name}…`}
+              placeholder={
+                waiting && answer
+                  ? "Tell Sol what to change in the reply…"
+                  : p.yes
+                    ? `Or tell Sol what to do for ${name}…`
+                    : `Tell Sol what to do for ${name}…`
+              }
               aria-label={`Tell Sol what to do for ${name}`}
               className="min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
             />

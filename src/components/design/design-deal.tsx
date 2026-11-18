@@ -247,6 +247,16 @@ export function DealPage({ id }: { id: string }) {
   // (a draft Sol wrote) on its Email tab.
   const asked = useSearchParams().get("tab");
   const params = useSearchParams();
+  // A tab opened from Sol's card is brought into view (18 Nov 2026, Martin: Open the chat with the chat already the tab
+  // open changed nothing on screen, so it seemed to do nothing).
+  const goTab = (next: Tab) => {
+    setTab(next);
+    window.setTimeout(() => {
+      document.getElementById("deal-work")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const box = document.querySelector<HTMLElement>("#deal-work ~ * textarea, #deal-work ~ * input[type='text']");
+      box?.focus({ preventScroll: true });
+    }, 80);
+  };
   const [tab, setTab] = useState<Tab>(
     asked === "chat"
       ? "chat"
@@ -570,14 +580,16 @@ export function DealPage({ id }: { id: string }) {
           refresh={activity.length * 1000 + designVersion}
           onMove={(kind) =>
             kind === "reply"
-              ? setTab("chat")
-              : kind === "design"
-                ? menu.onDesign()
-                : kind === "proposal"
-                  ? openTool("proposal")
-                  : kind === "book"
-                    ? setTab("details")
-                    : setTab("team")
+              ? goTab("chat")
+              : kind === "email"
+                ? goTab("email")
+                : kind === "design"
+                  ? menu.onDesign()
+                  : kind === "proposal"
+                    ? openTool("proposal")
+                    : kind === "book"
+                      ? goTab("details")
+                      : goTab("team")
           }
         />
 
@@ -594,6 +606,7 @@ export function DealPage({ id }: { id: string }) {
             beside the page take its place. */}
           <DealMenu {...menu} />
           {card && <JobCardDialog jobId={job.id} onClose={() => setCard(false)} />}
+          <div id="deal-work" className="scroll-mt-24" aria-hidden />
 
           {/* Notes holds the deal's timeline and, beside it, its details and both chats (12 Nov 2026, Martin). */}
           {NOTES_VIEWS.some(([key]) => key === tab) && (
