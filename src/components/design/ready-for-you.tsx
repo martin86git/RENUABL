@@ -1,5 +1,6 @@
 "use client";
 
+import { ContextLine } from "./context-line";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
@@ -129,7 +130,8 @@ function ReadyCard({ item, onGone, showDeal, open: startOpen = false }: CardProp
             {item.kind === "recap" ? "Recap email" : item.kind === "hello" ? "Hello to a new lead" : "Follow-up email"} · {item.customer}
             {showDeal && <span className="font-normal text-muted"> · {item.title}</span>}
           </p>
-          <p className="text-[12px] text-muted">{item.why}</p>
+          {/* Context, as everywhere Sol proposes something (18 Nov 2026, Martin): why it is here, and what it rests on. */}
+          <ContextLine text={[item.why, item.basis[0]].filter(Boolean).join(" · ")} className="mt-1" />
         </div>
         <Link href={`/design/deals/${item.jobId}`} className="tap-area text-[12px] font-medium text-ink-2 hover:text-ink">
           Open deal

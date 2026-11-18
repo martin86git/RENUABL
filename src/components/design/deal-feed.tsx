@@ -709,6 +709,7 @@ function ArrivalCard(props: {
         {at.waiting ? <span className="size-1.5 rounded-full bg-line" aria-hidden /> : <Check className="size-3.5" aria-hidden />}
         {at.words}
       </p>
+      <ContextLine text={dealContext(d, now)} />
       {props.team && (
         <label className="flex items-center gap-1.5 text-[12px] text-muted">
           <span>With</span>
