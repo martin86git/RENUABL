@@ -1645,6 +1645,8 @@ alter table design_caller add column if not exists coach_past jsonb;
 alter table design_caller add column if not exists delivery jsonb;
 -- How its name is said, who it rings and why (domain/design/call-setup.ts): null is the calls as they were.
 alter table design_caller add column if not exists call_setup jsonb;
+-- The colour chosen for its stand-in picture (domain/design/caller.ts): null leaves it to its name.
+alter table design_caller add column if not exists tint smallint;
 -- Its scripts (domain/design/call-scripts.ts): the name of the one in use (coach_notes and call_setup hold it), and the others filed away.
 alter table design_caller add column if not exists script_name text;
 alter table design_caller add column if not exists scripts jsonb;

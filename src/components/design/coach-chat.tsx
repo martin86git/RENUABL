@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowUp,
   AudioLines,
+  Camera,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -43,7 +44,7 @@ import {
 } from "@/lib/domain/design/coach-window";
 import { currentChatLine, type CoachChatLine } from "@/lib/domain/design/coach-threads";
 import { COACH_COPY, packetsOf, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
-import { callerChanged, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
+import { callerChanged, removeCallerPhoto, saveCallerTint, uploadCallerPhoto, useCaller, useCallerInfo } from "@/lib/services/caller";
 import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
 import { CALL_SETUP_COPY, DEFAULT_CALL_SETUP, type CallSetup } from "@/lib/domain/design/call-setup";
 import { CallSetupSettings } from "./coach-call-setup";
@@ -51,7 +52,7 @@ import type { ScriptLine } from "@/lib/domain/design/call-scripts";
 import { ScriptPicker } from "./coach-scripts";
 import { roleOfKey } from "@/lib/domain/install-call";
 import { DeliverySettings, RingMe, TrainingReview, TrainingStrip, useTraining, type Training } from "./coach-training";
-import { voiceLabel } from "@/lib/domain/design/caller";
+import { TINT_NAMES, tintOf, voiceLabel } from "@/lib/domain/design/caller";
 import {
   clearCoachCall,
   closeCoach,
@@ -1059,48 +1060,131 @@ function CoachSettings(props: {
  */
 function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: string | null) => void }) {
   const caller = useCoachCaller();
+  const role = caller.role ?? "sales";
   const pick = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  // Closed by a press outside it or Escape.
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
   if (!editable) return <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />;
-  const chosen = async (file: File | undefined) => {
-    if (!file) return;
+  const run = async (work: () => Promise<{ ok: true } | { ok: false; message: string }>) => {
     setBusy(true);
     onFailed(null);
-    const res = await uploadCallerPhoto(file, caller.role ?? "sales");
+    const res = await work();
     setBusy(false);
     if (!res.ok) onFailed(res.message);
+    return res.ok;
   };
+  // A colour is the sound wave's, so choosing one puts any picture away first.
+  const colour = (tint: number | null) =>
+    run(async () => {
+      if (caller.photoAt) {
+        const gone = await removeCallerPhoto(role);
+        if (!gone.ok) return gone;
+      }
+      return saveCallerTint(tint, role);
+    });
+  const shown = caller.photoAt ? null : tintOf(caller);
   return (
-    <button
-      type="button"
-      onClick={() => pick.current?.click()}
-      disabled={busy}
-      aria-label={`Change ${caller.name}'s picture`}
-      title={`Change ${caller.name}'s picture`}
-      className="group relative shrink-0 rounded-full"
-    >
-      <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />
-      <span
-        className={clsx(
-          "absolute inset-0 grid place-items-center rounded-full bg-ink/60 text-white transition-opacity",
-          busy ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
-        )}
-        aria-hidden
+    <div ref={box} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={busy}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`Change ${caller.name}'s picture`}
+        title={`Change ${caller.name}'s picture or colour`}
+        className="group relative block rounded-full"
       >
-        {busy ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-4" />}
-      </span>
-      <input
-        ref={pick}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="sr-only"
-        tabIndex={-1}
-        onChange={(e) => {
-          void chosen(e.target.files?.[0]);
-          e.target.value = "";
-        }}
-      />
-    </button>
+        <CallerAvatar caller={caller} size={44} className="ring-2 ring-white/20" />
+        <span
+          className={clsx(
+            "absolute inset-0 grid place-items-center rounded-full bg-ink/60 text-white transition-opacity",
+            busy ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100",
+          )}
+          aria-hidden
+        >
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <Pencil className="size-4" />}
+        </span>
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label={`${caller.name}'s picture`}
+          className="absolute left-0 top-full z-50 mt-2 w-56 rounded-2xl bg-surface p-3 text-ink shadow-xl ring-1 ring-line"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Colour</p>
+          <div className="mt-2 flex items-center gap-2">
+            {TINT_NAMES.map((label, i) => (
+              <button
+                key={label}
+                type="button"
+                disabled={busy}
+                onClick={() => void colour(i)}
+                aria-label={label}
+                aria-pressed={shown === i}
+                title={label}
+                className={clsx(
+                  "grid size-7 place-items-center rounded-full bg-primary ring-2 ring-offset-2 ring-offset-surface",
+                  shown === i ? "ring-ink" : "ring-transparent hover:ring-line",
+                )}
+              >
+                <span className="size-3 rounded-full" style={{ background: `var(--caller-${i})` }} aria-hidden />
+              </button>
+            ))}
+          </div>
+          {caller.tint != null && !caller.photoAt && (
+            <button type="button" disabled={busy} onClick={() => void colour(null)} className="mt-2 text-xs text-ink-2 hover:text-ink">
+              Back to the colour of its name
+            </button>
+          )}
+          <div className="mt-3 border-t border-line pt-2.5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => pick.current?.click()}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-canvas"
+            >
+              <Camera className="size-4 text-ink-2" aria-hidden /> {caller.photoAt ? "Change the picture" : "Upload a picture"}
+            </button>
+            {caller.photoAt && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void run(() => removeCallerPhoto(role))}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] font-medium text-ink hover:bg-canvas"
+              >
+                <Trash2 className="size-4 text-ink-2" aria-hidden /> Remove the picture
+              </button>
+            )}
+          </div>
+          <input
+            ref={pick}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void run(() => uploadCallerPhoto(file, role)).then((ok) => ok && setOpen(false));
+            }}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 

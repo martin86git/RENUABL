@@ -4,6 +4,9 @@ import {
   CALLER_TINTS,
   CALLER_VOICES,
   cleanHiddenVoices,
+  cleanTint,
+  tintOf,
+  TINT_NAMES,
   hideVoice,
   showVoice,
   voiceKey,
@@ -119,6 +122,16 @@ describe("the phone assistant's voice", () => {
     expect(voicesRemoved(hidden, { provider: "azure", voiceId: "en-AU-KenNeural" }).map((v) => v.label)).toEqual(["Tara"]);
     expect(showVoice(hidden, ken)).toEqual([tara]);
     expect(voiceKey({ provider: "vapi", voiceId: "Tara" })).toBe(tara);
+  });
+
+  it("draws the stand-in in the colour chosen, else the name's own", () => {
+    expect(cleanTint(3)).toBe(3);
+    expect(cleanTint(0)).toBe(0);
+    for (const bad of [-1, 6, 2.5, "2", null, undefined]) expect(cleanTint(bad)).toBeNull();
+    expect(tintOf({ name: "Gary", tint: 4 })).toBe(4);
+    expect(tintOf({ name: "Gary", tint: null })).toBe(callerTint("Gary"));
+    expect(tintOf({ name: "Gary", tint: 99 })).toBe(callerTint("Gary"));
+    expect(TINT_NAMES).toHaveLength(CALLER_TINTS);
   });
 
   it("fetches a clip only from ElevenLabs' own places", () => {

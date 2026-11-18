@@ -258,5 +258,19 @@ export function callerTint(name: string): number {
   return sum % CALLER_TINTS;
 }
 
+/**
+ * A colour the business chose for the stand-in picture (19 Nov 2026, Martin: "i should be able to choose different
+ * colors"): one of the six, or null to leave it to the name.
+ */
+export function cleanTint(raw: unknown): number | null {
+  return typeof raw === "number" && Number.isInteger(raw) && raw >= 0 && raw < CALLER_TINTS ? raw : null;
+}
+
+/** The colour the stand-in picture is drawn in: the one chosen, else the name's own. */
+export const tintOf = (c: { name: string; tint?: number | null }): number => cleanTint(c.tint) ?? callerTint(c.name);
+
+/** What each colour is called, for the picker's labels (`--caller-0` … in globals.css). */
+export const TINT_NAMES = ["Teal", "Blue", "Orange", "Violet", "Pink", "Gold"] as const;
+
 /** The initial shown when there is no photo. */
 export const callerInitial = (name: string) => (speakableName(name).charAt(0) || "S").toUpperCase();

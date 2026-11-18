@@ -3,7 +3,7 @@
  * (domain/design/caller.ts). One row a business a role in `design_caller` (sales, and the admin assistant that books
  * installations: domain/install-call.ts), business id first as everywhere; no row is Sol with no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
-import { cleanHiddenVoices, DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
+import { cleanHiddenVoices, cleanTint, DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
 import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
@@ -22,15 +22,20 @@ export interface Caller {
   voice: CallerVoice | null;
   /** Whether the business has set its assistant up (Settings → Phone assistant), not just been given Sol. */
   named: boolean;
+  /** The colour chosen for its stand-in picture (caller.ts), or null to leave it to its name. */
+  tint: number | null;
 }
 
 /** The business's phone assistant: its name (Sol until named) and whether it has a picture. */
 export async function callerOf(businessId: string, role: CallerKey = "sales"): Promise<Caller> {
-  if (!dbConfigured()) return { role, name: DEFAULT_CALLER, photoAt: null, voice: null, named: false };
-  const rows = await query<{ name: string; photo_at: Date | null; voice_provider: string | null; voice_id: string | null }>(
-    `select name, photo_at, voice_provider, voice_id from design_caller where business_id = $1 and role = $2`,
-    [businessId, role],
-  );
+  if (!dbConfigured()) return { role, name: DEFAULT_CALLER, photoAt: null, voice: null, named: false, tint: null };
+  const rows = await query<{
+    name: string;
+    photo_at: Date | null;
+    voice_provider: string | null;
+    voice_id: string | null;
+    tint: number | null;
+  }>(`select name, photo_at, voice_provider, voice_id, tint from design_caller where business_id = $1 and role = $2`, [businessId, role]);
   const row = rows[0];
   const provider = voiceProvider(row?.voice_provider);
   return {
@@ -39,7 +44,18 @@ export async function callerOf(businessId: string, role: CallerKey = "sales"): P
     photoAt: row?.photo_at ? new Date(row.photo_at).toISOString() : null,
     voice: provider && row?.voice_id ? { provider, voiceId: row.voice_id } : null,
     named: Boolean(row),
+    tint: cleanTint(row?.tint),
   };
+}
+
+/** The colour of its stand-in picture, already cleaned (cleanTint); null leaves it to its name. */
+export async function setCallerTint(businessId: string, tint: number | null, by: string, role: CallerKey = "sales"): Promise<Caller> {
+  await query(
+    `insert into design_caller (business_id, name, tint, updated_by, role) values ($1, $2, $3, $4, $5)
+     on conflict (business_id, role) do update set tint = excluded.tint, updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, DEFAULT_CALLER, tint, by, role],
+  );
+  return callerOf(businessId, role);
 }
 
 /** The business's sales agents past the first (keys sales-2 …), in order, only those that have been made. */

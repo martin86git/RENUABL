@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-19",
+    area: "Phone assistant",
+    words: "Press a voice agent's picture in its chat to choose its colour, or upload a picture as before.",
+  },
+  {
     day: "2026-11-18",
     area: "Phone assistant",
     words: "Take voices you don't like off the voice list with the cross beside each, and bring them back any time.",

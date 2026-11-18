@@ -1,5 +1,5 @@
 import { can } from "@/lib/domain/design/account";
-import { cleanCallerName, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
+import { cleanCallerName, cleanTint, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
 import { cleanCallerKey } from "@/lib/domain/install-call";
 import {
   callerOf,
@@ -7,6 +7,7 @@ import {
   moreSalesAgents,
   saveHiddenVoices,
   setCallerName,
+  setCallerTint,
   setCallerVoice,
 } from "@/lib/server/design-caller-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
@@ -64,6 +65,13 @@ export async function PUT(request: Request) {
       const was = await hiddenVoicesOf(who.member.businessId);
       const next = v.all === true ? [] : typeof v.hide === "string" ? hideVoice(was, v.hide) : showVoice(was, v.show);
       return Response.json({ ok: true, hiddenVoices: await saveHiddenVoices(who.member.businessId, next) });
+    }
+    if ("tint" in read.body) {
+      // The colour of its stand-in picture: one of the six, or null for its name's own.
+      return Response.json({
+        ok: true,
+        caller: await setCallerTint(who.member.businessId, cleanTint(read.body.tint), who.member.email, role),
+      });
     }
     if ("voice" in read.body) {
       const voice = cleanVoice(read.body.voice);

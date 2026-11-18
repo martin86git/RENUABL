@@ -7,7 +7,7 @@ import {
   CALLER_COPY,
   CALLER_NAME_MAX,
   CALLER_VOICES,
-  callerTint,
+  tintOf,
   callerIntro,
   cleanCallerName,
   cleanVoice,
@@ -58,7 +58,7 @@ export function CallerAvatar({ caller, size = 32, className }: { caller: CallerS
       className={clsx("grid shrink-0 place-items-center rounded-full bg-primary", className)}
       style={{ width: size, height: size }}
     >
-      <SoundWave size={size} tint={callerTint(caller.name)} />
+      <SoundWave size={size} tint={tintOf(caller)} />
     </span>
   );
 }

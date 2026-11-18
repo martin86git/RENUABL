@@ -19,6 +19,8 @@ export interface CallerState {
   voice: CallerVoice | null;
   /** Whether the business has set it up in Settings (else it is Sol by default). */
   named: boolean;
+  /** The colour chosen for its stand-in picture, or null to leave it to its name. */
+  tint?: number | null;
 }
 
 type Answer<T> = ({ ok: true } & T) | { ok: false; message: string };
@@ -55,6 +57,17 @@ export async function saveCallerName(name: string, role: CallerKey = "sales") {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name, role }),
+  });
+  if (res.ok) window.dispatchEvent(new CustomEvent(CHANGED, { detail: res.caller }));
+  return res;
+}
+
+/** The colour of its stand-in picture (0 to 5); null leaves it to its name. */
+export async function saveCallerTint(tint: number | null, role: CallerKey = "sales") {
+  const res = await ask<{ caller: CallerState }>("/api/design/caller", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tint, role }),
   });
   if (res.ok) window.dispatchEvent(new CustomEvent(CHANGED, { detail: res.caller }));
   return res;
