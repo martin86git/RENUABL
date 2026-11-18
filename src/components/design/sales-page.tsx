@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, Check, Menu, Sparkles, X } from "lucide-react";
+import { ArrowRight, Check, Menu, X } from "lucide-react";
 import { BrandEyebrow, Sunrise } from "./business-brand";
 import { LivingHero } from "./living-hero";
+import { LiveSun } from "./live-sun";
 import { SalesLoop } from "./sales-loop";
 import { DesignerSlide } from "./designer-slide";
 import { InterfaceSlide } from "./interface-slide";
@@ -14,7 +15,7 @@ import { KnowledgeOrbit } from "./business-slides";
 import { RaysSlide } from "./rays-slide";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
-import { CLOSING, FAQ, PRICING, SALES_HERO } from "@/lib/domain/design/sales-page";
+import { CLOSING, FAQ, PRICING, SALES_HERO, STICKY } from "@/lib/domain/design/sales-page";
 import { askSales, startPlan } from "@/lib/services/billing";
 import { TryDemoButton } from "./business-demo";
 import { Reveal } from "./front-hero";
@@ -242,6 +243,7 @@ function SignUpLink({ dark = false }: { dark?: boolean }) {
 function StickySignUp() {
   const [show, setShow] = useState(false);
   const [closed, setClosed] = useState(false);
+  const [read, setRead] = useState(0);
   useEffect(() => {
     const hero = document.getElementById("start");
     const pricing = document.getElementById("pricing");
@@ -253,39 +255,65 @@ function StickySignUp() {
       setShow(![...on.values()].some(Boolean));
     });
     for (const el of [hero, pricing, closing]) if (el) io.observe(el);
-    return () => io.disconnect();
+    // How far down the page they are, drawn as a fine line along the bar's foot.
+    let frame = 0;
+    const scrolled = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        setRead(max > 0 ? Math.min(1, window.scrollY / max) : 0);
+      });
+    };
+    scrolled();
+    window.addEventListener("scroll", scrolled, { passive: true });
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scrolled);
+    };
   }, []);
   if (closed) return null;
   return (
     <div
       className={clsx(
-        "fixed inset-x-0 bottom-0 z-40 px-3 pb-3 transition-all duration-300 sm:px-5 sm:pb-5",
-        show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-6 opacity-0",
+        "fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3 transition-all duration-500 ease-out sm:pb-6",
+        show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-8 opacity-0",
       )}
       aria-hidden={!show}
     >
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-3 rounded-2xl bg-primary p-2 pl-5 text-white shadow-[0_20px_60px_-15px_rgba(11,11,12,0.6)] ring-1 ring-white/10">
-        <span className="flex min-w-0 flex-1 items-center gap-2 text-[15px] font-semibold">
-          <Sparkles className="size-4 shrink-0 text-sun-bright" aria-hidden />
-          <span className="truncate">Your whole solar business, in one platform.</span>
+      {/* A glass dock (18 Nov 2026, Martin: the flat grey bar was "lack luster"): dark glass over the page, Sol's live
+          sun at its start, the line and the first month's offer, a round Sign up, and how far down the page you are as
+          a fine orange line along its foot. */}
+      <div className="relative flex w-full max-w-[36rem] items-center gap-3 rounded-full bg-[#0b0b0c]/80 py-2 pl-3.5 pr-2 text-white shadow-[0_24px_60px_-18px_rgba(11,11,12,0.7),inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-white/10 backdrop-blur-xl backdrop-saturate-150">
+        <span className="relative grid size-9 shrink-0 place-items-center" aria-hidden>
+          <span className="absolute -inset-1/2">
+            <LiveSun live={show} />
+          </span>
+        </span>
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block truncate text-[15px] font-semibold tracking-[-0.01em]">{STICKY.line}</span>
+          <span className="block truncate text-[12.5px] text-white/55">{STICKY.offer}</span>
         </span>
         <a
           href="#pricing"
           tabIndex={show ? 0 : -1}
-          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl bg-sun-line px-5 text-[15px] font-semibold text-white hover:brightness-105"
+          className="group inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-sun-line pl-5 pr-4 text-[15px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(255,90,31,0.8)] transition hover:brightness-110"
         >
           {SALES_HERO.cta}
-          <ArrowRight className="size-4" aria-hidden />
+          <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
         </a>
         <button
           type="button"
           onClick={() => setClosed(true)}
           tabIndex={show ? 0 : -1}
-          className="hidden size-9 shrink-0 place-items-center rounded-full text-white/60 hover:text-white sm:grid"
-          aria-label="Put the sign-up bar away"
+          className="hidden size-8 shrink-0 place-items-center rounded-full text-white/45 hover:bg-white/10 hover:text-white sm:grid"
+          aria-label={STICKY.close}
         >
-          ×
+          <X className="size-4" aria-hidden />
         </button>
+        <span aria-hidden className="absolute inset-x-6 bottom-0 h-px bg-white/[0.06]">
+          <span className="block h-full origin-left bg-sun-line" style={{ transform: `scaleX(${read})` }} />
+        </span>
       </div>
     </div>
   );

@@ -1026,8 +1026,16 @@ export const CLOSING = {
 } as const;
 
 /** Every line of copy on the page, for the test that checks it. */
+/** The bar that follows you down the page once the hero has gone (18 Nov 2026, Martin: it was "lack luster"). */
+export const STICKY = {
+  line: "Solar just got a brain.",
+  offer: `${PLAN_WORDS.firstMonth}. Cancel any time.`,
+  close: "Put the sign-up bar away",
+} as const;
+
 export function salesCopy(): string[] {
   return [
+    ...Object.values(STICKY),
     ...Object.values(SALES_HERO).flat(),
     RAYS.eyebrow,
     ...RAYS.headline,
