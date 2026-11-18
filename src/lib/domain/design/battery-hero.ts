@@ -112,6 +112,18 @@ export function batteryHero(
 export const heroWords = (hero: BatteryHero): string =>
   [hero.headline, ...hero.says, ...hero.stages.flatMap((s) => [s.when, s.words]), hero.note, hero.label].join(" ");
 
+/**
+ * RENUABL's own battery is drawn as a stack of cells, one for about every `KWH_PER_CELL` it holds, so its size shows
+ * at a glance (18 Nov 2026, Martin: "we should have our own stylised battery… that indicates the size of it"). A
+ * drawing, not the product's real modules.
+ */
+export const KWH_PER_CELL = 4;
+export const MAX_CELLS = 7;
+export function batteryCells(kwh: number): number {
+  if (!(kwh > 0)) return 0;
+  return Math.min(MAX_CELLS, Math.max(1, Math.round(kwh / KWH_PER_CELL)));
+}
+
 /** The dark the battery is laid over on the roof picture. */
 export const HERO_DARK = "#111827";
 

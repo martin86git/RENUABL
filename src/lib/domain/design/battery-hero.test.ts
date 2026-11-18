@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BACKUP_LINE, BATTERY_STAGES, batteryHero, heroGlow, heroWords, shareOfDay } from "./battery-hero";
+import { BACKUP_LINE, BATTERY_STAGES, MAX_CELLS, batteryCells, batteryHero, heroGlow, heroWords, shareOfDay } from "./battery-hero";
 import { COST_WORDS, buildProposal, type ProposalOption, type ProposalView } from "./proposal";
 import { sampleInputs } from "./proposal-fixture";
 
@@ -93,5 +93,17 @@ describe("the charge's colour over the dark", () => {
   it("keeps a bright brand colour and gives way to white for a dark one", () => {
     expect(heroGlow("#FF5A1F")).toBe("#FF5A1F");
     expect(heroGlow("#1E3A2E")).toBe("#ffffff");
+  });
+});
+
+describe("our own battery's cells", () => {
+  it("draws one cell for about every 4 kWh, at least one and no more than the most", () => {
+    expect(batteryCells(0)).toBe(0);
+    expect(batteryCells(5)).toBe(1);
+    expect(batteryCells(8)).toBe(2);
+    expect(batteryCells(12.8)).toBe(3);
+    expect(batteryCells(16)).toBe(4);
+    expect(batteryCells(24)).toBe(6);
+    expect(batteryCells(80)).toBe(MAX_CELLS);
   });
 });

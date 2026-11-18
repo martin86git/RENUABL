@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import clsx from "clsx";
 import { Download, FileText } from "lucide-react";
 import {
@@ -40,7 +40,7 @@ import {
 import type { OptionKey } from "@/lib/domain/design/proposal";
 import { money } from "@/lib/domain/design/deposit";
 import { ROOF_IMAGE, metresPerPixel } from "@/lib/domain/design/roof-design";
-import { HERO_DARK, batteryHero, heroGlow, type BatteryHero } from "@/lib/domain/design/battery-hero";
+import { HERO_DARK, batteryCells, batteryHero, heroGlow, type BatteryHero } from "@/lib/domain/design/battery-hero";
 import { ProposalDay, hasDay } from "./proposal-day";
 
 const MONTHS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
@@ -127,6 +127,27 @@ function Roof({ view, src, hero }: { view: ProposalView; src: string | null; her
         aria-label={hero ? hero.label : `${view.system.panels} panels on the roof, seen from above`}
       >
         {src && arrived && <image href={src} width={width} height={height} preserveAspectRatio="xMidYMid slice" />}
+        {/* A fine outline round each array, so the design stands off the roof (18 Nov 2026, Martin: "a nice classy
+            outline"): every panel drawn first with a wider soft shadow, then a line in the business's colour (white
+            where that colour wouldn't read). Panels that touch merge, so only the array's outer edge shows. */}
+        <g strokeLinejoin="round" fill="none">
+          {view.roof.panels.map((p, i) => (
+            <polygon
+              key={`s${i}`}
+              points={[0, 2, 4, 6].map((k) => at(p[k], p[k + 1])).join(" ")}
+              stroke="rgb(0 0 0 / 0.35)"
+              strokeWidth={6}
+            />
+          ))}
+          {view.roof.panels.map((p, i) => (
+            <polygon
+              key={`o${i}`}
+              points={[0, 2, 4, 6].map((k) => at(p[k], p[k + 1])).join(" ")}
+              stroke={heroGlow(view.theme.primary)}
+              strokeWidth={3}
+            />
+          ))}
+        </g>
         {view.roof.panels.map((p, i) => (
           <polygon
             key={i}
@@ -210,6 +231,13 @@ const HERO_CSS = `
 @keyframes bh-st-a{0%,16%{opacity:.4}20%,50%{opacity:1}54%,100%{opacity:.4}}
 @keyframes bh-st-e{0%,50%{opacity:.4}54%,84%{opacity:1}88%,100%{opacity:.4}}
 @keyframes bh-st-n{0%,84%{opacity:.4}88%,98%{opacity:1}100%{opacity:.4}}
+.bh .bh-say{position:absolute;inset:0;opacity:0}
+.bh .bh-say-afternoon{animation:bh-say-a 14s linear infinite}
+.bh .bh-say-evening{opacity:1;animation:bh-say-e 14s linear infinite}
+.bh .bh-say-night{animation:bh-say-n 14s linear infinite}
+@keyframes bh-say-a{0%,50%{opacity:1}54%,96%{opacity:0}100%{opacity:1}}
+@keyframes bh-say-e{0%,50%{opacity:0}54%,84%{opacity:1}88%,100%{opacity:0}}
+@keyframes bh-say-n{0%,84%{opacity:0}88%,96%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.bh *{animation:none!important}}
 `;
 
@@ -222,44 +250,93 @@ function ChargeBar({ dark }: { dark?: boolean }) {
   );
 }
 
-/** Over the roof picture's corner (under it on a phone): "and your evenings", the battery filling by day and running the evening. */
+/**
+ * Over the roof picture's corner (under it on a phone): our own battery with its size, the day as one track whose words
+ * change with it, then what it means for the home (18 Nov 2026, Martin: "we can do better about the battery card").
+ */
 function BatteryOverlay({ hero }: { hero: BatteryHero }) {
+  // The first line says what it holds, which the figure beside the battery already does.
+  const lines = hero.says.slice(1);
   return (
-    <div className="bg-[#111827] px-4 py-4 text-white sm:absolute sm:bottom-4 sm:right-4 sm:w-[19rem] sm:rounded-xl sm:bg-[#111827]/70 sm:backdrop-blur-md">
-      <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-white/70">{hero.headline}</p>
-      <div className="mt-2 flex items-center gap-3">
-        <BatteryGlyph />
-        <p className="text-[24px] leading-none tracking-tight [font-variant-numeric:tabular-nums]">
-          {hero.kwh.toLocaleString("en-AU")} <span className="text-[14px] text-white/75">kWh battery</span>
-        </p>
+    <div className="bg-[#111827] px-5 py-4 text-white sm:absolute sm:bottom-4 sm:right-4 sm:w-[18.5rem] sm:rounded-2xl sm:bg-[#111827]/75 sm:ring-1 sm:ring-white/10 sm:backdrop-blur-md">
+      <div className="flex items-end gap-4">
+        <OurBattery kwh={hero.kwh} />
+        <div className="min-w-0 pb-0.5">
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.18em] text-white/60">{hero.headline}</p>
+          <p className="mt-1.5 text-[32px] font-light leading-none tracking-tight [font-variant-numeric:tabular-nums]">
+            {hero.kwh.toLocaleString("en-AU")}
+            <span className="ml-1 text-[13px] font-normal tracking-normal text-white/70">kWh</span>
+          </p>
+          <p className="mt-1 text-[12px] text-white/65">to run your evenings</p>
+        </div>
       </div>
-      <div className="mt-3">
-        <ChargeBar dark />
-      </div>
-      <ol className="mt-2 grid grid-cols-3 gap-2 text-[11px] leading-snug text-white/80">
+      <div className="mt-4 grid grid-cols-3 gap-1.5" aria-hidden>
         {hero.stages.map((s) => (
-          <li key={s.id} className={`bh-stage-${s.id}`}>
-            <span className="block font-medium text-white">{s.when}</span>
+          <div key={s.id} className={`bh-stage-${s.id}`}>
+            <div className="h-[3px] rounded-full" style={{ background: s.id === "night" ? "rgb(255 255 255 / 0.55)" : "var(--bh-glow)" }} />
+            <p className="mt-1.5 text-[10.5px] font-medium tracking-wide text-white">{s.when}</p>
+          </div>
+        ))}
+      </div>
+      <p className="relative mt-0.5 h-[1.4em] text-[12.5px] text-white/80">
+        {hero.stages.map((s) => (
+          <span key={s.id} className={`bh-say bh-say-${s.id}`}>
             {s.words}
-          </li>
+          </span>
         ))}
-      </ol>
-      <ul className="mt-3 space-y-1 border-t border-white/15 pt-3 text-[12.5px] leading-snug text-white/90">
-        {hero.says.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
+      </p>
+      {lines.length > 0 && (
+        <ul className="mt-3 space-y-1 border-t border-white/10 pt-3 text-[12.5px] leading-snug text-white/85">
+          {lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-/** A small battery, its charge rising and falling with the day. */
-function BatteryGlyph() {
+/**
+ * RENUABL's own battery: a slim wall unit with a rounded crown carrying the sun, its cells stacked one for about every
+ * 4 kWh (`batteryCells`), so a bigger battery is a taller one; its charge rises through the afternoon and runs down
+ * through the evening. A drawing, not the product's real modules.
+ */
+function OurBattery({ kwh }: { kwh: number }) {
+  const clip = `bc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const cells = Math.max(1, batteryCells(kwh));
+  const [W, CELL, GAP, CROWN, PAD] = [40, 13, 3, 12, 5];
+  const bodyH = PAD * 2 + cells * CELL + (cells - 1) * GAP;
+  const H = CROWN + bodyH + 1;
+  const ys = Array.from({ length: cells }, (_, i) => CROWN + PAD + i * (CELL + GAP));
+  const inner = W - 2 * PAD - 2;
   return (
-    <svg viewBox="0 0 20 32" className="h-8 w-5 shrink-0" aria-hidden>
-      <rect x={7} y={0.5} width={6} height={3} rx={1} fill="rgb(255 255 255 / 0.7)" />
-      <rect x={1} y={3.5} width={18} height={28} rx={3} fill="none" stroke="rgb(255 255 255 / 0.8)" strokeWidth={1.2} />
-      <rect className="bh-fill" x={3.5} y={6} width={13} height={23} rx={1.5} fill="var(--bh-glow)" />
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="shrink-0" aria-hidden>
+      <defs>
+        <clipPath id={clip}>
+          {ys.map((y) => (
+            <rect key={y} x={PAD + 1} y={y} width={inner} height={CELL} rx={2.5} />
+          ))}
+        </clipPath>
+      </defs>
+      {/* The crown, with the sun in it. */}
+      <path d={`M9,${CROWN} Q9,1.5 20,1.5 Q31,1.5 31,${CROWN}`} fill="none" stroke="rgb(255 255 255 / 0.7)" strokeWidth={1.2} />
+      <circle cx={20} cy={7.5} r={2.8} fill="var(--bh-glow)" />
+      <rect
+        x={1}
+        y={CROWN}
+        width={W - 2}
+        height={bodyH}
+        rx={8}
+        fill="rgb(255 255 255 / 0.06)"
+        stroke="rgb(255 255 255 / 0.8)"
+        strokeWidth={1.2}
+      />
+      {ys.map((y) => (
+        <rect key={y} x={PAD + 1} y={y} width={inner} height={CELL} rx={2.5} fill="rgb(255 255 255 / 0.12)" />
+      ))}
+      <g clipPath={`url(#${clip})`}>
+        <rect className="bh-fill" x={0} y={CROWN + PAD} width={W} height={bodyH - 2 * PAD} fill="var(--bh-glow)" />
+      </g>
     </svg>
   );
 }
