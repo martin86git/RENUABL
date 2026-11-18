@@ -3,6 +3,7 @@
 import { withDatasheets, type Datasheets } from "@/lib/domain/design/datasheets";
 import { findDatasheetOnline, loadDatasheets } from "@/lib/services/datasheets";
 import Link from "next/link";
+import { MapPin } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DesignBrief } from "./design-brief";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -112,7 +113,7 @@ export function DesignStudio() {
   const [theirs, setTheirs] = useState<{ jobId: string; address: string; lat: number; lng: number } | null>(null);
   // A deal opened in the designer with no place on the map (18 Nov 2026, Martin: the warning named no one and Sol's
   // brief for it floated over the other deals): its customer, so the address can be found for it here.
-  const [noPlace, setNoPlace] = useState<{ jobId: string; name: string } | null>(null);
+  const [noPlace, setNoPlace] = useState<{ jobId: string; name: string; typed: string } | null>(null);
   const [job, setJob] = useState<{ id: string; customerId: string; customerName: string; lat: number; lng: number } | null>(null);
   // The business's price lists and settings; and the STC rules, today's when they can be had.
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
@@ -228,7 +229,8 @@ export function DesignStudio() {
           setJob({ id: asked.job.id, customerId: asked.customer.id, customerName: asked.customer.name, lat: forJob.lat, lng: forJob.lng });
           rememberRoof(forJob);
         } else if (jobId) {
-          if (asked?.ok) setNoPlace({ jobId: asked.job.id, name: asked.customer.name });
+          if (asked?.ok)
+            setNoPlace({ jobId: asked.job.id, name: asked.customer.name, typed: asked.job.address || asked.customer.address || "" });
           else setProblem(asked ? asked.message : "That deal couldn't be opened.");
           // The deal has no place of its own, but its customer does: offered in one press (as Primero's).
           if (asked?.ok && asked.customer.lat !== null && asked.customer.lng !== null && asked.customer.address)
@@ -672,45 +674,36 @@ export function DesignStudio() {
   if (signedIn)
     return (
       <div className="theme-studio">
-        {/* A deal with no place yet: find its address here, and its roof opens (with Sol's brief, if one came with it). */}
-        {noPlace && (
-          <div className="mx-auto mb-4 max-w-3xl rounded-2xl bg-surface p-5 shadow-sm ring-1 ring-line" role="status">
-            <p className="text-[15px] font-semibold text-ink">{noPlace.name}&apos;s deal has no address on the map yet.</p>
-            <p className="mt-1 text-[13.5px] text-muted">Find it here to open their roof and start the design.</p>
-            <div className="mt-3">
-              <AddressEntry
-                compact
-                placeholder={`Search ${noPlace.name.split(" ")[0]}'s address`}
-                onPick={async (a) => {
-                  if (typeof a.lat !== "number" || typeof a.lng !== "number") return;
-                  const address = [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(", ");
-                  const res = await saveJob(noPlace.jobId, { address, lat: a.lat, lng: a.lng });
-                  if (res.ok) window.location.reload();
-                  else setProblem(res.message);
-                }}
-              />
-            </div>
-            {theirs && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const res = await saveJob(theirs.jobId, { address: theirs.address, lat: theirs.lat, lng: theirs.lng });
-                  if (res.ok) window.location.reload();
-                  else setProblem(res.message);
-                }}
-                className="mt-3 rounded-full bg-sun-line px-3 py-1.5 text-[13px] font-medium text-white hover:brightness-105"
-              >
-                Use the customer&apos;s address: {theirs.address}
-              </button>
-            )}
-          </div>
-        )}
         {problem && (
           <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
             <span>{problem}</span>
           </div>
         )}
-        {ready && <DesignToolHome onPick={pick} onOpen={openOver} />}
+        {/* A deal with no place yet (18 Nov 2026, Martin: from "Design required" in the chat it landed on the design home,
+            with two search boxes and other people's deals): only the one thing to do, find this customer's home, and its
+            roof opens. The deal's address as typed is already in the box. */}
+        {noPlace ? (
+          <NoPlaceYet
+            name={noPlace.name}
+            typed={noPlace.typed}
+            theirs={theirs?.address ?? null}
+            onPick={async (a) => {
+              if (typeof a.lat !== "number" || typeof a.lng !== "number") return;
+              const address = [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(", ");
+              const res = await saveJob(noPlace.jobId, { address, lat: a.lat, lng: a.lng });
+              if (res.ok) window.location.reload();
+              else setProblem(res.message);
+            }}
+            onTheirs={async () => {
+              if (!theirs) return;
+              const res = await saveJob(theirs.jobId, { address: theirs.address, lat: theirs.lat, lng: theirs.lng });
+              if (res.ok) window.location.reload();
+              else setProblem(res.message);
+            }}
+          />
+        ) : (
+          ready && <DesignToolHome onPick={pick} onOpen={openOver} />
+        )}
       </div>
     );
 
@@ -757,6 +750,38 @@ export function DesignStudio() {
           .
         </p>
       </main>
+    </div>
+  );
+}
+
+/** Where is <name>'s home? The one step before a deal with no place on the map can be designed. */
+function NoPlaceYet(props: { name: string; typed: string; theirs: string | null; onPick: (a: Address) => void; onTheirs: () => void }) {
+  const first = props.name.split(" ")[0] || props.name;
+  return (
+    <div className="mx-auto flex min-h-[60dvh] max-w-xl flex-col justify-center px-2 py-10">
+      <span className="grid size-12 place-items-center rounded-2xl bg-sun text-sun-line" aria-hidden>
+        <MapPin className="size-6" />
+      </span>
+      <h1 className="mt-4 text-[26px] font-semibold leading-tight tracking-tight text-ink">Where is {first}&apos;s home?</h1>
+      <p className="mt-2 text-[14.5px] leading-relaxed text-ink-2">
+        {props.name}&apos;s deal needs an address on the map before the design can start. Find it below and their roof opens, ready to
+        design.
+      </p>
+      <div className="mt-5">
+        <AddressEntry compact autoFocus initial={props.typed} placeholder={`Search ${first}'s address`} onPick={props.onPick} />
+      </div>
+      {props.typed && (
+        <p className="mt-2 text-[12.5px] text-muted">On the deal: {props.typed}. Pick it from the list to place it on the map.</p>
+      )}
+      {props.theirs && (
+        <button
+          type="button"
+          onClick={props.onTheirs}
+          className="mt-4 self-start rounded-full bg-sun-line px-4 py-2 text-[13.5px] font-semibold text-white hover:brightness-105"
+        >
+          Use {first}&apos;s address: {props.theirs}
+        </button>
+      )}
     </div>
   );
 }

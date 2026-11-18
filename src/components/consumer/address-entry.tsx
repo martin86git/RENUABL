@@ -27,6 +27,7 @@ export function AddressEntry({
   placeholder,
   above,
   autoFocus,
+  initial,
 }: {
   className?: string;
   onPick?: (address: Address) => void;
@@ -37,10 +38,12 @@ export function AddressEntry({
   /** The suggestions open above the box (a box at the foot of a window, as the designer's address strip). */
   above?: boolean;
   autoFocus?: boolean;
+  /** Words already in the box as it opens (a deal's address as typed, to be placed on the map). */
+  initial?: string;
 }) {
   const router = useRouter();
   const { state, update } = useFlow();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initial ?? "");
   const [focused, setFocused] = useState(false);
   const [active, setActive] = useState(-1);
   const [error, setError] = useState<string | null>(null);
