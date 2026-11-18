@@ -28,7 +28,6 @@ import { saveCallSetup } from "@/lib/services/coaching";
 const field =
   "mt-1 w-full rounded-lg bg-surface px-2.5 py-1.5 text-[13px] text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line disabled:bg-canvas disabled:text-muted";
 const label = "block text-[12px] font-medium text-ink";
-const hint = "mt-1 text-[11px] leading-snug text-muted";
 
 export function CallSetupSettings(props: {
   caller: CallerState;
@@ -76,7 +75,7 @@ export function CallSetupSettings(props: {
 
   return (
     <form
-      className="space-y-3.5"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!busy && (nameChanged || setupChanged)) void save();
@@ -106,18 +105,18 @@ export function CallSetupSettings(props: {
             maxLength={SAID_AS_MAX}
             disabled={!props.editable || busy}
             placeholder="As spelled"
+            title={COPY.saidAsHint}
             autoComplete="off"
             className={field}
           />
         </label>
-        <p className={clsx(hint, "col-span-2 !mt-0")}>{COPY.saidAsHint}</p>
       </div>
 
       {sales && (
         <>
           <fieldset disabled={!props.editable || busy}>
             <legend className={label}>{COPY.audience}</legend>
-            <div className="mt-1 inline-flex rounded-full bg-surface-2 p-0.5">
+            <div className="mt-1 grid grid-cols-2 rounded-full bg-surface-2 p-0.5">
               {CALL_AUDIENCES.map((a) => {
                 const on = draft.audience === a;
                 return (
@@ -128,7 +127,7 @@ export function CallSetupSettings(props: {
                     title={COPY.audiences[a][1]}
                     onClick={() => !on && change({ audience: a })}
                     className={clsx(
-                      "rounded-full px-3 py-1 text-[12px] font-medium",
+                      "truncate whitespace-nowrap rounded-full px-2 py-1.5 text-[12px] font-medium",
                       on ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
                     )}
                   >
@@ -137,7 +136,6 @@ export function CallSetupSettings(props: {
                 );
               })}
             </div>
-            <p className={hint}>{COPY.audiences[draft.audience][1]}</p>
           </fieldset>
 
           <label className="block">
@@ -149,9 +147,9 @@ export function CallSetupSettings(props: {
               rows={2}
               disabled={!props.editable || busy}
               placeholder={USUAL_REASON[draft.audience]}
+              title={COPY.reasonHint}
               className={clsx(field, "resize-none leading-snug")}
             />
-            <span className={clsx(hint, "block")}>{COPY.reasonHint}</span>
           </label>
 
           {draft.audience === "cold" && (
@@ -179,17 +177,19 @@ export function CallSetupSettings(props: {
       )}
 
       {props.editable ? (
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={busy || !(nameChanged || setupChanged)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-xs font-semibold text-white disabled:bg-surface-2 disabled:text-muted"
-          >
-            {busy && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-            Save
-          </button>
-          {said && <p className={clsx("text-xs", said.ok ? "text-ink-2" : "text-danger")}>{said.text}</p>}
-        </div>
+        (nameChanged || setupChanged || busy || said) && (
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={busy || !(nameChanged || setupChanged)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-xs font-semibold text-white disabled:bg-surface-2 disabled:text-muted"
+            >
+              {busy && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+              Save
+            </button>
+            {said && <p className={clsx("text-xs", said.ok ? "text-ink-2" : "text-danger")}>{said.text}</p>}
+          </div>
+        )
       ) : (
         <p className="text-xs text-muted">Only an admin can change these.</p>
       )}
