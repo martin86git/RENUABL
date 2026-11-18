@@ -2,6 +2,9 @@
 
 import { ContextLine } from "./context-line";
 import { dealContext } from "@/lib/domain/design/sol-on-deal";
+import { SolLive, SolTerminal, useTyped } from "./sol-on-deal";
+import { openDesigner } from "./design-drawer";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1073,6 +1076,9 @@ function DealCard(props: {
   const { deal: d, now } = props;
   const need = needsYou(d, now);
   const move = nextMove(d, now);
+  const router = useRouter();
+  // Sol's panel for whatever the deal needs, but booking the install, which keeps its own days to pick from.
+  const solPanel = Boolean(move) && move?.kind !== "book";
   const [reviewing, setReviewing] = useState(false);
   // A card cleared with Done or Later shows a tick for a moment before it leaves Needs you.
   const [cleared, setCleared] = useState<string | null>(null);
@@ -1157,19 +1163,60 @@ function DealCard(props: {
             )}
           </div>
           {/* What the deal needs, in the card's top right: the one call to action (14 Nov 2026, Martin). */}
-          <div className="hidden w-[38%] max-w-[14rem] shrink-0 sm:block">
+          <div className={clsx("hidden w-[38%] max-w-[14rem] shrink-0", !move && "sm:block")}>
             <NeedCall deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
           </div>
         </div>
-        <div className="mt-3 sm:hidden">
-          <NeedCall deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
-        </div>
+        {!move && (
+          <div className="mt-3 sm:hidden">
+            <NeedCall deal={d} move={move} now={now} reviewing={reviewing} onReview={() => setReviewing((r) => !r)} onCall={call} />
+          </div>
+        )}
+        {/* Sol puts what the deal needs to you, as on its page (18 Nov 2026, Martin: "do the same for the Needs you cards on
+            Today"): his line, his draft open (a reply, his lined-up email), yes or not now, and the box to tell him. */}
+        {solPanel && (
+          <div className="mt-3">
+            <SolTerminal
+              inCard
+              jobId={d.jobId}
+              phone={d.phone ?? null}
+              deal={d}
+              now={now}
+              onRead={props.onChanged}
+              onMove={(kind) => {
+                const deal = `${PATHS.deals}/${d.jobId}`;
+                const ask = d.team?.openAsks.find((a) => a.type === "design");
+                if (kind === "design")
+                  return openDesigner(ask ? briefHref(d.jobId, ask.id) : `${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`, router);
+                if (kind === "proposal") return openDesigner(`${deal}/proposal`, router);
+                router.push(
+                  kind === "reply"
+                    ? `${deal}?tab=chat`
+                    : kind === "email"
+                      ? `${deal}?tab=email`
+                      : kind === "book"
+                        ? `${deal}?tab=details`
+                        : `${deal}?tab=team`,
+                );
+              }}
+            />
+          </div>
+        )}
 
         {/* A signed deal: Sol's days to choose from, with the email that goes with the day (install-days.ts). */}
         {move?.kind === "book" && (
-          <BookInstall deal={d} days={props.installDays ?? []} signOff={props.signOff} onBooked={props.onChanged} />
+          <div className="mt-3 rounded-2xl bg-surface p-3.5 shadow-[0_10px_28px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70">
+            <SolSays
+              text={
+                props.installDays?.length
+                  ? `${d.customer.split(/\s+/)[0] || "They"} has signed. I've found days we're free and written the email. Want me to book one?`
+                  : `${d.customer.split(/\s+/)[0] || "They"} has signed and needs an installation day.`
+              }
+            />
+            <BookInstall deal={d} days={props.installDays ?? []} signOff={props.signOff} onBooked={props.onChanged} />
+          </div>
         )}
-        {reviewing && d.sol?.id && (
+        {reviewing && !solPanel && d.sol?.id && (
           <ReviewSol
             deal={d}
             now={now}
@@ -1410,6 +1457,20 @@ function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewin
     <Link href={href} className={look}>
       {inner}
     </Link>
+  );
+}
+
+/** Sol's line over a card's own controls (booking the install): his sun, his words typed out. */
+function SolSays({ text }: { text: string }) {
+  const typed = useTyped(text);
+  return (
+    <div className="flex items-start gap-3">
+      <SolLive />
+      <p className="min-h-[1.4em] pt-2.5 text-[14.5px] font-medium leading-snug text-ink" aria-live="polite">
+        {typed.text}
+        <span className="sol-caret ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
+      </p>
+    </div>
   );
 }
 

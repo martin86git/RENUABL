@@ -70,13 +70,15 @@ export function SolOnDealCard(props: {
   return <SolTerminal key={key} {...props} deal={deal} now={now} onRead={() => void read()} />;
 }
 
-function SolTerminal(props: {
+export function SolTerminal(props: {
   jobId: string;
   phone: string | null;
   deal: FeedDeal;
   now: Date;
   onRead: () => void;
   onMove: (kind: Exclude<MoveKind, "review" | "call"> | "email") => void;
+  /** Inside a card on Today (18 Nov 2026, Martin: Needs you as Sol's panel too): the card says the context and has the page. */
+  inCard?: boolean;
 }) {
   const { deal, now } = props;
   const p = solProposes(deal, now);
@@ -236,7 +238,7 @@ function SolTerminal(props: {
             {typed.text}
             <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
           </p>
-          <ContextLine text={dealContext(deal, now)} className="mt-2" />
+          {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-2" />}
 
           {!leftIt && p.draft && sol && (
             <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
@@ -420,7 +422,7 @@ function SolTerminal(props: {
           {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
         </div>
       </div>
-      {(deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
+      {!props.inCard && (deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
     </section>
   );
 }
