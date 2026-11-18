@@ -115,7 +115,7 @@ export function BigSol({
 }
 
 /** A speech bubble, typed as it is said. */
-export function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy: boolean; tail: "down" | "up" }) {
+export function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy: boolean; tail: "down" | "up" | "shoulder" }) {
   return (
     <div
       className={clsx(
@@ -140,8 +140,9 @@ export function Bubble({ who, text, busy, tail }: { who: Who; text: string; busy
       <span
         aria-hidden
         className={clsx(
-          "absolute left-1/2 size-3 -translate-x-1/2 rotate-45 bg-surface ring-1 ring-line [clip-path:polygon(100%_0,100%_100%,0_100%)]",
-          tail === "down" ? "-bottom-1.5" : "-top-1.5 [clip-path:polygon(0_0,100%_0,0_100%)]",
+          "absolute size-3 rotate-45 bg-surface ring-1 ring-line [clip-path:polygon(100%_0,100%_100%,0_100%)]",
+          tail === "shoulder" ? "left-1/2 -translate-x-1/2 xl:left-7 xl:translate-x-0" : "left-1/2 -translate-x-1/2",
+          tail === "up" ? "-top-1.5 [clip-path:polygon(0_0,100%_0,0_100%)]" : "-bottom-1.5",
           who === "sol" && "ring-sun-line/40",
         )}
       />
@@ -322,14 +323,14 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
       <div className="mx-auto grid max-w-[90rem] items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
         <div className="text-center lg:text-left">
           <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
-          <h1 id="hero" className="mt-6 text-[clamp(56px,8vw,148px)] font-semibold leading-[0.88] tracking-[-0.055em]">
+          <h1 id="hero" className="mt-6 text-[clamp(48px,6.4vw,116px)] font-semibold leading-[0.88] tracking-[-0.055em]">
             <span className="block">{SALES_HERO.headline[0]}</span>
             <span className="block text-sun-line">{SALES_HERO.headline[1]}</span>
           </h1>
           {/* …and a voice: the voice agents, the sales agent's wave speaking beside it. */}
-          <p className="mt-4 inline-flex items-center gap-3 text-[clamp(28px,3.4vw,56px)] font-semibold leading-none tracking-[-0.04em] text-ink-2">
+          <p className="mt-4 inline-flex items-center gap-3 text-[clamp(24px,2.8vw,44px)] font-semibold leading-none tracking-[-0.04em] text-ink-2">
             {SALES_HERO.andVoice}
-            <Ray i={0} size={48} live={live} />
+            <Ray i={0} size={40} live={live} />
           </p>
           <p className="mt-7 text-[clamp(22px,2.3vw,36px)] font-medium leading-tight tracking-[-0.025em] text-ink">{SALES_HERO.sub}</p>
           <p className="mx-auto mt-3 max-w-xl text-[17px] leading-relaxed text-ink-2 lg:mx-0">{SALES_HERO.line}</p>
@@ -343,11 +344,16 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
             {!signedIn && <TryDemoButton look="quiet" label="Start demo" />}
           </div>
         </div>
-        <div className="flex flex-col items-center gap-6">
-          <div aria-live="polite">
-            <Bubble who="sol" text={sol.shown} busy={sol.busy} tail="down" />
+        <div className="flex flex-col items-center gap-6 xl:pt-24">
+          {/* Sol a touch smaller, and his bubble off his shoulder rather than over his head (18 Nov 2026, Martin: above
+              him "seems weird"): on a wide screen (xl) it sits up and to his right, its tail pointing back to him; on a phone
+              it stays above him. */}
+          <div className="relative">
+            <div aria-live="polite" className="mb-6 xl:absolute xl:bottom-[90%] xl:left-[58%] xl:mb-0 xl:[&>div]:w-[17.5rem]">
+              <Bubble who="sol" text={sol.shown} busy={sol.busy} tail="shoulder" />
+            </div>
+            <BigSol busy={sol.busy} lean={lean} className="mx-auto size-40 sm:size-48 lg:size-[13.5rem]" />
           </div>
-          <BigSol busy={sol.busy} lean={lean} className="size-44 sm:size-56 lg:size-[17rem]" />
           <p className="text-[14px] text-muted">
             <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
           </p>
