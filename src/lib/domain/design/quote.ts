@@ -233,9 +233,11 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     if (r.smartMeter) install("Smart meter installation", r.smartMeter);
     if (r.fallProtection) install("Fall protection", r.fallProtection);
     // Costs that sometimes apply, decided on each job (as Primero's): the switchboard on every quote, the rest with a battery.
-    const decide = (group: CostGroup, label: string, amount: number) => lines.push({ group, label, amount, confirm: true });
+    const decide = (group: CostGroup, label: string, amount: number, qty?: number) =>
+      lines.push({ group, label, amount, confirm: true, ...(qty ? { qty } : {}) });
     decide("Switchboard", "Switchboard upgrade", r.switchboardUpgrade ?? 1000);
-    decide("Switchboard", "RCBO", r.rcbo ?? 100);
+    // RCBOs are counted (19 Nov 2026, Martin: Sol should ask how many): one to start, priced each.
+    decide("Switchboard", "RCBO", r.rcbo ?? 100, 1);
     if (spec.battery) {
       decide("Battery", "Protective bollard", r.bollard ?? 220);
       decide("Battery", "Fireproofing (sheeting)", r.fireSheeting ?? 200);

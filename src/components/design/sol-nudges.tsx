@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { NUDGE_KIND_WORDS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { BatteryWallPicture } from "./battery-wall-picture";
@@ -10,23 +10,44 @@ import { SolIcon } from "./sol-icon";
 /**
  * Sol beside the design (10 Nov 2026, Martin; `sol-nudges.ts`): one thing at a time in a small dark bubble over Ask
  * Sol, what the design needs, the quote's questions, then options, each with its answer or action, ✕ to put it aside
- * for the visit, and › to look at the next.
+ * for the visit, and › to look at the next. ‹ Back (19 Nov 2026, Martin: "move back to the previous sol question incase
+ * i've changed my mind") undoes the last answer and asks that question again (`focus`); a counted line (RCBOs) asks
+ * how many with its yes.
  */
 export function SolNudges({
   nudges,
   onAct,
   onDismiss,
+  onBack,
+  focus,
   className,
 }: {
   nudges: Nudge[];
-  onAct: (nudge: Nudge, action: NudgeAction) => void;
+  onAct: (nudge: Nudge, action: NudgeAction, count?: number) => void;
   onDismiss: (id: string) => void;
+  /** Undo the last answer, when there is one to undo. */
+  onBack?: (() => void) | null;
+  /** The question to show, once Back has brought it back. */
+  focus?: { id: string; at: number } | null;
   className?: string;
 }) {
   const [at, setAt] = useState(0);
+  const [count, setCount] = useState<number | null>(null);
+  const [seen, setSeen] = useState<string | null>(null);
+  const [focused, setFocused] = useState<number | null>(null);
+  if (focus && focus.at !== focused) {
+    setFocused(focus.at);
+    const k = nudges.findIndex((x) => x.id === focus.id);
+    if (k >= 0) setAt(k);
+  }
   if (!nudges.length) return null;
   const i = at % nudges.length;
   const n = nudges[i];
+  if (seen !== n.id) {
+    setSeen(n.id);
+    setCount(null);
+  }
+  const howMany = count ?? n.count?.start ?? 1;
   return (
     <div
       role="status"
@@ -63,13 +84,47 @@ export function SolNudges({
               </ul>
             </>
           )}
+          {n.count && (
+            <div className="mt-2 flex items-center gap-2 text-[12.5px] text-white/80">
+              <span>{n.count.label}</span>
+              <div className="flex items-center rounded-full ring-1 ring-white/25">
+                <button
+                  type="button"
+                  aria-label={`Fewer ${n.count.label}`}
+                  onClick={() => setCount(Math.max(1, howMany - 1))}
+                  className="flex size-7 items-center justify-center rounded-full text-white/80 hover:bg-white/10"
+                >
+                  <Minus className="size-3.5" aria-hidden />
+                </button>
+                <input
+                  value={howMany}
+                  onChange={(e) => {
+                    const v = Number(e.target.value.replace(/\D/g, "").slice(0, 2));
+                    setCount(v > 0 ? v : 1);
+                  }}
+                  onFocus={(e) => e.currentTarget.select()}
+                  inputMode="numeric"
+                  aria-label={`How many ${n.count.label}`}
+                  className="w-8 bg-transparent text-center text-[13.5px] font-semibold tabular-nums text-white outline-none"
+                />
+                <button
+                  type="button"
+                  aria-label={`More ${n.count.label}`}
+                  onClick={() => setCount(Math.min(99, howMany + 1))}
+                  className="flex size-7 items-center justify-center rounded-full text-white/80 hover:bg-white/10"
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                </button>
+              </div>
+            </div>
+          )}
           {n.actions.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {n.actions.map((a, k) => (
                 <button
                   key={a.act + k}
                   type="button"
-                  onClick={() => onAct(n, a)}
+                  onClick={() => onAct(n, a, n.count && a.act === "line-on" ? howMany : undefined)}
                   className={clsx(
                     "rounded-full px-3 py-1 text-[12.5px] font-medium",
                     k === 0 ? "bg-sun-line text-white hover:brightness-110" : "text-white/85 ring-1 ring-white/25 hover:bg-white/10",
@@ -82,6 +137,17 @@ export function SolNudges({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              aria-label="Back to the last question"
+              title="Back: change the last answer"
+              className="flex size-7 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </button>
+          )}
           {nudges.length > 1 && (
             <button
               type="button"

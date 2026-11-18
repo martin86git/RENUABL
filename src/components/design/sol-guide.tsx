@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useState } from "react";
 import type { NearbyHome } from "@/lib/domain/design/property-lot";
 import type { GuideStepId, GuideTarget } from "@/lib/domain/design/sol-guide";
@@ -9,6 +9,7 @@ import {
   FREE_HOURS,
   batteryForKw,
   batteryWords,
+  freeHoursWords,
   reachedWords,
   targetWords,
   unstrungWords,
@@ -72,10 +73,13 @@ export function SolGuide(props: {
   /** What to do with them: an inverter with more inputs, take them off, string them by hand, or leave them. */
   onUnstrung: (what: "inverter" | "remove" | "hand" | "leave") => void;
   /** "both": this design with the battery the panels fill, and a copy with the bigger one for the free hours. */
-  onBattery: (add: boolean | "choose" | "both") => void;
+  onBattery: (add: boolean | "choose" | "both" | "pair") => void;
   /** The battery Sol would pick for the free-hours version, when there is one. */
   freeBatteryName: string | null;
-  onBackup: (yes: boolean) => void;
+  /** "both": two options on the proposal, with backup and without (19 Nov 2026, Martin). */
+  onBackup: (yes: boolean | "both") => void;
+  /** Back to the last question answered, to change the answer (19 Nov 2026, Martin). */
+  onBack: (() => void) | null;
   onStop: () => void;
 }) {
   // Nothing is chosen until it is pressed (11 Nov 2026, Martin: a lit answer reads as a decision already made).
@@ -373,7 +377,7 @@ export function SolGuide(props: {
                         ? []
                         : ([
                             ["free", `${batt.freeKwh} kWh with the ${FREE_HOURS} free hours`],
-                            ["both", "Both, as two designs"],
+                            ["both", "Both, as two options"],
                           ] as [string, string][])),
                       ["other", "Another size"],
                     ]}
@@ -384,7 +388,7 @@ export function SolGuide(props: {
                   <p className="text-[12px] text-white/55">
                     {one
                       ? `The ${FREE_HOURS} free hours wouldn't change it: this battery already holds their evenings.`
-                      : `With the ${FREE_HOURS} free hours the grid tops the battery up free each day, so it can be bigger: it stores more, and costs more. Both makes a design of each, with its own price.`}
+                      : `${freeHoursWords(batt)} Both makes an option of each, with its own price.`}
                   </p>
                 </>
               )}
@@ -486,6 +490,7 @@ export function SolGuide(props: {
               </p>
               <Actions>
                 <Main onClick={() => props.onBattery("both")}>Make both</Main>
+                <Quiet onClick={() => props.onBattery("pair")}>With and without a battery</Quiet>
                 <Quiet onClick={() => props.onBattery(true)}>Just the {props.target.kwh} kWh</Quiet>
                 <Quiet onClick={() => props.onBattery("choose")}>Choose one</Quiet>
                 <Quiet onClick={() => props.onBattery(false)}>No battery</Quiet>
@@ -501,6 +506,7 @@ export function SolGuide(props: {
             </p>
             <Actions>
               {props.batteryName && <Main onClick={() => props.onBattery(true)}>Add it</Main>}
+              {props.batteryName && <Quiet onClick={() => props.onBattery("pair")}>With and without, as two options</Quiet>}
               <Quiet onClick={() => props.onBattery("choose")}>Choose one</Quiet>
               <Quiet onClick={() => props.onBattery(false)}>No battery</Quiet>
             </Actions>
@@ -513,6 +519,7 @@ export function SolGuide(props: {
             <Actions>
               <Main onClick={() => props.onBackup(true)}>Yes, add backup</Main>
               <Quiet onClick={() => props.onBackup(false)}>No</Quiet>
+              <Quiet onClick={() => props.onBackup("both")}>Both, as two options</Quiet>
             </Actions>
           </>
         );
@@ -526,6 +533,17 @@ export function SolGuide(props: {
       <div className="flex items-start gap-2.5">
         <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
         <div className="min-w-0 flex-1 leading-relaxed">{body}</div>
+        {props.onBack && (
+          <button
+            type="button"
+            onClick={props.onBack}
+            aria-label="Back to the last question"
+            title="Back: change the last answer"
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-white/55 hover:text-white"
+          >
+            <ChevronLeft className="size-4" aria-hidden />
+          </button>
+        )}
         <button
           type="button"
           onClick={props.onStop}

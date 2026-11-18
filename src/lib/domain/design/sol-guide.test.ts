@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { guideStep, guiding, panelsFor, reachedWords, targetWords, type GuideFacts } from "./sol-guide";
-import { batteryForKw, batteryWords, unstrungWords, wantsInputs, layingWords } from "./sol-guide";
+import { batteryForKw, batteryWords, freeHoursWords, unstrungWords, wantsInputs, layingWords } from "./sol-guide";
 
 const facts = (over: Partial<GuideFacts> = {}): GuideFacts => ({
   roof: "tile",
@@ -74,12 +74,16 @@ describe("the battery a size of panels points to", () => {
     const b = batteryForKw(10, 20)!;
     expect(b.eveningKwh).toBe(12);
     expect(b.solarKwh).toBe(13);
-    expect(b.freeKwh).toBe(14);
+    // The free hours fill a bigger one all the same: the rest past the evenings is a reserve for blackouts.
+    expect(b.freeKwh).toBe(26);
+    expect(b.reserveKwh).toBe(11);
+    expect(freeHoursWords(b)).toMatch(/About 11 kWh .* reserve for blackouts/);
     expect(batteryWords(b)).toBe("The panels spare about 23 kWh on an average day, 11 in winter. They use about 12 kWh after dark.");
   });
 
   it("is never under the smallest battery, and nothing without panels", () => {
     expect(batteryForKw(1)!.solarKwh).toBe(5);
+    expect(batteryForKw(1)!.freeKwh).toBe(13);
     expect(batteryForKw(0)).toBeNull();
   });
 });

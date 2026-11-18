@@ -3578,6 +3578,10 @@ export function RoofDesigner(props: {
   const [backupAnswered, setBackupAnswered] = useState(false);
   // The deal's network and its pre-approval, for Sol's card over the single-phase size (19 Nov 2026, Martin).
   const dealNetwork = useDealNetwork(props.jobId);
+  // The answers given on Sol's cards, last last, so Back can take one back and ask it again (19 Nov 2026, Martin: "i want
+  // to be able to move back to the previous sol question incase ive changed my mind on an answer").
+  const [nudgeDone, setNudgeDone] = useState<{ id: string; line?: string }[]>([]);
+  const [nudgeFocus, setNudgeFocus] = useState<{ id: string; at: number } | null>(null);
   const nudges = (() => {
     const strung = new Set(strings.flatMap((x) => x.panels));
     const keys = Object.keys(centres);
@@ -4219,8 +4223,10 @@ export function RoofDesigner(props: {
     if (window.parent !== window) window.parent.postMessage({ renuablDesign: { proposal: true } }, window.location.origin);
     else router.push(`/design/deals/${encodeURIComponent(props.jobId)}/proposal`);
   };
-  const actOnNudge = (nudge: Nudge, action: NudgeAction) => {
+  const actOnNudge = (nudge: Nudge, action: NudgeAction, count?: number) => {
     const aside = () => setNudgesAside((list) => [...list, nudge.id]);
+    if (/^(backup-|line-)/.test(action.act))
+      setNudgeDone((list) => [...list, { id: nudge.id, ...(action.line ? { line: action.line } : {}) }]);
     switch (action.act) {
       case "suggest-inverter":
         openMenu("inverters");
@@ -4251,6 +4257,13 @@ export function RoofDesigner(props: {
       case "backup-no":
         setBackupAnswered(true);
         return;
+      case "backup-both":
+        setBackupAnswered(true);
+        twoOptions(
+          (d) => ({ ...d, ...(d.battery ? { battery: { ...d.battery, backup: false } } : {}), label: d.label ?? "Without backup" }),
+          (d) => ({ ...d, ...(d.battery ? { battery: { ...d.battery, backup: true } } : {}), label: "With blackout backup" }),
+        );
+        return;
       case "finalise":
         if (quoteShort) shortQuote(false);
         return showSide("quote");
@@ -4264,11 +4277,39 @@ export function RoofDesigner(props: {
         if (!line) return aside();
         setQuote({
           ...quoteNow,
-          edits: { ...quoteNow.edits, [lineKey(line)]: action.act === "line-on" ? { on: true } : { removed: true } },
+          edits: {
+            ...quoteNow.edits,
+            [lineKey(line)]: action.act === "line-on" ? { on: true, ...(count && count > 1 ? { qty: count } : {}) } : { removed: true },
+          },
         });
         return;
       }
     }
+  };
+  /** Back on Sol's card: the last answer taken back, and its question asked again. */
+  const nudgeBack = () => {
+    const last = nudgeDone.at(-1);
+    if (!last) return;
+    setNudgeDone((list) => list.slice(0, -1));
+    if (last.line) {
+      const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === last.line);
+      if (line) {
+        const edits = { ...quoteNow.edits };
+        delete edits[lineKey(line)];
+        setQuote({ ...quoteNow, edits });
+      }
+    } else {
+      setBackupAnswered(false);
+      setBattery((b) => {
+        if (!b) return b;
+        const next = { ...b };
+        delete next.backup;
+        return next;
+      });
+      changed();
+    }
+    setNudgesAside((list) => list.filter((id) => id !== last.id));
+    setNudgeFocus({ id: last.id, at: Date.now() });
   };
   /**
    * A product's datasheet found online, then the panels strung by themselves once its figures are in (18 Nov 2026,
@@ -4457,6 +4498,24 @@ export function RoofDesigner(props: {
     setGuideOn(true);
     pickTool("panel");
   };
+  /**
+   * A second option on the proposal (19 Nov 2026, Martin: "sometimes i would like a second quote with a slight variation
+   * - example one quote with battery and one without. one with battery black out back up and one without"): this design
+   * made one way, a copy beside it the other, offered with it so the customer sees both prices.
+   */
+  const twoOptions = (mine: (d: RoofDesign) => RoofDesign, other: (d: RoofDesign) => RoofDesign) => {
+    if (everyDesign().length >= MAX_DESIGNS) return false;
+    const base = working();
+    const copy: RoofDesign = { ...other(base), offer: true };
+    delete copy.goal;
+    delete copy.recommended;
+    setQuotes([...everyQuote(), quoteNow]);
+    show([...everyDesign().map((d, i) => (i === active ? mine(base) : d)), copy], active);
+    setSaved("changed");
+    return true;
+  };
+  /** Back on Sol's lead: the last step answered is asked again. */
+  const guideBack = () => setGuideAnswered((list) => list.slice(0, -1));
   const guideHandlers = {
     onHouse: (answer: "yes" | "self" | "search" | NearbyHome) => {
       if (answer === "search") return props.onSearchAddress?.();
@@ -4544,8 +4603,29 @@ export function RoofDesigner(props: {
         removePicks(everyPanel().filter((pk) => left.has(keyOf(pk))));
       }
     },
-    onBattery: (add: boolean | "choose" | "both") => {
+    onBattery: (add: boolean | "choose" | "both" | "pair") => {
       answerGuide("battery");
+      // With and without a battery, as two options (19 Nov 2026, Martin).
+      if (add === "pair" && guideBattery) {
+        const b: DesignBattery = {
+          sku: guideBattery.battery.sku,
+          name: guideBattery.battery.name,
+          kwh: guideBattery.battery.kwh,
+          qty: guideBattery.qty,
+          x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
+          y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
+        };
+        twoOptions(
+          (d) => ({ ...d, battery: b, label: d.label ?? "With a battery" }),
+          (d) => {
+            const next = { ...d, label: "Without a battery" };
+            delete next.battery;
+            return next;
+          },
+        );
+        return;
+      }
+      if (add === "pair") add = true;
       // Both versions: this design takes the battery the panels fill, and a copy beside it the bigger one for the free
       // hours, offered on the proposal with it, so the customer sees both prices.
       if (add === "both" && guideBattery && guideFreeBattery && everyDesign().length < MAX_DESIGNS) {
@@ -4574,9 +4654,16 @@ export function RoofDesigner(props: {
       }
       if (add === "choose") openMenu("batteries");
     },
-    onBackup: (yes: boolean) => {
+    onBackup: (yes: boolean | "both") => {
       answerGuide("backup");
       setBackupAnswered(true);
+      if (yes === "both") {
+        twoOptions(
+          (d) => ({ ...d, ...(d.battery ? { battery: { ...d.battery, backup: false } } : {}), label: d.label ?? "Without backup" }),
+          (d) => ({ ...d, ...(d.battery ? { battery: { ...d.battery, backup: true } } : {}), label: "With blackout backup" }),
+        );
+        return;
+      }
       if (yes) {
         setBattery((b) => (b ? { ...b, backup: true } : b));
         changed();
@@ -9872,6 +9959,7 @@ export function RoofDesigner(props: {
                     onUpload={(file) => void readBillPhoto(file)}
                     reading={usageRead?.photo ? { busy: usageRead.busy, ...(usageRead.error ? { error: usageRead.error } : {}) } : null}
                     kw={summary.kw}
+                    onBack={guideAnswered.length ? guideBack : null}
                     {...guideHandlers}
                   />
                 </div>
@@ -9885,7 +9973,13 @@ export function RoofDesigner(props: {
                 !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
                 !(!props.tight && commandOpen) && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-[6.25rem] z-30 flex justify-center">
-                    <SolNudges nudges={nudges} onAct={actOnNudge} onDismiss={(id) => setNudgesAside((a) => [...a, id])} />
+                    <SolNudges
+                      nudges={nudges}
+                      onAct={actOnNudge}
+                      onDismiss={(id) => setNudgesAside((a) => [...a, id])}
+                      focus={nudgeFocus}
+                      onBack={nudgeDone.length ? nudgeBack : guideOn && guideAnswered.length ? guideBack : null}
+                    />
                   </div>
                 )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its

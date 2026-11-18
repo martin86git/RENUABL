@@ -12,6 +12,7 @@
  */
 
 import { ASSUMPTIONS } from "../recommendation";
+import { BACKUP_MODULE_KWH } from "./quick-size";
 
 export type GuideStepId =
   | "house"
@@ -49,10 +50,14 @@ export interface GuideBattery {
   /** Filled by the panels alone: what a winter day's spare fills, so it fills all year; kWh, whole. */
   solarKwh: number;
   /**
-   * With the three free hours: the grid tops it up free each day, so the panels' winter spare isn't the limit. Sized
-   * to the evenings when the home's use is known, else to an average day's spare; never smaller than the solar one.
+   * With the three free hours: the grid tops it up free each day, so neither the panels' winter spare nor the evenings
+   * are the limit (19 Nov 2026, Martin: even when the evenings don't need it, filled free it is a reserve for blackouts
+   * at no running cost, so it is offered on the bill as on a size). An average day's spare, never under the solar one
+   * with a module more (`BACKUP_MODULE_KWH`).
    */
   freeKwh: number;
+  /** What of the free-hours battery is more than the evenings take: a reserve for blackouts, when the evenings are known. */
+  reserveKwh: number | null;
   /** What the panels spare on an average day and on a winter day, kWh. */
   spareKwh: number;
   winterSpareKwh: number;
@@ -74,14 +79,22 @@ export function batteryForKw(kw: number, kwhPerDay?: number | null): GuideBatter
   const winter = spare * ASSUMPTIONS.winterSunShare;
   const evening = kwhPerDay && kwhPerDay > 0 ? kwhPerDay * ASSUMPTIONS.eveningShare : null;
   const solarKwh = toBattery(evening !== null ? Math.min(winter, evening) : winter);
-  const freeKwh = Math.max(solarKwh, toBattery(evening ?? spare));
+  const freeKwh = Math.max(solarKwh + BACKUP_MODULE_KWH, toBattery(spare), toBattery(evening ?? 0));
+  const reserve = evening !== null ? Math.floor(freeKwh * ASSUMPTIONS.batteryUsableShare - evening) : null;
   return {
     solarKwh,
     freeKwh,
+    reserveKwh: reserve !== null && reserve > 0 ? reserve : null,
     spareKwh: round1(spare),
     winterSpareKwh: round1(winter),
     eveningKwh: evening === null ? null : round1(evening),
   };
+}
+
+/** What the free-hours battery is for, under the choices. */
+export function freeHoursWords(b: GuideBattery): string {
+  const top = `With the ${FREE_HOURS} free hours the grid tops the battery up free each day, so it can be bigger: it stores more, and costs more.`;
+  return b.reserveKwh ? `${top} About ${b.reserveKwh} kWh is more than their evenings take: a reserve for blackouts, filled free.` : top;
 }
 
 /** The battery's line under the boxes: what the panels spare, and what the free hours change. */

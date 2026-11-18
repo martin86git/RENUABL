@@ -45,6 +45,15 @@ describe("Sol beside the design", () => {
     expect(ids({ undecided: ["RCBO"], costsHidden: true })).not.toContain("line:RCBO");
   });
 
+  it("asks how many RCBOs, and offers backup both ways as two options", () => {
+    const [rcbo] = nudgesFor({ ...base, undecided: ["RCBO"] });
+    expect(rcbo.words).toMatch(/How many/);
+    expect(rcbo.count).toEqual({ label: "RCBOs", start: 1 });
+    expect(nudgesFor({ ...base, undecided: ["Switchboard upgrade"] })[0].count).toBeUndefined();
+    const backup = nudgesFor({ ...base, battery: { kwh: 9.6 } }).find((n) => n.id === "backup")!;
+    expect(backup.actions.map((a) => a.act)).toEqual(["backup-yes", "backup-no", "backup-both"]);
+  });
+
   it("shows the battery on its wall for the battery's own questions, not the switchboard's", () => {
     const pics = nudgesFor({ ...base, undecided: ["Protective bollard", "Fireproofing (sheeting)", "Shade awning", "RCBO"] })
       .filter((n) => n.id.startsWith("line:"))
