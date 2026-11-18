@@ -328,12 +328,16 @@ function useTyped(text: string): { text: string; done: boolean } {
     }
     setShown(0);
     /* eslint-enable react-hooks/set-state-in-effect */
-    const t = window.setInterval(() => setShown((n) => (n >= text.length ? n : n + 1)), TYPE_MS);
-    const stop = window.setTimeout(() => window.clearInterval(t), TYPE_MS * (text.length + 2));
-    return () => {
-      window.clearInterval(t);
-      window.clearTimeout(stop);
-    };
+    // How far along is worked out from the time since it started, and the ticking stops only once the line is whole
+    // (18 Nov 2026, Martin: lines stopped part way). It used to count one letter a tick and stop on a timer, so a page
+    // whose ticks ran late (busy, or behind another tab) was cut off before the end.
+    const started = performance.now();
+    const t = window.setInterval(() => {
+      const n = Math.min(text.length, Math.floor((performance.now() - started) / TYPE_MS));
+      setShown(n);
+      if (n >= text.length) window.clearInterval(t);
+    }, TYPE_MS);
+    return () => window.clearInterval(t);
   }, [text]);
   return { text: text.slice(0, shown), done: shown >= text.length };
 }
