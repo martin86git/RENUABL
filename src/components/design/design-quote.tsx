@@ -52,6 +52,24 @@ const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
  * out. A line changed by hand keeps what was typed while the design changes
  * under it, and is marked so, with the way back to the worked-out figure.
  */
+/**
+ * A box clicked into has its figure picked whole, so typing replaces it (18 Nov 2026, Martin: it took a double click to
+ * pick the value and type over it). The click's own mouse-up would put the cursor back in, so that one is let go.
+ */
+let picked: HTMLInputElement | null = null;
+const pickWhole = {
+  onFocus: (e: React.FocusEvent) => {
+    const t = e.target;
+    if (!(t instanceof HTMLInputElement) || t.type === "checkbox" || t.type === "radio") return;
+    t.select();
+    picked = t;
+  },
+  onMouseUp: (e: React.MouseEvent) => {
+    if (picked && e.target === picked) e.preventDefault();
+    picked = null;
+  },
+};
+
 export function DesignQuote(props: {
   /** Roof, storeys and phase already answered elsewhere (Sol's guide), so the home box doesn't ask to be checked. */
   homeSettled?: boolean;
@@ -82,6 +100,8 @@ export function DesignQuote(props: {
    * Shown under the totals; held back while a cost decided on each job is still to decide.
    */
   onProceed?: () => void;
+  /** What came of pressing Proceed, when it didn't go on (a save refused, no deal). */
+  proceedSaid?: string | null;
   /** The workspace once a price list or a price is kept from the cart, so the quote is costed with it at once. */
   onWorkspace?: (next: Workspace) => void;
 }) {
@@ -144,6 +164,11 @@ export function DesignQuote(props: {
       >
         Proceed to proposal <ArrowRight className="size-4" aria-hidden />
       </button>
+      {props.proceedSaid && (
+        <p className="mt-1.5 rounded-md bg-warning-soft px-2.5 py-1.5 text-center text-xs text-warning" role="status">
+          {props.proceedSaid}
+        </p>
+      )}
       <p className="mt-1.5 text-center text-[11px] text-muted">
         {undecided.length > 0
           ? `Decide on ${undecided.length === 1 ? "the cost" : `the ${undecided.length} costs`} above first.`
@@ -197,7 +222,7 @@ export function DesignQuote(props: {
   if (props.compact) {
     const priced = editedLines(all, edits);
     return (
-      <section className="rounded-lg border border-line bg-surface p-2.5 text-[11px]" aria-label="Quote builder, short view">
+      <section className="rounded-lg border border-line bg-surface p-2.5 text-[11px]" aria-label="Quote builder, short view" {...pickWhole}>
         <div className="flex items-center justify-between gap-1">
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-2">Quote · {props.design}</p>
           {props.onCompact && (
@@ -710,7 +735,7 @@ export function DesignQuote(props: {
 
   if (split)
     return (
-      <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
+      <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder" {...pickWhole}>
         <div className="flex items-baseline justify-between gap-2">
           <p className={clsx(label, "flex items-center gap-1")}>
             Quote builder ·
@@ -837,7 +862,7 @@ export function DesignQuote(props: {
     );
 
   return (
-    <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder">
+    <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder" {...pickWhole}>
       <div className="flex items-baseline justify-between gap-2">
         <p className={clsx(label, "flex items-center gap-1")}>
           Quote builder ·

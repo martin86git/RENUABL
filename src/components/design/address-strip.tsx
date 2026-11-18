@@ -3,6 +3,7 @@
 import clsx from "clsx";
 import { MapPin, Plus, Search, UserRound, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import type { Address } from "@/lib/domain/types";
 import { CUSTOMER_EMAIL_WRONG } from "@/lib/domain/design/crm";
@@ -121,7 +122,15 @@ export function AddressStrip({
           <Plus className="size-4" aria-hidden /> Create deal
         </button>
       ) : null}
-      {creating && onCreate && <NewDealWindow address={address} onCreate={onCreate} onClose={() => setCreating(false)} />}
+      {creating &&
+        onCreate &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="theme-studio contents">
+            <NewDealWindow address={address} onCreate={onCreate} onClose={() => setCreating(false)} />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -167,7 +176,7 @@ function NewDealWindow({
   };
   return (
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[2px]"
       onClick={() => !busy && onClose()}
     >
       <form

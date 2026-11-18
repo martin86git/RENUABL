@@ -3306,6 +3306,7 @@ export function RoofDesigner(props: {
   const [sent, setSent] = useState<{ ok: boolean; message: string } | null>(null);
   // Ctrl+S (or Cmd+S) saves, from anywhere in the designer, even while typing in the quote (8 Nov 2026, Martin).
   const saveNow = useRef<() => Promise<boolean>>(async () => false);
+  const savedRef = useRef<"saved" | { error: string } | null>(null);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "s") return;
@@ -3329,6 +3330,7 @@ export function RoofDesigner(props: {
       active === primary ? net : null,
     );
     setSaved(problem ? { error: problem } : "saved");
+    savedRef.current = problem ? { error: problem } : "saved";
     // Saved: the draft is gone (the store throws it away), and the next is drawn over this save.
     if (!problem) {
       setResumed(null);
@@ -4190,9 +4192,26 @@ export function RoofDesigner(props: {
    * On from the quote to the proposal (15 Nov 2026, Martin): saved first (the proposal reads the saved design), then the
    * deal's proposal opens in the same window, or on its own page; a site with no deal shows why there is none yet.
    */
+  // Why Proceed to proposal didn't go on, said under it (18 Nov 2026, Martin: "the proceed to proposal button isnt
+  // working": a save refused, or no deal to put it on, showed nowhere he could see).
+  const [proceedSaid, setProceedSaid] = useState<string | null>(null);
   const toProposal = async () => {
-    if (!props.jobId) return props.onNeedDeal ? props.onNeedDeal() : showSide("proposal");
-    if (!(await saveNow.current())) return;
+    setProceedSaid(null);
+    if (!props.jobId) {
+      if (props.onNeedDeal) return props.onNeedDeal();
+      setProceedSaid("This roof isn't on a deal yet, so there's no proposal to open. Put it on a deal first.");
+      return showSide("proposal");
+    }
+    setProceedSaid("Saving the design…");
+    if (!(await saveNow.current())) {
+      const why = typeof savedRef.current === "object" && savedRef.current ? savedRef.current.error : null;
+      return setProceedSaid(
+        why
+          ? `The design couldn't be saved, so the proposal can't open yet: ${why}`
+          : "The design couldn't be saved. Try again in a moment.",
+      );
+    }
+    setProceedSaid(null);
     if (window.parent !== window) window.parent.postMessage({ renuablDesign: { proposal: true } }, window.location.origin);
     else router.push(`/design/deals/${encodeURIComponent(props.jobId)}/proposal`);
   };
@@ -10617,6 +10636,7 @@ export function RoofDesigner(props: {
                 onCompact={shortQuote}
                 homeless
                 onProceed={props.sitesOnly ? undefined : () => void toProposal()}
+                proceedSaid={proceedSaid}
               />
             </div>
             <div className={clsx("space-y-3", shown !== "proposal" && "hidden")}>
