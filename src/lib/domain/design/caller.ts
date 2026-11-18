@@ -37,11 +37,11 @@ export function callerIntro(name: string, business: string): string {
 
 /** A voice for the phone assistant, as Vapi takes it on a call (`voice: { provider, voiceId }`). */
 export interface CallerVoice {
-  provider: "vapi" | "11labs" | "deepgram";
+  provider: "vapi" | "11labs" | "deepgram" | "azure";
   voiceId: string;
 }
 
-const PROVIDERS: readonly CallerVoice["provider"][] = ["vapi", "11labs", "deepgram"];
+const PROVIDERS: readonly CallerVoice["provider"][] = ["vapi", "11labs", "deepgram", "azure"];
 
 /** A provider as kept in the database or sent from a browser, or null when it isn't one we send to Vapi. */
 export function voiceProvider(raw: unknown): CallerVoice["provider"] | null {
@@ -66,11 +66,68 @@ export interface VoiceChoice extends CallerVoice {
  * has without an ElevenLabs account of the business's own (its ready-made voices are every account's; Charlie is its only
  * Australian one). More Australian voices are in ElevenLabs' library, which Vapi reaches only through an ElevenLabs key
  * added in Vapi; one of those is typed in by its ID. None of the six has been tried on a call: VERIFY.
+ *
+ * 18 Nov 2026, later (Martin: "i want more australian voice options"): eight of Microsoft's Australian neural voices
+ * (learn.microsoft.com, Speech service language support, en-AU), which Vapi speaks through its own Azure integration
+ * (docs.vapi.ai/providers/voice/azure: provider "azure", "Language is set by the voice you choose"). Vapi's page shows
+ * only a short voice name ("andrew"); that it takes Microsoft's full name ("en-AU-NatashaNeural") is NOT confirmed,
+ * and Microsoft publishes no clip we can play, so each must be heard on a test call first. If Vapi turns a call away
+ * with one of these, the call goes once more in the usual voice (withoutSpeedSettings in voice-agent.ts).
  */
 export const CALLER_VOICES: readonly VoiceChoice[] = [
   { provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie", words: "Australian, relaxed and natural", sex: "male" },
   { provider: "deepgram", voiceId: "hyperion", label: "Hyperion", words: "Australian, caring and warm", sex: "male" },
   { provider: "deepgram", voiceId: "theia", label: "Theia", words: "Australian, polite and sincere", sex: "female" },
+  {
+    provider: "azure",
+    voiceId: "en-AU-NatashaNeural",
+    label: "Natasha",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-AnnetteNeural",
+    label: "Annette",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-CarlyNeural",
+    label: "Carly",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-FreyaNeural",
+    label: "Freya",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-WilliamNeural",
+    label: "William",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "male",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-DarrenNeural",
+    label: "Darren",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "male",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-DuncanNeural",
+    label: "Duncan",
+    words: "Australian · Microsoft, hear it on a test call",
+    sex: "male",
+  },
+  { provider: "azure", voiceId: "en-AU-KenNeural", label: "Ken", words: "Australian · Microsoft, hear it on a test call", sex: "male" },
   { provider: "11labs", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George", words: "British, warm", sex: "male" },
   { provider: "11labs", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", words: "British, steady", sex: "male" },
   { provider: "11labs", voiceId: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice", words: "British, clear", sex: "female" },
@@ -90,6 +147,7 @@ export const VOICE_PROVIDERS: { id: CallerVoice["provider"]; label: string }[] =
   { id: "11labs", label: "ElevenLabs" },
   { id: "vapi", label: "Vapi" },
   { id: "deepgram", label: "Deepgram" },
+  { id: "azure", label: "Microsoft" },
 ];
 
 /** A voice sent from the browser, checked: a known provider and an ID of letters and digits. Null is "the default". */

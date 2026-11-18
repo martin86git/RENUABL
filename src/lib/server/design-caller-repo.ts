@@ -9,6 +9,7 @@ import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threa
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { cleanDelivery, defaultDelivery, type Delivery } from "@/lib/domain/design/delivery";
 import { DEFAULT_CALL_SETUP, cleanCallSetup, type CallAudience, type CallSetup } from "@/lib/domain/design/call-setup";
+import { cleanScripts, liveName, type LiveScript, type SavedScript } from "@/lib/domain/design/call-scripts";
 import { dbConfigured, query } from "./db";
 
 export interface Caller {
@@ -149,6 +150,50 @@ export async function saveCallSetup(businessId: string, setup: CallSetup, by: st
     `insert into design_caller (business_id, name, call_setup, updated_by, role) values ($1, $2, $3, $4, $5)
      on conflict (business_id, role) do update set call_setup = excluded.call_setup, updated_by = excluded.updated_by, updated_at = now()`,
     [businessId, DEFAULT_CALLER, JSON.stringify(setup), by, role],
+  );
+}
+
+/** The agent's scripts (domain/design/call-scripts.ts): the one in use, and the others filed away. */
+export async function scriptBookOf(businessId: string, role: CallerKey = "sales"): Promise<{ live: LiveScript; saved: SavedScript[] }> {
+  const rows = dbConfigured()
+    ? await query<{ coach_notes: unknown; call_setup: unknown; script_name: unknown; scripts: unknown }>(
+        `select coach_notes, call_setup, script_name, scripts from design_caller where business_id = $1 and role = $2`,
+        [businessId, role],
+      )
+    : [];
+  const r = rows[0];
+  return {
+    live: {
+      name: liveName(r?.script_name),
+      notes: cleanNotes(r?.coach_notes),
+      setup: r?.call_setup ? cleanCallSetup(r.call_setup) : DEFAULT_CALL_SETUP,
+    },
+    saved: cleanScripts(r?.scripts),
+  };
+}
+
+/** The scripts after a change (one started, chosen, renamed or removed), kept together. The chat stays. */
+export async function saveScriptBook(
+  businessId: string,
+  book: { live: LiveScript; saved: SavedScript[] },
+  by: string,
+  role: CallerKey = "sales",
+): Promise<void> {
+  await query(
+    `insert into design_caller (business_id, name, coach_notes, call_setup, script_name, scripts, updated_by, role)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
+     on conflict (business_id, role) do update set coach_notes = excluded.coach_notes, call_setup = excluded.call_setup,
+       script_name = excluded.script_name, scripts = excluded.scripts, updated_by = excluded.updated_by, updated_at = now()`,
+    [
+      businessId,
+      DEFAULT_CALLER,
+      JSON.stringify(cleanNotes(book.live.notes)),
+      JSON.stringify(cleanCallSetup(book.live.setup)),
+      book.live.name,
+      JSON.stringify(cleanScripts(book.saved)),
+      by,
+      role,
+    ],
   );
 }
 

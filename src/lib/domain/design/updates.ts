@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
     area: "Phone assistant",
+    words: "A voice agent can keep several scripts: make a new one and choose which it uses. Eight more Australian voices to pick.",
+  },
+  {
+    day: "2026-11-18",
+    area: "Phone assistant",
     words: "Set your voice agent's name, how it's said, and the reason for its calls, beside its chat. Cold calls are a choice.",
   },
   {

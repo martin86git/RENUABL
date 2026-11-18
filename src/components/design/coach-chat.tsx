@@ -47,6 +47,9 @@ import { callerChanged, uploadCallerPhoto, useCaller, useCallerInfo } from "@/li
 import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
 import { CALL_SETUP_COPY, DEFAULT_CALL_SETUP, type CallSetup } from "@/lib/domain/design/call-setup";
 import { CallSetupSettings } from "./coach-call-setup";
+import type { ScriptLine } from "@/lib/domain/design/call-scripts";
+import { ScriptPicker } from "./coach-scripts";
+import { roleOfKey } from "@/lib/domain/install-call";
 import { DeliverySettings, RingMe, TrainingReview, TrainingStrip, useTraining, type Training } from "./coach-training";
 import { voiceLabel } from "@/lib/domain/design/caller";
 import {
@@ -268,6 +271,8 @@ function CoachWindowFor() {
   // Its name as said, who it rings and why (call-setup.ts), and the business it speaks for.
   const [setup, setSetup] = useState<CallSetup>(DEFAULT_CALL_SETUP);
   const [business, setBusiness] = useState("");
+  // Its scripts by name, the one in use first (call-scripts.ts).
+  const [scripts, setScripts] = useState<ScriptLine[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [text, setText] = useState("");
   // What the microphone is hearing, shown in the box as it comes (14 Nov 2026, Martin: talk into the chat field).
@@ -357,6 +362,7 @@ function CoachWindowFor() {
       setDelivery(res.delivery ?? null);
       setSetup(res.setup ?? DEFAULT_CALL_SETUP);
       setBusiness(res.business ?? "");
+      setScripts(res.scripts ?? []);
     });
     const t = window.setTimeout(() => box.current?.focus(), 50);
     const key = (e: KeyboardEvent) => e.key === "Escape" && closeCoach();
@@ -624,6 +630,8 @@ function CoachWindowFor() {
                 onDelivery={setDelivery}
                 setup={setup}
                 onSetup={setSetup}
+                scripts={scripts}
+                onScripts={setScripts}
                 business={business}
                 loaded={loaded}
                 onNotes={setNotes}
@@ -843,6 +851,8 @@ function CoachSettings(props: {
   onDelivery: (d: Delivery | null) => void;
   setup: CallSetup;
   onSetup: (s: CallSetup) => void;
+  scripts: ScriptLine[];
+  onScripts: (s: ScriptLine[]) => void;
   business: string;
   loaded: boolean;
   onNotes: (n: CoachNote[]) => void;
@@ -901,7 +911,7 @@ function CoachSettings(props: {
           {whoOpen && props.loaded && (
             <div className="border-t border-line px-3.5 py-3">
               <CallSetupSettings
-                key={`${caller.role ?? "sales"}|${caller.name}`}
+                key={`${caller.role ?? "sales"}|${caller.name}|${props.scripts[0]?.name ?? ""}|${props.setup.audience}|${props.setup.reason}`}
                 caller={caller}
                 business={props.business}
                 setup={props.setup}
@@ -962,6 +972,19 @@ function CoachSettings(props: {
             </span>
           </div>
           <div className="space-y-3 px-3.5 pb-3.5 pt-3">
+            {props.loaded && props.scripts.length > 0 && (
+              <ScriptPicker
+                name={name}
+                sales={roleOfKey(caller.role ?? "sales") === "sales"}
+                scripts={props.scripts}
+                editable={props.mayCoach}
+                onChanged={(r) => {
+                  props.onNotes(r.notes);
+                  props.onSetup(r.setup);
+                  props.onScripts(r.scripts);
+                }}
+              />
+            )}
             {props.notes.length === 0 && <p className="rounded-xl bg-canvas px-3 py-2.5 text-xs text-muted">{COACH_COPY.empty(name)}</p>}
             {locked.length > 0 && (
               <div>

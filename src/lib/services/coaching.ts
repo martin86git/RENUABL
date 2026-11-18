@@ -11,6 +11,7 @@ import type { CoachChatLine } from "@/lib/domain/design/coach-threads";
 import type { CoachNote, CoachTurn } from "@/lib/domain/design/coaching";
 import type { Delivery } from "@/lib/domain/design/delivery";
 import type { CallSetup } from "@/lib/domain/design/call-setup";
+import type { ScriptLine } from "@/lib/domain/design/call-scripts";
 import type { TrainingView } from "@/lib/domain/design/training-call";
 import type { CallerKey } from "@/lib/domain/install-call";
 import { callerFor, useCallerInfo, type CallerState } from "./caller";
@@ -87,6 +88,7 @@ export const loadCoaching = () =>
     delivery?: Delivery | null;
     setup?: CallSetup;
     business?: string;
+    scripts?: ScriptLine[];
   }>(at());
 
 type Chats = { turns: CoachTurn[]; past: CoachChatLine[] };
@@ -112,6 +114,11 @@ export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[]
 export const lockNote = (id: string, locked: boolean) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, locked }));
 /** How the agent speaks; null goes back to how it was. */
 export const saveDelivery = (delivery: Delivery | null) => ask<{ delivery: Delivery | null }>(at(), json("PUT", { delivery }));
+/** The agent's scripts (call-scripts.ts): start one, use one, rename one (id null: the one in use) or remove one. */
+export const changeScript = (
+  script:
+    { do: "new"; name: string; copy: boolean } | { do: "use" | "forget"; id: string } | { do: "rename"; id: string | null; name: string },
+) => ask<{ notes: CoachNote[]; setup: CallSetup; scripts: ScriptLine[] }>(at(), json("PUT", { script }));
 /** The agent's name as said, who it rings and why (call-setup.ts). */
 export const saveCallSetup = (setup: CallSetup) => ask<{ setup: CallSetup }>(at(), json("PUT", { setup }));
 export const removeNote = (id: string) => ask<{ notes: CoachNote[] }>(at("", `&id=${encodeURIComponent(id)}`), { method: "DELETE" });

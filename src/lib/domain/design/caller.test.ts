@@ -72,7 +72,12 @@ describe("the phone assistant's voice", () => {
     expect(australian.length).toBeGreaterThanOrEqual(3);
     expect(new Set(australian.map((v) => v.sex)).size).toBe(2);
     expect(voiceProvider("deepgram")).toBe("deepgram");
-    expect(voiceProvider("azure")).toBeNull();
+    expect(voiceProvider("azure")).toBe("azure");
+    expect(voiceProvider("playht")).toBeNull();
+    // Microsoft's Australian voices, by the names Microsoft gives them.
+    const microsoft = australian.filter((v) => v.provider === "azure");
+    expect(microsoft.length).toBeGreaterThanOrEqual(6);
+    for (const v of microsoft) expect(v.voiceId).toMatch(/^en-AU-[A-Z][a-z]+Neural$/);
     expect(voiceLabel({ provider: "deepgram", voiceId: "orion" })).toBe("Deepgram voice orion");
   });
 
@@ -91,8 +96,8 @@ describe("the phone assistant's voice", () => {
     expect(voiceSampleUrl({ provider: "deepgram", voiceId: "hyperion" })).toBe(
       "/api/design/caller/voice-sample?provider=deepgram&id=hyperion",
     );
-    // Every voice that isn't Vapi's own has a sample to play.
-    for (const v of CALLER_VOICES) expect(Boolean(voiceSampleUrl(v))).toBe(v.provider !== "vapi");
+    // Deepgram's and ElevenLabs' voices have a sample to play; Vapi's and Microsoft's publish none.
+    for (const v of CALLER_VOICES) expect(Boolean(voiceSampleUrl(v))).toBe(v.provider === "deepgram" || v.provider === "11labs");
   });
 
   it("fetches a clip only from ElevenLabs' own places", () => {
@@ -110,7 +115,7 @@ describe("the phone assistant's voice", () => {
       voiceId: "21m00Tcm4TlvDq8ikWAM",
     });
     expect(cleanVoice(null)).toBeNull();
-    expect(cleanVoice({ provider: "azure", voiceId: "abc" })).toBe("bad");
+    expect(cleanVoice({ provider: "playht", voiceId: "abc" })).toBe("bad");
     expect(cleanVoice({ provider: "vapi", voiceId: "<script>" })).toBe("bad");
   });
 

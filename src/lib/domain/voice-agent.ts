@@ -695,10 +695,15 @@ export function withoutSpeedSettings(assistant: Record<string, unknown>): Record
   const { startSpeakingPlan, voice, ...rest } = assistant;
   const wait = (startSpeakingPlan as { waitSeconds?: unknown } | undefined)?.waitSeconds;
   // Only ElevenLabs' model is a speed setting: a Deepgram voice needs its model to be found at all.
+  const provider = voice && typeof voice === "object" ? (voice as { provider?: unknown }).provider : null;
+  // A Microsoft voice's name is the one thing here Vapi hasn't been seen to take (caller.ts): on a second try the
+  // call goes in the usual voice instead of not going at all.
   const plainVoice =
-    voice && typeof voice === "object" && (voice as { provider?: unknown }).provider === "11labs"
-      ? Object.fromEntries(Object.entries(voice).filter(([k]) => k !== "model"))
-      : voice;
+    provider === "azure"
+      ? null
+      : provider === "11labs"
+        ? Object.fromEntries(Object.entries(voice as object).filter(([k]) => k !== "model"))
+        : voice;
   return {
     ...rest,
     ...(typeof wait === "number" ? { startSpeakingPlan: { waitSeconds: wait } } : {}),

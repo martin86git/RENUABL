@@ -11,6 +11,8 @@ import {
 } from "@/lib/domain/design/coaching";
 import { cleanDelivery } from "@/lib/domain/design/delivery";
 import { cleanCallSetup } from "@/lib/domain/design/call-setup";
+import { forgetScript, renameScript, scriptLines, startScript, chooseScript, type ScriptChange } from "@/lib/domain/design/call-scripts";
+import { randomBytes } from "node:crypto";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
@@ -29,6 +31,8 @@ import {
   saveCoachChats,
   saveCoaching,
   saveDelivery,
+  saveScriptBook,
+  scriptBookOf,
 } from "@/lib/server/design-caller-repo";
 import { ADMIN_FIXED_RULES, cleanCallerKey } from "@/lib/domain/install-call";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
@@ -46,13 +50,15 @@ export async function GET(request: Request) {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const role = roleIn(request);
-    const [c, chats, delivery, setup, biz] = await Promise.all([
+    const [c, chats, delivery, setup, biz, book] = await Promise.all([
       coachingOf(who.member.businessId, role),
       coachChatsOf(who.member.businessId, role),
       deliveryOf(who.member.businessId, role),
       // Its name as said, who it rings and why (call-setup.ts), with the business's name for the opening shown.
       callSetupOf(who.member.businessId, role),
       query<{ name: string }>(`select name from businesses where id = $1`, [who.member.businessId]),
+      // Its scripts by name, the one in use first (call-scripts.ts).
+      scriptBookOf(who.member.businessId, role),
     ]);
     const business = (await loadBrand(who.member.businessId, biz[0]?.name ?? "").catch(() => null))?.name || biz[0]?.name || "";
     const mayCoach = can(who.member.role, "prices", who.member.permissions);
@@ -66,6 +72,7 @@ export async function GET(request: Request) {
         delivery,
         setup,
         business,
+        scripts: scriptLines(book.live, book.saved),
       },
       { headers: PRIVATE },
     );
@@ -166,6 +173,26 @@ export async function PUT(request: Request) {
     const read = await readBody(request, 2_000);
     if ("refuse" in read) return read.refuse;
     const role = roleIn(request);
+    if (read.body.script && typeof read.body.script === "object") {
+      // Its scripts (call-scripts.ts): one started, chosen, renamed or removed. The one in use is what calls are given.
+      const s = read.body.script as Record<string, unknown>;
+      const book = await scriptBookOf(who.member.businessId, role);
+      const o = { fileId: `sc_${randomBytes(8).toString("hex")}`, at: new Date().toISOString() };
+      const next: ScriptChange =
+        s.do === "new"
+          ? startScript(book.live, book.saved, { name: s.name, copy: s.copy === true, ...o })
+          : s.do === "use"
+            ? chooseScript(book.live, book.saved, s.id, o)
+            : s.do === "rename"
+              ? renameScript(book.live, book.saved, s.id ?? null, s.name)
+              : s.do === "forget"
+                ? forgetScript(book.live, book.saved, s.id)
+                : { ok: false, message: "That isn't something a script can do." };
+      if (!next.ok) return Response.json({ ok: false, message: next.message }, { status: 409 });
+      await saveScriptBook(who.member.businessId, next, who.member.email, role);
+      const kept = await scriptBookOf(who.member.businessId, role);
+      return Response.json({ ok: true, notes: kept.live.notes, setup: kept.live.setup, scripts: scriptLines(kept.live, kept.saved) });
+    }
     if (read.body.setup !== undefined) {
       // How its name is said, who it rings and why: cleaned here, used from the next call.
       await saveCallSetup(who.member.businessId, cleanCallSetup(read.body.setup), who.member.email, role);
