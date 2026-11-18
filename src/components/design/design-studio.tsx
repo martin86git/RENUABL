@@ -402,7 +402,11 @@ export function DesignStudio() {
       <div className={popped ? "theme-studio" : "theme-studio pb-10"}>
         {jobId && askId && <DesignBrief jobId={jobId} askId={askId} />}
         {onStreet && (
-          <div className="mb-2 flex items-start gap-3 rounded-xl bg-warning-soft px-4 py-2.5 text-sm text-warning" role="alert">
+          <div
+            // In the pop-up on a phone, clear of the window's close round in the corner.
+            className={`mb-2 flex items-start gap-3 rounded-xl bg-warning-soft px-4 py-2.5 text-sm text-warning${popped ? " max-sm:pr-14" : ""}`}
+            role="alert"
+          >
             <span className="flex-1">{onStreet}</span>
             <button type="button" onClick={() => setOnStreet(null)} className="text-[12px] font-medium underline underline-offset-2">
               Dismiss

@@ -80,11 +80,14 @@ export function KnifeMenu({
   hold = false,
   panel,
   rank,
+  sheet = false,
 }: {
   main: (state: { open: boolean }) => React.ReactNode;
   label: string;
   sections: { title: string; children: React.ReactNode }[];
   hold?: boolean;
+  /** On a phone: the card comes up from the foot of the screen, its headings one under another. */
+  sheet?: boolean;
   /** Something opened from a row: shown in the card in place of the rows, with the way back. */
   panel?: { title: string; body: React.ReactNode; back: () => void };
   /** Where a row goes in its column, by its name. */
@@ -135,12 +138,15 @@ export function KnifeMenu({
       </div>
       <div
         className={clsx(
-          "absolute left-full top-0 z-40 ml-2 flex origin-top-left gap-1 rounded-2xl bg-surface/95 p-2 shadow-[0_18px_50px_rgba(11,11,12,0.22)] ring-1 ring-line backdrop-blur-md transition duration-200 ease-out motion-reduce:transition-none",
+          sheet
+            ? "fixed inset-x-2 bottom-2 z-[70] flex max-h-[75dvh] origin-bottom flex-col gap-2 overflow-y-auto"
+            : "absolute left-full top-0 z-40 ml-2 flex origin-top-left gap-1",
+          "rounded-2xl bg-surface/95 p-2 shadow-[0_18px_50px_rgba(11,11,12,0.22)] ring-1 ring-line backdrop-blur-md transition duration-200 ease-out motion-reduce:transition-none",
           open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0",
         )}
       >
         {panel && (
-          <div className="w-[26rem] max-w-[80vw] p-1">
+          <div className={clsx("p-1", sheet ? "w-full" : "w-[26rem] max-w-[80vw]")}>
             <button
               type="button"
               onClick={panel.back}
@@ -153,7 +159,14 @@ export function KnifeMenu({
           </div>
         )}
         {sections.map((section, s) => (
-          <div key={section.title} className={clsx("w-56", s > 0 && "border-l border-line pl-1", panel && "hidden")}>
+          <div
+            key={section.title}
+            className={clsx(
+              sheet ? "w-full" : "w-56",
+              s > 0 && (sheet ? "border-t border-line pt-2" : "border-l border-line pl-1"),
+              panel && "hidden",
+            )}
+          >
             <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">{section.title}</p>
             <div className="flex flex-col gap-0.5">
               {legsOf(section.children).map((leg, i) => (
