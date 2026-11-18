@@ -6,7 +6,7 @@ import { ArrowUp } from "lucide-react";
 import { HERO_LIVE, RAYS, SALES_HERO, VOICE_AGENTS } from "@/lib/domain/design/sales-page";
 
 const RAYS_SOON = RAYS.soon;
-import { BrandEyebrow, Sunrise } from "./business-brand";
+import { Sunrise } from "./business-brand";
 import { TryDemoButton } from "./business-demo";
 import { SolMark } from "./sol-icon";
 import { LiveSun } from "./live-sun";
@@ -322,8 +322,7 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
       <Sunrise light />
       <div className="mx-auto grid max-w-[90rem] items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-6">
         <div className="text-center lg:text-left">
-          <BrandEyebrow>{SALES_HERO.introducing}</BrandEyebrow>
-          <h1 id="hero" className="mt-6 text-[clamp(48px,6.4vw,116px)] font-semibold leading-[0.88] tracking-[-0.055em]">
+          <h1 id="hero" className="text-[clamp(48px,6.4vw,116px)] font-semibold leading-[0.88] tracking-[-0.055em]">
             <span className="block">{SALES_HERO.headline[0]}</span>
             <span className="block text-sun-line">{SALES_HERO.headline[1]}</span>
           </h1>
