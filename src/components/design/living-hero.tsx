@@ -137,15 +137,15 @@ function SunBrain({ busy }: { busy: boolean }) {
   );
   return (
     <svg
-      viewBox="0 0 100 100"
+      viewBox="11 12 78 78"
       aria-hidden
       className={clsx(
-        "pointer-events-none absolute inset-[17%] mix-blend-soft-light transition-opacity duration-700",
+        "pointer-events-none absolute inset-[2%] mix-blend-soft-light transition-opacity duration-700",
         busy ? "opacity-90" : "opacity-60",
       )}
       fill="none"
       stroke="white"
-      strokeWidth={1.6}
+      strokeWidth={1.2}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -160,15 +160,19 @@ function SunBrain({ busy }: { busy: boolean }) {
  * The launch's horizon, in light grey (18 Nov 2026, Martin): the edge of a planet curving under Sol, as if he is rising
  * over it. A wide circle with a fine rim and a faint warm and blue glow along its edge; the hero clips it.
  */
-function Horizon({ className }: { className: string }) {
+function Horizon({ className, solid = false }: { className: string; solid?: boolean }) {
   return (
     <span
       aria-hidden
       className={clsx("pointer-events-none absolute left-1/2 z-[1] aspect-square -translate-x-1/2 rounded-full", className)}
       style={{
-        background: "linear-gradient(180deg, #ebebee 0%, #f2f2f4 6%, #f6f6f7 18%)",
-        boxShadow:
-          "0 -1px 0 rgba(11,11,12,0.10), 0 -6px 18px rgba(255,120,50,0.10), 0 -24px 70px rgba(255,110,40,0.08), 0 -60px 140px rgba(80,140,255,0.06)",
+        // Faint (18 Nov 2026, Martin: "much feinter so it doesn't affect the headline"): the page's own grey, a breath
+        // darker at the rim and letting the warm light through lower down, with a hairline edge.
+        // Solid where it hides Sol's lower half (a phone), so no ghost of him shows through.
+        background: solid
+          ? "linear-gradient(180deg, #ececef 0%, #f4f4f5 3%)"
+          : "linear-gradient(180deg, rgba(236,236,239,0.95) 0%, rgba(244,244,245,0.9) 3%, rgba(244,244,245,0.55) 22%)",
+        boxShadow: "0 -1px 0 rgba(11,11,12,0.05), 0 -6px 18px rgba(255,120,50,0.05), 0 -40px 110px rgba(80,140,255,0.04)",
       }}
     />
   );
@@ -410,7 +414,7 @@ export function LivingHero({ signedIn }: { signedIn: boolean }) {
             </div>
             <BigSol busy={sol.busy} lean={lean} brain className="mx-auto size-40 sm:size-48 lg:size-[13.5rem]" />
             {/* On a phone the horizon curves under Sol himself. */}
-            <Horizon className="top-[78%] w-[420vw] lg:hidden" />
+            <Horizon solid className="top-[78%] w-[420vw] lg:hidden" />
           </div>
           <p className="relative z-[2] mt-6 text-[14px] text-muted">
             <span className="font-medium text-ink">Sol</span> · {HERO_LIVE.jobs.sol}
