@@ -1,3 +1,4 @@
+import { can } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { workOutProposal } from "@/lib/server/design-proposal";
 import { NO_DESIGN } from "@/lib/server/design-proposal-repo";
@@ -31,6 +32,12 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       customAllowed: await customProposalsAllowed(who.member.businessId),
       // Whether Sol answers this business's customers: the indicative message says so when he does.
       assistant: saved.brand.solAnswers,
+      // Sol's price check beside the preview (18 Nov 2026, Martin): the margin and the business's floor, only for a
+      // member who sees costs. Never in the customer's copy.
+      pricing:
+        built.ok && built.internal.priceExGst > 0 && can(who.member.role, "costs", who.member.permissions)
+          ? { marginShare: built.internal.margin / built.internal.priceExGst, floor: saved.workspace.settings.margin.floor ?? 0 }
+          : null,
     });
   });
 }

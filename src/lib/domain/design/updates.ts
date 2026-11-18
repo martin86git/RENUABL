@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
+    area: "Proposals",
+    words: "The proposal screen has Sol's price check too: your price and margin against your own signed jobs, before you publish.",
+  },
+  {
+    day: "2026-11-18",
     area: "Design tool",
     words: "The design tool fits a phone: the roof runs the screen's width, with the kit and tools above it and Ask Sol and a toolbar below.",
   },

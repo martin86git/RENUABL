@@ -1008,7 +1008,7 @@ export function HomeToggles(props: {
  * Sol's price check under the totals (18 Nov 2026, Martin): what the quote's price and margin are against the business's
  * own signed and quiet proposals, worked out by rule (no credit). Asking Sol about it opens his panel with the figures.
  */
-function PriceCheck({ advice, typed }: { advice: Advice[]; typed: number }) {
+export function PriceCheck({ advice, typed }: { advice: Advice[]; typed: number }) {
   const ask = () => {
     const lines = advice.map((a) => `- ${a.text}`).join("\n");
     askSolInPanel({

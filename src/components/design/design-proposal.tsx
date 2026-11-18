@@ -40,6 +40,9 @@ import { DepositLine } from "./deposit-panel";
 import { ChartThumb, TemplateThumb } from "./proposal-thumbs";
 import { ProposalPage } from "./proposal-view";
 import { BuilderPanel, useProposalBuilder } from "./proposal-builder";
+import { PriceCheck } from "./design-quote";
+import { priceAdvice } from "@/lib/domain/design/price-check";
+import { usePricePoints } from "@/lib/services/price-check";
 
 const STATE_WORDS: Record<ProposalState, string> = {
   live: "With the customer",
@@ -226,6 +229,10 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   // The builder (15 Nov 2026, Martin): off until turned on, since a proposal is usually sent as it is.
   const [building, setBuilding] = useState(false);
   const [customAllowed, setCustomAllowed] = useState(true);
+  // Sol's price check (18 Nov 2026, Martin: "add the price check to the proposal screen too"): only for a member who
+  // sees costs, from the margin the preview gives them and the business's own proposals.
+  const [pricing, setPricing] = useState<{ marginShare: number; floor: number } | null>(null);
+  const points = usePricePoints(Boolean(pricing));
   // The preview's conversation: empty, taking nothing, so the business sees where its message will show.
   const previewChat = useCustomerChat({ business: view?.business.name ?? "", phone: view?.business.phone });
 
@@ -243,6 +250,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
       setProjectVersion(res.projectVersion);
       setAssistant(Boolean(res.assistant));
       setCustomAllowed(res.customAllowed !== false);
+      setPricing(res.pricing ?? null);
       if (res.choice) setChoice((current) => ({ ...res.choice, ...current }));
     },
     [jobId],
@@ -282,6 +290,16 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
     setStatus({ text: "Withdrawn." });
   };
   const out = latest && latest.state !== "withdrawn";
+  const advice =
+    pricing && view && view.system.kw > 0
+      ? priceAdvice(
+          { kw: view.system.kw, batteryKwh: view.system.batteryKwh, youPay: view.price.youPay, marginShare: pricing.marginShare },
+          points,
+          pricing.floor,
+          new Date(),
+          jobId,
+        )
+      : [];
   const builder = useProposalBuilder(building, view, setView, () => void refresh(choice));
 
   return (
@@ -322,6 +340,15 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
               >
                 Open the quote
               </Link>
+            </div>
+          )}
+
+          {!building && advice.length > 0 && (
+            <div className="-mt-2">
+              <PriceCheck advice={advice} typed={0} />
+              {view?.options && view.options.length > 1 && (
+                <p className="mt-1 text-[10px] text-muted">Checked on the system you recommend.</p>
+              )}
             </div>
           )}
 
