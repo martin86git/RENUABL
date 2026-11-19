@@ -144,6 +144,33 @@ export function DesignQuote(props: {
         );
   const typedFlags = typedCostFlags(all, edits, jobId ? points.filter((p) => p.jobId !== jobId) : points);
   const underFloor = advice.find((a) => a.text.includes("floor"));
+  // Solar Victoria, when it has been put on this quote: always "if approved".
+  const solarVic = empty ? null : solarVicFor(form, costing.panels, totals.priceIncGst, stc, rates);
+  const solarVicOff = solarVicBar(form, costing.panels, rates);
+  // Whether the Solar Victoria switches were touched on this visit: Proceed asks about them only when they weren't
+  // (19 Nov 2026, Martin: "only when i haven't engaged with the toggles, meaning i could have potentially overlooked it").
+  const [vicTouched, setVicTouched] = useState(false);
+  const [vicAsk, setVicAsk] = useState(false);
+  const setSolarVic = (rebate: boolean, loan: boolean) => {
+    setVicTouched(true);
+    // The loan goes with the rebate: switching the loan on switches the rebate on, and switching the rebate off takes the loan too.
+    props.onChange({ form: { ...form, solarVicRebate: rebate || loan, solarVicLoan: loan && (rebate || loan) }, edits });
+  };
+  // What the rebate would take off, to say in the question (only where it can apply at all).
+  const vicMaybe =
+    empty || solarVicOff ? null : solarVicFor({ ...form, solarVicRebate: true }, costing.panels, totals.priceIncGst, stc, rates);
+  const proceedNow = () => {
+    if (vicMaybe && !vicTouched && !form.solarVicRebate && !form.solarVicLoan) return setVicAsk(true);
+    props.onProceed?.();
+  };
+  // Answered from the question: the switches as chosen, then on to the proposal once the quote has them.
+  const vicChoose = (rebate: boolean, loan: boolean) => {
+    setVicAsk(false);
+    if (rebate || loan) setSolarVic(rebate, loan);
+    else setVicTouched(true);
+    const go = props.onProceed;
+    window.setTimeout(() => go?.(), rebate || loan ? 120 : 0);
+  };
   const proceedBox = props.onProceed && !empty && (
     <div className="mt-3 border-t border-line pt-3">
       {underFloor && (
@@ -153,7 +180,7 @@ export function DesignQuote(props: {
       )}
       <button
         type="button"
-        onClick={props.onProceed}
+        onClick={proceedNow}
         disabled={undecided.length > 0}
         className={clsx(
           "flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold",
@@ -174,14 +201,9 @@ export function DesignQuote(props: {
           ? `Decide on ${undecided.length === 1 ? "the cost" : `the ${undecided.length} costs`} above first.`
           : "Saves the design, then opens the proposal to check and send."}
       </p>
+      {vicAsk && vicMaybe && <SolarVicAsk rebate={vicMaybe.rebate} onChoose={vicChoose} onClose={() => setVicAsk(false)} />}
     </div>
   );
-  // Solar Victoria, when it has been put on this quote: always "if approved".
-  const solarVic = empty ? null : solarVicFor(form, costing.panels, totals.priceIncGst, stc, rates);
-  const solarVicOff = solarVicBar(form, costing.panels, rates);
-  const setSolarVic = (rebate: boolean, loan: boolean) =>
-    // The loan goes with the rebate: switching the loan on switches the rebate on, and switching the rebate off takes the loan too.
-    props.onChange({ form: { ...form, solarVicRebate: rebate || loan, solarVicLoan: loan && (rebate || loan) }, edits });
   const { onNet } = props;
   useEffect(() => onNet(net), [onNet, net]);
 
@@ -1075,5 +1097,55 @@ export function PriceCheck({ advice, typed }: { advice: Advice[]; typed: number 
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Asked by Proceed to proposal when the Solar Victoria switches were never touched and the rebate can apply, in case
+ * they were overlooked (19 Nov 2026, Martin). Each answer goes on to the proposal; the cross or Escape stays here.
+ */
+function SolarVicAsk(props: { rebate: number; onChoose: (rebate: boolean, loan: boolean) => void; onClose: () => void }) {
+  const { onClose } = props;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  const choice = "w-full rounded-full px-4 py-2.5 text-sm font-semibold";
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="solar-vic-ask"
+        className="w-full max-w-sm rounded-2xl bg-surface p-5 text-left shadow-[0_24px_60px_rgba(0,0,0,0.25)]"
+      >
+        <h2 id="solar-vic-ask" className="text-base font-semibold text-ink">
+          Offer the Solar Victoria rebate?
+        </h2>
+        <p className="mt-1.5 text-sm leading-snug text-ink-2">
+          The rebate and loan are both off on this quote. If the customer is eligible, the rebate takes about {money(props.rebate)} off,
+          subject to Solar Victoria&rsquo;s approval.
+        </p>
+        <div className="mt-4 space-y-2">
+          <button type="button" autoFocus onClick={() => props.onChoose(true, false)} className={clsx(choice, "bg-ink text-white")}>
+            Add the rebate
+          </button>
+          <button
+            type="button"
+            onClick={() => props.onChoose(true, true)}
+            className={clsx(choice, "text-ink ring-1 ring-line hover:ring-ink-2")}
+          >
+            Add the rebate and the loan
+          </button>
+          <button type="button" onClick={() => props.onChoose(false, false)} className={clsx(choice, "text-ink-2 hover:text-ink")}>
+            Go ahead without them
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

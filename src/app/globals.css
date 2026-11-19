@@ -1158,3 +1158,16 @@ html:has(.sales-snap) {
     scroll-snap-type: y mandatory;
   }
 }
+
+/* Sol's panel beside the designer's pop-up (19 Nov 2026, Martin: Ask Sol under the quote did nothing; it opened the
+   panel under the pop-up). While both are open the panel stands above the dimmed page and the pop-up centres in the
+   room left of it. */
+@media (min-width: 1024px) {
+  body:has(section[data-design-popup][aria-modal="true"]) aside[aria-label="Sol"] {
+    z-index: 62;
+  }
+  html.sol-docked section[data-design-popup] {
+    right: var(--sol-w);
+    max-width: calc(100vw - var(--sol-w) - 3rem);
+  }
+}

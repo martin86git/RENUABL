@@ -59,8 +59,19 @@ export const SOL_TOGGLE = "renuabl:sol-toggle";
  */
 export const SOL_ASK = "renuabl:sol-ask";
 export type SolAsk = string | { text: string; shown?: string };
-/** Asks Sol in his panel from anywhere. */
-export const askSolInPanel = (ask: SolAsk) => window.dispatchEvent(new CustomEvent<SolAsk>(SOL_ASK, { detail: ask }));
+/**
+ * Asks Sol in his panel from anywhere. Inside the designer's pop-up (a frame of our own site with no panel of its own)
+ * the question goes to the page around it, where his panel is (19 Nov 2026, Martin: Ask Sol under the quote did nothing).
+ */
+export const askSolInPanel = (ask: SolAsk) => {
+  let target: Window = window;
+  try {
+    if (window.parent !== window && window.parent.location.origin === window.location.origin) target = window.parent;
+  } catch {
+    target = window;
+  }
+  target.dispatchEvent(new (target as Window & typeof globalThis).CustomEvent<SolAsk>(SOL_ASK, { detail: ask }));
+};
 /** Said back whenever the panel opens or shuts, so the rail can light its button. */
 export const SOL_STATE = "renuabl:sol-state";
 /** Said whenever Sol's conversation changes here, so the rail's count follows. */
