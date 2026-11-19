@@ -124,7 +124,7 @@ export function SolNudges({
                 <button
                   key={a.act + k}
                   type="button"
-                  onClick={() => onAct(n, a, n.count && a.act === "line-on" ? howMany : undefined)}
+                  onClick={() => onAct(n, a, n.count && (a.act === "line-on" || a.act === "line-v2") ? howMany : undefined)}
                   className={clsx(
                     "rounded-full px-3 py-1 text-[12.5px] font-medium",
                     k === 0 ? "bg-sun-line text-white hover:brightness-110" : "text-white/85 ring-1 ring-white/25 hover:bg-white/10",

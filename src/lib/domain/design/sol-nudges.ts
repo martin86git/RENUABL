@@ -24,6 +24,10 @@ export type NudgeAct =
   | "backup-both"
   | "line-on"
   | "line-off"
+  /** Included in the second version only (`NudgeState.versions`), left out of the first. */
+  | "line-v2"
+  /** Read and understood: the note is put aside. */
+  | "ok"
   | "finalise"
   | "request-preapproval";
 
@@ -92,6 +96,12 @@ export interface NudgeState {
    * raise the pre-approval request). Left out off a deal, or before the deal is read.
    */
   network?: { name: string | null; guessed: boolean; preApproval: string | null; mayRequest: boolean };
+  /**
+   * Two versions made from Sol's guide (19 Nov 2026, Martin: "all the other questions like add a switchboard etc, should
+   * ask me to apply it to one of the versions - say v2. that way i get one version thats bare, and one version that has
+   * all the extras"): each cost decided on each job is then offered for v2 alone first.
+   */
+  versions?: boolean;
 }
 
 /** Evenings at least this many kWh make a battery worth suggesting. */
@@ -171,10 +181,16 @@ export function nudgesFor(s: NudgeState): Nudge[] {
         ...(q ? { why: q[2] } : {}),
         ...(q?.[3] ? { picture: q[3] } : {}),
         ...(q?.[4] ? { count: { label: q[4], start: 1 } } : {}),
-        actions: [
-          { label: "Yes, include it", act: "line-on", line: label },
-          { label: "No", act: "line-off", line: label },
-        ],
+        actions: s.versions
+          ? [
+              { label: "Yes, in v2 only", act: "line-v2", line: label },
+              { label: "Yes, in both", act: "line-on", line: label },
+              { label: "No", act: "line-off", line: label },
+            ]
+          : [
+              { label: "Yes, include it", act: "line-on", line: label },
+              { label: "No", act: "line-off", line: label },
+            ],
       });
     }
 
@@ -254,7 +270,8 @@ function preApprovalNudge(s: NudgeState): Nudge | null {
       kind: "option",
       words: `${over}. Pre-approval with ${who}: ${v === "Requested" ? "requested, waiting in Pre-approvals to be submitted" : v.toLowerCase()}.`,
       ...(where ? { why: where } : {}),
-      actions: [],
+      // Read and understood (19 Nov 2026, Martin: "this should have a button acknowledged or OK").
+      actions: [{ label: "OK", act: "ok" }],
     };
   const ask = Boolean(net && s.onDeal && net.mayRequest);
   return {
@@ -264,7 +281,12 @@ function preApprovalNudge(s: NudgeState): Nudge | null {
     why:
       where ??
       (s.onDeal ? "Add the home's NMI to the deal to know its network." : "Put the design on a deal to raise a pre-approval request."),
-    actions: ask ? [{ label: "Yes, raise the request", act: "request-preapproval" }] : [],
+    actions: ask
+      ? [
+          { label: "Yes, raise the request", act: "request-preapproval" },
+          { label: "No", act: "ok" },
+        ]
+      : [{ label: "OK", act: "ok" }],
   };
 }
 

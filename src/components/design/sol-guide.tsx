@@ -4,7 +4,7 @@ import clsx from "clsx";
 import { ChevronLeft, X } from "lucide-react";
 import { useState } from "react";
 import type { NearbyHome } from "@/lib/domain/design/property-lot";
-import type { GuideStepId, GuideTarget } from "@/lib/domain/design/sol-guide";
+import type { GuideStepId, GuideTarget, VersionBattery } from "@/lib/domain/design/sol-guide";
 import {
   FREE_HOURS,
   batteryForKw,
@@ -13,6 +13,7 @@ import {
   reachedWords,
   targetWords,
   unstrungWords,
+  versionLines,
   wantsInputs,
 } from "@/lib/domain/design/sol-guide";
 import { SolIcon } from "./sol-icon";
@@ -81,6 +82,9 @@ export function SolGuide(props: {
   onBattery: (add: boolean | "choose" | "both" | "pair") => void;
   /** The battery Sol would pick for the free-hours version, when there is one. */
   freeBatteryName: string | null;
+  /** The two versions' batteries, counted, for the battery step's list. */
+  batteryKit?: VersionBattery | null;
+  freeBatteryKit?: VersionBattery | null;
   /** "both": two options on the proposal, with backup and without (19 Nov 2026, Martin). */
   onBackup: (yes: boolean | "both") => void;
   /** Back to the last question answered, to change the answer (19 Nov 2026, Martin). */
@@ -513,23 +517,32 @@ export function SolGuide(props: {
           </>
         );
       case "battery":
-        if (props.target?.freeKwh && props.batteryName)
+        if (props.target?.freeKwh && props.batteryName && props.batteryKit) {
+          const lines = versionLines(props.batteryKit, props.freeBatteryKit ?? null, props.target.freeKwh);
           return (
             <>
-              <p>
-                Two versions: {props.batteryName} (about {props.target.kwh} kWh, filled by the panels), and{" "}
-                {props.freeBatteryName ? props.freeBatteryName : "a bigger battery"} (about {props.target.freeKwh} kWh) for the {FREE_HOURS}{" "}
-                free hours. I&apos;ll make a design of each.
-              </p>
+              <p>Two versions:</p>
+              <ul className="mt-1.5 space-y-1">
+                <li className="flex gap-2">
+                  <span className="shrink-0 font-semibold text-sun-line">v1</span>
+                  <span>{lines.v1}</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="shrink-0 font-semibold text-sun-line">v2</span>
+                  <span>{lines.v2}</span>
+                </li>
+              </ul>
+              <p className="mt-1.5">Make a design for each?</p>
               <Actions>
                 <Main onClick={() => props.onBattery("both")}>Make both</Main>
                 <Quiet onClick={() => props.onBattery("pair")}>With and without a battery</Quiet>
-                <Quiet onClick={() => props.onBattery(true)}>Just the {props.target.kwh} kWh</Quiet>
+                <Quiet onClick={() => props.onBattery(true)}>Just v1</Quiet>
                 <Quiet onClick={() => props.onBattery("choose")}>Choose one</Quiet>
                 <Quiet onClick={() => props.onBattery(false)}>No battery</Quiet>
               </Actions>
             </>
           );
+        }
         return (
           <>
             <p>

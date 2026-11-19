@@ -29,21 +29,24 @@ describe("Sol's pre-approval card in the designer", () => {
       "Over 5 kW on single phase, so United Energy will likely need to pre-approve it, or limit its exports. Raise a pre-approval request?",
     );
     expect(card?.why).toBe("United Energy going by the postcode: the NMI on the bill settles it.");
-    expect(card?.actions).toEqual([{ label: "Yes, raise the request", act: "request-preapproval" }]);
+    expect(card?.actions).toEqual([
+      { label: "Yes, raise the request", act: "request-preapproval" },
+      { label: "No", act: "ok" },
+    ]);
   });
 
   it("says where a request stands, and goes once the network has approved", () => {
     const asked = exportCard({ network: { name: "AusNet Services", guessed: false, preApproval: "Requested", mayRequest: false } });
     expect(asked?.words).toContain("requested, waiting in Pre-approvals to be submitted");
-    expect(asked?.actions).toEqual([]);
+    expect(asked?.actions).toEqual([{ label: "OK", act: "ok" }]);
     expect(
       exportCard({ network: { name: "AusNet Services", guessed: false, preApproval: "Approved", mayRequest: false } }),
     ).toBeUndefined();
   });
 
-  it("offers nothing to press off a deal", () => {
+  it("offers only OK off a deal", () => {
     const card = exportCard({ onDeal: false });
-    expect(card?.actions).toEqual([]);
+    expect(card?.actions).toEqual([{ label: "OK", act: "ok" }]);
     expect(card?.why).toBe("Put the design on a deal to raise a pre-approval request.");
   });
 });

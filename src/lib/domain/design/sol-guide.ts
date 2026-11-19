@@ -43,6 +43,29 @@ export interface GuideTarget {
 
 /** The free hours a day some retailers offer (12 Nov 2026, Martin: "the 3 hour free electricity window"). */
 export const FREE_HOURS = 3;
+
+/** A battery as Sol names it in the two versions: how many, which, and what they hold together. */
+export interface VersionBattery {
+  qty: number;
+  name: string;
+  /** What one holds, kWh. */
+  kwh: number;
+}
+
+/**
+ * The two versions as Sol lists them (19 Nov 2026, Martin: "this can be written clearer… v1: 1x Sigenergy 8.0kW
+ * SigenStor Battery Module (7kWh - charged by solar surplus) v2: 2x … (16kWh - charged by 3x free grid charge hours)"):
+ * one line each, the count, the battery and what they hold together, and how it is charged.
+ */
+export function versionLines(v1: VersionBattery, v2: VersionBattery | null, v2Kwh: number): { v1: string; v2: string } {
+  const holds = (b: VersionBattery) => Math.round(b.qty * b.kwh * 10) / 10;
+  return {
+    v1: `${v1.qty}× ${v1.name} (${holds(v1)} kWh, charged by the solar surplus)`,
+    v2: v2
+      ? `${v2.qty}× ${v2.name} (${holds(v2)} kWh, charged in the ${FREE_HOURS} free grid hours)`
+      : `A bigger battery (about ${v2Kwh} kWh, charged in the ${FREE_HOURS} free grid hours)`,
+  };
+}
 /** The share of what panels make that is spare once the home has used its share as it's made: Martin's 60%. */
 export const SPARE_SHARE = 1 - ASSUMPTIONS.baseSelfConsumption;
 

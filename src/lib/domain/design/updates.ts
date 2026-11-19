@@ -15,8 +15,8 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
-    area: "Proposals",
-    words: "In the proposal builder, pick an option to see it through the page, and change the chart style on the chart itself.",
+    area: "Design tool",
+    words: "Sol lists two versions as v1 and v2, and extras like a switchboard upgrade can go in v2 only.",
   },
   {
     day: "2026-11-19",
@@ -146,7 +146,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
     area: "Design tool",
-    words: "The design tool fits a phone: the roof runs the screen's width, with the kit and tools above it and Ask Sol and a toolbar below.",
+    words:
+      "The design tool fits a phone: the roof runs the screen's width, with the kit and tools above it and Ask Sol and a toolbar below.",
   },
   {
     day: "2026-11-18",
@@ -161,12 +162,13 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-18",
     area: "Phone assistant",
-    words: "Each deal in your phone assistant's list shows the deal mark, icons for solar, battery and EV charger, and when it last rang them.",
+    words:
+      "Each deal in your phone assistant's list shows the deal mark, icons for solar, battery and EV charger, and when it last rang them.",
   },
   {
     day: "2026-11-18",
     area: "Deals",
-    words: "Type \"start the design\" in Sol's box on a deal and the designer opens at once. Start the design in his chat works too.",
+    words: 'Type "start the design" in Sol\'s box on a deal and the designer opens at once. Start the design in his chat works too.',
   },
   {
     day: "2026-11-18",
@@ -244,7 +246,11 @@ export const UPDATES: readonly Update[] = [
     area: "Calls",
     words: "Voice agents answer sooner: far less silence between you finishing and them starting to speak.",
   },
-  { day: "2026-11-17", area: "CRM", words: "Sol · Leads now emails each new lead a short hello with a link to their page, within minutes." },
+  {
+    day: "2026-11-17",
+    area: "CRM",
+    words: "Sol · Leads now emails each new lead a short hello with a link to their page, within minutes.",
+  },
   { day: "2026-11-17", area: "CRM", words: "A new lead can have their own page: their home with the design, and a chat Sol answers." },
   {
     day: "2026-11-17",
@@ -294,7 +300,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
     area: "Today",
-    words: "Sol's suggestions under each deal in the Deals list: press one and he writes the email, opened in the feed's place to check and send.",
+    words:
+      "Sol's suggestions under each deal in the Deals list: press one and he writes the email, opened in the feed's place to check and send.",
   },
   {
     day: "2026-11-16",

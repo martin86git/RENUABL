@@ -291,6 +291,11 @@ export interface LineEdit {
   /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
   on?: boolean;
   /**
+   * Decided for this design alone (19 Nov 2026, Martin: two versions, "one version thats bare, and one version that has
+   * all the extras"): the decision isn't shared with the roof's other designs (`withHomeOf`).
+   */
+  own?: boolean;
+  /**
    * A rate typed over a line priced by the watt (`CostLine.watts`), in dollars a watt (18 Nov 2026, Martin: the solar
    * installation's 30c a watt must be clearly editable): the line is priced again at it, unless a cost is typed too.
    */
@@ -417,6 +422,8 @@ const DECIDED_KEYS = DECIDED_LINES.map(([group, label]) => lineKey({ group, labe
 export function withHomeOf(from: QuoteFields, to: QuoteFields): QuoteFields {
   const edits = { ...to.edits };
   for (const key of DECIDED_KEYS) {
+    // A decision made for one design alone stays with it, and isn't handed to the others.
+    if (edits[key]?.own || from.edits[key]?.own) continue;
     if (from.edits[key]) edits[key] = from.edits[key];
     else delete edits[key];
   }
@@ -726,6 +733,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         label?: unknown;
         group?: unknown;
         rate?: unknown;
+        own?: unknown;
       };
       const money = (x: unknown) =>
         typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1_000_000 ? Math.round(x * 100) / 100 : undefined;
@@ -744,7 +752,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         continue;
       }
       if (v.removed === true) {
-        edits[key] = { removed: true };
+        edits[key] = { removed: true, ...(v.own === true ? { own: true } : {}) };
         continue;
       }
       const on = v.on === true;
@@ -763,6 +771,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
           ...(qty !== undefined ? { qty } : {}),
           ...(rate !== undefined ? { rate } : {}),
           ...(on ? { on: true } : {}),
+          ...(on && v.own === true ? { own: true } : {}),
         };
     }
     quotes.push({

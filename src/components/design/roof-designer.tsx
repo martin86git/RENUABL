@@ -121,6 +121,7 @@ import {
   sharedHome,
   withHomeOf,
   lineKey,
+  type LineEdit,
   undecidedLines,
   DAY,
   designFinance,
@@ -1134,6 +1135,8 @@ export function RoofDesigner(props: {
   const openMenu = (to: typeof menu) => {
     setMenu(to);
     setSeek("");
+    // The inverter suggestions fold each time a list opens, a press away (19 Nov 2026, Martin).
+    setSuggesting(false);
   };
   // The battery on this design, and where it stands on the picture.
   const [battery, setBattery] = useState<DesignBattery | undefined>(first.battery);
@@ -3614,6 +3617,10 @@ export function RoofDesigner(props: {
    * worked out by rule from the design as it stands (`sol-nudges.ts`), shown one at a time over Ask Sol.
    */
   const [nudgesAside, setNudgesAside] = useState<string[]>([]);
+  // The two versions Sol's guide made (19 Nov 2026, Martin: the quote's questions then ask whether a cost goes in v2
+  // alone, "one version thats bare, and one version that has all the extras"): v1 the design worked on, v2 its copy.
+  const [versions, setVersions] = useState<{ v1: number; v2: number } | null>(null);
+  const versionsLive = versions && versions.v1 < designs.length && versions.v2 < designs.length && versions.v1 !== versions.v2;
   const [backupAnswered, setBackupAnswered] = useState(false);
   // The deal's network and its pre-approval, for Sol's card over the single-phase size (19 Nov 2026, Martin).
   const dealNetwork = useDealNetwork(props.jobId);
@@ -3668,6 +3675,7 @@ export function RoofDesigner(props: {
       backupAnswered,
       costsHidden,
       ...(dealNetwork.network ? { network: dealNetwork.network } : {}),
+      ...(versionsLive ? { versions: true } : {}),
     }).filter((n) => !nudgesAside.includes(n.id));
   })();
   const [readyOpen, setReadyOpen] = useState(false);
@@ -4311,6 +4319,23 @@ export function RoofDesigner(props: {
         // Filed in Pre-approvals on the deal; the card then says it is requested (19 Nov 2026, Martin).
         void dealNetwork.request(summary.kw).then((why) => why && console.warn(`Pre-approval request not raised: ${why}`));
         return;
+      case "ok":
+        return aside();
+      case "line-v2": {
+        // In v2 alone, left out of v1: each decided for its own design, so neither is handed to the other.
+        const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === action.line);
+        if (!line || !versions) return aside();
+        const key = lineKey(line);
+        const list = everyQuote();
+        const decide = (i: number, edit: LineEdit) => {
+          if (list[i]) list[i] = { ...list[i], edits: { ...list[i].edits, [key]: edit } };
+        };
+        decide(versions.v2, { on: true, own: true, ...(count && count > 1 ? { qty: count } : {}) });
+        decide(versions.v1, { removed: true, own: true });
+        setQuotes(list);
+        setSaved("changed");
+        return;
+      }
       case "line-on":
       case "line-off": {
         const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === action.line);
@@ -4334,9 +4359,16 @@ export function RoofDesigner(props: {
     if (last.line) {
       const line = costSystem(spec, quoteNow.form, props.workspace).lines.find((l) => l.label === last.line);
       if (line) {
-        const edits = { ...quoteNow.edits };
-        delete edits[lineKey(line)];
-        setQuote({ ...quoteNow, edits });
+        // A cost decided for v2 alone is taken back from both versions.
+        const key = lineKey(line);
+        const list = everyQuote().map((q, i) => {
+          if (i !== active && !q.edits[key]?.own) return q;
+          const edits = { ...q.edits };
+          delete edits[key];
+          return { ...q, edits };
+        });
+        setQuotes(sharedHome(list, active));
+        setSaved("changed");
       }
     } else {
       setBackupAnswered(false);
@@ -4556,7 +4588,9 @@ export function RoofDesigner(props: {
     delete copy.goal;
     delete copy.recommended;
     setQuotes([...everyQuote(), quoteNow]);
-    show([...everyDesign().map((d, i) => (i === active ? mine(base) : d)), copy], active);
+    const list = everyDesign();
+    show([...list.map((d, i) => (i === active ? mine(base) : d)), copy], active);
+    setVersions({ v1: active, v2: list.length });
     setSaved("changed");
     return true;
   };
@@ -4629,10 +4663,8 @@ export function RoofDesigner(props: {
     onInverter: (use: boolean | "choose") => {
       answerGuide("inverter");
       if (use === true && guideInverter) takeSuggestion(guideInverter);
-      if (use === "choose") {
-        openMenu("inverters");
-        setSuggesting(true);
-      }
+      // The list, with the suggestions folded behind their button (19 Nov 2026, Martin: "i should click on it to see the options").
+      if (use === "choose") openMenu("inverters");
     },
     onString: (yes: boolean) => {
       answerGuide("string");
@@ -4646,7 +4678,6 @@ export function RoofDesigner(props: {
         setGuideAnswered((list) => list.filter((id) => id !== "string" && id !== "unstrung"));
         setAutoNote(null);
         openMenu("inverters");
-        setSuggesting(true);
         return;
       }
       answerGuide("unstrung");
@@ -4696,7 +4727,9 @@ export function RoofDesigner(props: {
         delete copy.goal;
         delete copy.recommended;
         setQuotes([...everyQuote(), quoteNow]);
-        show([...everyDesign().map((d, i) => (i === active ? mine : d)), copy], active);
+        const list = everyDesign();
+        show([...list.map((d, i) => (i === active ? mine : d)), copy], active);
+        setVersions({ v1: active, v2: list.length });
         setSaved("changed");
         return;
       }
@@ -10118,6 +10151,14 @@ export function RoofDesigner(props: {
                     }
                     batteryName={batteryNameOf(guideBattery)}
                     freeBatteryName={batteryNameOf(guideFreeBattery)}
+                    batteryKit={
+                      guideBattery ? { qty: guideBattery.qty, name: guideBattery.battery.name, kwh: guideBattery.battery.kwh } : null
+                    }
+                    freeBatteryKit={
+                      guideFreeBattery
+                        ? { qty: guideFreeBattery.qty, name: guideFreeBattery.battery.name, kwh: guideFreeBattery.battery.kwh }
+                        : null
+                    }
                     unstrung={guideFacts.leftWhy ? { left: guideFacts.unstrung, why: guideFacts.leftWhy } : null}
                     bill={{ amount: bill.amount, interval: bill.interval }}
                     onBill={(change) => setBill(billWith(bill, change))}
