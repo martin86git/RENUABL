@@ -226,7 +226,7 @@ export function BatteryIcon({ className }: IconProps) {
     </svg>
   );
 }
-function InverterIcon({ className }: IconProps) {
+export function InverterIcon({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" {...LINE} className={className}>
       <rect x="4" y="3" width="16" height="18" rx="2.5" />

@@ -6,6 +6,11 @@ import {
   isConfigKey,
   nearestVariant,
   backupPick,
+  batteriesFor,
+  inverterChoices,
+  invertersFor,
+  MAX_OTHER_INVERTERS,
+  switchInverter,
   panelChoices,
   pickOf,
   readConfigurator,
@@ -17,7 +22,8 @@ import {
   withPanel,
 } from "./configurator";
 import { COST_WORDS, buildProposal, internalForChoice, viewForChoice } from "./proposal";
-import { sampleInputs, sampleSet } from "./proposal-fixture";
+import { pricedWorkspace, sampleInputs, sampleSet } from "./proposal-fixture";
+import { workspaceCatalogue } from "./pricing";
 import { designPanels, panelAspects, panelOf } from "./roof-design";
 import { yearOnPlane } from "./tilt";
 
@@ -85,15 +91,15 @@ describe("the configurator's sizes", () => {
 describe("a proposal with the configurator", () => {
   const { view, internal } = built({ withBattery: true });
   const cfg = view.configurator!;
-  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, battery: null, ev: false, backup: false })!;
-  const withBatt = (size: number, backup = false) => nearestVariant(cfg, { size, panel: 0, battery: 0, ev: false, backup })!;
+  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, inverter: 0, battery: null, ev: false, backup: false })!;
+  const withBatt = (size: number, backup = false) => nearestVariant(cfg, { size, panel: 0, inverter: 0, battery: 0, ev: false, backup })!;
 
   it("prices every mix on publishing, largest size first, and starts as designed", () => {
     expect(cfg.sizes.length).toBeGreaterThan(1);
     expect(cfg.sizes[0].panels).toBe(view.system.panels);
     for (let i = 1; i < cfg.sizes.length; i++) expect(cfg.sizes[i].panels).toBeLessThan(cfg.sizes[i - 1].panels);
     const start = cfg.variants.find((v) => v.goal === cfg.start)!;
-    expect(pickOf(start)).toEqual({ size: 0, panel: 0, battery: 0, ev: false, backup: false });
+    expect(pickOf(start)).toEqual({ size: 0, panel: 0, inverter: 0, battery: 0, ev: false, backup: false });
     expect(start.price.youPay).toBe(view.price.youPay);
     // Each mix's own side is kept for the order, under the same key.
     expect(internal.configurator!.map((x) => x.goal).sort()).toEqual(cfg.variants.map((v) => v.goal).sort());
@@ -124,17 +130,17 @@ describe("a proposal with the configurator", () => {
     expect(withBatt(0).bill!.saving).toBeGreaterThan(alone.bill!.saving);
   });
   it("offers the batteries that fit, each a maker of its own, and an EV charger when one is listed", () => {
-    const makers = cfg.batteries.filter((b) => b.size === 0).map((b) => b.maker);
+    const makers = cfg.batteries.filter((b) => b.size === 0 && (b.inverter ?? 0) === 0).map((b) => b.maker);
     expect(makers.length).toBeGreaterThan(0);
     expect(new Set(makers).size).toBe(makers.length);
     if (cfg.charger) {
-      const ev = nearestVariant(cfg, { size: 0, panel: 0, battery: 0, ev: true, backup: false })!;
+      const ev = nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, ev: true, backup: false })!;
       expect(ev.ev).toBe(true);
       expect(ev.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
     }
   });
   it("shows the chosen mix's roof, system and price, and its own lines for the order", () => {
-    const key = configKey({ size: 1, panel: 0, battery: null, ev: false, backup: false });
+    const key = configKey({ size: 1, panel: 0, inverter: 0, battery: null, ev: false, backup: false });
     const shown = viewForChoice(view, key);
     expect(shown.roof.panels).toHaveLength(cfg.sizes[1].panels);
     expect(shown.system.batteryKwh).toBe(0);
@@ -151,7 +157,7 @@ describe("a proposal with the configurator", () => {
   });
   it("tells the business what was ordered, and to update the design when it differs", () => {
     expect(chosenWords(cfg, cfg.start)).not.toMatch(/Update the design/);
-    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, battery: null, ev: false, backup: false }))).toMatch(
+    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, battery: null, ev: false, backup: false }))).toMatch(
       /no battery. Update the design/,
     );
     expect(holdMessage(cfg, cfg.start, "the week of 8 December")).toMatch(/^I'd like to order .*installed the week of 8 December/);
@@ -166,5 +172,79 @@ describe("a proposal with the configurator", () => {
     const read = readConfigurator(old);
     expect(read.batteries[0]).toMatchObject({ id: 0, qty: 1 });
     expect(read.variants.every((v) => v.ev === false)).toBe(true);
+  });
+});
+
+// 19 Nov 2026, Martin: "different inverters to choose from that work with the design".
+describe("inverters to choose from", () => {
+  const set = sampleSet(true);
+  const design = set.designs[0];
+  const listed = workspaceCatalogue(pricedWorkspace()).inverters ?? [];
+
+  it("offers the one designed with first, then other makers of the same kind that take the panels", () => {
+    const choices = inverterChoices({ design, inverters: listed });
+    expect(choices[0].sku).toBe(design.inverters![0].sku);
+    expect(choices.length).toBeLessThanOrEqual(1 + MAX_OTHER_INVERTERS);
+    const arrayKw = (designPanels(design).length * panelOf(design).watts) / 1000;
+    const makers = choices.map((c) => c.name.split(" ")[0].toLowerCase());
+    expect(new Set(makers).size).toBe(makers.length);
+    for (const c of choices.slice(1)) {
+      expect(c.kw * 1.33).toBeGreaterThanOrEqual(arrayKw);
+      expect(/three/i.test(c.name)).toBe(false);
+      expect(/hybrid/i.test(c.name)).toBe(false);
+    }
+  });
+  it("offers only the one designed with when the design has two", () => {
+    const two = { ...design, inverters: [design.inverters![0], design.inverters![0]] };
+    expect(inverterChoices({ design: two, inverters: listed })).toHaveLength(2);
+    expect(inverterChoices({ design: two, inverters: listed }).every((i) => i.sku === design.inverters![0].sku)).toBe(true);
+  });
+  it("keeps keys of the inverter designed with as before, and marks another", () => {
+    const base = { size: 0, panel: 1, battery: 2, ev: true, backup: false };
+    expect(configKey({ ...base, inverter: 0 })).toBe("cfg-0-1-2-10");
+    expect(configKey({ ...base, inverter: 2 })).toBe("cfg-0-1-2-10-i2");
+    expect(isConfigKey("cfg-0-1-2-10-i2")).toBe(true);
+    expect(isConfigKey("cfg-0-1-2-10")).toBe(true);
+    expect(isConfigKey("cfg-0-1-b")).toBe(true);
+    expect(isConfigKey("cfg-0-1-2-i2")).toBe(false);
+  });
+  it("prices each inverter's mixes with batteries of its own, and switching keeps the battery's maker where it can", () => {
+    const cfg = readConfigurator(built({ withBattery: true }).view.configurator!);
+    const here = invertersFor(cfg, 0);
+    expect(here[0].id).toBe(0);
+    for (const inv of here) {
+      const mixes = cfg.variants.filter((v) => v.size === 0 && (v.inverter ?? 0) === inv.id);
+      expect(mixes.length).toBeGreaterThan(0);
+      for (const v of mixes) if (v.batteryId !== null) expect(batteriesFor(cfg, 0, inv.id).some((b) => b.id === v.batteryId)).toBe(true);
+    }
+    if (here.length > 1) {
+      const now = pickOf(cfg.variants.find((v) => v.goal === cfg.start)!);
+      const moved = switchInverter(cfg, now, here[1].id);
+      expect(moved.inverter).toBe(here[1].id);
+      const was = batteriesFor(cfg, 0, now.inverter).find((b) => b.id === now.battery)?.maker;
+      const there = batteriesFor(cfg, 0, here[1].id);
+      if (there.some((b) => b.maker === was)) expect(there.find((b) => b.id === moved.battery)?.maker).toBe(was);
+      expect(nearestVariant(cfg, moved)?.inverter ?? 0).toBe(here[1].id);
+    }
+  });
+});
+
+describe("inverters that need parts behind every panel, and the mixes' lines sent once", () => {
+  it("never swaps in SolarEdge, Enphase or Tigo for another maker's inverter", () => {
+    const design = sampleSet(true).designs[0];
+    const listed = workspaceCatalogue(pricedWorkspace()).inverters ?? [];
+    const names = inverterChoices({ design, inverters: listed }).map((i) => i.name.toLowerCase());
+    expect(names.some((n) => /solaredge|solar edge|enphase|tigo/.test(n))).toBe(false);
+  });
+  it("sends each system line once and reads every mix's lines back in order", () => {
+    const view = built({ withBattery: true }).view;
+    const cfg = view.configurator!;
+    expect(cfg.say!.length).toBeGreaterThan(0);
+    expect(cfg.variants.every((v) => v.system.details.length === 0)).toBe(true);
+    const read = readConfigurator(cfg);
+    expect(read.variants.every((v) => v.system.details.length > 0)).toBe(true);
+    const shown = viewForChoice(view, cfg.start);
+    expect(shown.system.details.length).toBeGreaterThan(0);
+    expect(variantOf(cfg, cfg.start)!.system.details).toEqual(read.variants.find((v) => v.goal === cfg.start)!.system.details);
   });
 });

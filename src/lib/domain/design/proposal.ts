@@ -23,6 +23,9 @@ import type { RebateRates } from "../rebates";
 import { BLOCK_SET, blocksForView, type ViewBlock } from "./blocks";
 import {
   batteryChoices,
+  inverterChoices,
+  packLines,
+  withInverter,
   configKey,
   panelChoices,
   sizeCounts,
@@ -33,6 +36,7 @@ import {
   withCharger,
   withPanel,
   type ConfigBattery,
+  type ConfigInverter,
   type ConfigKey,
   type ConfigPanel,
   type ConfigSize,
@@ -869,8 +873,8 @@ function optionFrom(
 
 /**
  * The configurator (`configurator.ts`): the sizes (the designs offered, else the primary worked back from as drawn),
- * the panels (the one designed with and up to two other makers), the batteries (none, or up to three makers that
- * work with the inverter), blackout backup with a battery, and an EV charger; every mix priced in full by `workOut`,
+ * the panels (the one designed with and up to two other makers), the inverters (the one designed with and up to two
+ * others that take the panels), the batteries for each inverter (none, or up to three makers that work with it), blackout backup with a battery, and an EV charger; every mix priced in full by `workOut`,
  * as a design of the roof's own would be. A mix that can't be priced (a product with no cost on file) is left out,
  * never guessed. Null when there is nothing to vary.
  */
@@ -922,67 +926,92 @@ function configuratorFor(
   });
 
   const sizes: ConfigSize[] = [];
+  const inverters: ConfigInverter[] = [];
   const batteries: ConfigBattery[] = [];
   const variants: ConfigVariant[] = [];
   const internal: NonNullable<ProposalInternal["configurator"]> = [];
   const usedPanels = new Set<number>();
   let chargerOffered: { name: string; kw: number } | null = null;
+  // The designed panel's input limits, when on file, to check another inverter takes its strings.
+  const panelLimits = (catalogue.panels ?? []).find((p) => p.sku === designedPanel.sku)?.electrical;
   ordered.forEach((src, id) => {
     const d = src.design;
-    const choices = batteryChoices({
-      design: d,
-      batteries: catalogue.batteries ?? [],
-      monthlyKwh: monthlyProduction(d, YIELD_PER_KW_DAY),
-      dailyKwh,
-      selfUseShare: workspace.settings.bill.selfUseShare,
-    });
     const charger = chargerFor(d);
-    const usedBatteries = new Set<number>();
     let priced = 0;
-    panelList.forEach((panel, j) => {
-      const panelled = j === 0 ? d : withPanel(d, panel);
-      const batteryPicks: { id: number | null; backup: boolean }[] = [
-        { id: null, backup: false },
-        ...choices.flatMap((_, b) => [
-          { id: b, backup: false },
-          { id: b, backup: true },
-        ]),
-      ];
-      for (const bp of batteryPicks)
-        for (const ev of charger ? [false, true] : [false]) {
-          const battery = bp.id === null ? null : bp.backup ? withBackup(choices[bp.id]) : choices[bp.id];
-          const mix = withCharger(withBattery(panelled, battery), ev ? charger : null);
-          const at = designs.length;
-          const extra = withExtra(mix, src.at);
-          const out = workOut(extra, at);
-          if (!out.ok) continue;
-          const goal = configKey({ size: id, panel: j, battery: bp.id, ev, backup: bp.backup });
-          const option = optionFrom(extra, mix, at, out, { goal, name: src.name, promise: src.note, recommended: src.pick });
-          // The size's roof is sent once, on the size (`variantOf` puts it back).
-          variants.push({
-            ...option,
-            roofPanels: [],
-            roofAspects: undefined,
-            goal,
+    // The inverters (19 Nov 2026, Martin): the one designed with, then others that take this size's panels. Each has
+    // its own batteries, since which batteries work depends on the inverter.
+    inverterChoices({ design: d, inverters: catalogue.inverters ?? [], panel: panelLimits }).forEach((inv, k) => {
+      const dk = k === 0 ? d : withInverter(d, inv);
+      const choices = batteryChoices({
+        design: k === 0 ? dk : { ...dk, battery: undefined },
+        batteries: catalogue.batteries ?? [],
+        monthlyKwh: monthlyProduction(dk, YIELD_PER_KW_DAY),
+        dailyKwh,
+        selfUseShare: workspace.settings.bill.selfUseShare,
+      });
+      const usedBatteries = new Set<number>();
+      let pricedHere = 0;
+      panelList.forEach((panel, j) => {
+        const panelled = j === 0 ? dk : withPanel(dk, panel);
+        const batteryPicks: { id: number | null; backup: boolean }[] = [
+          { id: null, backup: false },
+          ...choices.flatMap((_, b) => [
+            { id: b, backup: false },
+            { id: b, backup: true },
+          ]),
+        ];
+        for (const bp of batteryPicks)
+          for (const ev of charger ? [false, true] : [false]) {
+            const battery = bp.id === null ? null : bp.backup ? withBackup(choices[bp.id]) : choices[bp.id];
+            const mix = withCharger(withBattery(panelled, battery), ev ? charger : null);
+            const at = designs.length;
+            const extra = withExtra(mix, src.at);
+            const out = workOut(extra, at);
+            if (!out.ok) continue;
+            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, ev, backup: bp.backup });
+            const option = optionFrom(extra, mix, at, out, { goal, name: src.name, promise: src.note, recommended: src.pick });
+            // The size's roof is sent once, on the size (`variantOf` puts it back).
+            variants.push({
+              ...option,
+              roofPanels: [],
+              roofAspects: undefined,
+              goal,
+              size: id,
+              panel: j,
+              inverter: k,
+              battery: bp.id !== null,
+              batteryId: bp.id,
+              ev,
+            });
+            internal.push({
+              goal,
+              design: src.at,
+              cost: out.totals.cost,
+              margin: out.totals.margin,
+              priceExGst: out.totals.priceExGst,
+              lines: internalLines(out.lines),
+            });
+            usedPanels.add(j);
+            if (bp.id !== null) usedBatteries.add(bp.id);
+            if (ev && charger) chargerOffered = { name: charger.name, kw: charger.kw };
+            priced++;
+            pricedHere++;
+          }
+      });
+      if (!pricedHere) return;
+      inverters.push({ size: id, id: k, name: inv.name, maker: makerName(makerOf(inv.name)), kw: inv.kw });
+      choices.forEach((b, i) => {
+        if (usedBatteries.has(i))
+          batteries.push({
             size: id,
-            panel: j,
-            battery: bp.id !== null,
-            batteryId: bp.id,
-            ev,
+            inverter: k,
+            id: i,
+            name: b.name,
+            maker: makerName(makerOf(b.name)),
+            kwh: batteryKwhOf({ battery: b }),
+            qty: b.qty,
           });
-          internal.push({
-            goal,
-            design: src.at,
-            cost: out.totals.cost,
-            margin: out.totals.margin,
-            priceExGst: out.totals.priceExGst,
-            lines: internalLines(out.lines),
-          });
-          usedPanels.add(j);
-          if (bp.id !== null) usedBatteries.add(bp.id);
-          if (ev && charger) chargerOffered = { name: charger.name, kw: charger.kw };
-          priced++;
-        }
+      });
     });
     if (!priced) return;
     sizes.push({
@@ -995,10 +1024,6 @@ function configuratorFor(
       roofPanels: roofPanels(d),
       roofAspects: roofAspects(d),
     });
-    choices.forEach((b, i) => {
-      if (usedBatteries.has(i))
-        batteries.push({ size: id, id: i, name: b.name, maker: makerName(makerOf(b.name)), kwh: batteryKwhOf({ battery: b }), qty: b.qty });
-    });
   });
   if (variants.length < 2 || !sizes.length) return null;
   // It opens as the business recommends it: the recommended size, the panel and battery designed, its backup and charger.
@@ -1010,6 +1035,7 @@ function configuratorFor(
       (v) =>
         v.size === first.id &&
         v.panel === 0 &&
+        (v.inverter ?? 0) === 0 &&
         v.batteryId === (firstDesign.battery ? 0 : null) &&
         Boolean(v.backup) === Boolean(firstDesign.battery?.backup) &&
         v.ev === Boolean(firstDesign.charger),
@@ -1019,7 +1045,7 @@ function configuratorFor(
   const panels: ConfigPanel[] = panelList.flatMap((p, id) =>
     usedPanels.has(id) ? [{ id, name: p.name, maker: makerName(makerOf(p.name)), watts: p.watts }] : [],
   );
-  return { view: { sizes, panels, batteries, charger: chargerOffered, variants, start: start.goal }, internal };
+  return { view: packLines({ sizes, panels, inverters, batteries, charger: chargerOffered, variants, start: start.goal }), internal };
 }
 
 /** A quote's lines as kept on the business's side: a product's code and how many where the line is one product (for the order). */

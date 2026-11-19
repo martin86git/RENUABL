@@ -4,17 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, House, Plus, Receipt } from "lucide-react";
 import { announcementShows, themeVars } from "@/lib/domain/design/brand";
 import { todayInMarket } from "@/lib/domain/market";
 import {
   backupPick,
+  batteriesFor,
   batteryOfVariant,
+  invertersFor,
   isConfigKey,
   nearestVariant,
   pickOf,
   readConfigurator,
   solarOnly,
+  switchInverter,
+  switchSize,
   type ConfigPick,
   type ConfigVariant,
   type ConfiguratorView,
@@ -30,6 +34,7 @@ import {
   type ProposalView,
 } from "@/lib/domain/design/proposal";
 import { proposalUrls, tellOpened } from "@/lib/services/proposals";
+import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import { Roof } from "./proposal-view";
 
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
@@ -82,13 +87,21 @@ export function ConfiguratorPage(props: {
     props.weeks.find((w) => w.monday === props.week) ?? props.weeks.find((w) => w.monday === props.held?.monday) ?? props.weeks[0] ?? null,
   );
 
-  const batteriesHere = cfg.batteries.filter((b) => b.size === mix.size);
+  const invertersHere = invertersFor(cfg, mix.size);
+  const batteriesHere = batteriesFor(cfg, mix.size, now.inverter);
   const battery = batteryOfVariant(cfg, mix);
   const exists = (p: Partial<ConfigPick>) => {
     const want = { ...now, ...p };
     return cfg.variants.some((v) => {
       const q = pickOf(v);
-      return q.size === want.size && q.panel === want.panel && q.battery === want.battery && q.ev === want.ev && q.backup === want.backup;
+      return (
+        q.size === want.size &&
+        q.panel === want.panel &&
+        q.inverter === want.inverter &&
+        q.battery === want.battery &&
+        q.ev === want.ev &&
+        q.backup === want.backup
+      );
     });
   };
   /** What a change would add to or take off the price ("+ $1,200"), from the mix it would be. */
@@ -110,7 +123,7 @@ export function ConfiguratorPage(props: {
   return (
     <div
       style={themeVars(view.theme) as React.CSSProperties}
-      className="min-h-dvh bg-canvas pb-32 text-ink [color-scheme:light] [font-family:var(--proposal-body)] lg:pb-28"
+      className="min-h-dvh bg-surface pb-32 text-ink [color-scheme:light] [font-family:var(--proposal-body)] lg:pb-28"
     >
       {/* The business's special, across the top until its last day (19 Nov 2026, Martin: "an announcement bar at the top
           so we can announce any specials"). In its own words, as it stood when the proposal was published. */}
@@ -131,7 +144,7 @@ export function ConfiguratorPage(props: {
           )}
         </div>
       )}
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
+      <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
         {view.business.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route
           <img
@@ -150,7 +163,7 @@ export function ConfiguratorPage(props: {
         </Link>
       </header>
 
-      <main className="mx-auto grid w-full max-w-7xl gap-8 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-12">
+      <main className="mx-auto grid w-full max-w-[1680px] gap-8 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-10 lg:px-10 xl:grid-cols-[minmax(0,1fr)_28rem]">
         {/* The home: it stays in view on a wide screen and changes as they choose. */}
         <section aria-label="Your home" className="lg:sticky lg:top-6 lg:self-start">
           <p className={eyebrow}>
@@ -186,10 +199,10 @@ export function ConfiguratorPage(props: {
         </section>
 
         {/* The choices. */}
-        <section aria-label="Choose your system" className="space-y-9">
+        <section aria-label="Choose your system" className="space-y-4">
           {/* Why nothing below can be changed (19 Nov 2026, Martin: the switches looked broken once it was ordered). */}
           {locked && (
-            <div className="rounded-2xl border border-line bg-surface p-4 text-[14px] leading-relaxed">
+            <div className="rounded-[28px] bg-canvas p-5 text-[14px] leading-relaxed sm:p-6">
               {props.state === "accepted" ? (
                 <>
                   <p className="flex items-center gap-1.5 font-medium">
@@ -214,16 +227,16 @@ export function ConfiguratorPage(props: {
               )}
             </div>
           )}
-          <Step n={1} title="Size">
+          <Step icon={<House className="size-[18px]" strokeWidth={1.8} aria-hidden />} title="Size">
             <div className="space-y-2.5">
               {cfg.sizes.map((s) => {
-                const v = nearestVariant(cfg, { ...now, size: s.id });
+                const v = nearestVariant(cfg, switchSize(cfg, now, s.id));
                 return (
                   <Choice
                     key={s.id}
                     on={mix.size === s.id}
                     disabled={locked}
-                    onPick={() => v && setPick(pickOf(v))}
+                    onPick={() => setPick(switchSize(cfg, now, s.id))}
                     title={s.name}
                     note={`${v ? `${v.system.kw} kW · ` : ""}${s.panels} panels`}
                     side={v ? dollars(v.price.youPay) : ""}
@@ -233,7 +246,7 @@ export function ConfiguratorPage(props: {
             </div>
           </Step>
 
-          <Step n={2} title="Panels">
+          <Step icon={<PanelIcon className="size-[18px]" />} title="Panels">
             <div className="space-y-2.5">
               {cfg.panels.map((p) => (
                 <Choice
@@ -249,7 +262,26 @@ export function ConfiguratorPage(props: {
             </div>
           </Step>
 
-          <Step n={3} title="Battery">
+          <Step icon={<InverterIcon className="size-[18px]" />} title="Inverter">
+            <div className="space-y-2.5">
+              {invertersHere.map((i) => (
+                <Choice
+                  key={i.id}
+                  on={now.inverter === i.id}
+                  disabled={locked || !cfg.variants.some((v) => v.size === mix.size && (v.inverter ?? 0) === i.id)}
+                  onPick={() => setPick(switchInverter(cfg, now, i.id))}
+                  title={`${i.maker} · ${i.kw} kW`}
+                  note={i.name}
+                  side={now.inverter === i.id ? (i.id === 0 ? "As designed" : "") : deltaTo(switchInverter(cfg, now, i.id))}
+                />
+              ))}
+              {invertersHere.length <= 1 && (
+                <p className="px-1 text-[12.5px] leading-relaxed text-muted">Sized for your panels. Others are checked on site.</p>
+              )}
+            </div>
+          </Step>
+
+          <Step icon={<BatteryIcon className="size-[18px]" />} title="Battery">
             <div className="space-y-2.5">
               <Choice
                 on={mix.batteryId === null}
@@ -279,7 +311,7 @@ export function ConfiguratorPage(props: {
           </Step>
 
           {addOns && (
-            <Step n={4} title="Add-ons">
+            <Step icon={<Plus className="size-[18px]" strokeWidth={1.8} aria-hidden />} title="Add-ons">
               <div className="space-y-2.5">
                 {/* Backup is a battery's add-on, so it shows only once a battery is picked (19 Nov 2026, Martin). */}
                 {mix.batteryId !== null && (
@@ -298,6 +330,7 @@ export function ConfiguratorPage(props: {
                     disabled={locked || !exists({ ev: !mix.ev })}
                     onChange={(ev) => set({ ev })}
                     title="EV charger"
+                    icon={<ChargerIcon className="size-4" />}
                     note={`${cfg.charger.kw} kW · ${cfg.charger.name}, installed`}
                     side={mix.ev ? "Added" : delta({ ev: true })}
                   />
@@ -306,7 +339,7 @@ export function ConfiguratorPage(props: {
             </Step>
           )}
 
-          <Step n={addOns ? 5 : 4} title="Installation">
+          <Step icon={<CalendarDays className="size-[18px]" strokeWidth={1.8} aria-hidden />} title="Installation">
             {props.weeks.length ? (
               <>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -340,7 +373,7 @@ export function ConfiguratorPage(props: {
             )}
           </Step>
 
-          <Step n={addOns ? 6 : 5} title="Price">
+          <Step icon={<Receipt className="size-[18px]" strokeWidth={1.8} aria-hidden />} title="Price">
             <div className="rounded-2xl border border-line bg-surface p-4 text-[14px]">
               <Row label="System, installed (GST included)" value={dollars(shown.price.incGst)} />
               <Row label="Federal rebate (STCs)" value={`− ${dollars(shown.price.stc)}`} />
@@ -360,7 +393,7 @@ export function ConfiguratorPage(props: {
 
       {/* The price along the foot, and Order. */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-3.5 sm:px-8">
+        <div className="mx-auto flex w-full max-w-[1680px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-3.5 sm:px-8 lg:px-10">
           <p>
             <span className="text-[24px] font-semibold tracking-tight [font-variant-numeric:tabular-nums]">
               {dollars(shown.price.youPay)}
@@ -555,15 +588,24 @@ function ChargerArt() {
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+/**
+ * One choice on a pad of its own (19 Nov 2026, Martin, from Tesla's: "on pads… their titles are also more
+ * distinguishable from their content"): an icon in a round, the title large and heavy, the options in white under it.
+ */
+function Step({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <h2 className="mb-3 flex items-baseline gap-2 text-[17px] font-medium tracking-tight [font-family:var(--proposal-heading)]">
-        <span className="text-[12px] font-medium text-muted [font-variant-numeric:tabular-nums]">{String(n).padStart(2, "0")}</span>
+    <section className="rounded-[28px] bg-canvas p-5 sm:p-6">
+      <h2 className="mb-4 flex items-center gap-3 text-[22px] font-semibold leading-none tracking-tight text-ink [font-family:var(--proposal-heading)]">
+        <span
+          aria-hidden
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] ring-1 ring-line"
+        >
+          {icon}
+        </span>
         {title}
       </h2>
       {children}
-    </div>
+    </section>
   );
 }
 
@@ -589,7 +631,15 @@ function Choice(props: { on: boolean; disabled?: boolean; onPick: () => void; ti
   );
 }
 
-function Toggle(props: { on: boolean; disabled?: boolean; onChange: (on: boolean) => void; title: string; note: string; side?: string }) {
+function Toggle(props: {
+  on: boolean;
+  disabled?: boolean;
+  onChange: (on: boolean) => void;
+  title: string;
+  icon?: React.ReactNode;
+  note: string;
+  side?: string;
+}) {
   return (
     <button
       type="button"
@@ -613,7 +663,10 @@ function Toggle(props: { on: boolean; disabled?: boolean; onChange: (on: boolean
         <span className={clsx("size-4 rounded-full bg-white shadow transition-transform", props.on && "translate-x-4")} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-medium text-ink">{props.title}</span>
+        <span className="flex items-center gap-1.5 text-[15px] font-medium text-ink">
+          {props.icon && <span className="text-muted">{props.icon}</span>}
+          {props.title}
+        </span>
         <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{props.note}</span>
       </span>
       {props.side && <span className="shrink-0 text-[13px] text-ink [font-variant-numeric:tabular-nums]">{props.side}</span>}

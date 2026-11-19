@@ -21,6 +21,9 @@ const MAKERS = [
 /** Other ways a maker's name is written on price lists ("Sigen Energy Gateway"). */
 const ALIASES: Record<string, string> = { sigen: "sigenergy" };
 
+/** Whether a maker read by `makerOf` is one the designer knows (not just a name's first word, as "Three Phase…"). */
+export const isKnownMaker = (maker: string): boolean => MAKERS.includes(maker) || Object.values(ALIASES).includes(maker);
+
 /** The maker a product is from: one the designer knows, by name with the spaces taken out, else the first word. */
 export function makerOf(name: string): string {
   const flat = name.toLowerCase().replace(/[^a-z0-9]/g, "");
