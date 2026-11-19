@@ -9,6 +9,7 @@
  */
 import { blocksAreUsual, cleanBlocks, defaultBlocks, type BlockSetting } from "./blocks";
 import type { Cleaned } from "./crm";
+import { CHART_TONES, type ChartTone } from "./proposal-charts";
 
 // ---------------------------------------------------------------------------
 // Templates and colours
@@ -66,6 +67,9 @@ export function lookVars(template: string): Record<string, string> {
 
 /** How the year's output is drawn on a proposal: the same figures each way. */
 export const CHART_STYLES = [
+  // RENUABL's own (19 Nov 2026, Martin): a live readout a customer taps through, and the sun's ring as its alternative.
+  { id: "live", name: "Live", blurb: "Slim bars that read out each month, with the home's use." },
+  { id: "ring", name: "Sun ring", blurb: "A ray for each month round the sun." },
   { id: "bars", name: "Bars", blurb: "A bar for each month." },
   { id: "line", name: "Line", blurb: "One line through the year." },
   { id: "area", name: "Shaded area", blurb: "A line with the area under it filled." },
@@ -402,6 +406,10 @@ export interface BrandKit {
   ownTerms: TermsFile | null;
   /** How the year's output is drawn on its proposals. */
   chart: ChartStyle;
+  /** The colours its charts are drawn in: the sun, its own two colours, or two it picks (`chartFrom`, `chartTo`). */
+  chartTone: ChartTone;
+  chartFrom: string;
+  chartTo: string;
   /** The business says it is a New Energy Tech Approved Seller. We don't check it: it only chooses which line the consumer information carries. */
   netccApproved: boolean;
   /** The proposal's blocks: which show, in what order, with what heading, words and picture. */
@@ -451,7 +459,10 @@ export function defaultBrand(businessName: string): BrandKit {
     standardTerms: true,
     terms: "standard",
     ownTerms: null,
-    chart: "bars",
+    chart: "live",
+    chartTone: "sun",
+    chartFrom: "#ff5a1f",
+    chartTo: "#ffb23f",
     netccApproved: false,
     blocks: defaultBlocks(),
     design: "standard",
@@ -675,6 +686,9 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
   const primary = sent("primary") ? cleanColour(r.primary) : current.primary;
   const accent = sent("accent") ? cleanColour(r.accent) : current.accent;
   if (!primary || !accent) return { ok: false, message: BRAND_COLOUR_WRONG };
+  const chartFrom = sent("chartFrom") ? cleanColour(r.chartFrom) : current.chartFrom;
+  const chartTo = sent("chartTo") ? cleanColour(r.chartTo) : current.chartTo;
+  if (!chartFrom || !chartTo) return { ok: false, message: BRAND_COLOUR_WRONG };
   const deposit = sent("deposit") ? cleanDeposit(r.deposit) : current.deposit;
   if (!deposit) return { ok: false, message: DEPOSIT_WRONG };
   const milestones = sent("milestones") ? cleanMilestones(r.milestones) : { ok: true as const, value: current.milestones };
@@ -726,6 +740,9 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       terms: terms.value,
       ownTerms: current.ownTerms,
       chart: CHART_STYLES.some((c) => c.id === r.chart) ? (r.chart as ChartStyle) : current.chart,
+      chartTone: CHART_TONES.some((c) => c.id === r.chartTone) ? (r.chartTone as ChartTone) : current.chartTone,
+      chartFrom,
+      chartTo,
       netccApproved: typeof r.netccApproved === "boolean" ? r.netccApproved : current.netccApproved,
       blocks: sent("blocks") ? cleanBlocks(r.blocks) : current.blocks,
       design: PROPOSAL_DESIGNS.includes(r.design as ProposalDesign) ? (r.design as ProposalDesign) : current.design,

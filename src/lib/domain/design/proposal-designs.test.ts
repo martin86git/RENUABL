@@ -47,15 +47,23 @@ describe("the five proposal designs", () => {
 });
 
 describe("chart styles", () => {
-  it("are bars (the start), a line, a shaded area or a table", () => {
-    expect(CHART_STYLES.map((c) => c.id)).toEqual(["bars", "line", "area", "table"]);
-    expect(kit().chart).toBe("bars");
+  it("are RENUABL's live readout (the start) and sun ring, bars, a line, a shaded area or a table", () => {
+    expect(CHART_STYLES.map((c) => c.id)).toEqual(["live", "ring", "bars", "line", "area", "table"]);
+    expect(kit().chart).toBe("live");
+    expect(kit().chartTone).toBe("sun");
+  });
+  it("keep chart colours only as six-digit colours", () => {
+    const own = cleanBrandKit({ chartTone: "own", chartFrom: "#123ABC", chartTo: "#ffffff" }, kit());
+    expect(own.ok && [own.value.chartTone, own.value.chartFrom, own.value.chartTo]).toEqual(["own", "#123abc", "#ffffff"]);
+    expect(cleanBrandKit({ chartFrom: "red" }, kit()).ok).toBe(false);
+    const odd = cleanBrandKit({ chartTone: "neon" }, kit());
+    expect(odd.ok && odd.value.chartTone).toBe("sun");
   });
   it("keep only a style on offer", () => {
     const line = cleanBrandKit({ chart: "line" }, kit());
     expect(line.ok && line.value.chart).toBe("line");
     const pie = cleanBrandKit({ chart: "pie" }, kit());
-    expect(pie.ok && pie.value.chart).toBe("bars");
+    expect(pie.ok && pie.value.chart).toBe("live");
   });
 });
 

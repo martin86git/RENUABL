@@ -2,8 +2,9 @@
 
 import clsx from "clsx";
 import { lookOf, themeVars, type BrandKit, type ChartStyle, type TemplateId } from "@/lib/domain/design/brand";
+import { chartColours } from "@/lib/domain/design/proposal-charts";
 
-type Theme = Pick<BrandKit, "palette" | "primary" | "accent">;
+type Theme = Pick<BrandKit, "palette" | "primary" | "accent"> & Partial<Pick<BrandKit, "chartTone" | "chartFrom" | "chartTo">>;
 
 /** A grey line standing for a line of text. */
 const Bar = ({ w, className }: { w: string; className?: string }) => (
@@ -89,6 +90,42 @@ export function TemplateThumb({ template, theme }: { template: TemplateId; theme
 export function ChartThumb({ style, theme }: { style: ChartStyle; theme: Theme }) {
   const months = [0.45, 0.55, 0.7, 0.8, 0.92, 1, 0.97, 0.88, 0.75, 0.6, 0.5, 0.42];
   const pts = months.map((m, i) => `${(i + 0.5) * 10},${44 - m * 36}`);
+  // RENUABL's own (19 Nov 2026): slim rounded bars, or the sun's rays, in the chart colours.
+  if (style === "live" || style === "ring") {
+    const c = chartColours(theme);
+    const grad = `thumb-${style}-${c.from}${c.to}`.replace(/#/g, "");
+    return (
+      <div style={themeVars(theme) as React.CSSProperties} className="h-16 w-full overflow-hidden rounded-md bg-surface p-1.5" aria-hidden>
+        <svg viewBox={style === "ring" ? "-30 -30 60 60" : "0 0 120 48"} className="h-full w-full">
+          <defs>
+            <linearGradient id={grad} x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stopColor={c.from} />
+              <stop offset="100%" stopColor={c.to} />
+            </linearGradient>
+          </defs>
+          {style === "live"
+            ? months.map((m, i) => <rect key={i} x={i * 10 + 3} y={46 - m * 40} width={4} height={m * 40} rx={2} fill={`url(#${grad})`} />)
+            : [0.95, 0.92, 0.85, 0.7, 0.55, 0.45, 0.48, 0.58, 0.72, 0.86, 0.94, 1].map((m, i) => {
+                const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+                const [r0, r1] = [10, 10 + m * 17];
+                return (
+                  <line
+                    key={i}
+                    x1={Math.cos(a) * r0}
+                    y1={Math.sin(a) * r0}
+                    x2={Math.cos(a) * r1}
+                    y2={Math.sin(a) * r1}
+                    stroke={i % 2 ? c.to : c.from}
+                    strokeWidth={3.2}
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+          {style === "ring" && <circle r={7} fill={`url(#${grad})`} />}
+        </svg>
+      </div>
+    );
+  }
   return (
     <div style={themeVars(theme) as React.CSSProperties} className="h-16 w-full overflow-hidden rounded-md bg-surface p-1.5" aria-hidden>
       {style === "table" ? (

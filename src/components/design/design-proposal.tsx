@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, Copy, ExternalLink, FileText, Send, Trash2, Upload, X } from "lucide-react";
 import clsx from "clsx";
+import { CHART_TONES, chartColours } from "@/lib/domain/design/proposal-charts";
 import {
   CHART_STYLES,
   FONTS,
@@ -864,9 +865,10 @@ export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
           <fieldset className="sm:col-span-2">
             <legend className={ui.label}>Charts</legend>
             <p className="mt-0.5 text-xs text-muted">
-              How the year&apos;s output is drawn. With any chart, the bill now and with the system is shown as two bars.
+              How the year&apos;s output is drawn. Live and Sun ring are RENUABL&apos;s own: the customer taps a month to read it, and the
+              saving is drawn the same way.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {CHART_STYLES.map((c) => (
                 <label
                   key={c.id}
@@ -888,6 +890,49 @@ export function BrandSettings({ part }: { part: "who" | "look" | "words" }) {
                 </label>
               ))}
             </div>
+            {(brand.chart === "live" || brand.chart === "ring") && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-ink">Chart colours</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {CHART_TONES.map((t) => {
+                    const c = chartColours({ ...brand, chartTone: t.id });
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        aria-pressed={brand.chartTone === t.id}
+                        title={t.blurb}
+                        onClick={() => void save({ chartTone: t.id })}
+                        className={clsx(
+                          "inline-flex items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3 text-[13px]",
+                          brand.chartTone === t.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
+                        )}
+                      >
+                        <span
+                          className="size-5 rounded-full"
+                          style={{ background: `linear-gradient(to top, ${c.from}, ${c.to})` }}
+                          aria-hidden
+                        />
+                        {t.name}
+                      </button>
+                    );
+                  })}
+                  {brand.chartTone === "own" &&
+                    (["chartFrom", "chartTo"] as const).map((k) => (
+                      <label key={k} className="inline-flex items-center gap-1.5 text-[12px] text-muted">
+                        {k === "chartFrom" ? "Bottom" : "Top"}
+                        <input
+                          type="color"
+                          className="h-8 w-10 cursor-pointer rounded-md border border-line bg-surface p-0.5"
+                          defaultValue={brand[k]}
+                          key={`${k}:${brand[k]}`}
+                          onBlur={(e) => e.target.value !== brand[k] && void save({ [k]: e.target.value })}
+                        />
+                      </label>
+                    ))}
+                </div>
+              </div>
+            )}
           </fieldset>
           <label className={ui.label}>
             Page

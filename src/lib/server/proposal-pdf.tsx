@@ -131,10 +131,16 @@ function Months({ kwh, colour, style = "bars" }: { kwh: number[]; colour: string
             const h = Math.max(1, (m / top) * (H - 4));
             return <Rect key={i} x={i * slot + 6} y={H - h} width={slot - 12} height={h} fill={colour} />;
           })}
+        {/* RENUABL's own charts print as their slim rounded bars, still (19 Nov 2026). */}
+        {(style === "live" || style === "ring") &&
+          kwh.map((m, i) => {
+            const h = Math.max(4, (m / top) * (H - 4));
+            return <Rect key={i} x={i * slot + slot / 2 - 4} y={H - h} width={8} height={h} rx={4} ry={4} fill={colour} />;
+          })}
         {style === "area" && (
           <Polygon points={`${line} ${at[11][0].toFixed(1)},${H} ${at[0][0].toFixed(1)},${H}`} fill={colour} fillOpacity={0.18} />
         )}
-        {style !== "bars" && <Polyline points={line} fill="none" stroke={colour} strokeWidth={1.8} />}
+        {(style === "line" || style === "area") && <Polyline points={line} fill="none" stroke={colour} strokeWidth={1.8} />}
       </Svg>
       <View style={{ flexDirection: "row" }}>
         {MONTHS.map((m) => (
@@ -266,7 +272,11 @@ function ProposalDocument({
     production: () =>
       view.production ? (
         <View wrap={false}>
-          <Months kwh={view.production.monthlyKwh} colour={accent} style={view.theme.chart ?? "bars"} />
+          <Months
+            kwh={view.production.monthlyKwh}
+            colour={view.theme.chart === "live" || view.theme.chart === "ring" ? (view.theme.chartFrom ?? "#ff5a1f") : accent}
+            style={view.theme.chart ?? "bars"}
+          />
           <Text style={[s.small, { marginTop: 6 }]}>
             About {view.production.yearKwh.toLocaleString("en-AU")} kWh a year. {PRODUCTION_NOTE}
           </Text>

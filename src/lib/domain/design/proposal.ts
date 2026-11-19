@@ -55,6 +55,7 @@ import {
 import type { Cleaned, Customer, DetailKey, Job } from "./crm";
 import { systemDetails } from "./deal";
 import type { DepositStatus } from "./deposit";
+import { chartColours } from "./proposal-charts";
 import { workspaceCatalogue, type Workspace } from "./pricing";
 import { panelCatalogue } from "./catalogue";
 import {
@@ -100,7 +101,16 @@ export interface ProposalView {
   validUntil: ISODate;
   template: TemplateId;
   /** The page's colours and type, and how the year's output is drawn (`chart`: bars when left out, as on proposals published before it could be chosen). */
-  theme: { palette: PaletteId; primary: string; accent: string; font?: FontId; chart?: ChartStyle };
+  theme: {
+    palette: PaletteId;
+    primary: string;
+    accent: string;
+    font?: FontId;
+    chart?: ChartStyle;
+    /** The two colours its charts are drawn in (`chartColours`); the sun on proposals published before they could be chosen. */
+    chartFrom?: string;
+    chartTo?: string;
+  };
   business: {
     name: string;
     tagline: string;
@@ -659,7 +669,17 @@ export function buildProposal(given: ProposalInputs): Built {
     publishedAt: input.now,
     validUntil: addDays(input.today, input.choice.validDays),
     template: input.choice.template,
-    theme: { palette: brand.palette, primary: brand.primary, accent: brand.accent, font: brand.font, chart: brand.chart },
+    theme: {
+      palette: brand.palette,
+      primary: brand.primary,
+      accent: brand.accent,
+      font: brand.font,
+      chart: brand.chart,
+      ...(() => {
+        const c = chartColours(brand);
+        return { chartFrom: c.from, chartTo: c.to };
+      })(),
+    },
     business: {
       name: brand.name,
       tagline: brand.tagline,

@@ -16,6 +16,8 @@ import {
   type ViewBlock,
 } from "@/lib/domain/design/blocks";
 import { BlockPicture } from "./block-picture";
+import { BillReadout, LiveMonths, SunRing } from "./proposal-charts";
+import { monthlyUse } from "@/lib/domain/design/proposal-charts";
 import { darkGroundVars, lookOf, lookVars, shownAbn, shownBsb, shownWebsite, themeVars, type ChartStyle } from "@/lib/domain/design/brand";
 import {
   BANK_NOTE,
@@ -860,6 +862,9 @@ export function ProposalPage({
   const look = lookOf(view.template);
   const bold = look.cover === "colour";
   const chart = view.theme.chart ?? "bars";
+  // RENUABL's own charts (19 Nov 2026, Martin), in the business's chart colours (the sun on older proposals).
+  const ours = chart === "live" || chart === "ring";
+  const chartColours = { from: view.theme.chartFrom, to: view.theme.chartTo };
   const contact = [b.phone, b.email, b.website && shownWebsite(b.website)].filter(Boolean);
   const title = (
     <>
@@ -950,16 +955,24 @@ export function ProposalPage({
     production: () =>
       view.production ? (
         <div className={card}>
-          <p className="text-[15px] text-ink">
-            About{" "}
-            <strong className="font-semibold [font-variant-numeric:tabular-nums]">
-              {view.production.yearKwh.toLocaleString("en-AU")} kWh
-            </strong>{" "}
-            a year.
-          </p>
-          <div className="mt-5">
-            <Months kwh={view.production.monthlyKwh} style={chart} />
-          </div>
+          {chart === "live" ? (
+            <LiveMonths kwh={view.production.monthlyKwh} use={view.bill ? monthlyUse(view.bill.dailyKwh) : null} colours={chartColours} />
+          ) : chart === "ring" ? (
+            <SunRing kwh={view.production.monthlyKwh} colours={chartColours} />
+          ) : (
+            <>
+              <p className="text-[15px] text-ink">
+                About{" "}
+                <strong className="font-semibold [font-variant-numeric:tabular-nums]">
+                  {view.production.yearKwh.toLocaleString("en-AU")} kWh
+                </strong>{" "}
+                a year.
+              </p>
+              <div className="mt-5">
+                <Months kwh={view.production.monthlyKwh} style={chart} />
+              </div>
+            </>
+          )}
           <p className={clsx(fine, "mt-4")}>{PRODUCTION_NOTE}</p>
           {/* A day with the system: the sun across their roof, and their home's power hour by hour. */}
           {hasDay(view) && (
@@ -975,7 +988,17 @@ export function ProposalPage({
     bill: () =>
       view.bill ? (
         <div className={card}>
-          {chart !== "table" && <BillBars now={view.bill.now} after={view.bill.after} />}
+          {ours ? (
+            <BillReadout
+              now={view.bill.now}
+              after={view.bill.after}
+              saving={view.bill.saving}
+              payback={view.paybackYears}
+              colours={chartColours}
+            />
+          ) : (
+            chart !== "table" && <BillBars now={view.bill.now} after={view.bill.after} />
+          )}
           <Line label="A year's bill now (estimate)" value={dollars(view.bill.now)} />
           <Line label="A year's bill with this system (estimate)" value={dollars(view.bill.after)} />
           <Line label="Estimated saving a year" value={`about ${dollars(view.bill.saving)}`} strong />

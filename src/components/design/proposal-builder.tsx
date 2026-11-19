@@ -58,7 +58,9 @@ import {
   TITLE_FIELDS,
   type StepWords,
 } from "@/lib/domain/design/blocks";
-import { FONTS, type BrandImage, type BrandKit, type ImageKind } from "@/lib/domain/design/brand";
+import { CHART_STYLES, FONTS, type BrandImage, type BrandKit, type ImageKind } from "@/lib/domain/design/brand";
+import { CHART_TONES, chartColours } from "@/lib/domain/design/proposal-charts";
+import { ChartThumb } from "./proposal-thumbs";
 import { customPriceWords } from "@/lib/domain/design/custom-proposals";
 import { INDICATIVE_INTRO, INDICATIVE_STEPS, type ProposalView } from "@/lib/domain/design/proposal";
 import { addBrandImage, loadBrand, removeBrandImage, saveBrand } from "@/lib/services/proposals";
@@ -132,7 +134,17 @@ export function useProposalBuilder(
     onView({
       ...current,
       business: { ...current.business, logo: pic("logo"), cover: pic("cover") },
-      theme: { ...current.theme, primary: next.primary, accent: next.accent, font: next.font },
+      theme: {
+        ...current.theme,
+        primary: next.primary,
+        accent: next.accent,
+        font: next.font,
+        chart: next.chart,
+        ...(() => {
+          const c = chartColours(next);
+          return { chartFrom: c.from, chartTo: c.to };
+        })(),
+      },
       blocks: blocksForView(next.design, next.blocks, pics),
       blockSet: BLOCK_SET,
     });
@@ -808,6 +820,66 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
               );
             })}
           </div>
+        </fieldset>
+        {/* How the output and saving are drawn, and in what colours (19 Nov 2026, Martin: "allow for the colours to be customized"). */}
+        <fieldset className="mt-3">
+          <legend className={ui.label}>Charts</legend>
+          <div className="mt-1.5 grid grid-cols-3 gap-2">
+            {CHART_STYLES.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={kit.chart === c.id}
+                title={c.blurb}
+                onClick={() => builder.change({ chart: c.id })}
+                className={clsx(
+                  "rounded-lg border p-1.5 text-left",
+                  kit.chart === c.id ? "border-ink bg-surface ring-1 ring-ink" : "border-line bg-surface hover:border-line-strong",
+                )}
+              >
+                <ChartThumb style={c.id} theme={kit} />
+                <span className="mt-1 block text-[11.5px] font-medium text-ink">{c.name}</span>
+              </button>
+            ))}
+          </div>
+          {(kit.chart === "live" || kit.chart === "ring") && (
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+              {CHART_TONES.map((t) => {
+                const c = chartColours({ ...kit, chartTone: t.id });
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    aria-pressed={kit.chartTone === t.id}
+                    title={t.blurb}
+                    onClick={() => builder.change({ chartTone: t.id })}
+                    className={clsx(
+                      "inline-flex items-center gap-1.5 rounded-full border bg-surface py-1 pl-1 pr-2.5 text-[12px]",
+                      kit.chartTone === t.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
+                    )}
+                  >
+                    <span
+                      className="size-4 rounded-full"
+                      style={{ background: `linear-gradient(to top, ${c.from}, ${c.to})` }}
+                      aria-hidden
+                    />
+                    {t.name}
+                  </button>
+                );
+              })}
+              {kit.chartTone === "own" &&
+                (["chartFrom", "chartTo"] as const).map((k) => (
+                  <input
+                    key={k}
+                    type="color"
+                    aria-label={k === "chartFrom" ? "The chart's bottom colour" : "The chart's top colour"}
+                    className="h-7 w-9 cursor-pointer rounded-md border border-line bg-surface"
+                    value={kit[k]}
+                    onChange={(e) => builder.change({ [k]: e.target.value })}
+                  />
+                ))}
+            </div>
+          )}
         </fieldset>
       </div>
 
