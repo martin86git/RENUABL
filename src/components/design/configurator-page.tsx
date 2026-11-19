@@ -5,7 +5,8 @@ import clsx from "clsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
-import { themeVars } from "@/lib/domain/design/brand";
+import { announcementShows, themeVars } from "@/lib/domain/design/brand";
+import { todayInMarket } from "@/lib/domain/market";
 import {
   batteryOfVariant,
   isConfigKey,
@@ -31,6 +32,7 @@ import { proposalUrls, tellOpened } from "@/lib/services/proposals";
 import { Roof } from "./proposal-view";
 
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
+const cents = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 const percent = (share: number) => `${Math.round(share * 100)}%`;
 const eyebrow = "text-[11px] font-medium uppercase tracking-[0.16em] text-muted";
 
@@ -104,6 +106,25 @@ export function ConfiguratorPage(props: {
       style={themeVars(view.theme) as React.CSSProperties}
       className="min-h-dvh bg-canvas pb-32 text-ink [color-scheme:light] [font-family:var(--proposal-body)] lg:pb-28"
     >
+      {/* The business's special, across the top until its last day (19 Nov 2026, Martin: "an announcement bar at the top
+          so we can announce any specials"). In its own words, as it stood when the proposal was published. */}
+      {announcementShows(view.announcement, todayInMarket()) && (
+        <div className="bg-primary px-5 py-2.5 text-center text-[13.5px] text-[color:var(--primary-ink)] sm:px-8">
+          <span className="font-medium">{view.announcement.text}</span>
+          {view.announcement.until && (
+            <span className="opacity-80">
+              {" "}
+              · Until{" "}
+              {new Date(`${view.announcement.until}T00:00:00Z`).toLocaleDateString("en-AU", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                timeZone: "UTC",
+              })}
+            </span>
+          )}
+        </div>
+      )}
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
         {view.business.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route
@@ -312,6 +333,25 @@ export function ConfiguratorPage(props: {
             </span>{" "}
             <span className="text-[12.5px] text-muted">after the federal rebate</span>
           </p>
+          {/* Due today (19 Nov 2026, Martin, as Tesla's order fee): the deposit the business asks when they order, from
+              the share set on the proposal screen; nothing on an indicative proposal, which is confirmed after the visit. */}
+          {props.state === "live" && (
+            <p className="ml-auto text-right max-sm:ml-0 max-sm:text-left">
+              <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">Due today</span>
+              <span className="text-[20px] font-semibold tracking-tight [font-variant-numeric:tabular-nums]">
+                {view.indicative || !shown.terms?.deposit ? "$0" : cents(shown.terms.deposit)}
+              </span>{" "}
+              <span className="text-[12px] text-muted">
+                {view.indicative
+                  ? shown.terms?.deposit
+                    ? `deposit of ${cents(shown.terms.deposit)} once your final proposal is confirmed`
+                    : "nothing until your final proposal"
+                  : shown.terms?.deposit
+                    ? "deposit"
+                    : "nothing to pay to order"}
+              </span>
+            </p>
+          )}
           {props.state === "accepted" ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-1.5 text-[14px] font-medium">

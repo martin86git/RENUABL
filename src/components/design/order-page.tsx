@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { themeVars } from "@/lib/domain/design/brand";
 import {
@@ -11,7 +11,9 @@ import {
   type ProposalState,
   type ProposalView,
 } from "@/lib/domain/design/proposal";
-import { orderFromConfigurator, proposalUrls } from "@/lib/services/proposals";
+import { openProposal, orderFromConfigurator, proposalUrls, sayPaid, type OpenedProposal } from "@/lib/services/proposals";
+import { PayDeposit } from "./deposit-panel";
+import { PaySchedule } from "./pay-schedule";
 
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 const cents = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -42,6 +44,17 @@ export function OrderPage(props: {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<"ordered" | "requested" | null>(props.state === "accepted" ? "ordered" : null);
+  // Once ordered, the deposit due today and how to pay it (19 Nov 2026, Martin: Due today, then Order), read from the
+  // proposal's own link as its page reads it: by card through the business's Stripe, or by bank transfer.
+  const [paying, setPaying] = useState<OpenedProposal | null>(null);
+  useEffect(() => {
+    if (done !== "ordered") return;
+    let gone = false;
+    void openProposal(token).then((res) => !gone && res.ok && setPaying(res));
+    return () => {
+      gone = true;
+    };
+  }, [done, token]);
   const details = contractDetails(view);
   const indicative = Boolean(view.indicative);
 
@@ -165,9 +178,27 @@ export function OrderPage(props: {
                   ? `${view.business.name} has your order and will confirm your installation day with you.`
                   : `${view.business.name} will be in touch to book a visit to your home, then send your final proposal to confirm.`}
               </p>
+              {done === "ordered" && paying?.view && (paying.payments || paying.deposit) && (
+                <div className="mt-5 space-y-4">
+                  {paying.payments && <PaySchedule token={token} business={view.business.name} payments={paying.payments} />}
+                  {paying.deposit && (
+                    <PayDeposit
+                      view={paying.view}
+                      deposit={paying.deposit}
+                      cardsHere={Boolean(paying.payments?.cards)}
+                      onPaid={async (way) => {
+                        const res = await sayPaid(token, way);
+                        if (!res.ok) return res.message;
+                        setPaying(res);
+                        return null;
+                      }}
+                    />
+                  )}
+                </div>
+              )}
               {done === "ordered" && (
-                <Link href={`/p/${encodeURIComponent(token)}#pay`} className="mt-3 inline-block underline underline-offset-4">
-                  Your proposal and payment
+                <Link href={`/p/${encodeURIComponent(token)}`} className="mt-3 inline-block underline underline-offset-4">
+                  Your full proposal
                 </Link>
               )}
             </div>

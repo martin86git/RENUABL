@@ -54,6 +54,8 @@ import {
   type PaletteId,
   type TemplateId,
   type TermsFile,
+  announcementShows,
+  type Announcement,
 } from "./brand";
 import type { Cleaned, Customer, DetailKey, Job } from "./crm";
 import { systemDetails } from "./deal";
@@ -258,6 +260,8 @@ export interface ProposalView {
    * varied.
    */
   configurator?: ConfiguratorView;
+  /** The business's special when it was published (`BrandKit.announcement`), shown across the top of the configurator until its last day. */
+  announcement?: Announcement;
   /**
    * The costs decided on each job that were left out, in the customer's words (`variationsOf`), shown with
    * `VARIATIONS_NOTE`: they may apply, found at the site inspection. Absent on proposals published before 1 Nov 2026.
@@ -771,6 +775,8 @@ export function buildProposal(given: ProposalInputs): Built {
     ...(variations.length ? { variations } : {}),
     blocks: blocksForView(brand.design, brand.blocks, input.images),
     blockSet: BLOCK_SET,
+    // The business's special as it stands at publishing, shown across the top of the configurator until its last day.
+    ...(announcementShows(brand.announcement, input.today) ? { announcement: { ...brand.announcement } } : {}),
     ...(worked.length
       ? {
           options: worked.map(({ goal, at, out, name, promise }) => {

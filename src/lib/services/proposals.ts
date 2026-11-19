@@ -165,6 +165,9 @@ export interface OpenedProposal {
 
 const link = (token: string) => `/api/proposal/${encodeURIComponent(token)}`;
 
+/** The proposal as its customer sees it at their link: its state, and once ordered, the deposit and what is due. */
+export const openProposal = (token: string) => ask<OpenedProposal>(link(token));
+
 /** Says the customer has opened their proposal. Never shown, never waited for. */
 export const tellOpened = (token: string) => void ask<object>(link(token), { method: "POST", body: { action: "opened" } });
 /** Going ahead, on the system chosen when the proposal offers a choice (the recommended one otherwise). */

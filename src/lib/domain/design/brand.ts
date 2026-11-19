@@ -231,6 +231,36 @@ export const GST_MODES = [
 export type GstMode = (typeof GST_MODES)[number]["id"];
 
 /** What is asked for up front: nothing, a share of what the customer pays, or a set amount. */
+/** A special the business announces across the top of the configurator, until the day it ends (in the market's days). */
+export interface Announcement {
+  text: string;
+  /** The last day it shows, or null to show until it is taken down. */
+  until: string | null;
+}
+export const ANNOUNCEMENT_MAX = 140;
+
+/** An announcement as sent: one plain line, and a real day or none. */
+export function cleanAnnouncement(raw: unknown): Announcement {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const text =
+    typeof r.text === "string"
+      ? r.text
+          .replace(/[\u0000-\u001f\u007f<>]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, ANNOUNCEMENT_MAX)
+      : "";
+  const until =
+    typeof r.until === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.until) && !Number.isNaN(Date.parse(`${r.until}T00:00:00Z`))
+      ? r.until
+      : null;
+  return { text, until: text ? until : null };
+}
+
+/** Whether an announcement is to show on a day. */
+export const announcementShows = (a: Announcement | null | undefined, today: string): a is Announcement =>
+  Boolean(a?.text) && (!a?.until || a.until >= today);
+
 export interface Deposit {
   kind: "none" | "percent" | "fixed";
   /** A percentage (1 to 100) or dollars, by `kind`. 0 with none. */
@@ -383,6 +413,11 @@ export interface BrandKit {
    * when it has none. We only ever open it: no card is taken, and no money is held, by RENUABL.
    */
   payLink: string;
+  /**
+   * A line across the top of the configurator for a special the business is running (19 Nov 2026, Martin: "an
+   * announcement bar at the top so we can announce any specials"), until the day it ends. Its own words: empty for none.
+   */
+  announcement: Announcement;
   /** The business's own workmanship warranty, in years. Null when it doesn't state one. */
   warrantyYears: number | null;
   /** Its own words about that warranty. */
@@ -450,6 +485,7 @@ export function defaultBrand(businessName: string): BrandKit {
     milestones: [],
     bank: { ...NO_BANK },
     payLink: "",
+    announcement: { text: "", until: null },
     warrantyYears: null,
     warrantyWords: "",
     installTime: "",
@@ -729,6 +765,7 @@ export function cleanBrandKit(raw: unknown, current: BrandKit): Cleaned<BrandKit
       milestones: milestones.value,
       bank,
       payLink,
+      announcement: sent("announcement") ? cleanAnnouncement(r.announcement) : (current.announcement ?? { text: "", until: null }),
       warrantyYears,
       warrantyWords: sent("warrantyWords") ? paragraphs(r.warrantyWords, 3000) : current.warrantyWords,
       installTime: INSTALL_TIMES.some((t) => t.id === r.installTime) ? (r.installTime as InstallTime) : current.installTime,

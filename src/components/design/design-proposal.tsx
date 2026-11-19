@@ -35,6 +35,7 @@ import {
   withdrawProposal,
 } from "@/lib/services/proposals";
 import { PATHS, ui } from "./design-shell";
+import { OrderSettings } from "./proposal-extras";
 import { ChatDock, ChatGreeting, DealChat, useCustomerChat } from "./chat-panel";
 import { useDesignAccount } from "./design-account";
 import { DepositLine } from "./deposit-panel";
@@ -426,6 +427,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                   ))}
                 </div>
               </fieldset>
+
+              {/* The configurator's deposit and announcement (19 Nov 2026, Martin), the business's own settings. */}
+              <OrderSettings onChanged={() => void refresh(choice)} />
 
               <label className={ui.label}>
                 The price stands for
