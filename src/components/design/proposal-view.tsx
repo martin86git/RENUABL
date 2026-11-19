@@ -1459,7 +1459,9 @@ export function ProposalPage({
                 aria-label={heading || undefined}
                 style={dark ? ({ ...darkGroundVars(view.theme), background: "var(--block-ground)" } as React.CSSProperties) : undefined}
                 className={clsx(
-                  side && "sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-8",
+                  // Headings down the left only for a block with a heading: one without (the choice of systems) had its
+                  // content squeezed into the heading's narrow column (19 Nov 2026, Martin: Split broke the options).
+                  side && heading && "sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-8",
                   dark && "rounded-2xl px-6 py-8 sm:px-10 sm:py-12",
                 )}
               >
