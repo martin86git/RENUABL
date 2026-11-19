@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { guideStep, guiding, panelsFor, reachedWords, targetWords, type GuideFacts } from "./sol-guide";
+import {
+  MAX_PANEL_CELLS,
+  cellWords,
+  guideStep,
+  guiding,
+  panelCells,
+  panelsFor,
+  reachedWords,
+  targetWords,
+  type GuideFacts,
+} from "./sol-guide";
 import { batteryForKw, batteryWords, freeHoursWords, unstrungWords, wantsInputs, layingWords } from "./sol-guide";
 
 const facts = (over: Partial<GuideFacts> = {}): GuideFacts => ({
@@ -136,5 +146,28 @@ describe("layingWords", () => {
   });
   it("counts alone without a target", () => {
     expect(layingWords(1, 0, 475, null)).toEqual({ row: "1 panel · 0.48 kW", left: null, state: "none" });
+  });
+});
+
+describe("the panels-to-go bar", () => {
+  it("fills a cell a panel towards the target, marks the row being laid, and counts down", () => {
+    const c = panelCells(1, 3, 475, { kw: 7.1, kwh: 0 })!;
+    expect(c.cells).toHaveLength(15);
+    expect(c.cells.slice(0, 5)).toEqual(["laid", "laying", "laying", "laying", "empty"]);
+    expect(c.toGo).toBe(11);
+    expect(cellWords(c)).toBe("11 to go");
+  });
+  it("marks cells past the target as over, and caps what it draws", () => {
+    const c = panelCells(1, 33, 475, { kw: 7.1, kwh: 0 })!;
+    expect(c.over).toBe(19);
+    expect(c.cells.filter((x) => x === "over")).toHaveLength(19);
+    expect(cellWords(c)).toBe("19 over");
+    expect(cellWords(panelCells(15, 0, 475, { kw: 7.1, kwh: 0 })!)).toBe("On target");
+    const big = panelCells(0, 60, 475, { kw: 7.1, kwh: 0 })!;
+    expect(big.cells).toHaveLength(MAX_PANEL_CELLS);
+    expect(big.more).toBe(20);
+  });
+  it("draws nothing without a target", () => {
+    expect(panelCells(3, 2, 475, null)).toBeNull();
   });
 });

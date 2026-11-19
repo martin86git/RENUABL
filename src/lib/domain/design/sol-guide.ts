@@ -207,3 +207,40 @@ export function layingWords(
   if (need === 0) return { row, left: `Target reached: ${target.kw} kW`, state: "on" };
   return { row, left: `${-need} over the ${target.kw} kW target`, state: "over" };
 }
+
+/** One cell of the panels-to-go bar: laid already, in the row being dragged out, still to lay, or past the target. */
+export type PanelCell = "laid" | "laying" | "empty" | "over";
+
+/** The most cells drawn; past it the bar says how many more as "+N". */
+export const MAX_PANEL_CELLS = 40;
+
+/**
+ * The panels-to-go bar (19 Nov 2026, Martin: "small panel placeholders (like battery cells) being filled that represent
+ * the number of panels to go"): a cell a panel of the target, filled as they go down, and cells past it marked over.
+ * Null without a target. `toGo` is how many more reach it, `over` how many past it.
+ */
+export function panelCells(
+  laid: number,
+  laying: number,
+  watts: number,
+  target: GuideTarget | null,
+): { cells: PanelCell[]; more: number; toGo: number; over: number } | null {
+  if (!target || !(target.kw > 0)) return null;
+  const need = panelsFor(target.kw, watts);
+  const total = laid + laying;
+  const all: PanelCell[] = [];
+  for (let i = 0; i < Math.max(need, total); i++) all.push(i >= need ? "over" : i < laid ? "laid" : i < total ? "laying" : "empty");
+  return {
+    cells: all.slice(0, MAX_PANEL_CELLS),
+    more: Math.max(0, all.length - MAX_PANEL_CELLS),
+    toGo: Math.max(0, need - total),
+    over: Math.max(0, total - need),
+  };
+}
+
+/** The words beside the bar: only what is still to do, or how far past it. */
+export function cellWords(c: { toGo: number; over: number }): string {
+  if (c.over > 0) return `${c.over} over`;
+  if (c.toGo === 0) return "On target";
+  return `${c.toGo} to go`;
+}

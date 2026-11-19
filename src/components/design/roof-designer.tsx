@@ -13,6 +13,8 @@ import {
   guideStep,
   guiding,
   layingWords,
+  panelCells,
+  cellWords,
   panelsFor,
   type GuideFacts,
   type GuideStepId,
@@ -4484,6 +4486,12 @@ export function RoofDesigner(props: {
   };
   const guideNow = guideOn ? guideStep(guideAnswered, guideFacts) : null;
   const guideActive = guideOn && guiding(guideAnswered, guideFacts);
+  // While panels go down (a row being dragged out, or Sol counting down to a size) the figures above the picture light up
+  // and the system's size counts the row as it grows (19 Nov 2026, Martin: draw attention to the size as it is laid).
+  const layingNow = laying ? ghosts.length : 0;
+  const growing = layingNow > 0 || (guideOn && guideAnswered.includes("place") && !guideAnswered.includes("reached"));
+  const liveKw = layingNow ? ((summary.panels + layingNow) * panelOf(design).watts) / 1000 : summary.kw;
+  const livePanels = summary.panels + layingNow;
   // While Sol leads, look at the roof once for what is on it already, so he can ask about panels there before any are
   // laid (12 Nov 2026, Martin: nothing asked whether to replace the existing panels or work around them).
   const guideChecked = useRef("");
@@ -6390,13 +6398,14 @@ export function RoofDesigner(props: {
               {props.tight ? (
                 <div
                   className={clsx(
-                    "flex items-center gap-x-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums text-white/60",
+                    "flex items-center gap-x-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums transition-colors duration-300",
+                    growing ? "rounded-l-lg bg-sun-line text-white/85" : "text-white/60",
                     phone ? "flex-wrap" : "shrink-0",
                   )}
                 >
-                  <span className="whitespace-nowrap" title={`${summary.panels} panels of ${panelOf(design).watts} W`}>
-                    <b className="text-[15px] font-semibold text-sun-bright">{summary.kw.toFixed(2)}</b> kW · {summary.panels} ×{" "}
-                    {panelOf(design).watts} W
+                  <span className="whitespace-nowrap" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
+                    <b className={clsx("text-[15px] font-semibold", growing ? "text-white" : "text-sun-bright")}>{liveKw.toFixed(2)}</b> kW
+                    · {livePanels} × {panelOf(design).watts} W
                   </span>
                   <span
                     className={clsx("whitespace-nowrap", oversize?.over && "text-sun-bright")}
@@ -6413,17 +6422,34 @@ export function RoofDesigner(props: {
                 </div>
               ) : (
                 <>
-                  <div className="relative flex flex-[1.2] items-center justify-around gap-6 border-r border-white/15 px-5 py-1">
+                  <div
+                    className={clsx(
+                      "relative flex flex-[1.2] items-center justify-around gap-6 border-r border-white/15 px-5 py-1 transition-colors duration-300",
+                      growing && "rounded-l-lg bg-sun-line",
+                    )}
+                  >
                     <div>
-                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-sun-bright">Solar</p>
-                      <p className="whitespace-nowrap leading-tight">
-                        <span className="text-xl font-semibold tabular-nums tracking-[-0.02em] text-sun-bright">
-                          {summary.kw.toFixed(2)}
-                        </span>
-                        <span className="ml-1 text-xs text-white/60">kW</span>
+                      <p className={clsx("text-[9px] font-medium uppercase tracking-[0.2em]", growing ? "text-white" : "text-sun-bright")}>
+                        Solar
                       </p>
-                      <p className="whitespace-nowrap text-xs leading-tight tabular-nums text-white/60">
-                        {summary.panels} {summary.panels === 1 ? "panel" : "panels"} of {panelOf(design).watts} W
+                      <p className="whitespace-nowrap leading-tight">
+                        <span
+                          className={clsx(
+                            "text-xl font-semibold tabular-nums tracking-[-0.02em]",
+                            growing ? "text-white" : "text-sun-bright",
+                          )}
+                        >
+                          {liveKw.toFixed(2)}
+                        </span>
+                        <span className={clsx("ml-1 text-xs", growing ? "text-white/85" : "text-white/60")}>kW</span>
+                      </p>
+                      <p
+                        className={clsx(
+                          "whitespace-nowrap text-xs leading-tight tabular-nums",
+                          growing ? "text-white/85" : "text-white/60",
+                        )}
+                      >
+                        {livePanels} {livePanels === 1 ? "panel" : "panels"} of {panelOf(design).watts} W
                       </p>
                     </div>
                     <div>
@@ -8437,6 +8463,7 @@ export function RoofDesigner(props: {
                 ghosts.length > 0 &&
                 (() => {
                   const words = layingWords(ghosts.length, summary.panels, size.watts, guideTarget);
+                  const cells = panelCells(summary.panels, ghosts.length, size.watts, guideTarget);
                   const lefts = ghosts.map((g) => ((ROOF_IMAGE.width / 2 + g.x / scale - view.x) / view.w) * 100);
                   const tops = ghosts.map((g) => ((ROOF_IMAGE.height / 2 + g.y / scale - view.y) / view.h) * 100);
                   const left = (Math.min(...lefts) + Math.max(...lefts)) / 2;
@@ -8453,16 +8480,36 @@ export function RoofDesigner(props: {
                       aria-live="polite"
                     >
                       <SolIcon className="size-4 text-sun-line" />
-                      <span className="text-[13px] font-semibold tabular-nums">{words.row}</span>
-                      {words.left && (
-                        <span
-                          className={clsx(
-                            "border-l border-white/20 pl-2 text-[13px] font-medium tabular-nums",
-                            words.state === "short" ? "text-white/80" : words.state === "on" ? "text-emerald-300" : "text-sun-bright",
-                          )}
-                        >
-                          {words.left}
-                        </span>
+                      {cells ? (
+                        // Panels to go as cells, like a battery's (19 Nov 2026, Martin: the words were hard to read; the
+                        // cells say how many are laid without saying it, and the words only what is left to do).
+                        <>
+                          <span className="flex items-center gap-[2px]" aria-hidden>
+                            {cells.cells.map((c, i) => (
+                              <span
+                                key={i}
+                                className={clsx(
+                                  "h-3.5 w-[7px] rounded-[2px]",
+                                  c === "laid" && "bg-sun-line",
+                                  c === "laying" && "bg-white",
+                                  c === "empty" && "bg-white/15 ring-1 ring-inset ring-white/25",
+                                  c === "over" && "bg-danger",
+                                )}
+                              />
+                            ))}
+                            {cells.more > 0 && <span className="ml-0.5 text-[11px] font-semibold text-danger">+{cells.more}</span>}
+                          </span>
+                          <span
+                            className={clsx(
+                              "text-[13px] font-semibold tabular-nums",
+                              cells.over > 0 ? "text-danger" : cells.toGo === 0 ? "text-emerald-300" : "text-white",
+                            )}
+                          >
+                            {cellWords(cells)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-[13px] font-semibold tabular-nums">{words.row}</span>
                       )}
                     </div>
                   );
