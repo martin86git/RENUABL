@@ -4,6 +4,7 @@ import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
 import { nextWorkingDay } from "./today-pad";
 import { STAGE_LABELS, type JobStage } from "./crm";
 import { askNeedWords, type AskType, type DealLine } from "./deal-team";
+import { CALL_HEADLINES } from "../call-headlines";
 
 /**
  * The deal feed on Today (6 Nov 2026, Martin: Sol runs the deals, the feed is the controls, and the owner's judgement
@@ -101,11 +102,29 @@ export function lastAt(d: FeedDeal): string {
 }
 
 /** Why this deal needs a person now, in words, or null when Sol and the record have it in hand. */
+/**
+ * A call back asked for and not yet given (19 Nov 2026, Martin: Charlie's call ended "Wants a call back from the team",
+ * and Laura's card had no move from Sol): the latest time anyone was in touch was the phone assistant's call that came
+ * to that. A call, email or reply from the team since clears it. What they wanted it about, when the call said.
+ */
+export function callBackAsked(d: FeedDeal): { by: string | null; at: string; about: string | null } | null {
+  const touch = d.events.find((e) => e.kind === "call" || e.kind === "email" || e.kind === "reply");
+  if (!touch || touch.kind !== "call" || !touch.text.startsWith(CALL_HEADLINES.callback)) return null;
+  const about = /About:\s*([^\n]+)/.exec(touch.text)?.[1]?.trim() ?? null;
+  const short = about ? about.replace(/\s+/g, " ").replace(/\.$/, "") : null;
+  return {
+    by: touch.by ?? null,
+    at: touch.at,
+    about: short ? (short.length > 110 ? `${short.slice(0, short.lastIndexOf(" ", 107))}…` : short) : null,
+  };
+}
+
 export function needsYou(d: FeedDeal, now = new Date()): string | null {
   if (markHolds(d, now)) return null;
   const latest = d.events[0];
   const name = first(d.customer);
   if (latest?.kind === "message") return `${name} is waiting on a reply`;
+  if (callBackAsked(d)) return `${name} wants a call back`;
   // A request Sol left in the deal's team chat, still open.
   const ask = d.team?.openAsks[0];
   if (ask) return askNeedWords(ask);
@@ -167,6 +186,14 @@ export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
   const name = first(d.customer);
   if (d.events[0]?.kind === "message")
     return { kind: "reply", label: `Reply to ${name}`, why: `${name} asked something and is waiting on a reply.` };
+  const back = callBackAsked(d);
+  if (back) {
+    const who = back.by ? `${name} asked ${back.by}` : `${name} asked`;
+    const why = `${who} for a call back from the team${back.about ? `: ${back.about[0].toLowerCase()}${back.about.slice(1)}` : ""}.`;
+    return d.phone
+      ? { kind: "call", label: `Call ${name} back`, why }
+      : { kind: "deal", label: "Get back to them", why: `${why} There's no phone on file.` };
+  }
   if (d.sol) {
     const state = d.sol.state ?? (d.sol.held ? "held" : "counting");
     const what = d.sol.subject ? `: "${d.sol.subject}"` : "";

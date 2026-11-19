@@ -138,3 +138,23 @@ describe("approvals on a sold deal (19 Nov 2026: Today flagged them, the deal's 
       }
   });
 });
+
+describe("a call back the phone assistant was asked for", () => {
+  const asked = (text: string) => deal({ events: [{ kind: "call", text, at: ago(20), by: "Charlie" }] });
+  it("is the next move, with what it was about, until the team gets in touch", () => {
+    const d = asked(
+      "Wants a call back from the team · Today at 2pm\nAbout: Wants to discuss other system options, including a Sigenergy system.",
+    );
+    expect(nextMove(d, now)).toEqual({
+      kind: "call",
+      label: "Call Jo back",
+      why: "Jo asked Charlie for a call back from the team: wants to discuss other system options, including a Sigenergy system.",
+    });
+    expect(needsYou(d, now)).toBe("Jo wants a call back");
+    const called = deal({ events: [{ kind: "call", text: "Called Jo", at: ago(1), by: "sam" }, ...d.events] });
+    expect(needsYou(called, now)).not.toBe("Jo wants a call back");
+  });
+  it("asks someone to get back to them when there's no phone", () => {
+    expect(nextMove({ ...asked("Wants a call back from the team"), phone: null }, now)?.kind).toBe("deal");
+  });
+});
