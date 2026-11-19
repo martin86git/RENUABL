@@ -16,7 +16,7 @@
  * the same wording as the page.
  */
 import { Document, Image, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { blockHeading, stepsShown, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
+import { blockHeading, coverTitle, stepsShown, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { contrast, fontOf, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
 import { batteryHero } from "@/lib/domain/design/battery-hero";
 import { money } from "@/lib/domain/design/deposit";
@@ -198,7 +198,7 @@ function ProposalDocument({
     <>
       <Text style={[s.eyebrow, { color: soft }]}>{view.indicative ? INDICATIVE_LABEL : "Proposal"}</Text>
       <Text style={[s.h1, { color: ink, fontFamily: headingFace }, size ? { fontSize: size } : {}]}>
-        {view.title} for {view.customer.name}
+        {coverTitle(viewBlocks(view).find((block) => block.id === "cover")?.heading, view)}
       </Text>
       <Text style={{ marginTop: 8, color: ink }}>{view.customer.address}</Text>
       <Text style={{ marginTop: 14, fontSize: 9, color: soft }}>
@@ -397,6 +397,9 @@ function ProposalDocument({
         </View>
       ) : null,
     // On the PDF, At a glance is the cover's row of figures and How we work is said under going ahead (below).
+    // The choice of systems is listed with the price, and the battery is a card on the cover (while shown).
+    options: () => null,
+    hero: () => null,
     how: () => null,
     figures: () => null,
     "custom-1": () => null,
@@ -492,7 +495,9 @@ function ProposalDocument({
   const blocks = viewBlocks(view);
   const coverBlock = blocks.find((block) => block.id === "cover");
   // With a battery, the cover carries the battery's day as a still (the page draws it moving): the same words.
-  const hero = batteryHero(view, { roofShown: blocks.some((block) => block.id === "roof") });
+  const hero = blocks.some((block) => block.id === "hero")
+    ? batteryHero(view, { roofShown: blocks.some((block) => block.id === "roof") })
+    : null;
   /** A block's own words and picture, as the business set them in the customiser. */
   const own = (block: ViewBlock) => {
     const image = picture(block.image?.id);

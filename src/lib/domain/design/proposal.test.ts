@@ -451,6 +451,7 @@ describe("the customer's link", () => {
     expect(Object.keys(view).sort()).toEqual(
       [
         "bill",
+        "blockSet",
         "blocks",
         "business",
         "contract",

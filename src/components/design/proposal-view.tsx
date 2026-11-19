@@ -8,6 +8,7 @@ import {
   isCustom,
   PICTURE_PLACE_USUAL,
   PICTURE_SIZE,
+  coverTitle,
   stepsShown,
   viewBlocks,
   type StepWords,
@@ -848,7 +849,8 @@ export function ProposalPage({
           bold ? "text-[color:var(--primary-ink)]" : "text-ink",
         )}
       >
-        {view.title} for {view.customer.name}
+        {/* The business's own title when it gave one (the cover's heading in the builder), else ours. */}
+        {coverTitle(viewBlocks(view).find((block) => block.id === "cover")?.heading, view)}
       </h1>
       <p className={clsx("mt-3 text-[15px]", bold ? "text-[color:var(--primary-ink)] opacity-90" : "text-muted")}>
         {view.customer.address}
@@ -863,7 +865,10 @@ export function ProposalPage({
   // With a battery, the proposal opens on it (8 Nov 2026, Martin: the proposal is about the battery, not the array):
   // the roof with the battery laid over it, or the home's day when there is no solar on the design (or the roof is
   // switched off). The roof then isn't shown a second time in its own block.
-  const hero = batteryHero(view, { roofShown: blocks.some((block) => block.id === "roof"), chosen: choice?.chosen });
+  // Hidden by the business (Your battery off), the roof shows plainly in its own block instead.
+  const hero = blocks.some((block) => block.id === "hero")
+    ? batteryHero(view, { roofShown: blocks.some((block) => block.id === "roof"), chosen: choice?.chosen })
+    : null;
   const roofPicture = (withHero: BatteryHero | null) => (
     <>
       <Roof view={view} src={urls.roof} hero={withHero} />
@@ -887,6 +892,11 @@ export function ProposalPage({
   );
   const content: Record<BlockId, () => React.ReactNode> = {
     cover: () => null,
+    // The choice of systems and the battery were part of the cover until 19 Nov 2026 (Martin: "make the cover blocks
+    // editable too"): blocks of their own, with the cover's title and words edited in the builder.
+    options: () =>
+      view.options && view.options.length > 1 ? <ChooseSystem view={view} choice={choice} locked={state === "accepted"} /> : null,
+    hero: () => (hero ? hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} /> : null),
     // How we work and At a glance were part of the cover until 19 Nov 2026 (Martin: "edit the text / delete / re arrange
     // the blocks here in the build tool"): blocks of their own, so they move, hide and take the business's words.
     how: () =>
@@ -1242,7 +1252,11 @@ export function ProposalPage({
 
       <main className="mx-auto w-full max-w-4xl space-y-12 px-5 pb-20 sm:px-8">
         {/* How it opens: the one place the templates differ. Always first, whatever order the rest is in. */}
-        {(build ? build.cover : (node: React.ReactNode) => node)(
+        {(build && cover
+          ? (node: React.ReactNode) => build.block(cover, build.cover(node))
+          : build
+            ? build.cover
+            : (node: React.ReactNode) => node)(
           <section aria-label="Proposal">
             {look.cover === "colour" ? (
               <div className="rounded-2xl bg-primary px-6 py-12 sm:px-10 sm:py-16">{title}</div>
@@ -1276,14 +1290,6 @@ export function ProposalPage({
             {greeting && <div className="mt-6">{greeting}</div>}
             {view.note && <p className="mt-6 max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{view.note}</p>}
             {cover && (cover.words || cover.image) && <div className="mt-6">{own(cover)}</div>}
-            {/* With a choice of systems: the options first, ahead of the roof from above (15 Nov 2026, Martin), the one
-                chosen showing in the picture and below. */}
-            {view.options && view.options.length > 1 && (
-              <div className="mt-10">
-                <ChooseSystem view={view} choice={choice} locked={state === "accepted"} />
-              </div>
-            )}
-            {hero && <div className="mt-8">{hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} />}</div>}
             {/* With At a glance hidden, how long the price stands still shows, under the cover. */}
             {!blockOf("figures") && stands}
           </section>,

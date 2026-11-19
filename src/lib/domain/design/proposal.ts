@@ -20,7 +20,7 @@
  */
 import type { ISODate } from "../types";
 import type { RebateRates } from "../rebates";
-import { blocksForView, type ViewBlock } from "./blocks";
+import { BLOCK_SET, blocksForView, type ViewBlock } from "./blocks";
 import {
   INSTALL_TIMES,
   TEMPLATES,
@@ -214,6 +214,8 @@ export interface ProposalView {
   ownTerms?: TermsFile | null;
   /** The blocks to show, in order. Left out on a proposal published before they could be arranged (`USUAL_BLOCKS`). */
   blocks?: ViewBlock[];
+  /** Which blocks it was published knowing (`BLOCK_SET`): left out on one from before the cover's parts were blocks. */
+  blockSet?: number;
   /**
    * The systems the customer chooses between, when the roof has two or more goal designs (Quickest payback, Maximum
    * return, Maximum independence), in that order; the recommended one is what the rest of the view shows. Left out
@@ -719,6 +721,7 @@ export function buildProposal(given: ProposalInputs): Built {
         : null,
     ...(variations.length ? { variations } : {}),
     blocks: blocksForView(brand.design, brand.blocks, input.images),
+    blockSet: BLOCK_SET,
     ...(worked.length
       ? {
           options: worked.map(({ goal, at, out, name, promise }) => {

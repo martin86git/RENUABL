@@ -41,18 +41,21 @@ import {
 import {
   BLOCKS,
   blockHeading,
+  BLOCK_SET,
   blocksForView,
   isCustom,
   isFixed,
   isLocked,
   mayGoDark,
   moveBlock,
+  viewBlocks,
   nextOwnBlock,
   placeBlock,
   type BlockId,
   type BlockSetting,
   type ViewBlock,
   STEP_LIMITS,
+  TITLE_FIELDS,
   type StepWords,
 } from "@/lib/domain/design/blocks";
 import { FONTS, type BrandImage, type BrandKit, type ImageKind } from "@/lib/domain/design/brand";
@@ -131,6 +134,7 @@ export function useProposalBuilder(
       business: { ...current.business, logo: pic("logo"), cover: pic("cover") },
       theme: { ...current.theme, primary: next.primary, accent: next.accent, font: next.font },
       blocks: blocksForView(next.design, next.blocks, pics),
+      blockSet: BLOCK_SET,
     });
   };
 
@@ -303,7 +307,12 @@ export function useProposalBuilder(
                 setDragging(null);
                 setDropAt(null);
               }}
-              onMove={(by) => kit && change({ blocks: moveBlock(kit.blocks, block.id, by) })}
+              onMove={(by) => {
+                if (!kit) return;
+                // Past whatever isn't on the page, so each press moves it on the page.
+                const onPage = new Set((view ? viewBlocks(view) : []).map((b) => b.id));
+                change({ blocks: moveBlock(kit.blocks, block.id, by, (id) => !view || onPage.has(id)) });
+              }}
               onSet={(patch) => setBlock(block.id, patch)}
               onPicture={(file) => void upload("block", file, block.id)}
               onRemovePicture={() => {
@@ -423,11 +432,13 @@ function BlockTools(props: {
   const { setting } = props;
   const pick = useRef<HTMLInputElement>(null);
   const fixed = isFixed(setting.id);
+  // The cover is always first: its title, words and picture change, but it never moves.
+  const pinned = setting.id === "cover";
   const tool = "flex size-7 items-center justify-center rounded-md text-white/85 hover:bg-white/15 hover:text-white disabled:opacity-30";
   const lit = "bg-white/20 text-white";
   return (
     <div className={clsx("absolute -top-[17px] left-3 z-30 flex h-8 items-center gap-0.5 rounded-lg bg-ink px-1 shadow-lg")}>
-      {!fixed && (
+      {!fixed && !pinned && (
         <span
           draggable
           onDragStart={props.onDragStart}
@@ -450,34 +461,38 @@ function BlockTools(props: {
             props.editing || props.busy ? "flex" : "hidden group-hover/block:flex group-focus-within/block:flex",
           )}
         >
-          <span className="mx-1 h-5 w-px bg-white/20" aria-hidden />
-          <button
-            type="button"
-            className={tool}
-            disabled={props.first}
-            onClick={() => props.onMove(-1)}
-            title="Move up"
-            aria-label="Move up"
-          >
-            <ArrowUp className="size-4" aria-hidden />
-          </button>
-          <button
-            type="button"
-            className={tool}
-            disabled={props.last}
-            onClick={() => props.onMove(1)}
-            title="Move down"
-            aria-label="Move down"
-          >
-            <ArrowDown className="size-4" aria-hidden />
-          </button>
+          {!pinned && (
+            <>
+              <span className="mx-1 h-5 w-px bg-white/20" aria-hidden />
+              <button
+                type="button"
+                className={tool}
+                disabled={props.first}
+                onClick={() => props.onMove(-1)}
+                title="Move up"
+                aria-label="Move up"
+              >
+                <ArrowUp className="size-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                className={tool}
+                disabled={props.last}
+                onClick={() => props.onMove(1)}
+                title="Move down"
+                aria-label="Move down"
+              >
+                <ArrowDown className="size-4" aria-hidden />
+              </button>
+            </>
+          )}
           <span className="mx-1 h-5 w-px bg-white/20" aria-hidden />
           <button
             type="button"
             className={clsx(tool, props.editing && lit)}
             onClick={props.onEdit}
-            title="Heading and words"
-            aria-label="Heading and words"
+            title={pinned ? "Title and words" : "Heading and words"}
+            aria-label={pinned ? "Title and words" : "Heading and words"}
           >
             <Pencil className="size-4" aria-hidden />
           </button>
@@ -584,6 +599,7 @@ function BlockWords({
     INDICATIVE_STEPS.map((_, i) => ({ name: setting.steps?.[i]?.name ?? "", words: setting.steps?.[i]?.words ?? "" })),
   );
   const how = setting.id === "how";
+  const cover = setting.id === "cover";
   const wait = useRef<number | null>(null);
   const later = (patch: Partial<BlockSetting>) => {
     if (wait.current) window.clearTimeout(wait.current);
@@ -593,12 +609,12 @@ function BlockWords({
   return (
     <div className="theme-studio relative z-20 mt-4 rounded-xl border border-line bg-surface p-4 shadow-[var(--shadow-lift)]">
       <label className={ui.label}>
-        Heading
+        {cover ? "Title" : "Heading"}
         <input
           className={clsx(ui.input, "mt-1.5")}
           value={heading}
           maxLength={80}
-          placeholder={usual || "A heading of your own"}
+          placeholder={cover ? "{firstName}'s home, powered by the sun" : usual || "A heading of your own"}
           onChange={(e) => {
             setHeading(e.target.value);
             later({ heading: e.target.value, words, ...(how ? { steps } : {}) });
@@ -652,9 +668,11 @@ function BlockWords({
           </fieldset>
         ))}
       <p className="mt-2 text-xs text-muted">
-        {how
-          ? "Anything left blank keeps our wording, shown faint in the box."
-          : "The figures in a block come from the design, so they can't be written over here."}
+        {cover
+          ? `The title is used on every proposal: write ${TITLE_FIELDS} to fill in each customer's. Blank keeps ours.`
+          : how
+            ? "Anything left blank keeps our wording, shown faint in the box."
+            : "The figures in a block come from the design, so they can't be written over here."}
       </p>
       <button
         type="button"

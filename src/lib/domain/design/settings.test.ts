@@ -253,16 +253,16 @@ describe("the proposal's blocks", () => {
     expect(own.words).toHaveLength(1500);
     // Anything at all still comes back as the full, usual list.
     for (const junk of [null, "blocks", 5, {}, []]) expect(cleanBlocks(junk)).toEqual(defaultBlocks());
-    expect(BLOCKS.filter((b) => isLocked(b.id)).map((b) => b.id)).toEqual(["cover", "price", "accept", "conditions", "terms"]);
+    expect(BLOCKS.filter((b) => isLocked(b.id)).map((b) => b.id)).toEqual(["cover", "options", "price", "accept", "conditions", "terms"]);
   });
   it("move up and down, never above the cover or off the end", () => {
     const blocks = defaultBlocks();
     expect(
       moveBlock(blocks, "roof", -1)
         .map((b) => b.id)
-        .slice(0, 5),
-    ).toEqual(["cover", "how", "figures", "roof", "system"]);
-    expect(moveBlock(blocks, "how", -1)).toEqual(blocks);
+        .slice(0, 7),
+    ).toEqual(["cover", "options", "hero", "how", "figures", "roof", "system"]);
+    expect(moveBlock(blocks, "options", -1)).toEqual(blocks);
     expect(moveBlock(blocks, "cover", 1)).toEqual(blocks);
     // The standard terms close the proposal: they don't move, and nothing moves below them.
     expect(blocks[blocks.length - 1].id).toBe("terms");
@@ -271,8 +271,8 @@ describe("the proposal's blocks", () => {
     expect(
       moveBlock(blocks, "system", 1)
         .map((b) => b.id)
-        .slice(0, 5),
-    ).toEqual(["cover", "how", "figures", "roof", "system"]);
+        .slice(0, 7),
+    ).toEqual(["cover", "options", "hero", "how", "figures", "roof", "system"]);
   });
   it("read back from an old or damaged kit as the usual blocks", () => {
     expect(readBrandKit({ name: "Example Solar" }, "Example Solar").blocks).toEqual(defaultBlocks());
@@ -345,15 +345,15 @@ describe("a proposal with the business's terms and blocks", () => {
     const { view } = built({ blocks, design: "custom" }, [...SAMPLE_IMAGES, picture]);
     const ids = view.blocks!.map((b) => b.id);
     // How we work and At a glance, which the kit doesn't mention, go under the cover (How we work only when indicative).
-    expect(ids.slice(0, 5)).toEqual(["cover", "how", "figures", "price", "custom-1"]);
+    expect(ids.slice(0, 7)).toEqual(["cover", "options", "hero", "how", "figures", "price", "custom-1"]);
     expect(ids).not.toContain("roof");
     expect(ids).not.toContain("bill");
     expect(ids).not.toContain("custom-2");
     // The ones a customer must see are there whatever was switched off.
     for (const id of ["cover", "price", "accept", "conditions"]) expect(ids).toContain(id);
-    expect(view.blocks![3]).toEqual({ id: "price", heading: "The investment", words: "", image: null });
-    expect(view.blocks![4]).toEqual({ id: "custom-1", heading: "Our team", words: "Ten years on roofs.", image: picture });
-    expect(view.blocks![5].image).toBeNull();
+    expect(view.blocks![5]).toEqual({ id: "price", heading: "The investment", words: "", image: null });
+    expect(view.blocks![6]).toEqual({ id: "custom-1", heading: "Our team", words: "Ten years on roofs.", image: picture });
+    expect(view.blocks![7].image).toBeNull();
   });
   it("still carries no cost, margin or product code, with every term and block set", () => {
     const { view, internal } = built({

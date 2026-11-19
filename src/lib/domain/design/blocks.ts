@@ -17,8 +17,22 @@ export const BLOCKS = [
     id: "cover",
     name: "Cover",
     heading: "",
-    about: "Who the proposal is from and for, the roof or the battery, and your note.",
+    about: "Who the proposal is for, its title (yours in place of ours, if you like) and your note. Always first.",
     locked: true,
+  },
+  {
+    id: "options",
+    name: "Choice of systems",
+    heading: "",
+    about: "The systems on offer side by side, when there is more than one. Always shown: it is where the customer chooses.",
+    locked: true,
+  },
+  {
+    id: "hero",
+    name: "Your battery",
+    heading: "",
+    about:
+      "With a battery: the roof with the battery over it, or the home's day with the battery. Hidden, the roof shows in its own block.",
   },
   {
     id: "how",
@@ -191,7 +205,18 @@ export interface StepWords {
 export const STEP_LIMITS = { count: 3, name: 40, words: 240 } as const;
 
 /** The blocks that open a proposal under its cover: put back there, not at the end, for a kit or a proposal from before them. */
-const UNDER_COVER: readonly BlockId[] = ["how", "figures"];
+const UNDER_COVER: readonly BlockId[] = ["options", "hero", "how", "figures"];
+
+/**
+ * Which blocks a proposal was published knowing (`ProposalView.blockSet`): 2 brought How we work and At a glance out of
+ * the cover, 3 the choice of systems and the battery (19 Nov 2026). A proposal from before a set has those parts in its
+ * cover, so they are put back there; one from after it left out only what the business hid.
+ */
+export const BLOCK_SET = 3;
+const ADDED_IN: readonly { set: number; ids: readonly BlockId[] }[] = [
+  { set: 2, ids: ["how", "figures"] },
+  { set: 3, ids: ["options", "hero"] },
+];
 
 /** The blocks as every business starts: all the usual ones on, in the usual order, its own three off. */
 export function defaultBlocks(): BlockSetting[] {
@@ -256,9 +281,15 @@ export function cleanBlocks(raw: unknown): BlockSetting[] {
   // glance (they were part of the cover before), else after the rest.
   const missing = defaultBlocks().filter((b) => !seen.has(b.id));
   const under = missing.filter((b) => UNDER_COVER.includes(b.id));
-  if (under.length) {
-    const cover = out.findIndex((b) => b.id === "cover");
-    out.splice(cover < 0 ? 0 : cover + 1, 0, ...under);
+  // Each after the cover and after those of the cover's parts it usually follows.
+  for (const block of under) {
+    const rank = UNDER_COVER.indexOf(block.id);
+    let at = Math.max(0, out.findIndex((b) => b.id === "cover") + 1);
+    out.forEach((b, i) => {
+      const r = UNDER_COVER.indexOf(b.id);
+      if (r >= 0 && r < rank) at = Math.max(at, i + 1);
+    });
+    out.splice(at, 0, block);
   }
   for (const block of missing) if (!UNDER_COVER.includes(block.id)) out.push(block);
   // The cover opens the proposal and the standard terms close it, whatever order was sent.
@@ -301,11 +332,17 @@ export function nextOwnBlock(blocks: readonly BlockSetting[]): BlockId | null {
 }
 
 /** The list with one block moved a place up or down. The cover stays first and the standard terms last: nothing moves past either. */
-export function moveBlock(blocks: readonly BlockSetting[], id: BlockId, by: -1 | 1): BlockSetting[] {
+export function moveBlock(
+  blocks: readonly BlockSetting[],
+  id: BlockId,
+  by: -1 | 1,
+  /** Whether a block is on the page now (a block switched on can still be left out, as How we work on a final proposal). */
+  shown: (id: BlockId) => boolean = () => true,
+): BlockSetting[] {
   const from = blocks.findIndex((b) => b.id === id);
   // Past the hidden blocks to the next one shown, so every press moves it on the page (19 Nov 2026).
   let to = from + by;
-  while (to > 0 && to < blocks.length - 1 && !blocks[to].on && !isFixed(blocks[to].id)) to += by;
+  while (to > 0 && to < blocks.length - 1 && (!blocks[to].on || !shown(blocks[to].id)) && !isFixed(blocks[to].id)) to += by;
   if (from < 1 || to < 1 || to >= blocks.length || isFixed(blocks[from].id) || isFixed(blocks[to].id)) return [...blocks];
   const next = [...blocks];
   [next[from], next[to]] = [next[to], next[from]];
@@ -387,16 +424,41 @@ export const NOT_ON_INDICATIVE: readonly BlockId[] = ["payment", "conditions", "
  * The blocks a proposal shows, in order: its own, or the usual ones for one published before they could be arranged.
  * An indicative proposal leaves out `NOT_ON_INDICATIVE`.
  */
-export function viewBlocks(view: { blocks?: ViewBlock[]; indicative?: boolean }): ViewBlock[] {
+export function viewBlocks(view: { blocks?: ViewBlock[]; indicative?: boolean; blockSet?: number }): ViewBlock[] {
   let blocks = view.blocks?.length ? view.blocks : USUAL_BLOCKS;
-  // A proposal published before How we work and At a glance were blocks of their own had them in its cover: they stay there.
-  if (!blocks.some((b) => UNDER_COVER.includes(b.id))) {
+  // A proposal published before a part of the cover became a block of its own had it in its cover: it stays there.
+  // (One published on 19 Nov 2026 before `blockSet` was kept has How we work or At a glance in its list.)
+  const set = view.blockSet ?? (blocks.some((b) => b.id === "how" || b.id === "figures") ? 2 : 1);
+  const back = ADDED_IN.filter((added) => added.set > set).flatMap((added) => added.ids);
+  if (back.length) {
     const cover = blocks.findIndex((b) => b.id === "cover");
-    const under = UNDER_COVER.map((id) => ({ id, heading: "", words: "", image: null }));
+    const under = UNDER_COVER.filter((id) => back.includes(id) && !blocks.some((b) => b.id === id)).map((id) => ({
+      id,
+      heading: "",
+      words: "",
+      image: null,
+    }));
+    // Straight under the cover: each set's parts came before the ones taken out earlier.
     blocks = [...blocks.slice(0, cover + 1), ...under, ...blocks.slice(cover + 1)];
   }
   // How we work is only for an indicative proposal; a final one leaves out what goes with the indicative.
   return view.indicative ? blocks.filter((b) => !NOT_ON_INDICATIVE.includes(b.id)) : blocks.filter((b) => b.id !== "how");
+}
+
+/**
+ * The cover's title: the business's own (set once, so it is used on every proposal) with {firstName}, {name} and
+ * {system} filled in for this customer, else ours ("Solar and battery for Doug Mitchell").
+ */
+export const TITLE_FIELDS = "{firstName}, {name} and {system}";
+export function coverTitle(own: string | undefined, view: { title: string; customer: { name: string } }): string {
+  const ours = `${view.title} for ${view.customer.name}`;
+  if (!own?.trim()) return ours;
+  const first = view.customer.name.trim().split(/\s+/)[0] ?? "";
+  return own
+    .replace(/\{\s*firstName\s*\}/gi, first)
+    .replace(/\{\s*name\s*\}/gi, view.customer.name)
+    .replace(/\{\s*system\s*\}/gi, view.title)
+    .trim();
 }
 
 /** A block's heading as it is shown: the business's own, else the usual one (`fallback` for a block whose usual heading depends on the proposal). */

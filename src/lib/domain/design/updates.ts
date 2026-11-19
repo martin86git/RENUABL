@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
     area: "Proposals",
+    words: "The cover in the builder: your own title, and the choice of systems and the battery are blocks to move or hide.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Proposals",
     words: "How we work and the three figures are blocks in the builder: reword the steps, hide them or move them.",
   },
   {
