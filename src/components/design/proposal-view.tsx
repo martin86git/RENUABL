@@ -92,8 +92,33 @@ export interface ProposalActions {
   feedback?: (text: string) => Promise<string | null>;
 }
 
+/** A view box round the panels given, with room about them, in the picture's own shape and never past its edges. */
+function framed(panels: number[][], scale: number, width: number, height: number): string {
+  const xs = panels.flatMap((p) => [0, 2, 4, 6].map((k) => width / 2 + p[k] / scale));
+  const ys = panels.flatMap((p) => [1, 3, 5, 7].map((k) => height / 2 + p[k] / scale));
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  let w = Math.max((Math.max(...xs) - Math.min(...xs)) * 2.2, ((Math.max(...ys) - Math.min(...ys)) * 2.2 * width) / height, width / 3);
+  w = Math.min(w, width);
+  const h = (w * height) / width;
+  const x = Math.min(Math.max(cx - w / 2, 0), width - w);
+  const y = Math.min(Math.max(cy - h / 2, 0), height - h);
+  return `${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`;
+}
+
 /** The roof from above with the panels where they were placed: the same picture and scale the design was drawn on. */
-function Roof({ view, src, hero }: { view: ProposalView; src: string | null; hero?: BatteryHero | null }) {
+export function Roof({
+  view,
+  src,
+  hero,
+  frame,
+}: {
+  view: ProposalView;
+  src: string | null;
+  hero?: BatteryHero | null;
+  /** Panels to frame the picture on (the configurator: the largest size, so the picture holds still as sizes change). */
+  frame?: number[][];
+}) {
   // The picture is shown only once it is known to have come: a picture that can't be had (no map service here, or
   // the place has none) must leave the plain ground, not a broken image.
   const [arrived, setArrived] = useState(false);
@@ -124,7 +149,7 @@ function Roof({ view, src, hero }: { view: ProposalView; src: string | null; her
     >
       {hero && <style>{HERO_CSS}</style>}
       <svg
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={frame?.length ? framed(frame, scale, width, height) : `0 0 ${width} ${height}`}
         className="block h-auto w-full"
         role="img"
         aria-label={hero ? hero.label : `${view.system.panels} panels on the roof, seen from above`}

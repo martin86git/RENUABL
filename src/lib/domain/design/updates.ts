@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
     area: "Proposals",
+    words: "The configurator: a second way to read a proposal, choosing the size, panel and battery, with one price and one step.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Proposals",
     words: "The cover in the builder: your own title, and the choice of systems and the battery are blocks to move or hide.",
   },
   {

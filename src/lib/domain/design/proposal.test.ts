@@ -454,6 +454,7 @@ describe("the customer's link", () => {
         "blockSet",
         "blocks",
         "business",
+        "configurator",
         "contract",
         "customer",
         "note",

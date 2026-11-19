@@ -13,6 +13,7 @@
  * the costs and margin are.
  */
 import { randomBytes } from "node:crypto";
+import { chosenWords, isConfigKey, type ConfigKey } from "@/lib/domain/design/configurator";
 import { IMAGE_LIMITS, readBrandKit, type BrandImage, type BrandKit, type ImageKind, type TermsFile } from "@/lib/domain/design/brand";
 import { stageMoveText, type Customer, type Job, type JobStage } from "@/lib/domain/design/crm";
 import {
@@ -662,7 +663,10 @@ export async function acceptProposal(
     if (state !== "live") return state;
     // An indicative proposal is for the customer's thoughts: the final one, after the site visit, is the one accepted.
     if (found.view.indicative) return "indicative";
-    const chosen = found.view.options?.some((o) => o.goal === option) ? (option as OptionKey) : recommendedGoal(found.view);
+    // A mix from the configurator (19 Nov 2026) is taken as it was priced; anything else not on offer is the recommended system.
+    const fromConfigurator = isConfigKey(option) && found.view.configurator?.variants.some((v) => v.goal === option);
+    const chosen =
+      fromConfigurator || found.view.options?.some((o) => o.goal === option) ? (option as OptionKey) : recommendedGoal(found.view);
     // From here on it is the proposal as agreed: the chosen system's price, and so its deposit.
     const row = { ...found, view: viewForChoice(found.view, chosen) };
     await q(
@@ -677,6 +681,8 @@ export async function acceptProposal(
     if (depositAsked(row.view) !== null) await giveReference(q, row.businessId, row.versionId);
     const line = { customerId: row.customerId, jobId: row.jobId, by: FROM_CUSTOMER };
     await record(q, row.businessId, { ...line, kind: "proposal", text: acceptedText(name) });
+    const words = fromConfigurator && found.view.configurator ? chosenWords(found.view.configurator, option as ConfigKey) : null;
+    if (words) await record(q, row.businessId, { ...line, kind: "proposal", text: words });
     if (jobs[0] && BEFORE_WON.includes(jobs[0].stage)) {
       await q(`update design_jobs set stage = 'won', updated_at = now() where business_id = $1 and id = $2`, [row.businessId, row.jobId]);
       await record(q, row.businessId, { ...line, kind: "stage", text: stageMoveText("won") });

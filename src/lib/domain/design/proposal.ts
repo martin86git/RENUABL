@@ -22,6 +22,22 @@ import type { ISODate } from "../types";
 import type { RebateRates } from "../rebates";
 import { BLOCK_SET, blocksForView, type ViewBlock } from "./blocks";
 import {
+  batteryToAdd,
+  configKey,
+  panelChoices,
+  sizeCounts,
+  trimDesign,
+  variantOf,
+  withBattery,
+  withPanel,
+  type ConfigKey,
+  type ConfigPanel,
+  type ConfigSize,
+  type ConfigVariant,
+  type ConfiguratorView,
+} from "./configurator";
+import { makerName, makerOf } from "./battery-suggest";
+import {
   INSTALL_TIMES,
   TEMPLATES,
   termsInUse,
@@ -223,6 +239,12 @@ export interface ProposalView {
    */
   options?: ProposalOption[];
   /**
+   * The configurator's choices and every mix of them, priced in full (`configurator.ts`): read on its own page,
+   * `/p/<token>/configure`, beside this one. Left out on a proposal published before it, or when nothing could be
+   * varied.
+   */
+  configurator?: ConfiguratorView;
+  /**
    * The costs decided on each job that were left out, in the customer's words (`variationsOf`), shown with
    * `VARIATIONS_NOTE`: they may apply, found at the site inspection. Absent on proposals published before 1 Nov 2026.
    */
@@ -233,7 +255,7 @@ export interface ProposalView {
  * Which option a customer picks: a "Design it for me" goal, or one of the roof's designs by its place (`design-2`) when
  * the business offered designs by hand. Kept as `accepted_option`.
  */
-export type OptionKey = DesignGoal | `design-${number}`;
+export type OptionKey = DesignGoal | `design-${number}` | ConfigKey;
 
 /** One system a customer can choose, with everything that differs between them. Estimates throughout, as the rest. */
 export interface ProposalOption {
@@ -267,6 +289,8 @@ export interface ProposalInternal {
   design: number;
   /** Each option's own side, when the customer chooses between options (`internalForChoice`). */
   options?: { goal: OptionKey; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
+  /** The configurator's mixes, the business's side of each, as `options`. */
+  configurator?: { goal: OptionKey; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
 }
 
 /** What each goal is called on a proposal, and what it promises, in the customer's words. Never a figure. */
@@ -284,7 +308,7 @@ export const GOAL_WORDS: Record<DesignGoal, { name: string; promise: string }> =
  * deposit in place of the recommended one's. Unchanged without options, or for a goal it doesn't offer.
  */
 export function viewForChoice(view: ProposalView, goal: OptionKey | null | undefined): ProposalView {
-  const o = view.options?.find((x) => x.goal === goal);
+  const o = view.options?.find((x) => x.goal === goal) ?? variantOf(view.configurator, goal);
   if (!o) return view;
   return {
     ...view,
@@ -301,7 +325,7 @@ export function viewForChoice(view: ProposalView, goal: OptionKey | null | undef
 
 /** The business's side of the option chosen: its lines for the order and the installation allowance. */
 export function internalForChoice(internal: ProposalInternal, goal: OptionKey | null | undefined): ProposalInternal {
-  const o = internal.options?.find((x) => x.goal === goal);
+  const o = internal.options?.find((x) => x.goal === goal) ?? internal.configurator?.find((x) => x.goal === goal);
   return o ? { ...internal, cost: o.cost, margin: o.margin, priceExGst: o.priceExGst, lines: o.lines, design: o.design } : internal;
 }
 
@@ -628,6 +652,7 @@ export function buildProposal(given: ProposalInputs): Built {
 
   const image = (kind: BrandImage["kind"]) => input.images.find((i) => i.kind === kind) ?? null;
   const groups = new Set(lines.map((l) => l.group));
+  const configurator = configuratorFor(input, offered, recommended, main.finance?.dailyKwh ?? null);
 
   const view: ProposalView = {
     version: input.version,
@@ -726,51 +751,11 @@ export function buildProposal(given: ProposalInputs): Built {
       ? {
           options: worked.map(({ goal, at, out, name, promise }) => {
             if (!out.ok) throw new Error("unreachable");
-            const d = project.set.designs[at];
-            const quoteForm = project.extras.quotes[at].form;
-            return {
-              goal,
-              name,
-              promise,
-              recommended: at === recommended,
-              backup: Boolean(d.battery?.backup),
-              system: {
-                panels: out.spec.panels,
-                kw: designSummary(d, YIELD_PER_KW_DAY).kw,
-                batteryKwh: batteryKwhOf(d),
-                eveningKwh: shiftingKwhOf(d),
-                details: systemDetails(d, quoteForm, input.job.details)
-                  .filter((x) => SHOWN_DETAILS.includes(x.key) && x.value)
-                  .map((x) => ({ label: x.label, value: x.value as string })),
-              },
-              roofPanels: roofPanels(d),
-              roofAspects: roofAspects(d),
-              price: {
-                incGst: out.totals.priceIncGst,
-                stc: out.stc,
-                youPay: out.youPay,
-                solarVic: out.solarVic ? { ...out.solarVic, note: solarVicNote(out.solarVic) } : null,
-                ...(brand.gst === "excluded" ? splitGst(out.totals.priceIncGst) : {}),
-              },
-              production: out.monthlyKwh ? { monthlyKwh: out.monthlyKwh, yearKwh: out.monthlyKwh.reduce((n, m) => n + m, 0) } : null,
-              bill: out.finance
-                ? {
-                    now: out.finance.billNow,
-                    after: out.finance.billAfter,
-                    saving: out.saving,
-                    dailyKwh: out.finance.dailyKwh,
-                    selfReliance: Math.round(out.finance.selfReliance * 100) / 100,
-                    assumed: { interval: b.interval, ...entered, selfUseShare },
-                  }
-                : null,
-              paybackYears: out.saving > 0 ? Math.round((out.youPay / out.saving) * 10) / 10 : null,
-              deposit: depositOf(brand.deposit, out.youPay),
-              milestones: milestoneAmounts(brand.milestones, out.youPay),
-              variations: out.variations,
-            };
+            return optionFrom(input, project.set.designs[at], at, out, { goal, name, promise, recommended: at === recommended });
           }),
         }
       : {}),
+    ...(configurator ? { configurator: configurator.view } : {}),
   };
   const internal: ProposalInternal = {
     cost: totals.cost,
@@ -794,8 +779,182 @@ export function buildProposal(given: ProposalInputs): Built {
           }),
         }
       : {}),
+    ...(configurator ? { configurator: configurator.internal } : {}),
   };
   return { ok: true, view, internal };
+}
+
+/** A design worked out (`workOut`), as the customer sees it among the systems to choose from. */
+type WorkedOut = Extract<ReturnType<typeof workOut>, { ok: true }>;
+function optionFrom(
+  input: ProposalInputs,
+  d: RoofDesign,
+  at: number,
+  out: WorkedOut,
+  meta: { goal: OptionKey; name: string; promise: string; recommended: boolean },
+): ProposalOption {
+  const { brand } = input;
+  const quoteForm = input.project.extras.quotes[at].form;
+  return {
+    goal: meta.goal,
+    name: meta.name,
+    promise: meta.promise,
+    recommended: meta.recommended,
+    backup: Boolean(d.battery?.backup),
+    system: {
+      panels: out.spec.panels,
+      kw: designSummary(d, YIELD_PER_KW_DAY).kw,
+      batteryKwh: batteryKwhOf(d),
+      eveningKwh: shiftingKwhOf(d),
+      details: systemDetails(d, quoteForm, input.job.details)
+        .filter((x) => SHOWN_DETAILS.includes(x.key) && x.value)
+        .map((x) => ({ label: x.label, value: x.value as string })),
+    },
+    roofPanels: roofPanels(d),
+    roofAspects: roofAspects(d),
+    price: {
+      incGst: out.totals.priceIncGst,
+      stc: out.stc,
+      youPay: out.youPay,
+      solarVic: out.solarVic ? { ...out.solarVic, note: solarVicNote(out.solarVic) } : null,
+      ...(brand.gst === "excluded" ? splitGst(out.totals.priceIncGst) : {}),
+    },
+    production: out.monthlyKwh ? { monthlyKwh: out.monthlyKwh, yearKwh: out.monthlyKwh.reduce((n, m) => n + m, 0) } : null,
+    bill: out.finance
+      ? {
+          now: out.finance.billNow,
+          after: out.finance.billAfter,
+          saving: out.saving,
+          dailyKwh: out.finance.dailyKwh,
+          selfReliance: Math.round(out.finance.selfReliance * 100) / 100,
+          assumed: { interval: out.b.interval, ...out.entered, selfUseShare: out.selfUseShare },
+        }
+      : null,
+    paybackYears: out.saving > 0 ? Math.round((out.youPay / out.saving) * 10) / 10 : null,
+    deposit: depositOf(brand.deposit, out.youPay),
+    milestones: milestoneAmounts(brand.milestones, out.youPay),
+    variations: out.variations,
+  };
+}
+
+/**
+ * The configurator (`configurator.ts`): the sizes (the designs offered, else the primary worked back from as drawn),
+ * the panels (the one designed with and up to two other makers), a battery added or taken off, and every mix priced
+ * in full by `workOut`, as a design of the roof's own would be. A mix that can't be priced (a panel with no cost on
+ * file) is left out, never guessed. Null when there is nothing to vary.
+ */
+function configuratorFor(
+  input: ProposalInputs,
+  offered: readonly { goal: OptionKey; at: number; name: string; promise: string }[],
+  recommended: number,
+  dailyKwh: number | null,
+): { view: ConfiguratorView; internal: NonNullable<ProposalInternal["configurator"]> } | null {
+  const { project, workspace } = input;
+  const designs = project.set.designs;
+  const quotes = project.extras.quotes;
+  const primary = project.set.primary;
+  const catalogue = workspaceCatalogue(workspace);
+  const firstListed = (catalogue.panels ?? panelCatalogue())[0];
+
+  // The sizes: the designs on offer, else the primary as drawn and worked back from it.
+  const drawn = designPanels(designs[primary]).length;
+  if (drawn === 0) return null;
+  const sources =
+    offered.length >= 2
+      ? offered.map((g) => ({ at: g.at, design: designs[g.at], name: g.name, note: g.promise, worked: false, pick: g.at === recommended }))
+      : sizeCounts(drawn).map((n, i) => ({
+          at: primary,
+          design: trimDesign(designs[primary], n),
+          name: "",
+          note: i === 0 ? "As designed" : `The ${drawn - n} least sunny panels left off`,
+          worked: i > 0,
+          pick: i === 0,
+        }));
+  const ordered = sources.map((src) => ({ ...src, kw: designSummary(src.design, YIELD_PER_KW_DAY).kw })).sort((a, b) => b.kw - a.kw);
+
+  const designedPanel = designs[primary].panel ?? (firstListed ? { ...firstListed } : null);
+  if (!designedPanel) return null;
+  const panelList = panelChoices(designedPanel, catalogue.panels ?? []);
+
+  /** The input with one more design on the roof (the mix), priced with the quote of the design it came from. */
+  const withExtra = (design: RoofDesign, from: number): ProposalInputs => ({
+    ...input,
+    project: {
+      ...project,
+      set: { ...project.set, designs: [...designs, design] },
+      extras: { ...project.extras, quotes: [...quotes, quotes[from]] },
+    },
+  });
+
+  const sizes: ConfigSize[] = [];
+  const batteries: ConfiguratorView["batteries"] = [];
+  const variants: ConfigVariant[] = [];
+  const internal: NonNullable<ProposalInternal["configurator"]> = [];
+  const usedPanels = new Set<number>();
+  ordered.forEach((src, id) => {
+    const d = src.design;
+    const addable =
+      d.battery ??
+      batteryToAdd({
+        design: d,
+        batteries: catalogue.batteries ?? [],
+        monthlyKwh: monthlyProduction(d, YIELD_PER_KW_DAY),
+        dailyKwh,
+        selfUseShare: workspace.settings.bill.selfUseShare,
+      });
+    let priced = 0;
+    panelList.forEach((panel, j) => {
+      for (const battery of addable ? [true, false] : [false]) {
+        const mix = withBattery(j === 0 ? d : withPanel(d, panel), battery ? addable : null);
+        const at = designs.length;
+        const extra = withExtra(mix, src.at);
+        const out = workOut(extra, at);
+        if (!out.ok) continue;
+        const goal = configKey(id, j, battery);
+        const option = optionFrom(extra, mix, at, out, {
+          goal,
+          name: src.name,
+          promise: src.note,
+          recommended: src.pick,
+        });
+        // The size's roof is sent once, on the size (`variantOf` puts it back).
+        variants.push({ ...option, roofPanels: [], roofAspects: undefined, goal, size: id, panel: j, battery });
+        internal.push({
+          goal,
+          design: src.at,
+          cost: out.totals.cost,
+          margin: out.totals.margin,
+          priceExGst: out.totals.priceExGst,
+          lines: internalLines(out.lines),
+        });
+        usedPanels.add(j);
+        priced++;
+      }
+    });
+    if (!priced) return;
+    sizes.push({
+      id,
+      name: src.name || `${src.kw} kW`,
+      note: src.note,
+      panels: designPanels(d).length,
+      worked: src.worked,
+      designedBattery: Boolean(d.battery),
+      roofPanels: roofPanels(d),
+      roofAspects: roofAspects(d),
+    });
+    if (addable) batteries.push({ size: id, kwh: batteryKwhOf({ battery: addable }), name: addable.name, backup: Boolean(addable.backup) });
+  });
+  if (variants.length < 2 || !sizes.length) return null;
+  const startSize = ordered.findIndex((src) => src.pick);
+  const first = sizes.find((sz) => sz.id === startSize) ?? sizes[0];
+  const start =
+    variants.find((v) => v.size === first.id && v.panel === 0 && v.battery === first.designedBattery) ??
+    variants.find((v) => v.size === first.id) ??
+    variants[0];
+  const panels: ConfigPanel[] = panelList.flatMap((p, id) =>
+    usedPanels.has(id) ? [{ id, name: p.name, maker: makerName(makerOf(p.name)), watts: p.watts }] : [],
+  );
+  return { view: { sizes, panels, batteries, variants, start: start.goal }, internal };
 }
 
 /** A quote's lines as kept on the business's side: a product's code and how many where the line is one product (for the order). */

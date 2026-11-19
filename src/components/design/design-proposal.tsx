@@ -60,7 +60,7 @@ function standing(p: ProposalStatus): string {
 }
 
 /** Copies a proposal's private link, in full, and says so for a moment. */
-function CopyLink({ path, className }: { path: string; className?: string }) {
+function CopyLink({ path, className, label }: { path: string; className?: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -73,7 +73,7 @@ function CopyLink({ path, className }: { path: string; className?: string }) {
         });
       }}
     >
-      <Copy className="size-4" aria-hidden /> {copied ? "Copied" : "Copy the customer's link"}
+      <Copy className="size-4" aria-hidden /> {copied ? "Copied" : (label ?? "Copy the customer's link")}
     </button>
   );
 }
@@ -501,6 +501,12 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                   <a href={latest.path} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "w-full")}>
                     <ExternalLink className="size-4" aria-hidden /> Open it as the customer sees it
                   </a>
+                  {/* The configurator (19 Nov 2026, Martin): the same proposal as Tesla would sell it, at its own link
+                      beside the page, never in place of it. A proposal with nothing to vary opens its page instead. */}
+                  <a href={`${latest.path}/configure`} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "w-full")}>
+                    <ExternalLink className="size-4" aria-hidden /> Open the configurator (new)
+                  </a>
+                  <CopyLink path={`${latest.path}/configure`} label="Copy the configurator link" className={clsx(ui.quiet, "w-full")} />
                   <button
                     type="button"
                     onClick={() => void withdraw()}

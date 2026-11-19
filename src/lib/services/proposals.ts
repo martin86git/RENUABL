@@ -171,6 +171,10 @@ export const tellOpened = (token: string) => void ask<object>(link(token), { met
 export const acceptProposal = (token: string, name: string, agree: boolean, option: string | null = null) =>
   ask<OpenedProposal>(link(token), { method: "POST", body: { action: "accept", name, agree, option } });
 
+/** Holding the first free install week for the mix chosen in the configurator (an indicative proposal). Nothing is charged. */
+export const holdInstallWeek = (token: string, option: string) =>
+  ask<{ week: { monday: string; label: string } }>(`${link(token)}/configure`, { method: "POST", body: { action: "hold", option } });
+
 /** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
 /** "Call me": the business's assistant rings the number on the customer's record. `when` is "now", "today at 1pm", … */
 export const askForCall = (token: string) => ask<{ when: string; already?: boolean }>(`${link(token)}/call`, { method: "POST" });
