@@ -1,7 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Plus, Rows3, Wrench, Zap } from "lucide-react";
+import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/domain/design/pricing";
@@ -36,6 +37,44 @@ import { priceAdvice, typedCostFlags, type Advice } from "@/lib/domain/design/pr
 import { usePricePoints } from "@/lib/services/price-check";
 import { askSolInPanel } from "@/lib/services/sol";
 import { SolBadge } from "./sol-icon";
+
+const FOLDED_KEY = "renuabl.design.quote-folded";
+type GroupIcon = (props: { className?: string }) => React.ReactNode;
+/** Each section's mark on its strip: the deal banner's own drawings for the kit, plain marks for the rest. */
+const GROUP_ICONS: Record<(typeof COST_GROUPS)[number], GroupIcon> = {
+  Panels: PanelIcon,
+  Inverters: InverterIcon,
+  Battery: BatteryIcon,
+  "EV charger": ChargerIcon,
+  Racking: Rows3,
+  Electrical: Zap,
+  Switchboard: LayoutGrid,
+  Installation: Wrench,
+  Commission: BadgeCheck,
+};
+
+/**
+ * Beside the quote, a section's costs decided on each job in one quiet line (19 Nov 2026, Martin: they were in the
+ * list and in the panel beside it, twice): what is included and its sum, what is left out, what is still to decide.
+ */
+function DecidedLine({ lines, edits }: { lines: CostLine[]; edits: Record<string, LineEdit> }) {
+  const on = lines.filter((l) => edits[lineKey(l)]?.on);
+  const out = lines.filter((l) => edits[lineKey(l)]?.removed);
+  const open = lines.filter((l) => !edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  const sum = editedLines(on, edits).reduce((t, l) => t + l.amount, 0);
+  const names = (ls: CostLine[]) => ls.map((l) => l.label.toLowerCase()).join(", ");
+  return (
+    <p className="space-x-2 px-3 py-1 text-[11px] leading-snug text-muted">
+      {on.length > 0 && (
+        <span>
+          <span className="font-semibold tabular-nums text-ink-2">+{money(sum)}</span> decided on this job: {names(on)}.
+        </span>
+      )}
+      {out.length > 0 && <span>Left out, may apply: {names(out)}.</span>}
+      {open.length > 0 && <span className="font-medium text-sun-ink">To decide beside the quote: {names(open)}.</span>}
+    </p>
+  );
+}
 
 const money = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
 const label = "text-[10px] font-medium uppercase tracking-[0.14em] text-muted";
@@ -109,6 +148,27 @@ export function DesignQuote(props: {
   const { spec, workspace, rates } = props;
   // The cart: upload a price list, or set a price for each part with none on file (18 Nov 2026, Martin).
   const [cartOpen, setCartOpen] = useState(false);
+  // Sections folded to their strip, kept on the device (19 Nov 2026, Martin).
+  const [folded, setFolded] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const kept = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (Array.isArray(kept)) setFolded(kept.filter((g): g is string => typeof g === "string"));
+    } catch {
+      // No storage: every section opens.
+    }
+  }, []);
+  const fold = (group: string) =>
+    setFolded((now) => {
+      const next = now.includes(group) ? now.filter((g) => g !== group) : [...now, group];
+      try {
+        localStorage.setItem(FOLDED_KEY, JSON.stringify(next));
+      } catch {
+        // Kept for the visit only.
+      }
+      return next;
+    });
   const empty = spec.panels === 0;
   const costing = costSystem(spec, form, workspace);
   const stc = stcValue(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
@@ -365,278 +425,306 @@ export function DesignQuote(props: {
       {form.solarVicRebate && solarVicOff && <p className="mt-1 text-[11px] text-sun-ink">{solarVicOff} Nothing is added to this quote.</p>}
     </div>
   );
+  // The lines, a card a section (19 Nov 2026, Martin: "fit more into view… the sections are also not that easily
+  // distinguishable"): one line an item with its code beside it, each section's icon, count and subtotal in a tinted
+  // strip that folds it away, the column headings once at the top, and the take-out cross only on hover. Beside the
+  // quote, the costs decided on each job are one quiet line under their section; their switches are in the panel.
+  const priced = editedLines(all, edits);
+  const cols = "grid grid-cols-[minmax(0,1fr)_3.25rem_5.75rem_1.25rem] items-center gap-x-2";
   const tableBlock = (
     <>
-      {COST_GROUPS.map((group) => {
-        // A cost decided on each job stays in the list when left out, so it can be included again.
-        const rows = all.filter((l) => l.group === group && (l.confirm || !edits[lineKey(l)]?.removed));
-        if (!rows.length) return null;
-        return (
-          <table key={group} className="mt-4 w-full table-fixed text-sm first:mt-0">
-            <thead>
-              <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
-                <th className="pb-1 text-left">{group}</th>
-                <th className="w-10 pb-1 text-right">Qty</th>
-                <th className="w-[5.5rem] pb-1 text-right">Cost</th>
-                <th className="w-6 pb-1" aria-label="Take out" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((l, i) => {
-                const typed = edits[lineKey(l)]?.amount;
-                const typedQty = edits[lineKey(l)]?.qty;
-                const typedRate = edits[lineKey(l)]?.rate;
-                // The line as it stands with any hand changes: a quantity typed over it prices it again.
-                const shown = editedLines([l], edits)[0] ?? l;
-                const unset = l.missing && typed === undefined;
-                const on = Boolean(edits[lineKey(l)]?.on);
-                const out = Boolean(edits[lineKey(l)]?.removed);
-                return (
-                  <tr
-                    key={`${l.label}${i}`}
-                    className={
-                      l.confirm && !on && !out
-                        ? "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                        : l.confirm && out
-                          ? "group border-b border-line align-top text-muted last:border-0"
-                          : unset
-                            ? // A line with no cost asks to be dealt with: priced, or knowingly left at nothing.
-                              "group border-b border-line bg-sun align-top shadow-[inset_3px_0_0_var(--sun-line)] last:border-0"
-                            : "group border-b border-line align-top last:border-0"
-                    }
-                  >
-                    <td className={unset || (l.confirm && !on && !out) ? "py-1.5 pl-2.5 pr-2" : "py-1.5 pr-2"}>
-                      {l.watts ? (
-                        // Priced by the watt (18 Nov 2026, Martin): the cents a watt is a box to type over, always shown as one.
-                        <span className="inline-flex flex-wrap items-center gap-1">
-                          {l.label.replace(/ at [\d.]+c a watt$/, " at")}
-                          <span className="inline-flex items-center rounded-md bg-surface px-1 ring-1 ring-line focus-within:ring-forest">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={Math.round((typedRate ?? (typed !== undefined ? typed / l.watts : l.amount / l.watts)) * 1000) / 10}
-                              onChange={(e) =>
-                                edit(l, {
-                                  rate: Math.max(0, Math.min(MAX_RATE_PER_WATT, (Number(e.target.value) || 0) / 100)),
-                                  amount: undefined,
-                                })
-                              }
-                              aria-label="Cents a watt for the solar installation"
-                              className="w-12 bg-transparent py-0.5 text-right font-semibold tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <span className="pl-0.5 text-xs text-muted">c/W</span>
+      <div
+        className={clsx(cols, "sticky top-0 z-10 bg-surface px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted")}
+        aria-hidden
+      >
+        <span>Item</span>
+        <span className="text-right">Qty</span>
+        <span className="text-right">Cost ex GST</span>
+        <span />
+      </div>
+      <div className="space-y-2">
+        {COST_GROUPS.map((group) => {
+          // A cost decided on each job stays in the list when left out, so it can be included again (beside the quote,
+          // it is summed up in one line instead).
+          const rows = all.filter((l) => l.group === group && (l.confirm ? !split : !edits[lineKey(l)]?.removed));
+          const decided = split ? all.filter((l) => l.group === group && l.confirm) : [];
+          if (!rows.length && !decided.length) return null;
+          const subtotal = priced.filter((l) => l.group === group).reduce((t, l) => t + l.amount, 0);
+          const shut = folded.includes(group);
+          const Icon = GROUP_ICONS[group];
+          const flagged = rows.some((l) => l.missing && edits[lineKey(l)]?.amount === undefined);
+          return (
+            <section key={group} className="overflow-hidden rounded-lg border border-line" aria-label={group}>
+              <button
+                type="button"
+                onClick={() => fold(group)}
+                aria-expanded={!shut}
+                className="flex w-full items-center gap-2 bg-canvas px-3 py-1.5 text-left hover:bg-surface-2"
+              >
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line">
+                  <Icon className="size-3.5" aria-hidden />
+                </span>
+                <span className="text-[13px] font-semibold text-ink">{group}</span>
+                <span className="text-[11px] text-muted">
+                  {rows.length} {rows.length === 1 ? "line" : "lines"}
+                </span>
+                {flagged && <span className="rounded-full bg-warning-soft px-1.5 text-[10px] font-semibold text-warning">No cost</span>}
+                <span className="ml-auto text-[13px] font-semibold tabular-nums text-ink">{money(subtotal)}</span>
+                <ChevronDown className={clsx("size-4 shrink-0 text-muted transition-transform", shut && "-rotate-90")} aria-hidden />
+              </button>
+              {!shut && (
+                <div className="divide-y divide-line border-t border-line">
+                  {rows.map((l, i) => {
+                    const typed = edits[lineKey(l)]?.amount;
+                    const typedQty = edits[lineKey(l)]?.qty;
+                    const typedRate = edits[lineKey(l)]?.rate;
+                    // The line as it stands with any hand changes: a quantity typed over it prices it again.
+                    const shown = editedLines([l], edits)[0] ?? l;
+                    const unset = l.missing && typed === undefined;
+                    const on = Boolean(edits[lineKey(l)]?.on);
+                    const out = Boolean(edits[lineKey(l)]?.removed);
+                    const name = l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label;
+                    return (
+                      <div
+                        key={`${l.label}${i}`}
+                        className={clsx(
+                          "group px-3 py-1",
+                          (unset || (l.confirm && !on && !out)) && "bg-sun shadow-[inset_3px_0_0_var(--sun-line)]",
+                          l.confirm && out && "text-muted",
+                        )}
+                      >
+                        <div className={cols}>
+                          <div className="flex min-w-0 items-baseline gap-2 text-[13px]">
+                            {l.watts ? (
+                              // Priced by the watt (18 Nov 2026, Martin): the cents a watt is a box to type over.
+                              <span className="inline-flex min-w-0 items-center gap-1">
+                                <span className="truncate">{l.label.replace(/ at [\d.]+c a watt$/, " at")}</span>
+                                <span className="inline-flex shrink-0 items-center rounded-md bg-surface px-1 ring-1 ring-line focus-within:ring-forest">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.5"
+                                    value={
+                                      Math.round((typedRate ?? (typed !== undefined ? typed / l.watts : l.amount / l.watts)) * 1000) / 10
+                                    }
+                                    onChange={(e) =>
+                                      edit(l, {
+                                        rate: Math.max(0, Math.min(MAX_RATE_PER_WATT, (Number(e.target.value) || 0) / 100)),
+                                        amount: undefined,
+                                      })
+                                    }
+                                    aria-label="Cents a watt for the solar installation"
+                                    className="w-11 bg-transparent py-0 text-right font-semibold tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                                  />
+                                  <span className="pl-0.5 text-[11px] text-muted">c/W</span>
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="truncate" title={name}>
+                                {name}
+                              </span>
+                            )}
+                            {l.sku && <span className="shrink-0 truncate text-[11px] text-muted">{l.sku}</span>}
+                          </div>
+                          <div className="text-right text-[13px] tabular-nums text-ink-2">
+                            {l.qty !== undefined && (
+                              <input
+                                type="number"
+                                min="0"
+                                max={MAX_LINE_QTY}
+                                step="1"
+                                value={typedQty ?? l.qty}
+                                onChange={(e) =>
+                                  edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })
+                                }
+                                aria-label={`How many: ${l.label}`}
+                                style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
+                                className={`rounded-md border bg-transparent px-0.5 py-0 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                                  typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
+                                }`}
+                              />
+                            )}
+                          </div>
+                          <div className="text-right text-[13px]">
+                            <span className="inline-flex items-center justify-end gap-px">
+                              <span className="text-muted">$</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={Math.round(typed ?? shown.amount)}
+                                onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
+                                aria-label={`Cost of ${l.label}`}
+                                style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
+                                className={`rounded-md border bg-transparent px-0.5 py-0 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
+                                  typed !== undefined
+                                    ? "border-sun-line font-semibold"
+                                    : unset
+                                      ? "border-warning"
+                                      : "border-transparent hover:border-line"
+                                }`}
+                              />
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <button
+                              hidden={Boolean(l.confirm)}
+                              className="text-base leading-none text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100"
+                              onClick={() => edit(l, { removed: true })}
+                              aria-label={`Take out ${l.label}`}
+                              title="Take this line out"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+                        {l.confirm && (
+                          <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
+                            {on ? (
+                              <>
+                                <span className="font-medium text-positive">Included</span>
+                                <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { removed: true })}>
+                                  leave it out
+                                </button>
+                              </>
+                            ) : out ? (
+                              <>
+                                <span>Left out: the proposal says it may apply</span>
+                                <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
+                                  include it
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-sun-ink">Decided on each job:</span>
+                                <button
+                                  className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
+                                  onClick={() => edit(l, { on: true })}
+                                >
+                                  Include
+                                </button>
+                                <button
+                                  className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
+                                  onClick={() => edit(l, { removed: true })}
+                                >
+                                  Leave out
+                                </button>
+                              </>
+                            )}
                           </span>
-                        </span>
-                      ) : l.qty && /^\d+ × /.test(l.label) ? (
-                        l.label.replace(/^\d+ × /, "")
-                      ) : (
-                        l.label
-                      )}
-                      {l.confirm && split && (
-                        <span
-                          className={
-                            on ? "mt-0.5 block text-xs text-positive" : out ? "mt-0.5 block text-xs" : "mt-0.5 block text-xs text-sun-ink"
-                          }
-                        >
-                          {on ? "Included" : out ? "Left out: the proposal says it may apply" : "To decide, beside the quote"}
-                        </span>
-                      )}
-                      {l.confirm && !split && (
-                        <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs">
-                          {on ? (
-                            <>
-                              <span className="font-medium text-positive">Included</span>
-                              <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { removed: true })}>
-                                leave it out
-                              </button>
-                            </>
-                          ) : out ? (
-                            <>
-                              <span>Left out: the proposal says it may apply</span>
-                              <button className="underline underline-offset-2 hover:text-ink" onClick={() => edit(l, { on: true })}>
-                                include it
-                              </button>
-                            </>
+                        )}
+                        {unset && (
+                          <span className="block text-xs text-sun-ink">
+                            <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
+                            <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
+                              leave it at $0
+                            </button>
+                          </span>
+                        )}
+                        {(typed !== undefined || typedQty !== undefined || typedRate !== undefined) &&
+                          (l.missing && typed === 0 && typedQty === undefined ? (
+                            <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
+                              Left at $0 (no cost on file): undo
+                            </button>
                           ) : (
-                            <>
-                              <span className="text-sun-ink">Decided on each job:</span>
-                              <button
-                                className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-ink"
-                                onClick={() => edit(l, { on: true })}
-                              >
-                                Include
-                              </button>
-                              <button
-                                className="rounded-full px-2 py-0.5 font-semibold text-ink ring-1 ring-line hover:ring-ink-2"
-                                onClick={() => edit(l, { removed: true })}
-                              >
-                                Leave out
-                              </button>
-                            </>
-                          )}
-                        </span>
-                      )}
-                      {l.sku && <span className="block text-xs text-muted">{l.sku}</span>}
-                      {unset && (
-                        <span className="mt-0.5 block text-xs text-sun-ink">
-                          <strong className="font-semibold">No cost on file.</strong> Type one, or{" "}
-                          <button className="font-semibold underline underline-offset-2" onClick={() => edit(l, { amount: 0 })}>
-                            leave it at $0
-                          </button>
-                        </span>
-                      )}
-                      {(typed !== undefined || typedQty !== undefined || typedRate !== undefined) &&
-                        (l.missing && typed === 0 && typedQty === undefined ? (
-                          <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
-                            Left at $0 (no cost on file): undo
-                          </button>
-                        ) : (
-                          <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
-                            Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
-                            {typedRate !== undefined && l.watts ? `${centsWords(l.amount / l.watts)}c a watt, ` : ""}
-                            {l.missing ? "no cost" : money(l.amount)}
-                          </button>
-                        ))}
-                      {typedFlags[lineKey(l)] && (
-                        <span className="mt-0.5 flex items-start gap-1 text-xs text-warning">
-                          <SolBadge className="mt-px size-3.5 shrink-0" />
-                          {typedFlags[lineKey(l)]}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-1 text-right tabular-nums text-ink-2">
-                      {l.qty === undefined ? (
-                        ""
-                      ) : (
-                        <input
-                          type="number"
-                          min="0"
-                          max={MAX_LINE_QTY}
-                          step="1"
-                          value={typedQty ?? l.qty}
-                          onChange={(e) => edit(l, { qty: Math.max(0, Math.min(MAX_LINE_QTY, Math.round(Number(e.target.value) || 0))) })}
-                          aria-label={`How many: ${l.label}`}
-                          style={{ width: `${String(typedQty ?? l.qty).length + 1.6}ch` }}
-                          className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                            typedQty !== undefined ? "border-sun-line font-semibold text-ink" : "border-transparent hover:border-line"
-                          }`}
-                        />
-                      )}
-                    </td>
-                    <td className="py-1 pl-1 text-right">
+                            <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
+                              Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
+                              {typedRate !== undefined && l.watts ? `${centsWords(l.amount / l.watts)}c a watt, ` : ""}
+                              {l.missing ? "no cost" : money(l.amount)}
+                            </button>
+                          ))}
+                        {typedFlags[lineKey(l)] && (
+                          <span className="flex items-start gap-1 text-xs text-warning">
+                            <SolBadge className="mt-px size-3.5 shrink-0" />
+                            {typedFlags[lineKey(l)]}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {decided.length > 0 && <DecidedLine lines={decided} edits={edits} />}
+                </div>
+              )}
+            </section>
+          );
+        })}
+        {/* Lines of the business's own (15 Nov 2026, Martin): a name, how many and the cost each, ex GST. */}
+        {added.length > 0 && (
+          <section className="overflow-hidden rounded-lg border border-line" aria-label="Added by you">
+            <div className="flex items-center gap-2 bg-canvas px-3 py-1.5">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line">
+                <Plus className="size-3.5" aria-hidden />
+              </span>
+              <span className="text-[13px] font-semibold text-ink">Added by you</span>
+              <span className="text-[11px] text-muted">cost each</span>
+              <span className="ml-auto text-[13px] font-semibold tabular-nums text-ink">
+                {money(added.reduce((t, l) => t + l.amount, 0))}
+              </span>
+            </div>
+            <div className="divide-y divide-line border-t border-line">
+              {added.map((l) => {
+                const e = edits[l.key];
+                return (
+                  <div key={l.key} className={clsx(cols, "group px-3 py-1 text-[13px]")}>
+                    <div className="min-w-0">
+                      <input
+                        value={e.label ?? ""}
+                        maxLength={MAX_ADDED_LABEL}
+                        placeholder="What it is"
+                        onChange={(ev) => setKey(l.key, { ...e, label: ev.target.value })}
+                        onBlur={(ev) => !ev.target.value.trim() && setKey(l.key, { ...e, label: "New line" })}
+                        aria-label="What the line is"
+                        className="w-full rounded-md border border-transparent bg-transparent px-1 py-0 outline-none hover:border-line focus:border-forest"
+                      />
+                      {(e.qty ?? 1) > 1 && <span className="block px-1 text-[11px] text-muted">{money(l.amount)} in all</span>}
+                    </div>
+                    <div className="text-right">
+                      <input
+                        type="number"
+                        min="1"
+                        max={MAX_LINE_QTY}
+                        step="1"
+                        value={e.qty ?? 1}
+                        onChange={(ev) =>
+                          setKey(l.key, { ...e, qty: Math.max(1, Math.min(MAX_LINE_QTY, Math.round(Number(ev.target.value) || 1))) })
+                        }
+                        aria-label={`How many: ${e.label}`}
+                        style={{ width: `${String(e.qty ?? 1).length + 2}ch` }}
+                        className={numberBox(false)}
+                      />
+                    </div>
+                    <div className="text-right">
                       <span className="inline-flex items-center justify-end gap-px">
                         <span className="text-muted">$</span>
                         <input
                           type="number"
                           min="0"
                           step="1"
-                          value={Math.round(typed ?? shown.amount)}
-                          onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
-                          aria-label={`Cost of ${l.label}`}
-                          style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
-                          className={`rounded-md border bg-transparent px-0.5 py-0.5 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                            typed !== undefined
-                              ? "border-sun-line font-semibold"
-                              : unset
-                                ? "border-warning"
-                                : "border-transparent hover:border-line"
-                          }`}
+                          value={Math.round(e.amount ?? 0)}
+                          onChange={(ev) => setKey(l.key, { ...e, amount: Math.max(0, Number(ev.target.value) || 0) })}
+                          aria-label={`Cost each of ${e.label}`}
+                          style={{ width: `${String(Math.round(e.amount ?? 0)).length + 2}ch` }}
+                          className={numberBox(false)}
                         />
                       </span>
-                    </td>
-                    <td className="py-1.5 text-right">
+                    </div>
+                    <div className="text-right">
                       <button
-                        hidden={Boolean(l.confirm)}
-                        className="text-base leading-none text-muted hover:text-danger"
-                        onClick={() => edit(l, { removed: true })}
-                        aria-label={`Take out ${l.label}`}
+                        className="text-base leading-none text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100"
+                        onClick={() => setKey(l.key, null)}
+                        aria-label={`Take out ${e.label}`}
                         title="Take this line out"
                       >
                         ×
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
-        );
-      })}
-      {/* Lines of the business's own (15 Nov 2026, Martin): a name, how many and the cost each, ex GST. */}
-      {added.length > 0 && (
-        <table className="mt-4 w-full table-fixed text-sm">
-          <thead>
-            <tr className="border-b-2 border-forest text-xs font-semibold uppercase tracking-[0.12em] text-forest">
-              <th className="pb-1 text-left">Added by you</th>
-              <th className="w-10 pb-1 text-right">Qty</th>
-              <th className="w-[5.5rem] pb-1 text-right">Each</th>
-              <th className="w-6 pb-1" aria-label="Take out" />
-            </tr>
-          </thead>
-          <tbody>
-            {added.map((l) => {
-              const e = edits[l.key];
-              return (
-                <tr key={l.key} className="border-b border-line align-top last:border-0">
-                  <td className="py-1 pr-2">
-                    <input
-                      value={e.label ?? ""}
-                      maxLength={MAX_ADDED_LABEL}
-                      placeholder="What it is"
-                      onChange={(ev) => setKey(l.key, { ...e, label: ev.target.value })}
-                      onBlur={(ev) => !ev.target.value.trim() && setKey(l.key, { ...e, label: "New line" })}
-                      aria-label="What the line is"
-                      className="w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 outline-none hover:border-line focus:border-forest"
-                    />
-                    {(e.qty ?? 1) > 1 && <span className="block px-1 text-xs text-muted">{money(l.amount)} in all</span>}
-                  </td>
-                  <td className="py-1 text-right">
-                    <input
-                      type="number"
-                      min="1"
-                      max={MAX_LINE_QTY}
-                      step="1"
-                      value={e.qty ?? 1}
-                      onChange={(ev) =>
-                        setKey(l.key, { ...e, qty: Math.max(1, Math.min(MAX_LINE_QTY, Math.round(Number(ev.target.value) || 1))) })
-                      }
-                      aria-label={`How many: ${e.label}`}
-                      style={{ width: `${String(e.qty ?? 1).length + 2}ch` }}
-                      className={numberBox(false)}
-                    />
-                  </td>
-                  <td className="py-1 pl-1 text-right">
-                    <span className="inline-flex items-center justify-end gap-px">
-                      <span className="text-muted">$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={Math.round(e.amount ?? 0)}
-                        onChange={(ev) => setKey(l.key, { ...e, amount: Math.max(0, Number(ev.target.value) || 0) })}
-                        aria-label={`Cost each of ${e.label}`}
-                        style={{ width: `${String(Math.round(e.amount ?? 0)).length + 2}ch` }}
-                        className={numberBox(false)}
-                      />
-                    </span>
-                  </td>
-                  <td className="py-1.5 text-right">
-                    <button
-                      className="text-base leading-none text-muted hover:text-danger"
-                      onClick={() => setKey(l.key, null)}
-                      aria-label={`Take out ${e.label}`}
-                      title="Take this line out"
-                    >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
+            </div>
+          </section>
+        )}
+      </div>
       {added.length < MAX_ADDED_LINES && (
         <button
           type="button"
