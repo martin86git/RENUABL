@@ -549,12 +549,12 @@ export function DealFeed(props: {
                     Nothing needs you right now. Sol has the rest in hand.
                   </p>
                 )}
-                {/* Cards at a width of their own, the one that suits a card (30rem: the need, the days and the email read
-                without crowding), centred, two side by side where they fit (14 Nov 2026, Martin: not tied to New in's row). */}
+                {/* Cards take the feed's width (19 Nov 2026, Martin: "i have to scroll down to see all the information on the
+                card… we can occupy more width"): each card runs across the feed, one under another. */}
                 {parts.needs.length > 0 && (
-                  <div className="flex flex-wrap items-start gap-3">
+                  <div className="grid items-start gap-3">
                     {parts.needs.map((d) => (
-                      <div key={d.jobId} className="w-full max-w-[30rem]">
+                      <div key={d.jobId} className="min-w-0">
                         <DealCard
                           deal={d}
                           now={now}

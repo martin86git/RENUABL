@@ -240,203 +240,220 @@ export function SolTerminal(props: {
     </Link>
   ) : null;
 
+  // His drafts: under his line on the deal's page; in a card on Today, beside it where the card is wide enough
+  // (19 Nov 2026, Martin: the whole card in view without scrolling).
+  const hasDraft = Boolean((!leftIt && p.draft && sol) || (waiting && answer));
+  const drafts = (
+    <>
+      {!leftIt && p.draft && sol && (
+        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+          <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-2 text-[12px] text-muted">
+            <span>To {sol.to ?? `${name} (no email on file)`}</span>
+            {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
+            {state === "held" && <span>· held</span>}
+          </div>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            aria-label="Subject"
+            className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
+          />
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={props.inCard ? 4 : 6}
+            aria-label="The email"
+            className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
+          />
+        </div>
+      )}
+
+      {waiting && answer && (
+        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
+          <div className="border-b border-line px-3 py-2 text-[12px] text-muted">
+            {byChat ? `Reply in ${name}'s chat` : `Email to ${name}`}
+            {writing && <span className="text-sun-ink"> · writing it again…</span>}
+          </div>
+          {!byChat && (
+            <input
+              value={answer.subject}
+              onChange={(e) => keep({ ...answer, subject: e.target.value })}
+              aria-label="Subject"
+              className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
+            />
+          )}
+          <textarea
+            value={answer.body}
+            onChange={(e) => keep({ ...answer, body: e.target.value })}
+            rows={props.inCard ? 4 : 6}
+            aria-label={`The reply to ${name}`}
+            className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
+          />
+        </div>
+      )}
+    </>
+  );
+
   return (
     <section
       aria-label="Sol"
       className="overflow-hidden rounded-2xl bg-surface shadow-[0_14px_36px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70"
     >
-      <div className="flex gap-3.5 p-4 sm:gap-4 sm:p-5">
+      <div className={clsx("flex gap-3.5", props.inCard ? "p-3.5 sm:gap-4 sm:p-4" : "p-4 sm:gap-4 sm:p-5")}>
         <SolLive />
-        <div className="min-w-0 flex-1">
-          <p className="min-h-[1.5em] text-[16px] font-medium leading-snug text-ink" aria-live="polite">
-            {typed.text}
-            <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
-          </p>
-          {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-2" />}
-
-          {!leftIt && p.draft && sol && (
-            <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-              <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-2 text-[12px] text-muted">
-                <span>To {sol.to ?? `${name} (no email on file)`}</span>
-                {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
-                {state === "held" && <span>· held</span>}
-              </div>
-              <input
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                aria-label="Subject"
-                className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
-              />
-              <textarea
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={6}
-                aria-label="The email"
-                className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
-              />
-            </div>
-          )}
-
-          {waiting && answer && (
-            <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-              <div className="border-b border-line px-3 py-2 text-[12px] text-muted">
-                {byChat ? `Reply in ${name}'s chat` : `Email to ${name}`}
-                {writing && <span className="text-sun-ink"> · writing it again…</span>}
-              </div>
-              {!byChat && (
-                <input
-                  value={answer.subject}
-                  onChange={(e) => keep({ ...answer, subject: e.target.value })}
-                  aria-label="Subject"
-                  className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
-                />
-              )}
-              <textarea
-                value={answer.body}
-                onChange={(e) => keep({ ...answer, body: e.target.value })}
-                rows={6}
-                aria-label={`The reply to ${name}`}
-                className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
-              />
-            </div>
-          )}
-
-          {!leftIt && typed.done && waiting && (answer || unwritten) && (
-            <div className="mt-3.5 flex flex-wrap items-center gap-2">
-              {answer && (
-                <button
-                  type="button"
-                  onClick={() => void sendAnswer()}
-                  disabled={busy !== null || writing}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
-                >
-                  {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-                  Yes, send it
-                </button>
-              )}
-              <button type="button" onClick={() => setLeftIt(true)} disabled={busy !== null} className={quiet}>
-                Not now
-              </button>
-              {p.yes && (
-                <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
-                  {byChat ? "Write it myself" : `Email ${name} myself`}
-                </button>
-              )}
-              {openDealLink}
-            </div>
-          )}
-
-          {!leftIt && typed.done && !waiting && (
-            <div className="mt-3.5 flex flex-wrap items-center gap-2">
-              {p.yes && !(p.yes.kind === "call" && !props.phone) && (
-                <button
-                  type="button"
-                  onClick={yes}
-                  disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
-                >
-                  {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-                  {p.yes.label}
-                </button>
-              )}
-              {p.no && (
-                <button type="button" onClick={no} disabled={busy !== null} className={quiet}>
-                  {busy === "no" && <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />}
-                  {p.no}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setOther((o) => !o);
-                  box.current?.focus();
-                }}
-                aria-expanded={other}
-                className={clsx(quiet, other && "bg-surface-2")}
+        <div className={clsx("min-w-0 flex-1", props.inCard && "@container")}>
+          <div className={props.inCard ? "flex flex-col @xl:flex-row @xl:items-start @xl:gap-5" : undefined}>
+            <div className={props.inCard ? "contents @xl:block @xl:min-w-0 @xl:flex-1 [&>*]:order-3" : undefined}>
+              <p
+                className={clsx("min-h-[1.5em] font-medium leading-snug text-ink", props.inCard ? "order-1! text-[13.5px]" : "text-[16px]")}
+                aria-live="polite"
               >
-                Something else
-              </button>
-              {changed && <span className="text-[12px] text-muted">Your changes go with it.</span>}
-              {openDealLink}
-            </div>
-          )}
-          {props.openDeal && (leftIt || !typed.done) && <div className="mt-3.5 flex">{openDealLink}</div>}
+                {typed.text}
+                <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
+              </p>
+              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-2" />}
 
-          {other && !leftIt && p.draft && sol?.id && (
-            <div className="mt-2.5">
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  className={quiet}
-                  onClick={() => void run("hour", () => putOffOutbox(sol.id!, "hour"))}
-                >
-                  Send it in an hour
-                </button>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  className={quiet}
-                  onClick={() => void run("tomorrow", () => putOffOutbox(sol.id!, "tomorrow"))}
-                >
-                  Tomorrow at 9
-                </button>
-                {changed && (
+              {!props.inCard && drafts}
+
+              {!leftIt && typed.done && waiting && (answer || unwritten) && (
+                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                  {answer && (
+                    <button
+                      type="button"
+                      onClick={() => void sendAnswer()}
+                      disabled={busy !== null || writing}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                    >
+                      {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+                      Yes, send it
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setLeftIt(true)} disabled={busy !== null} className={quiet}>
+                    Not now
+                  </button>
+                  {p.yes && (
+                    <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
+                      {byChat ? "Write it myself" : `Email ${name} myself`}
+                    </button>
+                  )}
+                  {openDealLink}
+                </div>
+              )}
+
+              {!leftIt && typed.done && !waiting && (
+                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                  {p.yes && !(p.yes.kind === "call" && !props.phone) && (
+                    <button
+                      type="button"
+                      onClick={yes}
+                      disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
+                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                    >
+                      {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+                      {p.yes.label}
+                    </button>
+                  )}
+                  {p.no && (
+                    <button type="button" onClick={no} disabled={busy !== null} className={quiet}>
+                      {busy === "no" && <Loader2 className="mr-1.5 size-3.5 animate-spin" aria-hidden />}
+                      {p.no}
+                    </button>
+                  )}
                   <button
                     type="button"
-                    disabled={busy !== null}
-                    className={quiet}
-                    onClick={() => void run("save", async () => ({ ok: true }))}
+                    onClick={() => {
+                      setOther((o) => !o);
+                      box.current?.focus();
+                    }}
+                    aria-expanded={other}
+                    className={clsx(quiet, other && "bg-surface-2")}
                   >
-                    Keep my changes
+                    Something else
                   </button>
-                )}
-              </div>
+                  {changed && <span className="text-[12px] text-muted">Your changes go with it.</span>}
+                  {openDealLink}
+                </div>
+              )}
+              {props.openDeal && (leftIt || !typed.done) && <div className="mt-3.5 flex">{openDealLink}</div>}
+
+              {other && !leftIt && p.draft && sol?.id && (
+                <div className="mt-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      className={quiet}
+                      onClick={() => void run("hour", () => putOffOutbox(sol.id!, "hour"))}
+                    >
+                      Send it in an hour
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      className={quiet}
+                      onClick={() => void run("tomorrow", () => putOffOutbox(sol.id!, "tomorrow"))}
+                    >
+                      Tomorrow at 9
+                    </button>
+                    {changed && (
+                      <button
+                        type="button"
+                        disabled={busy !== null}
+                        className={quiet}
+                        onClick={() => void run("save", async () => ({ ok: true }))}
+                      >
+                        Keep my changes
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  tellSol();
+                }}
+                // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
+                className="mt-5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+              >
+                <span className="font-mono text-[12px] text-sun-line" aria-hidden>
+                  {">"}
+                </span>
+                <input
+                  ref={box}
+                  value={heard ? withSpoken(ask, heard) : ask}
+                  onChange={(e) => {
+                    setHeard("");
+                    setAsk(e.target.value);
+                  }}
+                  placeholder={
+                    waiting && answer
+                      ? "Tell Sol what to change in the reply…"
+                      : p.yes
+                        ? `Or tell Sol what to do for ${name}…`
+                        : `Tell Sol what to do for ${name}…`
+                  }
+                  aria-label={`Tell Sol what to do for ${name}`}
+                  className="min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
+                />
+                <DictateButton
+                  label={`Speak to Sol about ${name}`}
+                  onHearing={setHeard}
+                  onWords={(w) => setAsk((was) => withSpoken(was, w).slice(0, 2000))}
+                />
+                <button
+                  type="submit"
+                  disabled={!ask.trim()}
+                  aria-label="Send to Sol"
+                  className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                >
+                  <ArrowUp className="size-3.5" aria-hidden />
+                </button>
+              </form>
+              {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
             </div>
-          )}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              tellSol();
-            }}
-            // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
-            className="mt-5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
-          >
-            <span className="font-mono text-[12px] text-sun-line" aria-hidden>
-              {">"}
-            </span>
-            <input
-              ref={box}
-              value={heard ? withSpoken(ask, heard) : ask}
-              onChange={(e) => {
-                setHeard("");
-                setAsk(e.target.value);
-              }}
-              placeholder={
-                waiting && answer
-                  ? "Tell Sol what to change in the reply…"
-                  : p.yes
-                    ? `Or tell Sol what to do for ${name}…`
-                    : `Tell Sol what to do for ${name}…`
-              }
-              aria-label={`Tell Sol what to do for ${name}`}
-              className="min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
-            />
-            <DictateButton
-              label={`Speak to Sol about ${name}`}
-              onHearing={setHeard}
-              onWords={(w) => setAsk((was) => withSpoken(was, w).slice(0, 2000))}
-            />
-            <button
-              type="submit"
-              disabled={!ask.trim()}
-              aria-label="Send to Sol"
-              className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
-            >
-              <ArrowUp className="size-3.5" aria-hidden />
-            </button>
-          </form>
-          {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
+            {props.inCard && hasDraft && <div className="order-2 @xl:min-w-0 @xl:flex-[1.3] @xl:[&>*]:mt-0!">{drafts}</div>}
+          </div>
         </div>
       </div>
       {!props.inCard && (deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
