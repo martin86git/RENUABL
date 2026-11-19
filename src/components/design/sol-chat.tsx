@@ -13,6 +13,7 @@ import {
   FileText,
   History,
   MessageSquarePlus,
+  Minus,
   Paperclip,
   RefreshCw,
   X,
@@ -161,10 +162,13 @@ export function goWhereAsked(state: SolState | null, router: { push: (href: stri
 export function SolChat({
   side = false,
   onClose,
+  onMinimise,
   question,
 }: {
   side?: boolean;
   onClose?: () => void;
+  /** Tucks the panel away to a tab on the screen's edge, the conversation kept (19 Nov 2026, Martin). */
+  onMinimise?: () => void;
   question?: { id: number; text: string; shown?: string } | null;
 }) {
   const router = useRouter();
@@ -179,6 +183,13 @@ export function SolChat({
   const [fileProblem, setFileProblem] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Follow-ups typed while he answers (19 Nov 2026, Martin: "pressing enter in the text box results in nothing"): they
+  // wait in the chat and go to him together as soon as his answer is in.
+  const [queued, setQueued] = useState<{ said: string; shown?: string }[]>([]);
+  const queuedRef = useRef(queued);
+  useEffect(() => {
+    queuedRef.current = queued;
+  }, [queued]);
   const picker = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -284,15 +295,25 @@ export function SolChat({
   };
 
   /** `shown`: the short line the chat shows for a long instruction sent for them; the words still go to Sol. */
-  const send = async (over?: string, deep = false, shownAs?: string) => {
+  const send = async (over?: string, deep = false, shownAs?: string, followUp = false) => {
     const typed = (over ?? text).trim();
     const answering = !over && replyTo && typed ? replyTo : null;
     const said = answering ? answerFor(answering, typed) : typed;
     const shown = shownAs ?? (answering ? typed : undefined);
     const sending = over ? [] : files;
-    if ((!said && !sending.length) || busy) return;
+    if (!said && !sending.length) return;
+    if (busy) {
+      // Typed while he is answering: kept to send next. A file waits in the box until he has answered.
+      if (over || !said) return;
+      if (sending.length) return setFileProblem("Send the file once Sol has answered.");
+      setQueued((q) => [...q, { said, shown }]);
+      setText("");
+      setReplyTo(null);
+      setDealAt(null);
+      return;
+    }
     // Asked from the clean face: the last conversation is filed away first, so this starts a new chat.
-    if (resting && !(await run(newSolChat()))) return;
+    if (resting && !followUp && !(await run(newSolChat()))) return;
     let encoded: SolFile[];
     try {
       encoded = await Promise.all(sending.map(async (f) => ({ name: f.name, type: f.type as SolFile["type"], data: await base64Of(f) })));
@@ -320,6 +341,18 @@ export function SolChat({
       if (answering) setReplyTo(answering);
       setFiles(sending);
     }
+    sendQueued();
+  };
+
+  // What was typed while he answered goes to him as one message (`followUp`: never a new chat, it carries this one on).
+  const sendQueued = () => {
+    const waiting = queuedRef.current;
+    if (!waiting.length) return;
+    queuedRef.current = [];
+    setQueued([]);
+    const said = waiting.map((q) => q.said).join("\n\n");
+    const shown = waiting.some((q) => q.shown) ? waiting.map((q) => q.shown ?? q.said).join("\n\n") : undefined;
+    void send(said, false, shown, true);
   };
 
   /** A Yes or No goes straight to Sol; Reply puts the question over the box to answer in his own words. */
@@ -344,6 +377,7 @@ export function SolChat({
       void run(solSeen());
       goWhereAsked(next, router);
     }
+    sendQueued();
   };
 
   // A question from elsewhere is asked once, as soon as the panel is open (`asked` keeps a second render from asking again).
@@ -444,6 +478,17 @@ export function SolChat({
           >
             <History className="size-3.5" aria-hidden />
           </button>
+          {onMinimise && (
+            <button
+              type="button"
+              onClick={onMinimise}
+              aria-label="Minimise Sol"
+              title="Minimise Sol: a tab on the edge brings him back"
+              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+            >
+              <Minus className="size-3.5" aria-hidden />
+            </button>
+          )}
           {onClose && (
             <button
               type="button"
@@ -640,6 +685,21 @@ export function SolChat({
         ))}
         {pending !== null && <Bubble you text={pending} at="" />}
         <SolWorking busy={pending !== null} />
+        {queued.map((q, i) => (
+          <div key={i} className="opacity-60">
+            <Bubble you text={q.shown ?? q.said} at="" />
+            <p className="mt-1 flex items-center justify-end gap-2 text-[11px] text-muted">
+              Sends when Sol has answered
+              <button
+                type="button"
+                onClick={() => setQueued((all) => all.filter((_, j) => j !== i))}
+                className="underline-offset-2 hover:text-ink hover:underline"
+              >
+                Take back
+              </button>
+            </p>
+          </div>
+        ))}
         {problem && <p className="text-xs text-danger">{problem}</p>}
         <div ref={end} />
       </div>
@@ -772,9 +832,9 @@ export function SolChat({
             />
             <button
               type="submit"
-              disabled={busy || (!text.trim() && !files.length)}
+              disabled={!text.trim() && !files.length}
               aria-label="Send to Sol"
-              title="Send to Sol"
+              title={busy ? "Sends as soon as Sol has answered" : "Send to Sol"}
               className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
             >
               <svg

@@ -22,15 +22,24 @@ const EVERY_MS = 60_000;
  */
 export function SolDock() {
   const [open, setOpen] = useState(false);
+  // Minimised (19 Nov 2026, Martin: "the ability to minimize the sol drawer, with a little tab sticking out for me to
+  // re-engage it"): the panel slides away but stays open, so an answer on its way and the box's words are kept, and a
+  // tab with his sun stands out of the right edge to bring it back. Anything that opens him brings it back too.
+  const [tucked, setTucked] = useState(false);
+  const shown = open && !tucked;
   const [question, setQuestion] = useState<{ id: number; text: string; shown?: string } | null>(null);
   useEffect(() => {
-    const toggle = () => setOpen((o) => !o);
+    const toggle = () => {
+      setTucked(false);
+      setOpen((o) => !o);
+    };
     const asked = (e: Event) => {
       const said = (e as CustomEvent<SolAsk>).detail;
       const text = String((typeof said === "string" ? said : said?.text) ?? "").trim();
       if (!text) return;
       const shown = typeof said === "object" && said?.shown ? said.shown : undefined;
       setQuestion({ id: Date.now(), text, ...(shown ? { shown } : {}) });
+      setTucked(false);
       setOpen(true);
     };
     window.addEventListener(SOL_TOGGLE, toggle);
@@ -57,52 +66,78 @@ export function SolDock() {
     } catch {
       // As above.
     }
-    document.documentElement.classList.toggle(OPEN_CLASS, open);
-    return () => document.documentElement.classList.remove(OPEN_CLASS);
   }, [open]);
+  // The page makes room only while he is on show.
   useEffect(() => {
-    if (!open) return;
+    document.documentElement.classList.toggle(OPEN_CLASS, shown);
+    return () => document.documentElement.classList.remove(OPEN_CLASS);
+  }, [shown]);
+  useEffect(() => {
+    if (!shown) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [open]);
+  }, [shown]);
   const width = useSolWidth();
   return (
-    <aside
-      aria-label="Sol"
-      aria-hidden={!open}
-      className={clsx(
-        "fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
-        open
-          ? "translate-x-0 shadow-2xl min-[1440px]:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]"
-          : "pointer-events-none invisible translate-x-full",
-      )}
-    >
-      {open && (
-        // The left edge drags the panel wider or narrower (desktop only); a double press puts it back.
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Drag to change Sol's width"
-          aria-valuenow={width.px}
-          aria-valuemin={SOL_PANEL.min}
-          aria-valuemax={SOL_PANEL.max}
-          tabIndex={0}
-          title="Drag to change the width. Double-click to reset."
-          onPointerDown={width.startDrag}
-          onDoubleClick={width.reset}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowLeft") width.set(width.px + 32);
-            else if (e.key === "ArrowRight") width.set(width.px - 32);
-          }}
-          className="group absolute inset-y-0 -left-1.5 z-10 hidden w-3 cursor-col-resize touch-none lg:block"
+    <>
+      {open && tucked && (
+        <button
+          type="button"
+          onClick={() => setTucked(false)}
+          aria-label="Bring Sol back"
+          title="Bring Sol back"
+          className="sol-tab fixed bottom-28 right-0 z-40 flex items-center gap-1.5 rounded-l-2xl bg-[#3a3d43] py-2 pl-2 pr-1.5 shadow-[0_6px_24px_rgba(20,22,26,0.22)] transition-[padding] hover:pr-3 print:hidden"
         >
-          <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-sun-line group-focus-visible:bg-sun-line" />
-          <span className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-line transition-colors group-hover:bg-sun-line" />
-        </div>
+          <SolMark className="size-7" />
+        </button>
       )}
-      {open && <SolChat side question={question} onClose={() => setOpen(false)} />}
-    </aside>
+      <aside
+        aria-label="Sol"
+        aria-hidden={!shown}
+        className={clsx(
+          "fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
+          shown
+            ? "translate-x-0 shadow-2xl min-[1440px]:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]"
+            : "pointer-events-none invisible translate-x-full",
+        )}
+      >
+        {shown && (
+          // The left edge drags the panel wider or narrower (desktop only); a double press puts it back.
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Drag to change Sol's width"
+            aria-valuenow={width.px}
+            aria-valuemin={SOL_PANEL.min}
+            aria-valuemax={SOL_PANEL.max}
+            tabIndex={0}
+            title="Drag to change the width. Double-click to reset."
+            onPointerDown={width.startDrag}
+            onDoubleClick={width.reset}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowLeft") width.set(width.px + 32);
+              else if (e.key === "ArrowRight") width.set(width.px - 32);
+            }}
+            className="group absolute inset-y-0 -left-1.5 z-10 hidden w-3 cursor-col-resize touch-none lg:block"
+          >
+            <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-sun-line group-focus-visible:bg-sun-line" />
+            <span className="absolute left-1/2 top-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-line transition-colors group-hover:bg-sun-line" />
+          </div>
+        )}
+        {open && (
+          <SolChat
+            side
+            question={question}
+            onClose={() => {
+              setTucked(false);
+              setOpen(false);
+            }}
+            onMinimise={() => setTucked(true)}
+          />
+        )}
+      </aside>
+    </>
   );
 }
 

@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Sol",
+    words: "Type a follow-up while Sol is answering: it goes to him as soon as he's done.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Sol",
+    words: "Minimise Sol's panel to a tab on the edge of the screen, and bring him back with one press.",
+  },
+  {
+    day: "2026-11-19",
     area: "Deals",
     words: "A sold deal's own card now says when its grid or Solar Victoria approvals are still open, as Today does.",
   },
