@@ -117,6 +117,7 @@ export function ConfiguratorPage(props: {
   // Add-ons: blackout backup once a battery is picked, and the EV charger when one is listed.
   const addOns = mix.batteryId !== null || Boolean(cfg.charger);
 
+  const special = announcementShows(view.announcement, todayInMarket());
   const headline = `${shown.system.kw} kW solar${shown.system.batteryKwh ? ` with a ${shown.system.batteryKwh} kWh battery` : ""}`;
   const orderHref = `/p/${encodeURIComponent(token)}/order?mix=${encodeURIComponent(mix.goal)}${week ? `&week=${week.monday}` : ""}`;
 
@@ -127,7 +128,7 @@ export function ConfiguratorPage(props: {
     >
       {/* The business's special, across the top until its last day (19 Nov 2026, Martin: "an announcement bar at the top
           so we can announce any specials"). In its own words, as it stood when the proposal was published. */}
-      {announcementShows(view.announcement, todayInMarket()) && (
+      {special && view.announcement && (
         <div className="bg-primary px-5 py-2.5 text-center text-[13.5px] text-[color:var(--primary-ink)] sm:px-8">
           <span className="font-medium">{view.announcement.text}</span>
           {view.announcement.until && (
@@ -144,7 +145,7 @@ export function ConfiguratorPage(props: {
           )}
         </div>
       )}
-      <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
+      <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10 lg:py-8">
         {view.business.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route
           <img
@@ -166,36 +167,43 @@ export function ConfiguratorPage(props: {
       <main className="mx-auto grid w-full max-w-[1680px] gap-8 px-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-10 lg:px-10 xl:grid-cols-[minmax(0,1fr)_28rem]">
         {/* The home: it stays in view on a wide screen and changes as they choose. */}
         <section aria-label="Your home" className="lg:sticky lg:top-6 lg:self-start">
-          <p className={eyebrow}>
-            {view.indicative ? INDICATIVE_LABEL : "Your proposal"} · {view.customer.name}
-          </p>
-          <h1 className="mt-2 text-[28px] leading-[1.1] tracking-tight [font-family:var(--proposal-heading)] sm:text-[40px]">{headline}</h1>
-          <p className="mt-2 text-[14px] text-muted">{view.customer.address}</p>
-          <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-            <div className="relative [&>div]:rounded-none [&>div]:border-0">
-              <Roof view={shown} src={urls.roof} frame={cfg.sizes[0]?.roofPanels} />
-              {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
-              {(battery || mix.ev) && (
-                <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-2xl bg-[#141416] p-3 max-sm:origin-bottom-right max-sm:scale-[0.72] shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4">
-                  {mix.ev && <ChargerArt />}
-                  {battery && (
-                    <BatteryArt
-                      key={`${battery.id}-${Boolean(mix.backup)}`}
-                      kwh={shown.system.batteryKwh}
-                      qty={Math.min(8, battery.qty + (mix.backup ? 1 : 0))}
-                      maker={battery.maker}
-                      backup={Boolean(mix.backup)}
-                    />
-                  )}
-                </div>
-              )}
+          {/* The home, its figures and the battery in one fold, with room round them (19 Nov 2026, Martin: "the map needs
+              to fit along with the performance bar and battery all in one fold… space around it… for the RENUABL logo to
+              stand out"): on a wide screen everything here shares one width worked from the window's height. */}
+          <div className={clsx("cfg-home", special && "cfg-home-special")}>
+            <p className={eyebrow}>
+              {view.indicative ? INDICATIVE_LABEL : "Your proposal"} · {view.customer.name}
+            </p>
+            <h1 className="mt-2 text-[28px] leading-[1.1] tracking-tight [font-family:var(--proposal-heading)] sm:text-[40px]">
+              {headline}
+            </h1>
+            <p className="mt-2 text-[14px] text-muted">{view.customer.address}</p>
+            <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
+              <div className="@container relative [&>div]:rounded-none [&>div]:border-0">
+                <Roof view={shown} src={urls.roof} frame={cfg.sizes[0]?.roofPanels} />
+                {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
+                {(battery || mix.ev) && (
+                  <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 overflow-hidden rounded-3xl bg-[#15171c] p-0 pr-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4">
+                    {mix.ev && <ChargerArt />}
+                    {battery && (
+                      <BatteryArt
+                        key={`${battery.id}-${Boolean(mix.backup)}`}
+                        kwh={shown.system.batteryKwh}
+                        qty={Math.min(8, battery.qty + (mix.backup ? 1 : 0))}
+                        maker={battery.maker}
+                        backup={Boolean(mix.backup)}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+              <Performance cfg={cfg} mix={mix} />
             </div>
-            <Performance cfg={cfg} mix={mix} />
+            <p className="mt-3 text-[12px] leading-relaxed text-muted">
+              The layout is a design, checked on site before anything is installed. A different panel goes in the same places. Output,
+              offset and savings are estimates from your bill.
+            </p>
           </div>
-          <p className="mt-3 text-[12px] leading-relaxed text-muted">
-            The layout is a design, checked on site before anything is installed. A different panel goes in the same places. Output, offset
-            and savings are estimates from your bill.
-          </p>
         </section>
 
         {/* The choices. */}
@@ -505,55 +513,105 @@ function Cell({ title, big }: { title: string; big: string }) {
 }
 
 /**
- * The battery as it would hang on the home's wall, on a dark glass plate over the picture: a tall white unit, softly
- * lit from the left, with a light bar in the business's accent that fills as the battery charges, its modules as
- * fine seams (the one held for blackouts marked), and beside it its size and maker. Drawn, not a picture of any
- * maker's product, and nothing of RENUABL's on it (the proposal is the business's).
+ * The battery on the home's wall (19 Nov 2026, Martin: the first one was "so uninspiring… not exciting", with Tesla's
+ * Powerwall pictures as the bar): a white unit seen from three-quarters, light falling across its face, a graphite side
+ * with a status light, standing on a dark ribbed wall with its shadow; under it a label with the maker and size and a
+ * charge bar filling in the business's accent. Drawn by us, never a maker's product photo or mark. A unit a little
+ * taller for more modules. Still with reduced motion.
  */
 function BatteryArt({ kwh, qty, maker, backup }: { kwh: number; qty: number; maker: string; backup: boolean }) {
-  const height = 128 + Math.min(4, Math.max(0, qty - 2)) * 10;
-  const inner = height - 28;
-  const seam = inner / qty;
+  const W = 132;
+  const H = 176;
+  // The unit: front face with its top edge rising to the right, the side face going back.
+  const tall = Math.min(34, Math.max(0, qty - 2) * 6);
+  const fx = 34;
+  const fw = 52;
+  const sideW = 14;
+  const topL = 38 - tall;
+  const topR = 30 - tall;
+  const base = 158;
+  const front = `${fx},${topL} ${fx + fw},${topR} ${fx + fw},${base - 3} ${fx},${base}`;
+  const side = `${fx + fw},${topR} ${fx + fw + sideW},${topR + 6} ${fx + fw + sideW},${base - 6} ${fx + fw},${base - 3}`;
+  const shadow = `${fx + fw + sideW},${topR + 10} ${fx + fw + sideW + 22},${topR + 22} ${fx + fw + sideW + 22},${base + 2} ${fx + fw + sideW},${base - 4}`;
   return (
-    <figure className="cfg-in m-0 flex items-end gap-3">
-      <svg width={58} height={height} viewBox={`0 0 58 ${height}`} role="img" aria-label={`A ${kwh} kWh battery`}>
+    <figure className="cfg-in m-0 flex items-end gap-1">
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`A ${kwh} kWh battery`} className="shrink-0">
         <defs>
-          <linearGradient id="cfg-shell" x1="0" x2="1">
-            <stop offset="0" stopColor="#e9e9e6" />
-            <stop offset="0.35" stopColor="#ffffff" />
-            <stop offset="1" stopColor="#d4d4cf" />
+          <linearGradient id="cfg-rib" x1="0" x2="1">
+            <stop offset="0" stopColor="#1a1d24" />
+            <stop offset="0.5" stopColor="#2a2f3a" />
+            <stop offset="1" stopColor="#15171c" />
           </linearGradient>
-          <linearGradient id="cfg-charge" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stopColor="var(--accent)" stopOpacity="1" />
-            <stop offset="1" stopColor="var(--accent)" stopOpacity="0.35" />
+          <radialGradient id="cfg-warm" cx="0.15" cy="1" r="0.8">
+            <stop offset="0" stopColor="#c99a5b" stopOpacity="0.35" />
+            <stop offset="1" stopColor="#c99a5b" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id="cfg-front" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="0.55" stopColor="#f1f1ef" />
+            <stop offset="1" stopColor="#d9d9d5" />
           </linearGradient>
+          <linearGradient id="cfg-sheen" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#fff" stopOpacity="0" />
+            <stop offset="0.5" stopColor="#fff" stopOpacity="0.85" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="cfg-side" x1="0" x2="1">
+            <stop offset="0" stopColor="#4a4d53" />
+            <stop offset="1" stopColor="#2b2d31" />
+          </linearGradient>
+          <clipPath id="cfg-front-clip">
+            <polygon points={front} />
+          </clipPath>
+          <filter id="cfg-soft" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" />
+          </filter>
         </defs>
-        <ellipse cx="29" cy={height - 2} rx="24" ry="2.5" fill="rgb(0 0 0 / 0.45)" />
-        <rect x="3" y="1" width="52" height={height - 6} rx="12" fill="url(#cfg-shell)" />
-        <rect x="3.5" y="1.5" width="51" height={height - 7} rx="11.5" fill="none" stroke="rgb(255 255 255 / 0.9)" />
-        {/* The modules as fine seams; the one held for blackouts tinted. */}
-        {Array.from({ length: qty - 1 }, (_, i) => (
-          <line key={i} x1="10" x2="48" y1={14 + seam * (i + 1)} y2={14 + seam * (i + 1)} stroke="rgb(0 0 0 / 0.07)" />
+        {/* The wall: dark ribbed cladding with warm light low on it. */}
+        {Array.from({ length: 7 }, (_, i) => (
+          <rect key={i} x={i * 19} y="0" width="19" height={H} fill="url(#cfg-rib)" />
         ))}
-        {backup && <rect x="9" y={14 + seam * (qty - 1) + 2} width="40" height={seam - 4} rx="4" fill="var(--accent)" fillOpacity="0.14" />}
-        {/* The light bar: a track, and the charge rising in it. */}
-        <rect x="26" y="14" width="6" height={inner - 4} rx="3" fill="rgb(0 0 0 / 0.06)" />
-        <rect
-          className="cfg-charge"
-          x="26"
-          y="14"
-          width="6"
-          height={inner - 4}
-          rx="3"
-          fill="url(#cfg-charge)"
-          style={{ transformOrigin: `29px ${10 + inner}px` }}
-        />
+        <rect width={W} height={H} fill="url(#cfg-warm)" />
+        {/* Its shadow on the wall, and on the ground. */}
+        <polygon points={shadow} fill="#000" opacity="0.55" filter="url(#cfg-soft)" />
+        <ellipse cx={fx + fw / 2 + 8} cy={base + 4} rx={fw / 2 + 12} ry="4" fill="#000" opacity="0.6" filter="url(#cfg-soft)" />
+        {/* The unit. */}
+        <polygon points={side} fill="url(#cfg-side)" />
+        <polygon points={front} fill="url(#cfg-front)" />
+        <g clipPath="url(#cfg-front-clip)">
+          <rect
+            className="cfg-sheen"
+            x={fx - 30}
+            y={topR - 10}
+            width="26"
+            height={base - topR + 20}
+            fill="url(#cfg-sheen)"
+            transform={`skewX(-18)`}
+          />
+        </g>
+        <polyline points={`${fx},${topL} ${fx + fw},${topR}`} stroke="#fff" strokeWidth="1.2" fill="none" />
+        {/* The status light and a seam on the side. */}
+        <circle className="cfg-glow" cx={fx + fw + sideW / 2} cy={topR + 22} r="2.2" fill="var(--accent)" />
+        <circle cx={fx + fw + sideW / 2} cy={topR + 22} r="5" fill="var(--accent)" opacity="0.25" filter="url(#cfg-soft)" />
+        <rect x={fx + fw + sideW / 2 - 1.5} y={topR + 34} width="3" height="16" rx="1.5" fill="#1b1c1f" />
+        {backup && <rect x={fx + 8} y={base - 22} width={fw - 16} height="3" rx="1.5" fill="#9fd3ff" opacity="0.9" />}
       </svg>
       <figcaption className="pb-1 text-white">
-        <span className="block text-[22px] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]">{kwh}</span>
-        <span className="block text-[11px] text-white/75">kWh</span>
-        <span className="mt-2 block text-[12px] font-medium">{maker}</span>
-        {backup && <span className="mt-1 inline-block rounded-full bg-white/15 px-1.5 py-0.5 text-[10px]">Blackout backup</span>}
+        <span className="block text-[34px] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]">{kwh}</span>
+        <span className="mt-0.5 block text-[12px] text-white/70">kWh of storage</span>
+        {/* The label, as a product's tag: maker and size, with the charge filling. */}
+        <span className="mt-3 block rounded-lg bg-black/70 px-2.5 py-1.5 ring-1 ring-white/10">
+          <span className="block text-[12.5px] font-medium leading-tight">{maker}</span>
+          <span className="mt-1.5 block h-1 w-24 overflow-hidden rounded-full bg-white/15">
+            <span className="cfg-fill block h-full w-[86%] rounded-full bg-[color:var(--accent)]" />
+          </span>
+        </span>
+        {backup && (
+          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#9fd3ff]/20 px-2 py-0.5 text-[10.5px] font-medium text-[#cfe9ff]">
+            <span aria-hidden className="size-1.5 rounded-full bg-[#9fd3ff]" />
+            Blackout backup
+          </span>
+        )}
       </figcaption>
     </figure>
   );
@@ -562,7 +620,7 @@ function BatteryArt({ kwh, qty, maker, backup }: { kwh: number; qty: number; mak
 /** The EV charger on the wall: a small rounded box with its ring of light and cable. */
 function ChargerArt() {
   return (
-    <figure className="cfg-in m-0 flex flex-col items-center gap-1 text-white">
+    <figure className="cfg-in m-0 flex flex-col items-center gap-1 pb-4 pl-4 text-white">
       <svg width={46} height={84} viewBox="0 0 46 84" role="img" aria-label="An EV charger">
         <defs>
           <linearGradient id="cfg-ev" x1="0" x2="1">
@@ -684,6 +742,12 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 }
 
 const CSS = `
+/* The picture is 1.6 times as wide as it is tall: its width is the window's height less the header, the heading, the
+   figures under it and the Order bar with a margin (about 28rem; 2.5rem more with the special's bar), times 1.6. */
+@media (min-width: 1024px) {
+  .cfg-home { max-width: max(26rem, calc((100dvh - 28rem) * 1.6)); margin-inline: auto; }
+  .cfg-home-special { max-width: max(26rem, calc((100dvh - 30.5rem) * 1.6)); }
+}
 @keyframes cfg-fade { from { opacity: .35 } to { opacity: 1 } }
 .cfg-fade { animation: cfg-fade .45s ease-out }
 @keyframes cfg-in { from { opacity: 0; transform: translateY(14px) scale(.94) } to { opacity: 1; transform: none } }
@@ -692,5 +756,9 @@ const CSS = `
 @keyframes cfg-charge { from { transform: scaleY(.15) } to { transform: scaleY(1) } }
 .cfg-charge { animation: cfg-charge 1.6s cubic-bezier(.2,.8,.2,1) both }
 .cfg-glow { animation: cfg-glow 2.4s ease-in-out infinite }
-@media (prefers-reduced-motion: reduce) { .cfg-fade, .cfg-in, .cfg-glow, .cfg-charge { animation: none } }
+@keyframes cfg-fill { from { transform: scaleX(.05) } to { transform: scaleX(1) } }
+.cfg-fill { transform-origin: left; animation: cfg-fill 1.8s cubic-bezier(.2,.8,.2,1) .3s both }
+@keyframes cfg-sheen { 0% { transform: translateX(-40px) skewX(-18deg) } 55%, 100% { transform: translateX(120px) skewX(-18deg) } }
+.cfg-sheen { animation: cfg-sheen 4.5s ease-in-out .6s infinite both }
+@media (prefers-reduced-motion: reduce) { .cfg-fade, .cfg-in, .cfg-glow, .cfg-charge, .cfg-fill { animation: none } .cfg-sheen { display: none } }
 `;
