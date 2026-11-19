@@ -332,8 +332,7 @@ export function SolTerminal(props: {
             hasDraft && "@3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] @3xl:items-start @3xl:gap-5",
           )}
         >
-          <div className="@3xl:order-2">{drafts}</div>
-          <div className="@3xl:order-1">
+          <div>
             <div>
               <p
                 className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink"
@@ -482,6 +481,7 @@ export function SolTerminal(props: {
               {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
             </div>
           </div>
+          <div className="@3xl:[&>div:first-child]:mt-0">{drafts}</div>
         </div>
       </div>
       {!props.inCard && (deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
