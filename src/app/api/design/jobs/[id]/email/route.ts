@@ -9,6 +9,7 @@ import { siteUrl } from "@/lib/domain/sms";
 import { addDealFiles, newOpenToken, recordSent } from "@/lib/server/design-pulse-repo";
 import { emailParts, formFiles } from "@/lib/server/email-parts";
 import { listMembers } from "@/lib/server/design-repo";
+import { GmailOff, ReadOnlyMailbox, changeableAddresses, sendFromGmail } from "@/lib/server/gmail";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const fail = (message: string, status: number) => Response.json({ ok: false, message }, { status });
@@ -20,12 +21,28 @@ async function ownAddresses(businessId: string, brand: { email: string; notify: 
   return [...members.map((m) => m.email), brand.email, ...brand.notify].filter(Boolean);
 }
 
-/** GET: whether an email can be sent from here at all, so the box can say so before anything is written. */
-export async function GET() {
+/**
+ * GET: whether an email can be sent from here at all, so the box can say so before anything is written; and, for a
+ * composer (19 Nov 2026, Martin: "to: cc: and send from:… assurance of whos on the email, whos sending"), who it would
+ * go to (the customer's address as kept on the deal), the business it goes in the name of, and the member's own Gmail
+ * addresses it could go from instead.
+ */
+export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs/[id]/email">) {
   return answer(async () => {
+    const { id } = await ctx.params;
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    return Response.json({ ok: true, canSend: Boolean(emailProvider()), replyTo: who.member.email });
+    const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
+    const brand = await loadBrand(who.member.businessId, who.member.businessName);
+    const from = await changeableAddresses(who.member).catch(() => [] as string[]);
+    return Response.json({
+      ok: true,
+      canSend: Boolean(emailProvider()),
+      replyTo: who.member.email,
+      to: found?.customer.email ?? "",
+      business: brand.name || who.member.businessName,
+      from,
+    });
   });
 }
 
@@ -33,7 +50,9 @@ export async function GET() {
  * POST { to, cc, subject, body } as JSON, or as a form with up to six files ("file") when pictures or files go with it:
  * emails the deal's customer what the member wrote. `toCustomer` (Sol's draft cards) sends it to the customer's address
  * as kept here, ignoring `to`. Up to five people are copied in (`cleanCc`), listed on the record line; the business's
- * own among them get a copy of their own without the pixel (`splitOurCopies`). It goes from RENUABL's sender in the
+ * own among them get a copy of their own without the pixel (`splitOurCopies`). With `from` (one of the member's own
+ * Gmail addresses, connected to send) it goes through their Gmail instead, from that address, and sits in their Sent;
+ * such an email carries no open tracking and no files. Otherwise it goes from RENUABL's sender in the
  * business's name (its trading name when it has one), with replies to the member who wrote it, and is written on the
  * deal's record as an email. Only the member's own words: nothing is added from the proposal, but a one-pixel picture
  * so the deal can say when it was opened (domain/design/email-opens.ts). Pictures show inside the email under the words;
@@ -56,6 +75,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
         subject: form.get("subject"),
         body: form.get("body"),
         toCustomer: form.get("toCustomer"),
+        from: form.get("from"),
       };
       const got = formFiles(form);
       if ("problem" in got) return fail(got.problem, 422);
@@ -65,7 +85,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       if ("refuse" in read) return read.refuse;
       raw = read.body;
     }
-    if (!emailProvider()) return fail(NOT_SET_UP, 503);
+    // The member's own Gmail address to send from, when they chose one (checked against their mailboxes on sending).
+    const from = typeof raw.from === "string" ? raw.from.trim().toLowerCase() : "";
+    if (!from && !emailProvider()) return fail(NOT_SET_UP, 503);
     if (!validId(id)) return fail("There's no such deal.", 404);
     const found = await jobById(who.member.businessId, id, viewerOf(who.member));
     if (!found) return fail("There's no such deal.", 404);
@@ -73,6 +95,27 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const toCustomer = raw.toCustomer === true || raw.toCustomer === "1";
     const clean = cleanDealEmail(raw, toCustomer ? found.customer.email : undefined);
     if (!clean.ok) return fail(clean.message, 422);
+    if (from) {
+      if (files.length) return fail("Pictures and files can't go from your own Gmail here yet. Send it from the business's address.", 422);
+      try {
+        await sendFromGmail(who.member, from, { to: [clean.to], cc: clean.cc, subject: clean.subject, body: clean.body, size: "normal" });
+      } catch (e) {
+        if (e instanceof GmailOff || e instanceof ReadOnlyMailbox) return fail(e.message, 409);
+        console.error("a deal email couldn't be sent from the member's Gmail");
+        return fail("Gmail didn't take that email just now. It wasn't sent: try again in a moment.", 502);
+      }
+      const sent = await addActivity(
+        who.member.businessId,
+        found.customer.id,
+        { kind: "email", text: emailRecord(clean.to, clean.subject, clean.body, [], clean.cc).slice(0, 2000), jobId: id },
+        who.member.email,
+      );
+      return Response.json({
+        ok: true,
+        message: `Sent from ${from} to ${clean.to}${clean.cc.length ? `, copying in ${clean.cc.join(", ")}` : ""}.`,
+        activity: typeof sent === "string" ? null : sent,
+      });
+    }
     const brand = await loadBrand(who.member.businessId, who.member.businessName);
     const business = brand.name || who.member.businessName;
     // A pixel of its own, so the deal can say when the customer opened it (only when the site's address is known).

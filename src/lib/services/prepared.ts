@@ -15,6 +15,8 @@ export const loadPrepared = () => ask<{ items: PreparedItem[] }>("/api/design/pr
 const close = (id: string, act: "sent" | "dismiss") => ask<object>("/api/design/prepared", { method: "POST", body: { id, do: act } });
 
 export const dismissPrepared = (id: string) => close(id, "dismiss");
+/** Takes a draft off the tray as sent, when its email went another way (the composer on Sol's draft: a Cc, or their own Gmail). */
+export const markPreparedSent = (id: string) => close(id, "sent");
 
 /** Sends it as the member wrote it (their press), marks the follow-up done, and takes it off the tray. */
 export async function sendPrepared(item: PreparedItem, words: { subject: string; body: string }) {

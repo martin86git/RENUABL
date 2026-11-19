@@ -52,10 +52,11 @@ export interface DealChat {
 }
 const jobChat = (jobId: string) => `/api/design/jobs/${encodeURIComponent(jobId)}/chat`;
 export const loadDealChat = (jobId: string) => ask<DealChat>(jobChat(jobId));
-export const sendReply = (jobId: string, text: string, files: readonly File[] = []) =>
+export const sendReply = (jobId: string, text: string, files: readonly File[] = [], quiet = false) =>
   ask<{ lines: ChatLine[]; unanswered: number; email: ReplyEmail; outcome: string }>(jobChat(jobId), {
     method: "POST",
-    body: files.length ? withFiles({ text }, files) : { text },
+    // `quiet`: kept in their chat without its own email, when the same words were just emailed by the member.
+    body: files.length ? withFiles({ text }, files) : { text, ...(quiet ? { quiet: true } : {}) },
   });
 /** Sol writes a reply as the member asked, for them to change and send; nothing is sent by asking. */
 export const draftReply = (jobId: string, words: string) =>

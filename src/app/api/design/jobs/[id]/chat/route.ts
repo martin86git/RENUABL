@@ -54,7 +54,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ((request.headers.get("content-type") ?? "").startsWith("multipart/form-data")) {
       const form = await request.formData().catch(() => null);
       if (!form) return Response.json({ ok: false, message: "That couldn't be read." }, { status: 400 });
-      raw = { text: form.get("text") };
+      raw = { text: form.get("text"), quiet: form.get("quiet") };
       const got = formFiles(form);
       if ("problem" in got) return Response.json({ ok: false, message: got.problem }, { status: 422 });
       files = got.files;
@@ -65,7 +65,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     }
     const line = cleanLine(raw);
     if (!line.ok) return Response.json({ ok: false, message: line.message }, { status: 422 });
-    const replied = validId(id) ? await memberReplies(who.member, id, line.value.text, files) : null;
+    const replied = validId(id)
+      ? await memberReplies(who.member, id, line.value.text, files, raw.quiet === true || raw.quiet === "1")
+      : null;
     if (!replied) return notFound();
     if ("refused" in replied) return Response.json({ ok: false, message: replied.refused }, { status: 422 });
     return Response.json({ ok: true, lines: replied.lines, unanswered: 0, email: replied.email, outcome: replyOutcome(replied.email) });

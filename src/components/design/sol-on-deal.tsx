@@ -17,7 +17,8 @@ import { dealContext, solProposes } from "@/lib/domain/design/sol-on-deal";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { loadFeedDeal, writeWithSol } from "@/lib/services/deal-feed";
-import { emailDeal } from "@/lib/services/crm";
+import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
+import { markPreparedSent } from "@/lib/services/prepared";
 import { sendReply } from "@/lib/services/chat";
 import { WRITE_ASK_MAX } from "@/lib/domain/design/deal-write";
 import { leadPageFor } from "@/lib/services/hello";
@@ -105,6 +106,24 @@ export function SolTerminal(props: {
   const waiting =
     !leftIt && (p.yes?.kind === "reply" || p.yes?.kind === "email") ? deal.events.find((e) => e.kind === "message") : undefined;
   const byChat = Boolean(deal.proposal);
+  // The draft as an email composer (19 Nov 2026, Martin: "to: cc: and send from: and subject line… assurance of whos on
+  // the email, whos sending etc and the ability to add a cc"): who it goes to and from is read once from the server.
+  const [mail, setMail] = useState<{ canSend: boolean; replyTo: string; to: string; business: string; from: string[] } | null>(null);
+  const [cc, setCc] = useState("");
+  const [from, setFrom] = useState("");
+  const wantsMail = Boolean(sol || waiting);
+  useEffect(() => {
+    if (!wantsMail) return;
+    let live = true;
+    void dealEmailStatus(props.jobId).then((r) => {
+      if (live && r.ok) setMail({ canSend: r.canSend, replyTo: r.replyTo, to: r.to, business: r.business, from: r.from });
+    });
+    return () => {
+      live = false;
+    };
+  }, [wantsMail, props.jobId]);
+  // A reply to someone with a proposal goes as an email too when they can be emailed, and is kept in their chat.
+  const asEmail = !byChat || Boolean(mail?.to && (mail.canSend || mail.from.length));
   const keepKey = waiting ? `renuabl.design.sol-reply.${props.jobId}.${waiting.at}` : null;
   const [answer, setAnswer] = useState<{ subject: string; body: string } | null>(() => {
     try {
@@ -155,9 +174,11 @@ export function SolTerminal(props: {
     if (!answer) return;
     setBusy("yes");
     setSaid(null);
-    const r = byChat
-      ? await sendReply(props.jobId, answer.body)
-      : await emailDeal(props.jobId, { subject: answer.subject, body: answer.body, toCustomer: true });
+    const r = asEmail
+      ? await emailDeal(props.jobId, { subject: answer.subject, body: answer.body, toCustomer: true, cc, from })
+      : await sendReply(props.jobId, answer.body);
+    // The same words in their proposal's chat, with no second email.
+    if (r.ok && asEmail && byChat) await sendReply(props.jobId, answer.body, [], true);
     setBusy(null);
     if (!r.ok) return setSaid(r.message);
     keep(null);
@@ -187,7 +208,14 @@ export function SolTerminal(props: {
   const yes = () => {
     if (!p.yes) return;
     if (p.yes.kind === "send") {
-      if (sol?.id) void run("yes", () => actOnOutbox(sol.id!, "send"));
+      // With a Cc, or from their own Gmail, it goes through the deal's own email, and the draft is marked sent.
+      if (sol?.id)
+        void run("yes", async () => {
+          if (!cc.trim() && !from) return actOnOutbox(sol.id!, "send");
+          const r = await emailDeal(props.jobId, { subject, body, toCustomer: true, cc, from });
+          if (r.ok) await markPreparedSent(sol.id!);
+          return r;
+        });
       return;
     }
     if (p.yes.kind === "call") {
@@ -240,54 +268,49 @@ export function SolTerminal(props: {
     </Link>
   ) : null;
 
-  // His drafts: under his line on the deal's page; in a card on Today, beside it where the card is wide enough
-  // (19 Nov 2026, Martin: the whole card in view without scrolling).
+  // His drafts, as an email composer under his line: who it is from and to, anyone copied in, the subject, the words.
+  const fields = (to: string | null, subjectValue: string, onSubject: (v: string) => void) => (
+    <ComposeFields
+      mail={mail}
+      to={to}
+      name={name}
+      from={from}
+      onFrom={setFrom}
+      cc={cc}
+      onCc={setCc}
+      subject={subjectValue}
+      onSubject={onSubject}
+    />
+  );
   const hasDraft = Boolean((!leftIt && p.draft && sol) || (waiting && answer));
+  const words = "block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none";
   const drafts = (
     <>
       {!leftIt && p.draft && sol && (
         <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
           <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-2 text-[12px] text-muted">
-            <span>To {sol.to ?? `${name} (no email on file)`}</span>
+            <span>Email to {name}</span>
             {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
             {state === "held" && <span>· held</span>}
           </div>
-          <input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            aria-label="Subject"
-            className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
-          />
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={props.inCard ? 4 : 6}
-            aria-label="The email"
-            className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
-          />
+          {fields(sol.to ?? null, subject, setSubject)}
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={7} aria-label="The email" className={words} />
         </div>
       )}
 
       {waiting && answer && (
         <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
           <div className="border-b border-line px-3 py-2 text-[12px] text-muted">
-            {byChat ? `Reply in ${name}'s chat` : `Email to ${name}`}
+            {!byChat ? `Email to ${name}` : asEmail ? `Email to ${name} · also kept in their proposal's chat` : `Reply in ${name}'s chat`}
             {writing && <span className="text-sun-ink"> · writing it again…</span>}
           </div>
-          {!byChat && (
-            <input
-              value={answer.subject}
-              onChange={(e) => keep({ ...answer, subject: e.target.value })}
-              aria-label="Subject"
-              className="w-full border-b border-line bg-surface px-3 py-2 text-[14px] font-semibold text-ink focus:outline-none"
-            />
-          )}
+          {asEmail && fields(mail?.to || null, answer.subject, (v) => keep({ ...answer, subject: v }))}
           <textarea
             value={answer.body}
             onChange={(e) => keep({ ...answer, body: e.target.value })}
-            rows={props.inCard ? 4 : 6}
+            rows={7}
             aria-label={`The reply to ${name}`}
-            className="block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none"
+            className={words}
           />
         </div>
       )}
@@ -297,23 +320,29 @@ export function SolTerminal(props: {
   return (
     <section
       aria-label="Sol"
-      className="overflow-hidden rounded-2xl bg-surface shadow-[0_14px_36px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70"
+      className="@container overflow-hidden rounded-2xl bg-surface shadow-[0_14px_36px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70"
     >
-      <div className={clsx("flex gap-3.5", props.inCard ? "p-3.5 sm:gap-4 sm:p-4" : "p-4 sm:gap-4 sm:p-5")}>
+      <div className="flex gap-3 p-3.5 sm:gap-3.5 sm:p-4">
         <SolLive />
-        <div className={clsx("min-w-0 flex-1", props.inCard && "@container")}>
-          <div className={props.inCard ? "flex flex-col @xl:flex-row @xl:items-start @xl:gap-5" : undefined}>
-            <div className={props.inCard ? "contents @xl:block @xl:min-w-0 @xl:flex-1 [&>*]:order-3" : undefined}>
+        {/* Compact on the deal page too (19 Nov 2026, Martin: "sol is taking up too much space. make smarter design. reduce
+            text size"): smaller words, and his draft beside his line and buttons wherever the card is wide enough. */}
+        <div
+          className={clsx(
+            "min-w-0 flex-1",
+            hasDraft && "@3xl:grid @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] @3xl:items-start @3xl:gap-5",
+          )}
+        >
+          <div className="@3xl:order-2">{drafts}</div>
+          <div className="@3xl:order-1">
+            <div>
               <p
-                className={clsx("min-h-[1.5em] font-medium leading-snug text-ink", props.inCard ? "order-1! text-[13.5px]" : "text-[16px]")}
+                className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink"
                 aria-live="polite"
               >
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>
-              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-2" />}
-
-              {!props.inCard && drafts}
+              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-1.5" />}
 
               {!leftIt && typed.done && waiting && (answer || unwritten) && (
                 <div className="mt-3.5 flex flex-wrap items-center gap-2">
@@ -414,7 +443,7 @@ export function SolTerminal(props: {
                   tellSol();
                 }}
                 // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
-                className="mt-5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+                className="mt-3.5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
               >
                 <span className="font-mono text-[12px] text-sun-line" aria-hidden>
                   {">"}
@@ -452,7 +481,6 @@ export function SolTerminal(props: {
               </form>
               {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
             </div>
-            {props.inCard && hasDraft && <div className="order-2 @xl:min-w-0 @xl:flex-[1.3] @xl:[&>*]:mt-0!">{drafts}</div>}
           </div>
         </div>
       </div>
@@ -561,6 +589,73 @@ function LeadPage({ jobId, name }: { jobId: string; name: string }) {
         </button>
       </span>
       {said && <p className="w-full break-all text-ink-2">{said}</p>}
+    </div>
+  );
+}
+
+/**
+ * The top of an email composer on Sol's draft (19 Nov 2026, Martin): Send from (the business's name through RENUABL's
+ * sender, replies to you; or one of your own Gmail addresses), To (the customer's address as kept on the deal, never
+ * typed here), Cc and the subject.
+ */
+function ComposeFields(props: {
+  mail: { canSend: boolean; replyTo: string; to: string; business: string; from: string[] } | null;
+  to: string | null;
+  name: string;
+  from: string;
+  onFrom: (v: string) => void;
+  cc: string;
+  onCc: (v: string) => void;
+  subject: string;
+  onSubject: (v: string) => void;
+}) {
+  const { mail } = props;
+  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-[13px]";
+  const label = "w-[4.5rem] shrink-0 text-[12px] text-muted";
+  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[13px] text-ink outline-none placeholder:text-muted";
+  return (
+    <div>
+      <label className={row}>
+        <span className={label}>Send from</span>
+        <select value={props.from} onChange={(e) => props.onFrom(e.target.value)} className={clsx(box, "cursor-pointer")}>
+          <option value="">{mail ? `${mail.business} · replies come to ${mail.replyTo}` : "Your business"}</option>
+          {(mail?.from ?? []).map((a) => (
+            <option key={a} value={a}>
+              {a} · your Gmail
+            </option>
+          ))}
+        </select>
+        {mail && mail.from.length === 0 && (
+          <Link
+            href="/design/inbox"
+            className="shrink-0 text-[12px] text-muted underline hover:text-ink"
+            title="Connect your Gmail to send from your own address"
+          >
+            Use my address
+          </Link>
+        )}
+      </label>
+      <div className={row}>
+        <span className={label}>To</span>
+        <span className={clsx("min-w-0 flex-1 truncate py-0.5", props.to ? "text-ink" : "text-warning")}>
+          {props.to ?? `${props.name} has no email on file`}
+        </span>
+      </div>
+      <label className={row}>
+        <span className={label}>Cc</span>
+        <input
+          value={props.cc}
+          onChange={(e) => props.onCc(e.target.value)}
+          placeholder="Add an address, or several with commas"
+          inputMode="email"
+          autoComplete="off"
+          className={box}
+        />
+      </label>
+      <label className={row}>
+        <span className={label}>Subject</span>
+        <input value={props.subject} onChange={(e) => props.onSubject(e.target.value)} className={clsx(box, "font-semibold")} />
+      </label>
     </div>
   );
 }

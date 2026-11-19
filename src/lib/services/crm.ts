@@ -153,11 +153,13 @@ export async function loadDealDesign(
 
 /** Whether a deal's customer can be emailed from here (an email service is set up), and where replies go. */
 export const dealEmailStatus = (jobId: string) =>
-  ask<{ canSend: boolean; replyTo: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/email`);
+  ask<{ canSend: boolean; replyTo: string; to: string; business: string; from: string[] }>(
+    `/api/design/jobs/${encodeURIComponent(jobId)}/email`,
+  );
 /** Emails a deal's customer: sent in the business's name, replies to the member, written on the deal's record. */
 export const emailDeal = (
   jobId: string,
-  email: { to?: string; cc?: string; subject: string; body: string; toCustomer?: boolean },
+  email: { to?: string; cc?: string; subject: string; body: string; toCustomer?: boolean; from?: string },
   files: readonly File[] = [],
 ) => {
   // A Sol draft goes to the customer's address as the server keeps it (`toCustomer`), never one from here.

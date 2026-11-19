@@ -138,6 +138,8 @@ export async function memberReplies(
   jobId: string,
   text: string,
   files: readonly File[] = [],
+  /** Kept in the chat without its own email: the member already emailed these words themselves (the composer on Sol's draft). */
+  quiet = false,
 ): Promise<
   { lines: ChatLine[]; email: ReplyEmail; refused?: undefined } | { refused: string; lines?: undefined; email?: undefined } | null
 > {
@@ -148,7 +150,7 @@ export async function memberReplies(
   const site = siteUrl();
   // Without a proposal out there is nowhere for the customer to read or answer it.
   const block: "switched-off" | "no-address" | "not-set-up" | null =
-    !brand.emailReplies || isDemoEmail(member.email)
+    quiet || !brand.emailReplies || isDemoEmail(member.email)
       ? "switched-off"
       : !found.customer.email
         ? "no-address"

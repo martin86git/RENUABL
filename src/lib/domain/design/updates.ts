@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
     area: "Today",
+    words: "Sol's drafted emails open as a composer: Send from, To, Cc and Subject, with a taller box for the words.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Today",
     words: "Needs you cards run the full width, with Sol's draft beside his note, so a card fits in view.",
   },
   {
