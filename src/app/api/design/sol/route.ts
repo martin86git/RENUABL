@@ -3,7 +3,13 @@ import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { askSol, chooseReminderTime, retrySol } from "@/lib/server/design-sol";
 import { cleanPageContext } from "@/lib/domain/design/page-context";
+import { cleanAnswer, cleanScope } from "@/lib/domain/design/sol-induction";
 import {
+  answerInduction,
+  answerLearn,
+  chooseScope,
+  forgetBusinessPref,
+  setInductionStatus,
   clearSol,
   forgetSolPast,
   markSolSeen,
@@ -84,6 +90,36 @@ export async function POST(request: Request) {
       }
       case "forget-pref":
         return ok(await withSol(businessId, email, (row) => ({ ...row, prefs: row.prefs.filter((p) => p.id !== id) })));
+      // Sol's induction and what he learns in the moment (domain/design/sol-induction.ts). Never while viewing as
+      // someone (the proxy refuses every change then).
+      case "induction": {
+        const said = cleanAnswer(body.answer);
+        const key = typeof body.key === "string" ? body.key.slice(0, 40) : "";
+        if (!said) return Response.json({ ok: false, message: "Choose an answer, or skip it." }, { status: 422 });
+        const state = await answerInduction(businessId, email, key, said);
+        return state ? ok(state) : Response.json({ ok: false, message: "There's no such question." }, { status: 404 });
+      }
+      case "scope": {
+        const scope = cleanScope(body.scope);
+        if (!scope) return Response.json({ ok: false, message: "Choose one." }, { status: 422 });
+        const state = await chooseScope(businessId, email, scope);
+        return state ? ok(state) : Response.json({ ok: false, message: "Only the owner sets this for everyone." }, { status: 403 });
+      }
+      case "induction-status": {
+        const status = body.status === "later" || body.status === "done" || body.status === "pending" ? body.status : null;
+        if (!status) return Response.json({ ok: false, message: "Unknown request." }, { status: 400 });
+        return ok(await setInductionStatus(businessId, email, status));
+      }
+      case "learn": {
+        const at = typeof body.at === "string" ? body.at.slice(0, 40) : "";
+        const choice = cleanAnswer(body.choice, 120) ?? "";
+        const state = await answerLearn(businessId, email, at, choice);
+        return state ? ok(state) : Response.json({ ok: false, message: "That question has been answered." }, { status: 409 });
+      }
+      case "forget-business-pref": {
+        const state = await forgetBusinessPref(businessId, email, id);
+        return state ? ok(state) : Response.json({ ok: false, message: "Only the owner changes these." }, { status: 403 });
+      }
       // Past conversations (domain/design/sol-history.ts): the list, one to read, a new chat, one picked up again,
       // one forgotten. Only ever the member's own.
       case "past":

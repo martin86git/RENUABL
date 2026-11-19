@@ -20,6 +20,7 @@ import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
 import { cleanGoTo, type SolGoTo } from "./sol-goto";
 import { cleanNewCase, cleanRoom, type NewCaseAsk, type SolRoom } from "./sol-rooms";
+import { cleanLearnAsk, prefsBlock, SOL_LEARNING, type BusinessScope, type Induction, type LearnAsk } from "./sol-induction";
 
 export const SOL_NAME = "Sol";
 /** Turns kept in a member's conversation, and how many of the latest are sent with a question. */
@@ -84,6 +85,8 @@ export interface SolTurn {
   newCase?: NewCaseAsk;
   /** A meeting he put up to book (sol-meeting.ts), by its id: the card reads it from the server. */
   meeting?: string;
+  /** A question he put under the answer to learn how they like something done (sol-induction.ts). */
+  learn?: LearnAsk;
 }
 
 /** The longest short line shown for a question. */
@@ -160,6 +163,8 @@ export interface SolPref {
   id: string;
   text: string;
   at: string;
+  /** Where it came from, when Sol learned it ("You told me on 20 Nov, replying to Michelle"). */
+  from?: string;
 }
 
 export interface SolReminder {
@@ -177,6 +182,10 @@ export interface SolState {
   reminders: SolReminder[];
   prefs: SolPref[];
   unread: number;
+  /** The owner's preferences for everyone in the business (sol-induction.ts). */
+  businessPrefs?: SolPref[];
+  /** Where their induction with Sol stands, and whether the owner set the customer questions for everyone. */
+  induction?: { status: Induction["status"]; scope: BusinessScope | null; owner: boolean; firstName: string | null; business: string };
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -226,6 +235,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
       const room = cleanRoom(t.room);
       const newCase = role === "sol" ? cleanNewCase(t.newCase) : undefined;
       const meeting = role === "sol" && isMeetingId(t.meeting) ? t.meeting : undefined;
+      const learn = role === "sol" ? cleanLearnAsk(t.learn) : null;
       const remembered = (Array.isArray(t.remembered) ? t.remembered : [])
         .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object")
         .map((x) => ({ id: str(x.id, 40), question: str(x.question, 300) }))
@@ -250,6 +260,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(room ? { room } : {}),
         ...(newCase ? { newCase } : {}),
         ...(meeting ? { meeting } : {}),
+        ...(learn ? { learn } : {}),
       };
     })
     .filter((t): t is SolTurn => t !== null);
@@ -264,12 +275,17 @@ export function unreadOf(turns: readonly SolTurn[], seenAt: string | null): numb
 
 // ── The member's own preferences ────────────────────────────────────────────────────────────────────────────────
 
-export const MAX_PREFS = 20;
+export const MAX_PREFS = 40;
 
 export function cleanPrefs(raw: unknown): SolPref[] {
   return (Array.isArray(raw) ? raw : [])
     .filter((p): p is Record<string, unknown> => Boolean(p) && typeof p === "object")
-    .map((p) => ({ id: str(p.id, 40), text: str(p.text, 300), at: isTime(p.at) ? (p.at as string) : new Date(0).toISOString() }))
+    .map((p) => ({
+      id: str(p.id, 40),
+      text: str(p.text, 300),
+      at: isTime(p.at) ? (p.at as string) : new Date(0).toISOString(),
+      ...(str(p.from, 160) ? { from: str(p.from, 160) } : {}),
+    }))
     .filter((p) => p.id && p.text)
     .slice(0, MAX_PREFS);
 }
@@ -521,9 +537,11 @@ export function solSystem(input: {
   costs: boolean;
   facts: string;
   prefs: readonly SolPref[];
+  /** The owner's preferences for everyone (sol-induction.ts); the person's own win where they differ. */
+  businessPrefs?: readonly SolPref[];
   now: Date;
 }): string {
-  const prefs = input.prefs.length ? input.prefs.map((p) => `- ${p.id}: ${p.text}`).join("\n") : "- none";
+  const prefs = prefsBlock(input.businessPrefs ?? [], input.prefs);
   return `You are ${SOL_NAME}, the assistant in RENUABL, the software ${input.business} runs its solar business on. You are talking with ${input.member}, a member of ${input.business}'s team, in their own conversation (no one else sees it). Help them with their customers and their work: their deals, what to say to a customer, where things are in RENUABL, and general knowledge about solar, batteries and power bills where it helps.
 
 How you answer: the answer first, compressed to what they need, with the key figures, in plain Australian English. Lay it out to be read at a glance (the screen draws these marks): short paragraphs of one to three sentences with a blank line between them, never a wall of text; a list as a paragraph of its own, one "- " line an item (drawn as round bullets); when one point matters most (a deadline, a catch, the answer itself), that point alone on its own line starting "! " (drawn highlighted), at most one; and any question you put to them on its own line starting "? " (drawn highlighted), never tucked inside a paragraph. When they would choose between a few ways forward, put the question on its "? " line and straight under it two to four options, one "- " line each as "Name: one line on what it means" (drawn as a card of numbered choices they press, with room to answer in their own words); a yes or no question needs no options. Plain text otherwise: no headings, asterisks or bold. Leave out the working and the long lists. When there is more worth telling, end with "${MORE_DETAIL}" on its own line, and give the fuller answer only when they say yes. When a picture says it quicker (a comparison, a breakdown, a trend), draw it with show_chart from figures the facts or a tool gave you, and don't repeat its figures in words. For a labelled picture of a real case (a battery's clearances, a roof's setbacks, how strings run), draw it with show_diagram, and say it is an illustration to check against the rules and the site. When they ask to see a deal's roof design, its panel layout or its strings (by name, or "the next install"), find the deal and show it with show_design: it draws the real design over the roof photo under your answer, so never say you can't show a design; a deal with none yet you still show with show_design, which puts a Start the design button under your answer: say it has no design yet and to press that, never send them through the menus.
@@ -542,7 +560,9 @@ ${SOL_ORACLE}
 
 ${SOL_ON_SCREEN}
 
-Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference.
+Preferences: when they ask for something to apply from now on (a sign-off, their name, a tone), keep it with remember_my_preference; take one off with forget_my_preference. Follow their preferences in everything you do and write: how long your answers are, how you write to customers, what you suggest first.
+
+${SOL_LEARNING}
 
 Reminders: when they ask you to remind them of something, keep it with add_reminder. If they gave a time, pass it and say in a line when you'll remind them. If not, say "I'll add that to your reminders. When would you like me to remind you?" and nothing more: the times are offered as buttons under your answer. When it is due you'll say it in their chat. It is now ${nowWords(input.now)} in ${LAUNCH_MARKET.capital}; work times out from that.
 

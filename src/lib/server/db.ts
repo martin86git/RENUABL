@@ -637,6 +637,18 @@ create table if not exists design_sol (
 );
 -- Sol's past conversations (domain/design/sol-history.ts), newest first.
 alter table design_sol add column if not exists past jsonb not null default '[]';
+-- Sol's induction with each person (domain/design/sol-induction.ts): where it stands, and the topics he has asked
+-- about in the moment, so none is asked twice.
+alter table design_sol add column if not exists induction jsonb not null default '{}';
+-- The owner's preferences for everyone in the business, and whether they set them for all staff ("all") or let each
+-- person set their own ("own"; null until the owner has chosen).
+create table if not exists design_sol_business (
+  business_id text primary key references businesses(id) on delete cascade,
+  prefs jsonb not null default '[]',
+  scope text,
+  set_by text,
+  updated_at timestamptz not null default now()
+);
 -- Ready for you (domain/design/prepared.ts): work Sol prepared for a business's deals (a follow-up drafted when it
 -- falls due, a call's recap email), each once by its key, waiting for a member to send it or put it aside.
 create table if not exists design_prepared (

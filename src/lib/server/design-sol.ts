@@ -74,7 +74,8 @@ interface ToolGuard {
   asked: string;
 }
 import { casesForJob, casesToResolve } from "./design-service-repo";
-import { addSolTurns, newSolId, solState, withSol } from "./design-sol-repo";
+import { addSolTurns, learnState, markLearnAsked, newSolId, solState, withSol } from "./design-sol-repo";
+import { cleanLearnAsk, learnRefusal, type LearnAsk } from "@/lib/domain/design/sol-induction";
 import { addSolCredits, giveBackSolCredit, keepCost, modelFor, takeSolCredit } from "./sol-credits";
 import { RESEARCH_CREDITS, THINK_DEEPER_TOOL, TIER_CREDITS, routeQuestion, type SolTier } from "@/lib/domain/design/sol-routing";
 import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
@@ -391,6 +392,24 @@ const START_SERVICE_CASE_TOOL: Anthropic.Tool = {
   },
 };
 
+/** In their own conversation only: one question under his answer to learn how they like something done. */
+const ASK_HOW_TOOL: Anthropic.Tool = {
+  name: "ask_how_they_work",
+  description:
+    "Ask how they'd generally like something handled, as a card of choices under your answer (\"Ask me each time\" is added). Their press is kept as a preference. Only when the task you just did would change with a preference they don't have; at most one a conversation; never a topic asked before.",
+  input_schema: {
+    type: "object",
+    properties: {
+      key: { type: "string", description: "A short topic key, e.g. think-it-over, price-objection, first-reply." },
+      when: { type: "string", description: "The situation, e.g. When a customer wants time to think." },
+      question: { type: "string", description: "e.g. Would you generally like me to:" },
+      options: { type: "array", items: { type: "string" }, description: "Two to four real ways of handling it, a few words each." },
+      context: { type: "string", description: "What you were doing, e.g. replying to Michelle." },
+    },
+    required: ["key", "when", "question", "options"],
+  },
+};
+
 interface Turn {
   /** A page he opened for them (one an answer). */
   goTo?: SolGoTo;
@@ -409,6 +428,10 @@ interface Turn {
   recalled: KnowledgeEntry[];
   /** What was kept in memory with this answer. */
   remembered: { id: string; question: string }[];
+  /** A question put under the answer to learn how they like something done (sol-induction.ts). */
+  learn?: LearnAsk;
+  /** Answered where the whole business reads it: no questions of his own there. */
+  shared?: boolean;
   /** Datasheets swapped in this answer (at most two). */
   sheetsChanged: number;
   /** The meeting card put up in this answer (sol-meeting.ts), by its id. */
@@ -449,6 +472,16 @@ async function runTool(
     );
     shown.remembered.push({ id: kept.id, question: kept.question });
     return `Kept in memory as ${kept.id}.`;
+  }
+  if (name === "ask_how_they_work") {
+    const ask = cleanLearnAsk(input);
+    if (!ask) return "Not shown: give a topic key, when, the question and two to four options.";
+    if (shown.learn) return "Not shown: one question an answer.";
+    const why = learnRefusal(ask, { ...(await learnState(businessId, email)), shared: Boolean(shown.shared) });
+    if (why) return why;
+    shown.learn = ask;
+    await markLearnAsked(businessId, email, ask.key);
+    return "Shown under your answer, with Ask me each time added. If your answer is already written, reply with nothing more: your words so far stand, and the card speaks for itself. If not, write the full answer now (the task comes first) and end with one short line saying there's a question under it. Never ask the question in your words, and never say the line twice.";
   }
   if (name === "start_service_case") {
     shown.newCase = cleanNewCase(input) ?? { query: "", issue: "" };
@@ -760,13 +793,14 @@ export async function askSol(
       costs,
       facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
       prefs: state.prefs,
+      businessPrefs: state.businessPrefs ?? [],
       now: new Date(),
     }) + (said.retry ? `\n\n${anotherAnswerNote(said.retry.answer)}` : "");
   const ownTools: Anthropic.ToolUnion[] = [
     ...TOOLS,
     ...(costs ? [PRICE_TOOL] : []),
     // Opening a page is for their own conversation, never a channel everyone reads.
-    ...(said.shared ? [] : [OPEN_PAGE_TOOL]),
+    ...(said.shared ? [] : [OPEN_PAGE_TOOL, ASK_HOW_TOOL]),
     ...(said.room === "service" ? [START_SERVICE_CASE_TOOL] : []),
     ...WEB_TOOLS,
   ];
@@ -805,6 +839,7 @@ export async function askSol(
     recalled: [],
     remembered: [],
     sheetsChanged: 0,
+    ...(said.shared ? { shared: true } : {}),
   };
   let answer = "";
   /** The answer given just before he only kept it in memory: his next words add to it rather than replace it. */
@@ -852,7 +887,8 @@ export async function askSol(
         .trim();
       answer = keptAfter && said ? `${keptAfter}\n\n${said}` : said || answer;
       const uses = m.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-      keptAfter = uses.length && uses.every((u) => u.name === "save_knowledge") ? answer : "";
+      // Keeping a memory or asking how they work adds to the answer already given, never replaces it.
+      keptAfter = uses.length && uses.every((u) => u.name === "save_knowledge" || u.name === ASK_HOW_TOOL.name) ? answer : "";
       if (m.stop_reason !== "tool_use" || !uses.length) break;
       merged.push({ role: "assistant", content: m.content });
       const results: Anthropic.ToolResultBlockParam[] = [];
@@ -932,6 +968,7 @@ export async function askSol(
     ...(shown.goTo ? { goTo: shown.goTo } : {}),
     ...(shown.newCase ? { newCase: shown.newCase } : {}),
     ...(shown.meeting ? { meeting: shown.meeting } : {}),
+    ...(shown.learn ? { learn: shown.learn } : {}),
     ...inRoom,
   };
   // Asked again: the new answer takes the old one's place, only once there is one (a failure leaves the old answer).

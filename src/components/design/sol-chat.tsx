@@ -50,8 +50,10 @@ import {
   DRAFT_KEY,
   SOL_CHANGED,
   askSol,
+  forgetBusinessPref,
   forgetPref,
   forgetReminder,
+  setInductionStatus,
   loadSol,
   remindAt,
   solSeen,
@@ -74,6 +76,7 @@ import { SolThinking, SolWorking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { MeetingCard } from "./meeting-card";
+import { LearnCard, SolInduction } from "./sol-induction";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer, type OnPick } from "./sol-text";
 import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
@@ -231,6 +234,7 @@ export function SolChat({
       : [];
 
   const turns = state?.turns ?? [];
+  const inducting = state?.induction?.status === "pending";
   const unread = state?.unread ?? 0;
   // Only a real answer (one that took credits) to the latest question can be tried again.
   const canRetry = Boolean(turns[turns.length - 1]?.credits) && withoutLastExchange(turns) !== null;
@@ -560,7 +564,7 @@ export function SolChat({
       )}
       <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
-        {state && (turns.length === 0 || resting) && !pending && (
+        {state && !inducting && (turns.length === 0 || resting) && !pending && (
           <div className="space-y-2 text-ink-2">
             {resting && lastAt && (
               <button
@@ -644,6 +648,7 @@ export function SolChat({
               <SolDraftCard key={k} draft={d} onOpen={openDraft} />
             ))}
             {t.meeting && <MeetingCard id={t.meeting} />}
+            {t.role === "sol" && t.learn && <LearnCard turn={t} run={runFor} />}
             {t.reminder && (
               <ReminderCard
                 ask={t.reminder}
@@ -700,6 +705,8 @@ export function SolChat({
             </p>
           </div>
         ))}
+        {/* His induction (sol-induction.ts), as his newest words, until it is done or put off for later. */}
+        {inducting && state && <SolInduction state={state} run={runFor} />}
         {problem && <p className="text-xs text-danger">{problem}</p>}
         <div ref={end} />
       </div>
@@ -889,14 +896,43 @@ export function SolChat({
           )}
         </div>
         <div className="rounded-2xl bg-surface p-4 ring-1 ring-line">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Your preferences</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">How I work with you</p>
+          {/* The owner's for everyone (sol-induction.ts): only the owner takes one off. */}
+          {state?.businessPrefs?.length ? (
+            <>
+              <p className="mt-3 text-[12px] font-medium text-ink-2">Set by the owner for everyone</p>
+              <ul className="mt-1.5 space-y-2 text-sm">
+                {state.businessPrefs.map((p) => (
+                  <li key={p.id} className="flex items-start gap-2">
+                    <span className="min-w-0 flex-1 text-ink">{p.text}</span>
+                    {state.induction?.owner && (
+                      <button
+                        type="button"
+                        onClick={() => void run(forgetBusinessPref(p.id))}
+                        aria-label={`Take off: ${p.text}`}
+                        className="text-muted hover:text-ink"
+                      >
+                        <X className="size-3.5" aria-hidden />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {state.prefs.length > 0 && <p className="mt-3 text-[12px] font-medium text-ink-2">Your own (these win)</p>}
+            </>
+          ) : null}
           {!state?.prefs.length ? (
-            <p className="mt-2 text-sm text-muted">None yet. Tell Sol how to sign off your emails, and he&apos;ll keep it.</p>
+            !state?.businessPrefs?.length && (
+              <p className="mt-2 text-sm text-muted">None yet. Answer Sol&apos;s questions, or tell him how you like things done.</p>
+            )
           ) : (
             <ul className="mt-2 space-y-2 text-sm">
               {state.prefs.map((p) => (
                 <li key={p.id} className="flex items-start gap-2">
-                  <span className="min-w-0 flex-1 text-ink">{p.text}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-ink">{p.text}</span>
+                    {p.from && <span className="block text-xs text-muted">{p.from}</span>}
+                  </span>
                   <button
                     type="button"
                     onClick={() => void run(forgetPref(p.id))}
@@ -908,6 +944,15 @@ export function SolChat({
                 </li>
               ))}
             </ul>
+          )}
+          {state?.induction?.status !== "pending" && (
+            <button
+              type="button"
+              onClick={() => void run(setInductionStatus("pending"))}
+              className="mt-3 text-xs font-medium text-ink-2 underline-offset-4 hover:text-ink hover:underline"
+            >
+              Answer Sol&apos;s questions again
+            </button>
           )}
         </div>
         <SolKnows />

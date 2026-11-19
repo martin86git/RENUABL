@@ -8,6 +8,7 @@
  * he was thinking) is dropped. Nothing is emailed: the customer is on the page, and the business is already told of
  * every message its customer writes.
  */
+import { businessVoice } from "./design-prepared";
 import Anthropic from "@anthropic-ai/sdk";
 import { SOL_HANDED_OVER, solReplied } from "@/lib/domain/design/chat";
 import { readSolReply, solCustomerSystem, solDraftAsk, solDraftSystem, solHistory, solMayAnswer } from "@/lib/domain/design/sol-customer";
@@ -108,7 +109,7 @@ export async function solAnswersCustomer(token: string): Promise<void> {
     const m = await client.messages.create({
       model: modelFor(TIER),
       max_tokens: 700,
-      system: solCustomerSystem(proposal.view),
+      system: solCustomerSystem(proposal.view, await businessVoice(found.businessId)),
       messages: solHistory(lines),
     });
     raw = m.content

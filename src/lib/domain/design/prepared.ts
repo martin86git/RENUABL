@@ -15,6 +15,7 @@ import { INTENDED_FIELDS, type IntendedField, type IntendedSystem } from "./call
 import type { DetailKey } from "./crm";
 import { FOLLOW_UP_WORDS } from "./proposal-lists";
 import { nextWorkingDay } from "./today-pad";
+import { voiceBlock } from "./sol-induction";
 
 export type PreparedKind = "follow-up" | "recap" | "hello";
 /** Preparing while Sol writes it; ready to send; then sent or put aside; stale once the reason for it has gone. */
@@ -77,6 +78,8 @@ export interface FollowUpFacts {
   indicative: boolean;
   /** The customer's last words in the proposal's chat, if they have written. */
   lastWord: string | null;
+  /** The business's own preferences for writing to customers (sol-induction.ts `agentVoice`). */
+  voice?: string[];
 }
 
 /** The line under a follow-up in the tray: why it is there. */
@@ -167,6 +170,7 @@ export function followUpPrompt(f: FollowUpFacts): string {
     "- If they wrote in the chat, answer the spirit of it briefly or say the team will come back on it; never make up an answer.",
     "- Never mention a price, a figure, a saving, a discount, a date, a rebate or a product, and never promise anything. Never invent facts about their home or the system.",
     "- Never name anyone at the business.",
+    voiceBlock(f.voice ?? []),
     "Return the subject (under 60 characters) and the body.",
   ]
     .filter(Boolean)

@@ -28,7 +28,7 @@ import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
+import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
 import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
@@ -36,6 +36,7 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
+import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
@@ -228,6 +229,7 @@ export function TodayPad(props: {
         )}
         {!welcoming && onFeed && (
           <div className="pb-6">
+            <InductionReminder />
             <DealFeed
               me={props.email}
               onNew={() => setAdding((a) => !a)}
@@ -325,7 +327,16 @@ export function TodayPad(props: {
         )}
       </div>
 
-      {touring && <Spotlight steps={WELCOME_TOUR} onEnd={() => setTouring(false)} />}
+      {/* The tour ends on Sol: his panel opens on his introduction (sol-induction.ts). */}
+      {touring && (
+        <Spotlight
+          steps={WELCOME_TOUR}
+          onEnd={() => {
+            setTouring(false);
+            window.dispatchEvent(new Event(SOL_INDUCTION));
+          }}
+        />
+      )}
 
       {/* Not on the deal feed (8 Nov 2026, Martin: a third place to ask Sol confused more than it helped; each deal has
           its own chat and Sol's round is in the nav). */}

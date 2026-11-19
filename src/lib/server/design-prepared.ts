@@ -5,6 +5,8 @@
  * lets the drafts be written after the answer has gone back, so the tray never waits on Claude. A draft whose reason
  * has gone (the follow-up marked done, the customer wrote, a newer version went out) is put aside as stale.
  */
+import { agentPrefs } from "./design-sol-repo";
+import { agentVoice } from "@/lib/domain/design/sol-induction";
 import {
   DRAFT_SCHEMA,
   MAX_NEW_AT_ONCE,
@@ -204,6 +206,8 @@ export async function readyFor(
  */
 export async function draftPending(businessId: string, pending: Pending[], sol = true): Promise<void> {
   const apiKey = sol ? parseApiKey(process.env.ANTHROPIC_API_KEY) : null;
+  // The business's own way of writing to customers, from Sol's induction (sol-induction.ts): his agents follow it.
+  const voice = apiKey && pending.length ? await businessVoice(businessId) : [];
   for (const p of pending) {
     let words: { subject: string; body: string } | null = null;
     if (apiKey) {
@@ -214,7 +218,7 @@ export async function draftPending(businessId: string, pending: Pending[], sol =
           businessId,
           "follow-up",
           null,
-          async (ai) => cleanDraft(await readWithClaude<unknown>([], DRAFT_SCHEMA, followUpPrompt(p.facts), apiKey, ai)),
+          async (ai) => cleanDraft(await readWithClaude<unknown>([], DRAFT_SCHEMA, followUpPrompt({ ...p.facts, voice }), apiKey, ai)),
           "deep",
           "follow-up",
         );
@@ -292,4 +296,14 @@ export async function closePrepared(businessId: string, id: string, status: "sen
     [businessId, id, status, by.toLowerCase(), ACTIVE],
   );
   return done.length > 0;
+}
+
+/** The business's preferences for writing to customers, as Sol's agents follow them (sol-induction.ts). */
+export async function businessVoice(businessId: string): Promise<string[]> {
+  try {
+    const { business, owner } = await agentPrefs(businessId);
+    return agentVoice(business, owner);
+  } catch {
+    return [];
+  }
 }

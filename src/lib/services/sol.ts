@@ -35,6 +35,14 @@ export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });
 export const forgetReminder = (id: string) => post({ do: "forget-reminder", id });
 export const forgetPref = (id: string) => post({ do: "forget-pref", id });
+/** Sol's induction and what he learns in the moment (domain/design/sol-induction.ts). */
+export const answerInduction = (key: string, answer: string) => post({ do: "induction", key, answer });
+export const chooseInductionScope = (scope: "all" | "own") => post({ do: "scope", scope });
+export const setInductionStatus = (status: "later" | "done" | "pending") => post({ do: "induction-status", status });
+export const answerLearn = (at: string, choice: string) => post({ do: "learn", at, choice });
+export const forgetBusinessPref = (id: string) => post({ do: "forget-business-pref", id });
+/** Said on the window to open Sol's panel on his introduction (the end of the first visit's tour, Today's card). */
+export const SOL_INDUCTION = "renuabl:sol-induction";
 /** Sol's memory for the business (domain/design/sol-knowledge.ts). */
 export const listSolKnowledge = () =>
   ask<{ knowledge: KnowledgeEntry[] }>("/api/design/sol", { method: "POST", body: { do: "knowledge" } });

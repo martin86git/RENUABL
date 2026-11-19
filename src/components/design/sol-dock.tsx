@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { SolState } from "@/lib/domain/design/sol";
-import { SOL_ASK, SOL_CHANGED, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
+import { SOL_ASK, SOL_CHANGED, SOL_INDUCTION, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-icon";
@@ -42,11 +42,18 @@ export function SolDock() {
       setTucked(false);
       setOpen(true);
     };
+    // His introduction (sol-induction.ts): the panel opens, and the chat shows it while it is still to do.
+    const induct = () => {
+      setTucked(false);
+      setOpen(true);
+    };
     window.addEventListener(SOL_TOGGLE, toggle);
     window.addEventListener(SOL_ASK, asked);
+    window.addEventListener(SOL_INDUCTION, induct);
     return () => {
       window.removeEventListener(SOL_TOGGLE, toggle);
       window.removeEventListener(SOL_ASK, asked);
+      window.removeEventListener(SOL_INDUCTION, induct);
     };
   }, []);
   useEffect(() => {
