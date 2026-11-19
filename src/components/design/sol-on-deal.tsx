@@ -9,7 +9,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUp, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowUp, Handshake, Loader2 } from "lucide-react";
 import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
 import { boxMove } from "@/lib/domain/design/deal-box";
 import { dealContext, solProposes } from "@/lib/domain/design/sol-on-deal";
@@ -79,6 +80,8 @@ export function SolTerminal(props: {
   onMove: (kind: Exclude<MoveKind, "review" | "call"> | "email") => void;
   /** Inside a card on Today (18 Nov 2026, Martin: Needs you as Sol's panel too): the card says the context and has the page. */
   inCard?: boolean;
+  /** The deal's page: Open deal at the right of Sol's yes and no (19 Nov 2026, Martin: "the open the deal button as the far right option under sols drafted email"). */
+  openDeal?: string;
 }) {
   const { deal, now } = props;
   const p = solProposes(deal, now);
@@ -226,6 +229,17 @@ export function SolTerminal(props: {
   const quiet =
     "inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
 
+  const openDealLink = props.openDeal ? (
+    <Link
+      href={props.openDeal}
+      title={`${deal.customer}'s deal`}
+      className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+    >
+      Open deal
+      <Handshake className="size-4" aria-hidden />
+    </Link>
+  ) : null;
+
   return (
     <section
       aria-label="Sol"
@@ -308,6 +322,7 @@ export function SolTerminal(props: {
                   {byChat ? "Write it myself" : `Email ${name} myself`}
                 </button>
               )}
+              {openDealLink}
             </div>
           )}
 
@@ -342,8 +357,10 @@ export function SolTerminal(props: {
                 Something else
               </button>
               {changed && <span className="text-[12px] text-muted">Your changes go with it.</span>}
+              {openDealLink}
             </div>
           )}
+          {props.openDeal && (leftIt || !typed.done) && <div className="mt-3.5 flex">{openDealLink}</div>}
 
           {other && !leftIt && p.draft && sol?.id && (
             <div className="mt-2.5">

@@ -1179,6 +1179,7 @@ function DealCard(props: {
           <div className="mt-3">
             <SolTerminal
               inCard
+              openDeal={`${PATHS.deals}/${d.jobId}`}
               jobId={d.jobId}
               phone={d.phone ?? null}
               deal={d}
@@ -1296,15 +1297,18 @@ function DealCard(props: {
                 <MessageCircle className="size-4" aria-hidden />
               </Tool>
             )}
-            {/* Always in words, so the way into the deal is plain to find (18 Nov 2026, Martin: "Open Deal then the icon"). */}
-            <Link
-              href={`${PATHS.deals}/${d.jobId}`}
-              title={`${d.customer}'s deal`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
-            >
-              Open deal
-              <Handshake className="size-4" aria-hidden />
-            </Link>
+            {/* Always in words, so the way into the deal is plain to find (18 Nov 2026, Martin: "Open Deal then the icon");
+                with Sol's panel it sits at the right of his yes and no instead. */}
+            {!solPanel && (
+              <Link
+                href={`${PATHS.deals}/${d.jobId}`}
+                title={`${d.customer}'s deal`}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+              >
+                Open deal
+                <Handshake className="size-4" aria-hidden />
+              </Link>
+            )}
             {need && (
               <span className="ml-auto">
                 <MarkButtons busy={marking} onDone={() => void mark("done")} onLater={(c) => void mark("later", c)} />
