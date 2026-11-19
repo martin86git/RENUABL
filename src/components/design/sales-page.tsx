@@ -233,7 +233,8 @@ function SignUpLink({ dark = false }: { dark?: boolean }) {
 /**
  * A sign-up that follows the reader down the page (3 Nov 2026, Martin: there are a lot of slides, so every one is a
  * chance to sign up): once the hero's box has scrolled away, a bar at the foot of the screen with the email box and
- * Get started; it goes again over the closing box, and can be put away for the visit.
+ * Get started; it goes again over the closing box (and on a phone over the assisted designer), and can be put away for
+ * the visit.
  */
 function StickySignUp() {
   const [show, setShow] = useState(false);
@@ -243,13 +244,15 @@ function StickySignUp() {
     const hero = document.getElementById("start");
     const pricing = document.getElementById("pricing");
     const closing = document.getElementById("closing");
+    // On a phone it also goes over the assisted designer, whose picture it would cover (19 Nov 2026, Martin).
+    const designer = window.matchMedia("(max-width: 639px)").matches ? document.getElementById("designer") : null;
     if (!hero || !("IntersectionObserver" in window)) return;
     const on = new Map<Element, boolean>([[hero, true]]);
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) on.set(e.target, e.isIntersecting);
       setShow(![...on.values()].some(Boolean));
     });
-    for (const el of [hero, pricing, closing]) if (el) io.observe(el);
+    for (const el of [hero, pricing, closing, designer]) if (el) io.observe(el);
     // How far down the page they are, drawn as a fine line along the bar's foot.
     let frame = 0;
     const scrolled = () => {
