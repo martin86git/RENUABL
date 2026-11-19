@@ -52,10 +52,12 @@ import {
   type BlockId,
   type BlockSetting,
   type ViewBlock,
+  STEP_LIMITS,
+  type StepWords,
 } from "@/lib/domain/design/blocks";
 import { FONTS, type BrandImage, type BrandKit, type ImageKind } from "@/lib/domain/design/brand";
 import { customPriceWords } from "@/lib/domain/design/custom-proposals";
-import type { ProposalView } from "@/lib/domain/design/proposal";
+import { INDICATIVE_INTRO, INDICATIVE_STEPS, type ProposalView } from "@/lib/domain/design/proposal";
 import { addBrandImage, loadBrand, removeBrandImage, saveBrand } from "@/lib/services/proposals";
 import { ui } from "./design-shell";
 import type { BuildHooks } from "./proposal-view";
@@ -577,6 +579,11 @@ function BlockWords({
 }) {
   const [heading, setHeading] = useState(setting.heading);
   const [words, setWords] = useState(setting.words);
+  // How we work's three steps, in the business's words (blank is ours).
+  const [steps, setSteps] = useState<StepWords[]>(() =>
+    INDICATIVE_STEPS.map((_, i) => ({ name: setting.steps?.[i]?.name ?? "", words: setting.steps?.[i]?.words ?? "" })),
+  );
+  const how = setting.id === "how";
   const wait = useRef<number | null>(null);
   const later = (patch: Partial<BlockSetting>) => {
     if (wait.current) window.clearTimeout(wait.current);
@@ -594,29 +601,67 @@ function BlockWords({
           placeholder={usual || "A heading of your own"}
           onChange={(e) => {
             setHeading(e.target.value);
-            later({ heading: e.target.value, words });
+            later({ heading: e.target.value, words, ...(how ? { steps } : {}) });
           }}
         />
       </label>
       <label className={clsx(ui.label, "mt-3 block")}>
-        Your words {isCustom(setting.id) ? "" : "(shown at the top of this block)"}
+        {how ? "Its opening line" : `Your words ${isCustom(setting.id) ? "" : "(shown at the top of this block)"}`}
         <textarea
-          className={clsx(ui.input, "mt-1.5 min-h-24 py-2")}
+          className={clsx(ui.input, "mt-1.5 py-2", how ? "min-h-16" : "min-h-24")}
           value={words}
           maxLength={1500}
+          placeholder={how ? INDICATIVE_INTRO : undefined}
           onChange={(e) => {
             setWords(e.target.value);
-            later({ heading, words: e.target.value });
+            later({ heading, words: e.target.value, ...(how ? { steps } : {}) });
           }}
         />
       </label>
-      <p className="mt-2 text-xs text-muted">The figures in a block come from the design, so they can&apos;t be written over here.</p>
+      {how &&
+        INDICATIVE_STEPS.map((usual, i) => (
+          <fieldset key={i} className="mt-3 rounded-lg border border-line p-3">
+            <legend className="px-1 text-xs font-medium text-muted">
+              Step {i + 1}
+              {i === 0 ? " · You are here" : ""}
+            </legend>
+            <input
+              className={ui.input}
+              value={steps[i].name}
+              maxLength={STEP_LIMITS.name}
+              placeholder={usual.name}
+              aria-label={`Step ${i + 1}'s name`}
+              onChange={(e) => {
+                const next = steps.map((s, j) => (j === i ? { ...s, name: e.target.value } : s));
+                setSteps(next);
+                later({ heading, words, steps: next });
+              }}
+            />
+            <textarea
+              className={clsx(ui.input, "mt-2 min-h-16 py-2")}
+              value={steps[i].words}
+              maxLength={STEP_LIMITS.words}
+              placeholder={usual.words}
+              aria-label={`Step ${i + 1}'s words`}
+              onChange={(e) => {
+                const next = steps.map((s, j) => (j === i ? { ...s, words: e.target.value } : s));
+                setSteps(next);
+                later({ heading, words, steps: next });
+              }}
+            />
+          </fieldset>
+        ))}
+      <p className="mt-2 text-xs text-muted">
+        {how
+          ? "Anything left blank keeps our wording, shown faint in the box."
+          : "The figures in a block come from the design, so they can't be written over here."}
+      </p>
       <button
         type="button"
         className={clsx(ui.quiet, "mt-3")}
         onClick={() => {
           if (wait.current) window.clearTimeout(wait.current);
-          onSet({ heading, words });
+          onSet({ heading, words, ...(how ? { steps } : {}) });
           onDone();
         }}
       >

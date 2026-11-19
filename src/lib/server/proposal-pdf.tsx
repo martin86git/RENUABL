@@ -16,7 +16,7 @@
  * the same wording as the page.
  */
 import { Document, Image, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
-import { blockHeading, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
+import { blockHeading, stepsShown, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { contrast, fontOf, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
 import { batteryHero } from "@/lib/domain/design/battery-hero";
 import { money } from "@/lib/domain/design/deposit";
@@ -208,6 +208,8 @@ function ProposalDocument({
   );
 
   // Each block's own content, by its id, as on the page: null when this proposal has nothing for it.
+  // How we work, as the business worded it (only on an indicative proposal, and only while it is shown).
+  const how = viewBlocks(view).find((block) => block.id === "how");
   const content: Record<BlockId, () => React.ReactNode> = {
     cover: () => null,
     system: () => (
@@ -394,6 +396,9 @@ function ProposalDocument({
           ))}
         </View>
       ) : null,
+    // On the PDF, At a glance is the cover's row of figures and How we work is said under going ahead (below).
+    how: () => null,
+    figures: () => null,
     "custom-1": () => null,
     "custom-2": () => null,
     "custom-3": () => null,
@@ -411,8 +416,12 @@ function ProposalDocument({
           </View>
         ) : view.indicative ? (
           <Text>
-            How we work: {INDICATIVE_STEPS.map((step, i) => `${i + 1}. ${step.name}: ${step.words}`).join(" ")} Tell us what you think in
-            the chat on your proposal online, or get in touch: {contact || b.name}.
+            {how
+              ? `${how.words ? `${how.words} ` : ""}How we work: ${stepsShown(how.steps, INDICATIVE_STEPS)
+                  .map((step, i) => `${i + 1}. ${step.name}: ${step.words}`)
+                  .join(" ")} `
+              : ""}
+            Tell us what you think in the chat on your proposal online, or get in touch: {contact || b.name}.
           </Text>
         ) : (
           <Text>
@@ -542,19 +551,21 @@ function ProposalDocument({
         )}
         {view.note ? <Text style={{ marginTop: 18 }}>{view.note}</Text> : null}
         {coverBlock && (coverBlock.words || coverBlock.image) ? <View style={{ marginTop: 14 }}>{own(coverBlock)}</View> : null}
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
-          {[
-            ...(view.system.kw > 0 ? [[`${view.system.kw} kW`, `${view.system.panels} panels`]] : []),
-            ...(view.system.batteryKwh ? [[`${view.system.batteryKwh} kWh`, "battery storage"]] : []),
-            ...(view.production ? [[`${view.production.yearKwh.toLocaleString("en-AU")} kWh`, "a year, estimated"]] : []),
-            [dollars(view.price.youPay), "you pay, after the federal rebate"],
-          ].map(([figure, words]) => (
-            <View key={words} style={[s.card, { flex: 1 }]}>
-              <Text style={{ fontSize: 15, fontFamily: "Helvetica-Bold" }}>{figure}</Text>
-              <Text style={s.small}>{words}</Text>
-            </View>
-          ))}
-        </View>
+        {blocks.some((block) => block.id === "figures") && (
+          <View style={{ flexDirection: "row", gap: 10, marginTop: 18 }}>
+            {[
+              ...(view.system.kw > 0 ? [[`${view.system.kw} kW`, `${view.system.panels} panels`]] : []),
+              ...(view.system.batteryKwh ? [[`${view.system.batteryKwh} kWh`, "battery storage"]] : []),
+              ...(view.production ? [[`${view.production.yearKwh.toLocaleString("en-AU")} kWh`, "a year, estimated"]] : []),
+              [dollars(view.price.youPay), "you pay, after the federal rebate"],
+            ].map(([figure, words]) => (
+              <View key={words} style={[s.card, { flex: 1 }]}>
+                <Text style={{ fontSize: 15, fontFamily: "Helvetica-Bold" }}>{figure}</Text>
+                <Text style={s.small}>{words}</Text>
+              </View>
+            ))}
+          </View>
+        )}
         {hero && (
           <View style={[s.card, { marginTop: 14 }]} wrap={false}>
             <Text style={s.eyebrow}>Your battery</Text>
@@ -590,6 +601,7 @@ function ProposalDocument({
       <Page size="A4" style={[s.page, { fontFamily: fontOf(view.theme.font).pdfBody }]}>
         {blocks
           .filter((block) => block.id !== "cover")
+          .map((block) => (block.id === "how" ? { ...block, words: "" } : block))
           .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))
           .filter(({ inner, hasOwn }) => inner || hasOwn)
           .map(({ block, inner, hasOwn }, i) => {

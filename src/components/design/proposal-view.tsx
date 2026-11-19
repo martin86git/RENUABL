@@ -8,7 +8,9 @@ import {
   isCustom,
   PICTURE_PLACE_USUAL,
   PICTURE_SIZE,
+  stepsShown,
   viewBlocks,
+  type StepWords,
   type BlockId,
   type ViewBlock,
 } from "@/lib/domain/design/blocks";
@@ -740,12 +742,12 @@ function Thoughts({
   );
 }
 
-/** How the business works from an indicative proposal, in three steps, the first lit. */
-function HowWeWork() {
+/** How the business works from an indicative proposal, in three steps (in its own words where it gave them), the first lit. */
+function HowWeWork({ steps }: { steps?: StepWords[] }) {
   return (
     <ol className="grid gap-3 sm:grid-cols-3" aria-label="How we work">
-      {INDICATIVE_STEPS.map((step, i) => (
-        <li key={step.name} className={clsx(card, "sm:p-5", i === 0 && "shadow-[0_0_0_1px_var(--primary)]")}>
+      {stepsShown(steps, INDICATIVE_STEPS).map((step, i) => (
+        <li key={i} className={clsx(card, "sm:p-5", i === 0 && "shadow-[0_0_0_1px_var(--primary)]")}>
           <p className={clsx("text-[12px] font-medium tracking-[0.16em]", i === 0 ? "text-[color:var(--primary)]" : "text-muted")}>
             {String(i + 1).padStart(2, "0")}
             {i === 0 ? " · You are here" : ""}
@@ -871,8 +873,37 @@ export function ProposalPage({
       </p>
     </>
   );
+  // Every block's content, its own words aside, finds its block here (How we work's words are its opening line).
+  const blockOf = (id: BlockId) => blocks.find((block) => block.id === id);
+  const stands = (
+    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
+      <p className={fine}>The price stands until {day(view.validUntil)}.</p>
+      {urls.pdf && (
+        <a href={urls.pdf} className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">
+          <Download className="size-4" aria-hidden /> Download as a PDF
+        </a>
+      )}
+    </div>
+  );
   const content: Record<BlockId, () => React.ReactNode> = {
     cover: () => null,
+    // How we work and At a glance were part of the cover until 19 Nov 2026 (Martin: "edit the text / delete / re arrange
+    // the blocks here in the build tool"): blocks of their own, so they move, hide and take the business's words.
+    how: () =>
+      view.indicative ? (
+        <div>
+          <p className="max-w-2xl whitespace-pre-line text-[16px] leading-relaxed text-ink">{blockOf("how")?.words || INDICATIVE_INTRO}</p>
+          <div className="mt-4">
+            <HowWeWork steps={blockOf("how")?.steps} />
+          </div>
+        </div>
+      ) : null,
+    figures: () => (
+      <>
+        <Headline view={view} />
+        {stands}
+      </>
+    ),
     system: () => (
       <div className={card}>
         {view.system.details.map((d) => (
@@ -1253,34 +1284,15 @@ export function ProposalPage({
               </div>
             )}
             {hero && <div className="mt-8">{hero.kind === "roof" ? roofPicture(hero) : <BatteryDay hero={hero} />}</div>}
-            {view.indicative && (
-              <div className="mt-8">
-                <p className="max-w-2xl text-[16px] leading-relaxed text-ink">{INDICATIVE_INTRO}</p>
-                <div className="mt-4">
-                  <HowWeWork />
-                </div>
-              </div>
-            )}
-            <div className="mt-8">
-              <Headline view={view} />
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-              <p className={fine}>The price stands until {day(view.validUntil)}.</p>
-              {urls.pdf && (
-                <a
-                  href={urls.pdf}
-                  className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-ink underline underline-offset-4"
-                >
-                  <Download className="size-4" aria-hidden /> Download as a PDF
-                </a>
-              )}
-            </div>
+            {/* With At a glance hidden, how long the price stands still shows, under the cover. */}
+            {!blockOf("figures") && stands}
           </section>,
         )}
 
         {/* The rest, in the business's own order: each block under its heading, with the business's own words and picture first. */}
         {blocks
           .filter((block) => block.id !== "cover")
+          .map((block) => (block.id === "how" ? { ...block, words: "" } : block))
           .map((block) => ({ block, inner: content[block.id](), hasOwn: Boolean(block.words || block.image) }))
           .filter(({ block, inner, hasOwn }) => inner || hasOwn || (build && isCustom(block.id)))
           .map(({ block, inner, hasOwn }, i) => {

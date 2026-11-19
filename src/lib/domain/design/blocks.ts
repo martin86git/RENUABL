@@ -17,8 +17,21 @@ export const BLOCKS = [
     id: "cover",
     name: "Cover",
     heading: "",
-    about: "Who the proposal is from and for, the three figures that sum it up, and your note.",
+    about: "Who the proposal is from and for, the roof or the battery, and your note.",
     locked: true,
+  },
+  {
+    id: "how",
+    name: "How we work",
+    heading: "",
+    about:
+      "On an indicative proposal only: a line on what it is, then the three steps to the final proposal, the first marked You are here.",
+  },
+  {
+    id: "figures",
+    name: "At a glance",
+    heading: "",
+    about: "The system's size, the estimated yearly saving and what the customer pays, with how long the price stands.",
   },
   { id: "system", name: "The system", heading: "Your system", about: "The panels, inverter and battery, and what is known of the home." },
   { id: "roof", name: "Roof layout", heading: "Your roof", about: "The panels as designed, seen from above." },
@@ -165,7 +178,20 @@ export interface BlockSetting {
   size: number;
   x: number;
   y: number;
+  /** How we work only: its three steps in the business's own words (an empty name or words is the usual one). */
+  steps?: StepWords[];
 }
+
+/** One of How we work's steps, as the business has worded it. */
+export interface StepWords {
+  name: string;
+  words: string;
+}
+/** How many steps How we work has, and how long each part may be. */
+export const STEP_LIMITS = { count: 3, name: 40, words: 240 } as const;
+
+/** The blocks that open a proposal under its cover: put back there, not at the end, for a kit or a proposal from before them. */
+const UNDER_COVER: readonly BlockId[] = ["how", "figures"];
 
 /** The blocks as every business starts: all the usual ones on, in the usual order, its own three off. */
 export function defaultBlocks(): BlockSetting[] {
@@ -223,12 +249,36 @@ export function cleanBlocks(raw: unknown): BlockSetting[] {
       size: isFixed(e.id) ? PICTURE_SIZE.usual : cleanPictureSize(e.size),
       x: isFixed(e.id) ? PICTURE_PLACE_USUAL : cleanPicturePlace(e.x),
       y: isFixed(e.id) ? PICTURE_PLACE_USUAL : cleanPicturePlace(e.y),
+      ...(e.id === "how" ? stepsOf(e.steps) : {}),
     });
   }
-  for (const block of defaultBlocks()) if (!seen.has(block.id)) out.push(block);
+  // A block that came after the kit was saved goes in its usual place: under the cover for How we work and At a
+  // glance (they were part of the cover before), else after the rest.
+  const missing = defaultBlocks().filter((b) => !seen.has(b.id));
+  const under = missing.filter((b) => UNDER_COVER.includes(b.id));
+  if (under.length) {
+    const cover = out.findIndex((b) => b.id === "cover");
+    out.splice(cover < 0 ? 0 : cover + 1, 0, ...under);
+  }
+  for (const block of missing) if (!UNDER_COVER.includes(block.id)) out.push(block);
   // The cover opens the proposal and the standard terms close it, whatever order was sent.
   const middle = out.filter((b) => b.id !== "cover" && !isFixed(b.id));
   return [...out.filter((b) => b.id === "cover"), ...middle, ...out.filter((b) => isFixed(b.id))];
+}
+
+/** How we work's steps as sent, cleaned: three, each a name and words; none kept when all are the usual ones. */
+function stepsOf(raw: unknown): { steps?: StepWords[] } {
+  const list = Array.isArray(raw) ? raw : [];
+  const steps = Array.from({ length: STEP_LIMITS.count }, (_, i) => {
+    const e = (list[i] && typeof list[i] === "object" ? list[i] : {}) as Record<string, unknown>;
+    return { name: text(e.name, STEP_LIMITS.name, false), words: text(e.words, STEP_LIMITS.words, false) };
+  });
+  return steps.some((s) => s.name || s.words) ? { steps } : {};
+}
+
+/** How we work's steps as shown: the business's own wording where it gave one, else the usual. */
+export function stepsShown(own: readonly StepWords[] | undefined, usual: readonly StepWords[]): StepWords[] {
+  return usual.map((step, i) => ({ name: own?.[i]?.name || step.name, words: own?.[i]?.words || step.words }));
 }
 
 /**
@@ -253,7 +303,9 @@ export function nextOwnBlock(blocks: readonly BlockSetting[]): BlockId | null {
 /** The list with one block moved a place up or down. The cover stays first and the standard terms last: nothing moves past either. */
 export function moveBlock(blocks: readonly BlockSetting[], id: BlockId, by: -1 | 1): BlockSetting[] {
   const from = blocks.findIndex((b) => b.id === id);
-  const to = from + by;
+  // Past the hidden blocks to the next one shown, so every press moves it on the page (19 Nov 2026).
+  let to = from + by;
+  while (to > 0 && to < blocks.length - 1 && !blocks[to].on && !isFixed(blocks[to].id)) to += by;
   if (from < 1 || to < 1 || to >= blocks.length || isFixed(blocks[from].id) || isFixed(blocks[to].id)) return [...blocks];
   const next = [...blocks];
   [next[from], next[to]] = [next[to], next[from]];
@@ -273,6 +325,8 @@ export interface ViewBlock {
   size?: number;
   x?: number;
   y?: number;
+  /** How we work's steps in the business's words (left out when as usual). */
+  steps?: StepWords[];
 }
 
 /**
@@ -294,6 +348,7 @@ export function blocksForView(
       ...(block.layout !== "stack" ? { layout: block.layout } : {}),
       ...(block.tone === "dark" ? { tone: block.tone } : {}),
       ...(block.image && !pictureAsUsual(block) ? { size: block.size, x: block.x, y: block.y } : {}),
+      ...(block.steps ? { steps: block.steps } : {}),
     }));
 }
 
@@ -311,6 +366,7 @@ export function blocksAreUsual(blocks: readonly BlockSetting[]): boolean {
         !b.image &&
         b.layout === "stack" &&
         b.tone === "light" &&
+        !b.steps &&
         pictureAsUsual(b),
     )
   );
@@ -332,8 +388,15 @@ export const NOT_ON_INDICATIVE: readonly BlockId[] = ["payment", "conditions", "
  * An indicative proposal leaves out `NOT_ON_INDICATIVE`.
  */
 export function viewBlocks(view: { blocks?: ViewBlock[]; indicative?: boolean }): ViewBlock[] {
-  const blocks = view.blocks?.length ? view.blocks : USUAL_BLOCKS;
-  return view.indicative ? blocks.filter((b) => !NOT_ON_INDICATIVE.includes(b.id)) : blocks;
+  let blocks = view.blocks?.length ? view.blocks : USUAL_BLOCKS;
+  // A proposal published before How we work and At a glance were blocks of their own had them in its cover: they stay there.
+  if (!blocks.some((b) => UNDER_COVER.includes(b.id))) {
+    const cover = blocks.findIndex((b) => b.id === "cover");
+    const under = UNDER_COVER.map((id) => ({ id, heading: "", words: "", image: null }));
+    blocks = [...blocks.slice(0, cover + 1), ...under, ...blocks.slice(cover + 1)];
+  }
+  // How we work is only for an indicative proposal; a final one leaves out what goes with the indicative.
+  return view.indicative ? blocks.filter((b) => !NOT_ON_INDICATIVE.includes(b.id)) : blocks.filter((b) => b.id !== "how");
 }
 
 /** A block's heading as it is shown: the business's own, else the usual one (`fallback` for a block whose usual heading depends on the proposal). */

@@ -260,9 +260,9 @@ describe("the proposal's blocks", () => {
     expect(
       moveBlock(blocks, "roof", -1)
         .map((b) => b.id)
-        .slice(0, 4),
-    ).toEqual(["cover", "roof", "system", "production"]);
-    expect(moveBlock(blocks, "system", -1)).toEqual(blocks);
+        .slice(0, 5),
+    ).toEqual(["cover", "how", "figures", "roof", "system"]);
+    expect(moveBlock(blocks, "how", -1)).toEqual(blocks);
     expect(moveBlock(blocks, "cover", 1)).toEqual(blocks);
     // The standard terms close the proposal: they don't move, and nothing moves below them.
     expect(blocks[blocks.length - 1].id).toBe("terms");
@@ -271,8 +271,8 @@ describe("the proposal's blocks", () => {
     expect(
       moveBlock(blocks, "system", 1)
         .map((b) => b.id)
-        .slice(0, 3),
-    ).toEqual(["cover", "roof", "system"]);
+        .slice(0, 5),
+    ).toEqual(["cover", "how", "figures", "roof", "system"]);
   });
   it("read back from an old or damaged kit as the usual blocks", () => {
     expect(readBrandKit({ name: "Example Solar" }, "Example Solar").blocks).toEqual(defaultBlocks());
@@ -284,7 +284,9 @@ describe("the proposal's blocks", () => {
     expect(blockHeading({ id: "price", heading: "" })).toBe("Your price");
     expect(blockHeading({ id: "price", heading: "The investment" })).toBe("The investment");
     expect(blockHeading({ id: "about", heading: "" }, "About Example Solar")).toBe("About Example Solar");
-    expect(viewBlocks({})).toBe(USUAL_BLOCKS);
+    // A final proposal leaves out How we work, which is only for an indicative one.
+    expect(viewBlocks({})).toEqual(USUAL_BLOCKS.filter((b) => b.id !== "how"));
+    expect(viewBlocks({ indicative: true }).map((b) => b.id)).toContain("how");
     expect(USUAL_BLOCKS.map((b) => b.id)).not.toContain("custom-1");
   });
 });
@@ -342,15 +344,16 @@ describe("a proposal with the business's terms and blocks", () => {
     // The business's own arrangement is its custom design (the standard one keeps every block in its usual place).
     const { view } = built({ blocks, design: "custom" }, [...SAMPLE_IMAGES, picture]);
     const ids = view.blocks!.map((b) => b.id);
-    expect(ids.slice(0, 4)).toEqual(["cover", "price", "custom-1", "system"]);
+    // How we work and At a glance, which the kit doesn't mention, go under the cover (How we work only when indicative).
+    expect(ids.slice(0, 5)).toEqual(["cover", "how", "figures", "price", "custom-1"]);
     expect(ids).not.toContain("roof");
     expect(ids).not.toContain("bill");
     expect(ids).not.toContain("custom-2");
     // The ones a customer must see are there whatever was switched off.
     for (const id of ["cover", "price", "accept", "conditions"]) expect(ids).toContain(id);
-    expect(view.blocks![1]).toEqual({ id: "price", heading: "The investment", words: "", image: null });
-    expect(view.blocks![2]).toEqual({ id: "custom-1", heading: "Our team", words: "Ten years on roofs.", image: picture });
-    expect(view.blocks![3].image).toBeNull();
+    expect(view.blocks![3]).toEqual({ id: "price", heading: "The investment", words: "", image: null });
+    expect(view.blocks![4]).toEqual({ id: "custom-1", heading: "Our team", words: "Ten years on roofs.", image: picture });
+    expect(view.blocks![5].image).toBeNull();
   });
   it("still carries no cost, margin or product code, with every term and block set", () => {
     const { view, internal } = built({
