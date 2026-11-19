@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
+import { ShadeSummary } from "./shade-summary";
+import { accessColour } from "@/lib/domain/design/shade";
 import clsx from "clsx";
 import { Download, FileText } from "lucide-react";
 import {
@@ -136,6 +138,7 @@ export function Roof({
   hero,
   frame,
   line,
+  shadeView,
 }: {
   view: ProposalView;
   src: string | null;
@@ -148,6 +151,8 @@ export function Roof({
    * along it.
    */
   line?: { x: number; y: number } | null;
+  /** Each panel tinted by its share of the year's direct sun, with the figure on it, when the proposal carries shade. */
+  shadeView?: boolean;
 }) {
   // The picture is shown only once it is known to have come: a picture that can't be had (no map service here, or
   // the place has none) must leave the plain ground, not a broken image.
@@ -245,10 +250,36 @@ export function Roof({
           />
         ))}
         <g stroke="rgb(255 255 255 / 0.16)" strokeWidth={0.35} shapeRendering="geometricPrecision">
-          {view.roof.panels
-            .flatMap((p, i) => cellLines(p).map((l, j) => <line key={`c${i}-${j}`} x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />))
-            .map((el) => el)}
+          {view.roof.panels.flatMap((p, i) =>
+            cellLines(p).map((l, j) => <line key={`c${i}-${j}`} x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />),
+          )}
         </g>
+        {shadeView &&
+          view.roof.shade &&
+          view.roof.panels.map((p, i) => {
+            const access = view.roof.shade!.panels[i];
+            if (typeof access !== "number") return null;
+            const c = [0, 2, 4, 6].map((k) => [width / 2 + p[k] / scale, height / 2 + p[k + 1] / scale]);
+            const cx = Math.round(((c[0][0] + c[1][0] + c[2][0] + c[3][0]) / 4) * 100) / 100;
+            const cy = Math.round(((c[0][1] + c[1][1] + c[2][1] + c[3][1]) / 4) * 100) / 100;
+            const short = Math.min(Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]), Math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1]));
+            return (
+              <g key={`sh${i}`}>
+                <polygon points={[0, 2, 4, 6].map((k) => at(p[k], p[k + 1])).join(" ")} fill={accessColour(access)} fillOpacity={0.72} />
+                <text
+                  x={cx}
+                  y={cy}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={Math.round(short * 0.42 * 100) / 100}
+                  fontWeight={600}
+                  fill="#0b0b0c"
+                >
+                  {Math.min(access < 1 ? 99 : 100, Math.floor(access * 100))}
+                </text>
+              </g>
+            );
+          })}
         {line && view.roof.panels.length > 0 && <SolarLine from={mid as [number, number]} to={[bx + bw * line.x, by + bh * line.y]} />}
         {hero && (
           <>
@@ -969,6 +1000,7 @@ export function ProposalPage({
         The {view.system.panels} panels as designed, seen from above. {ROOF_NOTE}
         {withHero && ` ${withHero.note}`}
       </p>
+      {view.roof.shade && <ShadeSummary shade={view.roof.shade} className="mt-6" />}
     </>
   );
   // Every block's content, its own words aside, finds its block here (How we work's words are its opening line).

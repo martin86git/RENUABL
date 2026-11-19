@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { shadeFromReport, type DesignShade } from "@/lib/domain/design/design-shade";
 import { useRouter } from "next/navigation";
 import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
 import { loadTerrain, type Heights } from "@/lib/services/terrain";
@@ -1503,6 +1504,11 @@ export function RoofDesigner(props: {
         : "Nearmap"
       : null;
   const [shadeOn, setShadeOn] = useState(false);
+  // Each design's latest reading, kept to go with its quote on the next save (19 Nov 2026, Martin: shade on the proposal).
+  // Apart from the quotes, so a reading never marks the design changed; a design changed since shows none at publish.
+  const [shadeKept, setShadeKept] = useState<Record<number, DesignShade>>(() =>
+    Object.fromEntries(props.extras.quotes.flatMap((q, i) => (q.shade ? [[i, q.shade]] : []))),
+  );
   // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
   const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
   // The heights are read once there are panels on the roof, so shaded panels show as they are laid (10 Nov 2026,
@@ -1826,7 +1832,11 @@ export function RoofDesigner(props: {
   // The quote's postcode is the roof's own: the one in the address searched for. One typed before that rule stays only where the address has none.
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
-  const everyQuote = () => designs.map((_, i) => quotes[i] ?? defaultQuote(props.postcode));
+  const everyQuote = () =>
+    designs.map((_, i) => {
+      const q = quotes[i] ?? defaultQuote(props.postcode);
+      return shadeKept[i] ? { ...q, shade: shadeKept[i] } : q;
+    });
   // The home's roofs and their pitches (3 Nov 2026: a house and a garage at different angles): roof 1 is the home's own
   // (flat when the roof is set flat), the rest from `pitches`. New panels and traced faces start at the one in use.
   const roofPitches = [quoteNow.form.roof === "flat" ? 0 : (quoteNow.form.pitch ?? TILT.roof), ...(quoteNow.form.pitches ?? [])];
@@ -3435,10 +3445,12 @@ export function RoofDesigner(props: {
       : null;
   useEffect(() => {
     if (shadeKey === null || !terrain || terrain === "none") return;
-    const timer = window.setTimeout(
-      () => setShade({ report: shadeReport(terrain, standingPanels, spot.lat), keys: standingPanels.map((p) => p.key) }),
-      150,
-    );
+    const timer = window.setTimeout(() => {
+      const report = shadeReport(terrain, standingPanels, spot.lat);
+      const keys = standingPanels.map((p) => p.key);
+      setShade({ report, keys });
+      setShadeKept((kept) => ({ ...kept, [active]: shadeFromReport(report, keys, terrain.from, terrain.captured) }));
+    }, 150);
     return () => window.clearTimeout(timer);
     // `shadeKey` stands for the panels: it changes exactly when any of them does.
     // eslint-disable-next-line react-hooks/exhaustive-deps

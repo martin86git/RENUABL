@@ -13,6 +13,7 @@
  * was sent. Pure.
  */
 import { COSTING } from "../costing";
+import type { RoofShade } from "./design-shade";
 import { autoStringDesign } from "./auto-string";
 import type { CatalogueBattery, CatalogueInverter, CataloguePanel } from "./catalogue";
 import type { PanelElectrical } from "./electrical";
@@ -74,6 +75,8 @@ export interface ConfigSize {
   /** Each panel's four corners, as `ProposalView.roof.panels`. */
   roofPanels: number[][];
   roofAspects?: number[][];
+  /** The shade on its panels, when the design was read (`design-shade.ts`). */
+  roofShade?: RoofShade;
 }
 
 /** A panel a customer can choose: the one designed with first, then up to two of other makers. */
@@ -456,7 +459,14 @@ export function variantOf(cfg: ConfiguratorView | undefined, key: unknown): (Con
   if (!found) return null;
   const v = withLines(cfg, found);
   const size = cfg.sizes.find((s) => s.id === v.size);
-  return size ? { ...v, roofPanels: size.roofPanels, ...(size.roofAspects ? { roofAspects: size.roofAspects } : {}) } : null;
+  return size
+    ? {
+        ...v,
+        roofPanels: size.roofPanels,
+        ...(size.roofAspects ? { roofAspects: size.roofAspects } : {}),
+        ...(size.roofShade ? { roofShade: size.roofShade } : {}),
+      }
+    : null;
 }
 
 /**

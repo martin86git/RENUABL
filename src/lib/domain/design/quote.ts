@@ -11,6 +11,7 @@
  * unless the design names one.
  */
 import { deemingYears, batteryFactor, taperedKwh, type RebateRates } from "../rebates";
+import { cleanDesignShade, type DesignShade } from "./design-shade";
 import { zoneRating } from "../zone-ratings";
 import { controllerFor, makerName, makerOf, needsController } from "./makers";
 import {
@@ -352,6 +353,8 @@ export const MAX_LINE_QTY = 999;
 export interface QuoteFields {
   form: QuoteForm;
   edits: Record<string, LineEdit>;
+  /** The design's shade from its last reading in the designer (`design-shade.ts`), carried to its proposal. */
+  shade?: DesignShade;
 }
 
 /**
@@ -417,7 +420,8 @@ export function withHomeOf(from: QuoteFields, to: QuoteFields): QuoteFields {
     if (from.edits[key]) edits[key] = from.edits[key];
     else delete edits[key];
   }
-  return { form: { ...from.form }, edits };
+  // A design's shade is its own panels', never the home's.
+  return { form: { ...from.form }, edits, ...(to.shade ? { shade: to.shade } : {}) };
 }
 
 /** Every design's quote given the home of the one at `from` (the one being worked on). */
@@ -703,7 +707,12 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
   const given = Array.isArray(r.quotes) ? r.quotes : [];
   const quotes: QuoteFields[] = [];
   for (let i = 0; i < Math.min(Math.max(1, designs), MAX_DESIGNS); i++) {
-    const q = (given[i] && typeof given[i] === "object" ? given[i] : {}) as { form?: Record<string, unknown>; edits?: unknown };
+    const q = (given[i] && typeof given[i] === "object" ? given[i] : {}) as {
+      form?: Record<string, unknown>;
+      edits?: unknown;
+      shade?: unknown;
+    };
+    const shade = cleanDesignShade(q.shade);
     const f = q.form && typeof q.form === "object" ? q.form : {};
     const start = defaultQuote(defaults.postcode);
     const edits: Record<string, LineEdit> = {};
@@ -777,6 +786,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
           : {}),
       },
       edits,
+      ...(shade ? { shade } : {}),
     });
   }
   return { bill, quotes };

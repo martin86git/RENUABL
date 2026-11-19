@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CalendarDays, Check, House, Plus, Receipt, UtilityPole } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, House, Plus, Receipt, Sun, UtilityPole } from "lucide-react";
 import { announcementShows, themeVars } from "@/lib/domain/design/brand";
 import { todayInMarket } from "@/lib/domain/market";
 import { homeDay } from "@/lib/domain/design/home-day";
@@ -39,6 +39,7 @@ import {
 import { proposalUrls, tellOpened } from "@/lib/services/proposals";
 import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import { Roof } from "./proposal-view";
+import { ShadeSummary } from "./shade-summary";
 
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 const cents = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
@@ -123,6 +124,7 @@ export function ConfiguratorPage(props: {
   const addOns = mix.batteryId !== null || Boolean(cfg.charger) || Boolean(mix.extras?.length);
 
   const special = announcementShows(view.announcement, todayInMarket());
+  const [sunView, setSunView] = useState(false);
   // Where the battery's plate stands on the picture, so the line from the panels ends at its edge.
   const picture = useRef<HTMLDivElement>(null);
   const plate = useRef<HTMLDivElement>(null);
@@ -206,9 +208,34 @@ export function ConfiguratorPage(props: {
             </p>
             <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface">
               <div ref={picture} className="@container relative [&>div]:rounded-none [&>div]:border-0">
-                <Roof view={shown} src={urls.roof} frame={cfg.sizes[0]?.roofPanels} line={battery ? lineTo : null} />
+                <Roof
+                  view={shown}
+                  src={urls.roof}
+                  frame={cfg.sizes[0]?.roofPanels}
+                  line={battery && !sunView ? lineTo : null}
+                  shadeView={sunView}
+                />
+                {/* The sun on the panels (19 Nov 2026, Martin): from the design's shade reading, when it has one. */}
+                {shown.roof.shade && (
+                  <button
+                    type="button"
+                    aria-pressed={sunView}
+                    onClick={() => setSunView((v) => !v)}
+                    className={clsx(
+                      "absolute left-3 top-3 z-20 inline-flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[12.5px] font-medium shadow-[0_6px_18px_rgba(0,0,0,0.3)] backdrop-blur transition-colors",
+                      sunView ? "bg-white text-ink" : "bg-black/60 text-white hover:bg-black/75",
+                    )}
+                  >
+                    <Sun className="size-4" aria-hidden /> Sun on panels
+                  </button>
+                )}
+                {sunView && shown.roof.shade && (
+                  <div className="relative z-20 bg-[#0b0b0d] p-4 sm:absolute sm:left-3 sm:top-14 sm:w-[min(20rem,calc(100%-1.5rem))] sm:rounded-2xl sm:bg-[#0b0b0d]/90 sm:shadow-[0_12px_32px_rgba(0,0,0,0.4)] sm:ring-1 sm:ring-white/10 sm:backdrop-blur">
+                    <ShadeSummary shade={shown.roof.shade} dark />
+                  </div>
+                )}
                 {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
-                {(battery || mix.ev) && (
+                {(battery || mix.ev) && !sunView && (
                   <div
                     ref={plate}
                     className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4"

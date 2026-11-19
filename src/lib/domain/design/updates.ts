@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
     area: "Proposals",
+    words: "Proposals show how much of the year's sun reaches the panels, and the configurator can show it panel by panel.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Proposals",
     words: "Sharper panels, a solar line to the battery, a day's curve and a bigger picture of the home.",
   },
   {

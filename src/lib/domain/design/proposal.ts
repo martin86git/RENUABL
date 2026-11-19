@@ -19,6 +19,7 @@
  * an estimate and says so, a saving is rounded down, nothing is guaranteed.
  */
 import type { ISODate } from "../types";
+import { roofShadeFor, type RoofShade } from "./design-shade";
 import type { RebateRates } from "../rebates";
 import { BLOCK_SET, blocksForView, type ViewBlock } from "./blocks";
 import {
@@ -74,6 +75,7 @@ import {
   designFinance,
   undecidedLines,
   variationsOf,
+  type QuoteFields,
   includedExtrasOf,
   quoteTotals,
   sharedHome,
@@ -180,6 +182,8 @@ export interface ProposalView {
      * so the panels sit where they were placed. Left out for Google's picture and on older proposals.
      */
     picture?: string;
+    /** The shade on the panels from the design's last reading in the designer (`design-shade.ts`); left out without one. */
+    shade?: RoofShade;
   };
   /** What the system is estimated to make, kWh. Null where we have no sunshine record for the home's state. */
   production: { monthlyKwh: number[]; yearKwh: number } | null;
@@ -293,6 +297,7 @@ export interface ProposalOption {
   system: ProposalView["system"];
   roofPanels: number[][];
   roofAspects?: number[][];
+  roofShade?: RoofShade;
   price: Pick<ProposalView["price"], "incGst" | "stc" | "youPay" | "solarVic" | "beforeGst" | "gst">;
   production: ProposalView["production"];
   bill: ProposalView["bill"];
@@ -340,7 +345,13 @@ export function viewForChoice(view: ProposalView, goal: OptionKey | null | undef
   return {
     ...view,
     system: o.system,
-    roof: { lat: view.roof.lat, lng: view.roof.lng, panels: o.roofPanels, ...(o.roofAspects ? { aspects: o.roofAspects } : {}) },
+    roof: {
+      lat: view.roof.lat,
+      lng: view.roof.lng,
+      panels: o.roofPanels,
+      ...(o.roofAspects ? { aspects: o.roofAspects } : {}),
+      ...(o.roofShade ? { shade: o.roofShade } : {}),
+    },
     production: o.production,
     bill: o.bill,
     price: { ...view.price, ...o.price },
@@ -733,6 +744,7 @@ export function buildProposal(given: ProposalInputs): Built {
       panels: roofPanels(design),
       aspects: roofAspects(design),
       ...(input.picture ? { picture: input.picture } : {}),
+      ...withShade(design, project.extras.quotes[index]),
     },
     production: monthlyKwh ? { monthlyKwh, yearKwh: monthlyKwh.reduce((n, m) => n + m, 0) } : null,
     bill: finance
@@ -851,6 +863,10 @@ function optionFrom(
     },
     roofPanels: roofPanels(d),
     roofAspects: roofAspects(d),
+    ...(() => {
+      const shade = withShade(d, input.project.extras.quotes[at]).shade;
+      return shade ? { roofShade: shade } : {};
+    })(),
     price: {
       incGst: out.totals.priceIncGst,
       stc: out.stc,
@@ -985,6 +1001,7 @@ function configuratorFor(
               ...option,
               roofPanels: [],
               roofAspects: undefined,
+              roofShade: undefined,
               goal,
               size: id,
               panel: j,
@@ -1034,6 +1051,10 @@ function configuratorFor(
       designedBattery: Boolean(d.battery),
       roofPanels: roofPanels(d),
       roofAspects: roofAspects(d),
+      ...(() => {
+        const shade = withShade(d, quotes[src.at]).shade;
+        return shade ? { roofShade: shade } : {};
+      })(),
     });
   });
   if (variants.length < 2 || !sizes.length) return null;
@@ -1073,6 +1094,15 @@ const internalLines = (lines: readonly CostLine[]): ProposalInternal["lines"] =>
 /** Each panel's four corners, in metres from the middle of the roof's picture, to the centimetre. */
 const roofPanels = (design: RoofDesign) =>
   designPanels(design).map((p) => p.corners.flatMap((c) => [Math.round(c.x * 100) / 100, Math.round(c.y * 100) / 100]));
+
+/** The shade on a design's panels from its quote's last reading, when every panel in it was read (`roofShadeFor`). */
+const withShade = (design: RoofDesign, quote: QuoteFields | undefined): { shade?: RoofShade } => {
+  const shade = roofShadeFor(
+    quote?.shade,
+    designPanels(design).map((p) => p.key),
+  );
+  return shade ? { shade } : {};
+};
 
 /** Each panel's tilt and the way it faces, in the order of `roofPanels`. */
 const roofAspects = (design: RoofDesign) => [
