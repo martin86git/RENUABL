@@ -54,7 +54,7 @@ export function CustomerProposal(props: {
         // Only once accepted, and only when this proposal asks for a deposit.
         state === "accepted" && (deposit || payments) ? (
           <>
-            {payments && <PaySchedule token={token} business={view.business.name} payments={payments} />}
+            {payments && <PaySchedule token={token} business={view.business.name} payments={payments} form="proposal" />}
             {deposit && (
               <PayDeposit
                 view={shown}

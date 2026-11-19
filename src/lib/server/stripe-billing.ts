@@ -210,6 +210,8 @@ export async function createProposalPaymentCheckout(
     reference: string | null;
     token: string;
     origin: string;
+    /** Stripe's card form on our page (19 Nov 2026, Martin), with the page it was opened from to come back to. */
+    form?: { back: "proposal" | "order" };
   },
 ): Promise<string> {
   const back = `${opts.origin}/p/${opts.token}`;
@@ -237,13 +239,19 @@ export async function createProposalPaymentCheckout(
         metadata: tag,
       },
       metadata: tag,
-      success_url: `${back}?paid=1#pay`,
-      cancel_url: `${back}#pay`,
+      ...(opts.form
+        ? {
+            ui_mode: "form" as const,
+            return_url: `${back}${opts.form.back === "order" ? "/order" : ""}?paid=1#pay`,
+          }
+        : { success_url: `${back}?paid=1#pay`, cancel_url: `${back}#pay` }),
     },
     { stripeAccount: opts.account },
   );
-  if (!session.url) throw new Error("Stripe returned no checkout URL");
-  return session.url;
+  // The form: its client secret, used with the business's account in the browser. Else Stripe's own page.
+  const answer = opts.form ? session.client_secret : session.url;
+  if (!answer) throw new Error("Stripe returned no checkout to open");
+  return answer;
 }
 
 /*

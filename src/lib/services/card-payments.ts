@@ -43,3 +43,27 @@ export const switchCards = (on: boolean) => post("/api/design/connect", { do: "c
 
 /** The customer paying the next amount due: answers with Stripe's page. */
 export const payByCard = (token: string, due: DueKey) => post(`/api/proposal/${encodeURIComponent(token)}`, { action: "pay", due });
+
+/**
+ * The same, as Stripe's card form on our page (19 Nov 2026, Martin: pressing Place order opens a card box for the
+ * deposit): the session's client secret and the business's Stripe account the form is opened for.
+ */
+export async function cardFormFor(
+  token: string,
+  due: DueKey,
+  back: "proposal" | "order",
+): Promise<{ ok: true; secret: string; account: string } | { ok: false; message: string }> {
+  try {
+    const res = await fetch(`/api/proposal/${encodeURIComponent(token)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "pay", due, form: back }),
+    });
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; secret?: string; account?: string };
+    if (!res.ok || !json.ok || !json.secret || !json.account)
+      return { ok: false, message: json.message ?? "The card form couldn't be opened. Please try again." };
+    return { ok: true, secret: json.secret, account: json.account };
+  } catch {
+    return { ok: false, message: "We couldn't reach the server just now. Check your connection and try again." };
+  }
+}

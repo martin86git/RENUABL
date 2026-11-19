@@ -47,6 +47,8 @@ export function OrderPage(props: {
   // Once ordered, the deposit due today and how to pay it (19 Nov 2026, Martin: Due today, then Order), read from the
   // proposal's own link as its page reads it: by card through the business's Stripe, or by bank transfer.
   const [paying, setPaying] = useState<OpenedProposal | null>(null);
+  // Ordered on this visit: the card form for the deposit opens by itself (19 Nov 2026, Martin).
+  const [justOrdered, setJustOrdered] = useState(false);
   useEffect(() => {
     if (done !== "ordered") return;
     let gone = false;
@@ -68,6 +70,7 @@ export function OrderPage(props: {
     });
     setBusy(false);
     if (!res.ok) return setProblem(res.message);
+    setJustOrdered(res.kind === "ordered");
     setDone(res.kind);
   };
 
@@ -180,7 +183,15 @@ export function OrderPage(props: {
               </p>
               {done === "ordered" && paying?.view && (paying.payments || paying.deposit) && (
                 <div className="mt-5 space-y-4">
-                  {paying.payments && <PaySchedule token={token} business={view.business.name} payments={paying.payments} />}
+                  {paying.payments && (
+                    <PaySchedule
+                      token={token}
+                      business={view.business.name}
+                      payments={paying.payments}
+                      form="order"
+                      openNow={justOrdered}
+                    />
+                  )}
                   {paying.deposit && (
                     <PayDeposit
                       view={paying.view}
@@ -243,7 +254,7 @@ export function OrderPage(props: {
                 disabled={busy || (!indicative && (!name.trim() || !agree))}
                 className="mt-4 inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-6 text-[15px] font-medium text-[color:var(--primary-ink)] disabled:bg-line-strong disabled:text-muted"
               >
-                {busy ? "Placing it…" : indicative ? "Place order request" : `Place order · ${dollars(view.price.youPay)}`}
+                {busy ? "Placing it…" : indicative ? "Place order request" : "Place order"}
               </button>
             </form>
           )}

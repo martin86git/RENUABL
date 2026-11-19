@@ -112,6 +112,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
         return Response.json({ ok: false, message: why }, { status: 409 });
       }
       const amountCents = Math.round(target.due.amount * 100);
+      // Stripe's card form on the page asks for its client secret and the business's account; else Stripe's own page.
+      const back = read.body.form === "order" ? "order" : read.body.form === "proposal" ? "proposal" : null;
+      const form = back ? { back: back as "order" | "proposal" } : undefined;
       const url = await createProposalPaymentCheckout(stripe, {
         account: target.account,
         business: target.business,
@@ -123,7 +126,9 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
         reference: target.reference,
         token,
         origin: new URL(request.url).origin,
+        ...(form ? { form } : {}),
       });
+      if (form) return Response.json({ ok: true, secret: url, account: target.account }, { headers: PRIVATE });
       return Response.json({ ok: true, url }, { headers: PRIVATE });
     }
     return Response.json({ ok: false, message: "That can't be done here." }, { status: 400 });

@@ -38,7 +38,7 @@ interface CheckoutFormSdk {
 }
 type StripeFactory = (
   key: string,
-  opts: { betas: string[] },
+  opts: { betas: string[]; stripeAccount?: string },
 ) => {
   initCheckoutFormSdk(opts: { clientSecret: Promise<string> | string; appearance: typeof STRIPE_APPEARANCE }): CheckoutFormSdk;
 };
@@ -70,10 +70,19 @@ export function stripeFormAvailable() {
  * Mounts the payment form into `el`. On confirm, Stripe takes the payment and
  * sends the customer to the session's return page. Returns a clean-up function.
  */
-export async function mountDepositForm(el: HTMLElement, clientSecret: Promise<string>, onError: (message: string) => void) {
+export async function mountDepositForm(
+  el: HTMLElement,
+  clientSecret: Promise<string>,
+  onError: (message: string) => void,
+  /** A business's own Stripe account, for a payment taken straight into it (a proposal's deposit). */
+  stripeAccount?: string,
+) {
   if (!STRIPE_PUBLISHABLE_KEY) throw new Error("Stripe publishable key isn't set");
   const Stripe = await loadStripeJs();
-  const stripe = Stripe(STRIPE_PUBLISHABLE_KEY, { betas: ["custom_checkout_payment_form_1"] });
+  const stripe = Stripe(STRIPE_PUBLISHABLE_KEY, {
+    betas: ["custom_checkout_payment_form_1"],
+    ...(stripeAccount ? { stripeAccount } : {}),
+  });
   const checkout = stripe.initCheckoutFormSdk({ clientSecret, appearance: STRIPE_APPEARANCE });
   const form = checkout.createForm({ layout: "expanded" });
   form.mount(el);
