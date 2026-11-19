@@ -94,7 +94,7 @@ export function GET() {
       </div>
       {/* Sol, his brain lit, rising over the product. */}
       {/* eslint-disable-next-line @next/next/no-img-element -- drawn by ImageResponse, not the browser */}
-      <img src={SOL_PNG} width={540} height={540} alt="" style={{ position: "absolute", left: 625, top: -111 }} />
+      <img src={SOL_PNG} width={460} height={460} alt="" style={{ position: "absolute", left: 665, top: -71 }} />
       {/* Sol on a live call, over the screenshot. */}
       <div
         style={{
