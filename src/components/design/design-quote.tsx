@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Plus, Rows3, Wrench, Zap } from "lucide-react";
 import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/domain/design/pricing";
 import { PriceCart } from "./price-cart";
@@ -1200,40 +1201,46 @@ function SolarVicAsk(props: { rebate: number; onChoose: (rebate: boolean, loan: 
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);
   const choice = "w-full rounded-full px-4 py-2.5 text-sm font-semibold";
-  return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 p-4"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-    >
+  // Drawn on the page body (19 Nov 2026, Martin: it opened half drawn over the quote): the quote sits in a panel whose own
+  // frame pinned a "fixed" box to it, so the dimming stopped part way and the question sat over the column headings.
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="theme-studio contents">
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="solar-vic-ask"
-        className="w-full max-w-sm rounded-2xl bg-surface p-5 text-left shadow-[0_24px_60px_rgba(0,0,0,0.25)]"
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 p-4"
+        onMouseDown={(e) => e.target === e.currentTarget && onClose()}
       >
-        <h2 id="solar-vic-ask" className="text-base font-semibold text-ink">
-          Offer the Solar Victoria rebate?
-        </h2>
-        <p className="mt-1.5 text-sm leading-snug text-ink-2">
-          The rebate and loan are both off on this quote. If the customer is eligible, the rebate takes about {money(props.rebate)} off,
-          subject to Solar Victoria&rsquo;s approval.
-        </p>
-        <div className="mt-4 space-y-2">
-          <button type="button" autoFocus onClick={() => props.onChoose(true, false)} className={clsx(choice, "bg-ink text-white")}>
-            Add the rebate
-          </button>
-          <button
-            type="button"
-            onClick={() => props.onChoose(true, true)}
-            className={clsx(choice, "text-ink ring-1 ring-line hover:ring-ink-2")}
-          >
-            Add the rebate and the loan
-          </button>
-          <button type="button" onClick={() => props.onChoose(false, false)} className={clsx(choice, "text-ink-2 hover:text-ink")}>
-            Go ahead without them
-          </button>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="solar-vic-ask"
+          className="w-full max-w-sm rounded-2xl bg-surface p-5 text-left shadow-[0_24px_60px_rgba(0,0,0,0.25)]"
+        >
+          <h2 id="solar-vic-ask" className="text-base font-semibold text-ink">
+            Offer the Solar Victoria rebate?
+          </h2>
+          <p className="mt-1.5 text-sm leading-snug text-ink-2">
+            The rebate and loan are both off on this quote. If the customer is eligible, the rebate takes about {money(props.rebate)} off,
+            subject to Solar Victoria&rsquo;s approval.
+          </p>
+          <div className="mt-4 space-y-2">
+            <button type="button" autoFocus onClick={() => props.onChoose(true, false)} className={clsx(choice, "bg-ink text-white")}>
+              Add the rebate
+            </button>
+            <button
+              type="button"
+              onClick={() => props.onChoose(true, true)}
+              className={clsx(choice, "text-ink ring-1 ring-line hover:ring-ink-2")}
+            >
+              Add the rebate and the loan
+            </button>
+            <button type="button" onClick={() => props.onChoose(false, false)} className={clsx(choice, "text-ink-2 hover:text-ink")}>
+              Go ahead without them
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
