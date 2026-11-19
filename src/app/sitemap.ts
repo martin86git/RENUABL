@@ -1,23 +1,11 @@
 import type { MetadataRoute } from "next";
-import { BUSINESS_LINK_SHOWN } from "@/lib/domain/business-link";
 import { GUIDES } from "@/lib/domain/guides";
 import { publicSiteUrl } from "@/lib/domain/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const site = publicSiteUrl();
-  // RENUABL Business stays out of the sitemap until it launches (business-link.ts).
-  const listed = [
-    "",
-    "/battery",
-    "/learn",
-    "/home-health",
-    ...(BUSINESS_LINK_SHOWN ? ["/business"] : []),
-    "/partners",
-    "/offer-terms",
-    "/privacy",
-    "/terms",
-    "/contact",
-  ];
+  // "" is the front page, RENUABL Business since 19 Nov 2026; the homeowner homepage at /homeowners stays out.
+  const listed = ["", "/battery", "/learn", "/home-health", "/partners", "/offer-terms", "/privacy", "/terms", "/contact"];
   const pages = listed.map((path) => ({
     url: `${site}${path}`,
     changeFrequency: "monthly" as const,

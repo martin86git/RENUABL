@@ -37,7 +37,7 @@ export function DemoBar({ account }: { account: SignedIn }) {
           {DEMO_DETAILS.barButton}
         </button>
       ) : (
-        <Link href="/business" className="rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold text-white">
+        <Link href="/" className="rounded-full bg-white/20 px-3 py-0.5 text-xs font-semibold text-white">
           {DEMO_PAGE.barLink}
         </Link>
       )}

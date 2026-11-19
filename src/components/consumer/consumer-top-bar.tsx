@@ -30,7 +30,7 @@ export function ConsumerTopBar({
         </Link>
       )}
       {partners && BUSINESS_LINK_SHOWN && (
-        <Link href="/business" className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
+        <Link href="/" className="text-[13px] text-ink-2 underline-offset-4 hover:text-ink hover:underline">
           For solar businesses
         </Link>
       )}

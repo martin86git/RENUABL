@@ -5,8 +5,10 @@
  * show "For solar businesses", `/business` is left out of the sitemap and asks search engines not to index it, and
  * robots.txt keeps crawlers out of `/business`, `/design` and `/crm`. Every page still opens for anyone given the
  * address. Set to true at launch.
+ *
+ * Launched 19 Nov 2026 (Martin): RENUABL Business is the front page at /, and in search.
  */
-export const BUSINESS_LINK_SHOWN = false;
+export const BUSINESS_LINK_SHOWN = true;
 
 /** The addresses RENUABL Business answers at, kept out of search while it isn't launched. */
 export const BUSINESS_PATHS = ["/business", "/design", "/crm"] as const;

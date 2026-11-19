@@ -44,7 +44,7 @@ export function MobileMenu() {
           </nav>
           {BUSINESS_LINK_SHOWN && (
             <Link
-              href="/business"
+              href="/"
               onClick={() => setOpen(false)}
               className="mt-4 flex items-center justify-between px-1 text-[14px] text-ink-2"
             >

@@ -77,7 +77,7 @@ export function BusinessDemo({ signedIn }: { signedIn: boolean }) {
     <div className="theme-studio flex min-h-dvh flex-col bg-canvas text-ink">
       <header className="border-b border-line/70">
         <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 lg:px-8">
-          <Link href="/business" aria-label="RENUABL Business" className="flex items-baseline gap-2">
+          <Link href="/" aria-label="RENUABL Business" className="flex items-baseline gap-2">
             <Wordmark />
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-line sm:tracking-[0.2em]">Business</span>
           </Link>
@@ -119,7 +119,7 @@ export function BusinessDemo({ signedIn }: { signedIn: boolean }) {
         </ul>
         <p className="mt-10">
           <Link
-            href="/business"
+            href="/"
             className="tap-area inline-flex items-center gap-1.5 text-[14px] font-medium text-ink underline underline-offset-4"
           >
             {DEMO_PAGE.more} <ArrowRight className="size-4" aria-hidden />

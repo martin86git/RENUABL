@@ -49,9 +49,6 @@ export function SalesPage({ notice, signedIn = false }: { notice?: string | null
           <Link href="/design/terms" className="hover:text-ink">
             Terms
           </Link>
-          <Link href="/" className="hover:text-ink">
-            For homeowners
-          </Link>
           <Link href="/privacy" className="hover:text-ink">
             Privacy
           </Link>
@@ -90,7 +87,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
   }, [open]);
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
-      {/* RENUABL Business: the network's side for retailers and installers (RENUABL Home, for homeowners, is at /). */}
+      {/* RENUABL Business: the network's side for retailers and installers (the front page since 19 Nov 2026; the homeowner homepage is kept at /homeowners). */}
       <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 lg:px-8">
         <div className="relative">
           <button
@@ -128,7 +125,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
             </>
           )}
         </div>
-        <Link href="/business" aria-label="RENUABL Business" className="justify-self-center">
+        <Link href="/" aria-label="RENUABL Business" className="justify-self-center">
           <Wordmark />
         </Link>
         {/* Top right is for people who already have an account (18 Nov 2026, Martin): Sign in, or straight back into

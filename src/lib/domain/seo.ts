@@ -20,7 +20,9 @@ export function siteJsonLd(site: string) {
       url: site,
       email: LEGAL.email,
       areaServed: { "@type": "State", name: LAUNCH_MARKET.name },
-      description: "Solar and battery systems sized from your electricity bill, installed by accredited local installation partners.",
+      // RENUABL Business has been the front page since 19 Nov 2026 (Martin).
+      description:
+        "The platform for Australian solar businesses: design, quote, sell, approve, book, order, install and get paid in one place.",
     },
     {
       "@context": "https://schema.org",
