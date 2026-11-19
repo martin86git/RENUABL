@@ -184,6 +184,11 @@ export const orderFromConfigurator = (token: string, o: { option: string; week: 
 /** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
 /** "Call me": the business's assistant rings the number on the customer's record. `when` is "now", "today at 1pm", … */
 export const askForCall = (token: string) => ask<{ when: string; already?: boolean }>(`${link(token)}/call`, { method: "POST" });
+/** Whether a call they asked for is still waiting, and when it comes (null with none). */
+export const askedCall = (token: string) => ask<{ when: string | null }>(`${link(token)}/call`);
+/** Cancel the call they asked for, or have it ring now. */
+export const cancelCall = (token: string) => ask<object>(`${link(token)}/call`, { method: "DELETE" });
+export const callMeNow = (token: string) => ask<object>(`${link(token)}/call`, { method: "PUT" });
 
 export const sayPaid = (token: string, way: PaidWay) => ask<OpenedProposal>(link(token), { method: "POST", body: { action: "paid", way } });
 

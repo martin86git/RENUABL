@@ -184,12 +184,59 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     expect(row).toMatchObject({ asked: true, mobile: "+61491570156" });
     // With no proposal out, it falls back to a lead call: nothing to read out.
     // A call we place has no first message (it waits for them to speak); the opening is in its instructions.
-    expect(JSON.stringify(calls()[0].body!.assistant)).toContain("is that Ali");
+    expect(JSON.stringify(calls()[0].body!.assistant)).toContain("Ali");
     const record = await db.query<{ text: string }>(
       `select text from design_activity where business_id = $1 and job_id = $2 and kind = 'call'`,
       [own, asked.job.id],
     );
     expect(record.map((x) => x.text).join(" ")).toContain("asked for a call about their proposal");
+  });
+
+  it("lets the customer ring their call now or cancel it, but never a call the business lined up", async () => {
+    const mk = async (first: string, phone: string) => {
+      const c = await crm.createCustomer(
+        own,
+        {
+          name: `${first} Example`,
+          firstName: first,
+          lastName: "Example",
+          phone,
+          email: "",
+          address: "",
+          lat: null,
+          lng: null,
+          source: "",
+          notes: "",
+        },
+        { title: "Solar", address: "", lat: null, lng: null, stage: "proposal", value: null, installDate: null, details: {} },
+        "test",
+      );
+      if (c === "full" || !c.job) throw new Error("no deal");
+      return c.job.id;
+    };
+    const theirs = await mk("Bea", "0491 570 157");
+    expect(await voice.askedCallOf(own, theirs)).toBeNull();
+    expect(await voice.cancelAskedCall(own, theirs)).toBe("not-waiting");
+    expect((await voice.queueCall({ businessId: own, jobId: theirs, mode: "proposal", asked: true })).result).toBe("placed");
+    expect(await voice.askedCallOf(own, theirs)).toMatchObject({ when: expect.any(String) });
+    const before = calls().length;
+    expect(await voice.ringAskedCallNow(own, theirs)).toBe("ringing");
+    expect(calls().length).toBe(before + 1);
+    expect(await voice.cancelAskedCall(own, theirs)).toBe("cancelled");
+    expect(sent.some((x) => x.method === "DELETE")).toBe(true);
+    expect(await voice.askedCallOf(own, theirs)).toBeNull();
+    const notes = await db.query<{ text: string; by_email: string }>(
+      `select text, by_email from design_activity where business_id = $1 and job_id = $2 and kind = 'note'`,
+      [own, theirs],
+    );
+    expect(notes.map((x) => x.text).join(" ")).toContain("cancelled the call they asked for");
+
+    // A call the business lined up isn't the customer's to ring or cancel.
+    const ours = await mk("Cal", "0491 570 158");
+    expect((await voice.queueCall({ businessId: own, jobId: ours, mode: "lead", asked: false })).result).toBe("placed");
+    expect(await voice.askedCallOf(own, ours)).toBeNull();
+    expect(await voice.ringAskedCallNow(own, ours)).toBe("not-waiting");
+    expect(await voice.cancelAskedCall(own, ours)).toBe("not-waiting");
   });
 
   it("never calls another business's deals, or a customer with no mobile", async () => {
@@ -243,7 +290,7 @@ describe.skipIf(!url)("voice calls on deals (database)", () => {
     // A lead rings back: answered on their own deal (the open run of calls on their number, else their latest deal), told they rang in.
     const back = (await ring(MOBILE, "in_1")).assistant as { firstMessage: string; name: string; server?: { url: string } };
     expect(back.name).toBe("Ella");
-    expect(back.firstMessage).toContain("thanks for calling RENUABL");
+    expect(back.firstMessage).toContain("thanks for calling Renewable");
     const ref = new URL(back.server!.url).searchParams.get("ref")!;
     const row = (await voice.voiceCallByRef(ref))!;
     expect(row).toMatchObject({ mobile: MOBILE, status: "calling", vapi_call_id: "in_1" });

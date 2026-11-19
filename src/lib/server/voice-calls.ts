@@ -1068,6 +1068,70 @@ export async function callNowInstead(
 }
 
 /**
+ * The call a customer asked for from their proposal, while it hasn't started (19 Nov 2026, Martin: "allow the call
+ * request to be cancelled… allow it to call now"): the one lined up for later or waiting to try again, never one
+ * ringing or on, and never a call the business lined up itself. Business id first.
+ */
+async function askedCallWaiting(businessId: string, jobId: string) {
+  const rows = await query<VoiceRow & { live_status: string | null; due_at: Date | null }>(
+    `select * from voice_calls where business_id = $1 and job_id = $2 and asked and status in ('waiting', 'calling')
+      order by created_at desc limit 1`,
+    [businessId, jobId],
+  );
+  const r = rows[0];
+  return r && mayCallNow({ status: r.status, liveStatus: r.live_status }) ? r : null;
+}
+
+/** When the call a customer asked for will come ("Friday at 9am", "now"; "soon" when no time was kept), or null with none waiting. */
+export async function askedCallOf(businessId: string, jobId: string): Promise<{ when: string } | null> {
+  const r = await askedCallWaiting(businessId, jobId).catch(() => null);
+  if (!r) return null;
+  return { when: r.due_at ? whenWords({ from: new Date(r.due_at) }, new Date()) : "soon" };
+}
+
+/**
+ * The customer cancels the call they asked for: closed on our side first (so nothing tries it again), the call Vapi
+ * was holding cancelled, and written on the deal as theirs.
+ */
+export async function cancelAskedCall(businessId: string, jobId: string): Promise<"cancelled" | "not-waiting"> {
+  const s = voiceSettings();
+  const r = await askedCallWaiting(businessId, jobId);
+  if (!r) return "not-waiting";
+  const closed = await query<{ id: string }>(
+    `update voice_calls set status = 'stopped', stop_reason = 'Cancelled by the customer', updated_at = now()
+      where id = $1 and status in ('waiting', 'calling') returning id`,
+    [r.id],
+  );
+  if (!closed[0]) return "not-waiting";
+  if (s && r.vapi_call_id)
+    await fetch(`${VAPI}/call/${encodeURIComponent(r.vapi_call_id)}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${s.key}` },
+      signal: AbortSignal.timeout(10_000),
+    }).catch(() => undefined);
+  await transaction((q) =>
+    record(q, businessId, {
+      customerId: r.customer_id,
+      jobId,
+      kind: "note",
+      text: "They cancelled the call they asked for (on their proposal page).",
+      by: "customer",
+    }),
+  ).catch((e) => console.error("cancelled call not written on the deal", e instanceof Error ? e.message : e));
+  return "cancelled";
+}
+
+/**
+ * The customer has the call they asked for ring now. Their own press on their own proposal, so it rings whatever the
+ * calling hours (`callNowInstead`); only the call they asked for, never one the business lined up.
+ */
+export async function ringAskedCallNow(businessId: string, jobId: string): Promise<"ringing" | "not-waiting" | "off" | "failed"> {
+  const r = await askedCallWaiting(businessId, jobId);
+  if (!r) return "not-waiting";
+  return callNowInstead(businessId, jobId, { email: "customer", name: r.first_name || "The customer" });
+}
+
+/**
  * The team types to the assistant while it is on the call on this deal: something to work in (an answer, a thing to
  * mention), or words to say as typed. Sent to the call's control address (never the browser's), and kept on the call
  * as the team's line. Business id first; the caller has checked the member may see the deal.
