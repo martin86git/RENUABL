@@ -8,6 +8,25 @@ export const metadata: Metadata = {
   title: { absolute: "RENUABL Business: for solar retailers and installers" },
   description: "Design, quote, sell, approve, book, order, install and get paid, in one place built for Australian solar businesses.",
   alternates: { canonical: "/" },
+  // What a link to the front page shows in iMessage and the rest (19 Nov 2026, Martin): the headline and the share
+  // picture at /og/business. Setting openGraph here replaces the site-wide one, so it repeats the site details.
+  openGraph: {
+    type: "website",
+    siteName: "RENUABL",
+    locale: "en_AU",
+    title: "Solar just got a brain.",
+    description: "RENUABL: the AI sales force for solar businesses.",
+    url: "/",
+    images: [
+      { url: "/og/business", width: 1200, height: 630, alt: "Solar just got a brain. RENUABL, the AI sales force for solar businesses." },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Solar just got a brain.",
+    description: "RENUABL: the AI sales force for solar businesses.",
+    images: ["/og/business"],
+  },
 };
 
 /**
