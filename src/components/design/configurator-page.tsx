@@ -202,8 +202,9 @@ export function ConfiguratorPage(props: {
               <Performance cfg={cfg} mix={mix} />
             </div>
             <p className="mt-3 text-[12px] leading-relaxed text-muted">
-              The layout is a design, checked on site before anything is installed. A different panel goes in the same places. Output,
-              offset and savings are estimates from your bill.
+              {shown.production ? `Makes about ${shown.production.yearKwh.toLocaleString("en-AU")} kWh a year. ` : ""}The layout is a
+              design, checked on site before anything is installed. A different panel goes in the same places. Output, offset and savings
+              are estimates from your bill.
             </p>
           </div>
         </section>
@@ -517,11 +518,14 @@ const OFFSET_CAP = 0.9;
 const offsetWords = (share: number) => (share >= OFFSET_CAP ? `${percent(OFFSET_CAP)}+` : percent(share));
 
 /**
- * What the system does for the home, as rings (19 Nov 2026, Martin: "add some apple watch inspired analytics to show
- * the expected energy impacts of the system"): on black under the picture, three rings closing as the mix changes, each
- * an estimate from the mix's own figures. Outer, sun orange: the share of the home's power the system supplies (never
- * said to be more than 90%, `OFFSET_CAP`). Middle, green: the share of the bill it saves. Inner, sky: of the power the
- * panels alone can't supply (mostly evenings), the share the battery does. What it makes a year under them.
+ * What the system does for the home, as instruments (19 Nov 2026, Martin: "apple watch inspired analytics", then "make
+ * sure that it doesn't look exactly the same as apple's… the analytics they might come up with in a collaboration with
+ * SpaceX"): on black under the picture, three dials read like a flight display: a fine ring of graduations, a thin
+ * white arc to the reading with a point of the business's accent at its end, the figure in mono, the label in spaced
+ * capitals, and one line of telemetry under them. Each an estimate from the mix's own figures. HOME POWERED: the share
+ * of the home's power the system supplies (never said to be more than 90%, `OFFSET_CAP`). BILL SAVED: the share of the
+ * bill it saves, read in dollars a year. EVENINGS: of the power the panels alone can't supply (mostly evenings), the
+ * share the battery does.
  */
 function Performance({ cfg, mix }: { cfg: ConfiguratorView; mix: ConfigVariant }) {
   const solar = mix.batteryId === null ? mix : (solarOnly(cfg, mix) ?? mix);
@@ -529,86 +533,102 @@ function Performance({ cfg, mix }: { cfg: ConfiguratorView; mix: ConfigVariant }
   const fromPanels = solar.bill ? Math.min(OFFSET_CAP, solar.bill.selfReliance) : 0;
   const saved = mix.bill && mix.bill.now > 0 ? Math.min(1, Math.max(0, mix.bill.saving / mix.bill.now)) : 0;
   const evenings = mix.batteryId !== null && fromPanels < 1 ? Math.min(1, Math.max(0, (total - fromPanels) / (1 - fromPanels))) : 0;
-  const rings = [
+  const dials = [
+    { label: "Home powered", share: total, value: mix.bill ? offsetWords(mix.bill.selfReliance) : "—", unit: "of its power" },
+    { label: "Bill saved", share: saved, value: mix.bill && mix.bill.saving > 0 ? dollars(mix.bill.saving) : "—", unit: "a year" },
     {
-      tone: RING.sun,
-      share: total,
-      label: "Home powered",
-      value: mix.bill ? offsetWords(mix.bill.selfReliance) : "—",
-      note: "of its power",
-    },
-    {
-      tone: RING.leaf,
-      share: saved,
-      label: "Bill saved",
-      value: mix.bill && mix.bill.saving > 0 ? dollars(mix.bill.saving) : "—",
-      note: "a year",
-    },
-    {
-      tone: RING.sky,
-      share: evenings,
       label: "Evenings",
+      share: evenings,
       value: mix.batteryId === null ? "—" : percent(evenings),
-      note: mix.batteryId === null ? "add a battery" : "from the battery",
+      unit: mix.batteryId === null ? "no battery" : "from battery",
     },
   ];
   return (
-    <div className="flex items-center gap-5 bg-[#0b0b0d] px-4 py-4 text-white sm:gap-7 sm:px-6">
-      <Rings rings={rings} />
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-6">
-        {rings.map((r) => (
-          <div key={r.label} className="flex min-w-0 items-baseline justify-between gap-2 sm:block">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em]" style={{ color: r.tone }}>
-              {r.label}
-            </p>
-            <p className="truncate text-[18px] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums] sm:mt-1 sm:text-[24px]">
-              {r.value}
-            </p>
-            <p className="mt-1 hidden text-[11.5px] text-white/55 sm:block">{r.note}</p>
-          </div>
+    <div className="bg-[#060607] px-3 pb-2.5 pt-3 text-white sm:px-6">
+      <div className="grid grid-cols-3 gap-1 sm:gap-4">
+        {dials.map((d) => (
+          <Dial key={d.label} {...d} />
         ))}
-        <p className="text-[11.5px] text-white/45 sm:col-span-3 sm:-mt-1">
-          {mix.production ? `Makes about ${mix.production.yearKwh.toLocaleString("en-AU")} kWh a year. ` : ""}Estimates from your bill.
-        </p>
       </div>
     </div>
   );
 }
 
-/** The rings' colours: vivid on black, as a watch's are; our own, not any maker's. */
-const RING = { sun: "#ff8a3d", leaf: "#3ddc84", sky: "#4cc2ff" } as const;
-
-/** Three rings, one inside the next, each closing to its share with a round end; the track the same hue, dim. */
-function Rings({ rings }: { rings: { tone: string; share: number; label: string }[] }) {
-  const size = 92;
-  const stroke = 10;
-  const gap = 2.5;
+/** One instrument: graduations round three quarters of a circle, the reading as a thin arc, the figure in its middle. */
+function Dial({ label, share, value, unit }: { label: string; share: number; value: string; unit: string }) {
+  const size = 84;
+  const c = size / 2;
+  const r = 32;
+  const sweep = 270;
+  const from = 135; // degrees, clockwise from the right: the open end at the bottom
+  const point = (deg: number, radius: number) => {
+    const a = ((from + deg) * Math.PI) / 180;
+    // To the hundredth, so the page drawn on the server and in the browser agree.
+    return [Math.round((c + radius * Math.cos(a)) * 100) / 100, Math.round((c + radius * Math.sin(a)) * 100) / 100];
+  };
+  const shown = Math.max(0, Math.min(1, share));
+  const length = (2 * Math.PI * r * sweep) / 360;
+  const arc = (() => {
+    const [x0, y0] = point(0, r);
+    const [x1, y1] = point(sweep, r);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 1 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  })();
+  const [ex, ey] = point(sweep * shown, r);
+  const ticks = 54;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0 -rotate-90" aria-hidden>
-      {rings.map((r, i) => {
-        const radius = size / 2 - stroke / 2 - i * (stroke + gap);
-        const length = 2 * Math.PI * radius;
-        const shown = Math.max(0.001, Math.min(1, r.share));
-        return (
-          <g key={r.label}>
-            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={r.tone} strokeOpacity={0.2} strokeWidth={stroke} />
-            <circle
-              className="cfg-ring"
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke={r.tone}
-              strokeWidth={stroke}
-              strokeLinecap="round"
-              strokeDasharray={length}
-              strokeDashoffset={length * (1 - shown)}
-              style={{ ["--ring-len" as string]: `${length}` }}
-            />
-          </g>
-        );
-      })}
-    </svg>
+    <figure className="m-0 flex flex-col items-center">
+      <div className="relative" style={{ width: size, height: size - 8 }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-x-0 top-0" aria-hidden>
+          {/* The graduations, every fifth longer and brighter, and the quarters marked. */}
+          {Array.from({ length: ticks + 1 }, (_, i) => {
+            const deg = (sweep * i) / ticks;
+            const major = i % 9 === 0;
+            const [x0, y0] = point(deg, r + 5);
+            const [x1, y1] = point(deg, r + (major ? 10 : 7.5));
+            const lit = deg <= sweep * shown + 0.01 && shown > 0;
+            return (
+              <line
+                key={i}
+                x1={x0}
+                y1={y0}
+                x2={x1}
+                y2={y1}
+                stroke="#ffffff"
+                strokeOpacity={major ? (lit ? 0.85 : 0.35) : lit ? 0.5 : 0.14}
+                strokeWidth={major ? 1.2 : 0.8}
+              />
+            );
+          })}
+          <path d={arc} fill="none" stroke="#ffffff" strokeOpacity={0.1} strokeWidth={2} />
+          <path
+            className="cfg-ring"
+            d={arc}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeDasharray={length}
+            strokeDashoffset={length * (1 - shown)}
+            style={{ ["--ring-len" as string]: `${length}` }}
+          />
+          {shown > 0 && (
+            <>
+              <circle cx={ex} cy={ey} r={6} fill="var(--accent)" opacity={0.25} className="cfg-glow" />
+              <circle cx={ex} cy={ey} r={2.6} fill="var(--accent)" />
+            </>
+          )}
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center pt-1">
+          <span className="font-mono text-[16px] font-medium leading-none tracking-tight [font-variant-numeric:tabular-nums] sm:text-[18px]">
+            {value}
+          </span>
+        </div>
+      </div>
+      <figcaption className="-mt-1.5 text-center">
+        <span className="block text-[10px] font-medium uppercase tracking-[0.22em] text-white/75">{label}</span>
+        <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{unit}</span>
+      </figcaption>
+    </figure>
   );
 }
 
@@ -847,10 +867,10 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 const CSS = `
 /* The picture is 1.6 times as wide as it is tall: its width is the window's height less the header, the heading, the
-   figures under it and the Order bar with a margin (about 30rem with the rings; 2.5rem more with the special's bar), times 1.6. */
+   figures under it and the Order bar with a margin (about 27rem with the dials; 2.5rem more with the special's bar), times 1.6. */
 @media (min-width: 1024px) {
-  .cfg-home { max-width: max(26rem, calc((100dvh - 30rem) * 1.6)); margin-inline: auto; }
-  .cfg-home-special { max-width: max(26rem, calc((100dvh - 32.5rem) * 1.6)); }
+  .cfg-home { max-width: max(26rem, calc((100dvh - 27rem) * 1.6)); margin-inline: auto; }
+  .cfg-home-special { max-width: max(26rem, calc((100dvh - 29.5rem) * 1.6)); }
 }
 @keyframes cfg-ring { from { stroke-dashoffset: var(--ring-len) } }
 .cfg-ring { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1); animation: cfg-ring 1.2s cubic-bezier(.2,.8,.2,1) both }
