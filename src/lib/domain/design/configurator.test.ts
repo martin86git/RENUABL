@@ -5,6 +5,7 @@ import {
   holdMessage,
   isConfigKey,
   nearestVariant,
+  backupPick,
   panelChoices,
   pickOf,
   readConfigurator,
@@ -104,6 +105,17 @@ describe("a proposal with the configurator", () => {
     expect(backup.backup).toBe(true);
     expect(backup.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
     expect(backup.system.batteryKwh).toBeGreaterThan(withBatt(0).system.batteryKwh);
+  });
+  it("switches blackout backup on from any mix, adding a battery when there is none", () => {
+    const fromBattery = backupPick(cfg, pickOf(withBatt(0)))!;
+    expect(fromBattery).toEqual({ ...pickOf(withBatt(0)), backup: true });
+    const fromSolar = backupPick(cfg, pickOf(solar(0)))!;
+    expect(fromSolar.backup).toBe(true);
+    expect(fromSolar.battery).toBe(cfg.batteries.find((b) => b.size === 0)!.id);
+    expect(fromSolar.size).toBe(0);
+    // Nothing with backup priced: nothing to switch to.
+    const none = { ...cfg, variants: cfg.variants.filter((v) => !v.backup) };
+    expect(backupPick(none, pickOf(withBatt(0)))).toBeNull();
   });
   it("offsets more of the home's power with a battery, and saves more", () => {
     const alone = solarOnly(cfg, withBatt(0))!;

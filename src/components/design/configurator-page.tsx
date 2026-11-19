@@ -8,6 +8,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { announcementShows, themeVars } from "@/lib/domain/design/brand";
 import { todayInMarket } from "@/lib/domain/market";
 import {
+  backupPick,
   batteryOfVariant,
   isConfigKey,
   nearestVariant,
@@ -91,12 +92,17 @@ export function ConfiguratorPage(props: {
     });
   };
   /** What a change would add to or take off the price ("+ $1,200"), from the mix it would be. */
-  const delta = (p: Partial<ConfigPick>) => {
-    const there = nearestVariant(cfg, { ...now, ...p });
+  const deltaTo = (p: ConfigPick) => {
+    const there = nearestVariant(cfg, p);
     if (!there) return "";
     const d = there.price.youPay - mix.price.youPay;
     return d === 0 ? "" : `${d > 0 ? "+" : "−"} ${dollars(Math.abs(d))}`;
   };
+  const delta = (p: Partial<ConfigPick>) => deltaTo({ ...now, ...p });
+  // What switching blackout backup on moves to: this mix with backup, else the nearest priced one (with a battery).
+  const withBackup = backupPick(cfg, now);
+  // Add-ons: blackout backup once a battery is picked, and the EV charger when one is listed.
+  const addOns = mix.batteryId !== null || Boolean(cfg.charger);
 
   const headline = `${shown.system.kw} kW solar${shown.system.batteryKwh ? ` with a ${shown.system.batteryKwh} kWh battery` : ""}`;
   const orderHref = `/p/${encodeURIComponent(token)}/order?mix=${encodeURIComponent(mix.goal)}${week ? `&week=${week.monday}` : ""}`;
@@ -181,6 +187,33 @@ export function ConfiguratorPage(props: {
 
         {/* The choices. */}
         <section aria-label="Choose your system" className="space-y-9">
+          {/* Why nothing below can be changed (19 Nov 2026, Martin: the switches looked broken once it was ordered). */}
+          {locked && (
+            <div className="rounded-2xl border border-line bg-surface p-4 text-[14px] leading-relaxed">
+              {props.state === "accepted" ? (
+                <>
+                  <p className="flex items-center gap-1.5 font-medium">
+                    <Check className="size-4 text-positive" aria-hidden />
+                    You ordered this system
+                    {props.accepted?.at
+                      ? ` on ${new Date(props.accepted.at).toLocaleDateString("en-AU", { day: "numeric", month: "long", timeZone: "Australia/Melbourne" })}`
+                      : ""}
+                    .
+                  </p>
+                  <p className="mt-1 text-muted">
+                    It&apos;s shown as you ordered it, so the choices are fixed. To change anything, ask {view.business.name} in the chat on
+                    your proposal.
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted">
+                  {props.state === "lapsed"
+                    ? `This price has lapsed, so the choices are fixed. Ask ${view.business.name} for an up-to-date proposal.`
+                    : "This proposal isn't available any more, so the choices are fixed."}
+                </p>
+              )}
+            </div>
+          )}
           <Step n={1} title="Size">
             <div className="space-y-2.5">
               {cfg.sizes.map((s) => {
@@ -245,34 +278,35 @@ export function ConfiguratorPage(props: {
             </div>
           </Step>
 
-          <Step n={4} title="Add-ons">
-            <div className="space-y-2.5">
-              <Toggle
-                on={Boolean(mix.backup)}
-                disabled={locked || mix.batteryId === null || !exists({ backup: !mix.backup })}
-                onChange={(backup) => set({ backup })}
-                title="Blackout backup"
-                note={
-                  mix.batteryId === null
-                    ? "Comes with a battery: choose one above."
-                    : "One battery module more, held for blackouts, with chosen circuits kept on when the grid goes down."
-                }
-                side={mix.batteryId === null ? "" : mix.backup ? "Added" : delta({ backup: true })}
-              />
-              {cfg.charger && (
-                <Toggle
-                  on={Boolean(mix.ev)}
-                  disabled={locked || !exists({ ev: !mix.ev })}
-                  onChange={(ev) => set({ ev })}
-                  title="EV charger"
-                  note={`${cfg.charger.kw} kW · ${cfg.charger.name}, installed`}
-                  side={mix.ev ? "Added" : delta({ ev: true })}
-                />
-              )}
-            </div>
-          </Step>
+          {addOns && (
+            <Step n={4} title="Add-ons">
+              <div className="space-y-2.5">
+                {/* Backup is a battery's add-on, so it shows only once a battery is picked (19 Nov 2026, Martin). */}
+                {mix.batteryId !== null && (
+                  <Toggle
+                    on={Boolean(mix.backup)}
+                    disabled={locked || (mix.backup ? !exists({ backup: false }) : !withBackup)}
+                    onChange={(on) => (on ? withBackup && setPick(withBackup) : set({ backup: false }))}
+                    title="Blackout backup"
+                    note="One battery module more, held for blackouts, with chosen circuits kept on when the grid goes down."
+                    side={mix.backup ? "Added" : withBackup ? deltaTo(withBackup) : ""}
+                  />
+                )}
+                {cfg.charger && (
+                  <Toggle
+                    on={Boolean(mix.ev)}
+                    disabled={locked || !exists({ ev: !mix.ev })}
+                    onChange={(ev) => set({ ev })}
+                    title="EV charger"
+                    note={`${cfg.charger.kw} kW · ${cfg.charger.name}, installed`}
+                    side={mix.ev ? "Added" : delta({ ev: true })}
+                  />
+                )}
+              </div>
+            </Step>
+          )}
 
-          <Step n={5} title="Installation">
+          <Step n={addOns ? 5 : 4} title="Installation">
             {props.weeks.length ? (
               <>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -306,7 +340,7 @@ export function ConfiguratorPage(props: {
             )}
           </Step>
 
-          <Step n={6} title="Price">
+          <Step n={addOns ? 6 : 5} title="Price">
             <div className="rounded-2xl border border-line bg-surface p-4 text-[14px]">
               <Row label="System, installed (GST included)" value={dollars(shown.price.incGst)} />
               <Row label="Federal rebate (STCs)" value={`− ${dollars(shown.price.stc)}`} />

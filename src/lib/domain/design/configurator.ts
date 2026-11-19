@@ -302,6 +302,30 @@ export function nearestVariant(cfg: ConfiguratorView, want: ConfigPick): ConfigV
   return best;
 }
 
+/**
+ * The mix blackout backup switches on to (19 Nov 2026, Martin: "im unable to toggle the backup option"): the same mix
+ * with backup when it was priced, else the nearest priced mix with backup on this size, keeping the battery chosen if
+ * it can and else the first battery listed for the size (backup comes with a battery, so switching it on with no battery
+ * adds one). Null only when nothing with backup was priced for this size.
+ */
+export function backupPick(cfg: ConfiguratorView, now: ConfigPick): ConfigPick | null {
+  const order = cfg.batteries.filter((b) => b.size === now.size).map((b) => b.id);
+  let best: ConfigVariant | null = null;
+  let bestScore = -1;
+  for (const v of cfg.variants) {
+    if (v.size !== now.size || !v.backup) continue;
+    const p = pickOf(v);
+    const rank = p.battery === null ? order.length : order.indexOf(p.battery);
+    const score =
+      (p.panel === now.panel ? 1000 : 0) + (p.battery === now.battery ? 500 : 100 - Math.max(0, rank) * 10) + (p.ev === now.ev ? 1 : 0);
+    if (score > bestScore) {
+      best = v;
+      bestScore = score;
+    }
+  }
+  return best ? pickOf(best) : null;
+}
+
 /** The same mix with no battery: what the panels alone do, for the performance bar. */
 export function solarOnly(cfg: ConfiguratorView, v: ConfigVariant): ConfigVariant | null {
   const p = pickOf(v);
