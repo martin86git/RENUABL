@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Everywhere",
+    words: "The floating bar, the top corner and the strips over Today and Deals are glass too.",
+  },
+  {
+    day: "2026-11-19",
     area: "Design tool",
     words: "Blackout backup no longer takes a battery module out of the savings. A module kept for blackouts is now its own option.",
   },

@@ -484,7 +484,7 @@ function Shell({
             {/* One pill in liquid glass (19 Nov 2026, Martin: .glass-bar in globals.css; it was flat white). Every
                 round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
                 rail's are, black with its word in orange. */}
-            <nav aria-label="Sections" className="studio-sections glass-bar flex items-center gap-1 rounded-full p-1">
+            <nav aria-label="Sections" className="studio-sections glass-bar relative flex items-center gap-1 rounded-full p-1">
               {(() => {
                 // The business's own sections (CRM, Procurement, Installation, Service) fold behind one layers icon
                 // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
@@ -623,10 +623,7 @@ function Shell({
             })()}
             {/* The calculator, beside the top card on every page (14 Nov 2026, Martin: no bar of tools down the right). */}
             {designsRoofs(kind) && <QuickCalc />}
-            <div
-              data-tour="icons"
-              className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface p-1 shadow-[0_8px_30px_rgba(11,11,12,0.08)] ring-1 ring-line"
-            >
+            <div data-tour="icons" className="glass-bar relative flex shrink-0 items-center gap-0.5 rounded-full p-1">
               <DayWeather />
               {/* On the design tool the floating rounds are put away for the roof, so team chat comes up here. */}
               {retail && tool && <TeamChatButton me={account.email} customers={unread + mentions} />}

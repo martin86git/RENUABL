@@ -855,7 +855,7 @@ function todayPlaces(callsLive: boolean) {
 const STRIP_FIGURE = "mt-0.5 text-[20px] font-semibold leading-tight tabular-nums";
 const STRIP_SUB = "mt-0.5 whitespace-nowrap text-[12px] text-white/55";
 /** Today's strip and the Deals strip beside it: graphite, one height, so they sit level (15 Nov 2026, Martin). */
-const STRIP_BOX = "flex h-[5.25rem] rounded-2xl bg-primary text-primary-ink shadow-[0_10px_30px_rgba(11,11,12,0.16)]";
+const STRIP_BOX = "glass-strip relative flex h-[5.25rem] rounded-2xl bg-primary text-primary-ink";
 
 interface StripTab {
   id: string;

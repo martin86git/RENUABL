@@ -294,7 +294,7 @@ export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant
   return (
     <aside
       aria-label="Who you talk to: your team and your agents"
-      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center rounded-[2rem] bg-surface px-2 pb-3 pt-1.5 shadow-[0_10px_36px_rgba(20,22,26,0.12)] ring-1 ring-line print:hidden lg:flex"
+      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center glass-bar rounded-[2rem] px-2 pb-3 pt-1.5 print:hidden lg:flex"
     >
       {/* One rhythm down the bar (14 Nov 2026, Martin: "the bar doesn't look as good as it could"): a round, its name
           under it, and a fine rule between your team and your agents. */}
