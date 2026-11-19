@@ -3479,7 +3479,10 @@ export function RoofDesigner(props: {
   const shadeNow = shadeOn && shadeOpen && tool !== "string" && shadeKey !== null ? shade : null;
   // With the shade card closed or folded, the shaded panels only, tinted more the more shaded (`shadeHint`), no figures;
   // none while stringing, so the strings' colours show.
-  const shadeHints = !shadeNow && tool !== "string" && shadeKey !== null ? shade : null;
+  // Shade on, open or folded to the widget: every panel in its colour with its figure (19 Nov 2026, Martin: "i still want
+  // it to do that… i just want it to be replaced at stringing by the stringing colors").
+  const shadePanels = shadeOn && tool !== "string" && shadeKey !== null ? shade : null;
+  const shadeHints = !shadePanels && tool !== "string" && shadeKey !== null ? shade : null;
   // The folded widget's reading: the design's own, whether or not its figures are on the panels.
   const shadeFolded = shadeOn && !shadeNow && shadeKey !== null ? shade : null;
   /**
@@ -8083,10 +8086,10 @@ export function RoofDesigner(props: {
                       );
                     })}
                   {/* Shade analysis: each panel tinted by how open it is to the sun over a year, with the figure on it. */}
-                  {shadeNow &&
+                  {shadePanels &&
                     standingPanels.map((p) => {
-                      const at = shadeNow.keys.indexOf(p.key);
-                      const access = at < 0 ? null : shadeNow.report.panels[at]?.access;
+                      const at = shadePanels.keys.indexOf(p.key);
+                      const access = at < 0 ? null : shadePanels.report.panels[at]?.access;
                       if (access === null || access === undefined) return null;
                       const [cx, cy] = px(p);
                       return (
