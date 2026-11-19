@@ -6,7 +6,7 @@
  * A design is led through a fixed run of steps, each a question with its answers: whether the lot outlined from the land
  * register is the home (18 Nov 2026, Martin), the home (phase, storeys, roof),
  * on a flat roof the Kliplok interfaces and the tilt, the size to aim for (from the customer's bill when it is known),
- * the panel, placing the panels, the target reached, the inverter, the strings, the battery, and blackout backup.
+ * the panel, placing the panels, the target reached, the shade analysis, the inverter, the strings, the battery, and blackout backup.
  * Each step is answered once, yes or no alike, and the next applicable one comes up; a step the design has already
  * done (an inverter on it, every panel strung) is passed over. After the last, Sol's suggestions take over.
  */
@@ -23,6 +23,7 @@ export type GuideStepId =
   | "panel"
   | "place"
   | "reached"
+  | "shade"
   | "inverter"
   | "string"
   | "unstrung"
@@ -144,6 +145,8 @@ export function guideStep(answered: GuideAnswered, facts: GuideFacts): GuideStep
     if (!reached) return null;
     return "reached";
   }
+  // The shade analysis, once the panels are down (19 Nov 2026, Martin: "commence shade analysis yes / no").
+  if (open("shade") && facts.panels > 0) return "shade";
   if (open("inverter") && facts.panels > 0 && !facts.inverters) return "inverter";
   if (open("string") && facts.inverters > 0 && facts.unstrung > 0) return "string";
   if (open("unstrung") && answered.includes("string") && facts.unstrung > 0 && facts.leftWhy?.length) return "unstrung";

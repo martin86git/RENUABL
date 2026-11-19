@@ -37,8 +37,13 @@ describe("Sol leads the design", () => {
     expect(guiding(placing, facts({ target, panels: 8, kw: 3.8 }))).toBe(true);
     expect(guideStep(placing, facts({ target, panels: 16, kw: 7.6 }))).toBe("reached");
   });
+  it("asks to commence the shade analysis once the panels are down", () => {
+    const placed = ["home", "target", "panel", "place", "reached"] as const;
+    expect(guideStep(placed, facts({ panels: 16, kw: 7.6 }))).toBe("shade");
+    expect(guideStep([...placed, "shade"], facts({ panels: 16, kw: 7.6 }))).toBe("inverter");
+  });
   it("then the inverter, the strings, the battery and backup, passing over what's done", () => {
-    const done = ["home", "target", "panel", "place", "reached"] as const;
+    const done = ["home", "target", "panel", "place", "reached", "shade"] as const;
     const target = { kw: 7.6, kwh: 10 };
     expect(guideStep(done, facts({ target, panels: 16, kw: 7.6 }))).toBe("inverter");
     expect(guideStep(done, facts({ target, panels: 16, kw: 7.6, inverters: 1, unstrung: 16 }))).toBe("string");
@@ -90,7 +95,7 @@ describe("the battery a size of panels points to", () => {
 
 describe("panels left off the strings", () => {
   it("says so after Sol strings them, with why, and offers more inputs when that's the reason", () => {
-    const answered = ["home", "target", "panel", "place", "reached", "inverter", "string"] as const;
+    const answered = ["home", "target", "panel", "place", "reached", "shade", "inverter", "string"] as const;
     const f = facts({
       panels: 15,
       kw: 7.1,

@@ -4573,6 +4573,13 @@ export function RoofDesigner(props: {
         if (line) setQuote({ ...quoteNow, edits: { ...quoteNow.edits, [lineKey(line)]: { removed: true } } });
       }
     },
+    onShade: (yes: boolean) => {
+      answerGuide("shade");
+      if (yes) {
+        setShadeOn(true);
+        setArraysOpen(false);
+      }
+    },
     onInverter: (use: boolean | "choose") => {
       answerGuide("inverter");
       if (use === true && guideInverter) takeSuggestion(guideInverter);

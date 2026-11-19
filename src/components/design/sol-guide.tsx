@@ -18,6 +18,9 @@ import {
 import { SolIcon } from "./sol-icon";
 
 type Phase = "single" | "three";
+
+/** How long the shade analysis loads before it shows. */
+const SHADE_LOAD_MS = 2500;
 type Storeys = "single" | "double";
 type Roof = "tile" | "tin" | "flat";
 
@@ -66,6 +69,8 @@ export function SolGuide(props: {
   onExisting: (replace: boolean) => void;
   onPlace: () => void;
   onReached: (done: boolean) => void;
+  /** Commence the shade analysis, or pass it by. */
+  onShade: (yes: boolean) => void;
   onInverter: (use: boolean | "choose") => void;
   onString: (yes: boolean) => void;
   /** Panels still off a string after Sol strung them, and why. */
@@ -107,6 +112,17 @@ export function SolGuide(props: {
   const [battPick, setBattPick] = useState<"none" | "solar" | "free" | "both" | "other" | null>(null);
   // Another size of battery, typed (12 Nov 2026, Martin: pick a different storage amount).
   const [otherKwh, setOtherKwh] = useState("");
+  // The shade analysis loading: a bar fills over SHADE_LOAD_MS, then it shows (19 Nov 2026, Martin: "a bar would load
+  // purposely and 2.5 seconds later the shade analysis appears").
+  const [shading, setShading] = useState(false);
+  const commenceShade = () => {
+    if (shading) return;
+    setShading(true);
+    window.setTimeout(() => {
+      setShading(false);
+      props.onShade(true);
+    }, SHADE_LOAD_MS);
+  };
 
   const body = (() => {
     if (props.placing && !props.step)
@@ -442,6 +458,23 @@ export function SolGuide(props: {
             <Actions>
               <Main onClick={() => props.onReached(true)}>Done placing</Main>
               <Quiet onClick={() => props.onReached(false)}>Keep adding</Quiet>
+            </Actions>
+          </>
+        );
+      case "shade":
+        return shading ? (
+          <>
+            <p>Running the shade analysis…</p>
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Shade analysis">
+              <div className="sol-shade-bar h-full rounded-full bg-sun-line" style={{ animationDuration: `${SHADE_LOAD_MS}ms` }} />
+            </div>
+          </>
+        ) : (
+          <>
+            <p>Commence the shade analysis? I&apos;ll show how much of the year&apos;s sun reaches each panel.</p>
+            <Actions>
+              <Main onClick={commenceShade}>Yes</Main>
+              <Quiet onClick={() => props.onShade(false)}>No</Quiet>
             </Actions>
           </>
         );

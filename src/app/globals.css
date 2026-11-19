@@ -1171,3 +1171,7 @@ html:has(.sales-snap) {
     max-width: calc(100vw - var(--sol-w) - 3rem);
   }
 }
+
+/* Sol's guide: the shade analysis loading bar, filling once (19 Nov 2026). */
+@keyframes sol-shade-fill { from { width: 0%; } to { width: 100%; } }
+.sol-shade-bar { width: 100%; animation: sol-shade-fill linear both; }
