@@ -4,6 +4,10 @@ import {
   configKey,
   holdMessage,
   isConfigKey,
+  mixMarks,
+  mixMarksWords,
+  type ConfiguratorView,
+  type ConfigVariant,
   nearestVariant,
   backupPick,
   batteriesFor,
@@ -298,5 +302,41 @@ describe("costs decided on the job, shown as included", () => {
       [lineKey(lines[3])]: { on: true as const },
     };
     expect(includedExtrasOf(lines, edits)).toEqual(["RCBO switches (3)", "Protective bollards", "Fire sheeting"]);
+  });
+});
+
+describe("what sets a mix apart on its card", () => {
+  const cfg = {
+    sizes: [],
+    panels: [],
+    batteries: [{ size: 0, id: 0, name: "SigenStor", maker: "Sigenergy", kwh: 8, qty: 1 }],
+    variants: [],
+    start: "cfg-0-0-n-00",
+  } as unknown as ConfiguratorView;
+  const mix = (over: Partial<ConfigVariant>) =>
+    ({ size: 0, panel: 0, battery: false, batteryId: null, system: { kw: 5.225, batteryKwh: 0 }, ...over }) as unknown as ConfigVariant;
+
+  it("is panels alone for a mix with no battery", () => {
+    const m = mixMarks(cfg, mix({}));
+    expect(m).toEqual({ battery: null, backup: false, ev: false, extras: [] });
+    expect(mixMarksWords(m)).toBe("Solar");
+  });
+
+  it("carries the battery's storage and maker, backup, the charger and the costs included", () => {
+    const m = mixMarks(
+      cfg,
+      mix({
+        battery: true,
+        batteryId: 0,
+        backup: true,
+        ev: true,
+        extras: ["Fire sheeting", "Protective bollards"],
+        system: { kw: 5.225, batteryKwh: 16 } as never,
+      }),
+    );
+    expect(m.battery).toEqual({ kwh: 16, maker: "Sigenergy" });
+    expect(mixMarksWords(m)).toBe(
+      "Solar · 16 kWh Sigenergy battery · blackout backup · EV charger · included: Fire sheeting, Protective bollards",
+    );
   });
 });

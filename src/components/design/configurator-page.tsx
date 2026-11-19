@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CalendarDays, Check, House, Plus, Receipt, Sun, UtilityPole } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, House, Plus, Receipt, ShieldCheck, Sun, UtilityPole } from "lucide-react";
 import { announcementShows, themeVars } from "@/lib/domain/design/brand";
 import { todayInMarket } from "@/lib/domain/market";
 import { homeDay } from "@/lib/domain/design/home-day";
@@ -16,6 +16,9 @@ import {
   batteryOfVariant,
   invertersFor,
   isConfigKey,
+  mixMarks,
+  mixMarksWords,
+  type MixMarks,
   nearestVariant,
   pickOf,
   readConfigurator,
@@ -304,6 +307,7 @@ export function ConfiguratorPage(props: {
                     title={s.name}
                     note={`${v ? `${v.system.kw} kW · ` : ""}${s.panels} panels`}
                     side={v ? dollars(v.price.youPay) : ""}
+                    marks={v ? <Marks marks={mixMarks(cfg, v)} /> : null}
                   />
                 );
               })}
@@ -957,7 +961,57 @@ function Step({ icon, title, children }: { icon: React.ReactNode; title: string;
   );
 }
 
-function Choice(props: { on: boolean; disabled?: boolean; onPick: () => void; title: string; note: string; side?: string }) {
+/**
+ * What sets an option apart, on its card (19 Nov 2026, Martin: three options of the same kW and panels read alike until
+ * you scrolled): a panel; a battery with what it holds and its maker; a shield for blackout backup; a charger; and a
+ * plus with how many costs are included on the job. Each a small pill, in words for a screen reader and on hover.
+ */
+function Marks({ marks }: { marks: MixMarks }) {
+  const pill = "inline-flex h-6 items-center gap-1 rounded-full bg-canvas px-2 text-[11.5px] font-medium text-ink";
+  return (
+    <span role="img" aria-label={mixMarksWords(marks)} className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className={pill} title="Solar panels">
+        <PanelIcon className="size-3.5" />
+        Solar
+      </span>
+      {marks.battery && (
+        <span className={pill} title={`${marks.battery.kwh} kWh ${marks.battery.maker} battery`}>
+          <BatteryIcon className="size-3.5" />
+          <span className="[font-variant-numeric:tabular-nums]">{marks.battery.kwh} kWh</span>
+          {marks.battery.maker && <span className="font-normal text-muted">{marks.battery.maker}</span>}
+        </span>
+      )}
+      {marks.backup && (
+        <span className={pill} title="Blackout backup">
+          <ShieldCheck className="size-3.5" strokeWidth={1.8} aria-hidden />
+          Backup
+        </span>
+      )}
+      {marks.ev && (
+        <span className={pill} title="EV charger">
+          <ChargerIcon className="size-3.5" />
+          EV
+        </span>
+      )}
+      {marks.extras.length > 0 && (
+        <span className={pill} title={`Included: ${marks.extras.join(", ")}`}>
+          <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+          {marks.extras.length} {marks.extras.length === 1 ? "add-on" : "add-ons"}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function Choice(props: {
+  on: boolean;
+  disabled?: boolean;
+  onPick: () => void;
+  title: string;
+  note: string;
+  side?: string;
+  marks?: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -973,6 +1027,7 @@ function Choice(props: { on: boolean; disabled?: boolean; onPick: () => void; ti
       <span className="min-w-0 flex-1">
         <span className="block text-[15px] font-medium text-ink">{props.title}</span>
         <span className="mt-0.5 block text-[12.5px] leading-snug text-muted">{props.note}</span>
+        {props.marks}
       </span>
       {props.side && <span className="shrink-0 text-[13px] text-ink [font-variant-numeric:tabular-nums]">{props.side}</span>}
     </button>

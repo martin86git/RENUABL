@@ -577,6 +577,41 @@ export function switchInverter(cfg: ConfiguratorView, now: ConfigPick, inverter:
   return same ? { ...now, inverter, battery: same.id } : { ...now, inverter, battery: null, backup: false };
 }
 
+/**
+ * What sets a mix apart, for its card under Size (19 Nov 2026, Martin: "the options in the configurator should show on
+ * the card what sets them apart": three options of the same kW and panels read alike, though one had 8 kWh, one 16 and
+ * one 8 with add-ons further down). Panels always; the battery with what it holds and its maker (two batteries of one
+ * size differ only by maker); blackout backup; the EV charger; and the costs included on the job, as a count with their
+ * names. Read from a mix whose lists are read back (`readConfigurator`).
+ */
+export interface MixMarks {
+  battery: { kwh: number; maker: string } | null;
+  backup: boolean;
+  ev: boolean;
+  /** The costs decided on the job that this mix includes, in the customer's words. */
+  extras: string[];
+}
+
+export function mixMarks(cfg: ConfiguratorView, v: ConfigVariant): MixMarks {
+  const b = v.battery ? batteryOfVariant(cfg, v) : null;
+  return {
+    battery: v.battery ? { kwh: v.system.batteryKwh ?? b?.kwh ?? 0, maker: b?.maker ?? "" } : null,
+    backup: Boolean(v.battery && v.backup),
+    ev: Boolean(v.ev),
+    extras: [...(v.extras ?? [])],
+  };
+}
+
+/** The marks in words, for a screen reader and the card's hover: "Solar, an 8 kWh Sigenergy battery, an EV charger, 3 extras included". */
+export function mixMarksWords(m: MixMarks): string {
+  const parts = ["Solar"];
+  if (m.battery) parts.push(`${m.battery.kwh} kWh ${m.battery.maker} battery`.replace("  ", " "));
+  if (m.backup) parts.push("blackout backup");
+  if (m.ev) parts.push("EV charger");
+  if (m.extras.length) parts.push(`included: ${m.extras.join(", ")}`);
+  return parts.join(" · ");
+}
+
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 
 /** A mix in a few words: "7.125 kW, 15 Jinko panels, a 16 kWh Sigenergy battery with blackout backup, an EV charger". */

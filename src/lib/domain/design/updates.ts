@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Proposals",
+    words: "Each option in a proposal's configurator shows what sets it apart: solar, the battery's size and maker, backup, EV charger and add-ons.",
+  },
+  {
+    day: "2026-11-19",
     area: "Design tool",
     words: "Sol lists two versions as v1 and v2, and extras like a switchboard upgrade can go in v2 only.",
   },
