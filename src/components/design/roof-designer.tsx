@@ -6487,7 +6487,10 @@ export function RoofDesigner(props: {
               {/* What it does for this home. Until the customer's bill is in, this part asks for it; once it is, the part
                   shows what the bill works out to, and a press on it opens the bill again. */}
               <div
-                className={clsx("relative min-w-0 flex-[2.4] bg-surface text-ink", designs.length > 1 ? "" : "rounded-r-lg")}
+                className={clsx(
+                  "relative flex min-w-0 flex-[2.4] items-stretch bg-surface text-ink",
+                  designs.length > 1 ? "" : "rounded-r-lg",
+                )}
                 data-menu-host
               >
                 <div
@@ -6506,7 +6509,8 @@ export function RoofDesigner(props: {
                     openMenu(menu === "bill" ? false : "bill");
                   }}
                   className={clsx(
-                    "h-full cursor-pointer rounded-r-lg",
+                    "min-w-0 flex-1 cursor-pointer",
+                    !shadeOn || (shadeOpen && tool !== "string") ? "rounded-r-lg" : "",
                     props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
@@ -6551,7 +6555,10 @@ export function RoofDesigner(props: {
                     <dl className="mt-0.5 flex gap-x-4">
                       {(
                         [
-                          ["Home uses", `${finance.dailyKwh} kWh a day`, false],
+                          // Left out while the shade widget sits beside them, so the pad keeps to its width.
+                          ...(shadeOn && !(shadeOpen && tool !== "string")
+                            ? []
+                            : ([["Home uses", `${finance.dailyKwh} kWh a day`, false]] as const)),
                           ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
                           ["Saves a year", dollars(finance.saving), true],
                           ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
@@ -6584,6 +6591,56 @@ export function RoofDesigner(props: {
                     </p>
                   )}
                 </div>
+                {/* The shade folded to a widget (19 Nov 2026, Martin: "apple meets tesla"), in the white pad beside the
+                    figures for this home (Martin: "the shade widget should sit in the white pad above adjacent the
+                    financials"): the year's figure, a light and the months as fine bars; pressed, the card opens again with
+                    the figures on the panels. */}
+                {shadeOn && !(shadeOpen && tool !== "string") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (tool === "string") pickTool("select");
+                      setShadeOpen(true);
+                    }}
+                    title="Shade analysis: open it"
+                    aria-label={
+                      shadeFolded
+                        ? `Shade analysis: ${Math.round(shadeFolded.report.access * 100)}% of the year's sun reaches the panels. Open it`
+                        : "Shade analysis: open it"
+                    }
+                    className={clsx(
+                      "flex shrink-0 items-center gap-2.5 border-l border-line pl-3 pr-3.5 text-ink hover:bg-surface-2",
+                      designs.length > 1 ? "" : "rounded-r-lg",
+                      props.tight ? "py-1" : "py-1.5",
+                    )}
+                  >
+                    <span
+                      className={clsx("flex items-center justify-center rounded-full", props.tight ? "size-6" : "size-8")}
+                      style={{
+                        boxShadow: `inset 0 0 0 1.5px ${shadeFolded ? LIGHT_COLOURS[shadeLight(shadeFolded.report) ?? "pass"] : "var(--line)"}`,
+                      }}
+                    >
+                      <SunMedium className={props.tight ? "size-3.5" : "size-4"} aria-hidden />
+                    </span>
+                    <span className="flex flex-col items-start leading-none">
+                      <span className={clsx("font-mono font-semibold tabular-nums", props.tight ? "text-[14px]" : "text-[16px]")}>
+                        {shadeFolded ? `${Math.round(shadeFolded.report.access * 100)}%` : "--"}
+                      </span>
+                      <span className="mt-0.5 text-[9px] font-medium uppercase tracking-[0.18em] text-muted">Sun · year</span>
+                    </span>
+                    {shadeFolded && (
+                      <span className={clsx("flex items-end gap-[2px]", props.tight ? "h-5" : "h-7")} aria-hidden>
+                        {shadeFolded.report.byMonth.map((share, m) => (
+                          <span
+                            key={m}
+                            className="w-[3px] rounded-full"
+                            style={{ height: `${Math.max(12, Math.round(share * 100))}%`, background: accessColour(share) }}
+                          />
+                        ))}
+                      </span>
+                    )}
+                  </button>
+                )}
                 {menu === "bill" && (
                   <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw] overflow-y-auto text-ink shadow-lift rounded-lg border border-line bg-surface p-3">
                     <p className={label}>The customer&apos;s electricity bill</p>
@@ -9820,50 +9877,6 @@ export function RoofDesigner(props: {
                   <LayoutGrid className="size-5" aria-hidden />
                 </button>
               </div>
-              {/* The shade folded to a widget (19 Nov 2026, Martin: "apple meets tesla"): the year's figure, a light and the
-                  months as fine bars; pressed, the card opens again with the figures on the panels. */}
-              {shadeOn && !(shadeOpen && tool !== "string") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (tool === "string") pickTool("select");
-                    setShadeOpen(true);
-                  }}
-                  title="Shade analysis: open it"
-                  aria-label={
-                    shadeFolded
-                      ? `Shade analysis: ${Math.round(shadeFolded.report.access * 100)}% of the year's sun reaches the panels. Open it`
-                      : "Shade analysis: open it"
-                  }
-                  className="absolute right-3 top-[7.5rem] z-20 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111214]/85 py-2 pl-2.5 pr-3.5 text-white shadow-lift backdrop-blur-xl transition hover:bg-[#111214]/95"
-                >
-                  <span
-                    className="flex size-8 items-center justify-center rounded-full"
-                    style={{
-                      boxShadow: `inset 0 0 0 1.5px ${shadeFolded ? LIGHT_COLOURS[shadeLight(shadeFolded.report) ?? "pass"] : "rgba(255,255,255,0.3)"}`,
-                    }}
-                  >
-                    <SunMedium className="size-4" aria-hidden />
-                  </span>
-                  <span className="flex flex-col items-start leading-none">
-                    <span className="font-mono text-[18px] font-semibold tabular-nums">
-                      {shadeFolded ? `${Math.round(shadeFolded.report.access * 100)}%` : "--"}
-                    </span>
-                    <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.18em] text-white/55">Sun · year</span>
-                  </span>
-                  {shadeFolded && (
-                    <span className="flex h-7 items-end gap-[2px]" aria-hidden>
-                      {shadeFolded.report.byMonth.map((share, m) => (
-                        <span
-                          key={m}
-                          className="w-[3px] rounded-full"
-                          style={{ height: `${Math.max(12, Math.round(share * 100))}%`, background: accessColour(share) }}
-                        />
-                      ))}
-                    </span>
-                  )}
-                </button>
-              )}
               {shadeOn && shadeOpen && tool !== "string" && (
                 <div
                   className="absolute right-3 top-[7.5rem] z-20 max-h-[calc(100%-14rem)] w-[19rem] max-w-[calc(100%-1.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
