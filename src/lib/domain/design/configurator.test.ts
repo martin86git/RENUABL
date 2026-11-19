@@ -97,16 +97,16 @@ describe("the configurator's sizes", () => {
 describe("a proposal with the configurator", () => {
   const { view, internal } = built({ withBattery: true });
   const cfg = view.configurator!;
-  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false })!;
-  const withBatt = (size: number, backup = false) =>
-    nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup })!;
+  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false })!;
+  const withBatt = (size: number, backup = false, reserve = false) =>
+    nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup, reserve })!;
 
   it("prices every mix on publishing, largest size first, and starts as designed", () => {
     expect(cfg.sizes.length).toBeGreaterThan(1);
     expect(cfg.sizes[0].panels).toBe(view.system.panels);
     for (let i = 1; i < cfg.sizes.length; i++) expect(cfg.sizes[i].panels).toBeLessThan(cfg.sizes[i - 1].panels);
     const start = cfg.variants.find((v) => v.goal === cfg.start)!;
-    expect(pickOf(start)).toEqual({ size: 0, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup: false });
+    expect(pickOf(start)).toEqual({ size: 0, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup: false, reserve: false });
     expect(start.price.youPay).toBe(view.price.youPay);
     // Each mix's own side is kept for the order, under the same key.
     expect(internal.configurator!.map((x) => x.goal).sort()).toEqual(cfg.variants.map((v) => v.goal).sort());
@@ -117,7 +117,19 @@ describe("a proposal with the configurator", () => {
     const backup = withBatt(0, true);
     expect(backup.backup).toBe(true);
     expect(backup.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
-    expect(backup.system.batteryKwh).toBeGreaterThan(withBatt(0).system.batteryKwh);
+    // Backup by itself is the wiring: the same storage, and the same saving (19 Nov 2026, Martin).
+    expect(backup.reserve).toBeFalsy();
+    expect(backup.system.batteryKwh).toBe(withBatt(0).system.batteryKwh);
+    expect(backup.bill?.saving).toBe(withBatt(0).bill?.saving);
+    // A module more kept for blackouts is its own choice, only with backup: more storage, none of it in the evenings.
+    const kept = withBatt(0, true, true);
+    expect(kept.backup && kept.reserve).toBe(true);
+    expect(kept.system.batteryKwh).toBeGreaterThan(backup.system.batteryKwh);
+    expect(kept.price.youPay).toBeGreaterThan(backup.price.youPay);
+    expect(kept.bill?.saving).toBe(backup.bill?.saving);
+    expect(cfg.variants.some((v) => v.reserve && !v.backup)).toBe(false);
+    expect(configKey(pickOf(kept))).toMatch(/-02$/);
+    expect(isConfigKey(configKey(pickOf(kept)))).toBe(true);
   });
   it("switches blackout backup on from any mix, adding a battery when there is none", () => {
     const fromBattery = backupPick(cfg, pickOf(withBatt(0)))!;
@@ -141,13 +153,13 @@ describe("a proposal with the configurator", () => {
     expect(makers.length).toBeGreaterThan(0);
     expect(new Set(makers).size).toBe(makers.length);
     if (cfg.charger) {
-      const ev = nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, extra: 0, battery: 0, ev: true, backup: false })!;
+      const ev = nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, extra: 0, battery: 0, ev: true, backup: false, reserve: false })!;
       expect(ev.ev).toBe(true);
       expect(ev.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
     }
   });
   it("shows the chosen mix's roof, system and price, and its own lines for the order", () => {
-    const key = configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false });
+    const key = configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false });
     const shown = viewForChoice(view, key);
     expect(shown.roof.panels).toHaveLength(cfg.sizes[1].panels);
     expect(shown.system.batteryKwh).toBe(0);
@@ -164,7 +176,7 @@ describe("a proposal with the configurator", () => {
   });
   it("tells the business what was ordered, and to update the design when it differs", () => {
     expect(chosenWords(cfg, cfg.start)).not.toMatch(/Update the design/);
-    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false }))).toMatch(
+    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false }))).toMatch(
       /no battery. Update the design/,
     );
     expect(holdMessage(cfg, cfg.start, "the week of 8 December")).toMatch(/^I'd like to order .*installed the week of 8 December/);
@@ -207,7 +219,7 @@ describe("inverters to choose from", () => {
     expect(inverterChoices({ design: two, inverters: listed }).every((i) => i.sku === design.inverters![0].sku)).toBe(true);
   });
   it("keeps keys of the inverter designed with as before, and marks another", () => {
-    const base = { size: 0, panel: 1, battery: 2, extra: 0, ev: true, backup: false };
+    const base = { size: 0, panel: 1, battery: 2, extra: 0, ev: true, backup: false, reserve: false };
     expect(configKey({ ...base, inverter: 0 })).toBe("cfg-0-1-2-10");
     expect(configKey({ ...base, inverter: 2 })).toBe("cfg-0-1-2-10-i2");
     expect(isConfigKey("cfg-0-1-2-10-i2")).toBe(true);
@@ -259,7 +271,7 @@ describe("inverters that need parts behind every panel, and the mixes' lines sen
 // 19 Nov 2026, Martin: "an option to increase or decrease the storage by adding or removing a module".
 describe("storage a module up or down", () => {
   const cfg = readConfigurator(built({ withBattery: true }).view.configurator!);
-  const at = (extra: number) => nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, extra, ev: false, backup: false })!;
+  const at = (extra: number) => nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, extra, ev: false, backup: false, reserve: false })!;
 
   it("prices the battery a module fewer and a module more, holding more and costing more", () => {
     expect(at(0).extra ?? 0).toBe(0);
@@ -272,7 +284,7 @@ describe("storage a module up or down", () => {
     }
   });
   it("marks the step in the key only when there is one, and never steps under one module", () => {
-    const base = { size: 0, panel: 0, inverter: 0, battery: 0, ev: false, backup: false };
+    const base = { size: 0, panel: 0, inverter: 0, battery: 0, ev: false, backup: false, reserve: false };
     expect(configKey({ ...base, extra: 0 })).toBe("cfg-0-0-0-00");
     expect(configKey({ ...base, extra: 1 })).toBe("cfg-0-0-0-00-m1");
     expect(configKey({ ...base, extra: -1, inverter: 2 })).toBe("cfg-0-0-0-00-i2-m-1");
@@ -318,7 +330,7 @@ describe("what sets a mix apart on its card", () => {
 
   it("is panels alone for a mix with no battery", () => {
     const m = mixMarks(cfg, mix({}));
-    expect(m).toEqual({ battery: null, backup: false, ev: false, extras: [] });
+    expect(m).toEqual({ battery: null, backup: false, reserve: false, ev: false, extras: [] });
     expect(mixMarksWords(m)).toBe("Solar");
   });
 

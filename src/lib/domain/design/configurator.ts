@@ -52,13 +52,15 @@ export interface ConfigPick {
   extra: number;
   ev: boolean;
   backup: boolean;
+  /** With backup: one module more, kept for blackouts. */
+  reserve: boolean;
 }
 
 export const configKey = (p: ConfigPick): ConfigKey =>
-  `cfg-${p.size}-${p.panel}-${p.battery === null ? "n" : p.battery}-${p.ev ? 1 : 0}${p.backup ? 1 : 0}${p.inverter ? `-i${p.inverter}` : ""}${p.extra ? `-m${p.extra}` : ""}`;
+  `cfg-${p.size}-${p.panel}-${p.battery === null ? "n" : p.battery}-${p.ev ? 1 : 0}${p.backup ? (p.reserve ? 2 : 1) : 0}${p.inverter ? `-i${p.inverter}` : ""}${p.extra ? `-m${p.extra}` : ""}`;
 
 export const isConfigKey = (raw: unknown): raw is ConfigKey =>
-  typeof raw === "string" && /^cfg-\d{1,2}-\d{1,2}-(n|b|\d{1,2})(-[01]{2}(-i\d{1,2})?(-m-?\d)?)?$/.test(raw);
+  typeof raw === "string" && /^cfg-\d{1,2}-\d{1,2}-(n|b|\d{1,2})(-[01][012](-i\d{1,2})?(-m-?\d)?)?$/.test(raw);
 
 /** One size on offer: a design (the business's own, or worked back from it) with its panels on the roof. */
 export interface ConfigSize {
@@ -292,17 +294,24 @@ export function withModules(battery: DesignBattery, by: number): DesignBattery |
   return qty < 1 || qty > MAX_BATTERY_QTY ? null : { ...battery, qty };
 }
 
-/** A battery with blackout backup: one module more, held for blackouts (the quote adds the backup circuits). */
-export const withBackup = (battery: DesignBattery): DesignBattery => ({
-  ...battery,
-  qty: Math.min(MAX_BATTERY_QTY, battery.qty + 1),
-  backup: true,
-});
+/** A battery with blackout backup: the same storage, wired for blackouts (the quote adds the backup circuits). */
+export const withBackup = (battery: DesignBattery): DesignBattery => {
+  const rest = { ...battery };
+  delete rest.reserve;
+  return { ...rest, backup: true };
+};
 
-/** A battery as it runs the evenings: the module held for blackouts taken off. */
+/**
+ * Backup with a module kept for it (19 Nov 2026, Martin: "add an extra module, and keep that for backup - but only
+ * offered on backup systems"): one module more, left out of the evenings. Null when the stack is already at its most.
+ */
+export const withReserve = (battery: DesignBattery): DesignBattery | null =>
+  battery.qty + 1 > MAX_BATTERY_QTY ? null : { ...battery, qty: battery.qty + 1, backup: true, reserve: true };
+
+/** A battery as it runs the evenings: backup off, and the module kept for blackouts taken off. */
 export const withoutBackup = (battery: DesignBattery): DesignBattery => {
-  const { backup, ...rest } = battery;
-  return { ...rest, qty: backup ? Math.max(1, rest.qty - 1) : rest.qty };
+  const { backup, reserve, ...rest } = battery;
+  return { ...rest, qty: backup && reserve ? Math.max(1, rest.qty - 1) : rest.qty };
 };
 
 /**
@@ -450,6 +459,7 @@ export const pickOf = (v: ConfigVariant): ConfigPick => ({
   battery: v.batteryId === undefined ? (v.battery ? 0 : null) : v.batteryId,
   ev: Boolean(v.ev),
   backup: Boolean(v.backup),
+  reserve: Boolean(v.backup && v.reserve),
 });
 
 /** A configurator variant in place of the proposal's own system, with its size's panels on the roof. */
@@ -485,7 +495,8 @@ export function nearestVariant(cfg: ConfiguratorView, want: ConfigPick): ConfigV
       (p.battery === want.battery ? 8 : 0) +
       (p.extra === want.extra ? 4 : 0) +
       (p.ev === want.ev ? 2 : 0) +
-      (p.backup === want.backup ? 1 : 0);
+      (p.backup === want.backup ? 1 : 0) +
+      (p.reserve === want.reserve ? 0.5 : 0);
     if (score > bestScore) {
       best = v;
       bestScore = score;
@@ -513,7 +524,8 @@ export function backupPick(cfg: ConfiguratorView, now: ConfigPick): ConfigPick |
       (p.extra === now.extra ? 300 : 0) +
       (p.panel === now.panel ? 1000 : 0) +
       (p.battery === now.battery ? 500 : 100 - Math.max(0, rank) * 10) +
-      (p.ev === now.ev ? 1 : 0);
+      (p.ev === now.ev ? 1 : 0) +
+      (p.reserve === now.reserve ? 0.5 : 0);
     if (score > bestScore) {
       best = v;
       bestScore = score;
@@ -587,6 +599,8 @@ export function switchInverter(cfg: ConfiguratorView, now: ConfigPick, inverter:
 export interface MixMarks {
   battery: { kwh: number; maker: string } | null;
   backup: boolean;
+  /** With backup: a module more, kept for blackouts. */
+  reserve: boolean;
   ev: boolean;
   /** The costs decided on the job that this mix includes, in the customer's words. */
   extras: string[];
@@ -597,6 +611,7 @@ export function mixMarks(cfg: ConfiguratorView, v: ConfigVariant): MixMarks {
   return {
     battery: v.battery ? { kwh: v.system.batteryKwh ?? b?.kwh ?? 0, maker: b?.maker ?? "" } : null,
     backup: Boolean(v.battery && v.backup),
+    reserve: Boolean(v.battery && v.backup && v.reserve),
     ev: Boolean(v.ev),
     extras: [...(v.extras ?? [])],
   };
@@ -606,7 +621,7 @@ export function mixMarks(cfg: ConfiguratorView, v: ConfigVariant): MixMarks {
 export function mixMarksWords(m: MixMarks): string {
   const parts = ["Solar"];
   if (m.battery) parts.push(`${m.battery.kwh} kWh ${m.battery.maker} battery`.replace("  ", " "));
-  if (m.backup) parts.push("blackout backup");
+  if (m.backup) parts.push(m.reserve ? "blackout backup with a module kept for it" : "blackout backup");
   if (m.ev) parts.push("EV charger");
   if (m.extras.length) parts.push(`included: ${m.extras.join(", ")}`);
   return parts.join(" · ");
@@ -627,7 +642,10 @@ export function mixWords(cfg: ConfiguratorView, key: ConfigKey): string | null {
     `${size.panels} ${panel.maker} panels`,
     ...(inverter ? [`a ${inverter.kw} kW ${inverter.maker} inverter`] : []),
     v.battery
-      ? `a ${v.system.batteryKwh} kWh ${battery?.maker ?? ""} battery${v.backup ? " with blackout backup" : ""}`.replace("  ", " ")
+      ? `a ${v.system.batteryKwh} kWh ${battery?.maker ?? ""} battery${v.backup ? (v.reserve ? " with blackout backup and a module kept for blackouts" : " with blackout backup") : ""}`.replace(
+          "  ",
+          " ",
+        )
       : "no battery",
     ...(v.ev ? ["an EV charger"] : []),
   ];

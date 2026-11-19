@@ -88,7 +88,8 @@ export function ConfiguratorPage(props: {
   const mix = nearestVariant(cfg, pick) ?? opening;
   const shown = viewForChoice(view, mix.goal);
   const now = pickOf(mix);
-  const set = (patch: Partial<ConfigPick>) => setPick({ ...now, ...patch });
+  // Backup off takes the module kept for it away too: it is only ever offered with backup.
+  const set = (patch: Partial<ConfigPick>) => setPick({ ...now, ...patch, ...(patch.backup === false ? { reserve: false } : {}) });
   const [week, setWeek] = useState<Week | null>(
     props.weeks.find((w) => w.monday === props.week) ?? props.weeks.find((w) => w.monday === props.held?.monday) ?? props.weeks[0] ?? null,
   );
@@ -109,7 +110,8 @@ export function ConfiguratorPage(props: {
         q.battery === want.battery &&
         q.extra === want.extra &&
         q.ev === want.ev &&
-        q.backup === want.backup
+        q.backup === want.backup &&
+        q.reserve === want.reserve
       );
     });
   };
@@ -132,7 +134,7 @@ export function ConfiguratorPage(props: {
   const picture = useRef<HTMLDivElement>(null);
   const plate = useRef<HTMLDivElement>(null);
   const [lineTo, setLineTo] = useState<{ x: number; y: number } | null>(null);
-  const plateKey = `${battery?.id ?? "none"}-${mix.extra ?? 0}-${Boolean(mix.backup)}-${Boolean(mix.ev)}`;
+  const plateKey = `${battery?.id ?? "none"}-${mix.extra ?? 0}-${Boolean(mix.backup)}-${Boolean(mix.reserve)}-${Boolean(mix.ev)}`;
   useLayoutEffect(() => {
     const box = picture.current;
     if (!box) return;
@@ -246,10 +248,11 @@ export function ConfiguratorPage(props: {
                     {mix.ev && <ChargerArt />}
                     {battery && (
                       <BatteryArt
-                        key={`${battery.id}-${mix.extra ?? 0}-${Boolean(mix.backup)}`}
+                        key={`${battery.id}-${mix.extra ?? 0}-${Boolean(mix.backup)}-${Boolean(mix.reserve)}`}
                         kwh={shown.system.batteryKwh}
-                        qty={Math.min(8, battery.qty + (mix.extra ?? 0) + (mix.backup ? 1 : 0))}
+                        qty={Math.min(8, battery.qty + (mix.extra ?? 0) + (mix.reserve ? 1 : 0))}
                         backup={Boolean(mix.backup)}
+                        kept={Boolean(mix.backup && mix.reserve)}
                       />
                     )}
                   </div>
@@ -441,8 +444,19 @@ export function ConfiguratorPage(props: {
                     disabled={locked || (mix.backup ? !exists({ backup: false }) : !withBackup)}
                     onChange={(on) => (on ? withBackup && setPick(withBackup) : set({ backup: false }))}
                     title="Blackout backup"
-                    note="One battery module more, held for blackouts, with chosen circuits kept on when the grid goes down."
+                    note="Chosen circuits kept on when the grid goes down. Your battery still runs your evenings as usual."
                     side={mix.backup ? "Added" : withBackup ? deltaTo(withBackup) : ""}
+                  />
+                )}
+                {/* A module kept for blackouts is offered only with backup (19 Nov 2026, Martin). */}
+                {mix.batteryId !== null && mix.backup && (mix.reserve || exists({ reserve: true })) && (
+                  <Toggle
+                    on={Boolean(mix.reserve)}
+                    disabled={locked || !exists({ reserve: !mix.reserve })}
+                    onChange={(reserve) => set({ reserve })}
+                    title="Extra module for blackouts"
+                    note="One battery module more, kept full for a blackout, on top of what runs your evenings."
+                    side={mix.reserve ? "Added" : delta({ reserve: true })}
                   />
                 )}
                 {cfg.charger && (
@@ -825,7 +839,7 @@ function Dial({ label, icon, share, value, unit }: { label: string; icon: React.
  * and dim together, again and again. The storage beside it, large. Our own drawing, no maker. The unit is taller for
  * more modules. Lit and still with reduced motion.
  */
-function BatteryArt({ kwh, qty, backup }: { kwh: number; qty: number; backup: boolean }) {
+function BatteryArt({ kwh, qty, backup, kept }: { kwh: number; qty: number; backup: boolean; kept: boolean }) {
   const modules = Math.max(1, Math.min(8, qty));
   const per = modules <= 2 ? 4 : modules <= 4 ? 3 : 2;
   const W = 76;
@@ -840,7 +854,7 @@ function BatteryArt({ kwh, qty, backup }: { kwh: number; qty: number; backup: bo
   const segs = Array.from({ length: modules * per }, (_, k) => {
     const m = Math.floor(k / per);
     const y = top + m * (moduleH + moduleGap) + (k % per) * (segH + segGap);
-    return { y, held: backup && m === 0 };
+    return { y, held: kept && modules > 1 && m === 0 };
   }).reverse();
   const n = segs.length;
   const name = `cfg-seg-${n}`;
@@ -904,7 +918,7 @@ function BatteryArt({ kwh, qty, backup }: { kwh: number; qty: number; backup: bo
         <span className="mt-1 block text-[12.5px] text-white/65">kWh of storage</span>
         <span className="mt-2.5 block text-[12px] text-white/50">
           {qty} module{qty === 1 ? "" : "s"}
-          {backup ? " · one held for blackouts" : ""}
+          {kept && qty > 1 ? " · one kept for blackouts" : backup ? " · blackout backup" : ""}
         </span>
       </figcaption>
     </figure>
@@ -982,9 +996,9 @@ function Marks({ marks }: { marks: MixMarks }) {
         </span>
       )}
       {marks.backup && (
-        <span className={pill} title="Blackout backup">
+        <span className={pill} title={marks.reserve ? "Blackout backup, with a module kept for it" : "Blackout backup"}>
           <ShieldCheck className="size-3.5" strokeWidth={1.8} aria-hidden />
-          Backup
+          {marks.reserve ? "Backup + module" : "Backup"}
         </span>
       )}
       {marks.ev && (

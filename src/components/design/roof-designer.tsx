@@ -146,7 +146,7 @@ import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@
 import { SolIcon, SolMark, SolStars } from "./sol-icon";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
-import { shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
+import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
@@ -1764,7 +1764,7 @@ export function RoofDesigner(props: {
   const wallKit = useMemo(
     () => ({
       inverters: fitted.map((f) => ({ name: f.name, kw: f.kw })),
-      battery: battery ? { name: battery.name, kwh: battery.kwh, qty: battery.qty, backup: battery.backup === true } : null,
+      battery: battery ? { name: battery.name, kwh: battery.kwh, qty: battery.qty, backup: heldModulesOf({ battery }) > 0 } : null,
       charger: charger ? { name: charger.name, kw: charger.kw } : null,
       switchboard: msb !== null,
     }),
@@ -1972,7 +1972,7 @@ export function RoofDesigner(props: {
       name: to.name,
       kwh: to.kwh,
       qty: battery?.qty ?? 1,
-      ...(battery?.backup ? { backup: true } : {}),
+      ...(battery?.backup ? { backup: true, ...(battery.reserve ? { reserve: true } : {}) } : {}),
       // A new battery stands low on the right of what is in view, clear of the roof as a rule, to be dragged to its wall.
       x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
       y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
@@ -3645,7 +3645,7 @@ export function RoofDesigner(props: {
           solarDayKwh: Number(summary.kwhPerDay) || 0,
           homeDayKwh: finance?.dailyKwh ?? null,
           batteryKwh: battery.kwh * battery.qty,
-          backupKwh: battery.backup ? battery.kwh : 0,
+          backupKwh: heldModulesOf({ battery }) * battery.kwh,
         })
       : null;
     return nudgesFor({
@@ -5080,14 +5080,14 @@ export function RoofDesigner(props: {
           name: pick.battery.name,
           kwh: pick.battery.kwh,
           qty: pick.qty,
-          ...(ask.backup ? { backup: true } : {}),
+          ...(ask.backup ? { backup: true, ...(pick.qty > 1 ? { reserve: true } : {}) } : {}),
           x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
           y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
         });
         words.push(
           `${pick.qty > 1 ? `${pick.qty} × ` : ""}${pick.battery.name} (${Math.round(pick.battery.kwh * pick.qty * 10) / 10} kWh)`,
         );
-        if (ask.backup) words.push("one module held for blackouts");
+        if (ask.backup) words.push(pick.qty > 1 ? "blackout backup, one module kept for it" : "blackout backup");
       }
     }
     changed();
@@ -5252,7 +5252,7 @@ export function RoofDesigner(props: {
           name: pick.battery.name,
           kwh: pick.battery.kwh,
           qty: pick.qty,
-          ...(battery?.backup ? { backup: true } : {}),
+          ...(battery?.backup ? { backup: true, ...(battery.reserve ? { reserve: true } : {}) } : {}),
           x: battery?.x ?? cm((view.x + view.w * 0.8 - ROOF_IMAGE.width / 2) * scale),
           y: battery?.y ?? cm((view.y + view.h * 0.62 - ROOF_IMAGE.height / 2) * scale),
         });
@@ -7828,7 +7828,7 @@ export function RoofDesigner(props: {
                         solarDayKwh: Number(summary.kwhPerDay) || 0,
                         homeDayKwh: finance?.dailyKwh ?? null,
                         batteryKwh: battery.kwh * battery.qty,
-                        backupKwh: battery.backup ? battery.kwh : 0,
+                        backupKwh: heldModulesOf({ battery }) * battery.kwh,
                       });
                       const share = fill?.share ?? 0;
                       // The bars lit, counted from the bottom: seven a module.
@@ -9669,15 +9669,46 @@ export function RoofDesigner(props: {
                                 className="mt-0.5 size-4"
                                 checked={Boolean(battery.backup)}
                                 onChange={(e) => {
-                                  setBattery({ ...battery, backup: e.target.checked || undefined });
+                                  // Backup off takes the module kept for it away too.
+                                  const { reserve, ...rest } = battery;
+                                  setBattery(
+                                    e.target.checked
+                                      ? { ...rest, backup: true }
+                                      : { ...rest, backup: undefined, qty: reserve ? Math.max(1, rest.qty - 1) : rest.qty },
+                                  );
                                   changed();
                                 }}
                               />
                               <span>
-                                Blackout backup: wire chosen circuits to it, one module held back for outages. Adds the backup circuits to
-                                the quote; the held module isn&apos;t counted in the savings.
+                                Blackout backup: wire chosen circuits to it. Adds the backup circuits to the quote; the battery still runs
+                                the evenings.
                               </span>
                             </label>
+                            {/* Only on a backup system (19 Nov 2026, Martin): a module more, kept for blackouts. */}
+                            {battery.backup && (
+                              <label className="ml-6 mt-1.5 flex items-start gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 size-4"
+                                  checked={Boolean(battery.reserve)}
+                                  disabled={!battery.reserve && battery.qty >= MAX_BATTERY_QTY}
+                                  onChange={(e) => {
+                                    const rest = { ...battery };
+                                    delete rest.reserve;
+                                    setBattery(
+                                      e.target.checked
+                                        ? { ...rest, qty: rest.qty + 1, reserve: true }
+                                        : { ...rest, qty: Math.max(1, rest.qty - 1) },
+                                    );
+                                    changed();
+                                  }}
+                                />
+                                <span>
+                                  Add a module kept for blackouts: one more {battery.kwh} kWh module, held full for an outage and not
+                                  counted in the savings.
+                                </span>
+                              </label>
+                            )}
                             <p className="mt-1.5 text-xs text-muted">It is on the picture: drag it to the wall it will stand against.</p>
                           </div>
                         ) : (

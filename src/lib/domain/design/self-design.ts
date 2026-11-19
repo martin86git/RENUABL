@@ -337,7 +337,7 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
       kwh: product.kwh,
       qty: Math.min(MAX_BATTERY_QTY, Math.max(1, qty)),
       ...(kit?.battery ?? batterySpot(input.centre.lat)),
-      ...(way === "blackout" ? { backup: true } : {}),
+      ...(way === "blackout" ? { backup: true, reserve: true } : {}),
     };
   }
   const design: RoofDesign = {

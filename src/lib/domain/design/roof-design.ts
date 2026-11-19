@@ -299,11 +299,14 @@ export interface DesignBattery {
   qty: number;
   x: number;
   y: number;
-  /**
-   * Wired to keep chosen circuits on in a blackout, with one of its modules held back for it: that module isn't
-   * counted in the evenings it covers (`shiftingKwhOf`), and the quote adds the backup wiring.
-   */
+  /** Wired to keep chosen circuits on in a blackout: the quote adds the backup wiring. Its storage still runs the evenings. */
   backup?: boolean;
+  /**
+   * With backup only (19 Nov 2026, Martin: "reserving one whole module for backup is crazy. however this should be
+   * built in as an option. add an extra module, and keep that for backup"): one module more was added and is kept for
+   * blackouts, so it isn't counted in the evenings the battery covers (`shiftingKwhOf`, `heldModulesOf`).
+   */
+  reserve?: boolean;
 }
 export const MAX_BATTERY_QTY = 16;
 
@@ -941,6 +944,7 @@ function cleanBattery(raw: unknown): DesignBattery | undefined {
     x: Math.round(x * 100) / 100,
     y: Math.round(y * 100) / 100,
     ...(p.backup === true ? { backup: true } : {}),
+    ...(p.backup === true && p.reserve === true && Math.round(qty) > 1 ? { reserve: true } : {}),
   };
 }
 

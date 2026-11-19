@@ -35,6 +35,7 @@ import {
   trimDesign,
   variantOf,
   withBackup,
+  withReserve,
   withBattery,
   withCharger,
   withPanel,
@@ -292,8 +293,10 @@ export interface ProposalOption {
   name: string;
   promise: string;
   recommended: boolean;
-  /** A battery module held back to keep chosen circuits on in a blackout. */
+  /** Wired to keep chosen circuits on in a blackout. */
   backup: boolean;
+  /** With backup: one module more, kept for blackouts (left out on proposals before 19 Nov 2026). */
+  reserve?: boolean;
   system: ProposalView["system"];
   roofPanels: number[][];
   roofAspects?: number[][];
@@ -852,6 +855,7 @@ function optionFrom(
     promise: meta.promise,
     recommended: meta.recommended,
     backup: Boolean(d.battery?.backup),
+    ...(d.battery?.backup && d.battery.reserve ? { reserve: true } : {}),
     system: {
       panels: out.spec.panels,
       kw: designSummary(d, YIELD_PER_KW_DAY).kw,
@@ -977,24 +981,32 @@ function configuratorFor(
         const panelled = j === 0 ? dk : withPanel(dk, panel);
         // Each battery as offered, with backup, and a module fewer and more (19 Nov 2026, Martin: "an option to
         // increase or decrease the storage by adding or removing a module").
-        const batteryPicks: { id: number | null; backup: boolean; extra: number }[] = [
+        const batteryPicks: { id: number | null; backup: boolean; reserve?: boolean; extra: number }[] = [
           { id: null, backup: false, extra: 0 },
           ...choices.flatMap((b, i) => [
             { id: i, backup: false, extra: 0 },
             { id: i, backup: true, extra: 0 },
+            // Backup with a module more, kept for blackouts: only ever beside backup (Martin).
+            ...(withReserve(b) ? [{ id: i, backup: true, reserve: true, extra: 0 }] : []),
             ...STORAGE_STEPS.filter((by) => withModules(b, by)).map((by) => ({ id: i, backup: false, extra: by })),
           ]),
         ];
         for (const bp of batteryPicks)
           for (const ev of charger ? [false, true] : [false]) {
             const battery =
-              bp.id === null ? null : bp.backup ? withBackup(choices[bp.id]) : (withModules(choices[bp.id], bp.extra) ?? choices[bp.id]);
+              bp.id === null
+                ? null
+                : bp.reserve
+                  ? (withReserve(choices[bp.id]) ?? withBackup(choices[bp.id]))
+                  : bp.backup
+                    ? withBackup(choices[bp.id])
+                    : (withModules(choices[bp.id], bp.extra) ?? choices[bp.id]);
             const mix = withCharger(withBattery(panelled, battery), ev ? charger : null);
             const at = designs.length;
             const extra = withExtra(mix, src.at);
             const out = workOut(extra, at);
             if (!out.ok) continue;
-            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, extra: bp.extra, ev, backup: bp.backup });
+            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, extra: bp.extra, ev, backup: bp.backup, reserve: Boolean(bp.reserve) });
             const option = optionFrom(extra, mix, at, out, { goal, name: src.name, promise: src.note, recommended: src.pick });
             // The size's roof is sent once, on the size (`variantOf` puts it back).
             variants.push({
@@ -1071,6 +1083,7 @@ function configuratorFor(
         !v.extra &&
         v.batteryId === (firstDesign.battery ? 0 : null) &&
         Boolean(v.backup) === Boolean(firstDesign.battery?.backup) &&
+        Boolean(v.reserve) === Boolean(firstDesign.battery?.backup && firstDesign.battery.reserve) &&
         v.ev === Boolean(firstDesign.charger),
     ) ??
     variants.find((v) => v.size === first.id) ??

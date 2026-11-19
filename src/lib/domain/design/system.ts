@@ -49,9 +49,19 @@ export function batteryKwhOf(design: Pick<RoofDesign, "battery">): number {
   return design.battery ? Math.round(design.battery.kwh * design.battery.qty * 10) / 10 : 0;
 }
 
-/** What a design's battery has for the evenings, kWh: all of it, less the module held back for blackouts when it is wired for them. */
+/**
+ * What a design's battery has for the evenings, kWh: all of it. Blackout backup by itself holds nothing back (19 Nov
+ * 2026, Martin: an 8 kWh battery with backup showed the saving of no battery at all; "reserving one whole module for
+ * backup is crazy"): only a module added to be kept for blackouts (`reserve`) is left out.
+ */
 export function shiftingKwhOf(design: Pick<RoofDesign, "battery">): number {
   const b = design.battery;
   if (!b) return 0;
-  return Math.round(b.kwh * Math.max(0, b.qty - (b.backup ? 1 : 0)) * 10) / 10;
+  return Math.round(b.kwh * (b.qty - heldModulesOf(design)) * 10) / 10;
+}
+
+/** How many of a battery's modules are kept for blackouts: the one added for it (`reserve`), on a battery wired for backup. */
+export function heldModulesOf(design: Pick<RoofDesign, "battery">): number {
+  const b = design.battery;
+  return b?.backup && b.reserve && b.qty > 1 ? 1 : 0;
 }

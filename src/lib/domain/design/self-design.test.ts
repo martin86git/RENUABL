@@ -109,6 +109,11 @@ describe("the roof designing itself, for three outcomes", () => {
     const plain = costSystem(systemSpecOf(by("return").design, panel), base().form, workspace).lines;
     expect(plain.some((l) => l.label === "Backup circuits for blackouts")).toBe(false);
     expect(shiftingKwhOf(design)).toBe(design.battery!.kwh * (design.battery!.qty - 1));
+    // Backup by itself holds nothing back: only the module added to be kept for blackouts is left out.
+    expect(shiftingKwhOf({ battery: { ...design.battery!, reserve: false } })).toBe(design.battery!.kwh * design.battery!.qty);
+    const one = { battery: { ...design.battery!, qty: 1, backup: true, reserve: false } };
+    expect(shiftingKwhOf(one)).toBe(design.battery!.kwh);
+    expect(shiftingKwhOf({ battery: { ...one.battery, backup: false } })).toBe(design.battery!.kwh);
   });
 
   it("fills the sunnier north face before the east one", () => {
