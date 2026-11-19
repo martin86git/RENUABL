@@ -171,3 +171,25 @@ export function readinessLight(items: readonly ReadinessItem[]): { ready: boolea
     check: items.filter((i) => i.state === "check").length,
   };
 }
+
+/** A check's light: green passed, amber worth a look, red to fix, none while it doesn't apply yet. */
+export type CheckLight = "pass" | "check" | "fix";
+
+/**
+ * One light for some of the checks (19 Nov 2026, Martin: the rail's icons light up like traffic lights as each check is
+ * passed): the worst of them, or null when none of them is on the list yet.
+ */
+export function lightOf(items: readonly ReadinessItem[], ids: readonly ReadinessItem["id"][]): CheckLight | null {
+  const these = items.filter((i) => ids.includes(i.id));
+  if (!these.length) return null;
+  if (these.some((i) => i.state === "fix")) return "fix";
+  if (these.some((i) => i.state === "check")) return "check";
+  return "pass";
+}
+
+/** The shade's light: green when no panel loses more than a tenth, red when one gets under half its sun, else amber. */
+export function shadeLight(report: { shaded: number; worst: number } | null): CheckLight | null {
+  if (!report) return null;
+  if (report.shaded === 0) return "pass";
+  return report.worst < 0.5 ? "fix" : "check";
+}

@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Design tool",
+    words: "The shade analysis folds to a small widget and gives way to stringing; the rail lights strings and shade.",
+  },
+  {
+    day: "2026-11-19",
     area: "Proposals",
     words: "Proposals show how much of the year's sun reaches the panels, and the configurator can show it panel by panel.",
   },

@@ -82,6 +82,7 @@ import {
   SunMedium,
   Brush,
   House,
+  Minus,
   Sunrise,
   LayoutGrid,
   Radio,
@@ -154,7 +155,7 @@ import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
-import { readiness, readinessLight, type ReadinessItem } from "@/lib/domain/design/readiness";
+import { lightOf, readiness, readinessLight, shadeLight, type CheckLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import {
   faces as facesWay,
   parseCommand,
@@ -478,23 +479,35 @@ function knifeRank(name: string): number {
 }
 
 /** A round on a fan's leg. */
-function Leg(props: { label: string; on?: boolean; onClick: () => void; children: React.ReactNode }) {
+function Leg(props: { label: string; on?: boolean; onClick: () => void; children: React.ReactNode; light?: CheckLight | null }) {
+  const lightWords = props.light ? ` · ${LIGHT_WORDS[props.light]}` : "";
   return (
     <button
       type="button"
       onClick={props.onClick}
-      title={props.label}
-      aria-label={props.label}
+      title={props.label + lightWords}
+      aria-label={props.label + lightWords}
       aria-pressed={props.on}
       className={clsx(
-        "flex size-11 items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+        "relative flex size-11 items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
         props.on ? "border-primary bg-primary text-primary-ink" : "border-line bg-surface/95 text-ink hover:bg-surface",
       )}
     >
       {props.children}
+      {/* The check's light (19 Nov 2026, Martin: the rail's icons light up like traffic lights as each check passes). */}
+      {props.light && (
+        <span
+          aria-hidden
+          className="absolute -right-0.5 -top-0.5 size-3 rounded-full ring-2 ring-surface"
+          style={{ background: LIGHT_COLOURS[props.light], boxShadow: `0 0 6px ${LIGHT_COLOURS[props.light]}` }}
+        />
+      )}
     </button>
   );
 }
+
+const LIGHT_COLOURS: Record<CheckLight, string> = { pass: "#2fb36b", check: "#f2a516", fix: "#e5484d" };
+const LIGHT_WORDS: Record<CheckLight, string> = { pass: "passed", check: "worth a check", fix: "to fix" };
 
 function SlopeNote(props: {
   slope: AspectReading | "busy" | "none" | undefined;
@@ -1378,6 +1391,8 @@ export function RoofDesigner(props: {
   /** Takes up a tool, leaving behind anything half-drawn with the last one. */
   const pickTool = (t: Tool) => {
     setTool(t);
+    // Taking up another tool folds the shade card to its widget, so the work shows (19 Nov 2026, Martin).
+    if (t !== "select") setShadeOpen(false);
     setToolMenu(null);
     setFanOpen(false);
     setTracing([]);
@@ -1524,8 +1539,12 @@ export function RoofDesigner(props: {
     // The roof's place never changes for the life of this designer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shadeOn, anyPanels, terrain]);
+  // The shade card is open to read, or folded to its widget (19 Nov 2026, Martin: it persisted as a large card and kept
+  // its figures on the panels while stringing): folded, the panels keep only their tint, and stringing hides that too.
+  const [shadeOpen, setShadeOpen] = useState(true);
   const toggleShade = () => {
     setShadeOn(!shadeOn);
+    setShadeOpen(true);
     setArraysOpen(false);
   };
   // The arrays on the design, listed (and each marked with its size on the picture) while this is open.
@@ -3455,9 +3474,12 @@ export function RoofDesigner(props: {
     // `shadeKey` stands for the panels: it changes exactly when any of them does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shadeKey, terrain]);
-  const shadeNow = shadeOn && shadeKey !== null ? shade : null;
-  // With the shade view closed, the shaded panels only, tinted more the more shaded (`shadeHint`), no figures.
-  const shadeHints = !shadeOn && shadeKey !== null ? shade : null;
+  const shadeNow = shadeOn && shadeOpen && tool !== "string" && shadeKey !== null ? shade : null;
+  // With the shade card closed or folded, the shaded panels only, tinted more the more shaded (`shadeHint`), no figures;
+  // none while stringing, so the strings' colours show.
+  const shadeHints = !shadeNow && tool !== "string" && shadeKey !== null ? shade : null;
+  // The folded widget's reading: the design's own, whether or not its figures are on the panels.
+  const shadeFolded = shadeOn && !shadeNow && shadeKey !== null ? shade : null;
   /**
    * The design's arrays, largest first, for the list that the arrays button opens: groups of panels that touch, or as
    * good as (`ARRAY_GAP`, the same rule the quote counts arrays by), each with the way most of its panels face, their
@@ -4261,6 +4283,7 @@ export function RoofDesigner(props: {
         return pickTool("panel");
       case "show-shade":
         setShadeOn(true);
+        setShadeOpen(true);
         return aside();
       case "backup-yes":
         setBattery((b) => (b ? { ...b, backup: true } : b));
@@ -6045,17 +6068,24 @@ export function RoofDesigner(props: {
           quick={
             props.tight ? (
               <>
-                <Leg label="String panels (S)" on={tool === "string"} onClick={() => pickTool(tool === "string" ? "select" : "string")}>
+                <Leg
+                  label="String panels (S)"
+                  on={tool === "string"}
+                  light={summary.panels ? lightOf(ready, ["strings", "unstrung", "ratio"]) : null}
+                  onClick={() => pickTool(tool === "string" ? "select" : "string")}
+                >
                   <Cable className="size-5" aria-hidden />
                 </Leg>
-                <Leg label="Shade analysis" on={shadeOn} onClick={toggleShade}>
+                <Leg
+                  label="Shade analysis"
+                  on={shadeOn}
+                  light={shadeKey !== null ? shadeLight(shade?.report ?? null) : null}
+                  onClick={toggleShade}
+                >
                   <SunMedium className="size-5" aria-hidden />
                 </Leg>
                 <Leg label={illustrated ? "Show the photo" : "Draw the roof"} on={illustrated} onClick={toggleIllustrated}>
                   <Brush className="size-5" aria-hidden />
-                </Leg>
-                <Leg label="The home's day" on={homeDay.on} onClick={() => (homeDay.on ? homeDay.close() : homeDay.open())}>
-                  <Sunrise className="size-5" aria-hidden />
                 </Leg>
               </>
             ) : undefined
@@ -9743,7 +9773,51 @@ export function RoofDesigner(props: {
                   <LayoutGrid className="size-5" aria-hidden />
                 </button>
               </div>
-              {shadeOn && (
+              {/* The shade folded to a widget (19 Nov 2026, Martin: "apple meets tesla"): the year's figure, a light and the
+                  months as fine bars; pressed, the card opens again with the figures on the panels. */}
+              {shadeOn && !(shadeOpen && tool !== "string") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tool === "string") pickTool("select");
+                    setShadeOpen(true);
+                  }}
+                  title="Shade analysis: open it"
+                  aria-label={
+                    shadeFolded
+                      ? `Shade analysis: ${Math.round(shadeFolded.report.access * 100)}% of the year's sun reaches the panels. Open it`
+                      : "Shade analysis: open it"
+                  }
+                  className="absolute right-3 top-[7.5rem] z-20 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#111214]/85 py-2 pl-2.5 pr-3.5 text-white shadow-lift backdrop-blur-xl transition hover:bg-[#111214]/95"
+                >
+                  <span
+                    className="flex size-8 items-center justify-center rounded-full"
+                    style={{
+                      boxShadow: `inset 0 0 0 1.5px ${shadeFolded ? LIGHT_COLOURS[shadeLight(shadeFolded.report) ?? "pass"] : "rgba(255,255,255,0.3)"}`,
+                    }}
+                  >
+                    <SunMedium className="size-4" aria-hidden />
+                  </span>
+                  <span className="flex flex-col items-start leading-none">
+                    <span className="font-mono text-[18px] font-semibold tabular-nums">
+                      {shadeFolded ? `${Math.round(shadeFolded.report.access * 100)}%` : "--"}
+                    </span>
+                    <span className="mt-1 text-[9px] font-medium uppercase tracking-[0.18em] text-white/55">Sun · year</span>
+                  </span>
+                  {shadeFolded && (
+                    <span className="flex h-7 items-end gap-[2px]" aria-hidden>
+                      {shadeFolded.report.byMonth.map((share, m) => (
+                        <span
+                          key={m}
+                          className="w-[3px] rounded-full"
+                          style={{ height: `${Math.max(12, Math.round(share * 100))}%`, background: accessColour(share) }}
+                        />
+                      ))}
+                    </span>
+                  )}
+                </button>
+              )}
+              {shadeOn && shadeOpen && tool !== "string" && (
                 <div
                   className="absolute right-3 top-[7.5rem] z-20 max-h-[calc(100%-14rem)] w-[19rem] max-w-[calc(100%-1.5rem)] overflow-auto rounded-2xl border border-line bg-surface p-4 shadow-lift"
                   role="region"
@@ -9751,13 +9825,23 @@ export function RoofDesigner(props: {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Shade analysis · estimate</p>
-                    <button
-                      className="text-muted hover:text-ink"
-                      onClick={() => setShadeOn(false)}
-                      aria-label="Put the shade analysis away"
-                    >
-                      <X className="size-4" aria-hidden />
-                    </button>
+                    <span className="flex items-center gap-2">
+                      <button
+                        className="text-muted hover:text-ink"
+                        onClick={() => setShadeOpen(false)}
+                        title="Fold it to a widget"
+                        aria-label="Fold the shade analysis to a widget"
+                      >
+                        <Minus className="size-4" aria-hidden />
+                      </button>
+                      <button
+                        className="text-muted hover:text-ink"
+                        onClick={() => setShadeOn(false)}
+                        aria-label="Put the shade analysis away"
+                      >
+                        <X className="size-4" aria-hidden />
+                      </button>
+                    </span>
                   </div>
                   {terrain === null ? (
                     <p className="mt-3 text-sm text-ink-2">Measuring what stands around the roof…</p>
