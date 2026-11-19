@@ -33,6 +33,22 @@ export function approvalsOpen(j: JourneyJob): boolean {
   return gridOpen || rebate === "Eligibility to check" || rebate === "Applied";
 }
 
+/**
+ * What is still open on a sold job's approvals, in words for a sentence ("the grid pre-approval isn't submitted yet"),
+ * or null when they are through (19 Nov 2026, Martin: Today flagged Casey's approvals while the deal's own card said
+ * nothing needed him). The same test as `approvalsOpen`, so the two never disagree.
+ */
+export function approvalsWaiting(details: Job["details"]): string | null {
+  const grid = details.preApproval;
+  const rebate = details.solarVicStatus;
+  const parts: string[] = [];
+  if (!grid || grid === "Not submitted") parts.push("the grid pre-approval isn't submitted yet");
+  else if (grid === "Submitted") parts.push("the grid pre-approval is still with the network");
+  if (rebate === "Eligibility to check") parts.push("Solar Victoria eligibility is still to check");
+  else if (rebate === "Applied") parts.push("the Solar Victoria application is still waiting");
+  return parts.length ? parts.join(" and ") : null;
+}
+
 /** Where a job is on the journey; null once lost. Service is counted from the service cases, not from a job's stage. */
 export function journeyStopOf(j: JourneyJob): Exclude<JourneyStop, "service"> | null {
   if (j.stage === "lead") return "enquiries";

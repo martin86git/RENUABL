@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Deals",
+    words: "A sold deal's own card now says when its grid or Solar Victoria approvals are still open, as Today does.",
+  },
+  {
+    day: "2026-11-19",
     area: "Sol",
     words: "Sol searches the web further before he answers, and no longer talks about search limits.",
   },

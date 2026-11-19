@@ -7,6 +7,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { usageOf } from "@/lib/domain/ai-costs";
 import type { DealViewer } from "@/lib/domain/design/account";
 import { OPEN_STAGES, PRE_INSTALL_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
+import { approvalsWaiting } from "@/lib/domain/design/journey";
 import { EXAMPLE_DEALS, EXAMPLE_SOURCE, exampleAddress, exampleEmail, mayHaveExamples } from "@/lib/domain/design/example-deals";
 import { SAMPLE_AUTHOR } from "@/lib/domain/design/crm";
 import { readDraft, writeAsk, writeSystem, type WriteFacts } from "@/lib/domain/design/deal-write";
@@ -129,6 +130,7 @@ export async function dealFeed(
     const proposal = proposals.find((p) => p.job === j.id);
     return {
       jobId: j.id,
+      approvals: PRE_INSTALL_STAGES.includes(j.stage) ? approvalsWaiting(j.details) : null,
       customer: j.customerName,
       suburb: suburbOfAddress(j.address),
       address: j.address,

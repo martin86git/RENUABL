@@ -156,6 +156,7 @@ export function solProposes(d: FeedDeal, now = new Date()): SolProposal {
       : `${name}'s roof isn't designed yet. Shall we design it now?`,
     proposal: `${name}'s system is designed and priced. Shall we send the proposal?`,
     call: `Nobody has spoken to ${name} yet. Want to ring them now?`,
+    approvals: `${name} has signed, but ${d.approvals ?? "the approvals aren't through yet"}. Shall we open the deal's details to move it on?`,
     book: `${name} has signed. Shall we book the installation day?`,
     deal: `${move.why} Want to take a look?`,
   };

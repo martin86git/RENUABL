@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { feedFilter, nextMove, type FeedDeal } from "./deal-feed";
+import { feedFilter, needsYou, nextMove, type FeedDeal } from "./deal-feed";
+import { approvalsOpen, approvalsWaiting } from "./journey";
+import { solProposes } from "./sol-on-deal";
 import { firesAtFor, laterAt, outboxState } from "./sol-agents";
 
 const now = new Date("2026-11-06T03:00:00Z"); // Friday 2 pm in Melbourne
@@ -111,5 +113,28 @@ describe("filtering the feed", () => {
   });
   it("keeps only the person's own deals with Mine on", () => {
     expect(ids(feedFilter(deals, { pipeline: "all", stages: null, mine: true, me: "sam@example.com" }))).toEqual(["a"]);
+  });
+});
+
+describe("approvals on a sold deal (19 Nov 2026: Today flagged them, the deal's card didn't)", () => {
+  it("asks for the approvals before anything else on a signed deal, install day or not", () => {
+    const words = approvalsWaiting({ preApproval: "Not submitted" });
+    const d = deal({ stage: "won", installDate: "2026-11-23", proposal: null, approvals: words });
+    expect(nextMove(d, now)).toMatchObject({ kind: "approvals", why: "Signed, but the grid pre-approval isn't submitted yet." });
+    expect(needsYou(d, now)).toBe("Sold: approvals to move on");
+    expect(solProposes(d, now).yes).toMatchObject({ kind: "approvals" });
+  });
+  it("is quiet once the approvals are through", () => {
+    expect(approvalsWaiting({ preApproval: "Approved" })).toBeNull();
+    expect(approvalsWaiting({ preApproval: "Approved", solarVicStatus: "Approved" })).toBeNull();
+    const d = deal({ stage: "won", installDate: "2026-11-23", proposal: null, approvals: null });
+    expect(nextMove(d, now)).toBeNull();
+  });
+  it("says the same as approvalsOpen for every grid and rebate state", () => {
+    for (const preApproval of [undefined, "Not submitted", "Submitted", "Approved", "Declined"])
+      for (const solarVicStatus of [undefined, "Eligibility to check", "Applied", "Approved", "Not applying"]) {
+        const details = { ...(preApproval ? { preApproval } : {}), ...(solarVicStatus ? { solarVicStatus } : {}) };
+        expect(Boolean(approvalsWaiting(details))).toBe(approvalsOpen({ stage: "won", details }));
+      }
   });
 });

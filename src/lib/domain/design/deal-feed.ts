@@ -25,6 +25,8 @@ export interface FeedEvent {
 
 export interface FeedDeal {
   jobId: string;
+  /** A sold deal's approvals still open, in words (journey.ts `approvalsWaiting`), or null when through or not sold. */
+  approvals?: string | null;
   customer: string;
   suburb: string;
   /** The deal's address as kept on it, for the heading of its chat. */
@@ -113,6 +115,7 @@ export function needsYou(d: FeedDeal, now = new Date()): string | null {
   }
   if (d.heat === "hot" && !d.events.some((e) => e.kind === "call" && now.getTime() - Date.parse(e.at) < 3 * DAY))
     return "Hot: worth a call today";
+  if (d.approvals) return "Sold: approvals to move on";
   if (d.stage === "won" && !d.installDate) return "Sold: needs an install date";
   return null;
 }
@@ -142,7 +145,7 @@ export function caption(d: FeedDeal, now = new Date()): string {
 }
 
 /** What the card's lit button does. */
-export type MoveKind = "reply" | "review" | "design" | "proposal" | "call" | "book" | "deal";
+export type MoveKind = "reply" | "review" | "design" | "proposal" | "call" | "approvals" | "book" | "deal";
 
 export interface NextMove {
   kind: MoveKind;
@@ -192,6 +195,8 @@ export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
       : { kind: "deal", label: "Get in touch", why: `Nobody has been in touch with ${name} yet, and there's no phone on file.` };
   if (d.heat === "hot" && !called && d.phone && OPEN.includes(d.stage))
     return { kind: "call", label: `Call ${name}`, why: `${name} is warm to it and hasn't had a call in three days.` };
+  // The same approvals Today's list flags, ahead of booking: the gate says approvals come first.
+  if (d.approvals) return { kind: "approvals", label: "Move the approvals on", why: `Signed, but ${d.approvals}.` };
   if (d.stage === "won" && !d.installDate) return { kind: "book", label: "Book the install", why: "Signed. It needs an installation day." };
   return null;
 }

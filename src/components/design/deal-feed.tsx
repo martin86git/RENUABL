@@ -20,6 +20,7 @@ import {
   Eye,
   FileText,
   Flame,
+  FileCheck,
   Handshake,
   Mail,
   MessageCircle,
@@ -1194,9 +1195,11 @@ function DealCard(props: {
                     ? `${deal}?tab=chat`
                     : kind === "email"
                       ? `${deal}?tab=email`
-                      : kind === "book"
-                        ? `${deal}?tab=details`
-                        : `${deal}?tab=team`,
+                      : kind === "approvals"
+                        ? `${deal}?tab=details&section=network`
+                        : kind === "book"
+                          ? `${deal}?tab=details`
+                          : `${deal}?tab=team`,
                 );
               }}
             />
@@ -1401,6 +1404,7 @@ const MOVE_ICONS: Record<MoveKind, React.ComponentType<{ className?: string }>> 
   design: PenTool,
   proposal: FileText,
   call: Phone,
+  approvals: FileCheck,
   book: CalendarPlus,
   deal: Handshake,
 };
@@ -1450,9 +1454,11 @@ function MoveButton(props: { deal: FeedDeal; move: NextMove; now: Date; reviewin
           : `${PATHS.designer}?job=${encodeURIComponent(d.jobId)}`
         : move.kind === "proposal"
           ? `${PATHS.deals}/${encodeURIComponent(d.jobId)}/proposal`
-          : move.kind === "book"
-            ? `${PATHS.deals}/${d.jobId}?tab=details`
-            : `${PATHS.deals}/${d.jobId}?tab=team`;
+          : move.kind === "approvals"
+            ? `${PATHS.deals}/${d.jobId}?tab=details&section=network`
+            : move.kind === "book"
+              ? `${PATHS.deals}/${d.jobId}?tab=details`
+              : `${PATHS.deals}/${d.jobId}?tab=team`;
   return (
     <Link href={href} className={look}>
       {inner}

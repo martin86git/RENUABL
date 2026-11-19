@@ -313,7 +313,8 @@ export function DealPage({ id }: { id: string }) {
   const [designVersion, setDesignVersion] = useState(0);
   const [account] = useDesignAccount();
   // Which of the deal's tabs of fields is showing, and the signed proposal's figures for Financials.
-  const [section, setSection] = useState("deal");
+  // ?section=network opens Details on that tab (19 Nov 2026: Move the approvals on lands where the pre-approval is set).
+  const [section, setSection] = useState(() => params.get("section") || "deal");
   // The business's own arrangement of a deal's fields (Settings → Deal fields); ours until it has loaded.
   const [fieldsConfig, setFieldsConfig] = useState<DealFieldsConfig | null>(null);
   // The business's people: who a deal can be given to, and who can be @mentioned in a note.
@@ -587,9 +588,11 @@ export function DealPage({ id }: { id: string }) {
                   ? menu.onDesign()
                   : kind === "proposal"
                     ? openTool("proposal")
-                    : kind === "book"
-                      ? goTab("details")
-                      : goTab("team")
+                    : kind === "approvals"
+                      ? (setSection("network"), goTab("details"))
+                      : kind === "book"
+                        ? goTab("details")
+                        : goTab("team")
           }
         />
 
