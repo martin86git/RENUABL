@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Proposals",
+    words: "In the proposal builder, pick an option to see it through the page, and change the chart style on the chart itself.",
+  },
+  {
+    day: "2026-11-19",
     area: "Design tool",
     words: "The shade analysis folds to a small widget and gives way to stringing; the rail lights strings and shade.",
   },

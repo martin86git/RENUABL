@@ -17,7 +17,15 @@ import {
   type BrandKit,
   type ImageKind,
 } from "@/lib/domain/design/brand";
-import type { ProposalChoice, ProposalState, ProposalStatus, ProposalView } from "@/lib/domain/design/proposal";
+import {
+  recommendedGoal,
+  viewForChoice,
+  type OptionKey,
+  type ProposalChoice,
+  type ProposalState,
+  type ProposalStatus,
+  type ProposalView,
+} from "@/lib/domain/design/proposal";
 import { firstTemplate } from "@/lib/domain/design/send-message";
 import { dollars, shortDate } from "@/lib/services/crm";
 import {
@@ -41,7 +49,7 @@ import { useDesignAccount } from "./design-account";
 import { DepositLine } from "./deposit-panel";
 import { ChartThumb, TemplateThumb } from "./proposal-thumbs";
 import { ProposalPage } from "./proposal-view";
-import { BuilderPanel, useProposalBuilder } from "./proposal-builder";
+import { BuilderPanel, Hint, useProposalBuilder } from "./proposal-builder";
 import { PriceCheck } from "./design-quote";
 import { priceAdvice } from "@/lib/domain/design/price-check";
 import { usePricePoints } from "@/lib/services/price-check";
@@ -303,24 +311,37 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
         )
       : [];
   const builder = useProposalBuilder(building, view, setView, () => void refresh(choice));
+  // With a choice of systems, the one picked on the page shows through it, as it does for the customer (19 Nov 2026,
+  // Martin: "the proposal contents should change in the proposal builder when i click on a different proposal option").
+  const [picked, setPicked] = useState<OptionKey | null>(null);
+  const chosen = view ? (view.options?.some((o) => o.goal === picked) ? picked : recommendedGoal(view)) : null;
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
-      <aside className="w-full shrink-0 border-b border-line bg-surface lg:w-[340px] lg:border-b-0 lg:border-r" aria-label="Proposal">
+      {/* Beside the page it stays put with a scroll of its own, so its choices are in reach wherever the page is. */}
+      <aside
+        className="w-full shrink-0 border-b border-line bg-surface lg:sticky lg:top-0 lg:h-dvh lg:w-[340px] lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r"
+        aria-label="Proposal"
+      >
         <div className="space-y-5 px-5 py-5">
           <Link href={`${PATHS.deals}/${jobId}`} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink hover:underline">
             <ChevronLeft className="size-4" aria-hidden /> Back to the deal
           </Link>
           <div>
             <p className={ui.eyebrow}>Proposal</p>
-            <h1 className="mt-1 text-[20px] leading-snug tracking-tight text-ink">
+            <h1 className="mt-1 flex items-center gap-1.5 text-[20px] leading-snug tracking-tight text-ink">
               {building ? "Build your proposal" : "Preview and send"}
+              {building && (
+                <Hint>
+                  Changes are saved for your proposals from now on. A proposal already sent stays as it was until you publish again.
+                </Hint>
+              )}
             </h1>
-            <p className="mt-1.5 text-xs leading-relaxed text-muted">
-              {building
-                ? "Changes are saved for your proposals from now on. A proposal already sent stays as it was until you publish again."
-                : "Worked out from the saved design, the customer's bill and your prices. Your costs and margin are never in it."}
-            </p>
+            {!building && (
+              <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                Worked out from the saved design, the customer&apos;s bill and your prices. Your costs and margin are never in it.
+              </p>
+            )}
           </div>
 
           {status && (
@@ -569,7 +590,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
           >
             <ProposalPage
               build={building && builder.ready ? builder.hooks : undefined}
-              view={view}
+              view={viewForChoice(view, chosen)}
+              choice={{ chosen, onChoose: setPicked }}
               state="live"
               accepted={null}
               urls={{

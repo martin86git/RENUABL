@@ -33,6 +33,7 @@ import {
   PanelRight,
   PanelTop,
   Pencil,
+  Info,
   Plus,
   Sun,
   Trash2,
@@ -332,6 +333,12 @@ export function useProposalBuilder(
                 setBlock(block.id, { image: null });
               }}
             />
+          )}
+          {kit && (block.id === "production" || block.id === "bill") && (
+            <div className="mb-4 rounded-xl bg-surface p-2.5 shadow-sm ring-1 ring-line">
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-muted">Chart style</p>
+              <ChartPicker kit={kit} onChange={change} inline />
+            </div>
           )}
           <div className={clsx(dragging === block.id && "opacity-40")}>{node}</div>
           {custom && setting && editing === block.id && (
@@ -701,6 +708,95 @@ function BlockWords({
   );
 }
 
+/** A line of help kept behind a small mark, shown on hover or focus (19 Nov 2026, Martin: "alot of explainer text"). */
+export function Hint({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="group/hint relative inline-flex align-middle">
+      <button type="button" aria-label="What this is" className="rounded-full text-muted hover:text-ink focus-visible:text-ink">
+        <Info className="size-3.5" aria-hidden />
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-50 mt-1.5 hidden w-60 rounded-lg bg-ink px-3 py-2 text-[12px] font-normal leading-snug tracking-normal text-canvas shadow-lg group-focus-within/hint:block group-hover/hint:block"
+      >
+        {children}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * How the charts are drawn and in what colours. In the side panel, and `inline` on the chart's own block on the page,
+ * so a style is tried where it shows (19 Nov 2026, Martin: "im having to scroll back up to find the chart options").
+ */
+function ChartPicker({ kit, onChange, inline }: { kit: BrandKit; onChange: (patch: Partial<BrandKit>) => void; inline?: boolean }) {
+  return (
+    <div>
+      <div className={inline ? "flex flex-wrap gap-1.5" : "mt-1.5 grid grid-cols-3 gap-1.5"}>
+        {CHART_STYLES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            aria-pressed={kit.chart === c.id}
+            title={c.blurb}
+            onClick={() => onChange({ chart: c.id })}
+            className={clsx(
+              "rounded-lg border bg-surface text-left",
+              inline ? "px-2.5 py-1 text-[12px] font-medium text-ink" : "p-1.5",
+              kit.chart === c.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
+            )}
+          >
+            {inline ? (
+              c.name
+            ) : (
+              <>
+                <span className="block [&>div]:h-10">
+                  <ChartThumb style={c.id} theme={kit} />
+                </span>
+                <span className="mt-1 block text-[11.5px] font-medium text-ink">{c.name}</span>
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+      {(kit.chart === "live" || kit.chart === "ring") && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {CHART_TONES.map((t) => {
+            const c = chartColours({ ...kit, chartTone: t.id });
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={kit.chartTone === t.id}
+                title={t.blurb}
+                onClick={() => onChange({ chartTone: t.id })}
+                className={clsx(
+                  "inline-flex items-center gap-1.5 rounded-full border bg-surface py-1 pl-1 pr-2.5 text-[12px] text-ink",
+                  kit.chartTone === t.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
+                )}
+              >
+                <span className="size-4 rounded-full" style={{ background: `linear-gradient(to top, ${c.from}, ${c.to})` }} aria-hidden />
+                {t.name}
+              </button>
+            );
+          })}
+          {kit.chartTone === "own" &&
+            (["chartFrom", "chartTo"] as const).map((k) => (
+              <input
+                key={k}
+                type="color"
+                aria-label={k === "chartFrom" ? "The chart's bottom colour" : "The chart's top colour"}
+                className="h-7 w-9 cursor-pointer rounded-md border border-line bg-surface"
+                value={kit[k]}
+                onChange={(e) => onChange({ [k]: e.target.value })}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The builder's side panel: the design (standard or custom), the brand, and in a custom design the tray of blocks. */
 export function BuilderPanel({ builder, customAllowed }: { builder: Builder; customAllowed: boolean }) {
   const { kit } = builder;
@@ -722,19 +818,21 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
     });
   };
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {builder.problem && (
         <p className="text-sm text-danger" role="alert">
           {builder.problem}
         </p>
       )}
-      <p className="rounded-lg bg-sun/60 px-3 py-2.5 text-xs leading-relaxed text-sun-ink">
-        {custom
-          ? "Each dashed box on the page is a block. Drag one by its handle to move it, hover it for its picture, words and layout, or add a block between two."
-          : "Each dashed box on the page is a block. In Standard they keep their usual order: switch to Custom to move them, add your own and put pictures on them."}
-      </p>
       <fieldset>
-        <legend className={ui.label}>Design</legend>
+        <legend className={clsx(ui.label, "flex items-center gap-1.5")}>
+          Design
+          <Hint>
+            {custom
+              ? "Each dashed box on the page is a block. Drag one by its handle to move it, hover it for its picture, words and layout, or add a block between two."
+              : "Each dashed box on the page is a block. In Standard they keep their usual order: switch to Custom to move them, add your own and put pictures on them."}
+          </Hint>
+        </legend>
         <div className="mt-1.5 grid grid-cols-2 gap-1.5" role="radiogroup">
           {(
             [
@@ -747,34 +845,36 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
               type="button"
               role="radio"
               aria-checked={kit.design === id}
+              title={blurb}
               onClick={() => builder.change({ design: id })}
               className={clsx(
-                "rounded-md border px-3 py-2.5 text-left",
+                "rounded-md border px-3 py-1.5 text-center",
                 kit.design === id ? "border-ink bg-surface-2" : "border-line hover:border-line-strong",
               )}
             >
               <span className="block text-sm font-medium text-ink">{name}</span>
-              <span className="mt-0.5 block text-[11.5px] leading-snug text-muted">{blurb}</span>
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-muted">
-          {customPriceWords()}
-          {custom && !customAllowed && " Publishing a custom design needs the add-on."}
-        </p>
+        {custom && (
+          <p className="mt-1.5 text-[11.5px] leading-snug text-muted">
+            {customPriceWords()}
+            {!customAllowed && " Publishing a custom design needs the add-on."}
+          </p>
+        )}
       </fieldset>
 
       <div>
-        <p className={ui.label}>Your brand</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          Drop your logo onto the top of the proposal and a cover photo onto its cover, or press them to pick a picture.
+        <p className={clsx(ui.label, "flex items-center gap-1.5")}>
+          Your brand
+          <Hint>Drop your logo onto the top of the proposal and a cover photo onto its cover, or press them to pick a picture.</Hint>
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-1.5 grid grid-cols-2 gap-3">
           <label className="text-xs text-ink-2">
             Main colour
             <input
               type="color"
-              className="mt-1 block h-9 w-full cursor-pointer rounded-md border border-line bg-surface"
+              className="mt-1 block h-7 w-full cursor-pointer rounded-md border border-line bg-surface"
               value={kit.primary}
               onChange={(e) => builder.change({ primary: e.target.value })}
             />
@@ -783,7 +883,7 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
             Second colour
             <input
               type="color"
-              className="mt-1 block h-9 w-full cursor-pointer rounded-md border border-line bg-surface"
+              className="mt-1 block h-7 w-full cursor-pointer rounded-md border border-line bg-surface"
               value={kit.accent}
               onChange={(e) => builder.change({ accent: e.target.value })}
             />
@@ -792,7 +892,7 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
         <fieldset className="mt-3">
           <legend className={ui.label}>Type</legend>
           {/* Each choice set in its own faces, so it is picked by eye (15 Nov 2026, Martin: more font styles). */}
-          <div className="mt-1.5 grid grid-cols-2 gap-2">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {FONTS.map((f) => {
               const on = kit.font === f.id;
               return (
@@ -802,20 +902,13 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
                   aria-pressed={on}
                   title={`${f.blurb} ${f.pdf}`}
                   onClick={() => builder.change({ font: f.id })}
+                  style={{ fontFamily: f.heading }}
                   className={clsx(
-                    "rounded-lg border px-3 py-2 text-left transition-colors",
-                    on ? "border-ink bg-surface ring-1 ring-ink" : "border-line bg-surface hover:border-line-strong",
+                    "rounded-full border bg-surface px-3 py-1 text-[13px] text-ink transition-colors",
+                    on ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
                   )}
                 >
-                  <span className="block text-[22px] leading-none text-ink" style={{ fontFamily: f.heading }}>
-                    Aa
-                  </span>
-                  <span className="mt-1.5 block text-[12.5px] font-medium text-ink" style={{ fontFamily: f.heading }}>
-                    {f.name}
-                  </span>
-                  <span className="block text-[11px] leading-snug text-muted" style={{ fontFamily: f.body }}>
-                    Your new system
-                  </span>
+                  {f.name}
                 </button>
               );
             })}
@@ -824,71 +917,19 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
         {/* How the output and saving are drawn, and in what colours (19 Nov 2026, Martin: "allow for the colours to be customized"). */}
         <fieldset className="mt-3">
           <legend className={ui.label}>Charts</legend>
-          <div className="mt-1.5 grid grid-cols-3 gap-2">
-            {CHART_STYLES.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={kit.chart === c.id}
-                title={c.blurb}
-                onClick={() => builder.change({ chart: c.id })}
-                className={clsx(
-                  "rounded-lg border p-1.5 text-left",
-                  kit.chart === c.id ? "border-ink bg-surface ring-1 ring-ink" : "border-line bg-surface hover:border-line-strong",
-                )}
-              >
-                <ChartThumb style={c.id} theme={kit} />
-                <span className="mt-1 block text-[11.5px] font-medium text-ink">{c.name}</span>
-              </button>
-            ))}
-          </div>
-          {(kit.chart === "live" || kit.chart === "ring") && (
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              {CHART_TONES.map((t) => {
-                const c = chartColours({ ...kit, chartTone: t.id });
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-pressed={kit.chartTone === t.id}
-                    title={t.blurb}
-                    onClick={() => builder.change({ chartTone: t.id })}
-                    className={clsx(
-                      "inline-flex items-center gap-1.5 rounded-full border bg-surface py-1 pl-1 pr-2.5 text-[12px]",
-                      kit.chartTone === t.id ? "border-ink ring-1 ring-ink" : "border-line hover:border-line-strong",
-                    )}
-                  >
-                    <span
-                      className="size-4 rounded-full"
-                      style={{ background: `linear-gradient(to top, ${c.from}, ${c.to})` }}
-                      aria-hidden
-                    />
-                    {t.name}
-                  </button>
-                );
-              })}
-              {kit.chartTone === "own" &&
-                (["chartFrom", "chartTo"] as const).map((k) => (
-                  <input
-                    key={k}
-                    type="color"
-                    aria-label={k === "chartFrom" ? "The chart's bottom colour" : "The chart's top colour"}
-                    className="h-7 w-9 cursor-pointer rounded-md border border-line bg-surface"
-                    value={kit[k]}
-                    onChange={(e) => builder.change({ [k]: e.target.value })}
-                  />
-                ))}
-            </div>
-          )}
+          <ChartPicker kit={kit} onChange={builder.change} />
         </fieldset>
       </div>
 
       {custom ? (
         <div>
-          <p className={ui.label}>Add to the proposal</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            Drag a block of your own onto the page where you want it, or press it. Hover over any block to move it, give it a picture, or
-            change its words.
+          <p className={clsx(ui.label, "flex items-center gap-1.5")}>
+            Add to the proposal
+            <Hint>
+              Drag a block of your own onto the page where you want it, or press it. Hover over any block to move it, give it a picture or
+              change its words. The cover, the price, going ahead and the terms always stay on, and no figure can be written over: they come
+              from the design and are what your customer signs.
+            </Hint>
           </p>
           <button
             type="button"
@@ -899,16 +940,15 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
               e.dataTransfer.effectAllowed = "copy";
             }}
             onClick={addOwn}
-            className="mt-2.5 flex w-full cursor-grab items-center gap-3 rounded-lg border border-dashed border-line-strong bg-surface px-3 py-3 text-left hover:border-sun-line active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+            title="Words and a picture: your team, a past job, why you."
+            className="mt-1.5 flex w-full cursor-grab items-center gap-3 rounded-lg border border-dashed border-line-strong bg-surface px-3 py-2 text-left hover:border-sun-line active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <span className="flex size-9 items-center justify-center rounded-md bg-sun text-sun-ink">
+            <span className="flex size-7 items-center justify-center rounded-md bg-sun text-sun-ink">
               <Plus className="size-4" aria-hidden />
             </span>
             <span>
               <span className="block text-sm font-medium text-ink">A block of your own</span>
-              <span className="block text-xs text-muted">
-                {ownLeft > 0 ? `Words and a picture: your team, a past job, why you. ${ownLeft} left.` : "All six are on the proposal."}
-              </span>
+              <span className="block text-xs text-muted">{ownLeft > 0 ? `${ownLeft} left` : "All six are on the proposal."}</span>
             </span>
           </button>
           {hidden.length > 0 && (
@@ -929,20 +969,17 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
               </ul>
             </div>
           )}
-          <p className="mt-4 text-xs leading-relaxed text-muted">
-            The cover, the price, going ahead and the terms always stay on, and no figure can be written over: they come from the design and
-            are what your customer signs.
-          </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-line bg-surface-2 p-4">
-          <LayoutTemplate className="size-5 text-ink-2" aria-hidden />
-          <p className="mt-2 text-sm font-medium text-ink">Make it your own</p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            A custom design lets you move every block, add your own with words and pictures, put pictures beside the words and give blocks a
-            dark ground.
+        <div className="rounded-lg border border-line bg-surface-2 p-3">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+            <LayoutTemplate className="size-4 text-ink-2" aria-hidden /> Make it your own
+            <Hint>
+              A custom design lets you move every block, add your own with words and pictures, put pictures beside the words and give blocks
+              a dark ground.
+            </Hint>
           </p>
-          <button type="button" className={clsx(ui.primary, "mt-3")} onClick={() => builder.change({ design: "custom" })}>
+          <button type="button" className={clsx(ui.primary, "mt-2")} onClick={() => builder.change({ design: "custom" })}>
             Start a custom design
           </button>
         </div>
