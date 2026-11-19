@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { SALES_HERO } from "@/lib/domain/design/sales-page";
 import { publicSiteUrl } from "@/lib/domain/site";
@@ -13,6 +15,37 @@ export const dynamic = "force-static";
 
 const SIZE = { width: 1200, height: 630 };
 const ORANGE = "#FF5A1F";
+
+/**
+ * Sol as the page shows him (19 Nov 2026, Martin: the brain should have Sol's faint sun behind it, as on the website): the
+ * hero's live sun with its brain, captured once with a see-through glow (`public/design/landing/sol-brain.png`; the disc
+ * is half its width). Read from disk when the picture is made.
+ */
+const SOL_PNG = `data:image/png;base64,${readFileSync(join(process.cwd(), "public/design/landing/sol-brain.png")).toString("base64")}`;
+
+/** A voice agent's mark, as the page draws it: a graphite round with the wave in its colour. */
+function VoiceMark({ size, colour = ORANGE }: { size: number; colour?: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        width: size,
+        height: size,
+        borderRadius: 9999,
+        background: "radial-gradient(circle at 35% 30%, #34373e 0%, #1d1f24 60%, #141519 100%)",
+        border: `1px solid ${colour}66`,
+        boxShadow: `0 6px 22px ${colour}55`,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: size * 0.06,
+      }}
+    >
+      {[0.35, 0.7, 1, 0.6, 0.35].map((v, i) => (
+        <div key={i} style={{ width: size * 0.07, height: size * 0.42 * v, borderRadius: 9, background: colour }} />
+      ))}
+    </div>
+  );
+}
 
 export function GET() {
   const shot = `${publicSiteUrl()}/design/landing/today.jpg`;
@@ -44,8 +77,8 @@ export function GET() {
       <div
         style={{
           position: "absolute",
-          left: 640,
-          top: 120,
+          left: 650,
+          top: 210,
           width: 700,
           height: 438,
           display: "flex",
@@ -59,12 +92,15 @@ export function GET() {
         {/* eslint-disable-next-line @next/next/no-img-element -- drawn by ImageResponse, not the browser */}
         <img src={shot} width={700} height={438} alt="" style={{ objectFit: "cover" }} />
       </div>
+      {/* Sol, his brain lit, rising over the product. */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- drawn by ImageResponse, not the browser */}
+      <img src={SOL_PNG} width={540} height={540} alt="" style={{ position: "absolute", left: 625, top: -111 }} />
       {/* Sol on a live call, over the screenshot. */}
       <div
         style={{
           position: "absolute",
-          left: 610,
-          top: 470,
+          left: 620,
+          top: 500,
           display: "flex",
           alignItems: "center",
           gap: 14,
@@ -76,46 +112,35 @@ export function GET() {
           boxShadow: "0 18px 40px rgba(0,0,0,0.45)",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            width: 44,
-            height: 44,
-            borderRadius: 999,
-            background: "#2a2d33",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 4,
-          }}
-        >
-          {[14, 24, 18, 26, 12].map((h, i) => (
-            <div key={i} style={{ width: 4, height: h, borderRadius: 4, background: ORANGE }} />
-          ))}
-        </div>
+        <VoiceMark size={44} />
         <div style={{ display: "flex" }}>Sol is on the call with Doug</div>
         <div style={{ display: "flex", width: 12, height: 12, borderRadius: 999, background: "#22c55e" }} />
       </div>
 
       {/* The words. */}
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "64px 0 60px 72px", width: 640 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
-          <div
-            style={{
-              width: 46,
-              height: 46,
-              borderRadius: 999,
-              background: "radial-gradient(circle at 35% 30%, #fff3d6 0%, #ffc04d 25%, #ff7a2a 60%, #e0400f 100%)",
-              boxShadow: "0 0 40px rgba(255,120,40,0.7)",
-            }}
-          />
-          <div style={{ display: "flex", fontSize: 30, letterSpacing: 10 }}>RENUABL</div>
-        </div>
+        <div style={{ display: "flex", fontSize: 30, letterSpacing: 10 }}>RENUABL</div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", fontSize: 104, lineHeight: 1, letterSpacing: -4, fontWeight: 600 }}>{SALES_HERO.headline[0]}</div>
-          <div style={{ display: "flex", fontSize: 104, lineHeight: 1.05, letterSpacing: -4, fontWeight: 600, color: ORANGE }}>
+          <div style={{ display: "flex", fontSize: 92, lineHeight: 1, letterSpacing: -3.5, fontWeight: 600 }}>{SALES_HERO.headline[0]}</div>
+          <div style={{ display: "flex", fontSize: 92, lineHeight: 1.05, letterSpacing: -3.5, fontWeight: 600, color: ORANGE }}>
             {SALES_HERO.headline[1]}
           </div>
-          <div style={{ display: "flex", marginTop: 28, fontSize: 34, color: "rgba(255,255,255,0.78)" }}>{SALES_HERO.sub}</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              marginTop: 14,
+              fontSize: 48,
+              fontWeight: 600,
+              letterSpacing: -1.5,
+              color: "rgba(255,255,255,0.82)",
+            }}
+          >
+            {SALES_HERO.andVoice}
+            <VoiceMark size={52} />
+          </div>
+          <div style={{ display: "flex", marginTop: 22, fontSize: 28, color: "rgba(255,255,255,0.72)" }}>{SALES_HERO.sub}</div>
         </div>
         <div style={{ display: "flex" }}>
           <div style={{ display: "flex", padding: "14px 30px", borderRadius: 999, background: ORANGE, fontSize: 28, fontWeight: 600 }}>
