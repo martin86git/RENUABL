@@ -481,13 +481,10 @@ function Shell({
             className="mt-4 flex min-w-0 items-center justify-center"
             style={tool ? undefined : { transform: `translateY(${MENU_DROP_PX}px)` }}
           >
-            {/* One white pill like the rail (10 Nov 2026, Martin: the toggle hadn't looked right since the sections folded): every
+            {/* One pill in liquid glass (19 Nov 2026, Martin: .glass-bar in globals.css; it was flat white). Every
                 round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
                 rail's are, black with its word in orange. */}
-            <nav
-              aria-label="Sections"
-              className="studio-sections flex items-center gap-1 rounded-full bg-surface p-1 shadow-[0_6px_24px_rgba(20,22,26,0.07)] ring-1 ring-line"
-            >
+            <nav aria-label="Sections" className="studio-sections glass-bar flex items-center gap-1 rounded-full p-1">
               {(() => {
                 // The business's own sections (CRM, Procurement, Installation, Service) fold behind one layers icon
                 // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
@@ -505,7 +502,7 @@ function Shell({
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
-                        lit ? "bg-primary font-medium text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
+                        lit ? "glass-lit bg-primary font-medium text-primary-ink" : "glass-item text-ink-2 hover:text-ink",
                       )}
                     >
                       {sec.label}
@@ -527,7 +524,7 @@ function Shell({
                           title="Design tool"
                           aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                           className={clsx(
-                            "relative z-10 -my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+                            "relative z-10 -my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center glass-orb rounded-full text-white transition hover:brightness-105",
                             path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                           )}
                         >
@@ -543,7 +540,7 @@ function Shell({
                           title="Proposals"
                           aria-current={current.id === "proposals" ? "page" : undefined}
                           className={clsx(
-                            "-my-2 mr-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_4px_14px_rgba(11,11,12,0.12)] ring-1 ring-line transition-[margin,color,box-shadow] duration-300 ease-out hover:text-ink motion-reduce:transition-none",
+                            "-my-2 mr-0.5 flex size-12 shrink-0 items-center justify-center glass-bead rounded-full text-sun-line transition-[margin,color,box-shadow] duration-300 ease-out hover:text-ink motion-reduce:transition-none",
                             current.id === "proposals"
                               ? "ml-1 ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface"
                               : "-ml-7 group-focus-within/tools:ml-1 group-hover/tools:ml-1",
@@ -574,7 +571,7 @@ function Shell({
                         title="Design tool"
                         aria-current={path.startsWith(PATHS.designer) ? "page" : undefined}
                         className={clsx(
-                          "-my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_4px_14px_rgba(255,90,31,0.35)] transition hover:brightness-105",
+                          "-my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center glass-orb rounded-full text-white transition hover:brightness-105",
                           path.startsWith(PATHS.designer) && "ring-2 ring-sun-line/40 ring-offset-2 ring-offset-surface",
                         )}
                       >
@@ -591,7 +588,7 @@ function Shell({
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
-                        lit ? "bg-primary font-medium text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
+                        lit ? "glass-lit bg-primary font-medium text-primary-ink" : "glass-item text-ink-2 hover:text-ink",
                       )}
                     >
                       {sec.label}

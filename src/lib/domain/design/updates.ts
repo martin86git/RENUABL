@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
+    area: "Everywhere",
+    words: "The menu across the top has a glass finish.",
+  },
+  {
+    day: "2026-11-19",
     area: "Today",
     words: "Sol's drafted emails open as a composer: Send from, To, Cc and Subject, with a taller box for the words.",
   },
@@ -26,12 +31,14 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
     area: "Proposals",
-    words: "A customer who asked for a call on their proposal can now cancel it or be rung straight away, and is told it is an AI assistant.",
+    words:
+      "A customer who asked for a call on their proposal can now cancel it or be rung straight away, and is told it is an AI assistant.",
   },
   {
     day: "2026-11-19",
     area: "Proposals",
-    words: "Each option in a proposal's configurator shows what sets it apart: solar, the battery's size and maker, backup, EV charger and add-ons.",
+    words:
+      "Each option in a proposal's configurator shows what sets it apart: solar, the battery's size and maker, backup, EV charger and add-ons.",
   },
   {
     day: "2026-11-19",

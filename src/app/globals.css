@@ -1185,3 +1185,58 @@ html:has(.sales-snap) {
   width: 100%;
   animation: sol-shade-fill linear both;
 }
+/* The centre menu in liquid glass (19 Nov 2026, Martin: "it looks very flat. i want it to liven up a little"; chosen from
+   tools/demo/nav-glass-preview.html): a sheen across the top half, a rim of light all round and a deeper lift; the lit
+   section and the two tool rounds as glass beads, the designer's pen a lit orb like Sol's sun at the other end. */
+.glass-bar {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.78) 0%, rgb(255 255 255 / 0.42) 52%, rgb(255 255 255 / 0.6) 100%);
+  -webkit-backdrop-filter: blur(26px) saturate(200%);
+  backdrop-filter: blur(26px) saturate(200%);
+  box-shadow:
+    inset 0 1.5px 0 rgb(255 255 255 / 1),
+    inset 0 -1.5px 0 rgb(255 255 255 / 0.55),
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    0 0 0 1px rgb(16 18 24 / 0.06),
+    0 14px 34px rgb(20 22 30 / 0.12),
+    0 2px 6px rgb(20 22 30 / 0.07);
+}
+.glass-bar::before {
+  content: "";
+  position: absolute;
+  inset: 3px 14px auto;
+  height: 42%;
+  z-index: -1;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.75), rgb(255 255 255 / 0));
+  pointer-events: none;
+}
+.glass-bar .glass-item:hover {
+  background: rgb(255 255 255 / 0.65);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 3px rgb(20 22 30 / 0.06);
+}
+.glass-bar .glass-lit {
+  background: linear-gradient(180deg, #575b63, #2c2f34);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    inset 0 -1px 0 rgb(0 0 0 / 0.3),
+    0 4px 10px rgb(0 0 0 / 0.2);
+}
+.glass-orb {
+  background: radial-gradient(circle at 35% 25%, #ffb08a 0 10%, #ff6a2c 45%, #e8470f 100%);
+  box-shadow:
+    inset 0 2px 1px rgb(255 255 255 / 0.55),
+    inset 0 -3px 6px rgb(140 30 0 / 0.3),
+    0 0 0 1px rgb(255 255 255 / 0.6),
+    0 10px 24px rgb(255 90 31 / 0.4);
+}
+.glass-bead {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(255 255 255 / 0.6));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 1px rgb(16 18 24 / 0.06),
+    0 5px 14px rgb(0 0 0 / 0.1);
+}

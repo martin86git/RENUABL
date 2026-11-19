@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nav glass preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --ink: #1d1d1f;
+        --muted: #6e6e73;
+        --orange: #ff5a1f;
+        --graphite: #3a3d43;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--ink);
+        background: #fbfbfc;
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 24px 64px;
+      }
+      h2 {
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 40px 0 4px;
+      }
+      p.note {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 16px;
+        max-width: 640px;
+        line-height: 1.55;
+      }
+      .stage {
+        position: relative;
+        border-radius: 28px;
+        overflow: hidden;
+        padding: 28px 24px 34px;
+        display: flex;
+        justify-content: center;
+      }
+      .stage.page {
+        background: #f7f7f8;
+      }
+      .stage.page::after {
+        content: "";
+        position: absolute;
+        left: 24px;
+        right: 24px;
+        top: 96px;
+        height: 120px;
+        border-radius: 24px;
+        background: #e9e9ec;
+      }
+      .stage.busy {
+        background:
+          radial-gradient(60% 120% at 15% 110%, rgba(255, 90, 31, 0.35), transparent 60%),
+          radial-gradient(50% 120% at 85% -10%, rgba(80, 120, 255, 0.22), transparent 60%), #eef0f3;
+      }
+      .bar {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        height: 58px;
+        padding: 0 8px 0 8px;
+        border-radius: 999px;
+      }
+      .item {
+        font-size: 17px;
+        font-weight: 450;
+        color: #3a3a3c;
+        padding: 0 22px;
+        height: 42px;
+        display: flex;
+        align-items: center;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--orange);
+        margin-left: 8px;
+      }
+      .today {
+        background: var(--graphite);
+        color: #fff;
+        font-weight: 600;
+        padding: 0 22px;
+      }
+      .pen {
+        width: 62px;
+        height: 62px;
+        margin: -4px -6px -4px 4px;
+        border-radius: 50%;
+        background: var(--orange);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        position: relative;
+        z-index: 2;
+      }
+      .doc {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: #fff;
+        display: grid;
+        place-items: center;
+        color: var(--orange);
+        margin-right: 6px;
+      }
+      .sol {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        margin-left: 6px;
+        background: radial-gradient(circle at 34% 30%, #fff4cf 0 12%, #ffc163 30%, #ff7a2b 62%, #e2541a 100%);
+      }
+
+      /* 0. today: flat */
+      .flat {
+        background: #fff;
+        border: 1px solid #ececef;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      }
+      .flat .pen {
+        box-shadow: 0 6px 16px rgba(255, 90, 31, 0.35);
+      }
+      .flat .doc {
+        border: 1px solid #ececef;
+      }
+
+      /* 1. frosted glass */
+      .frost {
+        background: rgba(255, 255, 255, 0.55);
+        backdrop-filter: blur(22px) saturate(180%);
+        -webkit-backdrop-filter: blur(22px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.75);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.95),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.04),
+          0 10px 30px rgba(20, 22, 30, 0.1),
+          0 1px 3px rgba(20, 22, 30, 0.08);
+      }
+      .frost .today {
+        background: linear-gradient(180deg, #4a4e56, #2f3237);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          0 3px 8px rgba(0, 0, 0, 0.18);
+      }
+      .frost .pen {
+        background: linear-gradient(180deg, #ff7a45, #f04e14);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          inset 0 -2px 4px rgba(150, 40, 0, 0.25),
+          0 8px 20px rgba(255, 90, 31, 0.38);
+      }
+      .frost .doc {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        box-shadow:
+          inset 0 1px 0 #fff,
+          0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+
+      /* 2. liquid glass: rim light and a sheen across the top */
+      .liquid {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.38) 52%, rgba(255, 255, 255, 0.55) 100%);
+        backdrop-filter: blur(26px) saturate(200%);
+        -webkit-backdrop-filter: blur(26px) saturate(200%);
+        box-shadow:
+          inset 0 1.5px 0 rgba(255, 255, 255, 1),
+          inset 0 -1.5px 0 rgba(255, 255, 255, 0.55),
+          inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+          0 0 0 1px rgba(16, 18, 24, 0.06),
+          0 14px 34px rgba(20, 22, 30, 0.14),
+          0 2px 6px rgba(20, 22, 30, 0.08);
+        overflow: visible;
+      }
+      .liquid::before {
+        content: "";
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        top: 3px;
+        height: 42%;
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
+        pointer-events: none;
+      }
+      .liquid > * {
+        position: relative;
+      }
+      .liquid .today {
+        background: linear-gradient(180deg, #575b63, #2c2f34);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.28),
+          inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+          0 4px 10px rgba(0, 0, 0, 0.22);
+      }
+      .liquid .pen {
+        background: radial-gradient(circle at 35% 25%, #ffb08a 0 10%, #ff6a2c 45%, #e8470f 100%);
+        box-shadow:
+          inset 0 2px 1px rgba(255, 255, 255, 0.55),
+          inset 0 -3px 6px rgba(140, 30, 0, 0.3),
+          0 0 0 1px rgba(255, 255, 255, 0.6),
+          0 10px 24px rgba(255, 90, 31, 0.42);
+      }
+      .liquid .doc {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.55));
+        box-shadow:
+          inset 0 1px 0 #fff,
+          0 0 0 1px rgba(16, 18, 24, 0.06),
+          0 5px 14px rgba(0, 0, 0, 0.1);
+      }
+      .liquid .item:not(.today):hover {
+        background: rgba(255, 255, 255, 0.6);
+        box-shadow: inset 0 1px 0 #fff;
+      }
+
+      /* 3. warm glass: a breath of the sun through it */
+      .warm {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 244, 236, 0.55));
+        backdrop-filter: blur(22px) saturate(180%);
+        -webkit-backdrop-filter: blur(22px) saturate(180%);
+        border: 1px solid rgba(255, 255, 255, 0.85);
+        box-shadow:
+          inset 0 1px 0 #fff,
+          inset 0 -8px 18px rgba(255, 120, 60, 0.07),
+          0 0 0 1px rgba(255, 90, 31, 0.1),
+          0 12px 32px rgba(255, 90, 31, 0.12),
+          0 2px 6px rgba(20, 22, 30, 0.06);
+      }
+      .warm .today {
+        background: linear-gradient(180deg, #4a4e56, #2f3237);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.18),
+          0 3px 8px rgba(0, 0, 0, 0.18);
+      }
+      .warm .pen {
+        background: linear-gradient(180deg, #ff7a45, #f04e14);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          0 0 0 4px rgba(255, 90, 31, 0.12),
+          0 8px 22px rgba(255, 90, 31, 0.4);
+      }
+      .warm .doc {
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid #fff;
+        box-shadow: 0 4px 12px rgba(255, 90, 31, 0.12);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h2>Now: flat</h2>
+      <p class="note">The menu as it is today.</p>
+      <div class="stage page"><div class="bar flat" data-bar></div></div>
+
+      <h2>1 · Frosted glass</h2>
+      <p class="note">
+        See-through white, blurred behind, a bright hairline along its top edge and a soft lift off the page. Today and the pen round get a
+        gentle curve of light so they read as pressed glass beads.
+      </p>
+      <div class="stage page"><div class="bar frost" data-bar></div></div>
+      <div class="stage busy" style="margin-top: 10px"><div class="bar frost" data-bar></div></div>
+
+      <h2>2 · Liquid glass</h2>
+      <p class="note">
+        The most lively: a sheen across the top half, a rim of light all round, deeper lift. The pen is a lit orb, matching Sol's sun at the
+        other end. Hover a word to see it catch the light.
+      </p>
+      <div class="stage page"><div class="bar liquid" data-bar></div></div>
+      <div class="stage busy" style="margin-top: 10px"><div class="bar liquid" data-bar></div></div>
+
+      <h2>3 · Warm glass</h2>
+      <p class="note">
+        Frosted, with a breath of the signal orange coming up through it and a warm halo round the pen. Ties the bar to Sol and the designer
+        without adding colour to the words.
+      </p>
+      <div class="stage page"><div class="bar warm" data-bar></div></div>
+      <div class="stage busy" style="margin-top: 10px"><div class="bar warm" data-bar></div></div>
+      <p class="note" style="margin-top: 20px">
+        The second row of each shows the glass over something with colour behind it (a page scrolled under the bar). Over a plain near-white
+        page, glass shows mostly through its edges, light and lift.
+      </p>
+    </div>
+    <script>
+      const pen =
+        '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/></svg>';
+      const doc =
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm7 1.5V9h5.5"/></svg>';
+      for (const b of document.querySelectorAll("[data-bar]"))
+        b.innerHTML =
+          '<div class="item today">Today</div><div class="pen">' +
+          pen +
+          '</div><div class="doc">' +
+          doc +
+          "</div>" +
+          '<div class="item">Sales</div><div class="item">Jobs</div><div class="item">Customers</div><div class="item">Service<span class="dot"></span></div><div class="sol"></div>';
+    </script>
+  </body>
+</html>
