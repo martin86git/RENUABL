@@ -1,28 +1,55 @@
 /**
  * The configurator (19 Nov 2026, Martin: "compare it with ordering a car with Tesla … $65,000 and yet it doesn't feel
  * like a huge commitment"). A second way to read a proposal, beside the page we have: the home from above on one
- * side, a few choices on the other, one price that moves, and one small step.
+ * side, a few choices on the other, one price that moves, and one small step, Order.
  *
  * What a customer can change, and why only these (Martin): the layout is fixed, so the sizes are designs. The
  * business draws the fullest system the roof takes, and the smaller sizes are worked back from it by taking the
  * least sunny panels off first; or, when the roof has two or three designs offered (Quickest payback and the rest),
- * those designs are the sizes. A panel of another maker, and a battery added or taken off, change nothing on the
- * roof, so those can be swapped on any size. Every mix is priced in full on the server when the proposal is published,
- * exactly as the designer's quote does, so the page only ever switches between figures it was sent. Pure.
+ * those designs are the sizes. What isn't placed on the roof can be swapped on any size: the panel's maker (same
+ * places), the battery (none, or one of up to three makers that work with the inverter), blackout backup (one module
+ * more, held for blackouts, and the backup circuits) and an EV charger. Every mix is priced in full on the server when
+ * the proposal is published, exactly as the designer's quote does, so the page only ever switches between figures it
+ * was sent. Pure.
  */
 import type { CatalogueBattery, CataloguePanel } from "./catalogue";
-import { makerOf, suggestBatteries } from "./battery-suggest";
+import { makerName, makerOf, suggestBatteries } from "./battery-suggest";
 import { DAY } from "./quote";
-import { designPanels, panelAspects, panelOf, type DesignBattery, type InverterSpec, type RoofDesign } from "./roof-design";
+import {
+  MAX_BATTERY_QTY,
+  designPanels,
+  panelAspects,
+  panelOf,
+  type DesignBattery,
+  type DesignCharger,
+  type InverterSpec,
+  type RoofDesign,
+} from "./roof-design";
 import { yearOnPlane } from "./tilt";
 import type { ProposalOption } from "./proposal";
 
-/** A configurator choice as kept when a customer goes ahead: `cfg-<size>-<panel>-<b|n>` (battery or none). */
-export type ConfigKey = `cfg-${number}-${number}-${"b" | "n"}`;
+/**
+ * A configurator mix as kept when a customer orders: `cfg-<size>-<panel>-<battery>-<ev><backup>`, the battery `n` for
+ * none or which of the size's batteries, the last two `1` or `0`. (The first proposals, 19 Nov 2026, kept
+ * `cfg-<size>-<panel>-<b|n>`, still read.)
+ */
+export type ConfigKey = `cfg-${string}`;
 
-export const configKey = (size: number, panel: number, battery: boolean): ConfigKey => `cfg-${size}-${panel}-${battery ? "b" : "n"}`;
+/** What a customer has picked. */
+export interface ConfigPick {
+  size: number;
+  panel: number;
+  /** Which of the size's batteries, or null for none. */
+  battery: number | null;
+  ev: boolean;
+  backup: boolean;
+}
 
-export const isConfigKey = (raw: unknown): raw is ConfigKey => typeof raw === "string" && /^cfg-\d{1,2}-\d{1,2}-[bn]$/.test(raw);
+export const configKey = (p: ConfigPick): ConfigKey =>
+  `cfg-${p.size}-${p.panel}-${p.battery === null ? "n" : p.battery}-${p.ev ? 1 : 0}${p.backup ? 1 : 0}`;
+
+export const isConfigKey = (raw: unknown): raw is ConfigKey =>
+  typeof raw === "string" && /^cfg-\d{1,2}-\d{1,2}-(n|b|\d{1,2})(-[01]{2})?$/.test(raw);
 
 /** One size on offer: a design (the business's own, or worked back from it) with its panels on the roof. */
 export interface ConfigSize {
@@ -49,20 +76,36 @@ export interface ConfigPanel {
   watts: number;
 }
 
+/** A battery a customer can choose for a size: the one designed with, else what suits it, then other makers. */
+export interface ConfigBattery {
+  size: number;
+  id: number;
+  name: string;
+  maker: string;
+  /** What it holds without the module held for blackouts, kWh. */
+  kwh: number;
+  qty: number;
+}
+
 /** One mix, priced in full: an option like the proposal's own, with what it is a mix of. */
 export interface ConfigVariant extends ProposalOption {
   goal: ConfigKey;
   size: number;
   panel: number;
+  /** Whether it has a battery (and `batteryId` which; left out on the first proposals, where it was the one). */
   battery: boolean;
+  batteryId?: number | null;
+  /** With the EV charger (left out on the first proposals: none). */
+  ev?: boolean;
 }
 
 /** What the configurator is sent: the choices and every mix of them that could be priced. */
 export interface ConfiguratorView {
   sizes: ConfigSize[];
   panels: ConfigPanel[];
-  /** The battery a size would have, or null when none fits the inverter on it (by size id). */
-  batteries: { size: number; kwh: number; name: string; backup: boolean }[];
+  batteries: ConfigBattery[];
+  /** The EV charger offered, when there is one on the design or the business's lists. */
+  charger?: { name: string; kw: number } | null;
   variants: ConfigVariant[];
   /** The mix it opens on: the recommended design, as designed. */
   start: ConfigKey;
@@ -74,6 +117,8 @@ export const MIN_CONFIG_PANELS = 6;
 export const SIZE_STEPS = [1, 0.8, 0.6] as const;
 /** The most panels of other makers offered beside the one designed with. */
 export const MAX_OTHER_PANELS = 2;
+/** The most batteries a customer chooses between for a size. */
+export const MAX_BATTERY_CHOICES = 3;
 
 /** The panel counts to offer from a design of `drawn` panels: as drawn, then smaller, none under the minimum or twice. */
 export function sizeCounts(drawn: number): number[] {
@@ -124,6 +169,24 @@ export function withBattery(design: RoofDesign, battery: DesignBattery | null): 
   return { ...design, battery: battery ?? undefined };
 }
 
+/** The design with the EV charger given, or with none. */
+export function withCharger(design: RoofDesign, charger: DesignCharger | null): RoofDesign {
+  return { ...design, charger: charger ?? undefined };
+}
+
+/** A battery with blackout backup: one module more, held for blackouts (the quote adds the backup circuits). */
+export const withBackup = (battery: DesignBattery): DesignBattery => ({
+  ...battery,
+  qty: Math.min(MAX_BATTERY_QTY, battery.qty + 1),
+  backup: true,
+});
+
+/** A battery as it runs the evenings: the module held for blackouts taken off. */
+export const withoutBackup = (battery: DesignBattery): DesignBattery => {
+  const { backup, ...rest } = battery;
+  return { ...rest, qty: backup ? Math.max(1, rest.qty - 1) : rest.qty };
+};
+
 /**
  * The panels a customer can choose between: the one designed with, then up to `MAX_OTHER_PANELS` of other makers on
  * the business's lists, each the one nearest in watts of its maker, nearest first.
@@ -145,16 +208,17 @@ export function panelChoices(
 }
 
 /**
- * A battery to add to a design without one: what the battery suggestion picks for its panels and the home's bill,
- * of a maker that works with the inverter on it. Null when none on the lists fits.
+ * The batteries a customer can choose between for a design, each as it runs the evenings (no blackout module): the
+ * one designed with first, then what the battery suggestion picks for its panels and the home's bill, one of each
+ * maker that works with the inverter on it, up to `MAX_BATTERY_CHOICES`.
  */
-export function batteryToAdd(input: {
+export function batteryChoices(input: {
   design: RoofDesign;
   batteries: readonly CatalogueBattery[];
   monthlyKwh: readonly number[];
   dailyKwh: number | null;
   selfUseShare: number;
-}): DesignBattery | null {
+}): DesignBattery[] {
   const inverters: Pick<InverterSpec, "name">[] = input.design.inverters ?? [];
   const idea = suggestBatteries({
     batteries: [...input.batteries],
@@ -164,14 +228,47 @@ export function batteryToAdd(input: {
     selfUseShare: input.selfUseShare,
     eveningShare: DAY.eveningShare,
   });
+  const out: DesignBattery[] = input.design.battery ? [withoutBackup(input.design.battery)] : [];
   const own = inverters[0] ? makerOf(inverters[0].name) : null;
-  const pick =
-    idea.suggestions.find((s) => own && makerOf(s.battery.name) === own && s.battery.kwh * s.qty >= idea.size) ??
-    idea.suggestions.find((s) => s.battery.kwh * s.qty >= idea.size) ??
-    idea.suggestions[0];
-  if (!pick || !(pick.battery.kwh > 0)) return null;
-  return { sku: pick.battery.sku, name: pick.battery.name, kwh: pick.battery.kwh, qty: pick.qty, x: 0, y: 0 };
+  // The inverter's own maker first, then the rest by size.
+  const ideas = [...idea.suggestions].sort(
+    (a, b) => Number(own !== null && makerOf(b.battery.name) === own) - Number(own !== null && makerOf(a.battery.name) === own),
+  );
+  for (const s of ideas) {
+    if (out.length >= MAX_BATTERY_CHOICES) break;
+    if (!(s.battery.kwh > 0) || out.some((b) => makerOf(b.name) === makerOf(s.battery.name))) continue;
+    out.push({ sku: s.battery.sku, name: s.battery.name, kwh: s.battery.kwh, qty: s.qty, x: 0, y: 0 });
+  }
+  return out;
 }
+
+/** The first proposals' mixes read as today's: their battery the size's first, and no EV charger. */
+export function readConfigurator(cfg: ConfiguratorView): ConfiguratorView {
+  return {
+    ...cfg,
+    batteries: cfg.batteries.map((b, i) => ({
+      ...b,
+      id: b.id ?? 0,
+      maker: b.maker ?? makerName(makerOf(b.name)),
+      qty: b.qty ?? 1,
+      size: b.size ?? i,
+    })),
+    variants: cfg.variants.map((v) => ({
+      ...v,
+      batteryId: v.batteryId === undefined ? (v.battery ? 0 : null) : v.batteryId,
+      ev: v.ev ?? false,
+    })),
+  };
+}
+
+/** What a variant is a mix of. */
+export const pickOf = (v: ConfigVariant): ConfigPick => ({
+  size: v.size,
+  panel: v.panel,
+  battery: v.batteryId === undefined ? (v.battery ? 0 : null) : v.batteryId,
+  ev: Boolean(v.ev),
+  backup: Boolean(v.backup),
+});
 
 /** A configurator variant in place of the proposal's own system, with its size's panels on the roof. */
 export function variantOf(cfg: ConfiguratorView | undefined, key: unknown): (ConfigVariant & { size: number }) | null {
@@ -182,48 +279,87 @@ export function variantOf(cfg: ConfiguratorView | undefined, key: unknown): (Con
   return size ? { ...v, roofPanels: size.roofPanels, ...(size.roofAspects ? { roofAspects: size.roofAspects } : {}) } : null;
 }
 
-/** The variant for a mix, or the nearest priced one (the same size and panel with the battery the other way, then the size as designed). */
-export function nearestVariant(cfg: ConfiguratorView, size: number, panel: number, battery: boolean): ConfigVariant | null {
-  const at = (s: number, p: number, b: boolean) => cfg.variants.find((v) => v.size === s && v.panel === p && v.battery === b);
-  return at(size, panel, battery) ?? at(size, panel, !battery) ?? at(size, 0, battery) ?? at(size, 0, !battery) ?? null;
+/**
+ * The variant for a pick, or the nearest priced one on the same size: the panel matters most, then the battery, then
+ * the EV charger, then backup. Null only for a size with nothing priced.
+ */
+export function nearestVariant(cfg: ConfiguratorView, want: ConfigPick): ConfigVariant | null {
+  let best: ConfigVariant | null = null;
+  let bestScore = -1;
+  for (const v of cfg.variants) {
+    if (v.size !== want.size) continue;
+    const p = pickOf(v);
+    const score =
+      (p.panel === want.panel ? 8 : 0) +
+      (p.battery === want.battery ? 4 : 0) +
+      (p.ev === want.ev ? 2 : 0) +
+      (p.backup === want.backup ? 1 : 0);
+    if (score > bestScore) {
+      best = v;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
-/** What the business is told was chosen, written on the deal when a configurator mix is accepted. */
-export function chosenWords(cfg: ConfiguratorView, key: ConfigKey): string | null {
-  const v = cfg.variants.find((x) => x.goal === key);
-  if (!v) return null;
-  const size = cfg.sizes.find((s) => s.id === v.size);
-  const panel = cfg.panels.find((p) => p.id === v.panel);
-  if (!size || !panel) return null;
-  const parts = [
-    `${size.name}: ${v.system.kw} kW, ${size.panels} panels of ${panel.name}`,
-    v.battery ? `with a ${v.system.batteryKwh} kWh battery` : "no battery",
-  ];
-  // The order and the price are the mix's own; the drawing on the job card is still the design it came from.
-  const differs = size.worked || panel.id !== 0 || v.battery !== size.designedBattery;
-  return `Chosen in the configurator: ${parts.join(", ")}.${differs ? " Update the design to match before ordering." : ""}`;
+/** The same mix with no battery: what the panels alone do, for the performance bar. */
+export function solarOnly(cfg: ConfiguratorView, v: ConfigVariant): ConfigVariant | null {
+  const p = pickOf(v);
+  const alone = cfg.variants.find((x) => {
+    const q = pickOf(x);
+    return q.size === p.size && q.panel === p.panel && q.ev === p.ev && q.battery === null;
+  });
+  return alone ?? null;
+}
+
+/** The battery a variant has, as offered. */
+export function batteryOfVariant(cfg: ConfiguratorView, v: ConfigVariant): ConfigBattery | null {
+  const p = pickOf(v);
+  return p.battery === null ? null : (cfg.batteries.find((b) => b.size === p.size && b.id === p.battery) ?? null);
 }
 
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 
-/** A mix in a few words: "13.3 kW, 28 Jinko panels, with a 13.5 kWh battery". */
+/** A mix in a few words: "7.125 kW, 15 Jinko panels, a 16 kWh Sigenergy battery with blackout backup, an EV charger". */
 export function mixWords(cfg: ConfiguratorView, key: ConfigKey): string | null {
   const v = cfg.variants.find((x) => x.goal === key);
   const size = v && cfg.sizes.find((s) => s.id === v.size);
   const panel = v && cfg.panels.find((p) => p.id === v.panel);
   if (!v || !size || !panel) return null;
-  return `${v.system.kw} kW, ${size.panels} ${panel.maker} panels, ${v.battery ? `with a ${v.system.batteryKwh} kWh battery` : "no battery"}`;
+  const battery = batteryOfVariant(cfg, v);
+  const parts = [
+    `${v.system.kw} kW`,
+    `${size.panels} ${panel.maker} panels`,
+    v.battery
+      ? `a ${v.system.batteryKwh} kWh ${battery?.maker ?? ""} battery${v.backup ? " with blackout backup" : ""}`.replace("  ", " ")
+      : "no battery",
+    ...(v.ev ? ["an EV charger"] : []),
+  ];
+  return parts.join(", ");
 }
 
-/** What a customer holding their week says in the chat (their line, sent by their press). */
+/** What the business is told was chosen, written on the deal when a configurator mix is ordered. */
+export function chosenWords(cfg: ConfiguratorView, key: ConfigKey): string | null {
+  const v = cfg.variants.find((x) => x.goal === key);
+  const size = v && cfg.sizes.find((s) => s.id === v.size);
+  const words = mixWords(cfg, key);
+  if (!v || !size || !words) return null;
+  // The order and the price are the mix's own; the drawing on the job card is still the design it came from.
+  const p = pickOf(v);
+  const differs =
+    size.worked || p.panel !== 0 || (p.battery !== null) !== size.designedBattery || (p.battery !== null && p.battery > 0) || Boolean(v.ev);
+  return `Ordered in the configurator: ${size.name}: ${words}.${differs ? " Update the design to match before ordering stock." : ""}`;
+}
+
+/** What a customer ordering an indicative proposal says in the chat (their line, sent by their press). */
 export function holdMessage(cfg: ConfiguratorView, key: ConfigKey, week: string): string {
   const v = cfg.variants.find((x) => x.goal === key);
   const what = mixWords(cfg, key) ?? "the system I chose";
   const price = v ? ` It showed ${dollars(v.price.youPay)} after the federal rebate.` : "";
-  return `I'd like to hold ${week} for my installation: ${what}.${price} (Held from the configurator.)`;
+  return `I'd like to order ${what}, installed ${week}.${price} (Ordered from the configurator, to confirm at the site visit.)`;
 }
 
 /** The note on the install calendar's pencilled-in week. */
 export function holdNote(cfg: ConfiguratorView, key: ConfigKey, week: string): string {
-  return `Held by the customer from the configurator for ${week}: ${mixWords(cfg, key) ?? "their chosen system"}. Confirm at the site visit.`;
+  return `Asked for by the customer in the configurator for ${week}: ${mixWords(cfg, key) ?? "their chosen system"}. Confirm with them.`;
 }

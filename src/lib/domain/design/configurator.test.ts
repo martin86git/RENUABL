@@ -6,7 +6,10 @@ import {
   isConfigKey,
   nearestVariant,
   panelChoices,
+  pickOf,
+  readConfigurator,
   sizeCounts,
+  solarOnly,
   trimDesign,
   variantOf,
   withBattery,
@@ -81,42 +84,75 @@ describe("the configurator's sizes", () => {
 describe("a proposal with the configurator", () => {
   const { view, internal } = built({ withBattery: true });
   const cfg = view.configurator!;
+  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, battery: null, ev: false, backup: false })!;
+  const withBatt = (size: number, backup = false) => nearestVariant(cfg, { size, panel: 0, battery: 0, ev: false, backup })!;
 
   it("prices every mix on publishing, largest size first, and starts as designed", () => {
     expect(cfg.sizes.length).toBeGreaterThan(1);
     expect(cfg.sizes[0].panels).toBe(view.system.panels);
     for (let i = 1; i < cfg.sizes.length; i++) expect(cfg.sizes[i].panels).toBeLessThan(cfg.sizes[i - 1].panels);
     const start = cfg.variants.find((v) => v.goal === cfg.start)!;
-    expect(start).toMatchObject({ size: 0, panel: 0, battery: true });
+    expect(pickOf(start)).toEqual({ size: 0, panel: 0, battery: 0, ev: false, backup: false });
     expect(start.price.youPay).toBe(view.price.youPay);
     // Each mix's own side is kept for the order, under the same key.
     expect(internal.configurator!.map((x) => x.goal).sort()).toEqual(cfg.variants.map((v) => v.goal).sort());
   });
-  it("prices less for fewer panels and for no battery", () => {
-    const at = (size: number, battery: boolean) => nearestVariant(cfg, size, 0, battery)!.price.youPay;
-    expect(at(1, true)).toBeLessThan(at(0, true));
-    expect(at(0, false)).toBeLessThan(at(0, true));
+  it("prices less for fewer panels and for no battery, more for blackout backup", () => {
+    expect(withBatt(1).price.youPay).toBeLessThan(withBatt(0).price.youPay);
+    expect(solar(0).price.youPay).toBeLessThan(withBatt(0).price.youPay);
+    const backup = withBatt(0, true);
+    expect(backup.backup).toBe(true);
+    expect(backup.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
+    expect(backup.system.batteryKwh).toBeGreaterThan(withBatt(0).system.batteryKwh);
+  });
+  it("offsets more of the home's power with a battery, and saves more", () => {
+    const alone = solarOnly(cfg, withBatt(0))!;
+    expect(alone.batteryId).toBeNull();
+    expect(withBatt(0).bill!.selfReliance).toBeGreaterThan(alone.bill!.selfReliance);
+    expect(withBatt(0).bill!.saving).toBeGreaterThan(alone.bill!.saving);
+  });
+  it("offers the batteries that fit, each a maker of its own, and an EV charger when one is listed", () => {
+    const makers = cfg.batteries.filter((b) => b.size === 0).map((b) => b.maker);
+    expect(makers.length).toBeGreaterThan(0);
+    expect(new Set(makers).size).toBe(makers.length);
+    if (cfg.charger) {
+      const ev = nearestVariant(cfg, { size: 0, panel: 0, battery: 0, ev: true, backup: false })!;
+      expect(ev.ev).toBe(true);
+      expect(ev.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
+    }
   });
   it("shows the chosen mix's roof, system and price, and its own lines for the order", () => {
-    const key = configKey(1, 0, false);
+    const key = configKey({ size: 1, panel: 0, battery: null, ev: false, backup: false });
     const shown = viewForChoice(view, key);
     expect(shown.roof.panels).toHaveLength(cfg.sizes[1].panels);
     expect(shown.system.batteryKwh).toBe(0);
-    expect(shown.price.youPay).toBe(nearestVariant(cfg, 1, 0, false)!.price.youPay);
+    expect(shown.price.youPay).toBe(solar(1).price.youPay);
     expect(internalForChoice(internal, key).lines).toEqual(internal.configurator!.find((x) => x.goal === key)!.lines);
-    expect(variantOf(cfg, "cfg-9-9-b")).toBeNull();
+    expect(variantOf(cfg, "cfg-9-9-n-00")).toBeNull();
     expect(isConfigKey("design-1")).toBe(false);
+    // The first proposals' keys are still read.
+    expect(isConfigKey("cfg-0-1-b")).toBe(true);
   });
   it("sends the customer no cost, margin or product code", () => {
     const keys = keysOf(cfg);
     for (const word of COST_WORDS) expect(keys).not.toContain(word.toLowerCase());
   });
-  it("tells the business what was chosen, and to update the design when it differs", () => {
+  it("tells the business what was ordered, and to update the design when it differs", () => {
     expect(chosenWords(cfg, cfg.start)).not.toMatch(/Update the design/);
-    expect(chosenWords(cfg, configKey(1, 0, false))).toMatch(/no battery\. Update the design to match/);
-    expect(holdMessage(cfg, cfg.start, "the week of 8 December")).toMatch(/^I'd like to hold the week of 8 December/);
+    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, battery: null, ev: false, backup: false }))).toMatch(
+      /no battery. Update the design/,
+    );
+    expect(holdMessage(cfg, cfg.start, "the week of 8 December")).toMatch(/^I'd like to order .*installed the week of 8 December/);
   });
-  it("leaves out a proposal with nothing drawn to vary", () => {
-    expect(built().view.configurator?.variants.length ?? 0).toBeGreaterThanOrEqual(2);
+  it("reads a first proposal's configurator as today's", () => {
+    const old = {
+      ...cfg,
+      batteries: [{ size: 0, kwh: 16, name: "Sigenergy 8 kWh module", backup: false }],
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- taking the new fields off, as a first proposal had none
+      variants: cfg.variants.map(({ batteryId: _b, ev: _e, ...v }) => v),
+    } as unknown as typeof cfg;
+    const read = readConfigurator(old);
+    expect(read.batteries[0]).toMatchObject({ id: 0, qty: 1 });
+    expect(read.variants.every((v) => v.ev === false)).toBe(true);
   });
 });
