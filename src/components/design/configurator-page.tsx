@@ -88,6 +88,8 @@ export function ConfiguratorPage(props: {
   );
 
   const invertersHere = invertersFor(cfg, mix.size);
+  // On a proposal published before inverters could be chosen, the one on its system lines.
+  const designedInverter = shown.system.details.find((d) => /inverter/i.test(d.label));
   const batteriesHere = batteriesFor(cfg, mix.size, now.inverter);
   const battery = batteryOfVariant(cfg, mix);
   const exists = (p: Partial<ConfigPick>) => {
@@ -99,6 +101,7 @@ export function ConfiguratorPage(props: {
         q.panel === want.panel &&
         q.inverter === want.inverter &&
         q.battery === want.battery &&
+        q.extra === want.extra &&
         q.ev === want.ev &&
         q.backup === want.backup
       );
@@ -115,7 +118,7 @@ export function ConfiguratorPage(props: {
   // What switching blackout backup on moves to: this mix with backup, else the nearest priced one (with a battery).
   const withBackup = backupPick(cfg, now);
   // Add-ons: blackout backup once a battery is picked, and the EV charger when one is listed.
-  const addOns = mix.batteryId !== null || Boolean(cfg.charger);
+  const addOns = mix.batteryId !== null || Boolean(cfg.charger) || Boolean(mix.extras?.length);
 
   const special = announcementShows(view.announcement, todayInMarket());
   const headline = `${shown.system.kw} kW solar${shown.system.batteryKwh ? ` with a ${shown.system.batteryKwh} kWh battery` : ""}`;
@@ -183,14 +186,13 @@ export function ConfiguratorPage(props: {
                 <Roof view={shown} src={urls.roof} frame={cfg.sizes[0]?.roofPanels} />
                 {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
                 {(battery || mix.ev) && (
-                  <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 overflow-hidden rounded-3xl bg-[#15171c] p-0 pr-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4">
+                  <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4">
                     {mix.ev && <ChargerArt />}
                     {battery && (
                       <BatteryArt
-                        key={`${battery.id}-${Boolean(mix.backup)}`}
+                        key={`${battery.id}-${mix.extra ?? 0}-${Boolean(mix.backup)}`}
                         kwh={shown.system.batteryKwh}
-                        qty={Math.min(8, battery.qty + (mix.backup ? 1 : 0))}
-                        maker={battery.maker}
+                        qty={Math.min(8, battery.qty + (mix.extra ?? 0) + (mix.backup ? 1 : 0))}
                         backup={Boolean(mix.backup)}
                       />
                     )}
@@ -283,6 +285,9 @@ export function ConfiguratorPage(props: {
                   side={now.inverter === i.id ? (i.id === 0 ? "As designed" : "") : deltaTo(switchInverter(cfg, now, i.id))}
                 />
               ))}
+              {!invertersHere.length && designedInverter && (
+                <Choice on onPick={() => {}} title={designedInverter.value} note="Sized for your panels" side="As designed" />
+              )}
               {invertersHere.length <= 1 && (
                 <p className="px-1 text-[12.5px] leading-relaxed text-muted">Sized for your panels. Others are checked on site.</p>
               )}
@@ -294,7 +299,7 @@ export function ConfiguratorPage(props: {
               <Choice
                 on={mix.batteryId === null}
                 disabled={locked || !exists({ battery: null, backup: false })}
-                onPick={() => set({ battery: null, backup: false })}
+                onPick={() => set({ battery: null, backup: false, extra: 0 })}
                 title="No battery"
                 note="Solar only. A battery can be added later."
                 side={mix.batteryId === null ? "" : delta({ battery: null, backup: false })}
@@ -304,12 +309,48 @@ export function ConfiguratorPage(props: {
                   key={b.id}
                   on={mix.batteryId === b.id}
                   disabled={locked || !exists({ battery: b.id, backup: false })}
-                  onPick={() => set({ battery: b.id })}
+                  onPick={() => set({ battery: b.id, extra: 0 })}
                   title={`${b.maker} · ${b.kwh} kWh`}
                   note={b.name}
-                  side={mix.batteryId === b.id ? "" : delta({ battery: b.id })}
+                  side={mix.batteryId === b.id ? "" : delta({ battery: b.id, extra: 0 })}
                 />
               ))}
+              {/* Storage a module down or up (19 Nov 2026, Martin), each priced on publishing. */}
+              {mix.batteryId !== null && (
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
+                  <span>
+                    <span className="block text-[15px] font-medium text-ink">Storage</span>
+                    <span className="block text-[12.5px] text-muted">A module more or fewer</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <StepButton
+                      label="One module fewer"
+                      sign="−"
+                      disabled={locked || !exists({ extra: (now.extra ?? 0) - 1, backup: false })}
+                      onPress={() => set({ extra: (now.extra ?? 0) - 1, backup: false })}
+                      side={
+                        exists({ extra: (now.extra ?? 0) - 1, backup: false })
+                          ? deltaTo({ ...now, extra: (now.extra ?? 0) - 1, backup: false })
+                          : ""
+                      }
+                    />
+                    <span className="min-w-[4.5rem] text-center text-[17px] font-semibold tracking-tight [font-variant-numeric:tabular-nums]">
+                      {shown.system.batteryKwh} kWh
+                    </span>
+                    <StepButton
+                      label="One module more"
+                      sign="+"
+                      disabled={locked || !exists({ extra: (now.extra ?? 0) + 1, backup: false })}
+                      onPress={() => set({ extra: (now.extra ?? 0) + 1, backup: false })}
+                      side={
+                        exists({ extra: (now.extra ?? 0) + 1, backup: false })
+                          ? deltaTo({ ...now, extra: (now.extra ?? 0) + 1, backup: false })
+                          : ""
+                      }
+                    />
+                  </span>
+                </div>
+              )}
               {!batteriesHere.length && (
                 <p className="text-[13px] text-muted">
                   No battery on our lists works with this system&apos;s inverter. Ask us in the chat.
@@ -321,6 +362,20 @@ export function ConfiguratorPage(props: {
           {addOns && (
             <Step icon={<Plus className="size-[18px]" strokeWidth={1.8} aria-hidden />} title="Add-ons">
               <div className="space-y-2.5">
+                {/* Decided on the job in the designer (19 Nov 2026, Martin: "these aren't components a customer would self
+                    select"): in the price, ticked, not switches. */}
+                {mix.extras?.map((x) => (
+                  <div key={x} className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
+                    <span
+                      aria-hidden
+                      className="grid size-5 shrink-0 place-items-center rounded-full bg-[color:var(--primary)] text-[color:var(--primary-ink)]"
+                    >
+                      <Check className="size-3" strokeWidth={3} />
+                    </span>
+                    <span className="min-w-0 flex-1 text-[15px] font-medium text-ink">{x}</span>
+                    <span className="shrink-0 text-[13px] text-muted">Included</span>
+                  </div>
+                ))}
                 {/* Backup is a battery's add-on, so it shows only once a battery is picked (19 Nov 2026, Martin). */}
                 {mix.batteryId !== null && (
                   <Toggle
@@ -462,156 +517,190 @@ const OFFSET_CAP = 0.9;
 const offsetWords = (share: number) => (share >= OFFSET_CAP ? `${percent(OFFSET_CAP)}+` : percent(share));
 
 /**
- * What the system does, joined to the picture: what it makes in a year, how much of the home's power it offsets (the
- * panels' share, and the battery's on top of it in the business's accent, counted on its own), and the yearly saving.
- * Estimates; the offset is never said to be more than 90%.
+ * What the system does for the home, as rings (19 Nov 2026, Martin: "add some apple watch inspired analytics to show
+ * the expected energy impacts of the system"): on black under the picture, three rings closing as the mix changes, each
+ * an estimate from the mix's own figures. Outer, sun orange: the share of the home's power the system supplies (never
+ * said to be more than 90%, `OFFSET_CAP`). Middle, green: the share of the bill it saves. Inner, sky: of the power the
+ * panels alone can't supply (mostly evenings), the share the battery does. What it makes a year under them.
  */
 function Performance({ cfg, mix }: { cfg: ConfiguratorView; mix: ConfigVariant }) {
   const solar = mix.batteryId === null ? mix : (solarOnly(cfg, mix) ?? mix);
-  const total = mix.bill ? Math.min(OFFSET_CAP, mix.bill.selfReliance) : null;
-  const fromPanels = solar.bill ? Math.min(OFFSET_CAP, solar.bill.selfReliance) : null;
-  const fromBattery = total !== null && fromPanels !== null && mix.batteryId !== null ? Math.max(0, total - fromPanels) : 0;
+  const total = mix.bill ? Math.min(OFFSET_CAP, mix.bill.selfReliance) : 0;
+  const fromPanels = solar.bill ? Math.min(OFFSET_CAP, solar.bill.selfReliance) : 0;
+  const saved = mix.bill && mix.bill.now > 0 ? Math.min(1, Math.max(0, mix.bill.saving / mix.bill.now)) : 0;
+  const evenings = mix.batteryId !== null && fromPanels < 1 ? Math.min(1, Math.max(0, (total - fromPanels) / (1 - fromPanels))) : 0;
+  const rings = [
+    {
+      tone: RING.sun,
+      share: total,
+      label: "Home powered",
+      value: mix.bill ? offsetWords(mix.bill.selfReliance) : "—",
+      note: "of its power",
+    },
+    {
+      tone: RING.leaf,
+      share: saved,
+      label: "Bill saved",
+      value: mix.bill && mix.bill.saving > 0 ? dollars(mix.bill.saving) : "—",
+      note: "a year",
+    },
+    {
+      tone: RING.sky,
+      share: evenings,
+      label: "Evenings",
+      value: mix.batteryId === null ? "—" : percent(evenings),
+      note: mix.batteryId === null ? "add a battery" : "from the battery",
+    },
+  ];
   return (
-    <div className="grid grid-cols-3 divide-x divide-line border-t border-line">
-      <Cell title="Makes a year" big={mix.production ? `${mix.production.yearKwh.toLocaleString("en-AU")} kWh` : "—"} />
-      <div className="px-3 py-3.5 sm:px-4">
-        <p className="text-[11px] uppercase tracking-[0.12em] text-muted">Grid offset</p>
-        <p className="mt-1 text-[18px] leading-none tracking-tight [font-variant-numeric:tabular-nums] sm:text-[20px]">
-          {total !== null && mix.bill ? offsetWords(mix.bill.selfReliance) : "—"}
-        </p>
-        {total !== null && fromPanels !== null && (
-          <>
-            <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
-              <span className="h-full bg-ink/45 transition-[width] duration-500" style={{ width: percent(fromPanels) }} />
-              <span className="h-full bg-[color:var(--accent)] transition-[width] duration-500" style={{ width: percent(fromBattery) }} />
-            </div>
-            <p className="mt-1.5 text-[11px] leading-tight text-muted">
-              {fromBattery > 0.005 ? (
-                <>
-                  Solar {percent(fromPanels)} ·{" "}
-                  <span className="font-medium text-[color:var(--accent)]">battery +{percent(fromBattery)}</span>
-                </>
-              ) : (
-                "From the panels"
-              )}
+    <div className="flex items-center gap-5 bg-[#0b0b0d] px-4 py-4 text-white sm:gap-7 sm:px-6">
+      <Rings rings={rings} />
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-6">
+        {rings.map((r) => (
+          <div key={r.label} className="flex min-w-0 items-baseline justify-between gap-2 sm:block">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em]" style={{ color: r.tone }}>
+              {r.label}
             </p>
-          </>
-        )}
+            <p className="truncate text-[18px] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums] sm:mt-1 sm:text-[24px]">
+              {r.value}
+            </p>
+            <p className="mt-1 hidden text-[11.5px] text-white/55 sm:block">{r.note}</p>
+          </div>
+        ))}
+        <p className="text-[11.5px] text-white/45 sm:col-span-3 sm:-mt-1">
+          {mix.production ? `Makes about ${mix.production.yearKwh.toLocaleString("en-AU")} kWh a year. ` : ""}Estimates from your bill.
+        </p>
       </div>
-      <Cell title="Saves a year" big={mix.bill && mix.bill.saving > 0 ? dollars(mix.bill.saving) : "—"} />
     </div>
   );
 }
 
-function Cell({ title, big }: { title: string; big: string }) {
+/** The rings' colours: vivid on black, as a watch's are; our own, not any maker's. */
+const RING = { sun: "#ff8a3d", leaf: "#3ddc84", sky: "#4cc2ff" } as const;
+
+/** Three rings, one inside the next, each closing to its share with a round end; the track the same hue, dim. */
+function Rings({ rings }: { rings: { tone: string; share: number; label: string }[] }) {
+  const size = 92;
+  const stroke = 10;
+  const gap = 2.5;
   return (
-    <div className="px-3 py-3.5 sm:px-4">
-      <p className="text-[11px] uppercase tracking-[0.12em] text-muted">{title}</p>
-      <p className="mt-1 text-[18px] leading-none tracking-tight [font-variant-numeric:tabular-nums] sm:text-[20px]">{big}</p>
-    </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0 -rotate-90" aria-hidden>
+      {rings.map((r, i) => {
+        const radius = size / 2 - stroke / 2 - i * (stroke + gap);
+        const length = 2 * Math.PI * radius;
+        const shown = Math.max(0.001, Math.min(1, r.share));
+        return (
+          <g key={r.label}>
+            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={r.tone} strokeOpacity={0.2} strokeWidth={stroke} />
+            <circle
+              className="cfg-ring"
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={r.tone}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={length}
+              strokeDashoffset={length * (1 - shown)}
+              style={{ ["--ring-len" as string]: `${length}` }}
+            />
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
 /**
- * The battery on the home's wall (19 Nov 2026, Martin: the first one was "so uninspiring… not exciting", with Tesla's
- * Powerwall pictures as the bar): a white unit seen from three-quarters, light falling across its face, a graphite side
- * with a status light, standing on a dark ribbed wall with its shadow; under it a label with the maker and size and a
- * charge bar filling in the business's accent. Drawn by us, never a maker's product photo or mark. A unit a little
- * taller for more modules. Still with reduced motion.
+ * The battery on the home's wall (19 Nov 2026, Martin: "make it a unique to renuabl gif type image where the bars light
+ * up to the top of the battery… adjacent to it the amount of battery storage… modern, not gimmicky… imagine if Apple
+ * were making home batteries… you don't need to mention the brand"): a soft white unit, front on, with one column of
+ * light set into it, a short group of segments for each module; the segments light from the bottom to the top, hold,
+ * and dim together, again and again. The storage beside it, large. Our own drawing, no maker. The unit is taller for
+ * more modules. Lit and still with reduced motion.
  */
-function BatteryArt({ kwh, qty, maker, backup }: { kwh: number; qty: number; maker: string; backup: boolean }) {
-  const W = 132;
-  const H = 176;
-  // The unit: front face with its top edge rising to the right, the side face going back.
-  const tall = Math.min(34, Math.max(0, qty - 2) * 6);
-  const fx = 34;
-  const fw = 52;
-  const sideW = 14;
-  const topL = 38 - tall;
-  const topR = 30 - tall;
-  const base = 158;
-  const front = `${fx},${topL} ${fx + fw},${topR} ${fx + fw},${base - 3} ${fx},${base}`;
-  const side = `${fx + fw},${topR} ${fx + fw + sideW},${topR + 6} ${fx + fw + sideW},${base - 6} ${fx + fw},${base - 3}`;
-  const shadow = `${fx + fw + sideW},${topR + 10} ${fx + fw + sideW + 22},${topR + 22} ${fx + fw + sideW + 22},${base + 2} ${fx + fw + sideW},${base - 4}`;
+function BatteryArt({ kwh, qty, backup }: { kwh: number; qty: number; backup: boolean }) {
+  const modules = Math.max(1, Math.min(8, qty));
+  const per = modules <= 2 ? 4 : modules <= 4 ? 3 : 2;
+  const W = 76;
+  const H = 128 + Math.max(0, modules - 2) * 12;
+  const top = 22;
+  const bottom = H - 20;
+  const moduleGap = 6;
+  const segGap = 2.5;
+  const moduleH = (bottom - top - moduleGap * (modules - 1)) / modules;
+  const segH = (moduleH - segGap * (per - 1)) / per;
+  // From the bottom up: the order the segments light in.
+  const segs = Array.from({ length: modules * per }, (_, k) => {
+    const m = Math.floor(k / per);
+    const y = top + m * (moduleH + moduleGap) + (k % per) * (segH + segGap);
+    return { y, held: backup && m === 0 };
+  }).reverse();
+  const n = segs.length;
+  const name = `cfg-seg-${n}`;
+  // One keyframe a segment: each comes on in turn over the first 60% of the loop, all hold, then dim together.
+  const keyframes = segs
+    .map((_, i) => {
+      const on = 4 + (i * 58) / Math.max(1, n - 1);
+      return `@keyframes ${name}-${i} { 0%, ${on.toFixed(1)}% { opacity: .16 } ${(on + 3).toFixed(1)}%, 84% { opacity: 1 } 94%, 100% { opacity: .16 } }`;
+    })
+    .join("\n");
   return (
-    <figure className="cfg-in m-0 flex items-end gap-1">
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`A ${kwh} kWh battery`} className="shrink-0">
+    <figure className="cfg-in m-0 flex items-center gap-4">
+      <style>{`${keyframes}
+.${name} { animation-duration: 4.8s; animation-iteration-count: infinite; animation-timing-function: ease-out; animation-fill-mode: both }
+@media (prefers-reduced-motion: reduce) { .${name} { animation: none !important; opacity: 1 } }`}</style>
+      <svg width={W} height={H + 10} viewBox={`0 0 ${W} ${H + 10}`} role="img" aria-label={`A ${kwh} kWh battery`} className="shrink-0">
         <defs>
-          <linearGradient id="cfg-rib" x1="0" x2="1">
-            <stop offset="0" stopColor="#1a1d24" />
-            <stop offset="0.5" stopColor="#2a2f3a" />
-            <stop offset="1" stopColor="#15171c" />
-          </linearGradient>
-          <radialGradient id="cfg-warm" cx="0.15" cy="1" r="0.8">
-            <stop offset="0" stopColor="#c99a5b" stopOpacity="0.35" />
-            <stop offset="1" stopColor="#c99a5b" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id="cfg-front" x1="0" y1="0" x2="1" y2="1">
+          <linearGradient id="cfg-body" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0" stopColor="#ffffff" />
-            <stop offset="0.55" stopColor="#f1f1ef" />
-            <stop offset="1" stopColor="#d9d9d5" />
+            <stop offset="0.6" stopColor="#f2f2f0" />
+            <stop offset="1" stopColor="#dcdcd8" />
           </linearGradient>
-          <linearGradient id="cfg-sheen" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#fff" stopOpacity="0" />
-            <stop offset="0.5" stopColor="#fff" stopOpacity="0.85" />
-            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          <linearGradient id="cfg-well" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#e4e4e1" />
+            <stop offset="1" stopColor="#d6d6d2" />
           </linearGradient>
-          <linearGradient id="cfg-side" x1="0" x2="1">
-            <stop offset="0" stopColor="#4a4d53" />
-            <stop offset="1" stopColor="#2b2d31" />
-          </linearGradient>
-          <clipPath id="cfg-front-clip">
-            <polygon points={front} />
-          </clipPath>
-          <filter id="cfg-soft" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="5" />
+          <filter id="cfg-light" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="2.2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <filter id="cfg-drop" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="4" />
           </filter>
         </defs>
-        {/* The wall: dark ribbed cladding with warm light low on it. */}
-        {Array.from({ length: 7 }, (_, i) => (
-          <rect key={i} x={i * 19} y="0" width="19" height={H} fill="url(#cfg-rib)" />
-        ))}
-        <rect width={W} height={H} fill="url(#cfg-warm)" />
-        {/* Its shadow on the wall, and on the ground. */}
-        <polygon points={shadow} fill="#000" opacity="0.55" filter="url(#cfg-soft)" />
-        <ellipse cx={fx + fw / 2 + 8} cy={base + 4} rx={fw / 2 + 12} ry="4" fill="#000" opacity="0.6" filter="url(#cfg-soft)" />
-        {/* The unit. */}
-        <polygon points={side} fill="url(#cfg-side)" />
-        <polygon points={front} fill="url(#cfg-front)" />
-        <g clipPath="url(#cfg-front-clip)">
-          <rect
-            className="cfg-sheen"
-            x={fx - 30}
-            y={topR - 10}
-            width="26"
-            height={base - topR + 20}
-            fill="url(#cfg-sheen)"
-            transform={`skewX(-18)`}
-          />
+        <ellipse cx={W / 2} cy={H + 3} rx={W / 2 - 6} ry="4" fill="#000" opacity="0.6" filter="url(#cfg-drop)" />
+        <rect x="2" y="1" width={W - 4} height={H} rx="18" fill="url(#cfg-body)" />
+        <rect x="2.5" y="1.5" width={W - 5} height={H - 1} rx="17.5" fill="none" stroke="#fff" strokeOpacity="0.9" />
+        {/* The column of light, set into the face. */}
+        <rect x={W / 2 - 15} y={top - 7} width="30" height={bottom - top + 14} rx="9" fill="url(#cfg-well)" />
+        <g filter="url(#cfg-light)">
+          {segs.map((sg, i) => (
+            <rect
+              key={i}
+              className={`${name}`}
+              style={{ animationName: `${name}-${i}` }}
+              x={W / 2 - 10}
+              y={sg.y}
+              width="20"
+              height={segH}
+              rx="2.5"
+              fill={sg.held ? "#5fb8ff" : "var(--accent)"}
+            />
+          ))}
         </g>
-        <polyline points={`${fx},${topL} ${fx + fw},${topR}`} stroke="#fff" strokeWidth="1.2" fill="none" />
-        {/* The status light and a seam on the side. */}
-        <circle className="cfg-glow" cx={fx + fw + sideW / 2} cy={topR + 22} r="2.2" fill="var(--accent)" />
-        <circle cx={fx + fw + sideW / 2} cy={topR + 22} r="5" fill="var(--accent)" opacity="0.25" filter="url(#cfg-soft)" />
-        <rect x={fx + fw + sideW / 2 - 1.5} y={topR + 34} width="3" height="16" rx="1.5" fill="#1b1c1f" />
-        {backup && <rect x={fx + 8} y={base - 22} width={fw - 16} height="3" rx="1.5" fill="#9fd3ff" opacity="0.9" />}
       </svg>
-      <figcaption className="pb-1 text-white">
-        <span className="block text-[34px] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]">{kwh}</span>
-        <span className="mt-0.5 block text-[12px] text-white/70">kWh of storage</span>
-        {/* The label, as a product's tag: maker and size, with the charge filling. */}
-        <span className="mt-3 block rounded-lg bg-black/70 px-2.5 py-1.5 ring-1 ring-white/10">
-          <span className="block text-[12.5px] font-medium leading-tight">{maker}</span>
-          <span className="mt-1.5 block h-1 w-24 overflow-hidden rounded-full bg-white/15">
-            <span className="cfg-fill block h-full w-[86%] rounded-full bg-[color:var(--accent)]" />
-          </span>
+      <figcaption className="text-white">
+        <span className="block text-[40px] font-semibold leading-none tracking-tight [font-variant-numeric:tabular-nums]">{kwh}</span>
+        <span className="mt-1 block text-[12.5px] text-white/65">kWh of storage</span>
+        <span className="mt-2.5 block text-[12px] text-white/50">
+          {qty} module{qty === 1 ? "" : "s"}
+          {backup ? " · one held for blackouts" : ""}
         </span>
-        {backup && (
-          <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-[#9fd3ff]/20 px-2 py-0.5 text-[10.5px] font-medium text-[#cfe9ff]">
-            <span aria-hidden className="size-1.5 rounded-full bg-[#9fd3ff]" />
-            Blackout backup
-          </span>
-        )}
       </figcaption>
     </figure>
   );
@@ -620,7 +709,7 @@ function BatteryArt({ kwh, qty, maker, backup }: { kwh: number; qty: number; mak
 /** The EV charger on the wall: a small rounded box with its ring of light and cable. */
 function ChargerArt() {
   return (
-    <figure className="cfg-in m-0 flex flex-col items-center gap-1 pb-4 pl-4 text-white">
+    <figure className="cfg-in m-0 flex flex-col items-center gap-1 text-white">
       <svg width={46} height={84} viewBox="0 0 46 84" role="img" aria-label="An EV charger">
         <defs>
           <linearGradient id="cfg-ev" x1="0" x2="1">
@@ -689,6 +778,21 @@ function Choice(props: { on: boolean; disabled?: boolean; onPick: () => void; ti
   );
 }
 
+function StepButton(props: { label: string; sign: string; disabled: boolean; onPress: () => void; side: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={`${props.label}${props.side ? ` (${props.side})` : ""}`}
+      title={props.side || props.label}
+      disabled={props.disabled}
+      onClick={props.onPress}
+      className="grid size-9 place-items-center rounded-full text-[20px] leading-none text-ink ring-1 ring-line-strong transition-colors hover:bg-canvas disabled:text-muted disabled:ring-line"
+    >
+      {props.sign}
+    </button>
+  );
+}
+
 function Toggle(props: {
   on: boolean;
   disabled?: boolean;
@@ -743,11 +847,13 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 const CSS = `
 /* The picture is 1.6 times as wide as it is tall: its width is the window's height less the header, the heading, the
-   figures under it and the Order bar with a margin (about 28rem; 2.5rem more with the special's bar), times 1.6. */
+   figures under it and the Order bar with a margin (about 30rem with the rings; 2.5rem more with the special's bar), times 1.6. */
 @media (min-width: 1024px) {
-  .cfg-home { max-width: max(26rem, calc((100dvh - 28rem) * 1.6)); margin-inline: auto; }
-  .cfg-home-special { max-width: max(26rem, calc((100dvh - 30.5rem) * 1.6)); }
+  .cfg-home { max-width: max(26rem, calc((100dvh - 30rem) * 1.6)); margin-inline: auto; }
+  .cfg-home-special { max-width: max(26rem, calc((100dvh - 32.5rem) * 1.6)); }
 }
+@keyframes cfg-ring { from { stroke-dashoffset: var(--ring-len) } }
+.cfg-ring { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1); animation: cfg-ring 1.2s cubic-bezier(.2,.8,.2,1) both }
 @keyframes cfg-fade { from { opacity: .35 } to { opacity: 1 } }
 .cfg-fade { animation: cfg-fade .45s ease-out }
 @keyframes cfg-in { from { opacity: 0; transform: translateY(14px) scale(.94) } to { opacity: 1; transform: none } }
@@ -756,9 +862,5 @@ const CSS = `
 @keyframes cfg-charge { from { transform: scaleY(.15) } to { transform: scaleY(1) } }
 .cfg-charge { animation: cfg-charge 1.6s cubic-bezier(.2,.8,.2,1) both }
 .cfg-glow { animation: cfg-glow 2.4s ease-in-out infinite }
-@keyframes cfg-fill { from { transform: scaleX(.05) } to { transform: scaleX(1) } }
-.cfg-fill { transform-origin: left; animation: cfg-fill 1.8s cubic-bezier(.2,.8,.2,1) .3s both }
-@keyframes cfg-sheen { 0% { transform: translateX(-40px) skewX(-18deg) } 55%, 100% { transform: translateX(120px) skewX(-18deg) } }
-.cfg-sheen { animation: cfg-sheen 4.5s ease-in-out .6s infinite both }
-@media (prefers-reduced-motion: reduce) { .cfg-fade, .cfg-in, .cfg-glow, .cfg-charge, .cfg-fill { animation: none } .cfg-sheen { display: none } }
+@media (prefers-reduced-motion: reduce) { .cfg-fade, .cfg-in, .cfg-glow, .cfg-charge, .cfg-fill, .cfg-ring { animation: none; transition: none } .cfg-sheen { display: none } }
 `;

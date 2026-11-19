@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-19",
     area: "Proposals",
+    words: "The configurator: storage a module up or down, included extras listed, rings for the impact and a living battery.",
+  },
+  {
+    day: "2026-11-19",
+    area: "Proposals",
     words: "The configurator: the home and its figures fit one screen, and a new battery with a charge bar.",
   },
   {

@@ -47,15 +47,17 @@ export interface ConfigPick {
   inverter: number;
   /** Which of the batteries offered with that inverter, or null for none. */
   battery: number | null;
+  /** Modules more (1) or fewer (−1) than the battery is offered with; 0 as offered. */
+  extra: number;
   ev: boolean;
   backup: boolean;
 }
 
 export const configKey = (p: ConfigPick): ConfigKey =>
-  `cfg-${p.size}-${p.panel}-${p.battery === null ? "n" : p.battery}-${p.ev ? 1 : 0}${p.backup ? 1 : 0}${p.inverter ? `-i${p.inverter}` : ""}`;
+  `cfg-${p.size}-${p.panel}-${p.battery === null ? "n" : p.battery}-${p.ev ? 1 : 0}${p.backup ? 1 : 0}${p.inverter ? `-i${p.inverter}` : ""}${p.extra ? `-m${p.extra}` : ""}`;
 
 export const isConfigKey = (raw: unknown): raw is ConfigKey =>
-  typeof raw === "string" && /^cfg-\d{1,2}-\d{1,2}-(n|b|\d{1,2})(-[01]{2}(-i\d{1,2})?)?$/.test(raw);
+  typeof raw === "string" && /^cfg-\d{1,2}-\d{1,2}-(n|b|\d{1,2})(-[01]{2}(-i\d{1,2})?(-m-?\d)?)?$/.test(raw);
 
 /** One size on offer: a design (the business's own, or worked back from it) with its panels on the roof. */
 export interface ConfigSize {
@@ -114,6 +116,8 @@ export interface ConfigVariant extends ProposalOption {
   panel: number;
   /** Which of the size's inverters (left out before inverters could be chosen: the one designed with). */
   inverter?: number;
+  /** Modules more or fewer than its battery is offered with (left out: as offered). */
+  extra?: number;
   /** Whether it has a battery (and `batteryId` which; left out on the first proposals, where it was the one). */
   battery: boolean;
   batteryId?: number | null;
@@ -124,6 +128,9 @@ export interface ConfigVariant extends ProposalOption {
    * sent once. `system.details` is then empty until read back (`readConfigurator`, `variantOf`).
    */
   sayIds?: number[];
+  /** Its lists of costs that may apply and that are included, as places in `ConfiguratorView.groups`. */
+  mayId?: number;
+  withId?: number;
 }
 
 /** What the configurator is sent: the choices and every mix of them that could be priced. */
@@ -138,6 +145,10 @@ export interface ConfiguratorView {
   variants: ConfigVariant[];
   /** Every mix's system lines, each once (`packLines`); left out on proposals before 19 Nov 2026. */
   say?: { label: string; value: string }[];
+  /** Lists of words sent once (`packLines`): the costs that may apply, and those included. */
+  groups?: string[][];
+  /** The bill's assumptions, the same on every mix, sent once (`packLines`). */
+  assumed?: NonNullable<ProposalOption["bill"]>["assumed"];
   /** The mix it opens on: the recommended design, as designed. */
   start: ConfigKey;
 }
@@ -152,6 +163,22 @@ export const NEEDS_PANEL_PARTS = ["solaredge", "enphase", "tigo"] as const;
 export function packLines(cfg: ConfiguratorView): ConfiguratorView {
   const lines: { label: string; value: string }[] = [];
   const at = new Map<string, number>();
+  const groups: string[][] = [];
+  const groupAt = new Map<string, number>();
+  const groupOf = (list: string[] | undefined) => {
+    if (!list?.length) return undefined;
+    const key = list.join("\u0000");
+    let i = groupAt.get(key);
+    if (i === undefined) {
+      i = groups.length;
+      groups.push(list);
+      groupAt.set(key, i);
+    }
+    return i;
+  };
+  // The bill's assumptions are the home's, the same on every mix: sent once.
+  const assumed = cfg.variants.find((v) => v.bill)?.bill?.assumed;
+  const sameAssumed = assumed && cfg.variants.every((v) => !v.bill || JSON.stringify(v.bill.assumed) === JSON.stringify(assumed));
   const variants = cfg.variants.map((v) => {
     const sayIds = v.system.details.map((d) => {
       const key = `${d.label}\u0000${d.value}`;
@@ -163,16 +190,30 @@ export function packLines(cfg: ConfiguratorView): ConfiguratorView {
       }
       return i;
     });
-    return { ...v, system: { ...v.system, details: [] }, sayIds };
+    const { variations, extras, ...rest } = v;
+    const mayId = groupOf(variations);
+    const withId = groupOf(extras);
+    const bill = v.bill && sameAssumed ? { ...v.bill, assumed: undefined } : v.bill;
+    return {
+      ...rest,
+      bill,
+      system: { ...v.system, details: [] },
+      sayIds,
+      ...(mayId !== undefined ? { mayId } : {}),
+      ...(withId !== undefined ? { withId } : {}),
+    } as ConfigVariant;
   });
-  return { ...cfg, variants, say: lines };
+  return { ...cfg, variants, say: lines, ...(groups.length ? { groups } : {}), ...(sameAssumed ? { assumed } : {}) };
 }
 
-/** A mix with its system lines read back from the shared list. */
-function withLines<V extends ConfigVariant>(cfg: Pick<ConfiguratorView, "say">, v: V): V {
-  if (!v.sayIds || !cfg.say) return v;
-  const details = v.sayIds.map((i) => cfg.say![i]).filter(Boolean);
-  return { ...v, system: { ...v.system, details } };
+/** A mix with what was sent once put back: its system lines, the bill's assumptions, and its lists of costs. */
+function withLines<V extends ConfigVariant>(cfg: Pick<ConfiguratorView, "say" | "groups" | "assumed">, v: V): V {
+  let out: V = v;
+  if (v.sayIds && cfg.say) out = { ...out, system: { ...out.system, details: v.sayIds.map((i) => cfg.say![i]).filter(Boolean) } };
+  if (out.bill && !out.bill.assumed && cfg.assumed) out = { ...out, bill: { ...out.bill, assumed: cfg.assumed } };
+  if (v.mayId !== undefined && cfg.groups?.[v.mayId]) out = { ...out, variations: cfg.groups[v.mayId] };
+  if (v.withId !== undefined && cfg.groups?.[v.withId]) out = { ...out, extras: cfg.groups[v.withId] };
+  return out;
 }
 
 /** The fewest panels a size worked back from a design may have. */
@@ -183,6 +224,8 @@ export const SIZE_STEPS = [1, 0.8, 0.6] as const;
 export const MAX_OTHER_PANELS = 2;
 /** The most inverters of other makers offered beside the one designed with. */
 export const MAX_OTHER_INVERTERS = 2;
+/** The modules more or fewer a battery is also priced with, so storage can be stepped (19 Nov 2026, Martin). */
+export const STORAGE_STEPS = [-1, 1] as const;
 /** The most batteries a customer chooses between for a size. */
 export const MAX_BATTERY_CHOICES = 3;
 
@@ -238,6 +281,12 @@ export function withBattery(design: RoofDesign, battery: DesignBattery | null): 
 /** The design with the EV charger given, or with none. */
 export function withCharger(design: RoofDesign, charger: DesignCharger | null): RoofDesign {
   return { ...design, charger: charger ?? undefined };
+}
+
+/** A battery with `by` modules more or fewer, never under one or over the most a stack takes; null when it can't step. */
+export function withModules(battery: DesignBattery, by: number): DesignBattery | null {
+  const qty = battery.qty + by;
+  return qty < 1 || qty > MAX_BATTERY_QTY ? null : { ...battery, qty };
 }
 
 /** A battery with blackout backup: one module more, held for blackouts (the quote adds the backup circuits). */
@@ -384,6 +433,7 @@ export function readConfigurator(cfg: ConfiguratorView): ConfiguratorView {
         batteryId: v.batteryId === undefined ? (v.battery ? 0 : null) : v.batteryId,
         ev: v.ev ?? false,
         inverter: v.inverter ?? 0,
+        extra: v.extra ?? 0,
       })),
   };
 }
@@ -393,6 +443,7 @@ export const pickOf = (v: ConfigVariant): ConfigPick => ({
   size: v.size,
   panel: v.panel,
   inverter: v.inverter ?? 0,
+  extra: v.extra ?? 0,
   battery: v.batteryId === undefined ? (v.battery ? 0 : null) : v.batteryId,
   ev: Boolean(v.ev),
   backup: Boolean(v.backup),
@@ -419,9 +470,10 @@ export function nearestVariant(cfg: ConfiguratorView, want: ConfigPick): ConfigV
     if (v.size !== want.size) continue;
     const p = pickOf(v);
     const score =
-      (p.panel === want.panel ? 16 : 0) +
-      (p.inverter === want.inverter ? 8 : 0) +
-      (p.battery === want.battery ? 4 : 0) +
+      (p.panel === want.panel ? 32 : 0) +
+      (p.inverter === want.inverter ? 16 : 0) +
+      (p.battery === want.battery ? 8 : 0) +
+      (p.extra === want.extra ? 4 : 0) +
       (p.ev === want.ev ? 2 : 0) +
       (p.backup === want.backup ? 1 : 0);
     if (score > bestScore) {
@@ -448,6 +500,7 @@ export function backupPick(cfg: ConfiguratorView, now: ConfigPick): ConfigPick |
     const rank = p.battery === null ? order.length : order.indexOf(p.battery);
     const score =
       (p.inverter === now.inverter ? 2000 : 0) +
+      (p.extra === now.extra ? 300 : 0) +
       (p.panel === now.panel ? 1000 : 0) +
       (p.battery === now.battery ? 500 : 100 - Math.max(0, rank) * 10) +
       (p.ev === now.ev ? 1 : 0);
@@ -495,7 +548,7 @@ export function inverterOfVariant(cfg: ConfiguratorView, v: ConfigVariant): Conf
 export function switchSize(cfg: ConfiguratorView, now: ConfigPick, size: number): ConfigPick {
   const invMaker = invertersFor(cfg, now.size).find((i) => i.id === now.inverter)?.maker;
   const inverter = invertersFor(cfg, size).find((i) => i.maker === invMaker)?.id ?? 0;
-  if (now.battery === null) return { ...now, size, inverter };
+  if (now.battery === null) return { ...now, size, inverter, extra: 0 };
   const batMaker = batteriesFor(cfg, now.size, now.inverter).find((b) => b.id === now.battery)?.maker;
   const there = batteriesFor(cfg, size, inverter);
   const battery = (there.find((b) => b.maker === batMaker) ?? there[0])?.id;
@@ -507,7 +560,7 @@ export function switchSize(cfg: ConfiguratorView, now: ConfigPick, size: number)
  * battery when none was picked; the rest as it was.
  */
 export function switchInverter(cfg: ConfiguratorView, now: ConfigPick, inverter: number): ConfigPick {
-  if (now.battery === null) return { ...now, inverter };
+  if (now.battery === null) return { ...now, inverter, extra: 0 };
   const maker = batteriesFor(cfg, now.size, now.inverter).find((b) => b.id === now.battery)?.maker;
   const there = batteriesFor(cfg, now.size, inverter);
   const same = there.find((b) => b.maker === maker) ?? there[0];
@@ -548,6 +601,7 @@ export function chosenWords(cfg: ConfiguratorView, key: ConfigKey): string | nul
     size.worked ||
     p.panel !== 0 ||
     p.inverter !== 0 ||
+    p.extra !== 0 ||
     (p.battery !== null) !== size.designedBattery ||
     (p.battery !== null && p.battery > 0) ||
     Boolean(v.ev);

@@ -449,6 +449,22 @@ export function variationsOf(lines: readonly CostLine[], edits: Record<string, L
   return VARIATIONS.filter(([line]) => out.some((l) => line.test(l.label))).map(([, words]) => words);
 }
 
+/**
+ * The costs decided on each job that were included, in the customer's words (19 Nov 2026, Martin: "add ons should
+ * contain… battery bollard, battery fire sheeting, switchboard upgrades, RCBO's… if these are selected in the designer
+ * builder they should appear… these aren't components a customer would self select"): shown in the configurator's
+ * Add-ons as included, never switched by the customer. RCBOs say how many.
+ */
+export function includedExtrasOf(lines: readonly CostLine[], edits: Record<string, LineEdit>): string[] {
+  const kept = lines.filter((l) => l.confirm && edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  return VARIATIONS.flatMap(([line, words]) => {
+    const l = kept.find((x) => line.test(x.label));
+    if (!l) return [];
+    const qty = edits[lineKey(l)]?.qty ?? l.qty;
+    return [/^RCBO/i.test(l.label) && qty && qty > 1 ? `${words} (${qty})` : words];
+  });
+}
+
 export const VARIATIONS_NOTE =
   "Not included in this price, but they may apply. Whether they do is found at the site inspection, and any that do would be a variation to this proposal, agreed with you first.";
 

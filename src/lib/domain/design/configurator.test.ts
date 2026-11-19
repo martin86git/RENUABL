@@ -8,6 +8,7 @@ import {
   backupPick,
   batteriesFor,
   inverterChoices,
+  withModules,
   invertersFor,
   MAX_OTHER_INVERTERS,
   switchInverter,
@@ -24,6 +25,7 @@ import {
 import { COST_WORDS, buildProposal, internalForChoice, viewForChoice } from "./proposal";
 import { pricedWorkspace, sampleInputs, sampleSet } from "./proposal-fixture";
 import { workspaceCatalogue } from "./pricing";
+import { includedExtrasOf, lineKey } from "./quote";
 import { designPanels, panelAspects, panelOf } from "./roof-design";
 import { yearOnPlane } from "./tilt";
 
@@ -91,15 +93,16 @@ describe("the configurator's sizes", () => {
 describe("a proposal with the configurator", () => {
   const { view, internal } = built({ withBattery: true });
   const cfg = view.configurator!;
-  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, inverter: 0, battery: null, ev: false, backup: false })!;
-  const withBatt = (size: number, backup = false) => nearestVariant(cfg, { size, panel: 0, inverter: 0, battery: 0, ev: false, backup })!;
+  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false })!;
+  const withBatt = (size: number, backup = false) =>
+    nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup })!;
 
   it("prices every mix on publishing, largest size first, and starts as designed", () => {
     expect(cfg.sizes.length).toBeGreaterThan(1);
     expect(cfg.sizes[0].panels).toBe(view.system.panels);
     for (let i = 1; i < cfg.sizes.length; i++) expect(cfg.sizes[i].panels).toBeLessThan(cfg.sizes[i - 1].panels);
     const start = cfg.variants.find((v) => v.goal === cfg.start)!;
-    expect(pickOf(start)).toEqual({ size: 0, panel: 0, inverter: 0, battery: 0, ev: false, backup: false });
+    expect(pickOf(start)).toEqual({ size: 0, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup: false });
     expect(start.price.youPay).toBe(view.price.youPay);
     // Each mix's own side is kept for the order, under the same key.
     expect(internal.configurator!.map((x) => x.goal).sort()).toEqual(cfg.variants.map((v) => v.goal).sort());
@@ -134,13 +137,13 @@ describe("a proposal with the configurator", () => {
     expect(makers.length).toBeGreaterThan(0);
     expect(new Set(makers).size).toBe(makers.length);
     if (cfg.charger) {
-      const ev = nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, ev: true, backup: false })!;
+      const ev = nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, extra: 0, battery: 0, ev: true, backup: false })!;
       expect(ev.ev).toBe(true);
       expect(ev.price.youPay).toBeGreaterThan(withBatt(0).price.youPay);
     }
   });
   it("shows the chosen mix's roof, system and price, and its own lines for the order", () => {
-    const key = configKey({ size: 1, panel: 0, inverter: 0, battery: null, ev: false, backup: false });
+    const key = configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false });
     const shown = viewForChoice(view, key);
     expect(shown.roof.panels).toHaveLength(cfg.sizes[1].panels);
     expect(shown.system.batteryKwh).toBe(0);
@@ -157,7 +160,7 @@ describe("a proposal with the configurator", () => {
   });
   it("tells the business what was ordered, and to update the design when it differs", () => {
     expect(chosenWords(cfg, cfg.start)).not.toMatch(/Update the design/);
-    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, battery: null, ev: false, backup: false }))).toMatch(
+    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false }))).toMatch(
       /no battery. Update the design/,
     );
     expect(holdMessage(cfg, cfg.start, "the week of 8 December")).toMatch(/^I'd like to order .*installed the week of 8 December/);
@@ -200,7 +203,7 @@ describe("inverters to choose from", () => {
     expect(inverterChoices({ design: two, inverters: listed }).every((i) => i.sku === design.inverters![0].sku)).toBe(true);
   });
   it("keeps keys of the inverter designed with as before, and marks another", () => {
-    const base = { size: 0, panel: 1, battery: 2, ev: true, backup: false };
+    const base = { size: 0, panel: 1, battery: 2, extra: 0, ev: true, backup: false };
     expect(configKey({ ...base, inverter: 0 })).toBe("cfg-0-1-2-10");
     expect(configKey({ ...base, inverter: 2 })).toBe("cfg-0-1-2-10-i2");
     expect(isConfigKey("cfg-0-1-2-10-i2")).toBe(true);
@@ -246,5 +249,54 @@ describe("inverters that need parts behind every panel, and the mixes' lines sen
     const shown = viewForChoice(view, cfg.start);
     expect(shown.system.details.length).toBeGreaterThan(0);
     expect(variantOf(cfg, cfg.start)!.system.details).toEqual(read.variants.find((v) => v.goal === cfg.start)!.system.details);
+  });
+});
+
+// 19 Nov 2026, Martin: "an option to increase or decrease the storage by adding or removing a module".
+describe("storage a module up or down", () => {
+  const cfg = readConfigurator(built({ withBattery: true }).view.configurator!);
+  const at = (extra: number) => nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, extra, ev: false, backup: false })!;
+
+  it("prices the battery a module fewer and a module more, holding more and costing more", () => {
+    expect(at(0).extra ?? 0).toBe(0);
+    expect(at(1).extra).toBe(1);
+    expect(at(1).system.batteryKwh).toBeGreaterThan(at(0).system.batteryKwh);
+    expect(at(1).price.youPay).toBeGreaterThan(at(0).price.youPay);
+    if ((at(-1).extra ?? 0) === -1) {
+      expect(at(-1).system.batteryKwh).toBeLessThan(at(0).system.batteryKwh);
+      expect(at(-1).price.youPay).toBeLessThan(at(0).price.youPay);
+    }
+  });
+  it("marks the step in the key only when there is one, and never steps under one module", () => {
+    const base = { size: 0, panel: 0, inverter: 0, battery: 0, ev: false, backup: false };
+    expect(configKey({ ...base, extra: 0 })).toBe("cfg-0-0-0-00");
+    expect(configKey({ ...base, extra: 1 })).toBe("cfg-0-0-0-00-m1");
+    expect(configKey({ ...base, extra: -1, inverter: 2 })).toBe("cfg-0-0-0-00-i2-m-1");
+    expect(isConfigKey("cfg-0-0-0-00-m1")).toBe(true);
+    expect(isConfigKey("cfg-0-0-0-00-i2-m-1")).toBe(true);
+    const one = { sku: "X", name: "Sigenergy 8 kWh module", kwh: 8, qty: 1, x: 0, y: 0 };
+    expect(withModules(one, -1)).toBeNull();
+    expect(withModules(one, 1)?.qty).toBe(2);
+  });
+  it("says the step on the deal, so the design is updated before stock is ordered", () => {
+    expect(chosenWords(cfg, at(1).goal)).toMatch(/Update the design/);
+  });
+});
+
+describe("costs decided on the job, shown as included", () => {
+  it("names the decided costs included in the quote, in the customer's words, with how many RCBOs", () => {
+    const lines = [
+      { group: "Switchboard", label: "Switchboard upgrade", amount: 1000, confirm: true },
+      { group: "Switchboard", label: "RCBO", amount: 100, confirm: true, qty: 1 },
+      { group: "Battery", label: "Protective bollard", amount: 220, confirm: true },
+      { group: "Battery", label: "Fireproofing (sheeting)", amount: 200, confirm: true },
+    ] as Parameters<typeof includedExtrasOf>[0];
+    const edits = {
+      [lineKey(lines[0])]: { removed: true as const },
+      [lineKey(lines[1])]: { on: true as const, qty: 3 },
+      [lineKey(lines[2])]: { on: true as const },
+      [lineKey(lines[3])]: { on: true as const },
+    };
+    expect(includedExtrasOf(lines, edits)).toEqual(["RCBO switches (3)", "Protective bollards", "Fire sheeting"]);
   });
 });

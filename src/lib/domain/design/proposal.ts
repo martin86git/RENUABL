@@ -26,6 +26,8 @@ import {
   inverterChoices,
   packLines,
   withInverter,
+  withModules,
+  STORAGE_STEPS,
   configKey,
   panelChoices,
   sizeCounts,
@@ -72,6 +74,7 @@ import {
   designFinance,
   undecidedLines,
   variationsOf,
+  includedExtrasOf,
   quoteTotals,
   sharedHome,
   solarVicFor,
@@ -297,6 +300,8 @@ export interface ProposalOption {
   deposit: number | null;
   milestones: { name: string; percent: number; amount: number }[];
   variations?: string[];
+  /** The costs decided on each job that were included, in the customer's words (`includedExtrasOf`). */
+  extras?: string[];
 }
 
 /** The business's own record of a published proposal. Never sent to the customer. */
@@ -868,6 +873,7 @@ function optionFrom(
     deposit: depositOf(brand.deposit, out.youPay),
     milestones: milestoneAmounts(brand.milestones, out.youPay),
     variations: out.variations,
+    ...(out.extras.length ? { extras: out.extras } : {}),
   };
 }
 
@@ -953,22 +959,26 @@ function configuratorFor(
       let pricedHere = 0;
       panelList.forEach((panel, j) => {
         const panelled = j === 0 ? dk : withPanel(dk, panel);
-        const batteryPicks: { id: number | null; backup: boolean }[] = [
-          { id: null, backup: false },
-          ...choices.flatMap((_, b) => [
-            { id: b, backup: false },
-            { id: b, backup: true },
+        // Each battery as offered, with backup, and a module fewer and more (19 Nov 2026, Martin: "an option to
+        // increase or decrease the storage by adding or removing a module").
+        const batteryPicks: { id: number | null; backup: boolean; extra: number }[] = [
+          { id: null, backup: false, extra: 0 },
+          ...choices.flatMap((b, i) => [
+            { id: i, backup: false, extra: 0 },
+            { id: i, backup: true, extra: 0 },
+            ...STORAGE_STEPS.filter((by) => withModules(b, by)).map((by) => ({ id: i, backup: false, extra: by })),
           ]),
         ];
         for (const bp of batteryPicks)
           for (const ev of charger ? [false, true] : [false]) {
-            const battery = bp.id === null ? null : bp.backup ? withBackup(choices[bp.id]) : choices[bp.id];
+            const battery =
+              bp.id === null ? null : bp.backup ? withBackup(choices[bp.id]) : (withModules(choices[bp.id], bp.extra) ?? choices[bp.id]);
             const mix = withCharger(withBattery(panelled, battery), ev ? charger : null);
             const at = designs.length;
             const extra = withExtra(mix, src.at);
             const out = workOut(extra, at);
             if (!out.ok) continue;
-            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, ev, backup: bp.backup });
+            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, extra: bp.extra, ev, backup: bp.backup });
             const option = optionFrom(extra, mix, at, out, { goal, name: src.name, promise: src.note, recommended: src.pick });
             // The size's roof is sent once, on the size (`variantOf` puts it back).
             variants.push({
@@ -979,6 +989,7 @@ function configuratorFor(
               size: id,
               panel: j,
               inverter: k,
+              ...(bp.extra ? { extra: bp.extra } : {}),
               battery: bp.id !== null,
               batteryId: bp.id,
               ev,
@@ -992,7 +1003,7 @@ function configuratorFor(
               lines: internalLines(out.lines),
             });
             usedPanels.add(j);
-            if (bp.id !== null) usedBatteries.add(bp.id);
+            if (bp.id !== null && !bp.extra) usedBatteries.add(bp.id);
             if (ev && charger) chargerOffered = { name: charger.name, kw: charger.kw };
             priced++;
             pricedHere++;
@@ -1036,6 +1047,7 @@ function configuratorFor(
         v.size === first.id &&
         v.panel === 0 &&
         (v.inverter ?? 0) === 0 &&
+        !v.extra &&
         v.batteryId === (firstDesign.battery ? 0 : null) &&
         Boolean(v.backup) === Boolean(firstDesign.battery?.backup) &&
         v.ev === Boolean(firstDesign.charger),
@@ -1116,6 +1128,7 @@ function workOut(input: ProposalInputs, at: number) {
   const finance = monthlyKwh ? designFinance({ interval: b.interval, ...entered }, monthlyKwh, batteryKwh, selfUseShare) : null;
   const saving = finance ? shownSaving(finance.billNow, finance.billAfter) : 0;
   const variations = variationsOf(costing.lines, quote.edits);
+  const extras = includedExtrasOf(costing.lines, quote.edits);
   return {
     ok: true as const,
     spec,
@@ -1132,6 +1145,7 @@ function workOut(input: ProposalInputs, at: number) {
     entered,
     selfUseShare,
     variations,
+    extras,
   };
 }
 
