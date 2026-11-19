@@ -13,6 +13,7 @@ import Link from "next/link";
 import { ArrowUp, Handshake, Loader2 } from "lucide-react";
 import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
 import { boxMove } from "@/lib/domain/design/deal-box";
+import { callBackAsked } from "@/lib/domain/design/deal-feed";
 import { dealContext, solProposes } from "@/lib/domain/design/sol-on-deal";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
@@ -26,6 +27,7 @@ import { askSolInPanel } from "@/lib/services/sol";
 import { ContextLine } from "./context-line";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolMark } from "./sol-icon";
+import { CallChooser } from "./call-choice";
 
 const REFRESH_MS = 60_000;
 const TYPE_MS = 14;
@@ -37,6 +39,8 @@ export function SolOnDealCard(props: {
   refresh: number;
   /** The deal page acts on a move it has a place for: the chat, the designer, the proposal, the details. */
   onMove: (kind: Exclude<MoveKind, "review" | "call"> | "email") => void;
+  /** Starts the note-taker for this deal, for a call made on your own phone. */
+  onNotes?: () => void;
 }) {
   const [deal, setDeal] = useState<FeedDeal | null>(null);
   const [now, setNow] = useState(() => new Date());
@@ -83,8 +87,13 @@ export function SolTerminal(props: {
   inCard?: boolean;
   /** The deal's page: Open deal at the right of Sol's yes and no (19 Nov 2026, Martin: "the open the deal button as the far right option under sols drafted email"). */
   openDeal?: string;
+  /** Starts the note-taker for this deal, for a call made on your own phone. */
+  onNotes?: () => void;
 }) {
   const { deal, now } = props;
+  // Who makes the call (19 Nov 2026, Martin: "clicking call michelle back isnt giving me the options of selecting a
+  // voice agent"): a voice agent with what the call is about, you, or you with the note-taker.
+  const [calling, setCalling] = useState(false);
   const p = solProposes(deal, now);
   const name = deal.customer.split(/\s+/)[0] || "them";
   const sol = deal.sol;
@@ -219,7 +228,7 @@ export function SolTerminal(props: {
       return;
     }
     if (p.yes.kind === "call") {
-      if (props.phone) window.location.href = `tel:${props.phone.replace(/\s+/g, "")}`;
+      if (props.phone) setCalling(true);
       return;
     }
     if (p.yes.kind !== "review") props.onMove(p.yes.kind);
@@ -322,6 +331,16 @@ export function SolTerminal(props: {
       aria-label="Sol"
       className="@container overflow-hidden rounded-2xl bg-surface shadow-[0_14px_36px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70"
     >
+      {calling && (
+        <CallChooser
+          jobId={props.jobId}
+          phone={props.phone ?? ""}
+          name={deal.customer.trim().split(/\s+/)[0] ?? ""}
+          reason={callBackAsked(deal)?.about ?? ""}
+          onNotes={props.onNotes}
+          onClose={() => setCalling(false)}
+        />
+      )}
       <div className="flex gap-3 p-3.5 sm:gap-3.5 sm:p-4">
         <SolLive />
         {/* Compact on the deal page too (19 Nov 2026, Martin: "sol is taking up too much space. make smarter design. reduce
@@ -334,10 +353,7 @@ export function SolTerminal(props: {
         >
           <div>
             <div>
-              <p
-                className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink"
-                aria-live="polite"
-              >
+              <p className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink" aria-live="polite">
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>

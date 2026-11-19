@@ -36,9 +36,12 @@ export function CallChoices(props: {
   onNotes?: () => void;
   /** The deal is sold and has no installation day: the admin assistant can ring to book it. */
   toBook?: boolean;
+  /** What the call is about, to start the note an agent is handed (a call back they asked for, say). */
+  reason?: string;
   onClose: () => void;
 }) {
   const { caller, admin, more, callsOn, mayChange, ready } = useCallerInfo();
+  const [about, setAbout] = useState(props.reason ?? "");
   const [booking, setBooking] = useState(false);
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -58,7 +61,7 @@ export function CallChoices(props: {
   const handOver = async (agent: CallerKey = "sales") => {
     setSending(true);
     setFailed(null);
-    const res = await askAssistantToCall(props.jobId, agent);
+    const res = await askAssistantToCall(props.jobId, agent, about);
     setSending(false);
     if (!res.ok) return setFailed(res.message);
     watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message, role: agent });
@@ -122,6 +125,22 @@ export function CallChoices(props: {
             <span className="block text-xs text-muted">It can ring {who} to book the installation for you</span>
           </span>
         </Link>
+      )}
+      {/* Why the agent is calling (19 Nov 2026, Martin: "if i select an agent the agent needs a way of knowing why its
+          calling"): it goes with the call as the team's note, and is written on the deal. */}
+      {ready && caller.named && canHand && (
+        <label className="mb-1.5 block px-1">
+          <span className="block px-2 pb-1 pr-8 pt-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">
+            What the call is about
+          </span>
+          <textarea
+            value={about}
+            onChange={(e) => setAbout(e.target.value.slice(0, 300))}
+            rows={2}
+            placeholder={`Tell your agent why it's ringing ${who}`}
+            className="block w-full resize-none rounded-lg bg-surface-2 px-3 py-2 text-[13px] leading-snug text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-ink"
+          />
+        </label>
       )}
       {!ready ? (
         <p className="px-3 py-3 text-xs text-muted">Looking up your phone assistant…</p>
@@ -251,7 +270,7 @@ export function CallChoices(props: {
           <NotebookPen className="size-4 text-ink-2" aria-hidden />
           <span>
             With the note-taker
-            <span className="block text-xs text-muted">Ring on your phone, notes typed up here</span>
+            <span className="block text-xs text-muted">Ring on your phone; it listens to your side and writes the notes up</span>
           </span>
         </button>
       )}
@@ -266,6 +285,7 @@ export function CallChooser(props: {
   name: string;
   onNotes?: () => void;
   toBook?: boolean;
+  reason?: string;
   onClose: () => void;
 }) {
   useEffect(() => {

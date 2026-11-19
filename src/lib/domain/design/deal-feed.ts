@@ -189,7 +189,7 @@ export function nextMove(d: FeedDeal, now = new Date()): NextMove | null {
   const back = callBackAsked(d);
   if (back) {
     const who = back.by ? `${name} asked ${back.by}` : `${name} asked`;
-    const why = `${who} for a call back from the team${back.about ? `: ${back.about[0].toLowerCase()}${back.about.slice(1)}` : ""}.`;
+    const why = `${who} for a call back from the team${back.about ? `: ${back.about.startsWith(name) ? back.about : `${back.about[0].toLowerCase()}${back.about.slice(1)}`}` : ""}.`;
     return d.phone
       ? { kind: "call", label: `Call ${name} back`, why }
       : { kind: "deal", label: "Get back to them", why: `${why} There's no phone on file.` };

@@ -233,11 +233,11 @@ export const askByEmailFirst = (jobId: string) =>
   ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call/ask`, { method: "POST" });
 
 /** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
-export const askAssistantToCall = (jobId: string, agent: CallerKey = "sales") =>
+export const askAssistantToCall = (jobId: string, agent: CallerKey = "sales", about = "") =>
   ask<{ message: string; already?: boolean }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ agent }),
+    body: JSON.stringify({ agent, ...(about.trim() ? { about: about.trim() } : {}) }),
   });
 
 /** The phone assistant rings this deal's customer back to ask or confirm one thing the team typed. */

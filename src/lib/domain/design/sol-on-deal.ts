@@ -1,4 +1,4 @@
-import { agoWords, needsYou, nextMove, type FeedDeal, type FeedEvent, type NextMove } from "./deal-feed";
+import { agoWords, callBackAsked, needsYou, nextMove, type FeedDeal, type FeedEvent, type NextMove } from "./deal-feed";
 import { STAGE_LABELS } from "./crm";
 import { countdownWords, type OutboxState } from "./sol-agents";
 
@@ -155,7 +155,7 @@ export function solProposes(d: FeedDeal, now = new Date()): SolProposal {
       ? `${name}'s design is waiting on you. Shall we open it?`
       : `${name}'s roof isn't designed yet. Shall we design it now?`,
     proposal: `${name}'s system is designed and priced. Shall we send the proposal?`,
-    call: `Nobody has spoken to ${name} yet. Want to ring them now?`,
+    call: callBackAsked(d) ? `${move.why} Who should make the call?` : `Nobody has spoken to ${name} yet. Who should make the call?`,
     approvals: `${name} has signed, but ${d.approvals ?? "the approvals aren't through yet"}. Shall we open the deal's details to move it on?`,
     book: `${name} has signed. Shall we book the installation day?`,
     deal: `${move.why} Want to take a look?`,

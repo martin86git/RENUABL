@@ -579,6 +579,7 @@ export function DealPage({ id }: { id: string }) {
           jobId={job.id}
           phone={customer.phone || null}
           refresh={activity.length * 1000 + designVersion}
+          onNotes={() => notetaker.current?.start()}
           onMove={(kind) =>
             kind === "reply"
               ? goTab("chat")

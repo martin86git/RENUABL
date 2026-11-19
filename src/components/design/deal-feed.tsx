@@ -1185,6 +1185,7 @@ function DealCard(props: {
               deal={d}
               now={now}
               onRead={props.onChanged}
+              onNotes={() => notetaker.current?.start()}
               onMove={(kind) => {
                 const deal = `${PATHS.deals}/${d.jobId}`;
                 const ask = d.team?.openAsks.find((a) => a.type === "design");

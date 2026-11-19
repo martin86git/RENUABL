@@ -38,12 +38,15 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "design-feed-call", 20))
       return Response.json({ ok: false, message: "That's a lot of calls at once. Try again later." }, { status: 429 });
-    const body = (await request.json().catch(() => null)) as { book?: unknown; ask?: unknown; agent?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as { book?: unknown; ask?: unknown; about?: unknown; agent?: unknown } | null;
     const book = body?.book === true;
     // A call back to ask or confirm one thing (the finished call's window): the words go to the assistant as data.
     const ask = book ? null : cleanTeamAsk(body?.ask);
     if (body?.ask !== undefined && !book && !ask)
       return Response.json({ ok: false, message: "Say what to ask or confirm on the call back." }, { status: 400 });
+    // What the call is about, said as it was handed over (19 Nov 2026, Martin: the agent "needs a way of knowing why its
+    // calling"): the words go to the assistant as data, as a call back's question does.
+    const about = book || ask ? null : cleanTeamAsk(body?.about);
     const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
     // `{ agent }`: which sales agent it is handed to (its key), when the business has more than one.
     const asked = cleanCallerKey(body?.agent);
@@ -89,6 +92,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       source: book ? undefined : "Asked for by the team",
       ...(book ? {} : { agent }),
       ...(ask ? { teamAsk: { text: ask, by: who.member.email.split("@")[0] } } : {}),
+      ...(about ? { teamAbout: { text: about, by: who.member.email.split("@")[0] } } : {}),
     });
     if (placed.result === "placed")
       return Response.json({

@@ -162,7 +162,16 @@ export interface VoiceRow {
   first_name: string | null;
   mobile: string;
   email: string | null;
-  lead: { about?: string[]; source?: string; texted?: boolean; assistant?: string; inbound?: boolean; teamAsk?: string; agent?: string };
+  lead: {
+    about?: string[];
+    source?: string;
+    texted?: boolean;
+    assistant?: string;
+    inbound?: boolean;
+    teamAsk?: string;
+    teamAbout?: string;
+    agent?: string;
+  };
   status: "waiting" | "calling" | "booked" | "done" | "stopped";
   attempts: number;
   vapi_call_id: string | null;
@@ -191,6 +200,8 @@ export async function queueCall(o: {
   askedNote?: string;
   /** A call back the team asked for: the one thing to ask or confirm (`cleanTeamAsk`), and who asked. */
   teamAsk?: { text: string; by: string };
+  /** What a person said the call is about as they handed it over (`cleanTeamAsk`), and who. */
+  teamAbout?: { text: string; by: string };
   /** Which sales agent it was handed to (its key), when not the first. */
   agent?: CallerKey;
 }): Promise<QueueResult> {
@@ -228,6 +239,7 @@ export async function queueCall(o: {
             about,
             source: o.source,
             ...(o.teamAsk ? { teamAsk: o.teamAsk.text } : {}),
+            ...(o.teamAbout && !o.teamAsk ? { teamAbout: o.teamAbout.text } : {}),
             ...(o.agent && o.agent !== "sales" && o.mode !== "install" ? { agent: o.agent } : {}),
           }),
         ],
@@ -245,6 +257,11 @@ export async function queueCall(o: {
       await onDeal(
         { ...rows[0], lead: { ...rows[0].lead, assistant: (await callerOf(o.businessId, keyOfCall(rows[0]))).name } },
         `${o.teamAsk.by} asked for a call back to ask: ${o.teamAsk.text}`,
+      );
+    else if (o.teamAbout)
+      await onDeal(
+        { ...rows[0], lead: { ...rows[0].lead, assistant: (await callerOf(o.businessId, keyOfCall(rows[0]))).name } },
+        `${o.teamAbout.by} handed over a call about: ${o.teamAbout.text}`,
       );
     const window = nextCallWindow(new Date());
     if (!(await placeCall(s, rows[0], window)) || !window) {
@@ -333,6 +350,7 @@ async function briefFor(
       proposal: view ? customerFacts(view) : null,
       asked: row.asked,
       teamAsk: row.lead.teamAsk ?? null,
+      teamAbout: row.lead.teamAbout ?? null,
       canBook: own && !view,
       canSendLink: Boolean(view) && smsConfigured(),
       hasEmail: Boolean(row.email),
