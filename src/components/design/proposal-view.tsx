@@ -108,18 +108,46 @@ function framed(panels: number[][], scale: number, width: number, height: number
   return `${x.toFixed(1)} ${y.toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`;
 }
 
+/**
+ * A line of light from the panels to the battery: a soft glow, the line, and energy moving along it toward the battery.
+ * In the picture's own units; still with reduced motion.
+ */
+function SolarLine({ from, to }: { from: [number, number]; to: [number, number] }) {
+  const [fx, fy] = from.map((n) => Math.round(n * 10) / 10);
+  const [tx, ty] = to.map((n) => Math.round(n * 10) / 10);
+  // Down from the panels, then across to the battery: a turn like a cable run, rounded.
+  const d = `M${fx},${fy} C${fx},${((fy + ty) / 2).toFixed(1)} ${fx},${ty} ${((fx + tx) / 2).toFixed(1)},${ty} S${tx},${ty} ${tx},${ty}`;
+  return (
+    <g fill="none" strokeLinecap="round" aria-hidden>
+      <style>{`@keyframes roof-flow { to { stroke-dashoffset: -24 } } .roof-flow { animation: roof-flow 1.1s linear infinite } @media (prefers-reduced-motion: reduce) { .roof-flow { animation: none } }`}</style>
+      <path d={d} stroke="#f2c14e" strokeOpacity={0.35} strokeWidth={4} style={{ filter: "blur(2px)" }} />
+      <path d={d} stroke="#f2c14e" strokeWidth={1.4} />
+      <path className="roof-flow" d={d} stroke="#fff7d6" strokeWidth={1.4} strokeDasharray="2 10" />
+      <circle cx={fx} cy={fy} r={2.4} fill="#f2c14e" />
+      <circle cx={tx} cy={ty} r={2.4} fill="#f2c14e" />
+    </g>
+  );
+}
+
 /** The roof from above with the panels where they were placed: the same picture and scale the design was drawn on. */
 export function Roof({
   view,
   src,
   hero,
   frame,
+  line,
 }: {
   view: ProposalView;
   src: string | null;
   hero?: BatteryHero | null;
   /** Panels to frame the picture on (the configurator: the largest size, so the picture holds still as sizes change). */
   frame?: number[][];
+  /**
+   * Where the battery stands on the picture, as shares of its width and height (the configurator, 19 Nov 2026, Martin:
+   * "add the solar line from the panels to the battery"): a line of light runs there from the panels, energy moving
+   * along it.
+   */
+  line?: { x: number; y: number } | null;
 }) {
   // The picture is shown only once it is known to have come: a picture that can't be had (no map service here, or
   // the place has none) must leave the plain ground, not a broken image.
@@ -141,6 +169,25 @@ export function Roof({
   const mid = corners.length
     ? corners.reduce(([sx, sy], [x, y]) => [sx + x / corners.length, sy + y / corners.length], [0, 0])
     : [width / 2, height / 2];
+  const box = frame?.length ? framed(frame, scale, width, height) : `0 0 ${width} ${height}`;
+  const [bx, by, bw, bh] = box.split(" ").map(Number);
+  // A panel's cells: lines across its length at sixths, and one down its middle.
+  const cellLines = (p: number[]): number[][] => {
+    const c = [0, 2, 4, 6].map((k) => [width / 2 + p[k] / scale, height / 2 + p[k + 1] / scale]);
+    const lerp = (a: number[], b: number[], t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    const long = Math.hypot(c[1][0] - c[0][0], c[1][1] - c[0][1]) >= Math.hypot(c[2][0] - c[1][0], c[2][1] - c[1][1]);
+    const [a, b, cc, d] = long ? c : [c[1], c[2], c[3], c[0]];
+    const out: number[][] = [];
+    for (let k = 1; k < 6; k++) {
+      const u = lerp(a, b, k / 6);
+      const v = lerp(d, cc, k / 6);
+      out.push([u[0], u[1], v[0], v[1]]);
+    }
+    const m1 = lerp(a, d, 0.5);
+    const m2 = lerp(b, cc, 0.5);
+    out.push([m1[0], m1[1], m2[0], m2[1]]);
+    return out.map((l) => l.map((n) => Math.round(n * 100) / 100));
+  };
   const flow = ([tx, ty]: [number, number]) =>
     `M${mid[0].toFixed(1)},${mid[1].toFixed(1)} Q${((mid[0] + tx) / 2).toFixed(1)},${(Math.min(mid[1], ty) - 40).toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
   return (
@@ -151,7 +198,7 @@ export function Roof({
     >
       {hero && <style>{HERO_CSS}</style>}
       <svg
-        viewBox={frame?.length ? framed(frame, scale, width, height) : `0 0 ${width} ${height}`}
+        viewBox={box}
         className="block h-auto w-full"
         role="img"
         aria-label={hero ? hero.label : `${view.system.panels} panels on the roof, seen from above`}
@@ -165,8 +212,8 @@ export function Roof({
             <polygon
               key={`s${i}`}
               points={[0, 2, 4, 6].map((k) => at(p[k], p[k + 1])).join(" ")}
-              stroke="rgb(0 0 0 / 0.35)"
-              strokeWidth={6}
+              stroke="rgb(0 0 0 / 0.4)"
+              strokeWidth={4}
             />
           ))}
           {view.roof.panels.map((p, i) => (
@@ -174,19 +221,35 @@ export function Roof({
               key={`o${i}`}
               points={[0, 2, 4, 6].map((k) => at(p[k], p[k + 1])).join(" ")}
               stroke={heroGlow(view.theme.primary)}
-              strokeWidth={3}
+              strokeWidth={2.2}
             />
           ))}
         </g>
+        {/* Each panel as a panel (19 Nov 2026, Martin: "make the panels look a bit sharper"): dark glass catching the
+            light, a fine silver frame and the faint lines of its cells. */}
+        <defs>
+          <linearGradient id="roof-glass" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor="#2b3a52" />
+            <stop offset="0.45" stopColor="#141c2b" />
+            <stop offset="1" stopColor="#0b1019" />
+          </linearGradient>
+        </defs>
         {view.roof.panels.map((p, i) => (
           <polygon
             key={i}
             points={[0, 2, 4, 6].map((k) => at(p[k], p[k + 1])).join(" ")}
-            fill="rgb(17 24 39 / 0.82)"
-            stroke="rgb(255 255 255 / 0.85)"
-            strokeWidth={0.8}
+            fill="url(#roof-glass)"
+            stroke="#d9dee5"
+            strokeWidth={0.7}
+            shapeRendering="geometricPrecision"
           />
         ))}
+        <g stroke="rgb(255 255 255 / 0.16)" strokeWidth={0.35} shapeRendering="geometricPrecision">
+          {view.roof.panels
+            .flatMap((p, i) => cellLines(p).map((l, j) => <line key={`c${i}-${j}`} x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />))
+            .map((el) => el)}
+        </g>
+        {line && view.roof.panels.length > 0 && <SolarLine from={mid as [number, number]} to={[bx + bw * line.x, by + bh * line.y]} />}
         {hero && (
           <>
             {/* The dark the battery sits on, so it reads over any roof: deepest in the corner, gone by the middle. */}

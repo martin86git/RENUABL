@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CalendarDays, Check, House, Plus, Receipt } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, House, Plus, Receipt, UtilityPole } from "lucide-react";
 import { announcementShows, themeVars } from "@/lib/domain/design/brand";
 import { todayInMarket } from "@/lib/domain/market";
+import { homeDay } from "@/lib/domain/design/home-day";
+import { TILT } from "@/lib/domain/design/tilt";
+import { ASSUMPTIONS } from "@/lib/domain/recommendation";
 import {
   backupPick,
   batteriesFor,
@@ -40,7 +43,6 @@ import { Roof } from "./proposal-view";
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 const cents = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
 const percent = (share: number) => `${Math.round(share * 100)}%`;
-const eyebrow = "text-[11px] font-medium uppercase tracking-[0.16em] text-muted";
 
 type Week = { monday: string; label: string };
 
@@ -121,6 +123,25 @@ export function ConfiguratorPage(props: {
   const addOns = mix.batteryId !== null || Boolean(cfg.charger) || Boolean(mix.extras?.length);
 
   const special = announcementShows(view.announcement, todayInMarket());
+  // Where the battery's plate stands on the picture, so the line from the panels ends at its edge.
+  const picture = useRef<HTMLDivElement>(null);
+  const plate = useRef<HTMLDivElement>(null);
+  const [lineTo, setLineTo] = useState<{ x: number; y: number } | null>(null);
+  const plateKey = `${battery?.id ?? "none"}-${mix.extra ?? 0}-${Boolean(mix.backup)}-${Boolean(mix.ev)}`;
+  useLayoutEffect(() => {
+    const box = picture.current;
+    if (!box) return;
+    const measure = () => {
+      const p = plate.current?.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      if (!p || !b.width || !b.height) return setLineTo(null);
+      setLineTo({ x: Math.max(0, (p.left - b.left - 4) / b.width), y: Math.min(1, (p.top - b.top + p.height * 0.55) / b.height) });
+    };
+    measure();
+    const watch = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    watch?.observe(box);
+    return () => watch?.disconnect();
+  }, [plateKey]);
   const headline = `${shown.system.kw} kW solar${shown.system.batteryKwh ? ` with a ${shown.system.batteryKwh} kWh battery` : ""}`;
   const orderHref = `/p/${encodeURIComponent(token)}/order?mix=${encodeURIComponent(mix.goal)}${week ? `&week=${week.monday}` : ""}`;
 
@@ -148,7 +169,7 @@ export function ConfiguratorPage(props: {
           )}
         </div>
       )}
-      <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10 lg:py-8">
+      <header className="mx-auto flex w-full max-w-[1680px] items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10 lg:py-4">
         {view.business.logo ? (
           // eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served by our own route
           <img
@@ -174,19 +195,24 @@ export function ConfiguratorPage(props: {
               to fit along with the performance bar and battery all in one fold… space around it… for the RENUABL logo to
               stand out"): on a wide screen everything here shares one width worked from the window's height. */}
           <div className={clsx("cfg-home", special && "cfg-home-special")}>
-            <p className={eyebrow}>
-              {view.indicative ? INDICATIVE_LABEL : "Your proposal"} · {view.customer.name}
+            <h1 className="text-[28px] leading-[1.1] tracking-tight [font-family:var(--proposal-heading)] sm:text-[34px]">{headline}</h1>
+            {/* The label, who it is for and where, in one quiet line, so the picture has the height. */}
+            <p className="mt-1.5 text-[13px] text-muted">
+              <span className="font-medium uppercase tracking-[0.14em] text-[11px]">
+                {view.indicative ? INDICATIVE_LABEL : "Your proposal"}
+              </span>
+              {" · "}
+              {view.customer.name} · {view.customer.address}
             </p>
-            <h1 className="mt-2 text-[28px] leading-[1.1] tracking-tight [font-family:var(--proposal-heading)] sm:text-[40px]">
-              {headline}
-            </h1>
-            <p className="mt-2 text-[14px] text-muted">{view.customer.address}</p>
-            <div className="mt-6 overflow-hidden rounded-2xl border border-line bg-surface">
-              <div className="@container relative [&>div]:rounded-none [&>div]:border-0">
-                <Roof view={shown} src={urls.roof} frame={cfg.sizes[0]?.roofPanels} />
+            <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-surface">
+              <div ref={picture} className="@container relative [&>div]:rounded-none [&>div]:border-0">
+                <Roof view={shown} src={urls.roof} frame={cfg.sizes[0]?.roofPanels} line={battery ? lineTo : null} />
                 {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
                 {(battery || mix.ev) && (
-                  <div className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4">
+                  <div
+                    ref={plate}
+                    className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4"
+                  >
                     {mix.ev && <ChargerArt />}
                     {battery && (
                       <BatteryArt
@@ -199,7 +225,7 @@ export function ConfiguratorPage(props: {
                   </div>
                 )}
               </div>
-              <Performance cfg={cfg} mix={mix} />
+              <Performance cfg={cfg} mix={mix} view={view} />
             </div>
             <p className="mt-3 text-[12px] leading-relaxed text-muted">
               {shown.production ? `Makes about ${shown.production.yearKwh.toLocaleString("en-AU")} kWh a year. ` : ""}The layout is a
@@ -518,47 +544,172 @@ const OFFSET_CAP = 0.9;
 const offsetWords = (share: number) => (share >= OFFSET_CAP ? `${percent(OFFSET_CAP)}+` : percent(share));
 
 /**
- * What the system does for the home, as instruments (19 Nov 2026, Martin: "apple watch inspired analytics", then "make
- * sure that it doesn't look exactly the same as apple's… the analytics they might come up with in a collaboration with
- * SpaceX"): on black under the picture, three dials read like a flight display: a fine ring of graduations, a thin
- * white arc to the reading with a point of the business's accent at its end, the figure in mono, the label in spaced
- * capitals, and one line of telemetry under them. Each an estimate from the mix's own figures. HOME POWERED: the share
- * of the home's power the system supplies (never said to be more than 90%, `OFFSET_CAP`). BILL SAVED: the share of the
- * bill it saves, read in dollars a year. EVENINGS: of the power the panels alone can't supply (mostly evenings), the
- * share the battery does.
+ * What the system does for the home (19 Nov 2026, Martin: Apple Watch analytics as Apple and SpaceX might draw them;
+ * then "grow… so the dials can grow… reducing the size of the values… I like the Primero Solar style icons… a bell
+ * curve chart"): on a warm dark ground under the picture, a day's curve (`DayCurve`) and three instruments, each with a
+ * gold line icon in a fine circle. Every figure an estimate from the mix's own. HOME POWERED: the share of the home's
+ * power the system supplies (never said to be more than 90%, `OFFSET_CAP`). BILL SAVED: the share of the bill it saves,
+ * read in dollars a year. EVENINGS: of the power the panels alone can't supply (mostly evenings), the battery's share.
  */
-function Performance({ cfg, mix }: { cfg: ConfiguratorView; mix: ConfigVariant }) {
+function Performance({ cfg, mix, view }: { cfg: ConfiguratorView; mix: ConfigVariant; view: ProposalView }) {
   const solar = mix.batteryId === null ? mix : (solarOnly(cfg, mix) ?? mix);
   const total = mix.bill ? Math.min(OFFSET_CAP, mix.bill.selfReliance) : 0;
   const fromPanels = solar.bill ? Math.min(OFFSET_CAP, solar.bill.selfReliance) : 0;
   const saved = mix.bill && mix.bill.now > 0 ? Math.min(1, Math.max(0, mix.bill.saving / mix.bill.now)) : 0;
   const evenings = mix.batteryId !== null && fromPanels < 1 ? Math.min(1, Math.max(0, (total - fromPanels) / (1 - fromPanels))) : 0;
   const dials = [
-    { label: "Home powered", share: total, value: mix.bill ? offsetWords(mix.bill.selfReliance) : "—", unit: "of its power" },
-    { label: "Bill saved", share: saved, value: mix.bill && mix.bill.saving > 0 ? dollars(mix.bill.saving) : "—", unit: "a year" },
+    {
+      label: "Home powered",
+      icon: <House className="size-3" strokeWidth={1.6} />,
+      share: total,
+      value: mix.bill ? offsetWords(mix.bill.selfReliance) : "—",
+      unit: "of its power",
+    },
+    {
+      label: "Bill saved",
+      icon: <UtilityPole className="size-3" strokeWidth={1.6} />,
+      share: saved,
+      value: mix.bill && mix.bill.saving > 0 ? dollars(mix.bill.saving) : "—",
+      unit: "a year",
+    },
     {
       label: "Evenings",
+      icon: <BatteryIcon className="size-3" />,
       share: evenings,
       value: mix.batteryId === null ? "—" : percent(evenings),
       unit: mix.batteryId === null ? "no battery" : "from battery",
     },
   ];
   return (
-    <div className="bg-[#060607] px-3 pb-2.5 pt-3 text-white sm:px-6">
-      <div className="grid grid-cols-3 gap-1 sm:gap-4">
-        {dials.map((d) => (
-          <Dial key={d.label} {...d} />
-        ))}
+    <div
+      className="@container text-white"
+      style={{ background: "radial-gradient(120% 160% at 20% 130%, rgba(214,170,90,0.22), transparent 60%), #0a0a0b" }}
+    >
+      <div className="grid gap-x-4 gap-y-3 px-4 pb-3.5 pt-4 @2xl:grid-cols-[minmax(0,1.5fr)_minmax(0,2fr)] sm:px-6">
+        <DayCurve view={view} mix={mix} />
+        <div className="grid grid-cols-3 gap-1 sm:gap-3">
+          {dials.map((d) => (
+            <Dial key={d.label} {...d} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-/** One instrument: graduations round three quarters of a circle, the reading as a thin arc, the figure in its middle. */
-function Dial({ label, share, value, unit }: { label: string; share: number; value: string; unit: string }) {
-  const size = 84;
+const GOLD = "#e0b35a";
+
+/**
+ * An average day, as a bell (19 Nov 2026, Martin, from Primero Solar's day chart): every half hour a fine bar, what the
+ * roof makes rising above the line in gold, what the home uses hanging below it, its share from the panels and the
+ * battery in gold and from the grid in grey. Played through `homeDay` on the mix's own panels, the home's use from the
+ * bill on a typical day's shape, and the battery; the day's output is the year's divided by its days. An estimate.
+ */
+function DayCurve({ view, mix }: { view: ProposalView; mix: ConfigVariant }) {
+  const shown = viewForChoice(view, mix.goal);
+  const day = useMemo(() => {
+    const each = shown.system.panels > 0 ? shown.system.kw / shown.system.panels : 0;
+    const panels = shown.roof.panels.map((flat, n) => {
+      const corners = [0, 1, 2, 3].map((i) => [flat[i * 2], flat[i * 2 + 1]] as const);
+      const aspect = shown.roof.aspects?.[n];
+      return {
+        corners,
+        x: corners.reduce((sum, c) => sum + c[0], 0) / 4,
+        y: corners.reduce((sum, c) => sum + c[1], 0) / 4,
+        kw: each,
+        tilt: aspect?.[0] ?? TILT.roof,
+        facing: aspect?.[1] ?? 0,
+      };
+    });
+    const yearKwh = shown.production?.yearKwh ?? 0;
+    if (!panels.length || !yearKwh) return null;
+    return homeDay({
+      latitude: shown.roof.lat,
+      // March, near the equinox: a middle day of the year's sun.
+      month: 2,
+      panels,
+      dayKwh: yearKwh / 365,
+      homeDayKwh: shown.bill?.dailyKwh ?? null,
+      batteryKwh: Math.max(0, shown.system.eveningKwh ?? shown.system.batteryKwh) * ASSUMPTIONS.batteryUsableShare,
+    });
+  }, [shown]);
+  if (!day) return <div className="hidden @2xl:block" />;
+  const W = 480;
+  const H = 108;
+  const mid = 58;
+  const top = Math.max(0.1, ...day.steps.map((st) => st.solar));
+  const bottom = Math.max(0.1, ...day.steps.map((st) => st.use));
+  const up = (mid - 6) / top;
+  // Below the line on its own scale: a home uses a fraction of what the roof makes at noon, and the shape is what reads.
+  const down = (H - mid - 14) / bottom;
+  const step = W / day.steps.length;
+  const bar = step * 0.42;
+  return (
+    <figure className="m-0 min-w-0">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-white/75">An average day</span>
+        <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-white/45">
+          <span style={{ color: GOLD }}>■</span> Made <span className="ml-2 text-white/60">■</span> Used
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="mt-1.5 block h-auto w-full"
+        role="img"
+        aria-label={`About ${Math.round(day.solarKwh)} kWh made and ${Math.round(day.useKwh)} kWh used on an average day`}
+      >
+        <defs>
+          <linearGradient id="cfg-made" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={GOLD} />
+            <stop offset="1" stopColor={GOLD} stopOpacity="0.35" />
+          </linearGradient>
+        </defs>
+        {day.steps.map((st, i) => {
+          const x = Math.round((i * step + (step - bar) / 2) * 100) / 100;
+          // To the hundredth, so the page drawn on the server and in the browser agree.
+          const r2 = (n: number) => Math.round(n * 100) / 100;
+          const made = r2(st.solar * up);
+          const own = r2((st.direct + st.discharge) * down);
+          const grid = r2(st.imported * down);
+          return (
+            <g key={i}>
+              {made > 0.3 && (
+                <rect className="cfg-bar-up" x={x} y={mid - made} width={bar} height={made} rx={bar / 2} fill="url(#cfg-made)" />
+              )}
+              {own > 0.3 && (
+                <rect className="cfg-bar-down" x={x} y={mid + 2} width={bar} height={own} rx={bar / 2} fill={GOLD} fillOpacity={0.55} />
+              )}
+              {grid > 0.3 && (
+                <rect
+                  className="cfg-bar-down"
+                  x={x}
+                  y={mid + 2 + own}
+                  width={bar}
+                  height={grid}
+                  rx={bar / 2}
+                  fill="#ffffff"
+                  fillOpacity={0.22}
+                />
+              )}
+            </g>
+          );
+        })}
+        <line x1="0" x2={W} y1={mid + 1} y2={mid + 1} stroke="#ffffff" strokeOpacity={0.25} strokeWidth={0.8} />
+        {[6, 12, 18].map((h) => (
+          <text key={h} x={(h / 24) * W} y={H - 1} textAnchor="middle" className="fill-white/40 font-mono" fontSize={9} letterSpacing={1}>
+            {h === 12 ? "12 PM" : h < 12 ? `${h} AM` : `${h - 12} PM`}
+          </text>
+        ))}
+      </svg>
+    </figure>
+  );
+}
+
+/** One instrument: graduations round three quarters of a circle, the reading as a thin arc, the figure small in its middle. */
+function Dial({ label, icon, share, value, unit }: { label: string; icon: React.ReactNode; share: number; value: string; unit: string }) {
+  const size = 96;
   const c = size / 2;
-  const r = 32;
+  const r = 36;
   const sweep = 270;
   const from = 135; // degrees, clockwise from the right: the open end at the bottom
   const point = (deg: number, radius: number) => {
@@ -568,31 +719,28 @@ function Dial({ label, share, value, unit }: { label: string; share: number; val
   };
   const shown = Math.max(0, Math.min(1, share));
   const length = (2 * Math.PI * r * sweep) / 360;
-  const arc = (() => {
-    const [x0, y0] = point(0, r);
-    const [x1, y1] = point(sweep, r);
-    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 1 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
-  })();
+  const [x0, y0] = point(0, r);
+  const [x1, y1] = point(sweep, r);
+  const arc = `M${x0} ${y0} A${r} ${r} 0 1 1 ${x1} ${y1}`;
   const [ex, ey] = point(sweep * shown, r);
   const ticks = 54;
   return (
     <figure className="m-0 flex flex-col items-center">
-      <div className="relative" style={{ width: size, height: size - 8 }}>
+      <div className="relative" style={{ width: size, height: size - 10 }}>
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-x-0 top-0" aria-hidden>
-          {/* The graduations, every fifth longer and brighter, and the quarters marked. */}
           {Array.from({ length: ticks + 1 }, (_, i) => {
             const deg = (sweep * i) / ticks;
             const major = i % 9 === 0;
-            const [x0, y0] = point(deg, r + 5);
-            const [x1, y1] = point(deg, r + (major ? 10 : 7.5));
-            const lit = deg <= sweep * shown + 0.01 && shown > 0;
+            const [a0, b0] = point(deg, r + 5);
+            const [a1, b1] = point(deg, r + (major ? 10 : 7.5));
+            const lit = shown > 0 && deg <= sweep * shown + 0.01;
             return (
               <line
                 key={i}
-                x1={x0}
-                y1={y0}
-                x2={x1}
-                y2={y1}
+                x1={a0}
+                y1={b0}
+                x2={a1}
+                y2={b1}
                 stroke="#ffffff"
                 strokeOpacity={major ? (lit ? 0.85 : 0.35) : lit ? 0.5 : 0.14}
                 strokeWidth={major ? 1.2 : 0.8}
@@ -613,20 +761,26 @@ function Dial({ label, share, value, unit }: { label: string; share: number; val
           />
           {shown > 0 && (
             <>
-              <circle cx={ex} cy={ey} r={6} fill="var(--accent)" opacity={0.25} className="cfg-glow" />
-              <circle cx={ex} cy={ey} r={2.6} fill="var(--accent)" />
+              <circle cx={ex} cy={ey} r={6} fill={GOLD} opacity={0.3} className="cfg-glow" />
+              <circle cx={ex} cy={ey} r={2.6} fill={GOLD} />
             </>
           )}
         </svg>
-        <div className="absolute inset-0 flex items-center justify-center pt-1">
-          <span className="font-mono text-[16px] font-medium leading-none tracking-tight [font-variant-numeric:tabular-nums] sm:text-[18px]">
-            {value}
-          </span>
+        <div className="absolute inset-0 flex items-center justify-center pt-1.5">
+          <span className="font-mono text-[14px] font-medium leading-none tracking-tight [font-variant-numeric:tabular-nums]">{value}</span>
         </div>
       </div>
-      <figcaption className="-mt-1.5 text-center">
-        <span className="block text-[10px] font-medium uppercase tracking-[0.22em] text-white/75">{label}</span>
-        <span className="mt-0.5 block font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{unit}</span>
+      <figcaption className="-mt-1 flex flex-col items-center text-center">
+        <span className="flex items-center gap-1.5">
+          <span
+            className="grid size-5 place-items-center rounded-full ring-1"
+            style={{ color: GOLD, ["--tw-ring-color" as string]: "rgba(224,179,90,0.55)" }}
+          >
+            {icon}
+          </span>
+          <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/80">{label}</span>
+        </span>
+        <span className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-white/40">{unit}</span>
       </figcaption>
     </figure>
   );
@@ -867,13 +1021,17 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
 
 const CSS = `
 /* The picture is 1.6 times as wide as it is tall: its width is the window's height less the header, the heading, the
-   figures under it and the Order bar with a margin (about 27rem with the dials; 2.5rem more with the special's bar), times 1.6. */
+   figures under it and the Order bar with a margin (about 24.5rem with the dials; 2.5rem more with the special's bar), times 1.6. */
 @media (min-width: 1024px) {
-  .cfg-home { max-width: max(26rem, calc((100dvh - 27rem) * 1.6)); margin-inline: auto; }
-  .cfg-home-special { max-width: max(26rem, calc((100dvh - 29.5rem) * 1.6)); }
+  .cfg-home { max-width: max(26rem, calc((100dvh - 24.5rem) * 1.6)); margin-inline: auto; }
+  .cfg-home-special { max-width: max(26rem, calc((100dvh - 27rem) * 1.6)); }
 }
 @keyframes cfg-ring { from { stroke-dashoffset: var(--ring-len) } }
 .cfg-ring { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1); animation: cfg-ring 1.2s cubic-bezier(.2,.8,.2,1) both }
+.cfg-bar-up, .cfg-bar-down { transform-box: fill-box; transition: transform .5s ease-out }
+.cfg-bar-up { transform-origin: bottom } .cfg-bar-down { transform-origin: top }
+@keyframes cfg-bars { from { transform: scaleY(0) } }
+.cfg-bar-up, .cfg-bar-down { animation: cfg-bars .9s cubic-bezier(.2,.8,.2,1) both }
 @keyframes cfg-fade { from { opacity: .35 } to { opacity: 1 } }
 .cfg-fade { animation: cfg-fade .45s ease-out }
 @keyframes cfg-in { from { opacity: 0; transform: translateY(14px) scale(.94) } to { opacity: 1; transform: none } }
@@ -882,5 +1040,5 @@ const CSS = `
 @keyframes cfg-charge { from { transform: scaleY(.15) } to { transform: scaleY(1) } }
 .cfg-charge { animation: cfg-charge 1.6s cubic-bezier(.2,.8,.2,1) both }
 .cfg-glow { animation: cfg-glow 2.4s ease-in-out infinite }
-@media (prefers-reduced-motion: reduce) { .cfg-fade, .cfg-in, .cfg-glow, .cfg-charge, .cfg-fill, .cfg-ring { animation: none; transition: none } .cfg-sheen { display: none } }
+@media (prefers-reduced-motion: reduce) { .cfg-fade, .cfg-in, .cfg-glow, .cfg-charge, .cfg-fill, .cfg-ring, .cfg-bar-up, .cfg-bar-down { animation: none; transition: none } .cfg-sheen { display: none } }
 `;
