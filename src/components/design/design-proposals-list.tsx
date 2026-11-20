@@ -428,7 +428,7 @@ function FollowUpBox({
     );
 
   return (
-    <div className="mt-3 rounded-2xl bg-surface p-3.5 shadow-[0_10px_28px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70">
+    <div className="sol-ground sol-say mt-3 rounded-2xl p-3.5">
       <div className="flex gap-3">
         <SolLive />
         <div className="min-w-0 flex-1">

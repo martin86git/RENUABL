@@ -327,10 +327,7 @@ export function SolTerminal(props: {
   );
 
   return (
-    <section
-      aria-label="Sol"
-      className="@container overflow-hidden rounded-2xl bg-surface shadow-[0_14px_36px_-16px_rgba(255,90,31,0.55)] ring-2 ring-sun-line/70"
-    >
+    <section aria-label="Sol" className="sol-ground sol-say @container overflow-hidden rounded-2xl">
       {calling && (
         <CallChooser
           jobId={props.jobId}
@@ -489,7 +486,7 @@ export function SolTerminal(props: {
                   type="submit"
                   disabled={!ask.trim()}
                   aria-label="Send to Sol"
-                  className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                  className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
                 >
                   <ArrowUp className="size-3.5" aria-hidden />
                 </button>
@@ -505,24 +502,14 @@ export function SolTerminal(props: {
   );
 }
 
-/** Sol's sun with a thin ring turning round it: he's here, and on it. */
+/**
+ * Sol beside what he says: his own sun with its orbit turning round it (20 Nov 2026, Martin: "the same sol with the
+ * orbit around it (not the current ring)"), the mark he wears everywhere else.
+ */
 export function SolLive() {
   return (
     <span className="relative grid size-11 shrink-0 place-items-center" aria-hidden>
-      <svg viewBox="0 0 44 44" className="sol-live-ring absolute inset-0 size-11">
-        <circle
-          cx="22"
-          cy="22"
-          r="20.5"
-          fill="none"
-          stroke="var(--sun-line)"
-          strokeOpacity="0.85"
-          strokeWidth="1.5"
-          strokeDasharray="22 10 4 10"
-          strokeLinecap="round"
-        />
-      </svg>
-      <SolMark className="size-8" glow={false} />
+      <SolMark className="size-11" />
     </span>
   );
 }
