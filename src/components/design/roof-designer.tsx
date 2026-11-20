@@ -1524,13 +1524,13 @@ export function RoofDesigner(props: {
         : "Nearmap"
       : null;
   const [shadeOn, setShadeOn] = useState(false);
+  // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
+  const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
   // Each design's latest reading, kept to go with its quote on the next save (19 Nov 2026, Martin: shade on the proposal).
   // Apart from the quotes, so a reading never marks the design changed; a design changed since shows none at publish.
   const [shadeKept, setShadeKept] = useState<Record<number, DesignShade>>(() =>
     Object.fromEntries(props.extras.quotes.flatMap((q, i) => (q.shade ? [[i, q.shade]] : []))),
   );
-  // The shade on the design as it stands: each panel's access to the sun by its key, and the design's as a whole.
-  const [shade, setShade] = useState<{ report: ShadeReport; keys: string[] } | null>(null);
   // The heights are read once there are panels on the roof, so shaded panels show as they are laid (10 Nov 2026,
   // Martin), not only once the shade view is opened.
   const anyPanels = loose.length > 0 || faces.length > 0;
