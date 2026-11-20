@@ -6,6 +6,8 @@
  * <site>/api/auth/gmail/callback as a second authorised redirect and the Gmail API enabled on that project.
  * A member may connect several mailboxes (5 Nov 2026, up to `MAX_MAILBOXES`): each is kept by its address, every
  * Gmail call names the mailbox, and the inbox reads them all as one.
+ * A mailbox may also be an Outlook one (20 Nov 2026, `provider` on its row; outlook-mail.ts makes the Graph calls): every
+ * function here answers for either, an Outlook email handed back in the shape of a Gmail one.
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import {
@@ -23,8 +25,22 @@ import {
   type EmailAction,
   type MailPart,
 } from "@/lib/domain/design/inbox";
+import { providerOfId, type MailProvider } from "@/lib/domain/design/outlook-mail";
 import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
+import {
+  OutlookNotThere,
+  OutlookOff,
+  outlookAttachment,
+  outlookChangeEmail,
+  outlookInbox,
+  outlookMessage,
+  outlookSend,
+  outlookTokensFromCode,
+  outlookUnread,
+  refreshOutlook,
+  type OutlookConfig,
+} from "./outlook-mail";
 
 export const GMAIL_STATE_COOKIE = "renuabl_gmail_state";
 
@@ -126,6 +142,34 @@ export async function connectGmail(
   return canChangeMail(t.scope) ? true : "read-only";
 }
 
+/**
+ * Keeps an Outlook mailbox for this member beside any mailbox they connected before (20 Nov 2026). "full" past
+ * `MAX_MAILBOXES`; false when Microsoft says no, gave no refresh token, or left out reading or sending.
+ */
+export async function connectOutlookMail(config: OutlookConfig, code: string, member: Who): Promise<boolean | "full"> {
+  const t = await outlookTokensFromCode(config, code);
+  if (!t || !t.refresh || !t.granted) return false;
+  const address = t.address ?? member.email.toLowerCase();
+  const have = await gmailAddresses(member);
+  if (!have.includes(address) && have.length >= MAX_MAILBOXES) return "full";
+  await query(
+    `insert into design_gmail (business_id, email, address, token, access, expires_at, can_modify, provider)
+       values ($1,$2,$3,$4,$5, now() + make_interval(secs => $6), true, 'outlook')
+     on conflict (business_id, email, address) do update set token = excluded.token, access = excluded.access,
+       expires_at = excluded.expires_at, can_modify = true, provider = 'outlook'`,
+    [member.businessId, member.email.toLowerCase(), address, seal(t.refresh), seal(t.access), t.expiresIn],
+  );
+  return true;
+}
+
+/** Each of a member's mailboxes with which provider it is, the first connected first. */
+export async function mailboxes(member: Who): Promise<{ address: string; provider: MailProvider }[]> {
+  return query<{ address: string; provider: MailProvider }>(
+    `select address, provider from design_gmail where business_id = $1 and email = $2 order by created_at, address`,
+    [member.businessId, member.email.toLowerCase()],
+  );
+}
+
 /** The addresses of the mailboxes a member has connected, the first connected first. */
 export async function gmailAddresses(member: Who): Promise<string[]> {
   const rows = await query<{ address: string }>(
@@ -149,12 +193,13 @@ export const gmailAddress = async (member: Who): Promise<string | null> => (awai
 
 /** Disconnects one mailbox (or, with none named, every one): Google is told to forget each token, and it goes from here. */
 export async function disconnectGmail(member: Who, address?: string): Promise<void> {
-  const rows = await query<{ token: string }>(
-    `delete from design_gmail where business_id = $1 and email = $2 and ($3::text is null or address = $3) returning token`,
+  const rows = await query<{ token: string; provider: MailProvider }>(
+    `delete from design_gmail where business_id = $1 and email = $2 and ($3::text is null or address = $3) returning token, provider`,
     [member.businessId, member.email.toLowerCase(), address?.toLowerCase() ?? null],
   );
   for (const row of rows) {
-    const token = open(row.token);
+    // Microsoft has no call to forget a token: an Outlook mailbox simply goes from here.
+    const token = row.provider === "outlook" ? null : open(row.token);
     if (token)
       await fetch("https://oauth2.googleapis.com/revoke", {
         method: "POST",
@@ -167,19 +212,42 @@ export async function disconnectGmail(member: Who, address?: string): Promise<vo
 
 /** A working access token for one of the member's mailboxes, refreshed when it has run out. Null when not connected or revoked. */
 async function accessToken(member: Who, address: string): Promise<string | null> {
-  const rows = await query<{ token: string; access: string | null; fresh: boolean }>(
-    `select token, access, (expires_at > now()) as fresh from design_gmail where business_id = $1 and email = $2 and address = $3`,
+  return (await tokenFor(member, address))?.token ?? null;
+}
+
+/** The mailbox's working access token with which provider it is for. */
+async function tokenFor(member: Who, address: string): Promise<{ token: string; provider: MailProvider } | null> {
+  const rows = await query<{ token: string; access: string | null; fresh: boolean; provider: MailProvider }>(
+    `select token, access, provider, (expires_at > now()) as fresh from design_gmail where business_id = $1 and email = $2 and address = $3`,
     [member.businessId, member.email.toLowerCase(), address],
   );
   const row = rows[0];
   if (!row) return null;
+  const provider: MailProvider = row.provider === "outlook" ? "outlook" : "google";
   if (row.fresh && row.access) {
     const access = open(row.access);
-    if (access) return access;
+    if (access) return { token: access, provider };
   }
-  const config = gmailConfig("http://localhost");
   const refresh = open(row.token);
-  if (!config || !refresh) return null;
+  if (!refresh) return null;
+  if (provider === "outlook") {
+    const t = await refreshOutlook(refresh);
+    if (!t) return null;
+    // Microsoft hands out a new refresh token each time: keep it, so the next refresh still works.
+    await query(
+      `update design_gmail set access = $4, expires_at = now() + make_interval(secs => $5), token = coalesce($6, token)
+        where business_id = $1 and email = $2 and address = $3`,
+      [member.businessId, member.email.toLowerCase(), address, seal(t.access), t.expiresIn, t.refresh ? seal(t.refresh) : null],
+    );
+    return { token: t.access, provider };
+  }
+  const google = await refreshGoogle(member, address, refresh);
+  return google ? { token: google, provider } : null;
+}
+
+async function refreshGoogle(member: Who, address: string, refresh: string): Promise<string | null> {
+  const config = gmailConfig("http://localhost");
+  if (!config) return null;
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -204,6 +272,23 @@ async function accessToken(member: Who, address: string): Promise<string | null>
 export class GmailOff extends Error {}
 /** Gmail has no such email in that mailbox (it may be in another of the member's). */
 class NotThere extends Error {}
+
+/**
+ * Runs a Graph call for one of the member's Outlook mailboxes, or answers null when the mailbox is a Gmail one (the
+ * caller then goes on to Gmail). Outlook's refusals are said the way Gmail's are, so every screen handles one kind.
+ */
+async function viaOutlook<T>(member: Who, address: string, run: (token: string) => Promise<T>): Promise<{ got: T } | null> {
+  const t = await tokenFor(member, address);
+  if (!t) throw new GmailOff(`${address} isn't connected.`);
+  if (t.provider !== "outlook") return null;
+  try {
+    return { got: await run(t.token) };
+  } catch (e) {
+    if (e instanceof OutlookOff) throw new GmailOff(`Outlook turned the request down for ${address}: connect it again.`);
+    if (e instanceof OutlookNotThere) throw new NotThere();
+    throw e;
+  }
+}
 
 async function gmail<T>(member: Who, address: string, path: string, body?: object): Promise<T> {
   const token = await accessToken(member, address);
@@ -232,6 +317,8 @@ export interface GmailMessage {
 
 /** One mailbox's newest emails, with their headers (not their bodies). */
 async function boxMessages(member: Who, address: string): Promise<GmailMessage[]> {
+  const outlook = await viaOutlook(member, address, outlookInbox);
+  if (outlook) return outlook.got.map((m) => ({ ...m, box: address }));
   const list = await gmail<{ messages?: { id: string }[] }>(member, address, `messages?labelIds=INBOX&maxResults=${INBOX_SIZE}`);
   return Promise.all(
     (list.messages ?? []).map(async (m) => ({
@@ -259,10 +346,13 @@ export async function inboxMessages(member: Who): Promise<GmailMessage[]> {
 
 /** One email, whole, from the mailbox named (only one of the member's own), else whichever of their mailboxes holds it. */
 export async function fullMessage(member: Who, id: string, box?: string): Promise<GmailMessage> {
-  const mine = await gmailAddresses(member);
+  // An id says which kind of mailbox it is from, so a Gmail id is never asked of Outlook or the other way round.
+  const mine = (await mailboxes(member)).filter((m) => m.provider === providerOfId(id)).map((m) => m.address);
   const boxes = box ? mine.filter((b) => b === box.toLowerCase()) : mine;
   for (const b of boxes) {
     try {
+      const outlook = await viaOutlook(member, b, (token) => outlookMessage(token, id));
+      if (outlook) return { ...outlook.got, box: b };
       return { ...(await gmail<Omit<GmailMessage, "box">>(member, b, `messages/${id}?format=full`)), box: b };
     } catch (e) {
       if (!(e instanceof NotThere)) throw e;
@@ -273,6 +363,8 @@ export async function fullMessage(member: Who, id: string, box?: string): Promis
 
 /** One of an email's files or pictures, as bytes, from the mailbox it is in. */
 export async function attachment(member: Who, box: string, id: string, attachmentId: string): Promise<Buffer> {
+  const outlook = await viaOutlook(member, box, (token) => outlookAttachment(token, id, attachmentId));
+  if (outlook) return outlook.got;
   const a = await gmail<{ data?: string }>(member, box, `messages/${id}/attachments/${encodeURIComponent(attachmentId)}`);
   return Buffer.from(a.data ?? "", "base64url");
 }
@@ -310,6 +402,7 @@ export async function changeEmail(member: Who, box: string, id: string, action: 
       throw new ReadOnlyMailbox(`Connect ${address} again to mark read and archive from here.`);
     throw new GmailOff(`Gmail (${address}) isn't connected.`);
   }
+  if (await viaOutlook(member, address, (token) => outlookChangeEmail(token, id, action))) return;
   await gmail(member, address, `messages/${encodeURIComponent(id)}/modify`, labelChange(action));
 }
 
@@ -329,6 +422,7 @@ export async function sendFromGmail(
     if ((await gmailAddresses(member)).includes(address)) throw new ReadOnlyMailbox(`Connect ${address} again to send from it here.`);
     throw new GmailOff(`Gmail (${address}) isn't connected.`);
   }
+  if (await viaOutlook(member, address, (token) => outlookSend(token, address, mail, files, picturesHtml))) return;
   const token = await accessToken(member, address);
   if (!token) throw new GmailOff(`Gmail (${address}) isn't connected.`);
   // Gmail's upload address takes the email as it is (pictures and files included), with no JSON round it.
@@ -345,8 +439,13 @@ export async function sendFromGmail(
 /** The unread count of every mailbox the member has connected together, as Gmail keeps each. */
 export async function unreadCount(member: Who): Promise<number> {
   const boxes = await gmailAddresses(member);
-  const got = await Promise.allSettled(boxes.map((b) => gmail<{ messagesUnread?: number }>(member, b, "labels/INBOX")));
-  return got.reduce((n, g) => n + (g.status === "fulfilled" ? (g.value.messagesUnread ?? 0) : 0), 0);
+  const got = await Promise.allSettled(
+    boxes.map(async (b) => {
+      const outlook = await viaOutlook(member, b, outlookUnread);
+      return outlook ? outlook.got : ((await gmail<{ messagesUnread?: number }>(member, b, "labels/INBOX")).messagesUnread ?? 0);
+    }),
+  );
+  return got.reduce((n, g) => n + (g.status === "fulfilled" ? g.value : 0), 0);
 }
 
 export const subjectOf = (m: GmailMessage) => (m.payload ? headerOf(m.payload, "Subject") : "") || "(no subject)";

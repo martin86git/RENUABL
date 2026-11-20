@@ -79,7 +79,7 @@ export async function businessMailboxes(businessId: string): Promise<{ owner: st
   return query<{ owner: string; address: string }>(
     `select g.email as owner, g.address from design_gmail g
        join business_members m on m.business_id = g.business_id and lower(m.email) = g.email
-      where g.business_id = $1 order by g.created_at, g.address`,
+      where g.business_id = $1 and g.provider = 'google' order by g.created_at, g.address`,
     [businessId],
   );
 }

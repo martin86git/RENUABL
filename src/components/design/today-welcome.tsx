@@ -7,7 +7,7 @@ import { CONNECT_RESULTS, type CalendarProvider } from "@/lib/domain/design/my-c
 import { TEAM_LEVELS, levelPermissions, welcomeLines, welcomeSteps, type TeamLevel, type WelcomeStep } from "@/lib/domain/design/welcome";
 import { todayInMarket } from "@/lib/domain/market";
 import { addMember, finishWelcome, setMemberPermissions } from "@/lib/services/design-account";
-import { connectGmailHere, loadInbox, type GmailOutcome } from "@/lib/services/inbox";
+import { connectGmailHere, loadInbox, mailConnected, type GmailOutcome, type MailKind } from "@/lib/services/inbox";
 import { connectMyCalendar, loadMyCalendar } from "@/lib/services/my-calendar";
 import { SolSays, Typed } from "./today-pad";
 
@@ -27,6 +27,9 @@ const GMAIL_WORDS: Partial<Record<GmailOutcome, string>> = {
   "signed-out": "Sign in again to connect your Gmail.",
   "read-only":
     "Gmail is connected, but read only: Google wasn't given permission to organise your email. Connect it again and leave every box ticked on Google's page to mark read and archive from here.",
+  "outlook-failed": "Your Outlook couldn't be connected. Try again, and allow RENUABL to read and send your email when Microsoft asks.",
+  "outlook-off": "Microsoft sign-in isn't set up on this site yet, so Outlook email can't be connected.",
+  full: "That's as many mailboxes as one person can connect.",
 };
 
 /**
@@ -135,16 +138,17 @@ function ConnectStep({ onNext, current }: { onNext: () => void; current: boolean
       gone = true;
     };
   }, []);
-  const gmailNow = async () => {
-    setBusy("gmail");
+  const mailNow = async (kind: MailKind) => {
+    const name = kind === "outlook" ? "Outlook" : "Gmail";
+    setBusy(kind === "outlook" ? "outlook-mail" : "gmail");
     setProblem(null);
-    const outcome = await connectGmailHere(false);
+    const outcome = await connectGmailHere(false, kind);
     setBusy(null);
-    if (outcome === "connected" || outcome === "read-only") {
+    if (mailConnected(outcome)) {
       const r = await loadInbox();
-      setGmail(r.ok ? (r.addresses?.[0] ?? r.address ?? "Gmail") : "Gmail");
+      setGmail(r.ok ? (r.addresses?.at(-1) ?? r.address ?? name) : name);
     }
-    if (outcome !== "connected") setProblem(GMAIL_WORDS[outcome] ?? null);
+    if (outcome !== "connected" && outcome !== "outlook-connected") setProblem(GMAIL_WORDS[outcome] ?? null);
   };
   const calendarNow = (provider: CalendarProvider) => {
     setBusy(provider);
@@ -158,8 +162,11 @@ function ConnectStep({ onNext, current }: { onNext: () => void; current: boolean
   return (
     <div className={card}>
       <Row icon={<Mail className="size-4" aria-hidden />} title="Email" done={gmail}>
-        <button type="button" className={light} onClick={() => void gmailNow()} disabled={busy !== null}>
-          {busy === "gmail" ? "Connecting…" : "Connect Gmail"}
+        <button type="button" className={light} onClick={() => void mailNow("google")} disabled={busy !== null}>
+          {busy === "gmail" ? "Connecting…" : "Gmail"}
+        </button>
+        <button type="button" className={light} onClick={() => void mailNow("outlook")} disabled={busy !== null}>
+          {busy === "outlook-mail" ? "Connecting…" : "Outlook"}
         </button>
       </Row>
       <Row icon={<CalendarDays className="size-4" aria-hidden />} title="Calendar" done={calendar}>

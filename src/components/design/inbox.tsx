@@ -56,8 +56,10 @@ import {
   solOnNewEmail,
   solOnEmail,
   type InboxAnswer,
+  type MailKind,
   type OpenedEmail,
 } from "@/lib/services/inbox";
+import { outlookWebLink, providerOfId } from "@/lib/domain/design/outlook-mail";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
 import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
@@ -83,6 +85,9 @@ const GMAIL_SAYS: Record<string, string> = {
   "read-only":
     "Gmail is connected, but read only: Google wasn't given permission to organise your email. Connect it again and leave every box ticked on Google's page to mark read and archive from here.",
   full: "That's as many mailboxes as one person can connect. Disconnect one to add another.",
+  "outlook-connected": "Outlook is connected.",
+  "outlook-failed": "Outlook couldn't be connected. Try again, and allow RENUABL to read and send your email when Microsoft asks.",
+  "outlook-off": "Connecting Outlook isn't set up here yet.",
 };
 
 /**
@@ -131,8 +136,8 @@ export function InboxPage() {
   const [heard, setHeard] = useState<string | null>(null);
   const cameBack = useSearchParams().get("gmail");
   const said = heard ?? cameBack;
-  const connect = async (add = false) => {
-    const outcome = await connectGmailHere(add);
+  const connect = async (add = false, kind: MailKind = "google") => {
+    const outcome = await connectGmailHere(add, kind);
     if (outcome === "closed") return;
     setHeard(outcome);
     setAsks((n) => n + 1);
@@ -254,17 +259,23 @@ export function InboxPage() {
       ) : data.viewing ? (
         <p className={clsx(ui.card, "p-5 text-sm text-ink-2")}>You&apos;re viewing as someone else: their mailbox isn&apos;t read.</p>
       ) : !data.connected ? (
-        <ConnectCard ready={data.ready !== false} broken={data.broken} onConnect={() => void connect()} />
+        <ConnectCard
+          ready={data.ready !== false}
+          outlookReady={data.outlookReady === true}
+          broken={data.broken}
+          onConnect={(kind) => void connect(false, kind)}
+        />
       ) : (
         <>
           <Mailboxes
             boxes={boxes}
             picked={picked}
             more={data.more !== false}
-            onAdd={() => void connect(true)}
+            outlookReady={data.outlookReady === true}
+            onAdd={(kind) => void connect(true, kind)}
             onPick={(b) => setBox(b)}
             onRemove={async (b) => {
-              if (!window.confirm(`Disconnect ${b}? RENUABL stops reading it, and Google is told to forget the connection.`)) return;
+              if (!window.confirm(`Disconnect ${b}? RENUABL stops reading it.`)) return;
               await disconnectGmail(b);
               if (box === b) setBox(null);
               setAsks((n) => n + 1);
@@ -272,7 +283,7 @@ export function InboxPage() {
           />
           {sentFrom && !composing && (
             <p className="rounded-md bg-positive-soft px-4 py-2.5 text-sm text-positive" role="status">
-              Sent from {sentFrom}. It&apos;s in your Gmail&apos;s Sent.
+              Sent from {sentFrom}. It&apos;s in that mailbox&apos;s Sent.
             </p>
           )}
           {composing && (
@@ -858,6 +869,7 @@ function Mailboxes({
   boxes,
   picked,
   more,
+  outlookReady,
   onPick,
   onRemove,
   onAdd,
@@ -865,7 +877,8 @@ function Mailboxes({
   boxes: string[];
   picked?: string;
   more: boolean;
-  onAdd: () => void;
+  outlookReady: boolean;
+  onAdd: (kind: MailKind) => void;
   onPick: (box: string | null) => void;
   onRemove: (box: string) => void;
 }) {
@@ -898,38 +911,69 @@ function Mailboxes({
         </span>
       ))}
       {more && (
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
-        >
-          <Plus className="size-4" aria-hidden /> Add another Gmail
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => onAdd("google")}
+            className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+          >
+            <Plus className="size-4" aria-hidden /> Add a Gmail
+          </button>
+          {outlookReady && (
+            <button
+              type="button"
+              onClick={() => onAdd("outlook")}
+              className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+            >
+              <Plus className="size-4" aria-hidden /> Add an Outlook
+            </button>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function ConnectCard({ ready, broken, onConnect }: { ready: boolean; broken?: string; onConnect: () => void }) {
+function ConnectCard({
+  ready,
+  outlookReady,
+  broken,
+  onConnect,
+}: {
+  ready: boolean;
+  outlookReady: boolean;
+  broken?: string;
+  onConnect: (kind: MailKind) => void;
+}) {
   return (
     <section className={clsx(ui.card, "max-w-xl p-6")}>
       <h2 className="text-lg font-semibold tracking-tight text-ink">Connect your email</h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-2">
-        Connect one Gmail or several (your own and a shared one like sales@) and see them here as one inbox, with each customer&apos;s deal
-        beside their emails. Keep notes on an email, and share one with a teammate. Opening an email marks it read in Gmail, and you can
-        archive it or mark it unread from here. RENUABL never sends or deletes your email. Only you see your inbox.
+        Connect one mailbox or several, Gmail or Outlook (your own and a shared one like sales@), and see them here as one inbox, with each
+        customer&apos;s deal beside their emails. Keep notes on an email, and share one with a teammate. Opening an email marks it read in
+        your mailbox, and you can archive it or mark it unread from here. RENUABL sends only what you send, and never deletes your email.
+        Only you see your inbox.
       </p>
       {broken && <p className="mt-3 text-sm text-warning">{broken}</p>}
-      {ready ? (
-        <button type="button" onClick={onConnect} className={clsx(ui.primary, "mt-4")}>
-          Connect with Google
-        </button>
+      {ready || outlookReady ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {ready && (
+            <button type="button" onClick={() => onConnect("google")} className={ui.primary}>
+              Connect Gmail
+            </button>
+          )}
+          {outlookReady && (
+            <button type="button" onClick={() => onConnect("outlook")} className={ready ? ui.quiet : ui.primary}>
+              Connect Outlook
+            </button>
+          )}
+        </div>
       ) : (
-        <p className="mt-4 text-sm text-muted">Connecting Gmail isn&apos;t set up here yet (it needs the Google sign-in set up).</p>
+        <p className="mt-4 text-sm text-muted">Connecting email isn&apos;t set up here yet (it needs the Google or Microsoft sign-in).</p>
       )}
       <p className="mt-3 text-xs text-muted">
-        Google opens in a small window: pick your account and allow access, and your inbox appears here. Until Google has reviewed RENUABL,
-        only test accounts can connect.
+        The sign-in opens in a small window: pick your account and allow access, and your inbox appears here. Until Google has reviewed
+        RENUABL, only test Gmail accounts can connect.
       </p>
     </section>
   );
@@ -1117,12 +1161,14 @@ function EmailView({
               )}
               {!email.copy && (
                 <a
-                  href={`https://mail.google.com/mail/u/0/#all/${email.id}`}
+                  href={
+                    providerOfId(email.id) === "outlook" ? outlookWebLink(email.id) : `https://mail.google.com/mail/u/0/#all/${email.id}`
+                  }
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
                 >
-                  Open in Gmail <ExternalLink className="size-3" aria-hidden />
+                  Open in {providerOfId(email.id) === "outlook" ? "Outlook" : "Gmail"} <ExternalLink className="size-3" aria-hidden />
                 </a>
               )}
             </div>

@@ -19,6 +19,10 @@ export interface InboxAnswer {
   more?: boolean;
   /** Google's sign-in is set up here (without it, Connect Gmail can't work). */
   ready?: boolean;
+  /** Microsoft's sign-in is set up here (without it, Connect Outlook can't work). */
+  outlookReady?: boolean;
+  /** Which of `addresses` are Outlook mailboxes; the rest are Gmail. */
+  outlook?: string[];
   /** The owner is viewing as someone else: their mailbox isn't read. */
   viewing?: boolean;
   /** Gmail stopped answering for this member (revoked): connect again. */
@@ -69,22 +73,32 @@ export const CONNECT_GMAIL = "/api/auth/gmail";
 /** Connect a further mailbox: Google asks which account. */
 export const ADD_GMAIL = "/api/auth/gmail?add=1";
 
-export type GmailOutcome = "connected" | "failed" | "full" | "off" | "signed-out" | "read-only" | "closed";
+/** Connect an Outlook mailbox (20 Nov 2026): Microsoft asks which account. */
+export const CONNECT_OUTLOOK = "/api/auth/outlook";
+export type MailKind = "google" | "outlook";
+
+export type GmailOutcome =
+  "connected" | "failed" | "full" | "off" | "signed-out" | "read-only" | "closed" | "outlook-connected" | "outlook-failed" | "outlook-off";
+/** The mailbox is connected (either kind, read only included). */
+export const mailConnected = (o: GmailOutcome) => o === "connected" || o === "read-only" || o === "outlook-connected";
 
 /**
  * Connects a Gmail then and there (5 Nov 2026, Martin: never leave the page to do it): Google's sign-in opens in a
  * small window over the page, which tells this page how it went and closes itself. Answers "closed" when the person
  * shuts the window first. Where the browser blocks the window, the page goes to Google and comes back instead.
  */
-export function connectGmailHere(add = false): Promise<GmailOutcome> {
-  const url = `${CONNECT_GMAIL}?popup=1${add ? "&add=1" : ""}`;
+export function connectGmailHere(add = false, kind: MailKind = "google"): Promise<GmailOutcome> {
+  const start = kind === "outlook" ? CONNECT_OUTLOOK : CONNECT_GMAIL;
+  const url = `${start}?popup=1${add ? "&add=1" : ""}`;
   const w = 500;
   const h = 640;
   const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - w) / 2));
   const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - h) / 2));
   const popup = window.open(url, "renuabl-gmail", `popup=yes,width=${w},height=${h},left=${left},top=${top}`);
   if (!popup) {
-    window.location.assign(add ? ADD_GMAIL : CONNECT_GMAIL);
+    // The sign-in is one of our own API routes (it goes on to Google or Microsoft), not a page.
+    const signIn = start + (add ? "?add=1" : "");
+    window.location.assign(signIn);
     return new Promise(() => {});
   }
   popup.focus();

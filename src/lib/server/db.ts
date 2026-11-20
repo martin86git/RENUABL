@@ -1209,6 +1209,8 @@ do $$ begin
 end $$;
 -- Whether Google granted gmail.modify (5 Nov 2026: mark read and archive from RENUABL); older mailboxes read only.
 alter table design_gmail add column if not exists can_modify boolean not null default false;
+-- A mailbox may be an Outlook one (20 Nov 2026, domain/design/outlook-mail.ts); every one before is Gmail.
+alter table design_gmail add column if not exists provider text not null default 'google';
 -- The lead inbox (domain/design/lead-inbox.ts): one connected Gmail mailbox a business takes its emailed leads from,
 -- and every email it has looked at, once each by its Gmail id.
 create table if not exists design_lead_inbox (

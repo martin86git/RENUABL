@@ -25,9 +25,11 @@ import {
   disconnectGmail,
   gmailAddresses,
   gmailConfig,
+  mailboxes,
   sendFromGmail,
   unreadCount,
 } from "@/lib/server/gmail";
+import { outlookMailConfig } from "@/lib/server/outlook-mail";
 import { allow } from "@/lib/server/rate-limit";
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { withSolCredit } from "@/lib/server/sol-credits";
@@ -72,6 +74,7 @@ export async function GET(request: Request) {
         ok: true,
         connected: false,
         ready: Boolean(gmailConfig(new URL(request.url).origin)),
+        outlookReady: Boolean(outlookMailConfig(new URL(request.url).origin)),
         emails: [],
         shared: await sharedWith(member),
       });
@@ -111,14 +114,24 @@ export async function GET(request: Request) {
         address,
         addresses,
         changeable: await changeableAddresses(member),
+        outlook: (await mailboxes(member)).filter((m) => m.provider === "outlook").map((m) => m.address),
+        outlookReady: Boolean(outlookMailConfig(new URL(request.url).origin)),
         more: addresses.length < MAX_MAILBOXES,
         ...(await inboxFor(member, viewerOf(member))),
       });
     } catch (e) {
       if (e instanceof GmailOff)
-        return json({ ok: true, connected: false, ready: true, broken: e.message, emails: [], shared: await sharedWith(member) });
+        return json({
+          ok: true,
+          connected: false,
+          ready: Boolean(gmailConfig(new URL(request.url).origin)),
+          outlookReady: Boolean(outlookMailConfig(new URL(request.url).origin)),
+          broken: e.message,
+          emails: [],
+          shared: await sharedWith(member),
+        });
       console.error("inbox failed", e instanceof Error ? e.message : e);
-      return json({ ok: false, message: "Gmail couldn't be reached just now. Try again in a moment." }, 502);
+      return json({ ok: false, message: "Your email couldn't be reached just now. Try again in a moment." }, 502);
     }
   });
 }
@@ -152,7 +165,7 @@ async function sendNew(request: Request, member: Member, fields: Record<string, 
     typeof fields.box === "string" && fields.box.includes("@")
       ? fields.box.toLowerCase().slice(0, 254)
       : (await changeableAddresses(member))[0];
-  if (!box) return json({ ok: false, message: "Connect your Gmail first." }, 409);
+  if (!box) return json({ ok: false, message: "Connect your email first." }, 409);
   const parts: ComposedFile[] = [];
   const ids: string[] = [];
   let pictures = 0;
@@ -169,7 +182,7 @@ async function sendNew(request: Request, member: Member, fields: Record<string, 
   } catch (e) {
     if (e instanceof GmailOff || e instanceof ReadOnlyMailbox) return json({ ok: false, message: e.message }, 409);
     console.error("inbox send failed", redactSecrets(e instanceof Error ? e.message : String(e)));
-    return json({ ok: false, message: "Gmail didn't take that email just now. It wasn't sent: try again in a moment." }, 502);
+    return json({ ok: false, message: "Your mailbox didn't take that email just now. It wasn't sent: try again in a moment." }, 502);
   }
 }
 

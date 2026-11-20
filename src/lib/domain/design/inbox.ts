@@ -468,5 +468,5 @@ export const cleanEmailNote = (raw: unknown) =>
 export const mayReadTalk = (talk: { owner: string; shared: readonly string[] }, me: string) =>
   talk.owner === me.toLowerCase() || talk.shared.includes(me.toLowerCase());
 
-/** A Gmail message id: hex. */
-export const isMessageId = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{8,40}$/i.test(v);
+/** An email's id: Gmail's is short hex, Outlook's a long run of letters, digits, "-", "_" and "=" (never a path). */
+export const isMessageId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_=-]{8,400}$/.test(v);
