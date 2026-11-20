@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
+    area: "Menu",
+    words: "The top menu is a little tighter, and the section under your pointer is easier to see.",
+  },
+  {
+    day: "2026-11-20",
     area: "Routines",
     words: "Build a routine of your own: choose Sol or a voice agent, what starts it, and add, move or remove its steps.",
   },

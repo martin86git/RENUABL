@@ -473,7 +473,7 @@ function Shell({
             {/* One pill in liquid glass (19 Nov 2026, Martin: .glass-bar in globals.css; it was flat white). Every
                 round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
                 rail's are, black with its word in orange. */}
-            <nav aria-label="Sections" className="studio-sections glass-bar relative flex items-center gap-1 rounded-full p-1">
+            <nav aria-label="Sections" className="studio-sections glass-bar relative flex items-center gap-0.5 rounded-full p-1">
               {(() => {
                 // The business's own sections (CRM, Procurement, Installation, Service) fold behind one layers icon
                 // (section-fold.tsx, 8 Nov 2026, Martin): Today, the designer and Sol are the surface; the sections are
@@ -490,7 +490,7 @@ function Shell({
                       href={sec.pages[0].href}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
+                        "flex h-8 items-center gap-1.5 rounded-full px-3 text-sm transition-colors",
                         lit ? "glass-lit bg-primary font-medium text-primary-ink" : "glass-item text-ink-2 hover:text-ink",
                       )}
                     >
@@ -576,7 +576,7 @@ function Shell({
                       href={sec.pages[0].href}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
-                        "flex h-8 items-center gap-1.5 rounded-full px-3.5 text-sm transition-colors",
+                        "flex h-8 items-center gap-1.5 rounded-full px-3 text-sm transition-colors",
                         lit ? "glass-lit bg-primary font-medium text-primary-ink" : "glass-item text-ink-2 hover:text-ink",
                       )}
                     >
