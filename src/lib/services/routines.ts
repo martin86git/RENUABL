@@ -3,6 +3,7 @@
  * Sol's agents' settings through their own route, a voice agent's script and who it rings through its coach route.
  */
 import type { CallSetup } from "@/lib/domain/design/call-setup";
+import type { CustomRoutine } from "@/lib/domain/design/custom-routines";
 import type { Routine, StepLive } from "@/lib/domain/design/routines";
 import type { AgentSettings } from "@/lib/domain/design/sol-agents";
 import { ask } from "./crm";
@@ -14,6 +15,10 @@ export interface RoutinesView {
   settings: AgentSettings;
   voice: { key: string; setup: CallSetup; scripts: { id: string | null; name: string }[] }[];
   may: { settings: boolean; onOff: boolean; voice: boolean };
+  /** The routines the business built itself, as kept (the flows are in routines). */
+  own: CustomRoutine[];
+  /** Who can run one: Sol, and each named voice agent. */
+  agents: { key: string; name: string; medium: "text" | "voice" }[];
   readOnly: boolean;
 }
 
@@ -40,3 +45,9 @@ export const saveVoiceSetup = (key: string, setup: CallSetup) =>
 /** The script a voice agent calls with, from those it keeps. */
 export const chooseVoiceScript = (key: string, id: string) =>
   told(ask<object>(coach(key), { method: "PUT", body: { script: { do: "use", id } } }));
+
+/** Makes (no id) or changes a routine of the business's own. */
+export const saveOwnRoutine = (id: string | null, routine: Omit<CustomRoutine, "id" | "onAt" | "updatedAt">) =>
+  told(ask<{ routine: CustomRoutine }>("/api/design/routines", { method: "POST", body: { do: "save", id, routine } }));
+
+export const deleteOwnRoutine = (id: string) => told(ask<object>("/api/design/routines", { method: "POST", body: { do: "delete", id } }));

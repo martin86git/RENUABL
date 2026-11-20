@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
+    area: "Routines",
+    words: "Build a routine of your own: choose Sol or a voice agent, what starts it, and add, move or remove its steps.",
+  },
+  {
+    day: "2026-11-20",
     area: "Settings",
     words: "Lead inbox: pick the mailbox your enquiries arrive in, and each new lead emailed there becomes a deal with the email on it.",
   },

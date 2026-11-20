@@ -2,6 +2,7 @@ import { dbConfigured } from "@/lib/server/db";
 import { fireDue, sendingBusinesses } from "@/lib/server/design-sol-agents";
 import { lineUpHellos } from "@/lib/server/design-hello";
 import { leadInboxBusinesses, syncLeadInbox } from "@/lib/server/design-lead-inbox";
+import { routineBusinesses, runCustomRoutines } from "@/lib/server/design-custom-routines";
 
 export const maxDuration = 300;
 
@@ -32,5 +33,13 @@ export async function GET(request: Request) {
     });
     leads += run?.taken ?? 0;
   }
-  return Response.json({ ok: true, sent, leads });
+  // Routines a business built itself (custom-routines.ts): new deals started, each run moved on. Their emails go into
+  // Sol's outbox with a time, so the next run of this cron sends them inside the hours.
+  let routines = 0;
+  for (const business of await routineBusinesses().catch(() => [] as { id: string; name: string }[]))
+    routines += await runCustomRoutines(business).catch((e) => {
+      console.error("a business's routines couldn't run", e instanceof Error ? e.message : e);
+      return 0;
+    });
+  return Response.json({ ok: true, sent, leads, routines });
 }

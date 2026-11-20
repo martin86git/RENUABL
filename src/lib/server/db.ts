@@ -1238,6 +1238,32 @@ create table if not exists design_lead_inbox_emails (
   primary key (business_id, message_id)
 );
 create index if not exists design_lead_inbox_emails_recent on design_lead_inbox_emails (business_id, processed_at desc);
+-- Routines a business builds itself (domain/design/custom-routines.ts), and each one's run on a deal, once a deal.
+create table if not exists design_routines (
+  business_id text not null references businesses(id) on delete cascade,
+  id text not null,
+  routine jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  updated_by text,
+  primary key (business_id, id)
+);
+create table if not exists design_routine_runs (
+  business_id text not null references businesses(id) on delete cascade,
+  routine_id text not null,
+  job_id text not null,
+  step int not null default 0,
+  step_at timestamptz not null default now(),
+  start_stage text not null,
+  status text not null default 'running',
+  log jsonb not null default '[]',
+  started_at timestamptz not null default now(),
+  ended_at timestamptz,
+  primary key (business_id, routine_id, job_id),
+  foreign key (business_id, routine_id) references design_routines(business_id, id) on delete cascade,
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
+create index if not exists design_routine_runs_running on design_routine_runs (business_id, status, step_at);
 -- Each member's own calendar, Google or Outlook, read only (domain/design/my-calendar.ts), kept as Gmail's is.
 create table if not exists design_calendar (
   business_id text not null references businesses(id) on delete cascade,

@@ -34,6 +34,7 @@ import type { CallerKey } from "@/lib/domain/install-call";
 import { callerFor, useCallerInfo } from "@/lib/services/caller";
 import { loadRoutines, saveRoutineSettings, saveVoiceSetup, chooseVoiceScript, type RoutinesView } from "@/lib/services/routines";
 import { PageHead, ui } from "./design-shell";
+import { RoutineBuilder } from "./routines-builder";
 import { CallerAvatar } from "./settings-caller";
 import { SolBadge } from "./sol-icon";
 
@@ -86,6 +87,8 @@ export function RoutinesPage() {
 
   const routines = view.routines;
   const chosen = routines.find((r) => r.id === picked) ?? routines[0];
+  const own = chosen.custom ? (view.own.find((r) => r.id === chosen.custom) ?? null) : null;
+  const mayBuild = view.may.settings && !view.readOnly;
   const running = runningCount(routines);
 
   return (
@@ -101,12 +104,46 @@ export function RoutinesPage() {
         </p>
       )}
       <div className="mt-5 grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
-        <RoutineList routines={routines} chosen={chosen.id} onPick={setPicked} />
-        <FlowCanvas key={chosen.id} routine={chosen} view={view} onProblem={setProblem} onChanged={read} />
+        <RoutineList
+          routines={routines}
+          chosen={picked === NEW ? NEW : chosen.id}
+          onPick={setPicked}
+          onNew={mayBuild ? () => setPicked(NEW) : undefined}
+        />
+        {picked === NEW ? (
+          <RoutineBuilder
+            key={NEW}
+            routine={null}
+            view={view}
+            onSaved={async (id) => {
+              await read();
+              setPicked(`custom-${id}`);
+            }}
+            onGone={read}
+            onCancelNew={() => setPicked(null)}
+          />
+        ) : own ? (
+          <RoutineBuilder
+            key={own.id + own.updatedAt}
+            routine={own}
+            view={view}
+            onSaved={read}
+            onGone={async () => {
+              setPicked(null);
+              await read();
+            }}
+            onCancelNew={() => setPicked(null)}
+          />
+        ) : (
+          <FlowCanvas key={chosen.id} routine={chosen} view={view} onProblem={setProblem} onChanged={read} />
+        )}
       </div>
     </div>
   );
 }
+
+/** The list's id for a routine being built and not yet kept. */
+const NEW = "new";
 
 /** The agent's face: its own picture or sound wave for a voice agent, Sol's sun for Sol's. */
 function Face({ routine, size = 36 }: { routine: Routine; size?: number }) {
@@ -129,18 +166,49 @@ function Standing({ routine }: { routine: Routine }) {
       </span>
     );
   if (routine.on === false)
-    return <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">Drafts only</span>;
+    return (
+      <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+        {routine.custom ? "Off" : "Drafts only"}
+      </span>
+    );
   return <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">Not running</span>;
 }
 
-function RoutineList({ routines, chosen, onPick }: { routines: Routine[]; chosen: string; onPick: (id: string) => void }) {
+function RoutineList({
+  routines,
+  chosen,
+  onPick,
+  onNew,
+}: {
+  routines: Routine[];
+  chosen: string;
+  onPick: (id: string) => void;
+  onNew?: () => void;
+}) {
   const groups: { title: string; list: Routine[] }[] = [
-    { title: "Sol · writes", list: routines.filter((r) => r.medium === "text" && !r.soon) },
-    { title: "Voice agents · ring", list: routines.filter((r) => r.medium === "voice") },
+    { title: "Your routines", list: routines.filter((r) => r.custom) },
+    { title: "Sol · writes", list: routines.filter((r) => r.medium === "text" && !r.soon && !r.custom) },
+    { title: "Voice agents · ring", list: routines.filter((r) => r.medium === "voice" && !r.custom) },
     { title: "Coming soon", list: routines.filter((r) => r.soon) },
   ];
   return (
     <nav aria-label="Your agents' routines" className="space-y-4">
+      {onNew && (
+        <button
+          type="button"
+          onClick={onNew}
+          aria-current={chosen === NEW ? "true" : undefined}
+          className={clsx(
+            "flex w-full items-center gap-3 rounded-xl border border-dashed px-3 py-2.5 text-left text-sm font-semibold transition",
+            chosen === NEW ? "border-ink bg-surface text-ink" : "border-line text-ink-2 hover:border-ink/40 hover:text-ink",
+          )}
+        >
+          <span className="grid size-9 place-items-center rounded-full bg-sun-line text-white" aria-hidden>
+            <Plus className="size-4" />
+          </span>
+          New routine
+        </button>
+      )}
       {groups
         .filter((g) => g.list.length)
         .map((g) => (
@@ -180,7 +248,7 @@ function RoutineList({ routines, chosen, onPick }: { routines: Routine[]; chosen
   );
 }
 
-const KIND: Record<StepKind, { label: string; Icon: typeof Zap; tone: string }> = {
+export const KIND: Record<StepKind, { label: string; Icon: typeof Zap; tone: string }> = {
   trigger: { label: "When", Icon: Zap, tone: "bg-sun-line text-white" },
   check: { label: "Checks", Icon: GitBranch, tone: "bg-[#5b5bd6] text-white" },
   wait: { label: "Waits", Icon: Hourglass, tone: "bg-[#8e8e93] text-white" },
@@ -308,7 +376,7 @@ function FlowCanvas({
 }
 
 /** What each step is doing now (routineLive), by its id. */
-const LiveSteps = createContext<Record<string, StepLive>>({});
+export const LiveSteps = createContext<Record<string, StepLive>>({});
 
 const LIVE_TONE: Record<StepLive["tone"], { pill: string; dot: string }> = {
   now: { pill: "bg-sun-line/12 text-ink ring-sun-line/40", dot: "bg-sun-line animate-pulse motion-reduce:animate-none" },
@@ -320,7 +388,7 @@ const LIVE_TONE: Record<StepLive["tone"], { pill: string; dot: string }> = {
  * A step's live line (20 Nov 2026, Martin: "build the live counts on each step"): what it is doing now, waiting on a
  * person, or has done lately; pressed, the deals behind the count, each opening its deal.
  */
-function LiveLine({ id }: { id: string }) {
+export function LiveLine({ id }: { id: string }) {
   const live = useContext(LiveSteps)[id];
   const [open, setOpen] = useState(false);
   if (!live) return null;
@@ -357,7 +425,7 @@ function LiveLine({ id }: { id: string }) {
 }
 
 /** The line between two steps, with a small arrow. */
-function Joint() {
+export function Joint() {
   return (
     <span className="flex h-8 flex-col items-center" aria-hidden>
       <span className="w-px flex-1 bg-ink/25" />
@@ -495,7 +563,21 @@ function LoopBox({
   );
 }
 
-function OnSwitch({ on, disabled, why, onFlip }: { on: boolean; disabled: boolean; why?: string; onFlip: () => void }) {
+export function OnSwitch({
+  on,
+  disabled,
+  why,
+  onFlip,
+  words = ["Sends by itself", "Drafts for you"],
+  hints,
+}: {
+  on: boolean;
+  disabled: boolean;
+  why?: string;
+  onFlip: () => void;
+  words?: [string, string];
+  hints?: [string, string];
+}) {
   return (
     <button
       type="button"
@@ -503,10 +585,12 @@ function OnSwitch({ on, disabled, why, onFlip }: { on: boolean; disabled: boolea
       aria-checked={on}
       disabled={disabled}
       onClick={onFlip}
-      title={disabled ? why : on ? "Sends by itself. Switch off to approve each one" : "Drafts only. Switch on to let it send"}
+      title={
+        disabled ? why : (hints ?? ["Sends by itself. Switch off to approve each one", "Drafts only. Switch on to let it send"])[on ? 0 : 1]
+      }
       className="flex items-center gap-2 text-[12.5px] font-medium text-ink-2 disabled:opacity-60"
     >
-      {on ? "Sends by itself" : "Drafts for you"}
+      {on ? words[0] : words[1]}
       <span className={clsx("relative h-6 w-10 rounded-full transition", on ? "bg-positive" : "bg-line")}>
         <span
           className={clsx("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", on ? "left-[1.125rem]" : "left-0.5")}

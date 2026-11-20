@@ -17,7 +17,8 @@ import { FOLLOW_UP_WORDS } from "./proposal-lists";
 import { nextWorkingDay } from "./today-pad";
 import { voiceBlock } from "./sol-induction";
 
-export type PreparedKind = "follow-up" | "recap" | "hello";
+/** A routine is an email from a routine the business built itself (custom-routines.ts). */
+export type PreparedKind = "follow-up" | "recap" | "hello" | "routine";
 /** Preparing while Sol writes it; ready to send; then sent or put aside; stale once the reason for it has gone. */
 export type PreparedStatus = "preparing" | "ready" | "sent" | "dismissed" | "stale";
 

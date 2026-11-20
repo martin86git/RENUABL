@@ -58,6 +58,8 @@ export type RoutineNode = RoutineStep | RoutineLoop;
 
 export interface Routine {
   id: string;
+  /** A routine the business built itself (custom-routines.ts): its own id. */
+  custom?: string;
   /** Sol writes; a voice agent rings. */
   medium: "text" | "voice";
   agent: string;
