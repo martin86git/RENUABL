@@ -1,6 +1,7 @@
 import { buildCallAvailability, formatCallTime, isBookableCallSlot } from "./booking";
 import { reasonWords, sayName, sayNameNote, usualCalls, type CallAudience } from "./design/call-setup";
 import { coachingBlock } from "./design/coaching";
+import { callVoiceBlock } from "./design/sol-induction";
 import { deliveryBlock, deliveryParams, type Delivery } from "./design/delivery";
 import { saidAs, saidAsNote } from "./said-as";
 import { formatDate } from "./format";
@@ -223,6 +224,8 @@ export interface CallBrief {
   locked?: string[];
   /** How it speaks (domain/design/delivery.ts); unset is the calls as they were. */
   delivery?: Delivery | null;
+  /** The business's own preferences from Sol's induction (sol-induction.ts `callVoice`), after every rule. */
+  houseStyle?: string[];
   /** A call back the team asked for after an earlier call: the one thing to ask or confirm (`cleanTeamAsk`). */
   teamAsk?: string | null;
   /** What the team said this call is about, when a person handed it over with a reason (`cleanTeamAsk`). */
@@ -525,7 +528,10 @@ export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTran
       : `What we know about them:\n${b.about.map((l) => `- ${plain(l, 200)}`).join("\n") || "- Nothing more yet."}`;
 
   // How the business has coached its assistant comes last, after every rule it always keeps.
-  const coached = [deliveryBlock(b.delivery), coachingBlock(b.coaching ?? [], business, b.locked ?? [])].filter(Boolean).join("\n\n");
+  // The business's own preferences from Sol's induction (sol-induction.ts) sit with the coaching, after every rule.
+  const coached = [deliveryBlock(b.delivery), callVoiceBlock(b.houseStyle ?? []), coachingBlock(b.coaching ?? [], business, b.locked ?? [])]
+    .filter(Boolean)
+    .join("\n\n");
   const nameNote = sayNameNote(b);
   return `You are ${sayName(b)}, ${business}'s automated phone assistant.
 

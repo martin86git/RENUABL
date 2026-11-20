@@ -41,6 +41,7 @@ export function practiceBrief(o: {
   assistantSaid?: string | null;
   audience?: CallBrief["audience"];
   reason?: string | null;
+  houseStyle?: string[];
 }): CallBrief {
   return {
     mode: "lead",
@@ -60,6 +61,8 @@ export function practiceBrief(o: {
     assistantSaid: o.assistantSaid ?? null,
     audience: o.audience,
     reason: o.reason ?? null,
+    // The business's own preferences from Sol's induction, as a real call carries them.
+    houseStyle: o.houseStyle ?? [],
   };
 }
 

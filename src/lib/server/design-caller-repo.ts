@@ -3,6 +3,8 @@
  * (domain/design/caller.ts). One row a business a role in `design_caller` (sales, and the admin assistant that books
  * installations: domain/install-call.ts), business id first as everywhere; no row is Sol with no picture. The picture is only ever kept as redrawn by `avatarImage`.
  */
+import { agentPrefs } from "./design-sol-repo";
+import { callVoice } from "@/lib/domain/design/sol-induction";
 import { cleanHiddenVoices, cleanTint, DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
 import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
@@ -240,12 +242,15 @@ export async function scriptFor(
   assistantSaid: string | null;
   audience: CallAudience;
   reason: string | null;
+  houseStyle: string[];
 }> {
-  const [c, delivery, setup] = await Promise.all([
+  const [c, delivery, setup, prefs] = await Promise.all([
     coachingOf(businessId, role).catch(() => null),
     // If it can't be read, the call goes as calls always did.
     deliveryOf(businessId, role).catch(() => null),
     callSetupOf(businessId, role).catch(() => DEFAULT_CALL_SETUP),
+    // The owner's preferences from Sol's induction (sol-induction.ts): every voice agent follows them too.
+    agentPrefs(businessId).catch(() => ({ business: [], owner: [] })),
   ]);
   return {
     ...scriptLines(c?.notes ?? []),
@@ -254,6 +259,7 @@ export async function scriptFor(
     assistantSaid: setup.saidAs || null,
     audience: setup.audience,
     reason: setup.reason || null,
+    houseStyle: callVoice(prefs.business, prefs.owner),
   };
 }
 

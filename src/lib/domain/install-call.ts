@@ -10,6 +10,7 @@
  */
 import { sayName } from "./design/call-setup";
 import { coachingBlock } from "./design/coaching";
+import { callVoiceBlock } from "./design/sol-induction";
 import { deliveryBlock } from "./design/delivery";
 import { saidAs, saidAsNote } from "./said-as";
 import { formatDate } from "./format";
@@ -170,7 +171,9 @@ export function installSystemPrompt(b: CallBrief, days: readonly InstallDay[], o
     o.canTransfer && "- transferCall: when they want to speak to a person right now.",
     "- endCall: to finish once you've said goodbye.",
   ].filter(Boolean);
-  const coached = [deliveryBlock(b.delivery), coachingBlock(b.coaching ?? [], business, b.locked ?? [])].filter(Boolean).join("\n\n");
+  const coached = [deliveryBlock(b.delivery), callVoiceBlock(b.houseStyle ?? []), coachingBlock(b.coaching ?? [], business, b.locked ?? [])]
+    .filter(Boolean)
+    .join("\n\n");
   return `You are ${sayName(b)}, ${business}'s automated phone assistant for bookings.
 
 You are on a phone call with ${name || "a customer"}, who has gone ahead with ${business}. Their job is ready to be booked in. Your one job: find a day for the installation that suits them from the days below, and pencil it in.

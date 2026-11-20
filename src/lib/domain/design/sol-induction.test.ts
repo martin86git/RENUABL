@@ -3,6 +3,8 @@ import {
   ASK_EACH_TIME,
   INDUCTION_QUESTIONS,
   agentVoice,
+  callVoice,
+  callVoiceBlock,
   asksScope,
   cleanInduction,
   cleanLearnAsk,
@@ -16,6 +18,9 @@ import {
   voiceBlock,
   withKeptPref,
 } from "./sol-induction";
+import { practiceBrief } from "./practice-call";
+import { voiceSystemPrompt } from "../voice-agent";
+import { installSystemPrompt } from "../install-call";
 
 const now = new Date("2026-11-20T03:00:00Z");
 
@@ -117,5 +122,47 @@ describe("what Sol and his agents read", () => {
     expect(agentVoice([], ownerOwn)).toEqual(["Talking price: lead with the saving."]);
     expect(voiceBlock([])).toBe("");
     expect(voiceBlock(["Be formal."])).toMatch(/rule above still comes first/);
+  });
+});
+
+describe("the voice agents", () => {
+  const at = now.toISOString();
+  const owner = [
+    { id: "in-tone", text: "When writing to customers, be friendly but brief.", at },
+    { id: "in-price", text: "Talking price: lead with the saving.", at },
+    { id: "in-never", text: "Never: mention finance", at },
+    { id: "in-nudge", text: "Follow up a quiet proposal weekly.", at },
+    { id: "in-signoff", text: "Sign off customer emails like this: Cheers.", at },
+  ];
+
+  it("follow only what applies to a call: how to come across, price talk and the never-do's", () => {
+    expect(callVoice(owner, [])).toEqual([
+      "With customers, be friendly but brief.",
+      "Talking price: lead with the saving.",
+      "Never: mention finance",
+    ]);
+    expect(callVoice([], owner)).toHaveLength(3);
+    expect(callVoice([], [])).toEqual([]);
+  });
+
+  it("are told the rules still come first", () => {
+    expect(callVoiceBlock([])).toBe("");
+    expect(callVoiceBlock(["Never: mention finance"])).toMatch(/every rule above still comes first/);
+  });
+
+  it("carry them on every kind of call, after the rules", () => {
+    const style = callVoice(owner, []);
+    const brief = {
+      ...practiceBrief({ assistant: "Charlie", business: "Sunrise Solar", memberFirstName: "Sam", coaching: [] }),
+      houseStyle: style,
+    };
+    const sales = voiceSystemPrompt(brief, [], { canTransfer: false });
+    expect(sales).toContain("Never: mention finance");
+    expect(sales.indexOf("Rules you always keep")).toBeLessThan(sales.indexOf("Never: mention finance"));
+    expect(installSystemPrompt({ ...brief, mode: "install" }, [], { canTransfer: false })).toContain("lead with the saving");
+    expect(
+      practiceBrief({ assistant: "Charlie", business: "Sunrise Solar", memberFirstName: "Sam", coaching: [], houseStyle: style })
+        .houseStyle,
+    ).toEqual(style);
   });
 });

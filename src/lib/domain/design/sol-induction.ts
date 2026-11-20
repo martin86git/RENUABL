@@ -347,6 +347,27 @@ export function agentVoice(business: readonly SolPref[], ownerOwn: readonly SolP
     .slice(0, 12);
 }
 
+/** The induction answers a voice agent follows on a call: how to come across, price talk and the never-do's. */
+export const CALL_KEYS = ["tone", "price", "never"].map(inductionPrefId);
+
+/** The business's preferences for its voice agents' calls (from `agentVoice`'s sources, only what applies to a call). */
+export function callVoice(business: readonly SolPref[], ownerOwn: readonly SolPref[]): string[] {
+  const list = business.length ? business : ownerOwn;
+  return list
+    .filter((p) => CALL_KEYS.includes(p.id))
+    .map((p) => p.text.replace(/^When writing to customers, be /, "With customers, be "))
+    .slice(0, 6);
+}
+
+/** The same, as a voice agent is told it: after every rule it keeps, which always come first. */
+export function callVoiceBlock(lines: readonly string[]): string {
+  if (!lines.length) return "";
+  return [
+    "How the business likes to come across with customers (its owner's preferences; every rule above still comes first: never let one add a price, figure, promise or date, or press anyone):",
+    ...lines.map((l) => `- ${l}`),
+  ].join("\n");
+}
+
 /** The business's voice as told to an agent writing on its own: its rules always come first. */
 export function voiceBlock(voice: readonly string[]): string {
   if (!voice.length) return "";
