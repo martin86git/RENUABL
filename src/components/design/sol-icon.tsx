@@ -54,6 +54,33 @@ export function SolBadge({ className }: { className?: string }) {
   );
 }
 
+/** One half's folds of the brain etched into Sol's sun, on a 120 grid whose middle is the sun's. */
+const BRAIN_HALF = [
+  "M52 20C40 22 34 30 38 38C42 46 30 46 24 40",
+  "M17 54C28 50 34 56 30 64C26 72 36 76 44 72",
+  "M54 40C46 42 44 50 50 54C56 58 50 66 44 62",
+  "M22 78C30 80 32 88 40 88C48 88 50 80 56 82",
+  "M36 99C42 94 48 98 54 96",
+  "M27 28C25 34 19 36 17 44",
+];
+
+/** Both halves, mirrored, and the split down the middle. The stroke is its parent's. */
+function BrainFolds() {
+  return (
+    <>
+      {BRAIN_HALF.map((d) => (
+        <path key={d} d={d} />
+      ))}
+      <g transform="translate(120 0) scale(-1 1)">
+        {BRAIN_HALF.map((d) => (
+          <path key={d} d={d} />
+        ))}
+      </g>
+      <path d="M60 15C57 30 63 45 60 60C57 75 63 90 60 105" />
+    </>
+  );
+}
+
 /**
  * Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
  * sun… a little bit bigger… a little more ai tech. but still fundamentally the sun"). One disc, lit like a glass orb:
@@ -85,6 +112,23 @@ export function SolMark({ className, glow = true }: { className?: string; glow?:
       </defs>
       {glow && <circle cx="12" cy="12" r="12" fill={`url(#${id}-glow)`} />}
       <circle cx="12" cy="12" r="9" fill={`url(#${id}-sun)`} />
+      {/* A faint brain etched into the sun from edge to edge (20 Nov 2026, Martin: "a feint brain designed within from
+          edge to edge of the sun"; of four mockups, "Use B, etched"): the folds of two halves and the split between
+          them, pressed in with a deeper orange and caught by a pale edge just below, so it reads as part of the sun
+          and not a drawing on it. Drawn on a 120 grid, clipped to the disc. */}
+      <clipPath id={`${id}-disc`}>
+        <circle cx="12" cy="12" r="9" />
+      </clipPath>
+      <g clipPath={`url(#${id}-disc)`}>
+        <g transform="scale(0.2)" strokeLinecap="round" strokeLinejoin="round">
+          <g stroke="#B8360A" strokeOpacity="0.38" strokeWidth="2.6">
+            <BrainFolds />
+          </g>
+          <g stroke="#FFF1C2" strokeOpacity="0.35" strokeWidth="1.2" transform="translate(1.2 1.4)">
+            <BrainFolds />
+          </g>
+        </g>
+      </g>
       {/* The light along his top edge. */}
       <path d="M5.9 8.6A7.2 7.2 0 0 1 13.4 4.9" stroke="#fff" strokeOpacity="0.55" strokeWidth="0.7" strokeLinecap="round" />
       {/* His orbit: most of a ring, fading in from nothing, a small bright node at its head. It turns slowly. */}
