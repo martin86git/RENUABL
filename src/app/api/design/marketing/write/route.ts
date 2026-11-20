@@ -2,7 +2,17 @@ import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
 import { goalAngle, isCampaignGoal } from "@/lib/domain/marketing/campaign-goals";
 import { EDM_LIMITS } from "@/lib/domain/marketing/edm";
 import { cleanSections, isEdmLayout, sectionsAsk, sectionsSchema } from "@/lib/domain/marketing/edm-sections";
-import { EDM_SOL_LIMITS, cleanEdmSol, edmSolPrompt, edmSolSchema, edmSolTier, isEdmSolPart } from "@/lib/domain/marketing/edm-sol";
+import {
+  EDM_SOL_LIMITS,
+  cleanEdmSol,
+  cleanEdmSolOptions,
+  edmSolOptionsSchema,
+  edmSolPrompt,
+  edmSolSchema,
+  edmSolTier,
+  isEdmSolPart,
+  isLinePart,
+} from "@/lib/domain/marketing/edm-sol";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer } from "@/lib/server/design-context";
@@ -14,7 +24,8 @@ import { withSolCredit } from "@/lib/server/sol-credits";
 export const maxDuration = 60;
 
 /**
- * POST {part, brief, draft, goal?, sections?} (a goal from the campaign's start screen adds its angle, campaign-goals.ts;members who may publish, where Marketing is on): Sol writes a marketing email's subject,
+ * POST {part, brief, draft, goal?, sections?, note?, options?, avoid?} (note is what the member wants changed about one part;
+ * options asks for a choice of a one-line part, avoid the ones already passed over; a goal from the campaign's start screen adds its angle, campaign-goals.ts;members who may publish, where Marketing is on): Sol writes a marketing email's subject,
  * preview line, heading or words, or all four from a brief (domain/marketing/edm-sol.ts). Quick for a line, deep for the
  * words; Sol credits as any answer (use "marketing"). Nothing is kept or sent: the answer goes into the editor.
  */
@@ -38,8 +49,17 @@ export async function POST(request: Request) {
       heading: text(d.heading, EDM_LIMITS.heading),
       text: text(d.text, EDM_LIMITS.text),
     };
+    const note = part === "all" ? "" : text(b.note, EDM_SOL_LIMITS.note);
+    const choice = isLinePart(part) && b.options === true ? part : null;
+    const avoid =
+      choice && Array.isArray(b.avoid)
+        ? b.avoid
+            .map((v) => text(v, EDM_LIMITS[choice]))
+            .filter(Boolean)
+            .slice(0, EDM_SOL_LIMITS.avoid)
+        : [];
     if (part === "all" && !brief) return refuse("Tell Sol what the email is about.");
-    if (!brief && !Object.values(draft).some((v) => v && v !== "Hi {firstName},"))
+    if (!brief && !note && !Object.values(draft).some((v) => v && v !== "Hi {firstName},"))
       return refuse("Write a line about what the email is for, or some of the email first.");
     const business = (await senderFor(member.businessId)).name || member.businessName;
     // A layout of sections from the campaign's start screen: Sol writes every section's heading and words.
@@ -50,13 +70,17 @@ export async function POST(request: Request) {
       draft,
       angle: isCampaignGoal(b.goal) ? goalAngle(b.goal) : null,
       ask: sections ? sectionsAsk(sections) : undefined,
+      note,
+      options: choice ? EDM_SOL_LIMITS.options : undefined,
+      avoid,
     });
     const tier = edmSolTier(part);
     const out = await withSolCredit(
       member.businessId,
       "marketing",
       member.email,
-      (ai) => readWithClaude<unknown>([], sections ? sectionsSchema() : edmSolSchema(part), prompt, apiKey, ai),
+      (ai) =>
+        readWithClaude<unknown>([], sections ? sectionsSchema() : choice ? edmSolOptionsSchema() : edmSolSchema(part), prompt, apiKey, ai),
       tier,
       part === "all" ? "marketing email written" : `marketing ${part} written`,
     ).catch((e) => {
@@ -68,6 +92,11 @@ export async function POST(request: Request) {
       const written = cleanSections(out, sections);
       if (!written) return refuse("Sol couldn't write that just now. Try again in a moment.", 502);
       return Response.json({ ok: true, ...written });
+    }
+    if (choice) {
+      const options = cleanEdmSolOptions(choice, out, [draft[choice], ...avoid]);
+      if (!options.length) return refuse("Sol couldn't write that just now. Try again in a moment.", 502);
+      return Response.json({ ok: true, options });
     }
     const clean = cleanEdmSol(part, out);
     if (!clean) return refuse("Sol couldn't write that just now. Try again in a moment.", 502);

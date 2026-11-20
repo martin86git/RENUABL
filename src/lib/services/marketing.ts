@@ -212,8 +212,15 @@ export const writeWithSol = (body: {
   goal?: string | null;
   /** A layout of 3, 4 or 5 sections: Sol answers with `sections` and `button` in place of heading and text. */
   sections?: number;
+  /** What the member wants changed about the one part asked for. */
+  note?: string;
+  /** A choice of a one-line part: Sol answers with `options`. */
+  options?: boolean;
+  /** Options already passed over. */
+  avoid?: string[];
 }) =>
   send<{
+    options?: string[];
     subject?: string;
     preview?: string;
     heading?: string;

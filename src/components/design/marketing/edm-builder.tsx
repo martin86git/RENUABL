@@ -40,6 +40,7 @@ import {
 } from "@/lib/domain/marketing/edm";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
 import { uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
+import { SolAsk, type SolAskResult } from "./edm-sol-ask";
 import { SolIcon } from "../sol-icon";
 
 export const field = "h-10 w-full rounded-lg border border-line bg-surface px-3 text-[14px] text-ink outline-none focus:border-ink/40";
@@ -140,20 +141,68 @@ export function EdmBuilder({
   const [busy, setBusy] = useState<string | null>(null);
   const [undo, setUndo] = useState<EdmContent | null>(null);
   const [solMsg, setSolMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  async function sol(part: EdmSolPart, blockId?: string) {
+  // Which field's Sol box is open (its block's id, else the part): what to change, then options to choose from.
+  const [asking, setAsking] = useState<string | null>(null);
+  const draftFor = (blockId?: string) => {
     const target = blockId ? content.blocks.find((b) => b.id === blockId) : undefined;
     const firstOf = (kind: "heading" | "text") => content.blocks.find((b) => b.kind === kind);
-    const draft = {
-      subject: content.subject,
-      preview: content.preview,
-      heading: (target?.kind === "heading" ? target : firstOf("heading"))?.text ?? "",
-      text: (target?.kind === "text" ? target : firstOf("text"))?.text ?? "",
+    return {
+      target,
+      draft: {
+        subject: content.subject,
+        preview: content.preview,
+        heading: (target?.kind === "heading" ? target : firstOf("heading"))?.text ?? "",
+        text: (target?.kind === "text" ? target : firstOf("text"))?.text ?? "",
+      },
     };
+  };
+  const flag = (written: string) => {
+    const flagged = claimsToCheck(written);
+    setSolMsg({
+      ok: !flagged.length,
+      text: flagged.length
+        ? `Sol wrote it. Check these words before sending, they would need proof: ${flagged.join(", ")}.`
+        : "Sol wrote it. Change anything you like; nothing is sent.",
+    });
+  };
+  /** Sol's box on one field: a choice of a one-line part (nothing changes until one is pressed), or the words rewritten. */
+  async function ask(part: Exclude<EdmSolPart, "all">, blockId: string | undefined, note: string, avoid: string[]): Promise<SolAskResult> {
+    if (part === "text")
+      return (await sol(part, blockId, note)) ? { ok: true } : { ok: false, message: "Sol couldn't write that just now." };
+    const r = await writeWithSol({ part, brief, draft: draftFor(blockId).draft, note, options: true, avoid });
+    return r.ok ? { ok: true, options: r.options ?? [] } : { ok: false, message: r.message };
+  }
+  function pick(part: Exclude<EdmSolPart, "all">, blockId: string | undefined, line: string) {
+    setUndo(content);
+    if (blockId) onChange({ ...content, blocks: content.blocks.map((b) => (b.id === blockId ? { ...b, text: line } : b)) });
+    else if (part === "subject" || part === "preview") onChange({ ...content, [part]: line });
+    flag(line);
+  }
+  const putBack = () => {
+    if (!undo) return;
+    onChange(undo);
+    setUndo(null);
+    setSolMsg(null);
+  };
+  const solAsk = (part: Exclude<EdmSolPart, "all">, current: string, blockId?: string) =>
+    !readOnly && asking === (blockId ?? part) ? (
+      <SolAsk
+        part={part}
+        current={current}
+        onAsk={(note, avoid) => ask(part, blockId, note, avoid)}
+        onPick={(line) => pick(part, blockId, line)}
+        onUndo={putBack}
+        onClose={() => setAsking(null)}
+      />
+    ) : null;
+
+  async function sol(part: EdmSolPart, blockId?: string, note?: string): Promise<boolean> {
+    const { target, draft } = draftFor(blockId);
     setBusy(blockId ?? part);
     setSolMsg(null);
-    const r = await writeWithSol({ part, brief, draft });
+    const r = await writeWithSol({ part, brief, draft, note });
     setBusy(null);
-    if (!r.ok) return setSolMsg({ ok: false, text: r.message });
+    if (!r.ok) return (setSolMsg({ ok: false, text: r.message }), false);
     const before = content;
     let blocks = content.blocks;
     const fill = (kind: "heading" | "text", words: string | undefined) => {
@@ -169,17 +218,19 @@ export function EdmBuilder({
     fill("text", r.text);
     onChange({ subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
     setUndo(before);
-    const flagged = claimsToCheck([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
-    setSolMsg({
-      ok: !flagged.length,
-      text: flagged.length
-        ? `Sol wrote it. Check these words before sending, they would need proof: ${flagged.join(", ")}.`
-        : "Sol wrote it. Change anything you like; nothing is sent.",
-    });
+    flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
+    return true;
   }
+  // Sol's button beside a field opens his box under it: what to change, then a choice. It no longer rewrites on a press.
   const solRound = (part: EdmSolPart, label: string, blockId?: string) =>
     readOnly ? null : (
-      <SolRound label={label} busy={busy === (blockId ?? part)} disabled={busy !== null} onClick={() => void sol(part, blockId)} />
+      <SolRound
+        label={label}
+        busy={busy === (blockId ?? part)}
+        on={asking === (blockId ?? part)}
+        disabled={busy !== null}
+        onClick={() => setAsking(asking === (blockId ?? part) ? null : (blockId ?? part))}
+      />
     );
 
   return (
@@ -208,8 +259,8 @@ export function EdmBuilder({
             </button>
           </div>
           <p className="mt-2 text-[12px] text-muted">
-            Sol uses only what you write here and what the email already says: no figures, offers or promises of its own. The Sol buttons
-            beside each field write just that one. Each answer uses Sol credits.
+            Sol uses only what you write here and what the email already says: no figures, offers or promises of its own. To change one
+            part, press the Sol button beside it: tell him what to change and pick from his options. Each answer uses Sol credits.
           </p>
           {(solMsg || undo) && (
             <div className="mt-2 flex flex-wrap items-center gap-3 text-[12px]">
@@ -227,28 +278,36 @@ export function EdmBuilder({
         </div>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="text-[12px] text-muted">
-          <span className="flex items-center justify-between">Subject {solRound("subject", "Sol writes the subject")}</span>
-          <input
-            value={content.subject}
-            disabled={readOnly}
-            maxLength={EDM_LIMITS.subject}
-            onChange={(e) => set({ subject: e.target.value })}
-            placeholder="What the inbox shows first"
-            className={cn(field, "mt-1")}
-          />
-        </label>
-        <label className="text-[12px] text-muted">
-          <span className="flex items-center justify-between">Preview line {solRound("preview", "Sol writes the preview line")}</span>
-          <input
-            value={content.preview}
-            disabled={readOnly}
-            maxLength={EDM_LIMITS.preview}
-            onChange={(e) => set({ preview: e.target.value })}
-            placeholder="Shown after the subject in most inboxes"
-            className={cn(field, "mt-1")}
-          />
-        </label>
+        <div className={cn(asking === "subject" && "sm:col-span-2")}>
+          <label className="block text-[12px] text-muted">
+            <span className="flex items-center justify-between">Subject {solRound("subject", "Improve the subject with Sol")}</span>
+            <input
+              value={content.subject}
+              disabled={readOnly}
+              maxLength={EDM_LIMITS.subject}
+              onChange={(e) => set({ subject: e.target.value })}
+              placeholder="What the inbox shows first"
+              className={cn(field, "mt-1")}
+            />
+          </label>
+          {solAsk("subject", content.subject)}
+        </div>
+        <div className={cn(asking === "preview" && "sm:col-span-2")}>
+          <label className="block text-[12px] text-muted">
+            <span className="flex items-center justify-between">
+              Preview line {solRound("preview", "Improve the preview line with Sol")}
+            </span>
+            <input
+              value={content.preview}
+              disabled={readOnly}
+              maxLength={EDM_LIMITS.preview}
+              onChange={(e) => set({ preview: e.target.value })}
+              placeholder="Shown after the subject in most inboxes"
+              className={cn(field, "mt-1")}
+            />
+          </label>
+          {solAsk("preview", content.preview)}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -305,11 +364,12 @@ export function EdmBuilder({
                 onRemove={() => set({ blocks: content.blocks.filter((x) => x.id !== b.id) })}
                 sol={
                   b.kind === "heading"
-                    ? solRound("heading", "Sol writes the heading", b.id)
+                    ? solRound("heading", "Improve the heading with Sol", b.id)
                     : b.kind === "text"
-                      ? solRound("text", "Sol writes the words", b.id)
+                      ? solRound("text", "Improve the words with Sol", b.id)
                       : null
                 }
+                solAsk={b.kind === "heading" || b.kind === "text" ? solAsk(b.kind, b.text, b.id) : null}
               />
             ))}
             <div className="rounded-xl border border-dashed border-line-strong p-3">
@@ -355,6 +415,7 @@ function BlockCard({
   onMove,
   onRemove,
   sol,
+  solAsk,
 }: {
   block: EdmBlock;
   first: boolean;
@@ -363,6 +424,8 @@ function BlockCard({
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
   sol?: ReactNode;
+  /** Sol's box for this block, open under its field. */
+  solAsk?: ReactNode;
 }) {
   const Icon = ICONS[b.kind];
   const badLink = b.url === null && (b.kind === "button" || b.kind === "image");
@@ -405,6 +468,7 @@ function BlockCard({
           className={cn(field, "h-auto py-2 leading-relaxed")}
         />
       )}
+      {solAsk}
       {b.kind === "button" && (
         <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)]">
           <input
@@ -425,19 +489,35 @@ function BlockCard({
   );
 }
 
-/** Sol's button beside a field: writes or rewrites that one part. */
-function SolRound({ label, busy, disabled, onClick }: { label: string; busy: boolean; disabled: boolean; onClick: () => void }) {
+/** Sol's button beside a field: opens his box under it, to say what to change. */
+function SolRound({
+  label,
+  busy,
+  on,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  busy: boolean;
+  on: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       title={label}
       aria-label={label}
+      aria-expanded={on}
       disabled={disabled}
       onClick={(e) => (e.preventDefault(), onClick())}
-      className="inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium text-ink-2 hover:bg-sun hover:text-sun-ink disabled:text-muted disabled:hover:bg-transparent"
+      className={cn(
+        "inline-flex h-7 items-center gap-1 rounded-full px-2 text-[11px] font-medium hover:bg-sun hover:text-sun-ink disabled:text-muted disabled:hover:bg-transparent",
+        on ? "bg-sun text-sun-ink" : "text-ink-2",
+      )}
     >
       {busy ? <Loader2 className="size-3.5 animate-spin" /> : <SolIcon className="size-3.5" />}
-      Sol
+      Improve
     </button>
   );
 }
