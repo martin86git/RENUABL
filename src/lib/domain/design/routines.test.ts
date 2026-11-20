@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysWords, routinesFor, runningCount, stepsOf, type RoutineFacts } from "./routines";
+import { daysWords, routineLive, routinesFor, runningCount, stepsOf, type RoutineFacts } from "./routines";
 import { cleanAgentSettings, DEFAULT_AGENT_SETTINGS, firesAtFor } from "./sol-agents";
 import { dueFollowUp } from "./proposal-lists";
 
@@ -83,5 +83,58 @@ describe("routine settings", () => {
   it("says the days plainly", () => {
     expect(daysWords([2, 7, 14])).toBe("2, 7 and 14 days");
     expect(daysWords([1])).toBe("1 day");
+  });
+});
+
+describe("live counts on the steps", () => {
+  const when = (iso: string) => `at ${iso.slice(11, 16)}`;
+  const now = new Date("2026-11-20T00:00:00.000Z");
+  const r = routinesFor(facts());
+
+  it("counts Sol's emails waiting, waiting for a press, and sent", () => {
+    const live = routineLive(
+      r,
+      {
+        outbox: [
+          { kind: "follow-up", jobId: "j1", customer: "Ann", firesAt: "2026-11-20T02:00:00.000Z", state: "counting" },
+          { kind: "follow-up", jobId: "j2", customer: "Bo", firesAt: "2026-11-20T01:00:00.000Z", state: "counting" },
+          { kind: "hello", jobId: "j3", customer: "Cy", firesAt: "2026-11-20T01:00:00.000Z", state: "waiting" },
+        ],
+        sent: [{ kind: "follow-up", jobId: "j4", customer: "Di", at: "2026-11-19T00:00:00.000Z" }],
+        calls: {},
+      },
+      when,
+      now,
+    );
+    expect(live["prop-wait"].words).toBe("2 waiting · next goes at 01:00");
+    expect(live["prop-wait"].deals[0].customer).toBe("Bo");
+    expect(live["prop-send"].words).toBe("1 sent this week");
+    expect(live["lead-send"]).toMatchObject({ words: "1 waits for your press", tone: "press" });
+    expect(live["lead-wait"]).toBeUndefined();
+  });
+
+  it("counts a voice agent's calls", () => {
+    const live = routineLive(
+      r,
+      {
+        outbox: [],
+        sent: [],
+        calls: {
+          sales: [
+            { jobId: "a", customer: "Ann", standing: "lined-up", dueAt: "2026-11-20T03:00:00.000Z" },
+            { jobId: "b", customer: "Bo", standing: "lined-up", dueAt: "2026-11-20T01:00:00.000Z" },
+            { jobId: "c", customer: "Cy", standing: "no-answer" },
+            { jobId: "d", customer: "Di", standing: "needs-you" },
+          ],
+          admin: [{ jobId: "e", customer: "Ed", standing: "live" }],
+        },
+      },
+      when,
+      now,
+    );
+    expect(live["sales-ring"].words).toBe("2 calls lined up · next at 01:00");
+    expect(live["sales-loop"].tone).toBe("press");
+    expect(live["sales-answer"].words).toBe("1 wants the team to call back");
+    expect(live["admin-offer"].words).toBe("On a call now with Ed");
   });
 });

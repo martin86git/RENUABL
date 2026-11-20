@@ -3,12 +3,14 @@
  * Sol's agents' settings through their own route, a voice agent's script and who it rings through its coach route.
  */
 import type { CallSetup } from "@/lib/domain/design/call-setup";
-import type { Routine } from "@/lib/domain/design/routines";
+import type { Routine, StepLive } from "@/lib/domain/design/routines";
 import type { AgentSettings } from "@/lib/domain/design/sol-agents";
 import { ask } from "./crm";
 
 export interface RoutinesView {
   routines: Routine[];
+  /** What each step is doing now, by its id. */
+  live: Record<string, StepLive>;
   settings: AgentSettings;
   voice: { key: string; setup: CallSetup; scripts: { id: string | null; name: string }[] }[];
   may: { settings: boolean; onOff: boolean; voice: boolean };

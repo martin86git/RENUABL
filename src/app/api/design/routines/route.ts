@@ -1,8 +1,12 @@
 import { can } from "@/lib/domain/design/account";
 import { VOICE_STANDING_WORDS } from "@/lib/domain/design/add-ons";
 import { scriptLines } from "@/lib/domain/design/call-scripts";
-import { routinesFor, type VoiceAgentFacts } from "@/lib/domain/design/routines";
-import { answer, requireMember } from "@/lib/server/design-context";
+import { routineLive, routinesFor, type VoiceAgentFacts } from "@/lib/domain/design/routines";
+import { countdownWords } from "@/lib/domain/design/sol-agents";
+import { assistantDeals } from "@/lib/server/design-call-log-repo";
+import { outbox } from "@/lib/server/design-sol-agents";
+import type { CallerKey } from "@/lib/domain/install-call";
+import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { callerOf, callSetupOf, moreSalesAgents, scriptBookOf, type Caller } from "@/lib/server/design-caller-repo";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { agentSettings } from "@/lib/server/design-routine-settings";
@@ -51,9 +55,40 @@ export async function GET() {
       callsWhy: callsOn ? undefined : VOICE_STANDING_WORDS[standing],
       voice,
     });
+    // What each step is doing now: Sol's outbox as this member may see it (read only: nothing is started or sent by
+    // looking), and each voice agent's own deals.
+    const viewer = viewerOf(who.member);
+    const [box, calls] = await Promise.all([
+      outbox(who.member, viewer, true).then(
+        (o) => o.outbox,
+        () => null,
+      ),
+      Promise.all(voice.map(async (v) => [v.key, await assistantDeals(businessId, viewer, v.key as CallerKey).catch(() => [])] as const)),
+    ]);
+    const live = routineLive(
+      routines,
+      {
+        outbox: (box?.entries ?? []).map((e) => ({
+          kind: e.kind,
+          jobId: e.jobId,
+          customer: e.customer,
+          firesAt: e.firesAt,
+          state: e.state,
+        })),
+        sent: (box?.sent ?? []).map((s) => ({ kind: s.kind ?? "", jobId: s.jobId, customer: s.customer, at: s.at })),
+        calls: Object.fromEntries(
+          calls.map(([key, list]) => [
+            key,
+            list.map((d) => ({ jobId: d.jobId, customer: d.customer, standing: d.standing, dueAt: d.dueAt })),
+          ]),
+        ),
+      },
+      (iso, now) => countdownWords(iso, now),
+    );
     return Response.json({
       ok: true,
       routines,
+      live,
       settings,
       voice: voice.map((v) => ({
         key: v.key,

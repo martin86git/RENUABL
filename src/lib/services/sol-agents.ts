@@ -17,7 +17,7 @@ export interface Outbox {
   settings: AgentSettings;
   entries: OutboxEntry[];
   needsYou: { jobId: string; customer: string; title: string; stage: AgentStage | null; last: string; at: string }[];
-  sent: { id: string; jobId: string; customer: string; subject: string; stage: AgentStage | null; at: string }[];
+  sent: { id: string; jobId: string; customer: string; subject: string; kind?: string; stage: AgentStage | null; at: string }[];
   canSend: boolean;
   owner: boolean;
 }

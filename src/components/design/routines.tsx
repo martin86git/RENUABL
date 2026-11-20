@@ -1,9 +1,24 @@
 "use client";
 
 import { clsx } from "clsx";
-import { CornerDownRight, Flag, GitBranch, Hourglass, Lock, Pencil, Play, Plus, Repeat, UserRound, Workflow, X, Zap } from "lucide-react";
+import {
+  ChevronDown,
+  CornerDownRight,
+  Flag,
+  GitBranch,
+  Hourglass,
+  Lock,
+  Pencil,
+  Play,
+  Plus,
+  Repeat,
+  UserRound,
+  Workflow,
+  X,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { CallSetup } from "@/lib/domain/design/call-setup";
 import {
   runningCount,
@@ -12,6 +27,7 @@ import {
   type RoutineSetting,
   type RoutineStep,
   type StepKind,
+  type StepLive,
 } from "@/lib/domain/design/routines";
 import { ROUTINE_CHOICES, SEND_HOURS, type AgentSettings, type SendHours } from "@/lib/domain/design/sol-agents";
 import type { CallerKey } from "@/lib/domain/install-call";
@@ -253,24 +269,26 @@ function FlowCanvas({
             <p className="mt-1 text-[13px] leading-snug text-ink-2">{routine.soon}</p>
           </div>
         ) : (
-          <ol className="mx-auto flex max-w-[34rem] flex-col items-center" aria-label="Its steps, in order">
-            {routine.nodes.map((n, i) => (
-              <li key={n.id} className="flex w-full flex-col items-center">
-                {i > 0 && <Joint />}
-                {n.kind === "loop" ? (
-                  <LoopBox node={n} open={open} onOpen={setOpen} mayEdit={mayEdit} editor={editor} />
-                ) : (
-                  <StepCard
-                    step={n}
-                    open={open === n.id}
-                    onOpen={(o) => setOpen(o ? n.id : null)}
-                    mayEdit={mayEdit(n.setting)}
-                    editor={editor}
-                  />
-                )}
-              </li>
-            ))}
-          </ol>
+          <LiveSteps.Provider value={view.live ?? {}}>
+            <ol className="mx-auto flex max-w-[34rem] flex-col items-center" aria-label="Its steps, in order">
+              {routine.nodes.map((n, i) => (
+                <li key={n.id} className="flex w-full flex-col items-center">
+                  {i > 0 && <Joint />}
+                  {n.kind === "loop" ? (
+                    <LoopBox node={n} open={open} onOpen={setOpen} mayEdit={mayEdit} editor={editor} />
+                  ) : (
+                    <StepCard
+                      step={n}
+                      open={open === n.id}
+                      onOpen={(o) => setOpen(o ? n.id : null)}
+                      mayEdit={mayEdit(n.setting)}
+                      editor={editor}
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          </LiveSteps.Provider>
         )}
       </div>
       <footer className="border-t border-line px-5 py-3 text-[12px] leading-snug text-muted">
@@ -286,6 +304,55 @@ function FlowCanvas({
         )}
       </footer>
     </section>
+  );
+}
+
+/** What each step is doing now (routineLive), by its id. */
+const LiveSteps = createContext<Record<string, StepLive>>({});
+
+const LIVE_TONE: Record<StepLive["tone"], { pill: string; dot: string }> = {
+  now: { pill: "bg-sun-line/12 text-ink ring-sun-line/40", dot: "bg-sun-line animate-pulse motion-reduce:animate-none" },
+  press: { pill: "bg-warning-soft text-warning ring-warning/30", dot: "bg-warning" },
+  done: { pill: "bg-surface-2 text-ink-2 ring-line", dot: "bg-positive" },
+};
+
+/**
+ * A step's live line (20 Nov 2026, Martin: "build the live counts on each step"): what it is doing now, waiting on a
+ * person, or has done lately; pressed, the deals behind the count, each opening its deal.
+ */
+function LiveLine({ id }: { id: string }) {
+  const live = useContext(LiveSteps)[id];
+  const [open, setOpen] = useState(false);
+  if (!live) return null;
+  const t = LIVE_TONE[live.tone];
+  return (
+    <div className="px-4 pb-3">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className={clsx("inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[12px] font-medium ring-1", t.pill)}
+      >
+        <span className={clsx("size-1.5 rounded-full", t.dot)} aria-hidden />
+        {live.words}
+        <ChevronDown className={clsx("size-3 opacity-60 transition", open && "rotate-180")} aria-hidden />
+      </button>
+      {open && (
+        <ul className="mt-2 divide-y divide-line overflow-hidden rounded-lg ring-1 ring-line">
+          {live.deals.map((d) => (
+            <li key={d.jobId}>
+              <Link
+                href={`/design/deals/${d.jobId}`}
+                className="flex items-center justify-between gap-3 px-3 py-2 text-[12.5px] hover:bg-canvas"
+              >
+                <span className="truncate font-medium text-ink">{d.customer}</span>
+                <span className="shrink-0 text-muted">{d.note ?? "Open deal"}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -355,6 +422,7 @@ function StepCard({
             <Lock className="mt-1 size-3.5 shrink-0 text-muted" aria-label="Can't be changed here" />
           ) : null}
         </button>
+        <LiveLine id={step.id} />
         {open && (
           <div className="border-t border-line px-4 py-3">
             {step.fixed ? <p className="text-[12.5px] leading-snug text-ink-2">{step.fixed}</p> : step.setting && editor(step.setting)}
@@ -399,6 +467,9 @@ function LoopBox({
         ) : null}
       </button>
       {node.detail && <p className="mt-1 text-center text-[12px] text-ink-2">{node.detail}</p>}
+      <div className="flex justify-center [&>div]:px-0 [&>div]:pb-0 [&>div]:pt-2">
+        <LiveLine id={node.id} />
+      </div>
       {here && node.setting && (
         <div className="mx-auto mt-2 max-w-sm rounded-xl bg-surface p-3 ring-1 ring-line">{editor(node.setting)}</div>
       )}

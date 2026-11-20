@@ -384,3 +384,105 @@ export const stepsOf = (r: Routine): RoutineStep[] => r.nodes.flatMap((n) => (n.
 
 /** How many routines are running now, for the round on the bar. */
 export const runningCount = (routines: readonly Routine[]): number => routines.filter((r) => r.on === true).length;
+
+/**
+ * What each step is doing now (20 Nov 2026, Martin: "build the live counts on each step"): read by rule from the
+ * outbox and the voice agents' own deals, no AI, so the flow says what is happening and what is about to.
+ */
+export interface StepLive {
+  /** "2 waiting · next goes in 4m". */
+  words: string;
+  /** now: happening or about to; press: waiting on a person; done: what it has done lately. */
+  tone: "now" | "press" | "done";
+  /** The deals behind the count, to open. */
+  deals: { jobId: string; customer: string; note?: string }[];
+}
+
+export interface LiveFacts {
+  /** Sol's outbox: each email lined up, its kind, when it goes and whether it waits for a press. */
+  outbox: { kind: string; jobId: string; customer: string; firesAt: string; state: "counting" | "waiting" | "held" | "no-email" }[];
+  /** What Sol sent himself this week. */
+  sent: { kind: string; jobId: string; customer: string; at: string }[];
+  /** Each voice agent's own deals, by its key. */
+  calls: Record<string, { jobId: string; customer: string; standing: string; dueAt?: string | null }[]>;
+}
+
+type When = (iso: string, now: Date) => string;
+
+const many = (n: number, one: string, more: string) => `${n} ${n === 1 ? one : more}`;
+const dealsOf = <T extends { jobId: string; customer: string }>(list: T[], note?: (x: T) => string | undefined) =>
+  list.slice(0, 12).map((x) => ({ jobId: x.jobId, customer: x.customer, note: note?.(x) }));
+
+/** The live line for each step of every routine, by the step's id; a step with nothing on has none. */
+export function routineLive(routines: readonly Routine[], facts: LiveFacts, when: When, now = new Date()): Record<string, StepLive> {
+  const out: Record<string, StepLive> = {};
+  const emails = (kind: string, wait: string, send: string) => {
+    const lined = facts.outbox.filter((e) => e.kind === kind);
+    const counting = lined.filter((e) => e.state === "counting").sort((a, b) => a.firesAt.localeCompare(b.firesAt));
+    if (counting.length)
+      out[wait] = {
+        words: `${many(counting.length, "waiting", "waiting")} · next goes ${when(counting[0].firesAt, now)}`,
+        tone: "now",
+        deals: dealsOf(counting, (e) => `goes ${when(e.firesAt, now)}`),
+      };
+    const press = lined.filter((e) => e.state === "waiting" || e.state === "held");
+    const sent = facts.sent.filter((s) => s.kind === kind);
+    if (press.length)
+      out[send] = {
+        words: `${many(press.length, "waits", "wait")} for your press`,
+        tone: "press",
+        deals: dealsOf(press, (e) => (e.state === "held" ? "held" : undefined)),
+      };
+    else if (sent.length) out[send] = { words: `${many(sent.length, "sent", "sent")} this week`, tone: "done", deals: dealsOf(sent) };
+  };
+  emails("hello", "lead-wait", "lead-send");
+  emails("follow-up", "prop-wait", "prop-send");
+
+  for (const r of routines) {
+    if (r.medium !== "voice" || !r.agentKey) continue;
+    const key = r.agentKey;
+    const deals = facts.calls[key] ?? [];
+    const on = deals.filter((d) => d.standing === "live");
+    const lined = deals.filter((d) => d.standing === "lined-up").sort((a, b) => (a.dueAt ?? "~").localeCompare(b.dueAt ?? "~"));
+    const step = key === "admin" ? `${key}-offer` : `${key}-ring`;
+    if (on.length)
+      out[step] = {
+        words: `On a call now with ${on[0].customer}${on.length > 1 ? ` and ${on.length - 1} more` : ""}`,
+        tone: "now",
+        deals: dealsOf(on),
+      };
+    else if (lined.length) {
+      const next = lined[0].dueAt;
+      out[step] = {
+        words: `${many(lined.length, "call", "calls")} lined up${next ? ` · next ${when(next, now)}` : ""}`,
+        tone: "now",
+        deals: dealsOf(lined, (d) => (d.dueAt ? when(d.dueAt, now) : undefined)),
+      };
+    }
+    const needs = deals.filter((d) => d.standing === "needs-you");
+    const missed = deals.filter((d) => d.standing === "no-answer");
+    const spoke = deals.filter((d) => d.standing === "spoke");
+    if (key === "admin") {
+      if (spoke.length)
+        out[`${key}-pencil`] = { words: `${many(spoke.length, "customer", "customers")} spoken to`, tone: "done", deals: dealsOf(spoke) };
+      if (needs.length)
+        out[`${key}-team`] = { words: `${many(needs.length, "wants", "want")} the team to call`, tone: "press", deals: dealsOf(needs) };
+      continue;
+    }
+    if (needs.length)
+      out[`${key}-answer`] = {
+        words: `${many(needs.length, "wants", "want")} the team to call back`,
+        tone: "press",
+        deals: dealsOf(needs),
+      };
+    if (missed.length)
+      out[`${key}-loop`] = {
+        words: `${many(missed.length, "couldn't be reached", "couldn't be reached")} · over to you`,
+        tone: "press",
+        deals: dealsOf(missed),
+      };
+    if (spoke.length)
+      out[`${key}-done`] = { words: `${many(spoke.length, "spoken to", "spoken to")} lately`, tone: "done", deals: dealsOf(spoke) };
+  }
+  return out;
+}

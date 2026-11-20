@@ -64,6 +64,8 @@ export interface SentBySol {
   jobId: string;
   customer: string;
   subject: string;
+  /** What it was: a hello or a follow-up (prepared.ts). */
+  kind?: string;
   stage: AgentStage | null;
   at: string;
 }
@@ -145,7 +147,17 @@ export async function outbox(
   const sent = sentRows.flatMap((r) => {
     const job = byId.get(r.jobId);
     if (!job) return [];
-    return [{ id: r.id, jobId: r.jobId, customer: r.item.customer, subject: r.item.subject, stage: agentFor(job.stage), at: r.at }];
+    return [
+      {
+        id: r.id,
+        jobId: r.jobId,
+        customer: r.item.customer,
+        subject: r.item.subject,
+        kind: r.item.kind,
+        stage: agentFor(job.stage),
+        at: r.at,
+      },
+    ];
   });
   return { outbox: { settings, entries, needsYou, sent, canSend: Boolean(emailProvider()) }, pending };
 }
