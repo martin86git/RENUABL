@@ -14,9 +14,9 @@ import { SolSays, Typed } from "./today-pad";
 type Stage = "hello" | WelcomeStep | "done";
 
 // A step's own pad sits inside Sol's chat pad, a shade off it.
-const card = "mt-3 rounded-xl bg-canvas p-3.5 ring-1 ring-line sm:p-4";
+const card = "mt-3 max-w-lg rounded-xl bg-canvas px-3.5 py-2.5 ring-1 ring-line";
 const pill =
-  "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted";
+  "inline-flex h-8 items-center gap-2 rounded-full px-3 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted";
 const dark = `${pill} bg-primary text-primary-ink hover:brightness-110`;
 const light = `${pill} bg-surface text-ink ring-1 ring-line hover:ring-ink-2`;
 const quiet = "text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink";
@@ -69,16 +69,13 @@ export function Welcome({
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl flex-1 pb-10 pt-2" aria-live="polite">
-      <div className="rounded-2xl bg-surface p-4 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line sm:p-5">
+    <div className="mx-auto w-full max-w-3xl flex-1 pb-10 pt-2" aria-live="polite">
+      <div className="rounded-3xl bg-surface p-5 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line sm:p-8">
         <SolSays>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted" aria-hidden>
-            Sol
-          </p>
-          <div className="mt-1.5 space-y-4">
+          <div className="space-y-4">
             {stages.slice(0, at + 1).map((s) => (
               <div key={s}>
-                <div className="text-[14px] leading-relaxed text-ink">
+                <div className="text-[13.5px] font-medium leading-relaxed text-ink">
                   <Typed text={lines[s]} onDone={heard(s)} />
                 </div>
                 {said.has(s) && s === "connect" && <ConnectStep onNext={next} current={stages[at] === "connect"} />}
@@ -179,7 +176,7 @@ function ConnectStep({ onNext, current }: { onNext: () => void; current: boolean
         </p>
       )}
       {current && (
-        <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
+        <div className="mt-2 flex items-center gap-3 border-t border-line pt-2.5">
           <button type="button" className={dark} onClick={onNext}>
             {gmail || calendar ? "Next" : "Skip for now"}
           </button>
@@ -194,9 +191,9 @@ function ConnectStep({ onNext, current }: { onNext: () => void; current: boolean
 
 function Row({ icon, title, done, children }: { icon: React.ReactNode; title: string; done: string | null; children: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 py-2">
-      <span className="inline-flex size-9 items-center justify-center rounded-full bg-surface-2 text-ink-2">{icon}</span>
-      <span className="min-w-24 text-[14px] font-medium text-ink">{title}</span>
+    <div className="flex flex-wrap items-center gap-2.5 py-1.5">
+      <span className="inline-flex size-7 items-center justify-center rounded-full bg-surface-2 text-ink-2">{icon}</span>
+      <span className="min-w-20 text-[13px] font-medium text-ink">{title}</span>
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {done ? (
           <span className="inline-flex items-center gap-1.5 text-[14px] text-positive">
@@ -283,7 +280,7 @@ function TeamStep({ onNext, current }: { onNext: () => void; current: boolean })
         </p>
       )}
       {current && (
-        <div className="mt-4 flex items-center gap-3 border-t border-line pt-4">
+        <div className="mt-2 flex items-center gap-3 border-t border-line pt-2.5">
           <button type="button" className={dark} onClick={onNext}>
             {added.length ? "Next" : "Just me for now"}
           </button>
