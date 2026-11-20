@@ -238,7 +238,7 @@ export function useSolUnread(): number {
 }
 
 /** Whether Sol's panel is open, as it says (`SOL_STATE`). */
-function useSolOpen(): boolean {
+export function useSolOpen(): boolean {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const said = (e: Event) => setOpen(Boolean((e as CustomEvent<boolean>).detail));

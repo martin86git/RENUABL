@@ -38,7 +38,7 @@ import { PATHS } from "./design-shell";
 import { SunArc } from "./gauges";
 
 const ICONS: Record<PadView, LucideIcon> = { leads: UserPlus, performance: TrendingUp, installs: HardHat, closed: BadgeCheck };
-const KIND_ICONS: Record<NextKind, LucideIcon> = {
+export const KIND_ICONS: Record<NextKind, LucideIcon> = {
   install: HardHat,
   message: MessageSquare,
   lead: UserPlus,

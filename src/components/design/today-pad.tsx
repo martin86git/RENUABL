@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
-import { LAUNCH_MARKET, greeting } from "@/lib/domain/market";
-import { nextHeadline, searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
+import { LAUNCH_MARKET } from "@/lib/domain/market";
+import { searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
 import { agentFor, type AgentStage } from "@/lib/domain/design/sol-agents";
 import {
@@ -36,9 +36,11 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
+import { TodayChat, TodaySwitch } from "./today-chat";
+import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
-import { SolBadge, SolIcon, SolMark, SolStars } from "./sol-icon";
+import { SolBadge, SolIcon, SolMark } from "./sol-icon";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
@@ -128,7 +130,35 @@ export function TodayPad(props: {
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
   // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
   // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Deals" comes back.
-  const [onFeed, setOnFeed] = useState(!props.welcome);
+  // Chat or Feed (20 Nov 2026, Martin): Chat the first visit of the day, as a welcome after a night away, else the one
+  // last had today (today-view.ts, kept on the device). Read after the page is up, so the server's page and the
+  // browser's agree; until then neither is drawn.
+  const [view, setViewState] = useState<TodayView | null>(props.welcome ? "chat" : null);
+  const onFeed = view === "feed";
+  const setView = useCallback(
+    (v: TodayView) => {
+      setViewState(v);
+      try {
+        localStorage.setItem(TODAY_VIEW_KEY, JSON.stringify({ day: props.today, view: v }));
+      } catch {
+        // Not kept: Today opens on Chat next time.
+      }
+    },
+    [props.today],
+  );
+  const setOnFeed = (feed: boolean) => setView(feed ? "feed" : "chat");
+  useEffect(() => {
+    if (props.welcome) return;
+    let seen = null;
+    try {
+      seen = cleanSeen(JSON.parse(localStorage.getItem(TODAY_VIEW_KEY) ?? "null"));
+    } catch {
+      // Nothing kept.
+    }
+    const opens = todayOpensOn(seen, props.today);
+    const t = window.setTimeout(() => setView(opens), 0);
+    return () => window.clearTimeout(t);
+  }, [props.welcome, props.today, setView]);
   // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
   const [touring, setTouring] = useState(false);
   const tour = () => {
@@ -217,6 +247,19 @@ export function TodayPad(props: {
         </p>
       )}
 
+      {!welcoming && view && (
+        <div className="mt-1 flex justify-center print:hidden">
+          <TodaySwitch
+            view={view}
+            onView={(v) => {
+              // Chat pressed while in the conversation: back to the start, with the cards (it carries on in Sol's panel).
+              if (v === "chat" && view === "chat" && talking) setTurns([]);
+              setView(v);
+            }}
+          />
+        </div>
+      )}
+
       <div className="mt-2 flex flex-1 flex-col">
         {welcoming && (
           <Welcome
@@ -243,8 +286,8 @@ export function TodayPad(props: {
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
         <div
           className={clsx(
-            "flex flex-col justify-center transition-[flex-grow,opacity] duration-500 ease-out",
-            (welcoming || onFeed) && "hidden",
+            "flex flex-col justify-start transition-[flex-grow,opacity] duration-500 ease-out",
+            (welcoming || onFeed || !view) && "hidden",
             talking ? "grow-0 opacity-0" : "grow opacity-100",
           )}
           aria-hidden={talking}
@@ -253,7 +296,7 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <Hello {...props} count={items?.length ?? null} onDay={showDay} onAsk={ask} asking={asking} hidden={talking} />
+              <TodayChat name={props.name} items={items} onDay={showDay} onAsk={ask} asking={asking} hidden={talking} onView={setView} />
             </div>
           </div>
         </div>
@@ -343,15 +386,6 @@ export function TodayPad(props: {
       {talking && !onFeed && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
-            {!welcoming && (
-              <button
-                type="button"
-                onClick={() => setOnFeed(!onFeed)}
-                className="mb-2.5 mr-2 inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
-              >
-                Back to your deals
-              </button>
-            )}
             {!dayTold && (
               <button
                 type="button"
@@ -391,49 +425,6 @@ export function SolSays({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** The greeting in the middle of the screen, with Show me my day and Sol's box under it. */
-function Hello(props: {
-  business: string;
-  name: string | null;
-  count: number | null;
-  asking: boolean;
-  hidden: boolean;
-  onDay: () => void;
-  onAsk: (q: string, files: SolFile[]) => void;
-}) {
-  return (
-    <div className="mx-auto flex max-w-3xl flex-col items-center px-1 py-10 text-center" inert={props.hidden}>
-      <span className="relative">
-        <span className="sol-orb sol-breathe inline-flex size-16 items-center justify-center rounded-full">
-          <SolMark className="size-12" />
-        </span>
-        <SolStars className="absolute -right-3 -top-3 size-6" />
-      </span>
-      <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{props.business || "Your business"}</p>
-      <h1 className="mt-2 text-[clamp(30px,4.4vw,48px)] font-light leading-[1.05] tracking-[-0.025em] text-ink">
-        {greeting()}
-        {props.name ? `, ${props.name}` : ""}.
-      </h1>
-      <p className="mt-3 text-[15px] text-ink-2">{props.count === null ? "Looking at your day…" : nextHeadline(props.count, hourNow())}</p>
-      <div data-tour="today-sol" className="flex w-full flex-col items-center">
-        <button
-          type="button"
-          onClick={props.onDay}
-          className="group mt-7 inline-flex h-12 items-center gap-2.5 rounded-full bg-primary pl-2 pr-5 text-[15px] font-medium text-primary-ink shadow-[0_6px_20px_rgb(20_22_26_/_0.18)] transition hover:shadow-[0_6px_24px_rgb(255_90_31_/_0.35)]"
-        >
-          <span className="inline-flex size-8 items-center justify-center rounded-full bg-white/10">
-            <SolBadge className="size-5 transition-transform duration-300 group-hover:scale-110" />
-          </span>
-          Show me my day
-        </button>
-        <div className="mt-8 w-full">
-          <SolBox onAsk={props.onAsk} asking={props.asking} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** Sol's box: what is asked goes to Sol, in the same conversation as his panel. */
 export function SolBox({
   onAsk,
@@ -442,7 +433,10 @@ export function SolBox({
   placeholder = "Ask Sol about your deals, your day, or what to say to a customer",
   replyTo = null,
   onStopReply,
+  tall = false,
 }: {
+  /** Twice as thick (20 Nov 2026, Martin): the words on top, the paperclip, microphone and send along its foot. */
+  tall?: boolean;
   /** One of Sol's questions being answered, shown over the box. */
   replyTo?: string | null;
   onStopReply?: () => void;
@@ -473,7 +467,10 @@ export function SolBox({
         e.preventDefault();
         void send();
       }}
-      className="rounded-[26px] bg-surface p-2 pl-4 text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line"
+      className={clsx(
+        "bg-surface text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line",
+        tall ? "rounded-[28px] p-3 pl-5 pt-4" : "rounded-[26px] p-2 pl-4",
+      )}
     >
       {replyTo && (
         <p className="mb-1.5 mr-2 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
@@ -486,34 +483,73 @@ export function SolBox({
         </p>
       )}
       <AttachedFiles attach={attach} />
-      <div className="flex items-center gap-1.5">
-        <SolBadge className="size-5 shrink-0" />
-        <label className="sr-only" htmlFor={id}>
-          Ask Sol
-        </label>
-        <input
-          id={id}
-          value={heard ? withSpoken(text, heard) : text}
-          onChange={(e) => {
-            setHeard("");
-            setText(e.target.value);
-          }}
-          maxLength={4000}
-          autoComplete="off"
-          placeholder={placeholder}
-          className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
-        />
-        <AttachButton attach={attach} />
-        <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
-        <button
-          type="submit"
-          disabled={asking || !ready}
-          aria-label="Ask Sol"
-          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
-        >
-          <ArrowUp className="size-4" aria-hidden />
-        </button>
-      </div>
+      {tall ? (
+        <>
+          <label className="sr-only" htmlFor={id}>
+            Ask Sol
+          </label>
+          <textarea
+            id={id}
+            value={heard ? withSpoken(text, heard) : text}
+            onChange={(e) => {
+              setHeard("");
+              setText(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            rows={2}
+            maxLength={4000}
+            autoComplete="off"
+            placeholder={placeholder}
+            className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
+          />
+          <div className="mt-2 flex items-center gap-1">
+            <AttachButton attach={attach} />
+            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
+            <button
+              type="submit"
+              disabled={asking || !ready}
+              aria-label="Ask Sol"
+              className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+            >
+              <ArrowUp className="size-4" aria-hidden />
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          <SolBadge className="size-5 shrink-0" />
+          <label className="sr-only" htmlFor={id}>
+            Ask Sol
+          </label>
+          <input
+            id={id}
+            value={heard ? withSpoken(text, heard) : text}
+            onChange={(e) => {
+              setHeard("");
+              setText(e.target.value);
+            }}
+            maxLength={4000}
+            autoComplete="off"
+            placeholder={placeholder}
+            className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+          />
+          <AttachButton attach={attach} />
+          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
+          <button
+            type="submit"
+            disabled={asking || !ready}
+            aria-label="Ask Sol"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+          >
+            <ArrowUp className="size-4" aria-hidden />
+          </button>
+        </div>
+      )}
     </form>
   );
 }
