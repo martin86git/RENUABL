@@ -327,7 +327,7 @@ export function SolTerminal(props: {
   );
 
   return (
-    <section aria-label="Sol" className="sol-ground sol-say @container overflow-hidden rounded-2xl">
+    <section aria-label="Sol" className="sol-say @container overflow-hidden rounded-2xl">
       {calling && (
         <CallChooser
           jobId={props.jobId}

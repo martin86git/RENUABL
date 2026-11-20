@@ -1376,11 +1376,19 @@ html:has(.sales-snap) {
    as easily with everything else and the eye gravitates there first… perhaps the charcoal?"): his chat's charcoal ground
    and its light-on-dark tokens (`.sol-ground`), as dark glass with a light top edge and a fine orange rim, lifted off the
    page. The only dark box among white cards, so it is read first. */
-.sol-ground.sol-say {
-  background: linear-gradient(180deg, #43464d 0%, #34373d 60%, #2e3136 100%);
+/* A warm wash of his own orange with dark words (20 Nov 2026, Martin: the deep graphite was "too much of a match with
+   the header boxes"): the one warm box on the page. Its cards and fields are white on it, its quiet buttons a warm tint. */
+.sol-say {
+  --canvas: #fff9f4;
+  --surface: #ffffff;
+  --surface-2: #fde6d6;
+  --line: #f1cdb6;
+  --line-strong: #e6b294;
+  --muted: #7d6a5f;
+  background: linear-gradient(180deg, #fff6ee 0%, #ffefe3 100%);
+  color: var(--ink);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.12),
-    inset 0 0 0 1px rgb(255 138 61 / 0.45),
-    0 18px 40px -18px rgb(255 90 31 / 0.45),
-    0 10px 26px -12px rgb(11 11 12 / 0.4);
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    inset 0 0 0 1px rgb(255 122 61 / 0.5),
+    0 16px 36px -20px rgb(255 90 31 / 0.5);
 }

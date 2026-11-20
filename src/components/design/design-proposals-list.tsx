@@ -439,7 +439,7 @@ function FollowUpBox({
     );
 
   return (
-    <div className="sol-ground sol-say mt-3 rounded-2xl p-3.5">
+    <div className="sol-say mt-3 rounded-2xl p-3.5">
       <div className="flex gap-3">
         <SolLive />
         <div className="min-w-0 flex-1">
