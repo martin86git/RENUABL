@@ -55,6 +55,8 @@ import { SolIcon } from "./sol-icon";
  */
 export function ProposalsPage({ signed }: { signed: boolean }) {
   const [rows, setRows] = useState<ProposalLine[] | null>(null);
+  // The business's own follow-up days (its Routines).
+  const [days, setDays] = useState<number[] | undefined>(undefined);
   const [problem, setProblem] = useState<string | null>(null);
   // Read once on the client, so "today" and "3 days ago" are the viewer's now.
   const [now] = useState(() => new Date());
@@ -62,8 +64,10 @@ export function ProposalsPage({ signed }: { signed: boolean }) {
     let gone = false;
     void listProposals().then((res) => {
       if (gone) return;
-      if (res.ok) setRows(res.proposals);
-      else setProblem(res.message);
+      if (res.ok) {
+        setRows(res.proposals);
+        setDays(res.followUpDays);
+      } else setProblem(res.message);
     });
     return () => {
       gone = true;
@@ -79,7 +83,7 @@ export function ProposalsPage({ signed }: { signed: boolean }) {
         </p>
       )}
       {!rows && !problem && <p className="mt-6 text-sm text-muted">Loading…</p>}
-      {rows && (signed ? <SignedList rows={rows} now={now} /> : <SentList rows={rows} now={now} />)}
+      {rows && (signed ? <SignedList rows={rows} now={now} /> : <SentList rows={rows} now={now} days={days} />)}
     </div>
   );
 }
@@ -126,7 +130,7 @@ function SentOn({ at, now }: { at: string; now: Date }) {
 
 type SentLine = ProposalLine & { at: string; due: FollowUpDue | null };
 
-function SentList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
+function SentList({ rows, now, days }: { rows: ProposalLine[]; now: Date; days?: number[] }) {
   const [list, setList] = useState(rows);
   const lines: SentLine[] = sentOrder(
     list.map((r) => ({
@@ -134,7 +138,14 @@ function SentList({ rows, now }: { rows: ProposalLine[]; now: Date }) {
       at: r.publishedAt,
       due:
         r.state === "live"
-          ? dueFollowUp({ sentAt: r.publishedAt, now, done: r.followUps.map((f) => f.day), lastWord: r.lastWord, lastTouch: r.lastTouch })
+          ? dueFollowUp({
+              sentAt: r.publishedAt,
+              now,
+              done: r.followUps.map((f) => f.day),
+              lastWord: r.lastWord,
+              lastTouch: r.lastTouch,
+              days,
+            })
           : null,
     })),
   );
@@ -547,11 +558,13 @@ function Touches({ line, now }: { line: ProposalLine; now: Date }) {
   const touches = [
     { label: "Proposal sent", at: line.publishedAt, Icon: Send },
     ...(line.openedAt ? [{ label: "Opened the proposal", at: line.openedAt, Icon: Eye }] : []),
-    ...line.followUps.map((f) => ({
-      label: `${FOLLOW_UP_WORDS[[2, 7, 14].indexOf(f.day)] ?? "A"} follow-up: ${f.how === "call" ? "called" : "emailed"}`,
-      at: f.at,
-      Icon: f.how === "call" ? Phone : Mail,
-    })),
+    ...[...line.followUps]
+      .sort((a, b) => a.day - b.day)
+      .map((f, i) => ({
+        label: `${FOLLOW_UP_WORDS[i] ?? "A"} follow-up: ${f.how === "call" ? "called" : "emailed"}`,
+        at: f.at,
+        Icon: f.how === "call" ? Phone : Mail,
+      })),
   ].sort((a, b) => a.at.localeCompare(b.at));
   return (
     <ol className="mt-2 flex flex-wrap gap-3">

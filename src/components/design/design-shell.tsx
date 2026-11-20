@@ -46,6 +46,7 @@ import { LiveCallsTray } from "./live-calls";
 import { CoachWindow } from "./coach-chat";
 import { ColleagueWindow } from "./colleague";
 import { RailAgents } from "./rail-agents";
+import { RoutinesRound } from "./routines-round";
 import { AgentsWindow } from "./agents-window";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
@@ -828,6 +829,7 @@ function Shell({
         <SolRail
           team={<TeamChatButton me={account.email} customers={unread + mentions} />}
           assistant={kind === "retailer" ? <RailAgents /> : undefined}
+          routines={kind === "retailer" ? <RoutinesRound /> : undefined}
         />
       )}
       {retail && <SolDock />}

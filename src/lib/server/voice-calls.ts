@@ -69,6 +69,7 @@ import {
   whenWords,
 } from "@/lib/domain/voice-agent";
 import { dbConfigured, newId, query, transaction } from "./db";
+import { agentSettings } from "./design-routine-settings";
 import { jobById, record } from "./design-crm-repo";
 import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
@@ -682,7 +683,14 @@ export async function handleCallEnded(row: VoiceRow, e: VapiEvent): Promise<void
       }
     };
     if (outcome === "voicemail") await textThem();
-    const next = s ? nextAttemptAt(row.attempts, new Date(), row.asked ? MAX_ASKED_ATTEMPTS : MAX_ATTEMPTS) : null;
+    // A new lead is rung as many times as the business's routine says (Routines, 20 Nov 2026); one who asked, as ever.
+    const most = row.asked
+      ? MAX_ASKED_ATTEMPTS
+      : await agentSettings(row.business_id).then(
+          (r) => r.callAttempts,
+          () => MAX_ATTEMPTS,
+        );
+    const next = s ? nextAttemptAt(row.attempts, new Date(), most) : null;
     if (s && next && (await placeCall(s, row, next))) return;
     await finish(row.id, "done", { outcome });
     await textThem();

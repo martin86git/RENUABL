@@ -50,7 +50,8 @@ import { readiness, type Check } from "@/lib/domain/design/schedule";
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
 import { record } from "./design-crm-repo";
-import { FOLLOW_UP_DAYS, FOLLOW_UP_WORDS } from "@/lib/domain/design/proposal-lists";
+import { FOLLOW_UP_WORDS } from "@/lib/domain/design/proposal-lists";
+import { agentSettings } from "./design-routine-settings";
 import { loadLists } from "./design-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -808,7 +809,7 @@ export async function markFollowUp(
       [businessId, jobId, day, how, by.toLowerCase()],
     );
     if (added.length) {
-      const step = FOLLOW_UP_DAYS.indexOf(day as (typeof FOLLOW_UP_DAYS)[number]);
+      const step = (await agentSettings(businessId)).followUpDays.indexOf(day);
       await record(q, businessId, {
         customerId: jobs[0].customerId,
         jobId,

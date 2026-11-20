@@ -12,7 +12,6 @@ import {
   SOL_SENDER,
   agentFor,
   agentOfItem,
-  cleanAgentSettings,
   firesAtFor,
   outboxState,
   shouldFire,
@@ -28,6 +27,7 @@ import { openPixel, tracksOpensTo, withPixel } from "@/lib/domain/design/email-o
 import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
+import { agentSettings, saveAgentSettings } from "./design-routine-settings";
 import { markFollowUp } from "./design-after-sale-repo";
 import { addActivity, listJobs } from "./design-crm-repo";
 import { isDemoBusiness } from "./design-demo-check";
@@ -40,20 +40,7 @@ import { emailProvider, sendEmail } from "./email";
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function agentSettings(businessId: string): Promise<AgentSettings> {
-  const rows = await query<{ settings: unknown }>(`select settings from design_sol_agents where business_id = $1`, [businessId]);
-  return cleanAgentSettings(rows[0]?.settings);
-}
-
-export async function saveAgentSettings(businessId: string, settings: AgentSettings, by: string): Promise<AgentSettings> {
-  const clean = cleanAgentSettings(settings);
-  await query(
-    `insert into design_sol_agents (business_id, settings, updated_by) values ($1, $2::jsonb, $3)
-     on conflict (business_id) do update set settings = excluded.settings, updated_at = now(), updated_by = excluded.updated_by`,
-    [businessId, JSON.stringify(clean), by.toLowerCase()],
-  );
-  return clean;
-}
+export { agentSettings, saveAgentSettings };
 
 export interface OutboxEntry extends PreparedItem {
   stage: AgentStage | null;
@@ -98,7 +85,7 @@ const entryOf = (item: Held, stage: JobStage | undefined, settings: AgentSetting
     ...item,
     stage: agent,
     held,
-    firesAt: firesAtFor(item, settings.hours, now),
+    firesAt: firesAtFor(item, settings, now),
     // With no email service on the site nothing can go, so nothing counts down.
     state: outboxState({
       stage: agent,

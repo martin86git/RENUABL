@@ -136,6 +136,7 @@ export function useNextUp(jobs: JobLine[] | null, today: ISODate): NextItem[] | 
                 done: p.followUps.map((x) => x.day),
                 lastWord: p.lastWord,
                 lastTouch: p.lastTouch,
+                days: proposals.followUpDays,
               });
               return due ? [{ jobId: p.jobId, customer: p.customer, age: due.age }] : [];
             })

@@ -9,7 +9,9 @@
  */
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
 import type { JobStage } from "./crm";
+import { MAX_ATTEMPTS } from "../voice-agent";
 import { HELLO_REVIEW_MINUTES } from "./first-contact";
+import { FOLLOW_UP_DAYS } from "./proposal-lists";
 import { isWorkingDay, nextWorkingDay } from "./today-pad";
 
 export const AGENT_STAGES = ["lead", "designed", "proposal", "won"] as const;
@@ -94,9 +96,46 @@ export interface AgentSettings {
   on: AgentStage[];
   /** When they may send. */
   hours: SendHours;
+  /**
+   * The rest of the routines (20 Nov 2026, Martin: the Routines page, "adjusting here should adjust actions"):
+   * the days after a proposal goes out that a follow-up falls due, ascending, one to three of them.
+   */
+  followUpDays: number[];
+  /** How long an email Sol wrote waits to be read before it goes. */
+  reviewMinutes: number;
+  /** How long a new lead's hello waits (speed to lead: minutes, not half an hour). */
+  helloMinutes: number;
+  /** How many times a voice agent rings a new lead before it hands them to the team. */
+  callAttempts: number;
 }
 
-export const DEFAULT_AGENT_SETTINGS: AgentSettings = { on: [], hours: "business" };
+/** What can be chosen for each, so nothing odd is ever kept. */
+export const ROUTINE_CHOICES = {
+  reviewMinutes: [10, 30, 60, 120],
+  helloMinutes: [2, 5, 15, 30],
+  callAttempts: [1, 2, 3],
+  followUpDay: { min: 1, max: 30, most: 3 },
+} as const;
+
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  on: [],
+  hours: "business",
+  followUpDays: [...FOLLOW_UP_DAYS],
+  reviewMinutes: MIN_REVIEW_MINUTES,
+  helloMinutes: HELLO_REVIEW_MINUTES,
+  callAttempts: MAX_ATTEMPTS,
+};
+
+/** Follow-up days made whole: whole days in range, no repeats, ascending, at most three; none sent keeps ours. */
+export function cleanFollowUpDays(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [...FOLLOW_UP_DAYS];
+  const { min, max, most } = ROUTINE_CHOICES.followUpDay;
+  const days = [...new Set(raw.filter((d): d is number => Number.isInteger(d) && d >= min && d <= max))].sort((a, b) => a - b);
+  return days.length ? days.slice(0, most) : [...FOLLOW_UP_DAYS];
+}
+
+const oneOf = <T extends number>(raw: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(raw as T) ? (raw as T) : fallback;
 
 /** Settings from anywhere made whole and safe. Older settings (one switch for all, with pauses) read as the same agents on. */
 export function cleanAgentSettings(raw: unknown): AgentSettings {
@@ -106,11 +145,19 @@ export function cleanAgentSettings(raw: unknown): AgentSettings {
     : r.sending === true && r.pausedAll !== true
       ? AGENT_STAGES.filter((s) => !(Array.isArray(r.paused) && r.paused.includes(s)))
       : [];
-  return { on, hours: r.hours === "long" ? "long" : "business" };
+  return {
+    on,
+    hours: r.hours === "long" ? "long" : "business",
+    followUpDays: cleanFollowUpDays(r.followUpDays),
+    reviewMinutes: oneOf(r.reviewMinutes, ROUTINE_CHOICES.reviewMinutes, MIN_REVIEW_MINUTES),
+    helloMinutes: oneOf(r.helloMinutes, ROUTINE_CHOICES.helloMinutes, HELLO_REVIEW_MINUTES),
+    callAttempts: oneOf(r.callAttempts, ROUTINE_CHOICES.callAttempts, MAX_ATTEMPTS),
+  };
 }
 
 /** Whether this agent sends its emails itself. */
-export const agentOn = (settings: AgentSettings, stage: AgentStage | null): boolean => Boolean(stage && settings.on.includes(stage));
+export const agentOn = (settings: Pick<AgentSettings, "on">, stage: AgentStage | null): boolean =>
+  Boolean(stage && settings.on.includes(stage));
 
 const minuteOfDay = (at: Date) => {
   const parts = new Intl.DateTimeFormat("en-AU", {
@@ -169,10 +216,16 @@ export function laterAt(later: Later, now = new Date()): string {
  * When an outbox email goes: the usual time after it was ready, or, when someone put it off, the first open time
  * from then (8 Nov 2026, Martin: the countdown is the person's to change).
  */
-export function firesAtFor(item: { createdAt: string; notBefore?: string; kind?: string }, hours: SendHours, now = new Date()): string {
-  if (item.notBefore && !Number.isNaN(Date.parse(item.notBefore))) return nextOpen(new Date(item.notBefore), hours);
+export function firesAtFor(
+  item: { createdAt: string; notBefore?: string; kind?: string },
+  settings: SendHours | Pick<AgentSettings, "hours" | "reviewMinutes" | "helloMinutes">,
+  now = new Date(),
+): string {
+  const s =
+    typeof settings === "string" ? { hours: settings, reviewMinutes: MIN_REVIEW_MINUTES, helloMinutes: HELLO_REVIEW_MINUTES } : settings;
+  if (item.notBefore && !Number.isNaN(Date.parse(item.notBefore))) return nextOpen(new Date(item.notBefore), s.hours);
   // A new lead's hello waits only minutes: speed to lead (first-contact.ts).
-  return sendAt(item.createdAt, hours, now, item.kind === "hello" ? HELLO_REVIEW_MINUTES : MIN_REVIEW_MINUTES);
+  return sendAt(item.createdAt, s.hours, now, item.kind === "hello" ? s.helloMinutes : s.reviewMinutes);
 }
 
 /** A clock time in the market as people say it: "10 am", "2:30 pm". */
@@ -223,7 +276,7 @@ export function outboxState(input: {
   stage: AgentStage | null;
   held: boolean;
   hasEmail: boolean;
-  settings: AgentSettings;
+  settings: Pick<AgentSettings, "on">;
   scheduled?: boolean;
 }): OutboxState {
   if (!input.hasEmail) return "no-email";

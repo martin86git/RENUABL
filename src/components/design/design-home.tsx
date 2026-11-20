@@ -404,6 +404,7 @@ function YourDay({ jobs, today, serviceOpen }: { jobs: JobLine[] | null; today: 
                     done: p.followUps.map((f) => f.day),
                     lastWord: p.lastWord,
                     lastTouch: p.lastTouch,
+                    days: proposals.followUpDays,
                   }),
               ).length
             : 0,

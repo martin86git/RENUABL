@@ -1,4 +1,3 @@
-import { FOLLOW_UP_DAYS } from "@/lib/domain/design/proposal-lists";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { markFollowUp } from "@/lib/server/design-after-sale-repo";
 
@@ -14,12 +13,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if ("refuse" in read) return read.refuse;
     const day = read.body.day;
     const how = read.body.how;
-    if (
-      !validId(id) ||
-      typeof day !== "number" ||
-      !(FOLLOW_UP_DAYS as readonly number[]).includes(day) ||
-      (how !== "call" && how !== "email")
-    )
+    if (!validId(id) || typeof day !== "number" || !Number.isInteger(day) || day < 1 || day > 60 || (how !== "call" && how !== "email"))
       return Response.json({ ok: false, message: "Couldn't be saved. Try again." }, { status: 422 });
     const done = await markFollowUp(who.member.businessId, id, day, how, who.member.email);
     if (done === "missing") return Response.json({ ok: false, message: "There's no such deal." }, { status: 404 });

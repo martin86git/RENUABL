@@ -52,8 +52,12 @@ describe("business hours", () => {
 describe("settings", () => {
   it("cleans to agents on and the hours", () => {
     expect(cleanAgentSettings(null)).toEqual(DEFAULT_AGENT_SETTINGS);
-    expect(cleanAgentSettings({ on: ["proposal", "nope", "won"], hours: "long" })).toEqual({ on: ["proposal", "won"], hours: "long" });
-    expect(cleanAgentSettings({ on: "proposal", hours: "all night" })).toEqual({ on: [], hours: "business" });
+    expect(cleanAgentSettings({ on: ["proposal", "nope", "won"], hours: "long" })).toEqual({
+      ...DEFAULT_AGENT_SETTINGS,
+      on: ["proposal", "won"],
+      hours: "long",
+    });
+    expect(cleanAgentSettings({ on: "proposal", hours: "all night" })).toEqual(DEFAULT_AGENT_SETTINGS);
   });
 
   it("reads older settings as the same agents on", () => {

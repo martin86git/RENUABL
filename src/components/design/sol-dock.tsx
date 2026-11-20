@@ -299,7 +299,15 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
  * (3 Nov 2026, Martin: the focus point), then notifications and email (moved from the top bar), then the sales at a
  * glance. Sol left it for his round in the nav (1 Nov 2026). Wide screens only.
  */
-export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant?: React.ReactNode }) {
+export function SolRail({
+  team,
+  assistant,
+  routines,
+}: {
+  team?: React.ReactNode;
+  assistant?: React.ReactNode;
+  routines?: React.ReactNode;
+}) {
   // The floating bar, half way down the right, as it was (14 Nov 2026, Martin: the loose rounds in the corner were
   // tried the same day and he didn't like them: "I want the old look and positioning of the floating bar… with just
   // the chat and the 2 agents"). It holds only who you talk to: team chat and the business's agents. The tools that
@@ -323,6 +331,8 @@ export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant
         {/* The business's agents, each with its name under it (rail-agents.tsx). */}
         {assistant}
       </div>
+      {/* Routines float under the bar, held to it by a bridge (routines-round.tsx). */}
+      {routines}
       {team && (
         <span className="flex flex-col items-center gap-1">
           <span className="team-bulb team-alone">{team}</span>

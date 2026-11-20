@@ -37,10 +37,12 @@ export function dueFollowUp(input: {
   done: readonly number[];
   lastWord: string | null;
   lastTouch?: string | null;
+  /** The business's own follow-up days (its Routines), else ours. */
+  days?: readonly number[];
 }): FollowUpDue | null {
   const sent = todayInMarket(new Date(input.sentAt));
   const age = dayNumber(todayInMarket(input.now)) - dayNumber(sent);
-  const reached = FOLLOW_UP_DAYS.map((day, i) => ({ day, step: i + 1 })).filter((p) => p.day <= age);
+  const reached = (input.days?.length ? input.days : FOLLOW_UP_DAYS).map((day, i) => ({ day, step: i + 1 })).filter((p) => p.day <= age);
   const latest = reached[reached.length - 1];
   if (!latest || input.done.includes(latest.day)) return null;
   for (const at of [input.lastWord, input.lastTouch])

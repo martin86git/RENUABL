@@ -37,6 +37,7 @@ import { newId, query } from "./db";
 import { listProposals } from "./design-after-sale-repo";
 import { listJobs } from "./design-crm-repo";
 import { lineUpHellos } from "./design-hello";
+import { agentSettings } from "./design-routine-settings";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -124,10 +125,11 @@ export async function readyFor(
   await lineUpHellos({ id: businessId, name: member.businessName }).catch((e) =>
     console.error("Sol couldn't line up a hello", e instanceof Error ? e.message : e),
   );
-  const [proposals, seenJobs, existing] = await Promise.all([
+  const [proposals, seenJobs, existing, routine] = await Promise.all([
     listProposals(businessId, todayInMarket(now)),
     viewer.all ? Promise.resolve(null) : listJobs(businessId, viewer),
     rows(businessId),
+    agentSettings(businessId),
   ]);
   const seen = seenJobs && new Set(seenJobs.map((j) => j.id));
   // Every follow-up due now, the business's whole list (the tray is shared; who sees which is decided below). Only on
@@ -136,7 +138,14 @@ export async function readyFor(
     .filter((p) => p.state === "live" && !p.acceptedAt && p.sentOut)
     .map((p) => ({
       p,
-      d: dueFollowUp({ sentAt: p.publishedAt, now, done: p.followUps.map((f) => f.day), lastWord: p.lastWord, lastTouch: p.lastTouch }),
+      d: dueFollowUp({
+        sentAt: p.publishedAt,
+        now,
+        done: p.followUps.map((f) => f.day),
+        lastWord: p.lastWord,
+        lastTouch: p.lastTouch,
+        days: routine.followUpDays,
+      }),
     }))
     .filter((x): x is { p: (typeof proposals)[number]; d: NonNullable<typeof x.d> } => Boolean(x.d));
   const dueKeys = new Set(due.map(({ p, d }) => followUpKey(p.jobId, p.version, d.day)));

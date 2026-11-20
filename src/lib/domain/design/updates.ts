@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
     area: "Everywhere",
+    words: "Routines, under the bar on the right: each agent's routine as a flow, with its follow-up days, waits and calls to change.",
+  },
+  {
+    day: "2026-11-20",
+    area: "Everywhere",
     words: "Sol now heads the bar on the right, team chat sits under it, and the Marketplace is the blue button at the end of the menu.",
   },
   {
