@@ -248,7 +248,7 @@ export function TodayPad(props: {
       )}
 
       {!welcoming && view && (
-        <div className="mt-1 flex justify-center print:hidden">
+        <div data-tour="today-switch" className="mt-1 flex justify-center print:hidden">
           <TodaySwitch
             view={view}
             onView={(v) => {
@@ -296,7 +296,16 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <TodayChat name={props.name} items={items} onDay={showDay} onAsk={ask} asking={asking} hidden={talking} onView={setView} />
+              <TodayChat
+                name={props.name}
+                items={items}
+                jobs={props.jobs}
+                onDay={showDay}
+                onAsk={ask}
+                asking={asking}
+                hidden={talking}
+                onView={setView}
+              />
             </div>
           </div>
         </div>
@@ -374,8 +383,11 @@ export function TodayPad(props: {
       {touring && (
         <Spotlight
           steps={WELCOME_TOUR}
+          onGo={(v) => setView(v === "feed" ? "feed" : "chat")}
           onEnd={() => {
             setTouring(false);
+            // Back to Chat, where Sol picks up with his introduction.
+            setView("chat");
             window.dispatchEvent(new Event(SOL_INDUCTION));
           }}
         />
