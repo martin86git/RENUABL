@@ -132,6 +132,8 @@ const BLOCKED: readonly RegExp[] = [
   // Add-ons to the plan, and a phone number bought (domain/design/add-ons.ts).
   /^\/api\/design\/addons(\/|$)/,
   /^\/api\/design\/inbox$/,
+  // The lead inbox reads a real mailbox (lead-inbox.ts).
+  /^\/api\/design\/lead-inbox$/,
   // Reading another company's account (Pylon) with a key.
   /^\/api\/design\/pylon$/,
   // Marketing email to a business's contacts (domain/marketing).

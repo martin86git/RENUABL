@@ -10,6 +10,7 @@ import { DatasheetSettings } from "@/components/design/settings-datasheets";
 import { StandardsSettings } from "@/components/design/settings-standards";
 import { TargetsSettings } from "@/components/design/settings-targets";
 import { PylonImportSettings } from "@/components/design/settings-pylon";
+import { LeadInboxSettings } from "@/components/design/settings-lead-inbox";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
 import { CallerSettings } from "@/components/design/settings-caller";
 import { StaffViewAs } from "@/components/design/staff-view-as";
@@ -70,6 +71,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <AfterSaleSettings part={AFTER_SALE[section]} />
         ) : section === "pylon" ? (
           <PylonImportSettings />
+        ) : section === "lead-inbox" ? (
+          <LeadInboxSettings />
         ) : section === "targets" ? (
           <TargetsSettings />
         ) : section === "datasheets" ? (

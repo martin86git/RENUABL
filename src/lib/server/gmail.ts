@@ -277,6 +277,25 @@ export async function attachment(member: Who, box: string, id: string, attachmen
   return Buffer.from(a.data ?? "", "base64url");
 }
 
+/**
+ * Emails matching a Gmail search in one mailbox, whole (format=full), newest first, up to `max` (the lead inbox,
+ * design-lead-inbox.ts). Only ever a mailbox the member connected.
+ */
+export async function searchMessages(member: Who, address: string, q: string, max: number): Promise<GmailMessage[]> {
+  const box = address.toLowerCase();
+  const list = await gmail<{ messages?: { id: string }[] }>(
+    member,
+    box,
+    `messages?q=${encodeURIComponent(q)}&maxResults=${Math.max(1, Math.min(50, max))}`,
+  );
+  return Promise.all(
+    (list.messages ?? []).map(async (m) => ({
+      ...(await gmail<Omit<GmailMessage, "box">>(member, box, `messages/${m.id}?format=full`)),
+      box,
+    })),
+  );
+}
+
 /** Read only: connected before RENUABL could mark read and archive; connecting it again allows it. */
 export class ReadOnlyMailbox extends Error {}
 

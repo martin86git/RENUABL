@@ -1209,6 +1209,35 @@ do $$ begin
 end $$;
 -- Whether Google granted gmail.modify (5 Nov 2026: mark read and archive from RENUABL); older mailboxes read only.
 alter table design_gmail add column if not exists can_modify boolean not null default false;
+-- The lead inbox (domain/design/lead-inbox.ts): one connected Gmail mailbox a business takes its emailed leads from,
+-- and every email it has looked at, once each by its Gmail id.
+create table if not exists design_lead_inbox (
+  business_id text primary key references businesses(id) on delete cascade,
+  owner_email text,
+  address text,
+  label text,
+  is_on boolean not null default false,
+  on_at timestamptz,
+  by_email text not null,
+  updated_at timestamptz not null default now(),
+  last_run_at timestamptz,
+  last_run jsonb
+);
+create table if not exists design_lead_inbox_emails (
+  business_id text not null references businesses(id) on delete cascade,
+  message_id text not null,
+  address text not null,
+  from_email text not null default '',
+  subject text not null default '',
+  received_at timestamptz,
+  outcome text not null,
+  reason text not null default '',
+  customer_id text,
+  job_id text,
+  processed_at timestamptz not null default now(),
+  primary key (business_id, message_id)
+);
+create index if not exists design_lead_inbox_emails_recent on design_lead_inbox_emails (business_id, processed_at desc);
 -- Each member's own calendar, Google or Outlook, read only (domain/design/my-calendar.ts), kept as Gmail's is.
 create table if not exists design_calendar (
   business_id text not null references businesses(id) on delete cascade,

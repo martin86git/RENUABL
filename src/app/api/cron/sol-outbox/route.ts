@@ -1,6 +1,7 @@
 import { dbConfigured } from "@/lib/server/db";
 import { fireDue, sendingBusinesses } from "@/lib/server/design-sol-agents";
 import { lineUpHellos } from "@/lib/server/design-hello";
+import { leadInboxBusinesses, syncLeadInbox } from "@/lib/server/design-lead-inbox";
 
 export const maxDuration = 300;
 
@@ -22,5 +23,14 @@ export async function GET(request: Request) {
       return 0;
     });
   }
-  return Response.json({ ok: true, sent });
+  // The lead inbox (lead-inbox.ts): new emailed leads into each business's CRM, before the next run's hellos find them.
+  let leads = 0;
+  for (const business of await leadInboxBusinesses().catch(() => [] as string[])) {
+    const run = await syncLeadInbox(business).catch((e) => {
+      console.error("the lead inbox couldn't be checked", e instanceof Error ? e.message : e);
+      return null;
+    });
+    leads += run?.taken ?? 0;
+  }
+  return Response.json({ ok: true, sent, leads });
 }
