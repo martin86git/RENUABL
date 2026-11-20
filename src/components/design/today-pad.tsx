@@ -248,7 +248,12 @@ export function TodayPad(props: {
       )}
 
       {!welcoming && view && (
-        <div data-tour="today-switch" className="mt-1 flex justify-center print:hidden">
+        // Over the pad's sticky top edge (.pad-cap, z 15), which on Today reaches down to the strip: under it the pill was
+        // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
+        <div
+          data-tour="today-switch"
+          className="relative z-[16] mt-1 flex justify-center print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
+        >
           <TodaySwitch
             view={view}
             onView={(v) => {
