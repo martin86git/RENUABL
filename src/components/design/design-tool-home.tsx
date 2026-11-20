@@ -149,7 +149,7 @@ export function DesignToolHome({ onPick, onOpen }: { onPick: (address: Address) 
             </h2>
             <p className="text-xs text-muted">Hottest first</p>
           </div>
-          <ul className="mt-3 space-y-4">
+          <ul className="mt-3 space-y-2">
             {rest.map((w) => (
               <li key={w.id}>
                 <FeedPost deal={w} pulse={pulses[w.id]} onPlaced={() => setAsks((n) => n + 1)} />
@@ -483,6 +483,7 @@ const cameIn = (days: number) => (days === 0 ? "Today" : days === 1 ? "Yesterday
  */
 function FeedPost({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse; onPlaced: () => void }) {
   const [note, setNote] = useState<string | null>(null);
+  const [placing, setPlacing] = useState(false);
   const place = async (a: Address) => {
     if (typeof a.lat !== "number" || typeof a.lng !== "number") return setNote("Pick the street address from the list.");
     const res = await saveJob(deal.id, { address: lineOf(a), lat: a.lat, lng: a.lng });
@@ -492,62 +493,82 @@ function FeedPost({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse;
   const hot = pulse?.heat.heat === "hot";
   const sign = pulse?.heat.reasons[0]?.text;
   const onMap = deal.placed && deal.lat !== null && deal.lng !== null;
+  // One row a deal (20 Nov 2026, Martin: the cards "take up too much of the page… more efficient cards"): who and what
+  // on one line, when, where and the latest sign under it, and the one thing to do at the right. A deal not on the map
+  // opens its address search under the row only when asked.
   return (
-    <article className="group overflow-hidden rounded-2xl bg-surface ring-1 ring-line transition hover:shadow-lift">
-      <header className="flex items-start gap-3 px-5 pt-4">
-        <span
-          className={clsx(
-            "flex size-10 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold",
-            hot ? "bg-sun-line text-white" : "bg-primary text-white",
-          )}
-          aria-hidden
-        >
-          {initials(deal.customerName)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-baseline gap-x-2 text-[15px] text-ink">
-            <span className="font-semibold">{deal.customerName}</span>
-            <span className="text-muted">wants {deal.title ? deal.title.toLowerCase() : "a design"}</span>
-          </p>
-          <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted">
-            <span className={clsx("tabular-nums", deal.late && "font-medium text-danger")}>{cameIn(deal.days)}</span>
-            <span aria-hidden>·</span>
-            <MapPin className="size-3 shrink-0" aria-hidden />
-            <span className="truncate">{deal.address || "No address yet"}</span>
-          </p>
-        </div>
-      </header>
-      <p className="px-5 pt-3 text-[14px] leading-snug text-ink-2">{sign ?? "No word from them yet."}</p>
-      {onMap ? (
-        <Link href={designHref(deal.id)} className="mt-3 block overflow-hidden" aria-label={`Design ${deal.customerName}'s roof`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={roofPicture({ lat: deal.lat!, lng: deal.lng! })}
-            alt=""
-            loading="lazy"
-            className="aspect-[2/1] w-full bg-surface-2 object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03] motion-reduce:transition-none"
-          />
-        </Link>
-      ) : (
-        <div className="mx-5 mt-3 rounded-xl bg-surface-2 p-3">
-          <p className="mb-2 text-xs font-medium text-ink-2">Place it on the map to design it</p>
-          <AddressEntry compact placeholder={deal.address || "Street address"} onPick={(a) => void place(a)} />
-          {note && <p className="mt-1.5 text-xs text-danger">{note}</p>}
-        </div>
-      )}
-      <footer className="flex items-center justify-between gap-3 px-5 py-3">
-        <Pulse pulse={pulse} />
+    <article className="group rounded-2xl bg-surface ring-1 ring-line transition hover:shadow-lift">
+      <div className="flex items-center gap-3 px-3 py-2.5">
         {onMap ? (
           <Link
             href={designHref(deal.id)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white transition hover:gap-2.5 hover:brightness-105 motion-reduce:transition-none"
+            className="shrink-0 overflow-hidden rounded-lg"
+            aria-label={`Design ${deal.customerName}'s roof`}
           >
-            <PenTool className="size-4" aria-hidden /> Design it <ArrowRight className="size-4" aria-hidden />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={roofPicture({ lat: deal.lat!, lng: deal.lng! })}
+              alt=""
+              loading="lazy"
+              className="h-11 w-16 bg-surface-2 object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06] motion-reduce:transition-none"
+            />
           </Link>
         ) : (
-          <span className="text-xs text-muted">Then design it here</span>
+          <span
+            className={clsx(
+              "flex size-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold",
+              hot ? "bg-sun-line text-white" : "bg-primary text-white",
+            )}
+            aria-hidden
+          >
+            {initials(deal.customerName)}
+          </span>
         )}
-      </footer>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] text-ink">
+            <span className="font-semibold">{deal.customerName}</span>{" "}
+            <span className="text-muted">wants {deal.title ? deal.title.toLowerCase() : "a design"}</span>
+          </p>
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+            <span className={clsx("shrink-0 tabular-nums", deal.late && "font-medium text-danger")}>{cameIn(deal.days)}</span>
+            <span aria-hidden>·</span>
+            <MapPin className="size-3 shrink-0" aria-hidden />
+            <span className="truncate">{deal.address || "No address yet"}</span>
+            <span className="hidden shrink-0 sm:inline" aria-hidden>
+              ·
+            </span>
+            <span className="hidden shrink-0 text-ink-2 sm:inline">{sign ?? "No word from them yet"}</span>
+          </p>
+        </div>
+        <span className="hidden shrink-0 sm:block">
+          <Pulse pulse={pulse} />
+        </span>
+        {onMap ? (
+          <Link
+            href={designHref(deal.id)}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white transition hover:brightness-105 motion-reduce:transition-none"
+          >
+            <PenTool className="size-3.5" aria-hidden /> Design it
+          </Link>
+        ) : (
+          <button
+            type="button"
+            aria-expanded={placing}
+            onClick={() => setPlacing((on) => !on)}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold text-ink ring-1 ring-inset ring-line transition hover:ring-ink/40"
+          >
+            <MapPin className="size-3.5" aria-hidden /> Place on map
+          </button>
+        )}
+      </div>
+      {!onMap && placing && (
+        <div className="border-t border-line px-3 py-2.5">
+          <AddressEntry compact placeholder={deal.address || "Street address"} onPick={(a) => void place(a)} />
+          <p className={clsx("mt-1.5 text-xs", note ? "text-danger" : "text-muted")}>
+            {note ?? "Pick the address from the list, then design it here."}
+          </p>
+        </div>
+      )}
     </article>
   );
 }

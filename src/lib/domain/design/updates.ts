@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
+    area: "Design tool",
+    words: "Deals waiting for a design are now compact rows, so more fit on the page.",
+  },
+  {
+    day: "2026-11-20",
     area: "Today",
     words: "Sol's box on a deal is a warm orange wash with dark words, so it no longer looks like the dark header boxes.",
   },
