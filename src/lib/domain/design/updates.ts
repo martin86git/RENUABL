@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
+    area: "Team chat",
+    words: "In team chat, Sol now sits between Team and Customers and flashes when he has something new for you.",
+  },
+  {
+    day: "2026-11-20",
     area: "Everywhere",
     words: "Routines, under the bar on the right: each agent's routine as a flow, with its follow-up days, waits and calls to change.",
   },

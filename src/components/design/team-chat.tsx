@@ -89,7 +89,8 @@ import { DealTeamChat } from "./deal-team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolChat } from "./sol-chat";
-import { SolBadge } from "./sol-icon";
+import { SolBadge, SolMark } from "./sol-icon";
+import { useSolUnread } from "./sol-dock";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolThinking, useSolLaunch } from "./sol-thinking";
 
@@ -396,7 +397,27 @@ export function TeamChatPanel({
     void load();
   };
 
-  const sides = <SideToggle side={side} onSide={setSide} customers={customers} />;
+  // Sol is the round between Team and Customers (20 Nov 2026, Martin: "move it to sit as sols hero icon… sandwhiched
+  // between the toggles team and customers. he should sit proud and larger than the toggles"), no longer a row under
+  // Direct messages. Pressing him opens his conversation on the Team side.
+  const sides = (
+    <SideToggle
+      side={side}
+      onSide={setSide}
+      customers={customers}
+      sol={
+        hasSol
+          ? {
+              on: side === "team" && solOpen,
+              open: () => {
+                setSide("team");
+                setRoom(SOL_ROOM);
+              },
+            }
+          : undefined
+      }
+    />
+  );
   if (side === "customers")
     return (
       <div className="flex h-full min-h-0 flex-col bg-surface text-ink">
@@ -432,7 +453,7 @@ export function TeamChatPanel({
           keys={(k) => (k === "ArrowLeft" ? keepListW(listW - 16) : k === "ArrowRight" ? keepListW(listW + 16) : undefined)}
           orientation="vertical"
         />
-        <div className="px-2 pt-2">{sides}</div>
+        <div className="px-2 pt-3">{sides}</div>
         <DealChatsList
           deals={view?.dealChats ?? []}
           room={room}
@@ -500,12 +521,6 @@ export function TeamChatPanel({
           />
         )}
         <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
-          {hasSol && (
-            <RoomButton on={solOpen} unread={0} onClick={() => setRoom(SOL_ROOM)} title="Your own conversation with Sol">
-              <Round email={SOL_BY} small />
-              <span className="truncate">Sol</span>
-            </RoomButton>
-          )}
           {view && view.people.length === 0 && (
             <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Press + to add someone.</p>
           )}
@@ -1829,39 +1844,83 @@ export function TeamChatButton({ me, customers = 0 }: { me: string; customers?: 
   );
 }
 
-/** Team or Customers, at the top of team chat. */
+/** Team or Customers, at the top of team chat, with Sol between them where the business has him. */
 function SideToggle({
   side,
   onSide,
   customers,
+  sol,
 }: {
   side: "team" | "customers";
   onSide: (side: "team" | "customers") => void;
   customers: number;
+  /** Sol's round between the two: whether his conversation is the one open, and how to open it. */
+  sol?: { on: boolean; open: () => void };
 }) {
+  const tab = (s: "team" | "customers") => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={side === s && !sol?.on}
+      onClick={() => onSide(s)}
+      className={clsx(
+        "relative whitespace-nowrap rounded-full px-1.5 py-1 text-xs font-medium",
+        side === s && !sol?.on ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
+      )}
+    >
+      {s === "team" ? "Team" : "Customers"}
+      {s === "customers" && customers > 0 && (
+        <span className="absolute -right-0.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
+          {customers}
+        </span>
+      )}
+    </button>
+  );
+  // Equal sides so Sol sits in the middle; on a narrow list each side is at least as wide as its word.
   return (
-    <div role="tablist" aria-label="Team or customers" className="flex rounded-full bg-canvas p-0.5 ring-1 ring-line">
-      {(["team", "customers"] as const).map((s) => (
-        <button
-          key={s}
-          type="button"
-          role="tab"
-          aria-selected={side === s}
-          onClick={() => onSide(s)}
-          className={clsx(
-            "relative flex-1 rounded-full px-3 py-1 text-xs font-medium",
-            side === s ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
-          )}
-        >
-          {s === "team" ? "Team" : "Customers"}
-          {s === "customers" && customers > 0 && (
-            <span className="ml-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white">
-              {customers}
-            </span>
-          )}
-        </button>
-      ))}
+    <div
+      role="tablist"
+      aria-label="Team, Sol or customers"
+      className={clsx(
+        "items-center rounded-full bg-canvas p-0.5 ring-1 ring-line",
+        sol ? "grid grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)]" : "grid grid-cols-2",
+      )}
+    >
+      {tab("team")}
+      {sol && <SolHero on={sol.on} onOpen={sol.open} />}
+      {tab("customers")}
     </div>
+  );
+}
+
+/**
+ * Sol between Team and Customers: his sun standing proud of the toggle, larger than it. While he has something unread
+ * and his conversation isn't the one open he flashes, as team chat's round does on the bar.
+ */
+function SolHero({ on, onOpen }: { on: boolean; onOpen: () => void }) {
+  const unread = useSolUnread();
+  const waiting = unread > 0 && !on;
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={on}
+      onClick={onOpen}
+      title="Your own conversation with Sol"
+      aria-label={unread ? `Sol: ${unread} unread` : "Sol, your assistant"}
+      className={clsx(
+        "sol-orb sol-hero group relative z-10 -my-3 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full bg-surface ring-1 ring-line transition",
+        on && "sol-hero-on",
+        waiting && "sol-hero-flash",
+      )}
+    >
+      <SolMark className="size-10 transition-transform duration-300 group-hover:scale-110" />
+      {waiting && (
+        <span className="absolute -right-1 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
+          {unread}
+        </span>
+      )}
+    </button>
   );
 }
 
