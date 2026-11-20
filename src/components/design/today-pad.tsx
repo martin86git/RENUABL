@@ -36,7 +36,7 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
-import { TodayChat, TodaySwitch } from "./today-chat";
+import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -168,6 +168,7 @@ export function TodayPad(props: {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
+  const insights = useInsights();
   const end = useRef<HTMLDivElement>(null);
   const talking = turns.length > 0;
   const dayTold = turns.some((t) => t.kind === "day");
@@ -255,6 +256,7 @@ export function TodayPad(props: {
           className="relative z-[16] mt-1 flex justify-center print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
         >
           <TodaySwitch
+            first={firstViewLabel(insights)}
             view={view}
             onView={(v) => {
               // Chat pressed while in the conversation: back to the start, with the cards (it carries on in Sol's panel).
@@ -301,16 +303,7 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <TodayChat
-                name={props.name}
-                items={items}
-                jobs={props.jobs}
-                onDay={showDay}
-                onAsk={ask}
-                asking={asking}
-                hidden={talking}
-                onView={setView}
-              />
+              <TodayChat name={props.name} views={insights} onAsk={ask} asking={asking} hidden={talking} />
             </div>
           </div>
         </div>

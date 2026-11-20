@@ -49,20 +49,20 @@ export function welcomeLines(firstName: string | null, business: string): Record
 
 /**
  * The spotlight tour after the welcome: each place on the page, in order. `go` turns Today to the view the place is on
- * (Chat or Feed) before it is lit. A place still not on screen is passed over.
+ * (the first view or Feed) before it is lit. A place still not on screen is passed over.
  * 20 Nov 2026, Martin: the tour "didnt show me the feed, deals pipeline". It now takes in the feed (Needs you, a deal's
  * card and its next move, the deals beside it) and Sales' pipeline, and says the menu and the bar as they are today.
  */
 export const WELCOME_TOUR: { what: string; now: string; at: string; go?: "chat" | "feed" }[] = [
   {
     what: "Today",
-    now: "is your home screen, in two views. Chat is where you talk to Sol; Feed is your deals as they happen.",
+    now: "is your home screen, in two views. The first is how the month is going and what's worth changing; Feed is your deals as they happen.",
     at: '[data-tour="today-switch"] [role="tablist"]',
     go: "chat",
   },
   {
     what: "Ask Sol",
-    now: "anything about your deals here, or press Show me my day and he'll write up what needs you.",
+    now: "about the business here: why a month is down, which leads are worth chasing, what to say to a customer.",
     at: '[data-tour="today-sol"]',
     go: "chat",
   },

@@ -1,236 +1,198 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ChevronRight, PenTool } from "lucide-react";
-import { nextHeadline, type NextItem } from "@/lib/domain/design/next-up";
-import { OPEN_STAGES } from "@/lib/domain/design/crm";
-import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
+import { ArrowRight, BatteryCharging, Eye, PhoneCall, Stamp, type LucideIcon } from "lucide-react";
+import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
 import type { TodayView } from "@/lib/domain/design/today-view";
-import type { Address } from "@/lib/domain/types";
-import type { JobLine } from "@/lib/services/crm";
-import { AddressEntry } from "@/components/consumer/address-entry";
-import { PATHS } from "./design-shell";
-import { designHref, openDesigner } from "./design-drawer";
-import { KIND_ICONS } from "./canvas-pad";
-import { useOutbox } from "./sol-agents";
-import { SolBadge, SolMark, SolStars } from "./sol-icon";
+import { dollars } from "@/lib/services/crm";
+import { loadInsights } from "@/lib/services/insights";
+import { GoalLine, SunArc } from "./gauges";
+import { SolMark, SolStars } from "./sol-icon";
 import { SolBox } from "./today-pad";
 
 /**
- * Today's Chat (20 Nov 2026, Martin: the first part of the old tour, Sol's greeting and his box, back "as a welcome
- * page after being inactive overnight", with a toggle to the feed; Sol larger and higher, the box twice as thick under
- * an actionable line in place of good morning or evening, then cards). Three short cards under the box, the same day's
- * three questions as the rest of RENUABL Business (LIVE_SOFTWARE.md): **Since yesterday** (what Sol did while nobody
- * was in: emails sent, emails lined up, new leads), **Needs you** (the three most pressing things from `nextUp`) and a
- * mini **designer** (the newest deal waiting for a design on its own roof, one press from the designer, or any address
- * typed in). Asking here starts the conversation on Today, as before.
+ * Today's Business and My month (21 Nov 2026, Martin: the Chat page wasn't a plus, chat is everywhere already; what
+ * nobody answered was "how is my business going, and what should I change?"). Today's first view, beside Feed. For
+ * anyone who may change settings it is the business: the month against its goal and up to three things worth changing,
+ * read by rule from the business's own deals (domain/design/insights.ts). For a salesperson it is their own month and
+ * coaching from their own deals, seen by them alone. An owner who also sells gets their own month under the business.
+ * Sol's box under it takes questions about the business, and asking turns Today into the conversation.
  */
+
+/** Today's views, read once a page. */
+export function useInsights(): InsightsView[] | null | "failed" {
+  const [views, setViews] = useState<InsightsView[] | null | "failed">(null);
+  useEffect(() => {
+    let on = true;
+    void loadInsights().then((r) => on && setViews(r.ok ? r.views : "failed"));
+    return () => {
+      on = false;
+    };
+  }, []);
+  return views;
+}
+
+/** The first view's name on the switch: Business for the owner and admins, My month for everyone else. */
+export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
+  Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
+
 export function TodayChat(props: {
   name: string | null;
-  items: NextItem[] | null;
-  jobs: JobLine[] | null;
+  views: InsightsView[] | null | "failed";
   asking: boolean;
   hidden: boolean;
-  onDay: () => void;
   onAsk: (q: string, files: SolFile[]) => void;
-  onView: (v: TodayView) => void;
 }) {
-  const hour = Number(new Date().toLocaleString("en-AU", { hour: "numeric", hourCycle: "h23", timeZone: "Australia/Melbourne" }));
+  const views = Array.isArray(props.views) ? props.views : null;
+  const mine = views?.[0]?.scope === "me";
+  const you = props.name ? `, ${props.name}` : "";
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-1 pb-10 pt-2 text-center" inert={props.hidden}>
+    <div className="mx-auto flex w-full max-w-[52rem] flex-col items-center px-1 pb-10 pt-2" inert={props.hidden}>
       <span className="relative">
-        <span className="sol-orb sol-breathe inline-flex size-24 items-center justify-center rounded-full">
-          <SolMark className="size-[4.75rem]" />
+        <span className="sol-orb sol-breathe inline-flex size-16 items-center justify-center rounded-full">
+          <SolMark className="size-12" />
         </span>
-        <SolStars className="absolute -right-4 -top-3 size-8" />
+        <SolStars className="absolute -right-3 -top-2 size-6" />
       </span>
-      <h1 className="mt-5 text-[clamp(24px,2.9vw,32px)] font-normal leading-[1.1] tracking-[-0.02em] text-ink">
-        What&rsquo;s next{props.name ? `, ${props.name}` : ""}?
+      <h1 className="mt-4 text-center text-[clamp(22px,2.6vw,28px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+        {mine ? `How's your month going${you}?` : `How's the business going${you}?`}
       </h1>
-      <p className="mt-1.5 text-[14.5px] text-ink-2">
-        {props.items === null ? "Looking at your day…" : nextHeadline(props.items.length, hour)}
+      <p className="mt-1 text-center text-[13.5px] text-ink-2">
+        {mine ? "From your own deals. Only you see this." : "Sol read your deals this morning. Here's what matters."}
       </p>
 
-      <div data-tour="today-sol" className="mt-6 w-full max-w-[46rem]">
-        <SolBox onAsk={props.onAsk} asking={props.asking} tall placeholder="Ask Sol, or tell him what to do" />
-        <div className="mt-3.5 flex flex-wrap justify-center gap-2">
-          <button
-            type="button"
-            onClick={props.onDay}
-            className="inline-flex h-9 items-center gap-2 rounded-full bg-primary pl-1.5 pr-4 text-[13.5px] font-medium text-primary-ink shadow-[0_4px_14px_rgb(20_22_26_/_0.16)] transition hover:shadow-[0_4px_18px_rgb(255_90_31_/_0.35)]"
-          >
-            <span className="inline-flex size-6 items-center justify-center rounded-full bg-white/10">
-              <SolBadge className="size-4" />
-            </span>
-            Show me my day
-          </button>
-          {STARTERS.map((q) => (
-            <button
-              key={q}
-              type="button"
-              disabled={props.asking}
-              onClick={() => props.onAsk(q, [])}
-              className="inline-flex h-9 items-center rounded-full bg-surface px-4 text-[13.5px] font-medium text-ink shadow-[0_2px_8px_rgb(20_22_26_/_0.06)] ring-1 ring-line transition hover:ring-sun-line disabled:text-muted"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
+      <div className="mt-6 w-full space-y-10 text-left">
+        {props.views === "failed" ? (
+          <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
+            The month couldn&rsquo;t be read just now. Feed has your deals.
+          </p>
+        ) : !views ? (
+          <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
+        ) : (
+          views.map((v, i) => <ViewPart key={v.scope} view={v} titled={i > 0} />)
+        )}
       </div>
 
-      <div className="mt-12 grid w-full max-w-5xl gap-3 text-left md:grid-cols-3">
-        <AwayCard jobs={props.jobs} onFeed={() => props.onView("feed")} />
-        <NeedsYouCard items={props.items} onFeed={() => props.onView("feed")} />
-        <DesignCard jobs={props.jobs} />
+      <div data-tour="today-sol" className="mt-8 w-full">
+        <SolBox
+          onAsk={props.onAsk}
+          asking={props.asking}
+          placeholder={mine ? "Ask Sol: how do I win a quiet deal back?" : "Ask about the business: why are we down on last month?"}
+        />
       </div>
     </div>
   );
 }
 
-/** Things to ask in one press (each one Sol answer, as anything typed). */
-const STARTERS = ["Who should I call first?", "Which proposals have gone quiet?"];
-
-/** A short card: a quiet label, then one thing to take in. */
-const CARD = "flex h-[11.5rem] flex-col rounded-[22px] bg-surface/80 p-4 ring-1 ring-line/70";
-const LABEL = "text-[11px] font-medium uppercase tracking-[0.14em] text-muted";
-const DAY_MS = 86_400_000;
-
-/**
- * What Sol did since this time yesterday, the proof the software works while nobody is in it: emails he sent, emails
- * he has lined up to send, and new leads that came in.
- */
-function AwayCard({ jobs, onFeed }: { jobs: JobLine[] | null; onFeed: () => void }) {
-  const { box, now } = useOutbox();
-  const since = (at: string) => now.getTime() - Date.parse(at) < DAY_MS;
-  const sent = box ? box.sent.filter((x) => since(x.at)).length : null;
-  const lined = box ? box.entries.filter((e) => !e.held).length : null;
-  const leads = jobs ? jobs.filter((j) => since(j.createdAt)).length : null;
-  const figures: [number | null, string][] = [
-    [sent, sent === 1 ? "email Sol sent" : "emails Sol sent"],
-    [lined, "lined up to send"],
-    [leads, leads === 1 ? "new lead" : "new leads"],
-  ];
+function ViewPart({ view, titled }: { view: InsightsView; titled: boolean }) {
+  const mine = view.scope === "me";
   return (
-    <button type="button" onClick={onFeed} className={clsx(CARD, "text-left transition hover:ring-line")}>
-      <span className={clsx(LABEL, "flex items-center gap-1.5")}>
-        <SolBadge className="size-3.5" /> Since yesterday
-      </span>
-      <span className="mt-auto grid grid-cols-3 gap-2">
-        {figures.map(([n, words]) => (
-          <span key={words} className="min-w-0">
-            <span className="block font-mono text-[26px] leading-none tracking-[-0.02em] text-ink">{n ?? "–"}</span>
-            <span className="mt-1.5 block text-[12px] leading-snug text-ink-2">{words}</span>
-          </span>
-        ))}
-      </span>
-    </button>
-  );
-}
-
-const KIND_TINT: Record<NextItem["kind"], string> = {
-  install: "var(--kind-install)",
-  message: "var(--kind-message)",
-  lead: "var(--kind-lead)",
-  "follow-up": "var(--kind-follow-up)",
-  order: "var(--kind-order)",
-  date: "var(--kind-date)",
-  approvals: "var(--kind-approvals)",
-};
-
-/** The three most pressing things, a line each. */
-function NeedsYouCard({ items, onFeed }: { items: NextItem[] | null; onFeed: () => void }) {
-  const shown = (items ?? []).slice(0, 3);
-  return (
-    <section className={CARD} aria-label="Needs you">
-      <button type="button" onClick={onFeed} className={clsx(LABEL, "group flex items-center gap-1 text-left hover:text-ink")}>
-        Needs you{items?.length ? ` · ${items.length}` : ""}
-        <ChevronRight className="size-3.5 transition group-hover:translate-x-0.5" aria-hidden />
-      </button>
-      {items === null ? (
-        <p className="mt-3 text-[13px] text-muted">Looking…</p>
-      ) : shown.length === 0 ? (
-        <p className="mt-auto text-[14px] text-ink-2">Nothing needs you right now.</p>
+    <section aria-label={mine ? "Your month" : "The business"}>
+      {titled && <h2 className="mb-3 ml-1 text-[15px] font-medium text-ink">Your own month</h2>}
+      <MonthPanel month={view.month} mine={mine} />
+      <p className="mb-2 ml-1 mt-5 text-[11.5px] font-medium uppercase tracking-[0.12em] text-muted">
+        {mine ? "Your next wins" : "Worth changing"}
+      </p>
+      {view.insights.length ? (
+        <div className="space-y-2">
+          {view.insights.map((x) => (
+            <InsightRow key={x.key} insight={x} />
+          ))}
+        </div>
       ) : (
-        <ul className="mt-auto space-y-0.5">
-          {shown.map((i) => {
-            const Icon = KIND_ICONS[i.kind];
-            return (
-              <li key={i.key}>
-                <Link href={i.href} className="-mx-1.5 flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition hover:bg-canvas">
-                  <Icon className="size-4 shrink-0" style={{ color: KIND_TINT[i.kind] }} aria-hidden />
-                  <span className="min-w-0 truncate text-[13.5px] text-ink">{i.title}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">{ALL_GOOD}</p>
       )}
     </section>
   );
 }
 
-/**
- * A designer in a card: the newest deal waiting for a design, on its own roof, one press from the designer; or any
- * address typed in. Both open the designer over Today.
- */
-function DesignCard({ jobs }: { jobs: JobLine[] | null }) {
-  const router = useRouter();
-  const next =
-    jobs
-      ?.filter((j) => OPEN_STAGES.includes(j.stage) && !j.projectId && j.lat !== null && j.lng !== null)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
-  const open = (a: Address) => {
-    if (a.lat === undefined || a.lng === undefined) return;
-    const words = [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(" ");
-    openDesigner(`${PATHS.designer}?at=${a.lat},${a.lng}&address=${encodeURIComponent(words)}`, router);
-  };
+const MONTH = new Intl.DateTimeFormat("en-AU", { month: "long", timeZone: "Australia/Melbourne" });
+const k = (n: number) => (n >= 1000 ? `$${Math.round(n / 1000).toLocaleString("en-AU")}k` : dollars(n));
+
+function MonthPanel({ month, mine }: { month: MonthView; mine: boolean }) {
+  const now = month.day / month.days;
+  const share = month.goal ? (mine ? month.signed : month.sold) / month.goal : 0;
+  const name = MONTH.format(new Date());
+  const usual = month.goalIs === "target" ? "target" : mine ? "your usual" : "a usual month";
+  const paceTone = month.pace === "ahead" ? "text-positive" : month.pace === "behind" ? "text-warning" : undefined;
+  const figures: [string, string, string?][] = mine
+    ? [
+        [String(month.signed), month.goal ? `signed of ${Math.round(month.goal)}, ${usual}` : "signed so far"],
+        [k(month.sold), "signed in dollars"],
+        [String(month.likelyDeals), "likely to sign"],
+        month.pace === "none" ? ["–", "no usual month yet"] : [month.pace === "ahead" ? "Ahead" : "Behind", "of the sun", paceTone],
+      ]
+    : [
+        [k(month.sold), month.goal ? `sold of ${k(month.goal)}, ${usual}` : "sold so far"],
+        [k(month.likely), "likely by month end"],
+        month.needed === null
+          ? ["–", "no goal yet: set one in Settings"]
+          : month.needed === 0
+            ? ["Reached", "the month's goal", "text-positive"]
+            : [`${month.needed} more`, `signed to get there`, paceTone],
+      ];
   return (
-    <section className={clsx(CARD, "overflow-hidden p-0")} aria-label="Design">
-      {next ? (
-        <button
-          type="button"
-          onClick={() => openDesigner(designHref(next.id), router)}
-          className="group relative block min-h-0 flex-1 text-left"
-          title={`Design ${next.customerName}'s roof`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/design/roof?lat=${next.lat!.toFixed(6)}&lng=${next.lng!.toFixed(6)}&size=${ROOF_IMAGE.width}x${ROOF_IMAGE.height}`}
-            alt=""
-            className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]"
-          />
-          <span className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" aria-hidden />
-          <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/40 px-2 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.14em] text-white/90 backdrop-blur-sm">
-            <PenTool className="size-3" aria-hidden /> Next to design
-          </span>
-          <span className="absolute inset-x-3 bottom-2.5 flex items-end justify-between gap-2">
-            <span className="min-w-0">
-              <span className="block truncate text-[14px] font-medium text-white">{next.customerName}</span>
-              <span className="block truncate text-[12px] text-white/75">{next.address}</span>
-            </span>
-            <span className="shrink-0 rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white">Design it</span>
-          </span>
-        </button>
-      ) : (
-        <span className="flex flex-1 flex-col justify-center px-4">
-          <span className={clsx(LABEL, "flex items-center gap-1.5")}>
-            <PenTool className="size-3.5" aria-hidden /> Design
-          </span>
-          <span className="mt-1.5 text-[13.5px] text-ink-2">Every deal has a design. Draw another roof:</span>
+    <div className="rounded-[22px] bg-surface px-5 pb-5 pt-4 ring-1 ring-line/70">
+      <div className="flex items-baseline justify-between text-[12px] text-ink-2">
+        <span>{mine ? `Your ${name}` : `${name} so far`}</span>
+        <span className="tabular-nums">
+          Day {month.day} of {month.days}
         </span>
-      )}
-      <div className="border-t border-line/70 bg-surface p-2">
-        <AddressEntry compact placeholder="Design any address" onPick={open} />
       </div>
-    </section>
+      <div className="mx-auto mt-2 max-w-md">
+        <SunArc now={now} tone="light" start="1st" end={`${month.days}th`} />
+      </div>
+      {month.goal ? (
+        <div className="mt-1">
+          <GoalLine share={share} now={now} tone="light" label={`${Math.round(share * 100)}% of the month's goal`} />
+        </div>
+      ) : null}
+      <div className={clsx("mt-3 grid gap-3", figures.length === 4 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3")}>
+        {figures.map(([big, small, tone]) => (
+          <div key={small} className="min-w-0">
+            <div className={clsx("font-mono text-[22px] leading-none tracking-[-0.02em]", tone ?? "text-ink")}>{big}</div>
+            <div className="mt-1.5 text-[12px] leading-snug text-ink-2">{small}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
-/** Chat | Feed, at the top of Today. */
-export function TodaySwitch({ view, onView }: { view: TodayView; onView: (v: TodayView) => void }) {
+const ICONS: Record<Insight["key"], LucideIcon> = { speed: PhoneCall, opened: Eye, battery: BatteryCharging, approvals: Stamp };
+
+function InsightRow({ insight }: { insight: Insight }) {
+  const Icon = ICONS[insight.key];
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl bg-surface px-4 py-3.5 ring-1 ring-line/70 sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex min-w-0 flex-1 items-start gap-3.5">
+        <Icon
+          className={clsx(
+            "mt-0.5 size-5 shrink-0",
+            insight.tone === "good" ? "text-positive" : insight.tone === "warn" ? "text-warning" : "text-sun-line",
+          )}
+          aria-hidden
+        />
+        <div className="min-w-0">
+          <p className="text-[14.5px] font-medium text-ink">{insight.title}</p>
+          <p className="mt-0.5 text-[12.5px] leading-snug text-ink-2">{insight.why}</p>
+        </div>
+      </div>
+      <Link
+        href={insight.action.href}
+        className="inline-flex shrink-0 items-center gap-1 self-start rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-sun-line sm:self-auto"
+      >
+        {insight.action.label} <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
+/** Business (or My month) | Feed, at the top of Today. */
+export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
   return (
     <div
       role="tablist"
@@ -239,7 +201,7 @@ export function TodaySwitch({ view, onView }: { view: TodayView; onView: (v: Tod
     >
       {(
         [
-          ["chat", "Chat"],
+          ["chat", first],
           ["feed", "Feed"],
         ] as const
       ).map(([v, label]) => (
