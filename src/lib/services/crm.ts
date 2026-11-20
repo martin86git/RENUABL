@@ -48,7 +48,8 @@ export const sendGroupEmail = (input: { subject: string; body: string; ids: stri
     method: "POST",
     body: input,
   });
-export type JobLine = Job & { customerName: string };
+/** `sample`: the made-up deal a new business starts with, whose page opens on a tour. */
+export type JobLine = Job & { customerName: string; sample?: boolean };
 export type ActivityLine = Activity & { customerName: string };
 
 export interface CustomerInput {

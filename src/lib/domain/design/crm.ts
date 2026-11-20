@@ -463,25 +463,13 @@ export interface SampleCustomer extends CustomerInput {
 export const SAMPLE_AUTHOR = "Sample";
 
 /**
- * Five made-up customers, so a new business has something to look at and
- * click through. Nobody real: the names are plainly examples, the streets
- * are "Sample Street" and the like with no place on the map, the emails are
- * on example.com and the mobiles are from the range set aside for fiction.
+ * The one made-up customer a new business starts with (20 Nov 2026, Martin: "a new user shouldnt open up the pipeline to
+ * see a bunch of sample cards. Maybe just one - that when clicked on starts a tour"; it was five). Opening its deal
+ * starts the tour of a deal (deal-tour.ts). Nobody real: the name is plainly an example, the street is "Example Court"
+ * with no place on the map, the email is on example.com and the mobile is from the range set aside for fiction.
  * Added once for each business, marked `sample`, and gone for good once deleted.
  */
 export const SAMPLE_CUSTOMERS: readonly SampleCustomer[] = [
-  {
-    name: "Alex Example",
-    phone: "0491 570 006",
-    email: "alex@example.com",
-    address: "12 Sample Street, Glen Waverley VIC 3150",
-    lat: null,
-    lng: null,
-    source: "Website",
-    notes: "Sample customer. Asked about solar for a single-storey home with a tiled roof.",
-    job: { title: "Solar", stage: "lead", value: null },
-    activity: { kind: "note", text: "Enquiry came in through the website. Wants a call back after 4pm." },
-  },
   {
     name: "Sam Sample",
     phone: "0491 570 156",
@@ -493,41 +481,5 @@ export const SAMPLE_CUSTOMERS: readonly SampleCustomer[] = [
     notes: "Sample customer. Referred by a neighbour. Has an electric car on order.",
     job: { title: "Solar and battery", stage: "lead", value: null },
     activity: { kind: "call", text: "Spoke briefly. Asked for a design with a battery. Will send a recent power bill." },
-  },
-  {
-    name: "Jordan Placeholder",
-    phone: "0491 570 157",
-    email: "jordan@example.com",
-    address: "27 Demo Avenue, Werribee VIC 3030",
-    lat: null,
-    lng: null,
-    source: "Phone call",
-    notes: "Sample customer. Double-storey home, tin roof, three-phase power.",
-    job: { title: "Solar", stage: "designed", value: 9800 },
-    activity: { kind: "note", text: "Design drawn. Two roof faces, north and west. Ready to price." },
-  },
-  {
-    name: "Taylor Test",
-    phone: "0491 570 158",
-    email: "taylor@example.com",
-    address: "9 Specimen Road, Bendigo VIC 3550",
-    lat: null,
-    lng: null,
-    source: "Advertising",
-    notes: "Sample customer. Comparing two quotes. Cares most about the battery.",
-    job: { title: "Solar and battery", stage: "proposal", value: 18400 },
-    activity: { kind: "email", text: "Proposal emailed. Follow up early next week." },
-  },
-  {
-    name: "Casey Demo",
-    phone: "0491 570 159",
-    email: "casey@example.com",
-    address: "31 Mock Lane, Geelong VIC 3220",
-    lat: null,
-    lng: null,
-    source: "Walk-in",
-    notes: "Sample customer. Accepted the proposal. Prefers a morning installation.",
-    job: { title: "Solar", stage: "won", value: 8600 },
-    activity: { kind: "call", text: "Accepted over the phone. Installation date to be booked." },
   },
 ];

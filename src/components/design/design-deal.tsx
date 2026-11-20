@@ -69,6 +69,9 @@ import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { SolOnDealCard } from "./sol-on-deal";
+import { Spotlight } from "./new-look";
+import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
+import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
 import { DealFiles } from "./deal-pulse";
@@ -343,6 +346,29 @@ export function DealPage({ id }: { id: string }) {
     void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
   }, [id]);
   const business = account?.signedIn ? (account.business?.name ?? "") : "";
+  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): from the pipeline's card
+  // (?tour=1) every time, otherwise the first time it is opened on this device; Show me around starts it again.
+  const [touring, setTouring] = useState(false);
+  // The starter sample only: the example deals a demo is filled with are marked sample too, and aren't a tour each.
+  const isSample = Boolean(customer?.sample) && customer?.source !== EXAMPLE_SOURCE;
+  const tourAsked = params.get("tour") === "1";
+  useEffect(() => {
+    if (!isSample) return;
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem(DEAL_TOUR_KEY) === "1";
+    } catch {}
+    if (seen && !tourAsked) return;
+    // A moment for Sol's card and the fields to be on the page, so each has a place to light.
+    const t = window.setTimeout(() => setTouring(true), 900);
+    return () => window.clearTimeout(t);
+  }, [isSample, tourAsked]);
+  const endTour = useCallback(() => {
+    setTouring(false);
+    try {
+      window.localStorage.setItem(DEAL_TOUR_KEY, "1");
+    } catch {}
+  }, []);
   const [find, setFind] = useState("");
   const [kind, setKind] = useState<Written>("note");
   const [text, setText] = useState("");
@@ -503,6 +529,7 @@ export function DealPage({ id }: { id: string }) {
       data-rails-out
       className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
+      {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />
       <div className="min-w-0 space-y-4 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
@@ -528,9 +555,26 @@ export function DealPage({ id }: { id: string }) {
           />
         )}
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <Link href={PATHS.pipelines} className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink">
+          <Link
+            href={PATHS.pipelines}
+            data-tour="deal-back"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"
+          >
             <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
           </Link>
+          {isSample && (
+            <button
+              type="button"
+              onClick={() => {
+                setTab("details");
+                setSection("deal");
+                window.setTimeout(() => setTouring(true), 150);
+              }}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full bg-sun px-3 text-xs font-medium text-sun-ink ring-1 ring-sun-line/30 hover:ring-sun-line/60"
+            >
+              Sample deal · Show me around
+            </button>
+          )}
           <p className="min-h-4 flex-1 text-right text-xs text-muted" role="status">
             {status}
           </p>
@@ -548,16 +592,18 @@ export function DealPage({ id }: { id: string }) {
         </div>
 
         {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
-        <DealBanner
-          job={job}
-          designVersion={designVersion}
-          customer={customer}
-          pulse={pulse && hasPulse(job.stage) ? pulse : null}
-          compact={tab !== "activities"}
-          figures={bannerFigures(details, job.kw)}
-          onDesign={job.lat !== null ? () => openTool("design") : null}
-          onPlace={() => setAskPlace("place")}
-        />
+        <div data-tour="deal-banner">
+          <DealBanner
+            job={job}
+            designVersion={designVersion}
+            customer={customer}
+            pulse={pulse && hasPulse(job.stage) ? pulse : null}
+            compact={tab !== "activities"}
+            figures={bannerFigures(details, job.kw)}
+            onDesign={job.lat !== null ? () => openTool("design") : null}
+            onPlace={() => setAskPlace("place")}
+          />
+        </div>
         {askPlace && (
           <AskPlace
             name={customer.firstName}
@@ -575,27 +621,29 @@ export function DealPage({ id }: { id: string }) {
         )}
 
         {/* Sol's line (16 Nov 2026, Martin): what happened, what he does next, what the deal needs from you. */}
-        <SolOnDealCard
-          jobId={job.id}
-          phone={customer.phone || null}
-          refresh={activity.length * 1000 + designVersion}
-          onNotes={() => notetaker.current?.start()}
-          onMove={(kind) =>
-            kind === "reply"
-              ? goTab("chat")
-              : kind === "email"
-                ? goTab("email")
-                : kind === "design"
-                  ? menu.onDesign()
-                  : kind === "proposal"
-                    ? openTool("proposal")
-                    : kind === "approvals"
-                      ? (setSection("network"), goTab("details"))
-                      : kind === "book"
-                        ? goTab("details")
-                        : goTab("team")
-          }
-        />
+        <div data-tour="deal-sol" className="empty:hidden">
+          <SolOnDealCard
+            jobId={job.id}
+            phone={customer.phone || null}
+            refresh={activity.length * 1000 + designVersion}
+            onNotes={() => notetaker.current?.start()}
+            onMove={(kind) =>
+              kind === "reply"
+                ? goTab("chat")
+                : kind === "email"
+                  ? goTab("email")
+                  : kind === "design"
+                    ? menu.onDesign()
+                    : kind === "proposal"
+                      ? openTool("proposal")
+                      : kind === "approvals"
+                        ? (setSection("network"), goTab("details"))
+                        : kind === "book"
+                          ? goTab("details")
+                          : goTab("team")
+            }
+          />
+        </div>
 
         <CallNotetaker
           handle={notetaker}
@@ -617,6 +665,7 @@ export function DealPage({ id }: { id: string }) {
             <div
               role="tablist"
               aria-label="Details"
+              data-tour="deal-views"
               className="mt-5 inline-flex flex-wrap gap-0.5 rounded-full bg-surface p-1 ring-1 ring-line"
             >
               {NOTES_VIEWS.map(([key, label]) => (
@@ -707,7 +756,7 @@ export function DealPage({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <section className={clsx(ui.card, "p-5")}>
+              <section data-tour="deal-fields" className={clsx(ui.card, "p-5")}>
                 {section === "deal" || !shownTab ? (
                   <>
                     <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -1218,12 +1267,17 @@ function DealMenu({
           : "-mx-1 flex items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden"
       }
     >
-      <RailRound label="Design" title={designable ? "Design" : "Give the deal an address to design it"} onClick={onDesign}>
+      <RailRound
+        tour="deal-design"
+        label="Design"
+        title={designable ? "Design" : "Give the deal an address to design it"}
+        onClick={onDesign}
+      >
         <span className="flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105">
           <PenTool className="size-5" aria-hidden />
         </span>
       </RailRound>
-      <RailRound label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
+      <RailRound tour="deal-proposal" label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
         <span className="flex size-12 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition group-hover:text-ink">
           <FileText className="size-5" aria-hidden />
         </span>
@@ -1233,6 +1287,7 @@ function DealMenu({
       <div
         role="group"
         aria-label="Reach the customer"
+        data-tour="deal-reach"
         className={clsx(
           "flex shrink-0 gap-3 rounded-[2.25rem] bg-surface/60 ring-1 ring-line",
           vertical ? "flex-col items-center px-2.5 py-3" : "items-start px-3 py-2.5",
@@ -1251,6 +1306,7 @@ function DealMenu({
       </div>
       {line}
       <RailRound
+        tour="deal-details"
         label="Details"
         title="Details: the deal's details, with its notes and chats inside"
         onClick={() => onTab("details")}
@@ -1356,6 +1412,7 @@ function RailRound({
   title,
   onClick,
   on,
+  tour,
   children,
 }: {
   label: string;
@@ -1363,11 +1420,14 @@ function RailRound({
   onClick: () => void;
   /** A tab of the page: pressed while it is the one open. */
   on?: boolean;
+  /** Its place in the tour of a deal (deal-tour.ts). */
+  tour?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
+      data-tour={tour}
       onClick={onClick}
       title={title}
       aria-label={title}

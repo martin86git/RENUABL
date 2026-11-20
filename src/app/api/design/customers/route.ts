@@ -5,7 +5,7 @@ import { createCustomer, listCustomers } from "@/lib/server/design-crm-repo";
 /**
  * GET: the business's customers, whoever something last happened with first,
  * each with how many jobs they have and the one stage to show beside them.
- * The first time a business asks, its five sample customers are added.
+ * The first time a business asks, its sample customer is added.
  */
 export async function GET() {
   return answer(async () => {

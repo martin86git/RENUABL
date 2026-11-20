@@ -47,37 +47,71 @@ export function welcomeLines(firstName: string | null, business: string): Record
   };
 }
 
-/** The spotlight tour after the welcome: each place on the page, in order. A place not on screen is passed over. */
-export const WELCOME_TOUR: { what: string; now: string; at: string }[] = [
+/**
+ * The spotlight tour after the welcome: each place on the page, in order. `go` turns Today to the view the place is on
+ * (Chat or Feed) before it is lit. A place still not on screen is passed over.
+ * 20 Nov 2026, Martin: the tour "didnt show me the feed, deals pipeline". It now takes in the feed (Needs you, a deal's
+ * card and its next move, the deals beside it) and Sales' pipeline, and says the menu and the bar as they are today.
+ */
+export const WELCOME_TOUR: { what: string; now: string; at: string; go?: "chat" | "feed" }[] = [
   {
     what: "Today",
-    now: "is your home screen. Inbox, Calendar and Pipeline sit beside it, and Your day shows what's left to clear before sunset.",
-    at: 'nav[aria-label="Today"]',
+    now: "is your home screen, in two views. Chat is where you talk to Sol; Feed is your deals as they happen.",
+    at: '[data-tour="today-switch"] [role="tablist"]',
+    go: "chat",
   },
   {
     what: "Ask Sol",
     now: "anything about your deals here, or press Show me my day and he'll write up what needs you.",
     at: '[data-tour="today-sol"]',
+    go: "chat",
+  },
+  {
+    what: "Needs you",
+    now: "is the top of the feed: the work only a person can do, most pressing first. Clear it and the count goes down.",
+    at: '[data-tour="feed-needs"]',
+    go: "feed",
+  },
+  {
+    what: "Each card",
+    now: "is one deal: what just happened, what Sol has lined up, and one lit button for the next move. Done or Later takes it off your list until something new happens.",
+    at: '[data-tour="feed-card"]',
+    go: "feed",
+  },
+  {
+    what: "Your deals",
+    now: "sit beside the feed: new ones, those in progress, or all of them. Pick one to bring up its card.",
+    at: 'aside[aria-label="Deals"]',
+    go: "feed",
   },
   {
     what: "The designer",
-    now: "opens from the orange pen button. Draw a roof and the quote builds as you go.",
+    now: "is the orange round in the menu. Draw a roof and the quote builds as you go. Proposals slides out beside it.",
     at: 'a[aria-label="Design tool"]',
   },
   {
-    what: "The menu",
-    now: "is the layers button. Rest on it to open your CRM, procurement, installations and service; the pin keeps them open.",
+    what: "Sales",
+    now: "holds your pipeline: every deal as a card in a column for its stage, dragged along as it moves. Proposals open and closed, and your calls, sit beside it.",
+    at: '[data-tour="section-proposals"]',
+  },
+  {
+    what: "The rest of the menu",
+    now: "takes the work on after a sale. Jobs runs approvals, ordering and installs; Customers holds everyone you deal with; Service is for anything to put right after the install.",
     at: 'nav[aria-label="Sections"]',
   },
   {
     what: "Sol",
-    now: "opens from the sun at the top of the bar on the right, beside whatever page you're on. He can see what's on your screen.",
+    now: "heads the bar on the right. He opens beside whatever page you're on and can see what's on your screen.",
     at: 'button[title="Sol, your assistant"]',
   },
   {
+    what: "The bar",
+    now: "also holds your phone agents and the + to add one, with team chat at its foot and your routines under it.",
+    at: ".sol-rail",
+  },
+  {
     what: "RENUABL Marketplace",
-    now: "is the blue button at the end of the menu. It's where solar businesses will list jobs, bid on installations and trade equipment. Coming soon.",
+    now: "is the blue round at the end of the menu. It's where solar businesses will list jobs, bid on installations and trade equipment. Coming soon.",
     at: 'a[aria-label^="RENUABL Marketplace"]',
   },
-  { what: "The bar down the right", now: "holds Sol and your agents, with team chat under it.", at: ".sol-rail" },
 ];

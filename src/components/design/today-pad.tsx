@@ -383,6 +383,7 @@ export function TodayPad(props: {
       {touring && (
         <Spotlight
           steps={WELCOME_TOUR}
+          onGo={(v) => setView(v === "feed" ? "feed" : "chat")}
           onEnd={() => {
             setTouring(false);
             // Back to Chat, where Sol picks up with his introduction.

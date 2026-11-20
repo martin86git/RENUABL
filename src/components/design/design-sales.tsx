@@ -1,5 +1,6 @@
 "use client";
 
+import { SAMPLE_DEAL_HINT } from "@/lib/domain/design/deal-tour";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -136,6 +137,8 @@ export function PipelinesPage() {
   const shown = (jobs ?? []).filter((j) => stages.includes(j.stage) && (whose === "all" || (whose === "mine" ? j.owner === me : !j.owner)));
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
+  // The sample deal a new business starts with opens on the tour of a deal (deal-tour.ts).
+  const dealOf = (job: JobLine) => (job.sample ? `${deal(job.id)}?tour=1` : deal(job.id));
 
   return (
     <div className="px-5 py-8 lg:px-10">
@@ -306,14 +309,14 @@ export function PipelinesPage() {
                         setDragging(null);
                         setOver(null);
                       }}
-                      onClick={() => router.push(deal(job.id))}
+                      onClick={() => router.push(dealOf(job))}
                       className={clsx(
                         "cursor-pointer rounded-md bg-surface p-3 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
                         dragging === job.id && "opacity-60",
                       )}
                     >
                       <Link
-                        href={deal(job.id)}
+                        href={dealOf(job)}
                         className="block text-sm font-medium text-ink hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -323,6 +326,11 @@ export function PipelinesPage() {
                         {job.title}
                         {job.address ? ` · ${job.address.split(",")[0]}` : ""}
                       </p>
+                      {job.sample && (
+                        <p className="mt-1.5 inline-flex h-6 items-center rounded-full bg-sun px-2.5 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
+                          {SAMPLE_DEAL_HINT}
+                        </p>
+                      )}
                       <PulseMarks pulse={pulses[job.id]} />
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <span className="flex items-center gap-1.5 text-sm tabular-nums text-ink">
@@ -387,11 +395,11 @@ export function PipelinesPage() {
               {shown.map((job) => (
                 <tr
                   key={job.id}
-                  onClick={() => router.push(deal(job.id))}
+                  onClick={() => router.push(dealOf(job))}
                   className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
                 >
                   <td className="px-5 py-3">
-                    <Link href={deal(job.id)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
+                    <Link href={dealOf(job)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
                       {job.customerName}
                     </Link>
                     <span className="block text-xs text-muted">{job.title}</span>

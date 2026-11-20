@@ -537,7 +537,13 @@ export function DealFeed(props: {
                 )}
               </section>
 
-              <Part id={TODAY_IDS.needs} className={clsx(place.needs, view(TODAY_IDS.needs))} title="Needs you" count={data ? needs : null}>
+              <Part
+                id={TODAY_IDS.needs}
+                tour="feed-needs"
+                className={clsx(place.needs, view(TODAY_IDS.needs))}
+                title="Needs you"
+                count={data ? needs : null}
+              >
                 {/* Needs you emptied (9 Nov 2026, Martin: clearing the list should feel like work getting done). */}
                 {data && needs === 0 && (
                   // One quiet line (14 Nov 2026, Martin): an empty Needs you shouldn't take the top of the page.
@@ -553,8 +559,8 @@ export function DealFeed(props: {
                 card… we can occupy more width"): each card runs across the feed, one under another. */}
                 {parts.needs.length > 0 && (
                   <div className="grid items-start gap-3">
-                    {parts.needs.map((d) => (
-                      <div key={d.jobId} className="min-w-0">
+                    {parts.needs.map((d, i) => (
+                      <div key={d.jobId} data-tour={i === 0 ? "feed-card" : undefined} className="min-w-0">
                         <DealCard
                           deal={d}
                           now={now}
@@ -936,9 +942,18 @@ export const PAD = "w-full sm:w-[14.25rem]";
 const IN_HAND_SHOWN = 5;
 
 /** A part of Today: its title, how many, a line on what it is. */
-function Part(props: { id?: string; className?: string; title: string; count?: number | null; note?: string; children: React.ReactNode }) {
+function Part(props: {
+  id?: string;
+  className?: string;
+  title: string;
+  count?: number | null;
+  note?: string;
+  /** Where the first visit tour lights it (welcome.ts WELCOME_TOUR). */
+  tour?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section id={props.id} className={clsx(TRAY, props.className)}>
+    <section id={props.id} data-tour={props.tour} className={clsx(TRAY, props.className)}>
       {/* The title over its cards, centred as they are (14 Nov 2026, Martin: three edges on one page looked messy). */}
       <div className="mb-4 flex flex-col items-start gap-0.5">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-ink">

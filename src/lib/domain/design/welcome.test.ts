@@ -26,4 +26,15 @@ describe("welcome", () => {
     const what = WELCOME_TOUR.map((s) => s.what);
     for (const w of ["Today", "The designer", "Sol", "RENUABL Marketplace"]) expect(what).toContain(w);
   });
+
+  it("shows the deal feed and the pipeline (20 Nov 2026, Martin: the tour skipped them)", () => {
+    const what = WELCOME_TOUR.map((s) => s.what);
+    for (const w of ["Needs you", "Each card", "Your deals", "Sales"]) expect(what).toContain(w);
+    // The feed's places are lit on the Feed, Sol's box on Chat.
+    for (const s of WELCOME_TOUR.filter((s) => s.at.includes("feed-") || s.at.includes("Deals"))) expect(s.go).toBe("feed");
+    expect(WELCOME_TOUR.find((s) => s.what === "Ask Sol")?.go).toBe("chat");
+    expect(WELCOME_TOUR.find((s) => s.what === "Sales")?.now).toMatch(/pipeline/);
+    // Nothing about the layers button that left the menu.
+    for (const s of WELCOME_TOUR) expect(s.now).not.toMatch(/layers/i);
+  });
 });

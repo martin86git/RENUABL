@@ -55,31 +55,31 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     await db.resetDbForTests();
   });
 
-  it("gives a new business its five sample customers once, and never again after they are deleted", async () => {
-    // Asked for twice at the same moment: still five.
+  it("gives a new business its one sample customer once, and never again after they are deleted", async () => {
+    // Asked for twice at the same moment: still one.
     const [first] = await Promise.all([crm.listCustomers(a), crm.listCustomers(a)]);
-    expect(first).toHaveLength(5);
+    expect(first).toHaveLength(1);
     expect(first.map((c) => c.name)).toEqual(SAMPLE_CUSTOMERS.map((s) => s.name));
-    expect(first.map((c) => c.stage)).toEqual(["lead", "lead", "designed", "proposal", "won"]);
+    expect(first.map((c) => c.stage)).toEqual(["lead"]);
     for (const c of first) expect(c).toMatchObject({ sample: true, jobs: 1, lat: null, lng: null });
     expect(first[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    expect(await crm.listCustomers(a)).toHaveLength(5);
+    expect(await crm.listCustomers(a)).toHaveLength(1);
 
-    const detail = await crm.customerDetail(a, first[3].id);
+    const detail = await crm.customerDetail(a, first[0].id);
     expect(detail?.jobs).toHaveLength(1);
     expect(detail?.jobs[0]).toMatchObject({
       title: "Solar and battery",
-      stage: "proposal",
-      value: 18400,
+      stage: "lead",
+      value: null,
       projectId: null,
       installDate: null,
     });
     expect(detail?.activity).toHaveLength(1);
-    expect(detail?.activity[0]).toMatchObject({ kind: "email", by: "Sample", jobId: detail?.jobs[0].id });
+    expect(detail?.activity[0]).toMatchObject({ kind: "call", by: "Sample", jobId: detail?.jobs[0].id });
 
-    // The other business has its own five, none of them this one's.
+    // The other business has its own, none of them this one's.
     const theirs = await crm.listCustomers(b);
-    expect(theirs).toHaveLength(5);
+    expect(theirs).toHaveLength(1);
     expect(theirs.map((c) => c.id).filter((id) => first.some((c) => c.id === id))).toEqual([]);
 
     // Deleted, they stay gone, whichever screen asks next.
@@ -88,7 +88,7 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     expect(await crm.listJobs(a)).toEqual([]);
     expect((await crm.overview(a)).customers).toBe(0);
     expect(await crm.listCustomers(a)).toEqual([]);
-    expect(await crm.listCustomers(b)).toHaveLength(5);
+    expect(await crm.listCustomers(b)).toHaveLength(1);
   });
 
   it("makes a customer, with a first job when they have an address", async () => {
@@ -278,8 +278,8 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
 
     // The other business's figures are its samples' alone.
     const theirs = await crm.overview(b);
-    expect(theirs.counts).toMatchObject({ lead: 2, designed: 1, proposal: 1, won: 1, installed: 0, lost: 0 });
-    expect([theirs.openValue, theirs.wonValue, theirs.customers]).toEqual([28200, 8600, 5]);
+    expect(theirs.counts).toMatchObject({ lead: 1, designed: 0, proposal: 0, won: 0, installed: 0, lost: 0 });
+    expect([theirs.openValue, theirs.wonValue, theirs.customers]).toEqual([0, 0, 1]);
 
     const all = await crm.listJobs(a);
     expect(all).toHaveLength(3);
@@ -304,7 +304,7 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     expect(await repo.projectAt(a, ROOF)).not.toBeNull();
     expect((await crm.listCustomers(a)).map((c) => c.name)).toEqual(["Riley Example"]);
     // The other business is untouched.
-    expect(await crm.listCustomers(b)).toHaveLength(5);
+    expect(await crm.listCustomers(b)).toHaveLength(1);
   });
 
   it("removes everything when the business goes", async () => {

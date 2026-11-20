@@ -242,9 +242,9 @@ describe("a note, call or email as written", () => {
 });
 
 describe("the customers a new business starts with", () => {
-  it("are five, spread across lead, lead, designed, proposal and won", () => {
-    expect(SAMPLE_CUSTOMERS).toHaveLength(5);
-    expect(SAMPLE_CUSTOMERS.map((s) => s.job.stage)).toEqual(["lead", "lead", "designed", "proposal", "won"]);
+  it("is one, a lead: a new pipeline isn't a board of made-up cards", () => {
+    expect(SAMPLE_CUSTOMERS).toHaveLength(1);
+    expect(SAMPLE_CUSTOMERS.map((s) => s.job.stage)).toEqual(["lead"]);
   });
   it("pass the same checks as anything typed in, unchanged", () => {
     for (const s of SAMPLE_CUSTOMERS) {
@@ -268,7 +268,7 @@ describe("the customers a new business starts with", () => {
       expect(LEAD_SOURCES).toContain(s.source);
       expect(s.activity.text.length).toBeGreaterThan(10);
     }
-    expect(names.size).toBe(5);
+    expect(names.size).toBe(SAMPLE_CUSTOMERS.length);
   });
   it("make no claims and name no business", () => {
     const text = SAMPLE_CUSTOMERS.flatMap((s) => [s.notes, s.activity.text, s.job.title]).join(" ");

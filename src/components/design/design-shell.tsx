@@ -488,6 +488,7 @@ function Shell({
                     <Link
                       key={sec.id}
                       href={sec.pages[0].href}
+                      data-tour={`section-${sec.id}`}
                       aria-current={lit ? "true" : undefined}
                       className={clsx(
                         "flex h-8 items-center gap-1.5 rounded-full px-3 text-sm transition-colors",

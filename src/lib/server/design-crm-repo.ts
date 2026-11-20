@@ -406,10 +406,10 @@ export async function addActivity(
 // ---------------------------------------------------------------------------
 
 /** Every job the business has, the most recently changed first, each with its customer's name. */
-export async function listJobs(businessId: string, viewer?: DealViewer): Promise<(Job & { customerName: string })[]> {
+export async function listJobs(businessId: string, viewer?: DealViewer): Promise<(Job & { customerName: string; sample: boolean })[]> {
   await ensureSamples(businessId);
   return query(
-    `select ${JOB}, c.name as "customerName"
+    `select ${JOB}, c.name as "customerName", (c.sample and c.source <> 'Example deal') as "sample"
        from design_jobs j join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
       where j.business_id = $1 and ${seen(viewer, 2)} order by j.updated_at desc, j.id limit 20000`,
     [businessId, ...seenParams(viewer)],
