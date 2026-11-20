@@ -131,40 +131,28 @@ const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
  * the others (the design tool, its settings) are shown bare, as they work on the device without one.
  */
 /**
- * RENUABL Marketplace beside the sections (3 Nov 2026, Martin: the add-on network should read as a sub-brand, apart
- * from the business's own work): its mark white in a blue round, beside it RENUABL in small black capitals over
- * Marketplace in the signal orange, no pill behind them, and "Soon" while it is closed.
+ * RENUABL Marketplace as the blue round at the far end of the sections menu (20 Nov 2026, Martin: Sol moved to the
+ * floating bar, "so to replace sols position i want to move the Renuabl market palce into it… the blue marketplace icon
+ * needs to be the same size as what the Sol icon was"): the size of the designer's orange round at the other end, so the
+ * two frame the sections. Its name, and "coming soon" while it is closed, are its hover title.
  */
 function MarketplaceButton({ href, lit, waiting }: { href: string; lit: boolean; waiting: number }) {
+  const name = `RENUABL Marketplace${marketplaceOpen() ? "" : ", coming soon"}`;
   return (
     <Link
       href={href}
       aria-current={lit ? "true" : undefined}
-      aria-label={`RENUABL Marketplace${marketplaceOpen() ? "" : ", coming soon"}`}
-      // A white pill like the sections menu beside it (14 Nov 2026, Martin: on the pad's edge it didn't sit nicely alone).
-      className="group flex shrink-0 items-center gap-2.5 rounded-full bg-surface p-1 shadow-[0_6px_24px_rgba(20,22,26,0.07)] ring-1 ring-line"
+      aria-label={name}
+      title={name}
+      className={clsx(
+        "glass-orb-market relative -my-2 mx-0.5 flex size-12 shrink-0 items-center justify-center rounded-full text-white transition hover:brightness-110",
+        lit && "ring-2 ring-market/40 ring-offset-2 ring-offset-surface",
+      )}
     >
-      <span
-        className={clsx(
-          "relative flex size-8 items-center justify-center rounded-full bg-market text-white transition group-hover:brightness-110",
-          lit && "ring-2 ring-market/40 ring-offset-2 ring-offset-surface",
-        )}
-      >
-        <MarketplaceMark className="size-4" />
-        {waiting > 0 && (
-          <span
-            className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas"
-            aria-label={`${waiting} waiting`}
-          />
-        )}
-      </span>
-      <span className="studio-market-words flex-col pr-3 text-left leading-none">
-        <span className="text-[9px] font-medium uppercase tracking-[0.26em] text-ink">RENUABL</span>
-        <span className="mt-0.5 flex items-baseline gap-1.5 text-[14px] font-semibold tracking-[-0.01em] text-sun-line">
-          Marketplace
-          {!marketplaceOpen() && <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-muted">Soon</span>}
-        </span>
-      </span>
+      <MarketplaceMark className="size-[22px]" />
+      {waiting > 0 && (
+        <span className="absolute right-0 top-0 size-2.5 rounded-full bg-sun-line ring-2 ring-surface" aria-label={`${waiting} waiting`} />
+      )}
     </Link>
   );
 }
@@ -596,36 +584,25 @@ function Shell({
                     </Link>,
                   ];
                 })}
-              {/* Sol, the other tool, as the graphite round at the far end: the two rounds frame the sections. */}
-              {retail && (
-                <span className="flex">
-                  <SolNavButton />
-                </span>
-              )}
+              {/* The Marketplace as the blue round at the far end, where Sol was (20 Nov 2026, Martin): the two
+                  rounds frame the sections. Sol heads the floating bar on the right. */}
+              {(() => {
+                const market = sections.find((s) => s.id === "marketplace");
+                if (!market) return null;
+                const waiting = market.pages.reduce((n, p) => n + count(p.id), 0);
+                return <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />;
+              })()}
             </nav>
           </div>
           <div className="mt-3 flex min-w-0 items-center gap-2.5">
-            {(() => {
-              // The Marketplace is the network, not the business's own work: in the middle of the room between the
-              // sections and the card (3 Nov 2026, Martin), its words beside its round where there is room
-              // (`.studio-market-words`).
-              const market = sections.find((s) => s.id === "marketplace");
-              const waiting = market ? market.pages.reduce((n, p) => n + count(p.id), 0) : 0;
-              return (
-                // It drops with the sections menu onto the pad's edge (14 Nov 2026, Martin): its row sits 2px higher.
-                <div
-                  className="flex min-w-0 flex-1 justify-center"
-                  style={tool ? undefined : { transform: `translateY(${MENU_DROP_PX + 2}px)` }}
-                >
-                  {market && <MarketplaceButton href={market.pages[0].href} lit={market.id === current.id} waiting={waiting} />}
-                </div>
-              );
-            })()}
+            {/* The room between the sections and the card (the Marketplace was here until it joined the menu). */}
+            <div className="min-w-0 flex-1" />
             {/* The calculator, beside the top card on every page (14 Nov 2026, Martin: no bar of tools down the right). */}
             {designsRoofs(kind) && <QuickCalc />}
             <div data-tour="icons" className="glass-bar relative flex shrink-0 items-center gap-0.5 rounded-full p-1">
               <DayWeather />
               {/* On the design tool the floating rounds are put away for the roof, so team chat comes up here. */}
+              {retail && tool && <SolNavButton small />}
               {retail && tool && <TeamChatButton me={account.email} customers={unread + mentions} />}
               {/* Email, with its unread count, on every page. */}
               {retail && <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />}
@@ -845,8 +822,8 @@ function Shell({
           deal={(id) => `${PATHS.deals}/${id}`}
         />
       )}
-      {/* Who you talk to, floating bottom right (team chat and the agents; not over the design tool, which needs the
-          room) and Sol's panel. */}
+      {/* Who you talk to, floating on the right (Sol, the agents, and team chat under them; not over the design
+          tool, which needs the room) and Sol's panel. */}
       {retail && !tool && (
         <SolRail
           team={<TeamChatButton me={account.email} customers={unread + mentions} />}

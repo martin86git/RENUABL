@@ -254,9 +254,11 @@ function useSolOpen(): boolean {
  * tools frame the sections without the one signal colour being spent twice. Pressing it opens his panel over the page
  * you are on (his own page is a press further, from the panel); his sun beats like a heart, and while a reply waits his
  * count glows.
- * `phone` is the foot bar's raised round.
+ * `phone` is the foot bar's raised round. Since 20 Nov 2026 (Martin: "I want Sol to move into the Floating bar and
+ * replace the chat icon") his round heads the floating bar on the right (`rail`: standing out of its top, as team
+ * chat's did), and on the design tool, where that bar is put away, a small one sits in the top card (`small`).
  */
-export function SolNavButton({ phone = false }: { phone?: boolean }) {
+export function SolNavButton({ phone = false, rail = false, small = false }: { phone?: boolean; rail?: boolean; small?: boolean }) {
   const unread = useSolUnread();
   const open = useSolOpen();
   const waiting = unread > 0 && !open;
@@ -269,14 +271,19 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
       aria-pressed={open}
       className={clsx(
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
-        phone ? "size-12" : "-my-2 size-12",
+        small ? "size-10" : rail ? "-mt-4 size-14" : phone ? "size-12" : "-my-2 size-12",
       )}
     >
       {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
           panel is open and no stars (18 Nov 2026, Martin: "lose its halo ring and resemble the same as the sol icon in
           the right hand chat"). */}
       <span className="sol-heartbeat inline-flex">
-        <SolMark className={clsx("transition-transform duration-300 group-hover:scale-110", phone ? "size-10" : "size-[38px]")} />
+        <SolMark
+          className={clsx(
+            "transition-transform duration-300 group-hover:scale-110",
+            small ? "size-8" : rail ? "size-12" : phone ? "size-10" : "size-[38px]",
+          )}
+        />
       </span>
       {waiting && (
         <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
@@ -293,27 +300,35 @@ export function SolNavButton({ phone = false }: { phone?: boolean }) {
  * glance. Sol left it for his round in the nav (1 Nov 2026). Wide screens only.
  */
 export function SolRail({ team, assistant }: { team?: React.ReactNode; assistant?: React.ReactNode }) {
-  if (!team && !assistant) return null;
   // The floating bar, half way down the right, as it was (14 Nov 2026, Martin: the loose rounds in the corner were
   // tried the same day and he didn't like them: "I want the old look and positioning of the floating bar… with just
   // the chat and the 2 agents"). It holds only who you talk to: team chat and the business's agents. The tools that
   // used to sit under them stay where they went: the calculator and email in the top card, the proposals in the CRM.
+  // Sol heads it, in team chat's old place, and team chat sits under the bar on its own (20 Nov 2026, Martin: "I want
+  // Sol to move into the Floating bar and replace the chat icon. im thinking the chat icon will sit below the floating
+  // bar on its own").
   return (
     <aside
-      aria-label="Who you talk to: your team and your agents"
-      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center glass-bar rounded-[2rem] px-2 pb-3 pt-1.5 print:hidden lg:flex"
+      aria-label="Who you talk to: Sol, your agents and your team"
+      className="sol-rail fixed right-4 top-1/2 z-30 hidden w-16 -translate-y-1/2 flex-col items-center gap-3 print:hidden lg:flex"
     >
-      {/* One rhythm down the bar (14 Nov 2026, Martin: "the bar doesn't look as good as it could"): a round, its name
-          under it, and a fine rule between your team and your agents. */}
-      {team && (
+      <div className="glass-bar relative flex w-full flex-col items-center rounded-[2rem] px-2 pb-3 pt-1.5">
+        {/* One rhythm down the bar (14 Nov 2026, Martin: "the bar doesn't look as good as it could"): a round, its
+            name under it, and a fine rule between Sol and your agents. */}
         <span className="flex flex-col items-center">
-          <span className="team-bulb">{team}</span>
+          <SolNavButton rail />
+          <span className="text-[11px] font-medium leading-tight text-ink-2">Sol</span>
+        </span>
+        {assistant && <span className="my-2.5 h-px w-7 bg-line" aria-hidden />}
+        {/* The business's agents, each with its name under it (rail-agents.tsx). */}
+        {assistant}
+      </div>
+      {team && (
+        <span className="flex flex-col items-center gap-1">
+          <span className="team-bulb team-alone">{team}</span>
           <span className="text-[11px] font-medium leading-tight text-ink-2">Team</span>
         </span>
       )}
-      {team && assistant && <span className="my-2.5 h-px w-7 bg-line" aria-hidden />}
-      {/* The business's agents, each with its name under it (rail-agents.tsx). */}
-      {assistant}
     </aside>
   );
 }

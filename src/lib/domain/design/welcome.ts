@@ -71,13 +71,13 @@ export const WELCOME_TOUR: { what: string; now: string; at: string }[] = [
   },
   {
     what: "Sol",
-    now: "opens from the dark button with the sun, beside whatever page you're on. He can see what's on your screen.",
+    now: "opens from the sun at the top of the bar on the right, beside whatever page you're on. He can see what's on your screen.",
     at: 'button[title="Sol, your assistant"]',
   },
   {
     what: "RENUABL Marketplace",
-    now: "is the blue button. It's where solar businesses will list jobs, bid on installations and trade equipment. Coming soon.",
+    now: "is the blue button at the end of the menu. It's where solar businesses will list jobs, bid on installations and trade equipment. Coming soon.",
     at: 'a[aria-label^="RENUABL Marketplace"]',
   },
-  { what: "The buttons down the right", now: "hold team chat, your notifications and email.", at: ".sol-rail" },
+  { what: "The bar down the right", now: "holds Sol and your agents, with team chat under it.", at: ".sol-rail" },
 ];
