@@ -13,9 +13,10 @@ import { SolSays, Typed } from "./today-pad";
 
 type Stage = "hello" | WelcomeStep | "done";
 
-const card = "mt-4 max-w-xl rounded-2xl bg-surface p-4 ring-1 ring-line sm:p-5";
+// A step's own pad sits inside Sol's chat pad, a shade off it.
+const card = "mt-3 rounded-xl bg-canvas p-3.5 ring-1 ring-line sm:p-4";
 const pill =
-  "inline-flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-medium transition disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted";
+  "inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium transition disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted";
 const dark = `${pill} bg-primary text-primary-ink hover:brightness-110`;
 const light = `${pill} bg-surface text-ink ring-1 ring-line hover:ring-ink-2`;
 const quiet = "text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink";
@@ -33,6 +34,10 @@ const GMAIL_WORDS: Partial<Record<GmailOutcome, string>> = {
  * step comes up in turn as he gets to it: connect email and calendar, add the team with Admin or User (the owner only),
  * and a spotlight tour of the page. Each step can be skipped; finishing or skipping the lot is kept (`finishWelcome`)
  * and Today opens as usual.
+ *
+ * One chat pad (20 Nov 2026, Martin: "sols text is too large. also there should be a chat text pad that sol is typing
+ * within, of which the connector request pad is within. also only need one Sol icon"): Sol's sun once at its head, his
+ * lines typed inside it in smaller type, each step's own pad under the line that asks for it.
  */
 export function Welcome({
   firstName,
@@ -64,42 +69,51 @@ export function Welcome({
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-10 pt-2" aria-live="polite">
-      {stages.slice(0, at + 1).map((s) => (
-        <SolSays key={s}>
-          <div className="text-[16px] leading-relaxed text-ink">
-            <Typed text={lines[s]} onDone={heard(s)} />
+    <div className="mx-auto w-full max-w-2xl flex-1 pb-10 pt-2" aria-live="polite">
+      <div className="rounded-2xl bg-surface p-4 shadow-[0_8px_30px_rgba(11,11,12,0.06)] ring-1 ring-line sm:p-5">
+        <SolSays>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted" aria-hidden>
+            Sol
+          </p>
+          <div className="mt-1.5 space-y-4">
+            {stages.slice(0, at + 1).map((s) => (
+              <div key={s}>
+                <div className="text-[14px] leading-relaxed text-ink">
+                  <Typed text={lines[s]} onDone={heard(s)} />
+                </div>
+                {said.has(s) && s === "connect" && <ConnectStep onNext={next} current={stages[at] === "connect"} />}
+                {said.has(s) && s === "team" && <TeamStep onNext={next} current={stages[at] === "team"} />}
+                {said.has(s) && s === "tour" && stages[at] === "tour" && (
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      className={dark}
+                      onClick={() => {
+                        void finishWelcome();
+                        onTour();
+                      }}
+                    >
+                      Show me around
+                    </button>
+                    <button type="button" className={quiet} onClick={next}>
+                      Skip the tour
+                    </button>
+                  </div>
+                )}
+                {said.has(s) && s === "done" && (
+                  <div className="mt-4">
+                    <button type="button" className={dark} onClick={end}>
+                      Go to Today
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-          {said.has(s) && s === "connect" && <ConnectStep onNext={next} current={stages[at] === "connect"} />}
-          {said.has(s) && s === "team" && <TeamStep onNext={next} current={stages[at] === "team"} />}
-          {said.has(s) && s === "tour" && stages[at] === "tour" && (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className={dark}
-                onClick={() => {
-                  void finishWelcome();
-                  onTour();
-                }}
-              >
-                Show me around
-              </button>
-              <button type="button" className={quiet} onClick={next}>
-                Skip the tour
-              </button>
-            </div>
-          )}
-          {said.has(s) && s === "done" && (
-            <div className="mt-4">
-              <button type="button" className={dark} onClick={end}>
-                Go to Today
-              </button>
-            </div>
-          )}
         </SolSays>
-      ))}
+      </div>
       {at < stages.length - 1 && (
-        <p className="text-center">
+        <p className="mt-5 text-center">
           <button type="button" className={quiet} onClick={end}>
             Skip setting up for now
           </button>
@@ -182,7 +196,7 @@ function Row({ icon, title, done, children }: { icon: React.ReactNode; title: st
   return (
     <div className="flex flex-wrap items-center gap-3 py-2">
       <span className="inline-flex size-9 items-center justify-center rounded-full bg-surface-2 text-ink-2">{icon}</span>
-      <span className="min-w-24 text-[15px] font-medium text-ink">{title}</span>
+      <span className="min-w-24 text-[14px] font-medium text-ink">{title}</span>
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {done ? (
           <span className="inline-flex items-center gap-1.5 text-[14px] text-positive">
