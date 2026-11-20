@@ -273,7 +273,7 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
         // On the bar he is a bulb: wider than the bar and standing out of its top, as team chat's round used to
         // (20 Nov 2026, Martin: "lets make the Sol brain larger so sits like a bulb (like the chat used to)").
-        small ? "size-10" : rail ? "-mx-3 -mt-7 mb-0.5 size-[4.5rem]" : phone ? "size-12" : "-my-2 size-12",
+        small ? "size-10" : rail ? "-mx-2 -mt-5 mb-0.5 size-16" : phone ? "size-12" : "-my-2 size-12",
       )}
     >
       {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
