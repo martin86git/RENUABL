@@ -69,6 +69,8 @@ export function CampaignStart() {
   const [drafts, setDrafts] = useState<CampaignLine[]>([]);
   const [busy, setBusy] = useState<"sol" | "open" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  /** Pressed with nothing typed: the box says what it needs. */
+  const [empty, setEmpty] = useState(false);
   const about = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -102,7 +104,14 @@ export function CampaignStart() {
   }
 
   async function write() {
-    if (!goal || !brief.trim()) return;
+    if (!goal) return;
+    if (!brief.trim()) {
+      // The grey words in the box are an example, which reads as filled in: say so, and put them there to type.
+      setEmpty(true);
+      box.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      box.current?.focus({ preventScroll: true });
+      return;
+    }
     setBusy("sol");
     setProblem(null);
     const r = await writeWithSol({
@@ -183,14 +192,36 @@ export function CampaignStart() {
                   value={brief}
                   rows={4}
                   maxLength={EDM_SOL_LIMITS.brief}
-                  onChange={(e) => setBrief(e.target.value)}
+                  aria-invalid={empty}
+                  onChange={(e) => {
+                    setBrief(e.target.value);
+                    setEmpty(false);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void write();
                   }}
                   placeholder={`For example: ${words.example}`}
-                  className={cn(field, "mt-3 h-auto py-2.5 leading-relaxed")}
+                  className={cn(field, "mt-3 h-auto py-2.5 leading-relaxed", empty && "ring-2 ring-sun-line")}
                 />
               </label>
+              {!brief.trim() && (
+                <p className={cn("mt-2 text-[13px]", empty ? "font-medium text-ink" : "text-muted")}>
+                  {empty
+                    ? "Tell Sol what the email is about first. The grey words are only an example. "
+                    : "The grey words are only an example. "}
+                  <button
+                    type="button"
+                    className="underline underline-offset-4 hover:text-ink"
+                    onClick={() => {
+                      setBrief(words.example);
+                      setEmpty(false);
+                      box.current?.focus({ preventScroll: true });
+                    }}
+                  >
+                    Start from the example
+                  </button>
+                </p>
+              )}
               <p className="mt-2 text-[12px] text-muted">
                 Sol uses only what you write here: no figures, offers, dates or promises of his own. Writing it uses Sol credits.
               </p>
@@ -248,7 +279,7 @@ export function CampaignStart() {
               {problem && <p className="mt-4 text-[13px] text-danger">{problem}</p>}
 
               <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Button disabled={!brief.trim()} onClick={() => void write()}>
+                <Button onClick={() => void write()}>
                   <SolIcon className="size-4" /> Write the first draft
                 </Button>
                 <Button variant="ghost" onClick={() => void open(null)}>
