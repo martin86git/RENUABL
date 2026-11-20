@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import clsx from "clsx";
-import { CalendarCheck, Headset, MailQuestion, NotebookPen, Phone, PhoneForwarded, Settings, X } from "lucide-react";
-import { askAssistantToBook, askAssistantToCall, askByEmailFirst, useCallerInfo } from "@/lib/services/caller";
+import { ArrowLeft, CalendarCheck, Headset, MailQuestion, NotebookPen, Phone, PhoneForwarded, Send, Settings, X } from "lucide-react";
+import { askAssistantToBook, askAssistantToCall, askByEmailFirst, loadAskDraft, useCallerInfo } from "@/lib/services/caller";
+import { ASK_LIMITS, type AskDraft } from "@/lib/domain/design/call-consent";
 import type { CallerKey } from "@/lib/domain/install-call";
 import { watchAssistantCall } from "@/lib/services/assistant-call";
 import { callFromComputer, useComputerCall, useComputerCallsOn } from "@/lib/services/computer-call";
@@ -68,13 +69,29 @@ export function CallChoices(props: {
     props.onClose();
   };
 
-  // Ask by email first (domain/design/call-consent.ts): the assistant rings once they say yes.
+  // Ask by email first (domain/design/call-consent.ts): the assistant rings once they say yes. Pressing it opens the
+  // email as a draft to read and change (20 Nov 2026, Martin: it "just told me an email was sent. i have no
+  // visibility"); nothing goes until Send is pressed there.
+  const [draft, setDraft] = useState<{ to: string; business: string; fixed: AskDraft } | null>(null);
+  const [subject, setSubject] = useState("");
+  const [opening, setOpening] = useState("");
   const askFirst = async () => {
     setAsking(true);
     setFailed(null);
-    const res = await askByEmailFirst(props.jobId);
+    const res = await loadAskDraft(props.jobId);
     setAsking(false);
     if (!res.ok) return setFailed(res.message);
+    setSubject(res.draft.subject);
+    setOpening(res.draft.opening);
+    setDraft({ to: res.to, business: res.business, fixed: res.draft });
+  };
+  const sendAsk = async () => {
+    setAsking(true);
+    setFailed(null);
+    const res = await askByEmailFirst(props.jobId, { subject, opening });
+    setAsking(false);
+    if (!res.ok) return setFailed(res.message);
+    setDraft(null);
     setAsked(res.message);
   };
 
@@ -87,6 +104,93 @@ export function CallChoices(props: {
     watchAssistantCall({ jobId: props.jobId, name: props.name, message: res.message, role: "admin" });
     props.onClose();
   };
+
+  if (draft)
+    return (
+      <div data-ask-draft className="p-1.5">
+        <div className="flex items-center gap-1 pr-8">
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(null);
+              setFailed(null);
+            }}
+            aria-label="Back to the call choices"
+            className="grid size-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+          </button>
+          <p className="min-w-0 truncate text-[15px] font-semibold text-ink">Email to {who}</p>
+          <span className="ml-1 shrink-0 whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">
+            Draft · not sent
+          </span>
+        </div>
+        <dl className="mt-2.5 space-y-1.5 px-1 text-[13px]">
+          <div className="flex gap-2">
+            <dt className="w-14 shrink-0 text-muted">To</dt>
+            <dd className="min-w-0 break-all text-ink">{draft.to}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-14 shrink-0 text-muted">From</dt>
+            <dd className="min-w-0 text-ink">
+              {draft.business || "Your business"}
+              <span className="block text-xs text-muted">Replies come to you</span>
+            </dd>
+          </div>
+          <div className="flex items-center gap-2">
+            <dt className="w-14 shrink-0 text-muted">
+              <label htmlFor="ask-subject">Subject</label>
+            </dt>
+            <dd className="min-w-0 flex-1">
+              <input
+                id="ask-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value.slice(0, ASK_LIMITS.subject))}
+                className="block w-full rounded-lg bg-surface-2 px-2.5 py-1.5 text-[13px] text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+              />
+            </dd>
+          </div>
+        </dl>
+        <textarea
+          aria-label={`Your words to ${who}`}
+          value={opening}
+          onChange={(e) => setOpening(e.target.value.slice(0, ASK_LIMITS.opening))}
+          rows={6}
+          className="mt-2.5 block w-full resize-y rounded-lg bg-surface-2 px-3 py-2 text-[13px] leading-relaxed text-ink focus:outline-none focus:ring-1 focus:ring-ink"
+        />
+        {/* What always goes, as the customer reads it: who would call, the one link, what a no means. */}
+        <div className="mt-2 rounded-lg px-3 py-2.5 text-[13px] leading-relaxed text-ink-2 ring-1 ring-line">
+          <p>{draft.fixed.fixed}</p>
+          <p className="my-2.5">
+            <span className="inline-block rounded-full bg-ink px-3.5 py-1.5 text-xs font-semibold text-white">{draft.fixed.button}</span>
+          </p>
+          <p>{draft.fixed.after}</p>
+          <p className="mt-2">{draft.fixed.signOff}</p>
+        </div>
+        <p className="mt-1.5 px-1 text-xs leading-snug text-muted">
+          The lines in the box always go as written, so {who} knows the caller is an AI assistant and how to answer. The button is their own
+          private link.
+        </p>
+        {failed && <p className="px-1 pt-1.5 text-xs text-danger">{failed}</p>}
+        <div className="mt-2.5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setDraft(null)}
+            className="h-9 rounded-full px-3.5 text-[13px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+          >
+            {"Don't send"}
+          </button>
+          <button
+            type="button"
+            disabled={asking}
+            onClick={() => void sendAsk()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-ink"
+          >
+            <Send className="size-3.5" aria-hidden /> {asking ? "Sending…" : "Send email"}
+          </button>
+        </div>
+      </div>
+    );
 
   return (
     <div>
@@ -218,7 +322,7 @@ export function CallChoices(props: {
           <span>
             Ask {who} by email first
             <span className="block text-xs text-muted">
-              {asked ?? (asking ? "Sending…" : `They choose yes or no; ${caller.name} rings only after a yes`)}
+              {asked ?? (asking ? "Opening the email…" : `Read the email before it goes; ${caller.name} rings only after a yes`)}
             </span>
           </span>
         </button>
@@ -298,7 +402,7 @@ export function CallChooser(props: {
       <div
         role="menu"
         aria-label={`Call ${props.name || "them"}`}
-        className="relative w-full max-w-xs rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line"
+        className="relative max-h-[calc(100dvh-2rem)] w-full max-w-xs overflow-y-auto rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line has-[[data-ask-draft]]:max-w-md"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <button

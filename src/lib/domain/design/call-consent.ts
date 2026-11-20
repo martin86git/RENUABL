@@ -44,26 +44,79 @@ export function consentWords(n: ConsentNames): string {
   return `Yes, I'd like a call from ${assistant}, ${business}'s automated (AI) phone assistant, about my enquiry. I understand ${assistant} isn't a person and that notes of the call are kept by ${business}.`;
 }
 
-/** The email asking whether they'd like the call: who, why, and the one link to answer. */
-export function consentEmail(n: ConsentNames & { link: string }): { subject: string; text: string; html: string } {
+/** How much of the ask a member may write themselves. */
+export const ASK_LIMITS = { subject: 120, opening: 600 } as const;
+
+/** One plain line for a subject: nothing that could add a header. */
+export function cleanAskSubject(raw: unknown): string {
+  return typeof raw === "string" ? plain(raw, ASK_LIMITS.subject) : "";
+}
+
+/** The member's own opening words: plain text, paragraphs kept, nothing that reads as markup. */
+export function cleanAskOpening(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0009\u000b-\u001f<>]/g, "")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, ASK_LIMITS.opening)
+    .trim();
+}
+
+/**
+ * The ask as a draft the member reads before it goes (20 Nov 2026, Martin: pressing Ask by email first "just told me an
+ * email was sent. i have no visibility"). The subject and the opening are theirs to change. The rest always goes as
+ * written, so the customer is told the caller is an automated (AI) assistant and how to answer: `fixed` before the
+ * button, `after` under it, then the sign-off.
+ */
+export interface AskDraft {
+  subject: string;
+  opening: string;
+  fixed: string;
+  button: string;
+  after: string;
+  signOff: string;
+}
+
+export function askDraft(n: ConsentNames): AskDraft {
   const business = plain(n.business, 60) || "us";
   const assistant = plain(n.assistant, 30) || "our phone assistant";
   const hi = plain(n.firstName, 40);
-  const lines = [
-    `Hi${hi ? ` ${hi}` : ""},`,
-    `Thanks for your interest in ${business}. Would you like a quick call to go through your questions?`,
-    `The call would be from ${assistant}, our automated (AI) phone assistant. ${assistant} can answer questions about your enquiry and pass anything else to our team.`,
-    `Choose Yes or No here: ${n.link}`,
-    `If you say no, we won't call. Our team will be in touch another way.`,
-    `The ${business} team`,
-  ];
-  const foot = `Sent by ${business} using RENUABL.`;
-  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const para = (s: string) => `<p style="margin:0 0 14px">${esc(s)}</p>`;
   return {
     subject: `Would you like a call from ${business}?`,
+    opening: `Hi${hi ? ` ${hi}` : ""},\n\nThanks for your interest in ${business}. Would you like a quick call to go through your questions?`,
+    fixed: `The call would be from ${assistant}, our automated (AI) phone assistant. ${assistant} can answer questions about your enquiry and pass anything else to our team.`,
+    button: "Yes or no to a call",
+    after: "If you say no, we won't call. Our team will be in touch another way.",
+    signOff: `The ${business} team`,
+  };
+}
+
+/**
+ * The email asking whether they'd like the call: who, why, and the one link to answer. A subject and an opening the
+ * member wrote take the place of ours; a blank one leaves ours.
+ */
+export function consentEmail(n: ConsentNames & { link: string; subject?: string | null; opening?: string | null }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const business = plain(n.business, 60) || "us";
+  const d = askDraft(n);
+  const subject = cleanAskSubject(n.subject) || d.subject;
+  const opening = (cleanAskOpening(n.opening) || d.opening).split(/\n{2,}/).filter(Boolean);
+  const lines = [...opening, d.fixed, `Choose Yes or No here: ${n.link}`, d.after, d.signOff];
+  const foot = `Sent by ${business} using RENUABL.`;
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const para = (s: string) => `<p style="margin:0 0 14px">${esc(s).replace(/\n/g, "<br>")}</p>`;
+  return {
+    subject,
     text: `${lines.join("\n\n")}\n\n--\n${foot}`,
-    html: `<div style="font:15px/1.6 Arial,sans-serif;color:#111">${para(lines[0])}${para(lines[1])}${para(lines[2])}<p style="margin:22px 0"><a href="${esc(n.link)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">Yes or no to a call</a></p>${para(lines[4])}${para(lines[5])}<p style="margin-top:28px;font-size:12px;color:#777">${esc(foot)}</p></div>`,
+    html: `<div style="font:15px/1.6 Arial,sans-serif;color:#111">${opening.map(para).join("")}${para(d.fixed)}<p style="margin:22px 0"><a href="${esc(n.link)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600">${d.button}</a></p>${para(d.after)}${para(d.signOff)}<p style="margin-top:28px;font-size:12px;color:#777">${esc(foot)}</p></div>`,
   };
 }
 

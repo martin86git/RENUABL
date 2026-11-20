@@ -1,14 +1,32 @@
 import { ASK_REFUSAL_WORDS } from "@/lib/domain/design/call-consent";
-import { askForCall } from "@/lib/server/design-call-consent";
+import { askDraftFor, askForCall } from "@/lib/server/design-call-consent";
 import { answer, requireMember, viewerOf } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 
 /**
- * POST → { ok, message }: emails the deal's customer to ask whether they'd like a call from the business's phone
- * assistant (domain/design/call-consent.ts). Their Yes lines up the call; a No stops it. Members who may publish and
- * see the deal; the email goes to the address on the customer's record.
+ * GET → { ok, to, business, assistant, draft }: the ask as a draft to read and change before it goes (20 Nov 2026,
+ * Martin: it "just told me an email was sent. i have no visibility"). Nothing is kept or sent by reading it. Members
+ * who may publish and see the deal.
+ */
+export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs/[id]/call/ask">) {
+  return answer(async () => {
+    const who = await requireMember("publish");
+    if ("refuse" in who) return who.refuse;
+    const { id } = await ctx.params;
+    if (!validId(id)) return Response.json({ ok: false, message: ASK_REFUSAL_WORDS.missing }, { status: 404 });
+    const out = await askDraftFor(who.member, id, viewerOf(who.member));
+    if (out.ok) return Response.json(out);
+    return Response.json({ ok: false, message: ASK_REFUSAL_WORDS[out.why] }, { status: out.why === "missing" ? 404 : 409 });
+  });
+}
+
+/**
+ * POST { subject?, opening? } → { ok, message }: emails the deal's customer to ask whether they'd like a call from the
+ * business's phone assistant (domain/design/call-consent.ts), with the member's own subject and opening when given
+ * (cleaned on the server; the lines saying who calls and how to answer always go). Their Yes lines up the call; a No
+ * stops it. Members who may publish and see the deal; the email goes to the address on the customer's record.
  */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/call/ask">) {
   return answer(async () => {
@@ -18,7 +36,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       return Response.json({ ok: false, message: "That's a lot of emails at once. Try again later." }, { status: 429 });
     const { id } = await ctx.params;
     if (!validId(id)) return Response.json({ ok: false, message: ASK_REFUSAL_WORDS.missing }, { status: 404 });
-    const out = await askForCall(who.member, id, viewerOf(who.member));
+    const body = (await request.json().catch(() => null)) as { subject?: unknown; opening?: unknown } | null;
+    const out = await askForCall(who.member, id, viewerOf(who.member), { subject: body?.subject, opening: body?.opening });
     if (out.ok)
       return Response.json({
         ok: true,

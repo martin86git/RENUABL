@@ -8,6 +8,7 @@ import type { StrayText, TextLine } from "@/lib/domain/design/texts";
 import { useEffect, useState } from "react";
 import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
 import type { CallerKey } from "@/lib/domain/install-call";
+import type { AskDraft } from "@/lib/domain/design/call-consent";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
 import { watchAssistantCall } from "./assistant-call";
 
@@ -229,8 +230,16 @@ export const salesAgents = (info: CallerInfo): CallerState[] => [info.caller, ..
 export const useCaller = (): CallerState => useCallerInfo().caller;
 
 /** Emails the deal's customer to ask whether they'd like the assistant's call; it rings after a yes (call-consent.ts). */
-export const askByEmailFirst = (jobId: string) =>
-  ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call/ask`, { method: "POST" });
+export const askByEmailFirst = (jobId: string, own?: { subject: string; opening: string }) =>
+  ask<{ message: string }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call/ask`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(own ?? {}),
+  });
+
+/** The ask as a draft to read and change before it goes: who it goes to, and the lines that always go. Sends nothing. */
+export const loadAskDraft = (jobId: string) =>
+  ask<{ to: string; business: string; assistant: string; draft: AskDraft }>(`/api/design/jobs/${encodeURIComponent(jobId)}/call/ask`);
 
 /** The phone assistant rings this deal's customer (in calling hours). Answers what to tell the member. */
 export const askAssistantToCall = (jobId: string, agent: CallerKey = "sales", about = "") =>

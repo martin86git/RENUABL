@@ -1108,7 +1108,7 @@ function CallMenu({
             ref={menu}
             role="menu"
             style={{ top: at.top, left: at.left }}
-            className="fixed z-[70] w-72 rounded-xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
+            className="fixed z-[70] max-h-[calc(100dvh-1.75rem)] w-72 overflow-y-auto rounded-xl bg-surface p-1.5 shadow-lift ring-1 ring-line has-[[data-ask-draft]]:w-96"
           >
             <CallChoices jobId={jobId} phone={phone} name={name} onNotes={onNotes} toBook={toBook} onClose={() => setAt(null)} />
           </div>,

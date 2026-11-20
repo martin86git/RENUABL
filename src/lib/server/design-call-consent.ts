@@ -6,7 +6,11 @@
  * signed-in member, and the customer's page is reached by its token alone.
  */
 import {
+  askDraft,
   askRefusal,
+  cleanAskOpening,
+  cleanAskSubject,
+  type AskDraft,
   CALL_CONSENT_VERSION,
   consentEmail,
   consentRecordLine,
@@ -64,13 +68,9 @@ export async function lastAsk(businessId: string, jobId: string): Promise<{ stat
  * Emails the deal's customer to ask whether they'd like a call from the business's phone assistant. Only where calls
  * are on for the business, to the email on the customer's record, never one from a browser.
  */
-export async function askForCall(
-  member: { businessId: string; email: string },
-  jobId: string,
-  viewer: DealViewer,
-): Promise<{ ok: true; assistant: string; email: string } | { ok: false; why: AskRefusal }> {
+async function readyToAsk(member: { businessId: string }, jobId: string, viewer: DealViewer) {
   const found = await jobById(member.businessId, jobId, viewer);
-  if (!found) return { ok: false, why: "missing" };
+  if (!found) return { ok: false as const, why: "missing" as AskRefusal };
   const { customer } = found;
   const on = await callMeFor(member.businessId);
   const last = await lastAsk(member.businessId, jobId);
@@ -80,14 +80,41 @@ export async function askForCall(
     mobile: normaliseMobile(customer.phone),
     last: last?.state ?? null,
   });
-  if (why) return { ok: false, why };
+  if (why) return { ok: false as const, why };
   const site = siteUrl();
-  if (!site) return { ok: false, why: "no-site" };
-  if (!emailProvider()) return { ok: false, why: "no-email-service" };
-
+  if (!site) return { ok: false as const, why: "no-site" as AskRefusal };
+  if (!emailProvider()) return { ok: false as const, why: "no-email-service" as AskRefusal };
   const assistant = (await callerOf(member.businessId)).name;
   const business = await businessName(member.businessId);
   const firstName = customer.firstName || customer.name.split(" ")[0] || "";
+  return { ok: true as const, customer, site, assistant, business, firstName };
+}
+
+/**
+ * The ask as a draft, before anything is sent (20 Nov 2026, Martin: "i have no visibility"): who it goes to, the
+ * subject and opening to change, and the lines that always go. Nothing is kept or sent by reading it.
+ */
+export async function askDraftFor(
+  member: { businessId: string; email: string },
+  jobId: string,
+  viewer: DealViewer,
+): Promise<{ ok: true; to: string; business: string; assistant: string; draft: AskDraft } | { ok: false; why: AskRefusal }> {
+  const r = await readyToAsk(member, jobId, viewer);
+  if (!r.ok) return r;
+  const { business, assistant, firstName } = r;
+  return { ok: true, to: r.customer.email, business, assistant, draft: askDraft({ business, assistant, firstName }) };
+}
+
+export async function askForCall(
+  member: { businessId: string; email: string },
+  jobId: string,
+  viewer: DealViewer,
+  /** The member's own subject and opening, from the draft; blank leaves ours. Cleaned again as the email is built. */
+  own: { subject?: unknown; opening?: unknown } = {},
+): Promise<{ ok: true; assistant: string; email: string } | { ok: false; why: AskRefusal }> {
+  const r = await readyToAsk(member, jobId, viewer);
+  if (!r.ok) return r;
+  const { customer, site, assistant, business, firstName } = r;
   const words = consentWords({ business, assistant, firstName });
   const token = randomToken(20);
   await query(
@@ -111,7 +138,14 @@ export async function askForCall(
   );
   await sendEmail({
     to: customer.email,
-    ...consentEmail({ business, assistant, firstName, link: `${site}/c/${token}` }),
+    ...consentEmail({
+      business,
+      assistant,
+      firstName,
+      link: `${site}/c/${token}`,
+      subject: cleanAskSubject(own.subject),
+      opening: cleanAskOpening(own.opening),
+    }),
     replyTo: member.email,
   });
   await record(query, member.businessId, {
