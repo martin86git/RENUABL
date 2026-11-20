@@ -325,3 +325,25 @@ export const NUDGE_KIND_WORDS: Record<Nudge["kind"], string> = {
   option: "An option",
   next: "Next step",
 };
+
+/**
+ * How a roof was when it was opened (20 Nov 2026, Martin: the designer opened on "Do they want blackout backup?" every
+ * time; "if a design has been completed end to end, then Sol should remain inactive unless prompted. however, if we
+ * only got halfway through, then Sol should say here's where we left off… and then ask the question where we left off").
+ * Nothing drawn is new (his guide leads); every readiness check passed is done (Sol keeps quiet until something changes
+ * or he's asked); anything else is part way.
+ */
+export type OpenedAs = "new" | "done" | "partway";
+
+export function openedAs(s: { panels: number; battery: boolean; ready: boolean }): OpenedAs {
+  if (s.panels <= 0 && !s.battery) return "new";
+  return s.ready ? "done" : "partway";
+}
+
+/** The line over Sol's first card on a design opened part way: what is there, then on to the question. */
+export function leftOffWords(s: { panels: number; kw: number; batteryKwh: number | null }): string {
+  const parts: string[] = [];
+  if (s.panels > 0) parts.push(`${s.panels} panel${s.panels === 1 ? "" : "s"}, ${s.kw.toFixed(2)} kW`);
+  if (s.batteryKwh) parts.push(`a battery of ${round1(s.batteryKwh)} kWh`);
+  return `Here's where we left off: ${parts.join(" with ") || "the design so far"}. Picking up from here:`;
+}

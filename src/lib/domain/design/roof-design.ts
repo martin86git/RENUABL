@@ -943,7 +943,7 @@ function cleanBattery(raw: unknown): DesignBattery | undefined {
     qty: Math.round(qty),
     x: Math.round(x * 100) / 100,
     y: Math.round(y * 100) / 100,
-    ...(p.backup === true ? { backup: true } : {}),
+    ...(typeof p.backup === "boolean" ? { backup: p.backup } : {}),
     ...(p.backup === true && p.reserve === true && Math.round(qty) > 1 ? { reserve: true } : {}),
   };
 }

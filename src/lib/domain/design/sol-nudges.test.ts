@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nudgesFor, type NudgeState } from "./sol-nudges";
+import { leftOffWords, nudgesFor, openedAs, type NudgeState } from "./sol-nudges";
 
 const base: NudgeState = {
   panels: 14,
@@ -96,5 +96,19 @@ describe("Sol beside the design", () => {
     expect(n.options?.join(" ")).toMatch(/Rewire/);
     expect(n.options?.join(" ")).toMatch(/Move it/);
     expect(n.options?.join(" ")).toMatch(/Take it off/);
+  });
+});
+
+describe("a roof opened again", () => {
+  it("is new with nothing drawn, done when ready, else part way", () => {
+    expect(openedAs({ panels: 0, battery: false, ready: false })).toBe("new");
+    expect(openedAs({ panels: 22, battery: true, ready: true })).toBe("done");
+    expect(openedAs({ panels: 16, battery: true, ready: false })).toBe("partway");
+  });
+  it("says where we left off", () => {
+    expect(leftOffWords({ panels: 16, kw: 7.6, batteryKwh: 24 })).toBe(
+      "Here's where we left off: 16 panels, 7.60 kW with a battery of 24 kWh. Picking up from here:",
+    );
+    expect(leftOffWords({ panels: 1, kw: 0.5, batteryKwh: null })).toBe("Here's where we left off: 1 panel, 0.50 kW. Picking up from here:");
   });
 });

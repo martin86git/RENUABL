@@ -23,7 +23,7 @@ import {
 import { SolNudges } from "./sol-nudges";
 import { WalkthroughRecorder } from "./walkthrough-recorder";
 import { PRESENTING_EVENT } from "@/lib/services/walkthrough";
-import { nudgesFor, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
+import { leftOffWords, nudgesFor, openedAs, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { SideViewsButton } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
@@ -3613,6 +3613,18 @@ export function RoofDesigner(props: {
   })();
   const light = readinessLight(ready);
   /**
+   * How the roof was when opened (20 Nov 2026, Martin, `openedAs`): a finished design keeps Sol quiet until he's asked or
+   * something on it needs doing again; one left part way opens on "Here's where we left off" over its next question.
+   */
+  const [opened] = useState(() => openedAs({ panels: summary.panels, battery: Boolean(battery), ready: light.ready }));
+  const [solAsked, setSolAsked] = useState(false);
+  const [resumeSaid, setResumeSaid] = useState(false);
+  const solQuiet = opened === "done" && light.ready && !solAsked;
+  const resumeLine =
+    opened === "partway" && !resumeSaid
+      ? leftOffWords({ panels: summary.panels, kw: summary.kw, batteryKwh: battery ? battery.kwh * battery.qty : null })
+      : null;
+  /**
    * Sol beside the design (10 Nov 2026, Martin: options as you design, and the questions the quote needs answered):
    * worked out by rule from the design as it stands (`sol-nudges.ts`), shown one at a time over Ask Sol.
    */
@@ -4271,6 +4283,7 @@ export function RoofDesigner(props: {
     else router.push(`/design/deals/${encodeURIComponent(props.jobId)}/proposal`);
   };
   const actOnNudge = (nudge: Nudge, action: NudgeAction, count?: number) => {
+    setResumeSaid(true);
     const aside = () => setNudgesAside((list) => [...list, nudge.id]);
     if (/^(backup-|line-)/.test(action.act))
       setNudgeDone((list) => [...list, { id: nudge.id, ...(action.line ? { line: action.line } : {}) }]);
@@ -4303,8 +4316,10 @@ export function RoofDesigner(props: {
         setBackupAnswered(true);
         return changed();
       case "backup-no":
+        // Kept on the battery, so the question isn't asked again the next time the roof is opened (20 Nov 2026, Martin).
+        setBattery((b) => (b ? { ...b, backup: false } : b));
         setBackupAnswered(true);
-        return;
+        return changed();
       case "backup-both":
         setBackupAnswered(true);
         twoOptions(
@@ -4798,6 +4813,8 @@ export function RoofDesigner(props: {
   // a common one (`parseCommand`), else read by Sol against the design described in words (`/api/design/command`),
   // and carried out here as one change that undoes like any other.
   const [commandOpen, setCommandOpen] = useState(false);
+  // Asking Sol is the prompt a finished design waits for: his cards come back once it has been opened.
+  if (commandOpen && !solAsked) setSolAsked(true);
   const [commandText, setCommandText] = useState("");
   const [commandBusy, setCommandBusy] = useState(false);
   // Sol's thinking stays a moment once he has answered, to take off (sol-thinking.tsx).
@@ -10204,6 +10221,7 @@ export function RoofDesigner(props: {
               )}
               {/* Sol beside the design: one suggestion or question at a time, over Ask Sol, never while his panel is out. */}
               {!guideActive &&
+                !solQuiet &&
                 nudges.length > 0 &&
                 !menu &&
                 !opening &&
@@ -10214,7 +10232,11 @@ export function RoofDesigner(props: {
                     <SolNudges
                       nudges={nudges}
                       onAct={actOnNudge}
-                      onDismiss={(id) => setNudgesAside((a) => [...a, id])}
+                      onDismiss={(id) => {
+                        setResumeSaid(true);
+                        setNudgesAside((a) => [...a, id]);
+                      }}
+                      resume={resumeLine}
                       focus={nudgeFocus}
                       onBack={nudgeDone.length ? nudgeBack : guideOn && guideAnswered.length ? guideBack : null}
                     />

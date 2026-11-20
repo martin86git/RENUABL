@@ -20,6 +20,7 @@ export function SolNudges({
   onDismiss,
   onBack,
   focus,
+  resume,
   className,
 }: {
   nudges: Nudge[];
@@ -29,6 +30,8 @@ export function SolNudges({
   onBack?: (() => void) | null;
   /** The question to show, once Back has brought it back. */
   focus?: { id: string; at: number } | null;
+  /** On a design opened part way: what is there, over the first question (`leftOffWords`). */
+  resume?: string | null;
   className?: string;
 }) {
   const [at, setAt] = useState(0);
@@ -60,6 +63,7 @@ export function SolNudges({
       <div className="flex items-start gap-2.5">
         <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
         <div className="min-w-0 flex-1">
+          {resume && <p className="mb-1.5 text-[12.5px] leading-snug text-white/75">{resume}</p>}
           <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/50">
             {NUDGE_KIND_WORDS[n.kind]}
             {nudges.length > 1 && ` · ${i + 1} of ${nudges.length}`}
