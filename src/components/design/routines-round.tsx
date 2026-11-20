@@ -13,30 +13,31 @@ import { usePathname } from "next/navigation";
  */
 export function RoutinesRound() {
   const here = usePathname()?.startsWith("/design/routines") ?? false;
+  // In the floating bar's own graphite, with no name under it (20 Nov 2026, Martin chose the slim graphite bar with the
+  // names on hover): a pill the bar's width under it, held to it by the bridge.
   return (
-    <span className="-mt-3 flex flex-col items-center print:hidden">
-      {/* The bridge: two fine rails with a rung between them, from the bar down to the round. */}
+    <span className="-mt-3 flex w-full flex-col items-center print:hidden">
+      {/* The bridge: two fine graphite rails with a rung between them, from the bar down to the round. */}
       <span className="relative flex h-5 w-3 justify-between" aria-hidden>
-        <span className="w-px bg-ink/25" />
-        <span className="absolute inset-x-0 top-1/2 h-px bg-ink/25" />
-        <span className="w-px bg-ink/25" />
+        <span className="w-px bg-primary/60" />
+        <span className="absolute inset-x-0 top-1/2 h-px bg-primary/60" />
+        <span className="w-px bg-primary/60" />
       </span>
       <Link
         href="/design/routines"
         title="Routines: what each agent does by itself"
         aria-label="Routines: what each agent does by itself"
         aria-current={here ? "page" : undefined}
-        className="group glass-bar flex flex-col items-center rounded-[1.5rem] px-2 pb-1.5 pt-2 outline-none"
+        className="glass-rail group relative flex w-full items-center justify-center rounded-full p-1.5 outline-none"
       >
         <span
           className={clsx(
-            "grid size-11 place-items-center rounded-full shadow-[0_2px_8px_rgba(20,22,26,0.14)] ring-2 transition group-hover:-translate-y-0.5 group-hover:ring-sun-line group-focus-visible:ring-sun-line motion-reduce:transform-none",
-            here ? "bg-ink text-canvas ring-sun-line" : "bg-surface text-ink ring-transparent",
+            "grid size-10 place-items-center rounded-full bg-[#45484f] text-white shadow-[0_2px_8px_rgba(0,0,0,0.35)] ring-2 transition group-hover:-translate-y-0.5 group-hover:ring-sun-line group-focus-visible:ring-sun-line motion-reduce:transform-none",
+            here ? "ring-sun-line" : "ring-transparent",
           )}
         >
-          <Workflow className="size-5" aria-hidden />
+          <Workflow className="size-[18px]" aria-hidden />
         </span>
-        <span className="mt-1 text-[11px] font-medium leading-tight text-ink-2 group-hover:text-ink">Routines</span>
       </Link>
     </span>
   );

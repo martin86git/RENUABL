@@ -15,13 +15,9 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
-    area: "Marketing",
-    words: "Emails can be laid out in 3, 4 or 5 sections Sol writes, each with picture tiles: drop in as many pictures as you need.",
-  },
-  {
-    day: "2026-11-20",
-    area: "Marketing",
-    words: "New campaign now asks what you want to achieve first, then Sol writes the first draft from a few words.",
+    area: "Floating bar",
+    words:
+      "The bar on the right is slimmer and graphite, with team chat in its foot and Routines under it to match. Names show when you point at a round.",
   },
   {
     day: "2026-11-20",
