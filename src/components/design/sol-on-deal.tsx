@@ -264,16 +264,16 @@ export function SolTerminal(props: {
   };
 
   const quiet =
-    "inline-flex h-9 items-center rounded-full px-4 text-[13px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
+    "inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
 
   const openDealLink = props.openDeal ? (
     <Link
       href={props.openDeal}
       title={`${deal.customer}'s deal`}
-      className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+      className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
     >
       Open deal
-      <Handshake className="size-4" aria-hidden />
+      <Handshake className="size-3.5" aria-hidden />
     </Link>
   ) : null;
 
@@ -363,7 +363,7 @@ export function SolTerminal(props: {
                       type="button"
                       onClick={() => void sendAnswer()}
                       disabled={busy !== null || writing}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       Yes, send it
@@ -388,7 +388,7 @@ export function SolTerminal(props: {
                       type="button"
                       onClick={yes}
                       disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-full bg-sun-line px-4 text-[13px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       {p.yes.label}
