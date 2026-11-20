@@ -292,12 +292,12 @@ export function SolTerminal(props: {
     />
   );
   const hasDraft = Boolean((!leftIt && p.draft && sol) || (waiting && answer));
-  const words = "block w-full resize-y bg-surface px-3 py-2.5 text-[13.5px] leading-relaxed text-ink focus:outline-none";
+  const words = "block w-full resize-y bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-ink focus:outline-none";
   const drafts = (
     <>
       {!leftIt && p.draft && sol && (
         <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-          <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-2 text-[12px] text-muted">
+          <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
             <span>Email to {name}</span>
             {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
             {state === "held" && <span>· held</span>}
@@ -309,7 +309,7 @@ export function SolTerminal(props: {
 
       {waiting && answer && (
         <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-          <div className="border-b border-line px-3 py-2 text-[12px] text-muted">
+          <div className="border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
             {!byChat ? `Email to ${name}` : asEmail ? `Email to ${name} · also kept in their proposal's chat` : `Reply in ${name}'s chat`}
             {writing && <span className="text-sun-ink"> · writing it again…</span>}
           </div>
@@ -613,9 +613,9 @@ function ComposeFields(props: {
   onSubject: (v: string) => void;
 }) {
   const { mail } = props;
-  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-[13px]";
-  const label = "w-[4.5rem] shrink-0 text-[12px] text-muted";
-  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[13px] text-ink outline-none placeholder:text-muted";
+  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1 text-[12px]";
+  const label = "w-[4.5rem] shrink-0 text-[11.5px] text-muted";
+  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[12px] text-ink outline-none placeholder:text-muted";
   return (
     <div>
       <label className={row}>
