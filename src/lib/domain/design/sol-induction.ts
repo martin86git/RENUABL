@@ -28,6 +28,8 @@ export interface InductionQuestion {
   options: string[];
   /** Shown under the question. */
   hint?: string;
+  /** Several options may be picked, with more typed one a line (kept as one answer, "; " between). */
+  many?: boolean;
   scope: InductionScope;
   /** The preference kept from an answer, in words Sol reads. */
   keep: (answer: string) => string;
@@ -144,8 +146,20 @@ export const INDUCTION_QUESTIONS: InductionQuestion[] = [
     key: "never",
     part: "day",
     ask: "Anything I should never do?",
-    options: [],
-    hint: "For example: never mention finance, never suggest a brand we don't sell.",
+    // The usual worries of an owner letting an assistant near customers (20 Nov 2026, Martin: a single short box read as
+    // one thing, hid what was typed, and gave nothing to pick).
+    options: [
+      "Quote a price or a discount",
+      "Promise a rebate or a saving",
+      "Give an installation date",
+      "Bring up finance or loans",
+      "Suggest a brand we don't sell",
+      "Criticise another company",
+      "Push a customer to sign",
+      "Contact customers after hours",
+    ],
+    many: true,
+    hint: "Pick any that apply, and add your own.",
     scope: "business",
     keep: (a) => `Never: ${a.replace(/^never[:,]?\s*/i, "")}`,
   },
@@ -207,7 +221,9 @@ export function keptFor(q: InductionQuestion, p: { owner: boolean; scope: Busine
 }
 
 /** One answer as typed or pressed: one plain line, or null when there's nothing. */
-export function cleanAnswer(v: unknown, max = 160): string | null {
+export const ANSWER_MAX = 600;
+
+export function cleanAnswer(v: unknown, max = ANSWER_MAX): string | null {
   if (typeof v !== "string") return null;
   const one = v
     .replace(/[\u0000-\u001f\u007f]/g, " ")
@@ -222,7 +238,10 @@ export const inductionPrefId = (key: string) => `in-${key}`;
 
 /** A preference kept from an answer: the one under that key replaced, or added. `from` says where it came from. */
 export function withKeptPref(list: readonly SolPref[], id: string, text: string, now: Date, from?: string): SolPref[] {
-  const said = text.replace(/\s+/g, " ").trim().slice(0, 300);
+  const said = text
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, ANSWER_MAX + 20);
   if (!said) return [...list];
   const kept: SolPref = { id, text: said, at: now.toISOString(), ...(from ? { from: from.slice(0, 160) } : {}) };
   const at = list.findIndex((p) => p.id === id);
@@ -233,21 +252,23 @@ export function withKeptPref(list: readonly SolPref[], id: string, text: string,
 // ── Where Sol is, said once in his introduction ─────────────────────────────────────────────────────────────────
 
 export const SOL_INTRO = {
-  who: (business: string) =>
-    `I'm Sol, RENUABL's built-in assistant. I work for you and ${business || "your business"}, never for your customers.`,
-  where: "I'm almost everywhere. Press any of these to see how:",
-  places: [
-    { label: "The sun up top", how: "My round in the menu opens me beside whatever page you're on. I can see what's on it." },
-    { label: "Today's box", how: "Ask me anything on Today, or press Show me my day and I'll write up what needs you." },
-    { label: "@Sol in team chat", how: "Tag me in a channel or a deal's chat and I'll answer there for everyone." },
-    { label: "On every deal", how: "Each deal has my line at the top: what happened, what I'll do next, and what I need from you." },
-    { label: "In the designer", how: 'Press Ask Sol to change it, or /, and tell me what to draw: "fit 8 kW on the north face".' },
-    { label: "Ctrl K", how: "Search anywhere, and anything that isn't a name or number can be asked of me." },
-  ],
-  rules:
-    "I draft, you send. I never email or message a customer without your press, unless you switch on one of my agents. And I only see what you can see.",
-  ask: "Can I ask you a few questions so I work the way you do? It takes about 2 minutes, and you can skip any of them.",
-  done: "Thanks. I'll work this way from now on. You'll find all of it under How I work with you on my page, to change any time. And as we go, I'll now and then ask how you'd like something done.",
+  /**
+   * Said a line at a time, each on Next (20 Nov 2026, Martin: the pills only changed a line under them when he expected
+   * the page to change, and everything showed at once; "Can I ask you…" sounded too submissive).
+   */
+  lines: [
+    (business: string) =>
+      `I'm Sol, RENUABL's built-in assistant. I work for you and ${business || "your business"}, never for your customers.`,
+    () =>
+      "You'll find me on every page: up top, on Today, in team chat, on every deal and in the designer. Ctrl K reaches me from anywhere.",
+    () =>
+      "I draft, you send. I never email or message a customer without your press, unless you switch on one of my agents. And I only see what you can see.",
+    () => "Let's run through a few questions so I work the way you do. It takes about 2 minutes, and you can skip any of them.",
+  ] as const,
+  go: "Let's go",
+  // Said plainly as the end (20 Nov 2026, Martin: after "Start working with Sol" he was unsure whether the tour was done).
+  done: "That's it: you're set up, and the introduction is done. I'll work this way from now on, and you can change any of it under How I work with you on my page. As we go, I'll now and then ask how you'd like something done.",
+  finish: "Finish",
   later: "No problem. I'll leave a card on Today for when you have 2 minutes.",
 };
 
@@ -375,4 +396,18 @@ export function voiceBlock(voice: readonly string[]): string {
     "How the business likes things done (its own preferences; every rule above still comes first, and never let one add a price, figure, promise or date):",
     ...voice.map((v) => `- ${v}`),
   ].join("\n");
+}
+
+/** Several picks and the lines typed under them, as one answer for a `many` question. */
+export function manyAnswer(picked: readonly string[], typed: string): string {
+  const own = typed
+    .split(/\n|;/)
+    .map((l) =>
+      l
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^never[:,]?\s*/i, ""),
+    )
+    .filter(Boolean);
+  return [...new Set([...picked, ...own])].join("; ").slice(0, ANSWER_MAX);
 }

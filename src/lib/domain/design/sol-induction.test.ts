@@ -166,3 +166,16 @@ describe("the voice agents", () => {
     ).toEqual(style);
   });
 });
+
+describe("the never question", () => {
+  it("offers the usual worries to pick several of, and keeps picks and typed lines as one answer", async () => {
+    const { manyAnswer, questionByKey } = await import("./sol-induction");
+    const q = questionByKey("never")!;
+    expect(q.many).toBe(true);
+    expect(q.options.length).toBeGreaterThanOrEqual(6);
+    expect(manyAnswer(["Quote a price or a discount"], "Never: talk about the neighbours\n\nswear")).toBe(
+      "Quote a price or a discount; talk about the neighbours; swear",
+    );
+    expect(manyAnswer([], "  ")).toBe("");
+  });
+});

@@ -5,11 +5,13 @@ import clsx from "clsx";
 import { ArrowLeft, Check } from "lucide-react";
 import type { SolState, SolTurn } from "@/lib/domain/design/sol";
 import {
+  ANSWER_MAX,
   ASK_EACH_TIME,
   PART_WORDS,
   SCOPE_QUESTION,
   SOL_INTRO,
   asksScope,
+  manyAnswer,
   questionsFor,
   type InductionQuestion,
 } from "@/lib/domain/design/sol-induction";
@@ -28,7 +30,7 @@ type Run = (go: Promise<{ ok: true; state: SolState } | { ok: false; message: st
 
 const pill =
   "inline-flex min-h-9 items-center rounded-full px-3.5 py-1.5 text-left text-[13px] font-medium ring-1 transition disabled:cursor-not-allowed disabled:text-muted";
-const choice = `${pill} bg-surface text-ink ring-line hover:ring-sun-line`;
+const choice = `${pill} sol-choice bg-surface text-ink ring-line hover:ring-sun-line`;
 const main = `${pill} bg-sun-line text-white ring-sun-line hover:brightness-110`;
 const quiet = "text-[12.5px] font-medium text-muted underline-offset-4 hover:text-ink hover:underline";
 
@@ -53,7 +55,8 @@ export function SolInduction({ state, run }: { state: SolState; run: Run }) {
   }
   steps.push({ kind: "done" });
   const [at, setAt] = useState(0);
-  const [open, setOpen] = useState<number | null>(null);
+  // The introduction is said a line at a time, each on Next.
+  const [said, setSaid] = useState(0);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const step = steps[Math.min(at, steps.length - 1)];
@@ -64,7 +67,7 @@ export function SolInduction({ state, run }: { state: SolState; run: Run }) {
   const box = useRef<HTMLElement>(null);
   useEffect(() => {
     box.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [at]);
+  }, [at, said]);
 
   const next = () => {
     setTyped("");
@@ -91,34 +94,25 @@ export function SolInduction({ state, run }: { state: SolState; run: Run }) {
     <section ref={box} aria-label="Getting to know you" className="space-y-4 rounded-2xl bg-surface p-5 ring-1 ring-sun-line/40">
       {step.kind === "intro" && (
         <>
-          <p className="text-[14.5px] leading-relaxed text-ink">{SOL_INTRO.who(ind?.business ?? "")}</p>
-          <div>
-            <p className="text-[13.5px] text-ink-2">{SOL_INTRO.where}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {SOL_INTRO.places.map((p, i) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  aria-expanded={open === i}
-                  onClick={() => setOpen(open === i ? null : i)}
-                  className={clsx(choice, "min-h-8 py-1 text-[12.5px]", open === i && "ring-sun-line")}
-                >
-                  {p.label}
-                </button>
-              ))}
+          {SOL_INTRO.lines.slice(0, said + 1).map((line, i) => (
+            <p key={i} className={clsx("text-[14.5px] leading-relaxed", i === said ? "text-ink" : "text-ink-2")}>
+              {line(ind?.business ?? "")}
+            </p>
+          ))}
+          {said < SOL_INTRO.lines.length - 1 ? (
+            <button type="button" className={main} onClick={() => setSaid(said + 1)}>
+              Next
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" className={main} onClick={next}>
+                {SOL_INTRO.go}
+              </button>
+              <button type="button" className={quiet} onClick={() => void run(setInductionStatus("later"))}>
+                Later
+              </button>
             </div>
-            {open !== null && <p className="mt-2 text-[13px] leading-relaxed text-ink-2">{SOL_INTRO.places[open].how}</p>}
-          </div>
-          <p className="text-[13.5px] leading-relaxed text-ink-2">{SOL_INTRO.rules}</p>
-          <p className="text-[14.5px] leading-relaxed text-ink">{SOL_INTRO.ask}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className={main} onClick={next}>
-              Yes, ask me
-            </button>
-            <button type="button" className={quiet} onClick={() => void run(setInductionStatus("later"))}>
-              Later
-            </button>
-          </div>
+          )}
         </>
       )}
 
@@ -148,7 +142,8 @@ export function SolInduction({ state, run }: { state: SolState; run: Run }) {
           <Head part={PART_WORDS[step.q.part]} n={number} of={questions} back={at > 1 ? () => setAt(at - 1) : null} />
           <p className="text-[15px] leading-relaxed text-ink">{step.q.ask}</p>
           {step.q.hint && <p className="-mt-2 text-[12.5px] text-muted">{step.q.hint}</p>}
-          {step.q.options.length > 0 && (
+          {step.q.many && <ManyAnswer key={step.q.key} q={step.q} busy={busy} onKeep={(a) => void answer(step.q, a)} />}
+          {!step.q.many && step.q.options.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {step.q.options.map((o) => (
                 <button key={o} type="button" disabled={busy} onClick={() => void answer(step.q, o)} className={choice}>
@@ -157,33 +152,35 @@ export function SolInduction({ state, run }: { state: SolState; run: Run }) {
               ))}
             </div>
           )}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void answer(step.q, typed);
-            }}
-            className="flex items-center gap-2"
-          >
-            <input
-              key={step.q.key}
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              placeholder={
-                step.q.options.length ? "Or in your own words" : step.q.key === "name" ? (ind?.firstName ?? "Your name") : "Type it here"
-              }
-              maxLength={160}
-              className="h-9 min-w-0 flex-1 rounded-full bg-transparent px-3.5 text-[13.5px] text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
-            />
-            {step.q.key === "name" && !typed && ind?.firstName ? (
-              <button type="button" disabled={busy} onClick={() => void answer(step.q, ind.firstName!)} className={main}>
-                {ind.firstName}
-              </button>
-            ) : (
-              <button type="submit" disabled={busy || !typed.trim()} className={main}>
-                Keep
-              </button>
-            )}
-          </form>
+          {!step.q.many && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void answer(step.q, typed);
+              }}
+              className="flex items-center gap-2"
+            >
+              <input
+                key={step.q.key}
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                placeholder={
+                  step.q.options.length ? "Or in your own words" : step.q.key === "name" ? (ind?.firstName ?? "Your name") : "Type it here"
+                }
+                maxLength={160}
+                className="h-9 min-w-0 flex-1 rounded-full bg-transparent px-3.5 text-[13.5px] text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
+              />
+              {step.q.key === "name" && !typed && ind?.firstName ? (
+                <button type="button" disabled={busy} onClick={() => void answer(step.q, ind.firstName!)} className={main}>
+                  {ind.firstName}
+                </button>
+              ) : (
+                <button type="submit" disabled={busy || !typed.trim()} className={main}>
+                  Keep
+                </button>
+              )}
+            </form>
+          )}
           <div className="flex items-center justify-between gap-3">
             <button type="button" className={quiet} onClick={next}>
               Skip
@@ -205,11 +202,65 @@ export function SolInduction({ state, run }: { state: SolState; run: Run }) {
           )}
           <p className="text-[14.5px] leading-relaxed text-ink">{SOL_INTRO.done}</p>
           <button type="button" className={main} onClick={() => void run(setInductionStatus("done"))}>
-            Start working with Sol
+            {SOL_INTRO.finish}
           </button>
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * A question with several answers (`many`): the usual ones to tick, and a box that grows with what is typed for the
+ * rest, one a line, so nothing typed is hidden and it doesn't read as room for one thing.
+ */
+function ManyAnswer({ q, busy, onKeep }: { q: InductionQuestion; busy: boolean; onKeep: (answer: string) => void }) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const [own, setOwn] = useState("");
+  const area = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [own]);
+  const answer = manyAnswer(picked, own);
+  const count = answer ? answer.split("; ").length : 0;
+  const toggle = (o: string) => setPicked((p) => (p.includes(o) ? p.filter((x) => x !== o) : [...p, o]));
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {q.options.map((o) => {
+          const on = picked.includes(o);
+          return (
+            <button
+              key={o}
+              type="button"
+              role="checkbox"
+              aria-checked={on}
+              disabled={busy}
+              onClick={() => toggle(o)}
+              className={clsx(choice, "gap-1.5", on && "sol-choice-on ring-sun-line")}
+            >
+              {on && <Check className="size-3.5 text-sun-line" aria-hidden />}
+              {o}
+            </button>
+          );
+        })}
+      </div>
+      <textarea
+        ref={area}
+        rows={2}
+        value={own}
+        onChange={(e) => setOwn(e.target.value)}
+        placeholder="Anything else? One per line"
+        maxLength={ANSWER_MAX}
+        className="block max-h-48 w-full resize-none rounded-xl bg-transparent px-3.5 py-2.5 text-[13.5px] leading-relaxed text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-sun-line"
+      />
+      <button type="button" disabled={busy || !count} onClick={() => onKeep(answer)} className={main}>
+        {count ? `Keep ${count === 1 ? "this one" : `these ${count}`}` : "Pick or type at least one"}
+      </button>
+    </div>
   );
 }
 
