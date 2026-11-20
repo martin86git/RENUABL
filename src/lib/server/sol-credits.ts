@@ -9,6 +9,7 @@ import type { SolUse } from "@/lib/domain/design/sol-credits";
 import { solModel, TIER_CREDITS, type SolTier } from "@/lib/domain/design/sol-routing";
 import { addToSolCredit, keepSolCost, refundSolCredit, spendSolCredit } from "./design-billing-repo";
 import { isDemoBusiness } from "./design-demo-check";
+import { isNotBilled } from "./design-not-billed";
 import { topUpSoon } from "./design-top-up";
 
 /** Whether running out of design tokens or Sol credits stops anything (off until RENUABL's plans are live). Counted either way. */
@@ -25,8 +26,12 @@ export async function takeSolCredit(businessId: string, use: SolUse, by: string 
   return id;
 }
 
-/** A demo account's allowance always holds (demo.ts), whatever billing is doing for everyone else. */
-const enforcedFor = async (businessId: string) => billingEnforced() || (await isDemoBusiness(businessId).catch(() => false));
+/**
+ * A demo account's allowance always holds (demo.ts), whatever billing is doing for everyone else. A business RENUABL
+ * doesn't bill (design-not-billed.ts) is never refused.
+ */
+const enforcedFor = async (businessId: string) =>
+  (billingEnforced() && !(await isNotBilled(businessId).catch(() => false))) || (await isDemoBusiness(businessId).catch(() => false));
 
 /** More credits on an answer begun: false when too few are left (billing enforced), and nothing is added. */
 export async function addSolCredits(businessId: string, id: string, more: number): Promise<boolean> {

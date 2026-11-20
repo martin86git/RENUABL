@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-20",
+    area: "Billing",
+    words: "Have a code? Type it when you sign up: a code can make your first months free, or your plan free for good.",
+  },
+  {
+    day: "2026-11-20",
+    area: "CRM",
+    words: "Bring in from Pylon also takes Pylon's CSV export: every sold job comes in dated the day it sold.",
+  },
+  {
+    day: "2026-11-20",
     area: "Today",
     words: "Each morning Today opens on a chat with Sol: what needs you, your tools and past chats. Switch to Feed for your deals.",
   },

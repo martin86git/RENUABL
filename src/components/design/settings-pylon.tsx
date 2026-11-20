@@ -14,6 +14,7 @@ import {
   type PylonStage,
 } from "@/lib/domain/design/pylon-import";
 import { bringFromPylon, checkPylon } from "@/lib/services/pylon-import";
+import { PylonCsvImport } from "./settings-pylon-csv";
 import { PATHS, ui } from "./design-shell";
 
 type Found = { projects: PylonListed[]; already: string[]; more: boolean };
@@ -130,6 +131,8 @@ export function PylonImportSettings() {
         <p className="mt-2 text-xs text-muted">{PYLON_WORDS.keyKept}</p>
       </div>
 
+      <PylonCsvImport />
+
       {problem && (
         <p className="mt-4 flex items-start gap-2 rounded-xl bg-warning-soft px-4 py-3 text-sm text-ink" role="alert">
           <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> {problem}
@@ -144,7 +147,9 @@ export function PylonImportSettings() {
               : "No sold jobs found in Pylon"}
             {found.already.length > 0 && <span className="font-normal text-muted"> · {found.already.length} already brought in</span>}
           </p>
-          {found.more && <p className="mt-1 text-sm text-ink-2">That&rsquo;s as many as one import reads. Run it again once these are in.</p>}
+          {found.more && (
+            <p className="mt-1 text-sm text-ink-2">That&rsquo;s as many as one import reads. Run it again once these are in.</p>
+          )}
 
           {toBring.length > 0 && (
             <>

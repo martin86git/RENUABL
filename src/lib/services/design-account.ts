@@ -221,8 +221,8 @@ export async function stopViewing(): Promise<void> {
 }
 
 /** Off to Stripe's secure page to pay for the plan; answers a problem in words, or goes. */
-export async function choosePlan(email: string, seats: number): Promise<string | null> {
-  const res = await send<Answer & { url?: string }>("/api/design/subscribe", "POST", { email, seats });
+export async function choosePlan(email: string, seats: number, code?: string): Promise<string | null> {
+  const res = await send<Answer & { url?: string }>("/api/design/subscribe", "POST", { email, seats, ...(code ? { code } : {}) });
   if (!res.ok || !res.url) return res.message ?? UNREACHABLE;
   window.location.assign(res.url);
   return null;

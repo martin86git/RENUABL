@@ -16,6 +16,7 @@ import {
   type PlanTerm,
 } from "@/lib/domain/design/plans";
 import { creditSource, includedThisMonth, monthOf, solBalance, type SolBalance, type SolUse } from "@/lib/domain/design/sol-credits";
+import { isNotBilled } from "./design-not-billed";
 import { newId, query, transaction } from "./db";
 
 type Q = Parameters<Parameters<typeof transaction>[0]>[0];
@@ -215,6 +216,7 @@ export async function designPoolOf(businessId: string, today = todayInMarket()):
 
 /** Whether a new roof can be designed now: the month's pool has a job left, or the balance holds it. */
 export async function canStartRoof(businessId: string, withBattery = false): Promise<boolean> {
+  if (await isNotBilled(businessId).catch(() => false)) return true;
   if ((await designPoolOf(businessId)).left > 0) return true;
   return (await tokenBalance(businessId)) >= DESIGN_DOLLARS + (withBattery ? BATTERY_EXTRA_DOLLARS : 0);
 }
@@ -230,6 +232,7 @@ async function fromPool(q: Q, businessId: string, projectId: string): Promise<bo
 
 /** Whether a battery can go on a roof's designs now: paid for on this roof already, its job came from the pool, or $4 is left. */
 export async function canAddBattery(businessId: string, projectId: string): Promise<boolean> {
+  if (await isNotBilled(businessId).catch(() => false)) return true;
   const q: Q = query;
   const had = await q(`select 1 from design_tokens where business_id = $1 and project_id = $2 and reason = 'battery'`, [
     businessId,

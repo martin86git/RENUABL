@@ -29,6 +29,8 @@ import {
   type DesignAccount,
   type MemberLine,
 } from "@/lib/services/design-account";
+import { PlanCodeField, type AppliedCode } from "./plan-code-field";
+import { PLAN_CODE_WORDS } from "@/lib/domain/design/plan-codes";
 import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from "@/lib/services/design-store";
 
 const SIGN_IN = "/design/sign-in";
@@ -282,10 +284,11 @@ function PlanStep({ account, onSkip }: { account: Extract<DesignAccount, { signe
   const [seats, setSeats] = useState(1);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [code, setCode] = useState<AppliedCode | null>(null);
   const go = async () => {
     setBusy(true);
     setProblem(null);
-    const failed = await choosePlan(account.email, seats);
+    const failed = await choosePlan(account.email, seats, code?.code);
     if (failed) {
       setBusy(false);
       setProblem(failed);
@@ -322,16 +325,23 @@ function PlanStep({ account, onSkip }: { account: Extract<DesignAccount, { signe
             </button>
           </span>
         </div>
-        <dl className="space-y-1.5 border-t border-line pt-4 text-[14px]">
-          <div className="flex justify-between gap-3">
-            <dt className="text-ink-2">Your first month</dt>
-            <dd className="font-medium tabular-nums text-ink">{FIRST_MONTH_CENTS === 0 ? "Free" : dollars(FIRST_MONTH_CENTS * seats)}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-ink-2">Then each month</dt>
-            <dd className="tabular-nums text-ink">{dollars(SEAT_MONTHLY_CENTS * seats)}</dd>
-          </div>
-        </dl>
+        {code ? (
+          <p className="border-t border-line pt-4 text-[14px] text-ink">
+            {code.free ? PLAN_CODE_WORDS.forever : `${code.words}, then ${dollars(SEAT_MONTHLY_CENTS * seats)} a month.`}
+          </p>
+        ) : (
+          <dl className="space-y-1.5 border-t border-line pt-4 text-[14px]">
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-2">Your first month</dt>
+              <dd className="font-medium tabular-nums text-ink">{FIRST_MONTH_CENTS === 0 ? "Free" : dollars(FIRST_MONTH_CENTS * seats)}</dd>
+            </div>
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-2">Then each month</dt>
+              <dd className="tabular-nums text-ink">{dollars(SEAT_MONTHLY_CENTS * seats)}</dd>
+            </div>
+          </dl>
+        )}
+        <PlanCodeField applied={code} onApply={setCode} />
         <p className="text-[12px] leading-relaxed text-muted">
           {PLAN_WORDS.startExplained} {PLAN_WORDS.gst}
         </p>
@@ -346,7 +356,7 @@ function PlanStep({ account, onSkip }: { account: Extract<DesignAccount, { signe
         <span>{PLAN_WORDS.tryFirstMonth}</span>
       </p>
       <button type="button" className={`${primary} mt-4 w-full`} onClick={() => void go()} disabled={busy}>
-        {busy ? "Opening the secure payment page…" : "Continue to payment"}
+        {busy ? "Opening the secure payment page…" : code?.free ? "Continue" : "Continue to payment"}
       </button>
       <p className="mt-3 text-center text-[12px] text-muted">{PLAN_WORDS.enterprise}</p>
       <div className="mt-8 flex flex-wrap items-center gap-3 text-[13px] text-muted">

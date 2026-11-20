@@ -24,6 +24,7 @@ import { dbConfigured, query } from "./db";
 import { renuablCrm } from "./renuabl-crm";
 import { billingEnforced } from "./sol-credits";
 import { gstTaxRate } from "./stripe-billing";
+import { isNotBilled } from "./design-not-billed";
 
 /** Whether the business has this add-on on (a row; RENUABL's own business isn't counted here, see `standingOf`). */
 export async function hasAddOn(businessId: string, addOn: string): Promise<boolean> {
@@ -44,7 +45,9 @@ async function rowOf(businessId: string, key: AddOnKey): Promise<AddOnRow> {
   return { status: r.status === "requested" ? "requested" : "on", stripeItem: r.stripe_item };
 }
 
-const isOwn = async (businessId: string) => (await renuablCrm().catch(() => null))?.businessId === businessId;
+/** RENUABL's own business, or one RENUABL doesn't bill (design-not-billed.ts): every add-on included. */
+const isOwn = async (businessId: string) =>
+  (await renuablCrm().catch(() => null))?.businessId === businessId || (await isNotBilled(businessId).catch(() => false));
 
 /** Where the add-on stands for the business. */
 export async function standingOf(businessId: string, key: AddOnKey): Promise<AddOnStanding> {

@@ -17,6 +17,7 @@ import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
 import { CLOSING, FAQ, PRICING, SALES_HERO, STICKY } from "@/lib/domain/design/sales-page";
 import { askSales, startPlan } from "@/lib/services/billing";
+import { PlanCodeField, type AppliedCode } from "./plan-code-field";
 import { Reveal } from "./front-hero";
 
 /**
@@ -160,11 +161,12 @@ function TrialForm({
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [code, setCode] = useState<AppliedCode | null>(null);
   const go = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setProblem(null);
-    const a = await startPlan({ email, seats, interval });
+    const a = await startPlan({ email, seats, interval, ...(code ? { code: code.code } : {}) });
     if (a.ok && a.url) window.location.assign(a.url);
     else {
       setBusy(false);
@@ -205,6 +207,9 @@ function TrialForm({
         </button>
       </div>
       {problem && <p className={clsx("mt-2 text-sm", dark ? "text-sun-bright" : "text-danger")}>{problem}</p>}
+      <div className="mt-2 px-1">
+        <PlanCodeField applied={code} onApply={setCode} dark={dark} />
+      </div>
     </form>
   );
 }

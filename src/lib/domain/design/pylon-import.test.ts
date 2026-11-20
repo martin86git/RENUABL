@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  csvStage,
+  dealFromCsv,
+  readCsv,
+  readPylonExport,
+  soldDay,
   cleanPylonId,
   cleanPylonKey,
   dealFromPylon,
@@ -165,5 +170,66 @@ describe("reading Pylon's answers", () => {
       "Signed proposal (Pylon PYL-0003-7789) Jill Example.pdf",
     );
     expect(progressWords({ done: 142, total: 180, already: 3, failed: 0 })).toBe("142 of 180 sold jobs in · 3 already here");
+  });
+});
+
+const EXPORT = [
+  "\uFEFFproject_id,project_reference_number,created_at,owner_name,owner_email,customer_name,customer_phone,customer_email,address_line_1,address_line_2,locality,postal_code,region,country,is_sold,sold_at,is_pro,in_app_link,layout_size_kwp,quoted_price_total,proposal_link,stc_quantity,stc_value,lgc_quantity,lgc_value",
+  'cs6X7F9,,"2020-05-26 20:33:14 +10:00",Sam,sam@sample.test,,,,"4 Sample Street",,Cranbourne,3977,Victoria,Australia,false,,false,https://app.getpylon.com/library/cs6X7F9,,,,,,,',
+  'tex7GYi8,2130064,"2020-08-21 16:47:16 +10:00","Sam Seller",SAM@sample.test,"Wendy Example","0000 000 000",Wendy@Example.com,"178 Sample Drive",,Rosebud,3939,Victoria,Australia,true,"2020-09-04 23:51:54 +00:00",false,x,10.5,10170.98,https://app.getpylon.com/proposals/q2bIjAHTBI,136,4760.00,,0.00',
+  'kk30wsV0,"113-4444-333","2026-11-01 11:20:30 +11:00","Sam Seller",sam@sample.test,"Jamie","0400 000 001",,"544 Sample Road",,Mitcham,3132,Victoria,Australia,true,"2026-11-10 16:30:20 +11:00",false,x,6.6,"8,011.29",https://evil.example/p,,,,',
+].join("\r\n");
+
+describe("Pylon's CSV export", () => {
+  it("reads quoted cells, doubled quotes and line breaks inside quotes", () => {
+    expect(readCsv('a,"b, c","d ""e""\nf"\r\n1,2,3\n')).toEqual([
+      ["a", "b, c", 'd "e"\nf'],
+      ["1", "2", "3"],
+    ]);
+  });
+
+  it("keeps only the sold projects, oldest first, and says what isn't Pylon's", () => {
+    const read = readPylonExport(EXPORT);
+    if ("problem" in read) throw new Error(read.problem);
+    expect(read.all).toBe(3);
+    expect(read.sold.map((r) => r.id)).toEqual(["tex7GYi8", "kk30wsV0"]);
+    expect(read.sold[0]).toMatchObject({ soldOn: "2020-09-05", kw: 10.5, price: 10170.98, stcValue: 4760, ownerEmail: "sam@sample.test" });
+    expect(read.sold[1]).toMatchObject({ price: 8011.29, proposalLink: "" });
+    expect(readPylonExport("name,email\nJo,jo@x.test")).toEqual({ problem: expect.stringContaining("Pylon") });
+  });
+
+  it("reads Pylon's sold time as the day in Melbourne", () => {
+    expect(soldDay("2020-09-04 10:51:54 +10:00")).toBe("2020-09-04");
+    expect(soldDay("2020-09-04 23:51:54 +00:00")).toBe("2020-09-05");
+    expect(soldDay("not a date")).toBe("");
+  });
+
+  it("brings recent sales in as Won and older ones as Installed", () => {
+    expect(csvStage("2026-11-10", "2026-11-20")).toBe("won");
+    expect(csvStage("2026-08-01", "2026-11-20")).toBe("installed");
+    expect(csvStage("2026-08-01", "2026-11-20", 52)).toBe("won");
+    expect(csvStage("", "2026-11-20")).toBe("won");
+  });
+
+  it("makes a customer and a deal from a row, leaving out a placeholder phone and never making up a name", () => {
+    const read = readPylonExport(EXPORT);
+    if ("problem" in read) throw new Error(read.problem);
+    const deal = dealFromCsv(read.sold[0], "installed");
+    expect(deal.customer).toMatchObject({ firstName: "Wendy", lastName: "Example", email: "wendy@example.com", phone: "" });
+    expect(deal.job).toMatchObject({
+      stage: "installed",
+      value: 10170.98,
+      kw: 10.5,
+      lat: null,
+      address: "178 Sample Drive, Rosebud, Victoria 3939",
+    });
+    expect(deal.note).toContain("Sold in Pylon on 5 September 2020 by Sam Seller");
+    expect(deal.note).toContain("https://app.getpylon.com/proposals/q2bIjAHTBI");
+    const one = dealFromCsv({ ...read.sold[1], name: "" }, "won");
+    expect(one.customer).toMatchObject({ firstName: "Pylon customer", lastName: "113-4444-333", phone: "0400 000 001" });
+    expect(dealFromCsv({ ...read.sold[1], name: "J" }, "won").customer).toMatchObject({
+      firstName: "Pylon customer",
+      lastName: "J 113-4444-333",
+    });
   });
 });

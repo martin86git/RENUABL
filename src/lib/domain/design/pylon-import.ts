@@ -318,3 +318,261 @@ export function pdfName(deal: Pick<PylonDeal, "reference" | "customer">, signed:
       .slice(0, 100) + ".pdf"
   );
 }
+
+// ---------------------------------------------------------------------------
+// Pylon's CSV export (20 Nov 2026, Martin: Pylon exported every Primero project as a CSV). It carries the customer,
+// address, sold date, kW, price and STCs, but no system lines, no place on the map and no PDF. Read in the browser
+// (the file can be larger than a request may carry), sent in batches of the sold rows only, and read again on the
+// server before anything is kept.
+// ---------------------------------------------------------------------------
+
+/** The columns an export must have to be read as Pylon's. */
+export const PYLON_CSV_COLUMNS = [
+  "project_id",
+  "project_reference_number",
+  "customer_name",
+  "customer_email",
+  "address_line_1",
+  "is_sold",
+  "sold_at",
+  "layout_size_kwp",
+  "quoted_price_total",
+] as const;
+
+/** Rows sent a request. */
+export const PYLON_CSV_BATCH = 40;
+/** Sold within this many weeks of today comes in as Won, else as Installed, unless the business says otherwise. */
+export const PYLON_WON_WEEKS = 8;
+
+export const PYLON_CSV_WORDS = {
+  title: "Or upload Pylon's export",
+  how: "In Pylon, export your projects as a CSV and choose the file here. It's read on this computer, and only the sold jobs are sent.",
+  notPylon: "That file doesn't look like Pylon's project export. Choose the CSV Pylon emailed or downloaded.",
+  notCarried:
+    "The export has the customer, address, sold date, system size, price and STCs. It has no panels or inverter, no signed PDF and no place on the map, so add the address on the map when you design or service one.",
+} as const;
+
+/** One sold project from the export, as the browser sends it (every field read again on the server). */
+export interface PylonCsvRow {
+  id: string;
+  reference: string;
+  owner: string;
+  ownerEmail: string;
+  name: string;
+  phone: string;
+  email: string;
+  line1: string;
+  line2: string;
+  locality: string;
+  postcode: string;
+  region: string;
+  country: string;
+  /** YYYY-MM-DD in Melbourne, or "" when the export has none. */
+  soldOn: string;
+  kw: number | null;
+  price: number | null;
+  stcQty: number | null;
+  stcValue: number | null;
+  proposalLink: string;
+}
+
+/** A CSV as rows of cells (RFC 4180: quoted cells, doubled quotes, line breaks inside quotes; a BOM forgiven). */
+export function readCsv(raw: string): string[][] {
+  const t = raw.replace(/^﻿/, "");
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (quoted) {
+      if (c === '"') {
+        if (t[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else quoted = false;
+      } else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (c === "\n" || c === "\r") {
+      if (c === "\r" && t[i + 1] === "\n") i++;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+}
+
+const cellOf = (v: unknown, max = 200) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+const figure = (v: unknown, max: number): number | null => {
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v.replace(/[$,\s]/g, "")) : NaN;
+  return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+};
+
+/** "2020-09-04 10:51:54 +10:00" (as Pylon writes it, with its offset) as the day in Melbourne, else "". */
+export function soldDay(raw: unknown): string {
+  const m = cellOf(raw, 40).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)\s*([+-]\d{2}:?\d{2}|Z)?$/);
+  if (!m) return "";
+  const zone = !m[3] ? "+10:00" : m[3] === "Z" ? "Z" : m[3].includes(":") ? m[3] : `${m[3].slice(0, 3)}:${m[3].slice(3)}`;
+  const at = new Date(`${m[1]}T${m[2]}${zone}`);
+  if (Number.isNaN(at.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Melbourne",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(at);
+}
+
+/** One row as sent and read again: its cells cut to size, figures in range, the id Pylon's own shape. Null when not a row. */
+export function cleanCsvRow(raw: unknown): PylonCsvRow | null {
+  const r = bag(raw);
+  const id = cleanPylonId(r.id);
+  if (!id) return null;
+  const link = cellOf(r.proposalLink, 200);
+  const soldOn = cellOf(r.soldOn, 10);
+  return {
+    id,
+    reference: cellOf(r.reference, 60),
+    owner: cellOf(r.owner, 120),
+    ownerEmail: cellOf(r.ownerEmail, 200).toLowerCase(),
+    name: cellOf(r.name, 120),
+    phone: cellOf(r.phone, 40),
+    email: cellOf(r.email, 200).toLowerCase(),
+    line1: cellOf(r.line1),
+    line2: cellOf(r.line2),
+    locality: cellOf(r.locality, 80),
+    postcode: cellOf(r.postcode, 10),
+    region: cellOf(r.region, 60),
+    country: cellOf(r.country, 60),
+    soldOn: /^\d{4}-\d{2}-\d{2}$/.test(soldOn) ? soldOn : "",
+    kw: figure(r.kw, 10_000),
+    price: figure(r.price, 10_000_000),
+    stcQty: figure(r.stcQty, 1_000_000),
+    stcValue: figure(r.stcValue, 10_000_000),
+    // Only Pylon's own proposal pages are kept as a link.
+    proposalLink: /^https:\/\/app\.getpylon\.com\/proposals\/[A-Za-z0-9_-]+$/.test(link) ? link : "",
+  };
+}
+
+export interface PylonExport {
+  /** The sold projects, oldest sold first. */
+  sold: PylonCsvRow[];
+  /** Every project in the file, sold or not. */
+  all: number;
+}
+
+/** Pylon's project export read: its sold rows, or a problem in words when the file isn't Pylon's. */
+export function readPylonExport(raw: string): PylonExport | { problem: string } {
+  const rows = readCsv(raw);
+  const head = (rows.shift() ?? []).map((h) => h.trim().toLowerCase());
+  if (!PYLON_CSV_COLUMNS.every((c) => head.includes(c))) return { problem: PYLON_CSV_WORDS.notPylon };
+  const at = (r: string[], k: string) => r[head.indexOf(k)] ?? "";
+  const sold: PylonCsvRow[] = [];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (at(r, "is_sold").trim().toLowerCase() !== "true") continue;
+    const row = cleanCsvRow({
+      id: at(r, "project_id"),
+      reference: at(r, "project_reference_number"),
+      owner: at(r, "owner_name"),
+      ownerEmail: at(r, "owner_email"),
+      name: at(r, "customer_name"),
+      phone: at(r, "customer_phone"),
+      email: at(r, "customer_email"),
+      line1: at(r, "address_line_1"),
+      line2: at(r, "address_line_2"),
+      locality: at(r, "locality"),
+      postcode: at(r, "postal_code"),
+      region: at(r, "region"),
+      country: at(r, "country"),
+      soldOn: soldDay(at(r, "sold_at")),
+      kw: at(r, "layout_size_kwp"),
+      price: at(r, "quoted_price_total"),
+      stcQty: at(r, "stc_quantity"),
+      stcValue: at(r, "stc_value"),
+      proposalLink: at(r, "proposal_link"),
+    });
+    if (row && !seen.has(row.id)) {
+      seen.add(row.id);
+      sold.push(row);
+    }
+  }
+  sold.sort((a, b) => a.soldOn.localeCompare(b.soldOn));
+  return { sold, all: rows.length };
+}
+
+/** Won when sold within `wonWeeks` of today (or with no sold date), else Installed. */
+export function csvStage(soldOn: string, today: string, wonWeeks = PYLON_WON_WEEKS): PylonStage {
+  if (!soldOn) return "won";
+  const days = (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${soldOn}T00:00:00Z`)) / 86_400_000;
+  return days > wonWeeks * 7 ? "installed" : "won";
+}
+
+/** A placeholder phone Pylon's users typed for no number ("0000 000 000"): left out. */
+const realPhone = (p: string) => (/[1-9]/.test(p) ? p : "");
+
+/** A sold row of the export as a customer and a deal. */
+export function dealFromCsv(row: PylonCsvRow, stage: PylonStage): PylonDeal {
+  // A name the CRM can't take (under two letters) is kept after "Pylon customer" rather than lost.
+  const named = row.name.replace(/\s/g, "").length >= 2;
+  const [first = "", ...rest] = named ? row.name.split(" ") : [];
+  const unnamed = [row.name, row.reference || row.id].filter(Boolean).join(" ");
+  const address = [row.line1, row.line2, row.locality, [row.region, row.postcode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const kw = row.kw !== null && row.kw > 0 ? Math.round(row.kw * 1000) / 1000 : null;
+  const details: Record<string, string> = {};
+  if (kw) {
+    details.systemType = "Solar";
+    details.systemSize = `${kw} kW`;
+  }
+  const sold = row.soldOn
+    ? new Date(`${row.soldOn}T00:00:00Z`).toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+    : "";
+  const note = [
+    `Brought in from Pylon's export${row.reference ? ` (reference ${row.reference})` : ""}.`,
+    sold && `Sold in Pylon on ${sold}${row.owner ? ` by ${row.owner}` : ""}.`,
+    kw && `System: ${kw} kW.`,
+    row.price !== null && `Price on the Pylon proposal: ${dollars(row.price)}.`,
+    row.stcValue !== null &&
+      row.stcValue > 0 &&
+      `STC value on the proposal: ${dollars(row.stcValue)}${row.stcQty ? ` (${row.stcQty} STCs)` : ""}.`,
+    row.proposalLink && `Pylon proposal: ${row.proposalLink}`,
+    row.country && row.country !== "Australia" && `Country in Pylon: ${row.country}.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return {
+    pylonId: row.id,
+    reference: row.reference,
+    customer: {
+      firstName: first || "Pylon customer",
+      lastName: first ? rest.join(" ") : unnamed,
+      email: row.email,
+      phone: realPhone(row.phone),
+      address,
+      source: "Pylon",
+    },
+    job: {
+      title: "Solar",
+      address,
+      lat: null,
+      lng: null,
+      stage,
+      value: row.price,
+      installDate: null,
+      details,
+      kw,
+    },
+    note,
+    signedPdf: null,
+    proposalPdf: null,
+  };
+}

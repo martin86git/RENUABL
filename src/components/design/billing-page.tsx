@@ -128,6 +128,11 @@ export function BillingPanel() {
               />
               {plan.status === "trialing" && <Row k="Trial ends" v={`${day(plan.trialEnd)}. Nothing is charged before then.`} />}
             </dl>
+          ) : state.notBilled ? (
+            <p className="text-sm text-ink-2">
+              RENUABL isn&rsquo;t billing this business. There&rsquo;s no plan to choose and nothing is charged: Sol, design jobs and every
+              add-on are included.
+            </p>
           ) : (
             <p className="text-sm text-ink-2">
               No plan yet. Start one from the sign-up page: {PLAN_WORDS.seat}. {PLAN_WORDS.gst}

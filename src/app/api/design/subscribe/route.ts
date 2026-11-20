@@ -6,6 +6,8 @@ import { memberByEmail } from "@/lib/server/design-repo";
 import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { allow } from "@/lib/server/rate-limit";
 import { createPlanCheckout, stripeClient } from "@/lib/server/stripe";
+import { findPlanCode, type FoundCode } from "@/lib/server/stripe-plan-codes";
+import { PLAN_CODE_WORDS, cleanPlanCode, freeForGood } from "@/lib/domain/design/plan-codes";
 
 /**
  * POST { email, seats, interval }: starts a sign-up. Answers with Stripe's own secure page, where the card is taken
@@ -22,6 +24,19 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ ok: false }, { status: 400 });
   }
+  // A code (plan-codes.ts), looked up in Stripe: { do: "code", code } only checks it and says what it gives.
+  let code: FoundCode | null = null;
+  if (body.code !== undefined && body.code !== "") {
+    const typed = cleanPlanCode(body.code);
+    if (!typed) return Response.json({ ok: false, message: PLAN_CODE_WORDS.badCode }, { status: 422 });
+    const stripeForCode = stripeClient();
+    code = stripeForCode ? await findPlanCode(stripeForCode, typed).catch(() => null) : null;
+    if (!code) return Response.json({ ok: false, message: PLAN_CODE_WORDS.notFound }, { status: 422 });
+  }
+  if (body.do === "code")
+    return code
+      ? Response.json({ ok: true, code: code.code, words: code.words, free: freeForGood(code.coupon) })
+      : Response.json({ ok: false, message: PLAN_CODE_WORDS.badCode }, { status: 422 });
   const email = normaliseEmail(body.email);
   if (!email) return Response.json({ ok: false, message: "Enter your work email address." }, { status: 422 });
   const member = dbConfigured() ? await memberByEmail(email).catch(() => null) : null;
@@ -46,7 +61,7 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   try {
-    const url = await createPlanCheckout(stripe, { email, seats, origin: new URL(request.url).origin });
+    const url = await createPlanCheckout(stripe, { email, seats, origin: new URL(request.url).origin, code });
     return Response.json({ ok: true, url });
   } catch (e) {
     console.error("trial checkout failed", e instanceof Error ? e.message : e);

@@ -18,6 +18,7 @@ import {
   updateSubscription,
 } from "@/lib/server/design-billing-repo";
 import { billingCustomer, ensureBillingCustomer } from "@/lib/server/design-billing-customer";
+import { isNotBilled } from "@/lib/server/design-not-billed";
 import { syncSeats } from "@/lib/server/design-seats";
 import { saveTopUpSettings, topUpHistory, topUpSettingsOf } from "@/lib/server/design-top-up";
 import { cleanTopUp, cleanTopUpKind } from "@/lib/domain/design/top-up";
@@ -54,7 +55,11 @@ export async function GET() {
       billingDetailsOf(businessId),
       billingCustomer(businessId),
     ]);
-    const [topUps, topUpLines] = await Promise.all([topUpSettingsOf(businessId), topUpHistory(businessId)]);
+    const [topUps, topUpLines, notBilled] = await Promise.all([
+      topUpSettingsOf(businessId),
+      topUpHistory(businessId),
+      isNotBilled(businessId).catch(() => false),
+    ]);
     const stripe = stripeClient();
     // Invoices come from Stripe as they are; Stripe being slow or down never stops the rest of the page.
     const invoices =
@@ -95,6 +100,8 @@ export async function GET() {
           hostedUrl,
         })) ?? null,
       payments: Boolean(stripe),
+      // RENUABL doesn't bill this business (design-not-billed.ts).
+      ...(notBilled ? { notBilled: true } : {}),
       topUps: withSol ? topUps : { design: topUps.design },
       topUpLines,
     });

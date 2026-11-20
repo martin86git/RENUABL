@@ -6,6 +6,7 @@ import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { answer, designAccess } from "@/lib/server/design-context";
 import { staffBehind } from "@/lib/server/design-staff-view";
 import { marketingOn } from "@/lib/server/marketing-access";
+import { isNotBilled } from "@/lib/server/design-not-billed";
 
 /**
  * GET: who the roof designer is being used by. Signed out, the designer keeps
@@ -22,8 +23,11 @@ export async function GET() {
     // A new retailer's owner chooses a plan and pays before going in (needsPlan). Not RENUABL's own business, nor the
     // sample businesses staff look through.
     const demo = isDemoEmail(member?.email);
+    // Nor a business RENUABL doesn't bill (design-not-billed.ts), set by staff on /admin.
+    const notBilled = member ? await isNotBilled(member.businessId).catch(() => false) : false;
     const exempt =
       !member ||
+      notBilled ||
       demo ||
       Boolean(sampleByEmail(access.email)) ||
       access.email.toLowerCase() === process.env.RENUABL_CRM_EMAIL?.trim().toLowerCase();

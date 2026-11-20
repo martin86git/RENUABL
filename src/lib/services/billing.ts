@@ -28,9 +28,12 @@ export const chooseTwelveMonths = () => post("/api/design/billing", { do: "commi
 export const cancelPlan = () => post("/api/design/billing", { do: "cancel" });
 
 /** Starts the plan: answers with Stripe's secure page to go to. Monthly only (the interval is no longer used). */
-export function startPlan(o: { email: string; seats: number; interval?: BillingInterval }) {
+export function startPlan(o: { email: string; seats: number; interval?: BillingInterval; code?: string }) {
   return post("/api/design/subscribe", o);
 }
+
+/** Looks a code up (plan-codes.ts): what it gives, or why not. */
+export const checkPlanCode = (code: string) => post("/api/design/subscribe", { do: "code", code });
 
 /** Back from Stripe: checks the sign-up and sends the sign-in link. */
 export async function welcomeBack(
@@ -49,6 +52,8 @@ export function askSales(o: { name: string; business: string; email: string; mob
 }
 
 export interface BillingState {
+  /** RENUABL doesn't bill this business: no plan to choose, nothing charged. */
+  notBilled?: boolean;
   /** What this kind of business is billed for (business-kind.ts): an installer, design-job packs only. */
   parts: BillingPart[];
   plan: {

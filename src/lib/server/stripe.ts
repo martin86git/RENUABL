@@ -11,6 +11,8 @@ import {
   type BillingInterval,
   type TokenPack,
 } from "@/lib/domain/design/plans";
+import { PLAN_CODE_WORDS, freeForGood } from "@/lib/domain/design/plan-codes";
+import type { FoundCode } from "./stripe-plan-codes";
 import { INVOICE_FOOTER, gstTaxRate, packInvoice, portalWithoutCancel, seatItem, termOf } from "./stripe-billing";
 
 /** The API version and beta flag Stripe's embedded checkout form needs. */
@@ -112,13 +114,15 @@ async function firstMonthCoupon(stripe: Stripe, seats: number): Promise<string> 
  */
 export async function createPlanCheckout(
   stripe: Stripe,
-  opts: { email: string; seats: number; interval?: BillingInterval; origin: string },
+  opts: { email: string; seats: number; interval?: BillingInterval; origin: string; code?: FoundCode | null },
 ): Promise<string> {
+  // A code (plan-codes.ts) takes the place of the first month's price; free for good asks for no card.
+  const code = opts.code ?? null;
   const session = await stripe.checkout.sessions.create({
-    discounts: [{ coupon: await firstMonthCoupon(stripe, opts.seats) }],
+    discounts: code ? [{ promotion_code: code.id }] : [{ coupon: await firstMonthCoupon(stripe, opts.seats) }],
     mode: "subscription",
     customer_email: opts.email,
-    payment_method_collection: "always",
+    payment_method_collection: code && freeForGood(code.coupon) ? "if_required" : "always",
     billing_address_collection: "auto",
     automatic_tax: { enabled: false },
     locale: "en-GB",
@@ -138,10 +142,14 @@ export async function createPlanCheckout(
       description: INVOICE_FOOTER,
       metadata: { kind: "design-plan", email: opts.email },
     },
-    metadata: { kind: "design-plan", email: opts.email },
+    metadata: { kind: "design-plan", email: opts.email, ...(code ? { code: code.code } : {}) },
     custom_text: {
       submit: {
-        message: `Your first month, ${dollars(FIRST_MONTH_CENTS)} a user, is charged today; then ${dollars(SEAT_MONTHLY_CENTS)} a user a month, or ${dollars(COMMIT_SEAT_CENTS)} if you choose the 12-month plan. Cancel any time.`,
+        message: code
+          ? freeForGood(code.coupon)
+            ? `Code ${code.code}: ${PLAN_CODE_WORDS.forever}`
+            : `Code ${code.code}: ${code.words}, then ${dollars(SEAT_MONTHLY_CENTS)} a user a month. Cancel any time.`
+          : `Your first month, ${dollars(FIRST_MONTH_CENTS)} a user, is charged today; then ${dollars(SEAT_MONTHLY_CENTS)} a user a month, or ${dollars(COMMIT_SEAT_CENTS)} if you choose the 12-month plan. Cancel any time.`,
       },
     },
     success_url: `${opts.origin}/design/welcome?session_id={CHECKOUT_SESSION_ID}`,

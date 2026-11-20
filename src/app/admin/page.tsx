@@ -31,6 +31,10 @@ import { OUTCOME_WORDS, type CallOutcome } from "@/lib/domain/voice-agent";
 import { ADD_ON_WORDS } from "@/lib/domain/design/add-ons";
 import { addOnsAskedFor, addOnsOnForStaff } from "@/lib/server/design-addons";
 import { AddOnActions, AttachNumber } from "@/components/admin/add-on-actions";
+import { NotBilledSwitch } from "@/components/admin/not-billed";
+import { MakePlanCode, StopPlanCode } from "@/components/admin/plan-codes";
+import { stripeClient } from "@/lib/server/stripe";
+import { listPlanCodes } from "@/lib/server/stripe-plan-codes";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -55,19 +59,22 @@ export default async function AdminPage() {
   await processOffersSoon();
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn] = await Promise.all([
-    listPartners(),
-    listAllJobs(),
-    listPriceUploads(),
-    listWhoopClaims(),
-    allHealthAnswers(),
-    listBriefs(),
-    listDesignBusinesses(),
-    listVoiceCalls().catch(() => []),
-    solCostsThisMonth(todayInMarket()).catch(() => []),
-    addOnsAskedFor().catch(() => []),
-    addOnsOnForStaff().catch(() => []),
-  ]);
+  const stripe = stripeClient();
+  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn, planCodes] =
+    await Promise.all([
+      listPartners(),
+      listAllJobs(),
+      listPriceUploads(),
+      listWhoopClaims(),
+      allHealthAnswers(),
+      listBriefs(),
+      listDesignBusinesses(),
+      listVoiceCalls().catch(() => []),
+      solCostsThisMonth(todayInMarket()).catch(() => []),
+      addOnsAskedFor().catch(() => []),
+      addOnsOnForStaff().catch(() => []),
+      stripe ? listPlanCodes(stripe).catch(() => null) : null,
+    ]);
   const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
   const held = claims.filter((c) => c.status !== "released").length;
@@ -367,9 +374,40 @@ export default async function AdminPage() {
                   <span className="block text-[13px] text-muted">
                     Joined {formatDate(b.createdAt, { day: "numeric", month: "short", year: "numeric" })} · {b.members}{" "}
                     {b.members === 1 ? "person" : "people"}
+                    {b.owner ? ` · ${b.owner}` : ""}
                   </span>
                 </span>
-                <Badge tone={b.kind === "retailer" ? "info" : "neutral"}>{kindLabel(b.kind)}</Badge>
+                <span className="flex items-center gap-2">
+                  {b.notBilled && <Badge tone="positive">Not billed</Badge>}
+                  <Badge tone={b.kind === "retailer" ? "info" : "neutral"}>{kindLabel(b.kind)}</Badge>
+                  {b.kind === "retailer" && <NotBilledSwitch businessId={b.id} name={b.name} notBilled={b.notBilled} />}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      {/* Codes for the plan (domain/design/plan-codes.ts): a month or more free, or free for good, typed at sign-up. */}
+      <Panel className="mt-6" title={`Plan codes · ${planCodes?.length ?? 0}`}>
+        <p className="px-5 pt-3 text-[13px] text-muted">
+          A business types the code when it signs up and Stripe takes the plan off its bills for that long. Free for good asks for no card.
+          A code takes the place of the usual first month; stopping one leaves those who used it as they are.
+        </p>
+        {stripe ? <MakePlanCode /> : <p className="px-5 py-4 text-[14px] text-muted">Stripe isn&rsquo;t set up here.</p>}
+        {planCodes && planCodes.length > 0 && (
+          <ul className="divide-y divide-line border-t border-line">
+            {planCodes.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-[14px]">
+                <span className="min-w-0">
+                  <span className="font-mono font-medium">{c.code}</span> · {c.words}
+                  <span className="block text-[13px] text-muted">
+                    Used {c.used}
+                    {c.uses ? ` of ${c.uses}` : ""} {c.used === 1 ? "time" : "times"}
+                    {c.by ? ` · made by ${c.by}` : ""}
+                  </span>
+                </span>
+                <StopPlanCode id={c.id} code={c.code} />
               </li>
             ))}
           </ul>

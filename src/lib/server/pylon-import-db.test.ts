@@ -117,6 +117,48 @@ describe.skipIf(!url)("bringing sold jobs in from Pylon (database)", () => {
     expect(customers).toHaveLength(1);
   });
 
+  it("brings the export's sold rows in, dated the day they sold, owned by whoever sold them, and never twice", async () => {
+    const row = (id: string, soldOn: string, email: string) => ({
+      id,
+      reference: `R-${id}`,
+      owner: "Owner",
+      ownerEmail: A,
+      name: "Pat Example",
+      phone: "0000 000 000",
+      email,
+      line1: "1 Sample Street",
+      line2: "",
+      locality: "Rosebud",
+      postcode: "3939",
+      region: "Victoria",
+      country: "Australia",
+      soldOn,
+      kw: 6.6,
+      price: 8000,
+      stcQty: 80,
+      stcValue: 3000,
+      proposalLink: "",
+    });
+    const outs = await pylon.bringInCsvRows(
+      a,
+      [row("csv00001", "2026-11-10", "pat@example.com"), row("csv00002", "2021-03-01", "not-an-email")],
+      "2026-11-20",
+      8,
+      A,
+    );
+    expect(outs.map((o) => o.result)).toEqual(["in", "in"]);
+    const recent = await crm.jobById(a, outs[0].result === "in" ? outs[0].jobId : "");
+    expect(recent?.job).toMatchObject({ stage: "won", value: 8000, kw: 6.6, owner: A });
+    expect(recent?.job.wonAt?.slice(0, 10)).toBe("2026-11-10");
+    expect(recent?.customer).toMatchObject({ email: "pat@example.com", phone: "" });
+    const older = await crm.jobById(a, outs[1].result === "in" ? outs[1].jobId : "");
+    expect(older?.job.stage).toBe("installed");
+    expect(older?.customer.email).toBeFalsy();
+    expect(await pylon.alreadyBroughtIn(a, ["csv00001", "csv00002", "csv00003"])).toEqual(["csv00001", "csv00002"]);
+    const again = await pylon.bringInCsvRows(a, [row("csv00001", "2026-11-10", "pat@example.com")], "2026-11-20", 8, A);
+    expect(again[0].result).toBe("already");
+  });
+
   it("stops with words for the business when Pylon refuses the key", async () => {
     vi.stubGlobal("fetch", fakePylon({}, 401));
     await expect(pylon.listSoldProjects(a, KEY)).rejects.toThrow("Pylon didn't accept that key");
