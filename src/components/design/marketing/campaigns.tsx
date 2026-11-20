@@ -4,7 +4,7 @@ import { Check, Copy, Loader2, Plus, Send, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, cn } from "@/components/ui/primitives";
+import { Button, ButtonLink, cn } from "@/components/ui/primitives";
 import { DEFAULT_BRAND, type EdmSender, contentProblem, type EdmBrand, type EdmContent } from "@/lib/domain/marketing/edm";
 import {
   CAMPAIGN_STATE_WORDS,
@@ -25,7 +25,6 @@ import {
   loadContacts,
   NO_SENDER,
   loadMarketingSettings,
-  newCampaign,
   saveCampaignDraft,
   type CampaignLine,
   type CampaignView,
@@ -81,7 +80,6 @@ export function ReportStrip({ counts }: { counts: SendCounts }) {
 }
 
 export function CampaignsPage() {
-  const router = useRouter();
   const [list, setList] = useState<CampaignLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [gtm, setGtm] = useState<{ offer: boolean; made?: boolean } | null>(null);
@@ -98,11 +96,6 @@ export function CampaignsPage() {
     if (!r.ok) return setProblem(r.message);
     refresh();
   }
-  async function make() {
-    const r = await newCampaign();
-    if (r.ok) router.push(`/design/marketing/campaigns/${r.id}`);
-    else setProblem(r.message);
-  }
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -112,9 +105,9 @@ export function CampaignsPage() {
             One email to a list, sent now or at a time you choose. Nothing goes until you type SEND.
           </p>
         </div>
-        <Button size="sm" onClick={make}>
+        <ButtonLink size="sm" href="/design/marketing/campaigns/new">
           <Plus className="size-4" /> New campaign
-        </Button>
+        </ButtonLink>
       </div>
       {problem && <p className="mt-4 text-[13px] text-danger">{problem}</p>}
       {gtm?.offer && !gtm.made && (

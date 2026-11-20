@@ -1,5 +1,7 @@
 import { SOL_OUT_SHORT } from "@/lib/domain/design/sol-credits";
+import { goalAngle, isCampaignGoal } from "@/lib/domain/marketing/campaign-goals";
 import { EDM_LIMITS } from "@/lib/domain/marketing/edm";
+import { cleanSections, isEdmLayout, sectionsAsk, sectionsSchema } from "@/lib/domain/marketing/edm-sections";
 import { EDM_SOL_LIMITS, cleanEdmSol, edmSolPrompt, edmSolSchema, edmSolTier, isEdmSolPart } from "@/lib/domain/marketing/edm-sol";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
@@ -12,7 +14,7 @@ import { withSolCredit } from "@/lib/server/sol-credits";
 export const maxDuration = 60;
 
 /**
- * POST {part, brief, draft} (members who may publish, where Marketing is on): Sol writes a marketing email's subject,
+ * POST {part, brief, draft, goal?, sections?} (a goal from the campaign's start screen adds its angle, campaign-goals.ts;members who may publish, where Marketing is on): Sol writes a marketing email's subject,
  * preview line, heading or words, or all four from a brief (domain/marketing/edm-sol.ts). Quick for a line, deep for the
  * words; Sol credits as any answer (use "marketing"). Nothing is kept or sent: the answer goes into the editor.
  */
@@ -40,13 +42,21 @@ export async function POST(request: Request) {
     if (!brief && !Object.values(draft).some((v) => v && v !== "Hi {firstName},"))
       return refuse("Write a line about what the email is for, or some of the email first.");
     const business = (await senderFor(member.businessId)).name || member.businessName;
-    const prompt = edmSolPrompt(part, { business, brief, draft });
+    // A layout of sections from the campaign's start screen: Sol writes every section's heading and words.
+    const sections = part === "all" && isEdmLayout(b.sections) && b.sections > 1 ? b.sections : null;
+    const prompt = edmSolPrompt(part, {
+      business,
+      brief,
+      draft,
+      angle: isCampaignGoal(b.goal) ? goalAngle(b.goal) : null,
+      ask: sections ? sectionsAsk(sections) : undefined,
+    });
     const tier = edmSolTier(part);
     const out = await withSolCredit(
       member.businessId,
       "marketing",
       member.email,
-      (ai) => readWithClaude<unknown>([], edmSolSchema(part), prompt, apiKey, ai),
+      (ai) => readWithClaude<unknown>([], sections ? sectionsSchema() : edmSolSchema(part), prompt, apiKey, ai),
       tier,
       part === "all" ? "marketing email written" : `marketing ${part} written`,
     ).catch((e) => {
@@ -54,6 +64,11 @@ export async function POST(request: Request) {
       return null;
     });
     if (out === "out") return refuse(SOL_OUT_SHORT, 402);
+    if (sections) {
+      const written = cleanSections(out, sections);
+      if (!written) return refuse("Sol couldn't write that just now. Try again in a moment.", 502);
+      return Response.json({ ok: true, ...written });
+    }
     const clean = cleanEdmSol(part, out);
     if (!clean) return refuse("Sol couldn't write that just now. Try again in a moment.", 502);
     return Response.json({ ok: true, ...clean });

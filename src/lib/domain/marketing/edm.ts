@@ -5,18 +5,31 @@
  * text of one email for one contact.
  */
 
-export const EDM_BLOCK_KINDS = ["heading", "text", "image", "button", "divider"] as const;
+export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider"] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
 export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   heading: "Heading",
   text: "Words",
   image: "Picture",
+  tiles: "Picture tiles",
   button: "Button",
   divider: "Divider",
 };
 
 export type EdmAlign = "left" | "center";
+
+/** One picture in a tiles block: the picture, a line under it and where it goes when pressed. */
+export interface EdmTile {
+  imageId: string | null;
+  /** The line under the picture, also what it shows for a screen reader. */
+  text: string;
+  url: string | null;
+}
+
+/** How many tiles sit across a row. */
+export const TILE_COLUMNS = [1, 2, 3] as const;
+export type TileColumns = (typeof TILE_COLUMNS)[number];
 
 export interface EdmBlock {
   id: string;
@@ -28,6 +41,10 @@ export interface EdmBlock {
   /** An uploaded picture's id (marketing_images). */
   imageId: string | null;
   align: EdmAlign;
+  /** A tiles block's pictures (20 Nov 2026, Martin: as many picture blocks in a section as the email needs). */
+  tiles?: EdmTile[];
+  /** How many of its tiles sit across a row. */
+  columns?: TileColumns;
 }
 
 export interface EdmContent {
@@ -59,7 +76,17 @@ export const DEFAULT_BRAND: EdmBrand = {
   address: null,
 };
 
-export const EDM_LIMITS = { blocks: 30, subject: 150, preview: 160, heading: 200, text: 3000, label: 60, alt: 160 } as const;
+export const EDM_LIMITS = {
+  blocks: 30,
+  subject: 150,
+  preview: 160,
+  heading: 200,
+  text: 3000,
+  label: 60,
+  alt: 160,
+  tiles: 6,
+  caption: 80,
+} as const;
 
 const line = (v: unknown, max: number) =>
   typeof v === "string"
@@ -100,6 +127,21 @@ export const cleanColour = (raw: unknown, fallback = DEFAULT_BRAND.colour) =>
 
 const blockId = (v: unknown, i: number) => (typeof v === "string" && /^[a-z0-9]{4,16}$/.test(v) ? v : `b${i}x${(i * 7919).toString(36)}`);
 
+const imageIdOf = (v: unknown) => (typeof v === "string" && /^mimg_[0-9a-f]{24}$/.test(v) ? v : null);
+
+export function cleanTiles(raw: unknown): EdmTile[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, EDM_LIMITS.tiles).map((t) => {
+    const r = (t && typeof t === "object" ? t : {}) as Record<string, unknown>;
+    return { imageId: imageIdOf(r.imageId), text: line(r.text, EDM_LIMITS.caption), url: cleanLink(r.url) };
+  });
+}
+
+export const cleanColumns = (raw: unknown): TileColumns => (raw === 1 || raw === 3 ? raw : 2);
+
+/** A tiles block's tiles that have a picture: the ones an email shows. */
+export const filledTiles = (b: EdmBlock): EdmTile[] => (b.kind === "tiles" ? (b.tiles ?? []).filter((t) => t.imageId) : []);
+
 export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -110,10 +152,11 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
   return {
     id: blockId(r.id, i),
     kind,
-    text: kind === "text" ? words(r.text, max) : kind === "divider" ? "" : line(r.text, max),
+    text: kind === "text" ? words(r.text, max) : kind === "divider" || kind === "tiles" ? "" : line(r.text, max),
     url: kind === "button" || kind === "image" ? cleanLink(r.url) : null,
-    imageId: kind === "image" && typeof r.imageId === "string" && /^mimg_[0-9a-f]{24}$/.test(r.imageId) ? r.imageId : null,
+    imageId: kind === "image" ? imageIdOf(r.imageId) : null,
     align: r.align === "center" ? "center" : "left",
+    ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
   };
 }
 
@@ -161,7 +204,13 @@ export function contentProblem(c: EdmContent): string | null {
 
 /** Each link in the email, in order: the index is what a click is recorded against (no open redirects). */
 export function edmLinks(blocks: EdmBlock[]): string[] {
-  return blocks.filter((b) => (b.kind === "button" || b.kind === "image") && b.url).map((b) => b.url!);
+  return blocks.flatMap((b) =>
+    b.kind === "tiles"
+      ? filledTiles(b).flatMap((t) => (t.url ? [t.url] : []))
+      : (b.kind === "button" || b.kind === "image") && b.url
+        ? [b.url]
+        : [],
+  );
 }
 
 /** A fresh block id. */
@@ -169,9 +218,19 @@ export function newBlockId(rand: () => number = Math.random): string {
   return Array.from({ length: 10 }, () => "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(rand() * 36)]).join("");
 }
 
+export const EMPTY_TILE: EdmTile = { imageId: null, text: "", url: null };
+
 export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
   const text = kind === "heading" ? "A heading" : kind === "text" ? "Hi {firstName}," : kind === "button" ? "Find out more" : "";
-  return { id: newBlockId(rand), kind, text, url: null, imageId: null, align: kind === "button" ? "center" : "left" };
+  return {
+    id: newBlockId(rand),
+    kind,
+    text,
+    url: null,
+    imageId: null,
+    align: kind === "button" ? "center" : "left",
+    ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
+  };
 }
 
 export function moveBlock(blocks: EdmBlock[], id: string, by: -1 | 1): EdmBlock[] {
@@ -293,6 +352,43 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       }
       rows.push(`<tr><td style="padding:12px 32px">${cell}</td></tr>`);
       if (b.text) textParts.push(`[${merge(b.text, fields)}]`);
+    } else if (b.kind === "tiles") {
+      // Only tiles with a picture are sent; an empty spot in the builder is left out.
+      const tiles = filledTiles(b);
+      if (!tiles.length) continue;
+      const cols = Math.min(cleanColumns(b.columns), tiles.length) as TileColumns;
+      const gap = 12;
+      const width = Math.floor((536 - gap * (cols - 1)) / cols);
+      const cells = tiles.map((t) => {
+        const caption = merge(t.text, fields);
+        const img = `<img src="${esc(links.image(t.imageId!))}" alt="${esc(caption)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border:0;border-radius:8px">`;
+        let inner = img;
+        if (t.url) {
+          inner = `<a href="${esc(links.click(linkAt, linkList[linkAt]))}" target="_blank" style="text-decoration:none">${img}</a>`;
+          linkAt++;
+        }
+        if (caption) {
+          inner += `<div style="padding:8px 2px 0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.4;color:#3c3d41;text-align:${align}">${esc(caption)}</div>`;
+          textParts.push(`[${caption}]`);
+        }
+        return inner;
+      });
+      const trs: string[] = [];
+      for (let at = 0; at < cells.length; at += cols) {
+        const row = cells.slice(at, at + cols);
+        while (row.length < cols) row.push("");
+        trs.push(
+          `<tr>${row
+            .map(
+              (c, i) =>
+                `<td width="${Math.round(100 / cols)}%" valign="top" style="padding:0 ${i < cols - 1 ? gap / 2 : 0}px ${gap}px ${i > 0 ? gap / 2 : 0}px">${c}</td>`,
+            )
+            .join("")}</tr>`,
+        );
+      }
+      rows.push(
+        `<tr><td style="padding:12px 32px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
+      );
     } else if (b.kind === "button" && b.text && b.url) {
       const href = links.click(linkAt, linkList[linkAt]);
       linkAt++;

@@ -1,13 +1,32 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Eye, Heading, ImagePlus, Loader2, Minus, MousePointerClick, Pencil, Trash2, Type, Undo2 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Eye,
+  Heading,
+  ImagePlus,
+  LayoutGrid,
+  Loader2,
+  Minus,
+  MousePointerClick,
+  Pencil,
+  Plus,
+  Trash2,
+  Type,
+  Undo2,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
 import {
   EDM_BLOCK_KINDS,
   EDM_BLOCK_WORDS,
   EDM_LIMITS,
+  EMPTY_TILE,
   MERGE_FIELDS,
+  TILE_COLUMNS,
+  cleanColumns,
   cleanLink,
   moveBlock,
   newBlock,
@@ -17,6 +36,7 @@ import {
   type EdmBrand,
   type EdmContent,
   type EdmSender,
+  type EdmTile,
 } from "@/lib/domain/marketing/edm";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
 import { uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
@@ -27,9 +47,13 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   heading: Heading,
   text: Type,
   image: ImagePlus,
+  tiles: LayoutGrid,
   button: MousePointerClick,
   divider: Minus,
 };
+
+/** A change to one block: its new fields, or a function of the block as it stands when the change lands. */
+type BlockPatch = Partial<EdmBlock> | ((b: EdmBlock) => Partial<EdmBlock>);
 
 /** The email as a reader sees it, with a sample name and company, nothing tracked. */
 export function EdmPreview({
@@ -54,7 +78,8 @@ export function EdmPreview({
           click: (_i, url) => url,
           pixel: null,
           unsubscribe: "#",
-          image: (id) => `/api/m/i/${id}`,
+          // The whole address: a sandboxed frame doesn't take its page's address, so "/api/…" alone loads nothing.
+          image: (id) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/i/${id}`,
         },
       ).html,
     [content, brand, sender],
@@ -68,7 +93,8 @@ export function EdmPreview({
       </div>
       <iframe
         title="Email preview"
-        sandbox=""
+        // Still no scripts, forms or pop-ups: only "same origin", without which the frame loads none of its pictures.
+        sandbox="allow-same-origin"
         srcDoc={html}
         className={cn("mx-auto block h-[640px] w-full bg-[#f4f4f5]", phone && "max-w-[390px]")}
       />
@@ -93,8 +119,21 @@ export function EdmBuilder({
   const [mode, setMode] = useState<"builder" | "preview">(readOnly ? "preview" : "builder");
   const [phone, setPhone] = useState(false);
   const set = (patch: Partial<EdmContent>) => onChange({ ...content, ...patch });
-  const setBlock = (id: string, patch: Partial<EdmBlock>) =>
-    set({ blocks: content.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
+  // The email as it stands now, for changes that land after a wait (a picture uploading): two pictures going into two
+  // tiles at once each change the latest email, not the one on screen when their upload began.
+  const latest = useRef(content);
+  useEffect(() => {
+    latest.current = content;
+  }, [content]);
+  const setBlock = (id: string, patch: BlockPatch) => {
+    const now = latest.current;
+    const next = {
+      ...now,
+      blocks: now.blocks.map((b) => (b.id === id ? { ...b, ...(typeof patch === "function" ? patch(b) : patch) } : b)),
+    };
+    latest.current = next;
+    onChange(next);
+  };
 
   // Sol writing the email (edm-sol.ts): from the brief, one part or all four; the last fill can be undone.
   const [brief, setBrief] = useState("");
@@ -320,7 +359,7 @@ function BlockCard({
   block: EdmBlock;
   first: boolean;
   last: boolean;
-  onChange: (patch: Partial<EdmBlock>) => void;
+  onChange: (patch: BlockPatch) => void;
   onMove: (by: -1 | 1) => void;
   onRemove: () => void;
   sol?: ReactNode;
@@ -379,6 +418,7 @@ function BlockCard({
         </div>
       )}
       {b.kind === "image" && <ImageFields block={b} onChange={onChange} />}
+      {b.kind === "tiles" && <TilesFields block={b} onChange={onChange} />}
       {b.kind === "divider" && <div className="h-px bg-line" />}
       {badLink && b.kind === "button" && <p className="mt-1 text-[12px] text-muted">A button needs an https link.</p>}
     </div>
@@ -403,7 +443,15 @@ function SolRound({ label, busy, disabled, onClick }: { label: string; busy: boo
 }
 
 /** Keeps what's typed while it isn't a link yet; the block holds the cleaned link or null. */
-function LinkInput({ value, onChange }: { value: string | null; onChange: (url: string | null) => void }) {
+function LinkInput({
+  value,
+  onChange,
+  placeholder = "https://renuabl.com.au/business",
+}: {
+  value: string | null;
+  onChange: (url: string | null) => void;
+  placeholder?: string;
+}) {
   const [text, setText] = useState(value ?? "");
   const ok = !text || cleanLink(text) !== null;
   return (
@@ -413,7 +461,7 @@ function LinkInput({ value, onChange }: { value: string | null; onChange: (url: 
         setText(e.target.value);
         onChange(cleanLink(e.target.value));
       }}
-      placeholder="https://renuabl.com.au/business"
+      placeholder={placeholder}
       className={cn(field, !ok && "border-danger")}
     />
   );
@@ -467,6 +515,161 @@ function ImageFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch
         />
         <LinkInput value={b.url} onChange={(url) => onChange({ url })} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * A tiles block: as many pictures as the section needs (up to the limit), one, two or three across, each with a line
+ * under it and a link. Several files can be dropped on it at once. A spot with no picture is never sent.
+ */
+function TilesFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const tiles = b.tiles ?? [];
+  const columns = cleanColumns(b.columns);
+  const [busy, setBusy] = useState<number | "many" | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const full = tiles.length >= EDM_LIMITS.tiles;
+  const setTile = (i: number, patch: Partial<EdmTile>) => onChange({ tiles: tiles.map((t, j) => (j === i ? { ...t, ...patch } : t)) });
+
+  /** Puts the first picture in the spot named, the rest in the empty spots, then in new ones while there is room. */
+  async function add(files: File[], at?: number) {
+    const pictures = files.filter((f) => /^image\/(jpeg|png|webp)$/.test(f.type));
+    if (!pictures.length) {
+      if (files.length) setProblem("Pictures are JPEG, PNG or WebP.");
+      return;
+    }
+    setProblem(null);
+    setBusy(pictures.length === 1 && at !== undefined ? at : "many");
+    let left = false;
+    for (const [n, file] of pictures.entries()) {
+      const r = await uploadMarketingImage(file);
+      if (!r.ok) {
+        setProblem(r.message);
+        break;
+      }
+      // Placed in the block as it stands once the upload is in, so pictures going up together don't undo each other.
+      onChange((now) => {
+        const next = now.tiles ?? [];
+        const spot = n === 0 && at !== undefined && at < next.length ? at : next.findIndex((t) => !t.imageId);
+        if (spot >= 0) return { tiles: next.map((t, j) => (j === spot ? { ...t, imageId: r.id } : t)) };
+        if (next.length >= EDM_LIMITS.tiles) {
+          left = true;
+          return {};
+        }
+        return { tiles: [...next, { ...EMPTY_TILE, imageId: r.id }] };
+      });
+      if (left) break;
+    }
+    setBusy(null);
+    if (left) setProblem(`A block holds up to ${EDM_LIMITS.tiles} pictures. Add another Picture tiles block for more.`);
+  }
+
+  return (
+    <div
+      className="space-y-3"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        void add([...e.dataTransfer.files]);
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+        <span>Across</span>
+        <span className="inline-flex rounded-full bg-canvas p-0.5">
+          {TILE_COLUMNS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={columns === c}
+              onClick={() => onChange({ columns: c })}
+              className={cn(
+                "h-7 min-w-8 rounded-full px-2 text-[12px] font-medium",
+                columns === c ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-muted hover:text-ink",
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </span>
+        <span className="ml-auto">
+          {tiles.filter((t) => t.imageId).length} of {EDM_LIMITS.tiles} pictures · drop several here at once
+        </span>
+      </div>
+      <div className={cn("grid gap-3", columns === 1 ? "grid-cols-1" : columns === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
+        {tiles.map((t, i) => (
+          <div key={i} className="rounded-lg border border-line p-2">
+            <div
+              className="relative"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void add([...e.dataTransfer.files], i);
+              }}
+            >
+              <label
+                className={cn(
+                  "grid cursor-pointer place-items-center overflow-hidden rounded-md bg-canvas text-muted hover:text-ink",
+                  columns === 1 ? "aspect-[16/7]" : "aspect-[4/3]",
+                  !t.imageId && "border border-dashed border-line-strong",
+                )}
+              >
+                {t.imageId ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/m/i/${t.imageId}`} alt="" className="size-full object-cover" />
+                ) : busy === i ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <span className="flex flex-col items-center gap-1 text-[12px]">
+                    <ImagePlus className="size-5" /> Drop or choose a picture
+                  </span>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    void add([...(e.target.files ?? [])], i);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                aria-label="Remove this picture"
+                title="Remove this picture"
+                onClick={() => onChange({ tiles: tiles.filter((_, j) => j !== i) })}
+                className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] hover:text-ink"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+            <input
+              value={t.text}
+              maxLength={EDM_LIMITS.caption}
+              onChange={(e) => setTile(i, { text: e.target.value })}
+              placeholder="Caption (optional)"
+              className={cn(field, "mt-2")}
+            />
+            <div className="mt-1.5">
+              <LinkInput value={t.url} onChange={(url) => setTile(i, { url })} placeholder="Link (optional)" />
+            </div>
+          </div>
+        ))}
+        {!full && (
+          <button
+            type="button"
+            onClick={() => onChange({ tiles: [...tiles, EMPTY_TILE] })}
+            className="grid min-h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted hover:border-ink/40 hover:text-ink"
+          >
+            <span className="flex items-center gap-1.5">
+              {busy === "many" ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Add a picture
+            </span>
+          </button>
+        )}
+      </div>
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] text-muted">A spot with no picture is left out of the email.</p>
     </div>
   );
 }

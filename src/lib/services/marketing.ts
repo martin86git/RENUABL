@@ -209,7 +209,18 @@ export const writeWithSol = (body: {
   part: "all" | "subject" | "preview" | "heading" | "text";
   brief: string;
   draft: { subject: string; preview: string; heading: string; text: string };
-}) => send<{ subject?: string; preview?: string; heading?: string; text?: string }>(`/api/design/marketing/write`, json("POST", body));
+  goal?: string | null;
+  /** A layout of 3, 4 or 5 sections: Sol answers with `sections` and `button` in place of heading and text. */
+  sections?: number;
+}) =>
+  send<{
+    subject?: string;
+    preview?: string;
+    heading?: string;
+    text?: string;
+    sections?: { heading: string; text: string }[];
+    button?: string;
+  }>(`/api/design/marketing/write`, json("POST", body));
 
 export function uploadMarketingImage(file: File) {
   const form = new FormData();
