@@ -38,7 +38,8 @@ describe.skipIf(!url)("deal pulses, email opens and attachments (database)", () 
     const customer = cleanCustomerInput({ name: "Casey Pulse", address: "1 Sample Street, Exampleton VIC 3000" });
     const job = cleanJobInput({ address: "1 Sample Street, Exampleton VIC 3000" });
     if (!customer.ok || !job.ok) throw new Error("unexpected");
-    const made = await crm.createCustomer(a, customer.value, job.value, OWNER);
+    // Given to the owner in so many words: a lead the owner adds otherwise goes to the business's one salesperson (Sam).
+    const made = await crm.createCustomer(a, customer.value, job.value, OWNER, OWNER);
     if (made === "full" || !made.job) throw new Error("unexpected");
     jobId = made.job.id;
     customerId = made.customer.id;
