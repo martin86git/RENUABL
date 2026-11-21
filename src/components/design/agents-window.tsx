@@ -16,7 +16,7 @@ import {
   type AgentKind,
   type AgentNeed,
 } from "@/lib/domain/design/agents";
-import { CALLER_VOICES, type CallerVoice } from "@/lib/domain/design/caller";
+import type { CallerVoice } from "@/lib/domain/design/caller";
 import { INSTRUCTIONS_MAX, instructionLines } from "@/lib/domain/design/coaching";
 import type { CallerKey } from "@/lib/domain/install-call";
 import { addAgent, closeAgents, loadAgents, openAgents, useAgentsOpen, type AgentLine, type AgentsState } from "@/lib/services/agents";
@@ -25,6 +25,7 @@ import { openCoach } from "@/lib/services/coaching";
 import { openColleague } from "@/lib/services/colleague";
 import { AddOnOffer } from "./add-on-offer";
 import { CallerAvatar } from "./settings-caller";
+import { VoiceChoice } from "./voice-choice";
 
 /**
  * A quiet plus under the assistants on the rail (13 Nov 2026, Martin: "we're going to need a function for the user to
@@ -363,17 +364,10 @@ function AddForm({ kinds, state, onMade }: { kinds: AgentKind[]; state: AgentsSt
       )}
 
       {w.usesNumber && (
-        <label className="block px-1 text-sm font-semibold text-ink">
-          Its voice
-          <select value={voice} onChange={(e) => setVoice(e.target.value)} className={FIELD}>
-            <option value="">Choose later</option>
-            {CALLER_VOICES.map((v) => (
-              <option key={`${v.provider}:${v.voiceId}`} value={`${v.provider}:${v.voiceId}`}>
-                {v.label} · {v.words}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="px-1 text-sm font-semibold text-ink">
+          <span id="agent-voice">Its voice</span>
+          <VoiceChoice value={voice} onChange={setVoice} />
+        </div>
       )}
 
       {number ? (

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { SolMark } from "./sol-icon";
+import { SolMark, SunBrainLines } from "./sol-icon";
 
 /**
  * Sol as a real sun (18 Nov 2026, Martin: the glossy orb felt "built in an entry level design tool"; take the feel up a
@@ -58,36 +58,44 @@ void main(){
   float t=uTime;
   vec3 col=vec3(0.0); float alpha=0.0;
 
-  if(r<R+0.01){
-    // The disc: a turning sphere, finely granulated, strongly darker towards the limb as a real star is.
-    vec2 q=uv/R; float z=sqrt(max(0.0,1.0-dot(q,q)));
+  // The edge is a ball of energy, not a clean ball (21 Nov 2026, Martin: "starting to look like a basketball… the edge
+  // is too clean"): the limb boils, its radius stirred by noise round the sun and through time, and melts into the
+  // corona over a wide band instead of ending in a hard line.
+  float ang=atan(uv.y,uv.x);
+  vec3 ep=vec3(cos(ang)*2.2,sin(ang)*2.2,t*0.16);
+  float boil=fbm(ep)+0.5*snoise(vec3(cos(ang)*7.0,sin(ang)*7.0,t*0.45));
+  float Re=R*(1.0+0.035*boil);
+
+  if(r<Re+0.06){
+    // The disc: a turning sphere, finely granulated, warmer towards the limb rather than dark, so it glows like a star.
+    vec2 q=uv/R; float z=sqrt(max(0.0,1.0-min(1.0,dot(q,q))));
     float a=t*0.035; mat2 rot=mat2(cos(a),-sin(a),sin(a),cos(a));
     vec3 s=vec3(rot*q.xy,z);
     float gran=fbm(s*9.0+vec3(0.0,0.0,t*0.05));
     float cells=snoise(s*34.0+t*0.12);
-    float mu=z;
-    float limb=pow(mu,0.42);
-    float heat=limb*(0.95+0.06*gran+0.025*cells)*(0.96+0.06*uEnergy);
-    vec3 rim=vec3(0.80,0.20,0.04);
-    vec3 mid=vec3(1.0,0.50,0.12);
+    float limb=pow(z,0.3);
+    float heat=limb*(0.95+0.08*gran+0.03*cells)*(0.96+0.06*uEnergy);
+    vec3 rim=vec3(1.0,0.36,0.07);
+    vec3 mid=vec3(1.0,0.54,0.14);
     vec3 core=vec3(1.0,0.90,0.62);
-    col=mix(rim,mid,smoothstep(0.15,0.62,heat));
+    col=mix(rim,mid,smoothstep(0.10,0.60,heat));
     col=mix(col,core,smoothstep(0.70,1.02,heat));
-    alpha=smoothstep(R+0.006,R-0.006,r);
+    alpha=smoothstep(Re+0.028,Re-0.04,r);
   }
 
-  // The corona: a soft haze breathing and drifting outward, fading to nothing before the canvas's edge. No spikes.
-  float d=max(0.0,r-R);
-  float ang=atan(uv.y,uv.x);
+  // The corona: a soft haze breathing and drifting outward, bright where it leaves the limb, fading to nothing before
+  // the canvas's edge, with fine flickers of flame close in. No spikes.
+  float d=max(0.0,r-Re);
   vec3 cp=vec3(cos(ang)*1.5,sin(ang)*1.5,d*2.4-t*0.07);
   float wisps=fbm(cp)*0.5+0.5;
+  float flick=fbm(vec3(cos(ang)*5.0,sin(ang)*5.0,d*9.0-t*0.5))*0.5+0.5;
   float breathe=0.93+0.07*sin(t*0.6);
-  float inner=exp(-d*20.0)*0.55;
-  float haze=exp(-d*5.0)*(0.20+0.30*wisps)*breathe*(0.9+0.25*uEnergy);
-  float bloom=exp(-d*2.2)*0.07;
+  float inner=exp(-d*13.0)*(0.62+0.38*flick);
+  float haze=exp(-d*5.0)*(0.22+0.32*wisps)*breathe*(0.9+0.25*uEnergy);
+  float bloom=exp(-d*2.2)*0.08;
   float fade=smoothstep(1.0,0.72,r);
   float glow=(inner+haze+bloom)*fade;
-  vec3 gcol=mix(vec3(1.0,0.38,0.10),vec3(1.0,0.70,0.36),exp(-d*10.0));
+  vec3 gcol=mix(vec3(1.0,0.40,0.10),vec3(1.0,0.74,0.40),exp(-d*9.0));
   vec3 outc=col*alpha+gcol*glow*(1.0-alpha);
   float outa=clamp(alpha+glow*(1.0-alpha),0.0,1.0);
   gl_FragColor=vec4(outc,outa);
@@ -192,5 +200,28 @@ export function LiveSun({ className, energy = 0, live = true }: { className?: st
   }, [live]);
 
   if (failed) return <SolMark className={clsx("size-full", className)} />;
-  return <canvas ref={canvas} className={clsx("block size-full", className)} aria-hidden />;
+  // The brain in the sun (18 Nov 2026, Martin: "a feint brain outline, to show it's a sun brain"): fine light lines
+  // laid softly over the disc, a little brighter while he talks. On every live sun alike (21 Nov 2026, Martin: the
+  // etched lines tried in its place weren't liked; "reinstate the previous look and make it consistent everywhere").
+  // The disc is half the canvas across, in its middle.
+  return (
+    <span className="relative block size-full" aria-hidden>
+      <canvas ref={canvas} className={clsx("block size-full", className)} />
+      <span className="pointer-events-none absolute inset-1/4">
+        <SunBrain lit={energy > 0.5} />
+      </span>
+    </span>
+  );
+}
+
+/** The brain in the sun, the same lines as `SolMark`'s, a little brighter while he talks. */
+function SunBrain({ lit }: { lit: boolean }) {
+  return (
+    <svg
+      viewBox="11 12 78 78"
+      className={clsx("absolute inset-[2%] mix-blend-soft-light transition-opacity duration-700", lit ? "opacity-90" : "opacity-60")}
+    >
+      <SunBrainLines />
+    </svg>
+  );
 }

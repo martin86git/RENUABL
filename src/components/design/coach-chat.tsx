@@ -70,6 +70,7 @@ import {
   useCoachOpen,
 } from "@/lib/services/coaching";
 import { CallerAvatar, VoicePicker } from "./settings-caller";
+import { VoiceSample } from "./voice-choice";
 import { ContactReach } from "./coach-contacts";
 import { CoachDeals } from "./coach-deals";
 import { CoachWelcome } from "./coach-welcome";
@@ -1125,7 +1126,11 @@ function AvatarEdit({ editable, onFailed }: { editable: boolean; onFailed: (m: s
           aria-label={`${caller.name}'s picture`}
           className="absolute left-0 top-full z-50 mt-2 w-56 rounded-2xl bg-surface p-3 text-ink shadow-xl ring-1 ring-line"
         >
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Colour</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Voice</p>
+          <div className="mt-1.5">
+            <VoiceSample voice={caller.voice} label={voiceLabel(caller.voice)} />
+          </div>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">Colour</p>
           <div className="mt-2 flex items-center gap-2">
             {TINT_NAMES.map((label, i) => (
               <button

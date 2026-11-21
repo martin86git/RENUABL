@@ -14,6 +14,7 @@ import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { textsOnFor } from "@/lib/server/design-texts";
+import { speakingProviders } from "@/lib/server/voice-samples";
 import { voiceOnFor } from "@/lib/server/voice-calls";
 
 /** GET: the business's phone assistant (its name, whether it has a picture), the name it speaks for, and whether its calls are on. */
@@ -47,6 +48,8 @@ export async function GET() {
       mayChange,
       business: brand.name || biz[0]?.name || "",
       hiddenVoices,
+      // The makers whose voices can speak the solar sample line (their key is set): the rest play the maker's clip.
+      speakers: speakingProviders(),
     });
   });
 }
