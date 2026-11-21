@@ -30,7 +30,6 @@ import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import clsx from "clsx";
 import { DealTeamChat } from "./deal-team-chat";
 import {
-  JOB_STAGES,
   STAGE_LABELS,
   type Activity,
   type Customer,
@@ -64,6 +63,7 @@ import { ACTIVITY_WORD } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
+import { StageSelect } from "./stage-select";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
@@ -775,17 +775,7 @@ export function DealPage({ id }: { id: string }) {
                       />
                       <label className="block text-xs text-muted">
                         Deal stage
-                        <select
-                          className={clsx(ui.input, "mt-1 appearance-auto")}
-                          value={job.stage}
-                          onChange={(e) => void patch({ stage: e.target.value as JobStage })}
-                        >
-                          {JOB_STAGES.map((s) => (
-                            <option key={s} value={s}>
-                              {STAGE_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                        <StageSelect job={job} className={clsx(ui.input, "mt-1 appearance-auto")} onChange={(to) => void patch(to)} />
                       </label>
                       <label className="block text-xs text-muted">
                         Quoted price, inc. GST ($)

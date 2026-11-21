@@ -33,9 +33,24 @@ import {
   type Job,
   type JobInput,
   type JobStage,
-  type SavedPipeline,
 } from "@/lib/domain/design/crm";
 import { newId, query, transaction } from "./db";
+import {
+  MAX_OWN_STAGES,
+  MAX_PIPELINE_STAGES,
+  OWN_STAGES_FULL,
+  PIPELINE_TOO_LONG,
+  STAGE_NAME_MISSING,
+  STAGE_NAME_TAKEN,
+  cleanOwnStageInput,
+  cleanStageName,
+  insertStage,
+  moveText,
+  nameTaken,
+  pipelinesFor,
+  type KeptPipeline,
+  type OwnStage,
+} from "@/lib/domain/design/pipeline-stages";
 
 export type Q = Parameters<Parameters<typeof transaction>[0]>[0];
 
@@ -50,7 +65,7 @@ const CUSTOMER = `c.id, c.name,
   case when c.first_name = '' and c.last_name = '' then btrim(substr(c.name, length(split_part(c.name, ' ', 1)) + 1)) else c.last_name end as "lastName",
   c.phone, c.email, c.address, c.lat, c.lng, c.source, c.notes, c.sample,
   ${moment("c.created_at")} as "createdAt", ${moment("c.updated_at")} as "updatedAt"`;
-const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.project_id as "projectId",
+const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.sub_stage as "subStage", j.project_id as "projectId",
   j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate", j.details,
   j.kw::float8 as kw, j.owner_email as owner,
   ${moment(`coalesce(j.won_at, case when j.stage in (${inList(WON_STAGES)}) then j.updated_at end)`)} as "wonAt",
@@ -505,6 +520,7 @@ export async function updateJob(
               -- Sold and installed are dated when a job first reaches those stages, and undated if it goes back.
               won_at = case when $15::boolean then coalesce(won_at, now()) else null end,
               installed_at = case when $16::boolean then coalesce(installed_at, now()) else null end,
+              sub_stage = $17,
               updated_at = now()
         where business_id = $1 and id = $2`,
       [
@@ -524,10 +540,15 @@ export async function updateJob(
         next.kw ?? null,
         WON_STAGES.includes(next.stage),
         INSTALLED_STAGES.includes(next.stage),
+        next.subStage ?? null,
       ],
     );
-    if (next.stage !== before.stage)
-      await record(q, businessId, { customerId: before.customerId, jobId: id, kind: "stage", text: stageMoveText(next.stage), by: who });
+    const sub = next.subStage ?? null;
+    if (next.stage !== before.stage || sub !== (before.subStage ?? null)) {
+      const own = sub ? await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1 and id = $2`, [businessId, sub]) : [];
+      const text = sub && own[0] ? moveText(next.stage, sub, own) : stageMoveText(next.stage);
+      await record(q, businessId, { customerId: before.customerId, jobId: id, kind: "stage", text, by: who });
+    }
     if (moved) await link(q, businessId, { jobId: id }, who);
     const after = await q<Job>(`select ${JOB} from design_jobs j where j.business_id = $1 and j.id = $2`, [businessId, id]);
     return after[0];
@@ -543,23 +564,38 @@ export async function deleteJob(businessId: string, id: string): Promise<boolean
 // Saved pipelines
 // ---------------------------------------------------------------------------
 
-const PIPELINE = `id, name, stages`;
+const PIPELINE = `id, name, stages, base_id as "baseId"`;
+const STAGE = `id, name, base`;
 
-/** The pipelines the business has saved, in the order they were made. */
-export async function listPipelines(businessId: string): Promise<SavedPipeline[]> {
+/** The pipelines the business keeps (its own, and stand-ins for set ones it changed), in the order they were made. */
+export async function listPipelines(businessId: string): Promise<KeptPipeline[]> {
   return query(`select ${PIPELINE} from design_pipelines where business_id = $1 order by created_at, id`, [businessId]);
 }
 
-/** Saves a new pipeline for the business. "full" at the limit. */
+/**
+ * Saves a pipeline for the business: one of its own, or (with `baseId`) a stand-in for a set pipeline, which replaces
+ * any stand-in it had for that one. "full" at the limit.
+ */
 export async function createPipeline(
   businessId: string,
-  input: Pick<SavedPipeline, "name" | "stages">,
+  input: Pick<KeptPipeline, "name" | "stages" | "baseId">,
   by: string,
-): Promise<SavedPipeline | "full"> {
+): Promise<KeptPipeline | "full"> {
   return transaction(async (q) => {
-    const count = await q<{ n: string }>(`select count(*) as n from design_pipelines where business_id = $1`, [businessId]);
+    if (input.baseId) {
+      const rows = await q<KeptPipeline>(
+        `insert into design_pipelines (id, business_id, name, stages, base_id, created_by) values ($2,$1,$3,$4::jsonb,$5,$6)
+           on conflict (business_id, base_id) where base_id is not null do update set name = excluded.name, stages = excluded.stages
+           returning ${PIPELINE}`,
+        [businessId, newId("pipe"), input.name, JSON.stringify(input.stages), input.baseId, by.toLowerCase()],
+      );
+      return rows[0];
+    }
+    const count = await q<{ n: string }>(`select count(*) as n from design_pipelines where business_id = $1 and base_id is null`, [
+      businessId,
+    ]);
     if (Number(count[0]?.n ?? 0) >= MAX_PIPELINES) return "full";
-    const rows = await q<SavedPipeline>(
+    const rows = await q<KeptPipeline>(
       `insert into design_pipelines (id, business_id, name, stages, created_by) values ($2,$1,$3,$4::jsonb,$5) returning ${PIPELINE}`,
       [businessId, newId("pipe"), input.name, JSON.stringify(input.stages), by.toLowerCase()],
     );
@@ -571,18 +607,106 @@ export async function createPipeline(
 export async function updatePipeline(
   businessId: string,
   id: string,
-  input: Pick<SavedPipeline, "name" | "stages">,
-): Promise<SavedPipeline | null> {
-  const rows = await query<SavedPipeline>(
+  input: Pick<KeptPipeline, "name" | "stages">,
+): Promise<KeptPipeline | null> {
+  const rows = await query<KeptPipeline>(
     `update design_pipelines set name = $3, stages = $4::jsonb where business_id = $1 and id = $2 returning ${PIPELINE}`,
     [businessId, id, input.name, JSON.stringify(input.stages)],
   );
   return rows[0] ?? null;
 }
 
+/** Removes one of the business's pipelines (a stand-in: the set pipeline comes back as it was). Its deals are untouched. */
 export async function deletePipeline(businessId: string, id: string): Promise<boolean> {
   const rows = await query(`delete from design_pipelines where business_id = $1 and id = $2 returning id`, [businessId, id]);
   return rows.length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// The business's own stages
+// ---------------------------------------------------------------------------
+
+/** The stages the business added, in the order they were made. */
+export async function listOwnStages(businessId: string): Promise<OwnStage[]> {
+  return query(`select ${STAGE} from design_stages where business_id = $1 order by created_at, id`, [businessId]);
+}
+
+/**
+ * Adds a stage, and with `pipelineId` puts it into that pipeline after position `after` (a set pipeline's id makes
+ * or changes its stand-in). Checked again under a lock: the name not taken, the limit. Answers the stage and the
+ * pipeline as kept, or why not.
+ */
+export async function addOwnStage(
+  businessId: string,
+  raw: unknown,
+  place: { pipelineId: string; after: number } | null,
+  by: string,
+): Promise<{ stage: OwnStage; pipeline: KeptPipeline | null } | { refused: string }> {
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
+    const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
+    if (own.length >= MAX_OWN_STAGES) return { refused: OWN_STAGES_FULL };
+    const input = cleanOwnStageInput(raw, own);
+    if (!input.ok) return { refused: input.message };
+    const made = await q<OwnStage>(
+      `insert into design_stages (id, business_id, name, base, created_by) values ($2,$1,$3,$4,$5) returning ${STAGE}`,
+      [businessId, newId("st", 8), input.value.name, input.value.base, by.toLowerCase()],
+    );
+    const stage = made[0];
+    if (!place) return { stage, pipeline: null };
+    const kept = await q<KeptPipeline>(`select ${PIPELINE} from design_pipelines where business_id = $1`, [businessId]);
+    const shown = pipelinesFor(kept, [...own, stage]).find((p) => p.id === place.pipelineId);
+    if (!shown) return { refused: "That pipeline isn't here." };
+    const stages = insertStage(shown.stages, stage.id, place.after);
+    if (stages.length > MAX_PIPELINE_STAGES) return { refused: PIPELINE_TOO_LONG };
+    const rows = shown.rowId
+      ? await q<KeptPipeline>(`update design_pipelines set stages = $3::jsonb where business_id = $1 and id = $2 returning ${PIPELINE}`, [
+          businessId,
+          shown.rowId,
+          JSON.stringify(stages),
+        ])
+      : await q<KeptPipeline>(
+          `insert into design_pipelines (id, business_id, name, stages, base_id, created_by) values ($2,$1,$3,$4::jsonb,$5,$6) returning ${PIPELINE}`,
+          [businessId, newId("pipe"), shown.name, JSON.stringify(stages), shown.id, by.toLowerCase()],
+        );
+    return { stage, pipeline: rows[0] };
+  });
+}
+
+/** Renames a stage the business added. Null: no such stage. */
+export async function renameOwnStage(businessId: string, id: string, raw: unknown): Promise<OwnStage | { refused: string } | null> {
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
+    const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
+    if (!own.some((s) => s.id === id)) return null;
+    const name = cleanStageName(raw);
+    if (!name) return { refused: STAGE_NAME_MISSING };
+    if (nameTaken(name, own, id)) return { refused: STAGE_NAME_TAKEN };
+    const rows = await q<OwnStage>(`update design_stages set name = $3 where business_id = $1 and id = $2 returning ${STAGE}`, [
+      businessId,
+      id,
+      name,
+    ]);
+    return rows[0];
+  });
+}
+
+/**
+ * Removes a stage the business added: out of every pipeline, and its deals stay at the stage it counted as.
+ * Their records aren't rewritten.
+ */
+export async function deleteOwnStage(businessId: string, id: string): Promise<boolean> {
+  return transaction(async (q) => {
+    const gone = await q(`delete from design_stages where business_id = $1 and id = $2 returning id`, [businessId, id]);
+    if (!gone.length) return false;
+    await q(`update design_jobs set sub_stage = null where business_id = $1 and sub_stage = $2`, [businessId, id]);
+    await q(
+      `update design_pipelines set stages = coalesce((select jsonb_agg(k) from jsonb_array_elements(stages) k where k <> to_jsonb($2::text)), '[]'::jsonb)
+        where business_id = $1 and stages ? $2`,
+      [businessId, id],
+    );
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------

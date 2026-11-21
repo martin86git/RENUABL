@@ -1,6 +1,6 @@
-import { cleanPipelineInput } from "@/lib/domain/design/crm";
+import { cleanPipelineSave } from "@/lib/domain/design/pipeline-stages";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { deletePipeline, updatePipeline } from "@/lib/server/design-crm-repo";
+import { deletePipeline, listOwnStages, updatePipeline } from "@/lib/server/design-crm-repo";
 
 const validId = (id: string) => /^pipe_[a-f0-9]{8,64}$/.test(id);
 /** The same answer for an id that doesn't exist and one that is another business's. */
@@ -15,14 +15,14 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/pipel
     const read = await readBody(request, 5_000);
     if ("refuse" in read) return read.refuse;
     if (!validId(id)) return notFound();
-    const input = cleanPipelineInput(read.body);
+    const input = cleanPipelineSave(read.body, await listOwnStages(who.member.businessId));
     if (!input.ok) return Response.json({ ok: false, message: input.message }, { status: 422 });
     const pipeline = await updatePipeline(who.member.businessId, id, input.value);
     return pipeline ? Response.json({ ok: true, pipeline }) : notFound();
   });
 }
 
-/** DELETE: removes one of the business's pipelines. Its deals are untouched. */
+/** DELETE: removes one of the business's pipelines (a set one it changed goes back as it was). Its deals are untouched. */
 export async function DELETE(_request: Request, ctx: RouteContext<"/api/design/pipelines/[id]">) {
   return answer(async () => {
     const { id } = await ctx.params;

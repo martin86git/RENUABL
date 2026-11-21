@@ -84,6 +84,7 @@ import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
 import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
+import { pipelinesByStage } from "@/lib/domain/design/pipeline-stages";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
 import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, type FeedAnswer } from "@/lib/services/deal-feed";
@@ -204,12 +205,13 @@ export function DealFeed(props: {
   const [saved, setSaved] = useState<Pipeline[]>([]);
   useEffect(() => {
     let gone = false;
-    void listPipelines().then((r) => !gone && r.ok && setSaved(r.pipelines));
+    void listPipelines().then((r) => !gone && r.ok && setSaved(pipelinesByStage(r.pipelines, r.stages)));
     return () => {
       gone = true;
     };
   }, []);
-  const pipelines: readonly Pipeline[] = [...PIPELINES, ...saved];
+  // The set pipelines as the business renamed or changed them, then its own (pipeline-stages.ts).
+  const pipelines: readonly Pipeline[] = saved.length ? saved : PIPELINES;
   const pickedPipeline = pipelines.find((p) => p.id === feedPick.pipeline) ?? null;
   const now = new Date();
   const deals = useMemo(

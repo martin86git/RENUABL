@@ -101,6 +101,11 @@ export interface Job {
   lat: number | null;
   lng: number | null;
   stage: JobStage;
+  /**
+   * A stage the business added (`OwnStage` in pipeline-stages.ts, its id) that the deal sits at on the board.
+   * It always counts as `stage`, which every rule reads; null at one of the twelve.
+   */
+  subStage?: string | null;
   /** The roof design this job is for, once there is one at its address. */
   projectId: string | null;
   /** The price including GST, in dollars. */
@@ -249,7 +254,7 @@ export function cleanCustomerInput(raw: unknown, current?: CustomerInput): Clean
   };
 }
 
-export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details"> & {
+export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "subStage" | "value" | "installDate" | "details"> & {
   /** Sent by the designer with the price when a design is saved. */
   kw?: number | null;
 };
@@ -343,7 +348,13 @@ function realDate(raw: unknown): string | null {
  * A job as sent. A new job starts as a lead with no price or date; with
  * `current` (an edit), anything not sent stays as it is.
  */
-export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonly SectionField[]): Cleaned<JobInput> {
+export function cleanJobInput(
+  raw: unknown,
+  current?: JobInput,
+  fields?: readonly SectionField[],
+  /** The stages the business added: only needed to put a deal at one (`subStage`). */
+  ownStages: readonly { id: string; base: JobStage }[] = [],
+): Cleaned<JobInput> {
   const r = bag(raw);
   const sent = (key: string) => key in r;
   const start: JobInput = current ?? {
@@ -361,9 +372,22 @@ export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonl
   if (!at) return { ok: false, message: PLACE_WRONG };
 
   let stage = start.stage;
+  let subStage = start.subStage ?? null;
   if (sent("stage")) {
     if (!JOB_STAGES.includes(r.stage as JobStage)) return { ok: false, message: JOB_STAGE_WRONG };
     stage = r.stage as JobStage;
+    // Moved to another of the twelve: off any added stage (one sent with it below wins).
+    if (stage !== start.stage) subStage = null;
+  }
+  if (sent("subStage")) {
+    if (r.subStage === null || r.subStage === "") subStage = null;
+    else {
+      // An added stage always counts as its own base stage, whatever stage was sent beside it.
+      const own = ownStages.find((s) => s.id === r.subStage);
+      if (!own) return { ok: false, message: JOB_STAGE_WRONG };
+      subStage = own.id;
+      stage = own.base;
+    }
   }
 
   let value = start.value;
@@ -390,6 +414,8 @@ export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonl
       address: sent("address") ? line(r.address, 200) : start.address,
       ...at,
       stage,
+      // Left out for a deal that never had an added stage, so it reads as before.
+      ...(subStage !== null || start.subStage !== undefined ? { subStage } : {}),
       value,
       installDate,
       ...(sent("kw")
