@@ -155,6 +155,7 @@ import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-sugge
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
 import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
+import { arrayFrame, growArray, growCount, growHandles, type ArrayFrame, type GrowSide } from "@/lib/domain/design/array-grow";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
@@ -1712,6 +1713,17 @@ export function RoofDesigner(props: {
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
     | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
+    | {
+        mode: "grow";
+        side: GrowSide;
+        from: Point;
+        base: LoosePanel[];
+        frame: ArrayFrame;
+        seed: string;
+        /** Every panel this drag has had on the roof: the group as picked up and any it has added. */
+        ids: Set<string>;
+        n: number;
+      }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
@@ -2345,11 +2357,12 @@ export function RoofDesigner(props: {
   };
 
   /**
-   * The panels a drag would place: from the first one, out to the pointer. Dragging across adds panels to the
-   * row; dragging up or down adds rows. Everything is in the first panel's own frame, so a turned panel makes a
-   * turned array. Places where a panel already stands are left out.
+   * The panels a drag would place: from the first one, out to the pointer, in one line (21 Nov 2026, Martin: a drag
+   * does one thing; rows are added from the array's handles afterwards). `across` keeps the line along the panel's row;
+   * otherwise it runs whichever way the pointer has gone further, across or along. Everything is in the first panel's
+   * own frame, so a turned panel makes a turned line. Places where a panel already stands are left out.
    */
-  const arrayFrom = (anchor: LoosePanel, p: Point): LoosePanel[] => {
+  const arrayFrom = (anchor: LoosePanel, p: Point, only: "across" | "either" = "either"): LoosePanel[] => {
     const a = (anchor.angle * Math.PI) / 180;
     const dx = p.x - anchor.x;
     const dy = p.y - anchor.y;
@@ -2357,8 +2370,11 @@ export function RoofDesigner(props: {
     const stepX = plan.w + size.gap;
     const stepY = plan.h + size.gap;
     // How many panels the pointer is away from the first, across and along, in that panel's frame.
-    const across = Math.max(-40, Math.min(40, Math.round((dx * Math.cos(a) + dy * Math.sin(a)) / stepX)));
-    const along = Math.max(-20, Math.min(20, Math.round((-dx * Math.sin(a) + dy * Math.cos(a)) / stepY)));
+    const lx = dx * Math.cos(a) + dy * Math.sin(a);
+    const ly = -dx * Math.sin(a) + dy * Math.cos(a);
+    const sideways = only === "across" || Math.abs(lx) >= Math.abs(ly);
+    const across = sideways ? Math.max(-40, Math.min(40, Math.round(lx / stepX))) : 0;
+    const along = sideways ? 0 : Math.max(-20, Math.min(20, Math.round(ly / stepY)));
     const standingNow = designPanels(design).map((panel) => middle(panel.corners));
     const out: LoosePanel[] = [];
     for (let j = 0; j <= Math.abs(along); j++) {
@@ -2400,6 +2416,26 @@ export function RoofDesigner(props: {
       Math.max(...all.map((p) => (p.x - centre.x) * Math.sin(a) - (p.y - centre.y) * Math.cos(a))) + size.long / 2 + 12 * u * scale;
     return { centre, turn: { x: centre.x + reach * Math.sin(a), y: centre.y - reach * Math.cos(a) } };
   })();
+  // Panels picked that lie on one grid have a + handle on each side: dragged out it adds a row or column there,
+  // dragged in it takes them away (`array-grow.ts`). A handle that would sit on a turn handle slides along its side.
+  const growGroup =
+    handles && panelPicks.length > 0 && panelPicks.length === picks.length && panelPicks.every((x) => x.kind === "loose")
+      ? loose.filter((panel) => panelPicks.some((x) => x.kind === "loose" && x.id === panel.id))
+      : [];
+  const growFrame = growGroup.length ? arrayFrame(growGroup, size) : null;
+  const growSpots = growFrame
+    ? growHandles(growFrame, 9 * u * scale).map((handle) => {
+        const turn = grip?.turn ?? spinGroup?.turn;
+        if (!turn || Math.hypot(handle.at.x - turn.x, handle.at.y - turn.y) > 16 * u * scale) return handle;
+        const t = (growFrame.angle * Math.PI) / 180;
+        const slide = 20 * u * scale;
+        const along =
+          handle.side === "top" || handle.side === "bottom" ? { x: Math.cos(t), y: Math.sin(t) } : { x: -Math.sin(t), y: Math.cos(t) };
+        return { ...handle, at: { x: handle.at.x + along.x * slide, y: handle.at.y + along.y * slide } };
+      })
+    : [];
+  const growAt = (p: Point) => growSpots.find((handle) => Math.hypot(p.x - handle.at.x, p.y - handle.at.y) < 7 * u * scale) ?? null;
+
   /** The direction of a point from a centre, in degrees clockwise from straight up. */
   const bearing = (p: Point, centre: Point) => (Math.atan2(p.x - centre.x, -(p.y - centre.y)) * 180) / Math.PI;
 
@@ -2911,6 +2947,23 @@ export function RoofDesigner(props: {
           : { mode: "inverter", n: grabbed, dx: p.x - at.x, dy: p.y - at.y };
       return;
     }
+    const growing = growFrame ? growAt(p) : null;
+    if (growing && growFrame) {
+      // A + handle on the picked array's side: dragging it adds rows or columns there, or takes them away.
+      svg.current?.setPointerCapture(e.pointerId);
+      setGhosts([]);
+      press.current = {
+        mode: "grow",
+        side: growing.side,
+        from: p,
+        base: growGroup,
+        frame: growFrame,
+        seed: newId("p"),
+        ids: new Set(growGroup.map((panel) => panel.id)),
+        n: 0,
+      };
+      return;
+    }
     if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) {
       // The group's turn handle: every picked panel swings round the middle of the group as the pointer goes round it.
       // Any that were in a row come out of it first.
@@ -2974,9 +3027,9 @@ export function RoofDesigner(props: {
       const shown = ghostAt(p);
       if (!shown) return;
       svg.current?.setPointerCapture(e.pointerId);
-      // Put down in the open (not beside a panel, not on a traced face) there is no roof line to follow: the row
-      // follows the drag (`pivotDrag`).
-      const free = shown.x === p.x && shown.y === p.y && !faces.some((f) => inside(p, f.points));
+      // Put down in the open (not beside a panel), pulled sideways it adds panels and pulled any other way it pivots
+      // (`pivotDrag`); on a traced face it starts out facing the way the face runs. Beside a panel it only adds.
+      const free = shown.x === p.x && shown.y === p.y;
       press.current = { mode: "array", anchor: shown, free, pivot: null };
       setLaying(true);
       return setGhosts([shown]);
@@ -3096,7 +3149,7 @@ export function RoofDesigner(props: {
       if (tool === "panel") {
         // Over a panel that is there (or the round beside its array) the arrow has taken over: no outline.
         const p = pointAt(e);
-        const next = p && !key && !onArrayHint(p) ? ghostAt(p) : null;
+        const next = p && !key && !onArrayHint(p) && !growAt(p) ? ghostAt(p) : null;
         setGhosts(next ? [next] : []);
       }
       // Selecting, the next panel shows itself just past a panel's edge (not over a panel, the round, the kit or a handle).
@@ -3105,7 +3158,8 @@ export function RoofDesigner(props: {
         const handle =
           p &&
           ((grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) ||
-            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale));
+            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) ||
+            growAt(p) !== null);
         // Over empty roof, or an empty place in a traced face's rows (8 Nov 2026: inside a face it never showed).
         const next = p && (!under || under.empty) && !on && !handle && !onArrayHint(p) ? edgeGhostAt(p) : null;
         if (next || ghosts.length) setGhosts(next ? [next] : []);
@@ -3118,19 +3172,12 @@ export function RoofDesigner(props: {
       // The row being drawn clicks into place against the panels or roof edge near it (`placeShift`); Alt places it freely.
       let anchor = held.anchor;
       if (held.free) {
-        // In the open the row runs towards the pointer, turning as it swings; pulled sideways it adds rows instead.
-        const plan = planSize(anchor, size);
-        const turned = pivotDrag(
-          anchor,
-          p,
-          { x: plan.w + size.gap, y: plan.h + size.gap },
-          held.pivot ?? null,
-          e.altKey ? [] : squareAngles,
-        );
+        // Pulled sideways, the way the panel faces, it adds panels as it lies; pulled any other way it pivots to the pointer.
+        const turned = pivotDrag(anchor, p, planSize(anchor, size).w + size.gap, held.pivot ?? null, e.altKey ? [] : squareAngles);
         held.pivot = turned.state;
         anchor = { ...anchor, angle: turned.angle };
       }
-      const drawn = arrayFrom(anchor, p);
+      const drawn = arrayFrom(anchor, p, held.free ? "across" : "either");
       const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
       let shown = shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn;
       // Squared to the roof edge it is near as it is drawn, so letting go changes nothing (it used to turn on release).
@@ -3138,6 +3185,27 @@ export function RoofDesigner(props: {
       if (settle) shown = applySettle(shown, settle);
       setGhosts(shown);
       return;
+    }
+    if (held.mode === "grow") {
+      const p = pointAt(e);
+      if (!p) return;
+      const n = growCount(held.frame, held.side, held.from, p);
+      if (n === held.n) return;
+      held.n = n;
+      const was = held.ids;
+      // Never onto a panel that stands outside the group.
+      const others = standingAll(
+        faces,
+        loose.filter((panel) => !was.has(panel.id)),
+      );
+      const next = growArray(held.base, held.frame, held.side, n, held.seed).filter(
+        (panel) => was.has(panel.id) || !others.some((o) => Math.hypot(o.x - panel.x, o.y - panel.y) < 0.4),
+      );
+      held.ids = new Set([...was, ...next.map((panel) => panel.id)]);
+      const mine = held.ids;
+      setLoose((all) => [...all.filter((panel) => !mine.has(panel.id)), ...next]);
+      setPicks(next.map((panel): Pick => ({ kind: "loose", id: panel.id })));
+      return changed();
     }
     if (held.mode === "msb") {
       const p = pointAt(e);
@@ -3333,6 +3401,15 @@ export function RoofDesigner(props: {
     // The drag is over: whatever it changed becomes one step to undo.
     setSettled((n) => n + 1);
     if (held?.mode === "spin") return setSpinAt(0);
+    if (held?.mode === "grow") {
+      // Panels taken away come off any string they were on.
+      const here = new Set(loose.map((panel) => `l:${panel.id}`));
+      if (strings.some((x) => x.panels.some((k) => k.startsWith("l:") && !here.has(k))))
+        setStrings(
+          strings.map((x) => ({ ...x, panels: x.panels.filter((k) => !k.startsWith("l:") || here.has(k)) })).filter((x) => x.panels.length),
+        );
+      return;
+    }
     if (held?.mode === "wire") {
       if (held.dragged) tips.nudge("strung-by-hand");
       // A plain click on a panel that was already on the string takes it off.
@@ -8374,6 +8451,23 @@ export function RoofDesigner(props: {
                       />
                     </g>
                   )}
+                  {/* A + on each side of the picked array: dragged out it adds a row or column there, dragged in it takes them away. */}
+                  {growSpots.map((handle) => {
+                    const [hx, hy] = px(handle.at);
+                    return (
+                      <g key={handle.side} style={{ cursor: "pointer" }}>
+                        <title>Drag out to add panels here, or in to take them away</title>
+                        <circle cx={hx} cy={hy} r={5.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.3 * u} />
+                        <path
+                          d={`M${hx - 2.6 * u},${hy} h${5.2 * u} M${hx},${hy - 2.6 * u} v${5.2 * u}`}
+                          stroke="#0b0c0e"
+                          strokeWidth={1.3 * u}
+                          strokeLinecap="round"
+                          fill="none"
+                        />
+                      </g>
+                    );
+                  })}
                   {/* One panel picked: a grip in its middle to drag it by, and a handle above it to turn it with. */}
                   {grip && (
                     <g pointerEvents="none">
