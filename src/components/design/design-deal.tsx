@@ -534,7 +534,7 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)] max-sm:gap-2.5 max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)] max-sm:-mr-3 max-sm:w-auto max-sm:gap-2.5 max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
       {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />

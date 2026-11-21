@@ -104,7 +104,7 @@ export function DealBanner({
           className={clsx(
             "min-w-0",
             // On a phone (21 Nov 2026, Martin): smaller, the kit stacked down the right beside who it's for.
-            "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2.5 max-sm:p-4",
+            "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2 max-sm:px-3.5 max-sm:py-3",
             "sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4",
             compact ? "sm:px-6 sm:py-4" : "sm:p-6",
           )}
@@ -112,17 +112,17 @@ export function DealBanner({
           <div className="min-w-0">
             <h1
               className={clsx(
-                "truncate leading-tight tracking-tight max-sm:text-[20px]",
+                "truncate leading-tight tracking-tight max-sm:text-[18px]",
                 compact ? "text-[21px]" : "text-[26px] sm:text-[28px]",
               )}
             >
               {customer.name}
             </h1>
-            <p className="mt-0.5 truncate text-sm text-white/75 max-sm:text-[12.5px]">
+            <p className="mt-0.5 truncate text-sm text-white/75 max-sm:text-[11.5px]">
               {where || "No address yet"}
               {job.title ? ` · ${job.title}` : ""}
             </p>
-            <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-2 max-sm:gap-1.5", compact ? "mt-2" : "mt-3")}>
+            <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-1.5 max-sm:gap-1", compact ? "mt-2" : "mt-3")}>
               <Chip>{STAGE_LABELS[job.stage]}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
@@ -143,7 +143,12 @@ export function DealBanner({
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}
-        <div className={clsx("relative bg-black/20", compact ? "min-h-[6.5rem]" : "min-h-[8.5rem] max-sm:min-h-[6.5rem]")}>
+        <div
+          className={clsx(
+            "relative bg-black/20",
+            compact ? "min-h-[6.5rem] max-sm:min-h-[4.5rem]" : "min-h-[8.5rem] max-sm:min-h-[4.5rem]",
+          )}
+        >
           {picture ? (
             <svg
               viewBox={bannerView(drawing?.viewBox ?? null, 1.5, 1.25)}
@@ -193,7 +198,7 @@ function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }
   return (
     <dl
       className={clsx(
-        "flex max-sm:flex-col max-sm:items-start max-sm:gap-y-1.5 sm:flex-wrap",
+        "flex max-sm:flex-col max-sm:items-start max-sm:gap-y-1 sm:flex-wrap",
         compact ? "sm:gap-x-5 sm:gap-y-2" : "sm:gap-x-6 sm:gap-y-3",
       )}
     >
@@ -203,16 +208,16 @@ function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }
           <div key={f.label} className="flex min-w-0 items-center gap-2.5 max-sm:gap-2">
             <span
               className={clsx(
-                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15 max-sm:size-7",
+                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15 max-sm:size-6",
                 compact ? "size-8" : "size-10",
               )}
               aria-hidden
             >
-              <Icon className={clsx("max-sm:size-4", compact ? "size-[18px]" : "size-[22px]")} />
+              <Icon className={clsx("max-sm:size-3.5", compact ? "size-[18px]" : "size-[22px]")} />
             </span>
             <div className="min-w-0">
               <dt className="sr-only">{f.label}</dt>
-              <dd className={clsx("tabular-nums leading-tight text-white max-sm:text-[13px]", compact ? "text-[14px]" : "text-[16px]")}>
+              <dd className={clsx("tabular-nums leading-tight text-white max-sm:text-[12px]", compact ? "text-[14px]" : "text-[16px]")}>
                 {f.label === "EV charger" ? "EV charger" : f.value}
               </dd>
               {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60 max-sm:hidden">{f.note}</dd>}
@@ -272,7 +277,7 @@ const KIT_ICONS: Record<string, (p: IconProps) => React.ReactNode> = {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/15 max-sm:h-6 max-sm:px-2.5 max-sm:text-[12px]">
+    <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/15 max-sm:h-[22px] max-sm:px-2 max-sm:text-[11px]">
       {children}
     </span>
   );
