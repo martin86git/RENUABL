@@ -24,6 +24,7 @@ import {
   callerPhotoUrl,
   changeHiddenVoices,
   loadHiddenVoices,
+  voiceSpeakers,
   loadCaller,
   removeCallerPhoto,
   ringMeToHear,
@@ -341,7 +342,7 @@ export function VoicePicker({
     const key = `${v.provider}:${v.voiceId}`;
     stopSample();
     if (playing === key) return setPlaying(null);
-    const url = voiceSampleUrl(v);
+    const url = voiceSampleUrl(v, voiceSpeakers());
     if (!url) return onStatus({ ok: false, text: NO_SAMPLE });
     setPlaying(key);
     const over = () => setPlaying((now) => (now === key ? null : now));
@@ -355,7 +356,7 @@ export function VoicePicker({
   const sampleButton = (v: CallerVoice, label: string) => {
     const key = `${v.provider}:${v.voiceId}`;
     const on = playing === key;
-    if (!voiceSampleUrl(v))
+    if (!voiceSampleUrl(v, voiceSpeakers()))
       return (
         <span className="grid size-9 shrink-0 place-items-center text-muted" title={NO_SAMPLE}>
           <VolumeX className="size-4" aria-hidden />
