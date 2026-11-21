@@ -7,7 +7,8 @@
  */
 import { overCap } from "./design-voice-usage";
 import { normaliseMobile } from "@/lib/domain/contact";
-import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { type JobStage } from "@/lib/domain/design/crm";
+import { moveTexts } from "@/lib/domain/design/pipeline-stages";
 import {
   CUSTOM_LIMITS,
   SOL_AGENT,
@@ -29,7 +30,7 @@ import type { CallerKey } from "@/lib/domain/install-call";
 import { parseApiKey, redactSecrets } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
 import { newId, query } from "./db";
-import { addActivity, jobById } from "./design-crm-repo";
+import { addActivity, jobById, listOwnStages, stageNamesOf } from "./design-crm-repo";
 import { memberTextsOnDeal } from "./design-deal-team-repo";
 import { isDemoBusiness } from "./design-demo-check";
 import { businessVoice } from "./design-prepared";
@@ -140,15 +141,17 @@ const RUNS_A_TIME = 40;
 async function enrol(businessId: string, r: CustomRoutine): Promise<void> {
   if (!r.onAt) return;
   const stage: JobStage = r.trigger.kind === "new-lead" ? "lead" : r.trigger.stage;
+  // A move is read from its line on the record, whatever the stage was called when it was written.
+  const [own, names] = await Promise.all([listOwnStages(businessId), stageNamesOf(businessId)]);
   const found = await query<{ jobId: string; stage: JobStage; createdAt: string; movedAt: string | null }>(
     `select j.id as "jobId", j.stage, ${moment("j.created_at")} as "createdAt",
-            (select ${moment("max(a.at)")} from design_activity a where a.business_id = j.business_id and a.job_id = j.id and a.text = $3) as "movedAt"
+            (select ${moment("max(a.at)")} from design_activity a where a.business_id = j.business_id and a.job_id = j.id and a.kind = 'stage' and a.text = any($3::text[])) as "movedAt"
        from design_jobs j join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
       where j.business_id = $1 and j.stage = $2 and not c.sample
         and greatest(j.created_at, j.updated_at) >= $4::timestamptz
         and not exists (select 1 from design_routine_runs x where x.business_id = j.business_id and x.routine_id = $5 and x.job_id = j.id)
       limit 50`,
-    [businessId, stage, `Moved to ${STAGE_LABELS[stage]}`, r.onAt, r.id],
+    [businessId, stage, moveTexts(stage, own, names), r.onAt, r.id],
   );
   for (const d of found.filter((d) => startsOn(r, d)))
     await query(
@@ -177,13 +180,15 @@ async function writeWithSol(
   const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) return null;
   try {
-    const voice = await businessVoice(businessId);
+    const [voice, names] = await Promise.all([businessVoice(businessId), stageNamesOf(businessId)]);
     const drafted = await withSolCredit(
       businessId,
       "follow-up",
       null,
       async (ai) =>
-        cleanDraft(await readWithClaude<unknown>([], DRAFT_SCHEMA, routineWritePrompt({ kind, about, ...facts, voice }), apiKey, ai)),
+        cleanDraft(
+          await readWithClaude<unknown>([], DRAFT_SCHEMA, routineWritePrompt({ kind, about, ...facts, voice, names }), apiKey, ai),
+        ),
       kind === "email" ? "deep" : "quick",
       "routine",
     );

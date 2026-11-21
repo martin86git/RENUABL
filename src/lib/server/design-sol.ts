@@ -47,7 +47,7 @@ import {
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
-import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { customerDetail, jobById, listCustomers, listJobs, stageNamesOf } from "./design-crm-repo";
 import { asksForMeeting, cleanAgreed, cleanMeeting } from "@/lib/domain/design/sol-meeting";
 import { connectedCalendar } from "./my-calendar";
 import { proposeMeeting } from "./design-meetings";
@@ -497,7 +497,8 @@ async function runTool(
   }
   if (name === "find_deal") {
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
-    return found.length ? found.map(dealLine).join("\n") : "No deal matches that.";
+    const names = await stageNamesOf(businessId);
+    return found.length ? found.map((j) => dealLine(j, names)).join("\n") : "No deal matches that.";
   }
   if (name === "deal_details") {
     const got = await jobById(businessId, s(input.deal_id), viewer);
@@ -513,7 +514,7 @@ async function runTool(
       `Customer: ${customer.name}${customer.sample ? " (a made-up sample customer)" : ""} · phone ${customer.phone || "none"} · email ${customer.email || "none"} · ${customer.address || "no address"}`,
       customer.source ? `Source: ${customer.source}` : "",
       customer.notes ? `Notes on the customer: ${customer.notes}` : "",
-      `Deal: ${dealLine({ ...job, customerName: customer.name })}`,
+      `Deal: ${dealLine({ ...job, customerName: customer.name }, await stageNamesOf(businessId))}`,
       `Owner: ${job.owner ?? "no one yet"} · made ${job.createdAt.slice(0, 10)}${job.wonAt ? ` · sold ${job.wonAt.slice(0, 10)}` : ""}${job.installedAt ? ` · installed ${job.installedAt.slice(0, 10)}` : ""}`,
       details.length ? `Details typed in: ${details.map(([k, v]) => `${k}: ${v}`).join("; ")}` : "",
       activity.length ? "Latest activity, newest first:" : "No activity yet.",
@@ -525,7 +526,7 @@ async function runTool(
       .filter(Boolean)
       .join("\n");
   }
-  if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket());
+  if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket(), await stageNamesOf(businessId));
   if (name === "price_lookup") {
     if (!can(member.role, "costs", member.permissions)) return "This person can't see costs.";
     const words = s(input.query).toLowerCase().split(/\s+/).filter(Boolean);
@@ -778,11 +779,12 @@ export async function askSol(
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
   const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text };
-  const [state, jobs, customers, serviceOpen] = await Promise.all([
+  const [state, jobs, customers, serviceOpen, stageNames] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
     listCustomers(businessId),
     casesToResolve(businessId),
+    stageNamesOf(businessId),
   ]);
   const visible = new Set(jobs.map((j) => j.customerId));
   const phones = new Map(customers.filter((c) => visible.has(c.id)).map((c) => [c.id, c.phone]));
@@ -791,7 +793,7 @@ export async function askSol(
       business: member.businessName,
       member: email,
       costs,
-      facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
+      facts: canvasFacts(jobs, serviceOpen, todayInMarket(), stageNames),
       prefs: state.prefs,
       businessPrefs: state.businessPrefs ?? [],
       now: new Date(),

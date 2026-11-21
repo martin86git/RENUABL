@@ -14,6 +14,22 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Emails take a background and text colour of their own, and the editor is clearer with more room.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Marketing",
+    words: "The email editor is drag and drop: drag blocks onto the email or into a new order, type straight into it, and undo any change.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Deals",
+    words:
+      "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
     day: "2026-11-21",
     area: "Team chat",
     words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",

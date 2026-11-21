@@ -348,6 +348,30 @@ create table if not exists design_pipelines (
   unique (business_id, id)
 );
 create index if not exists design_pipelines_business on design_pipelines(business_id, created_at);
+-- A business's own pipelines and stages (domain/design/pipeline-stages.ts). A pipeline's stages are keys in its order:
+-- one of the twelve or an added stage's id. base_id: the set pipeline ("sales", ...) a row stands in for once renamed
+-- or changed; one a set pipeline. An added stage counts as one of the twelve (base); a deal at it keeps that stage in
+-- design_jobs.stage, which every rule reads, and the added stage's id in sub_stage.
+alter table design_pipelines add column if not exists base_id text;
+create unique index if not exists design_pipelines_base on design_pipelines(business_id, base_id) where base_id is not null;
+create table if not exists design_stages (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
+  base text not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  unique (business_id, id)
+);
+create index if not exists design_stages_business on design_stages(business_id, created_at);
+alter table design_jobs add column if not exists sub_stage text;
+-- The business's own names for the twelve stages (domain/design/pipeline-stages.ts StageNames): only the words change.
+create table if not exists design_stage_names (
+  business_id text not null references businesses(id) on delete cascade,
+  stage text not null,
+  name text not null,
+  primary key (business_id, stage)
+);
 -- Proposals (server/design-proposal-repo.ts): a business's branding, the pictures it has put up, and what it has sent.
 -- design_brand: one row a business. design_files: its logo, cover and photos, made safe and small before they are kept;
 -- a picture taken out of the brand kit is only marked removed, so a proposal already sent keeps its pictures.

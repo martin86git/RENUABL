@@ -1,11 +1,12 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
 import type { ReactNode } from "react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
-import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
+import type { Customer, Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 import type { BannerFigure } from "@/lib/domain/design/system-summary";
@@ -83,6 +84,8 @@ export function DealBanner({
   /** On a phone, the ways of reaching the customer (Call, Email), in the banner's top right corner. */
   actions?: ReactNode;
 }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
   // On a phone the roof is a strip; a tap opens it tall to look at the layout, and the design from there (21 Nov 2026).
   const [roofOpen, setRoofOpen] = useState(false);
   const placed = job.lat !== null && job.lng !== null;
@@ -129,7 +132,7 @@ export function DealBanner({
               {job.title ? ` · ${job.title}` : ""}
             </p>
             <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-1.5 max-sm:gap-1", compact ? "mt-2" : "mt-3")}>
-              <Chip>{STAGE_LABELS[job.stage]}</Chip>
+              <Chip>{stageWords(job)}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
               {pulse && (

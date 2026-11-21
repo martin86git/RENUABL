@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { CustomerConversations } from "./customer-conversations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,7 +31,7 @@ import {
   type CatchUp,
   type ChatAction,
 } from "@/lib/domain/design/sol-chat-work";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import { TEAM_LIST, TEAM_WINDOW, readWindowSize, teamListWidth, teamWindowSize } from "@/lib/domain/design/team-window";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
@@ -130,6 +131,8 @@ export function TeamChatPanel({
   /** Customers' lines waiting and this member's unread mentions: the count on the Customers side. */
   customers?: number;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   // Team or Customers (10 Nov 2026, Martin: the bell went; customer chat is a toggle in team chat).
   const [side, setSide] = useState<"team" | "customers">("team");
   const [room, setRoomState] = useState<string>(() => {
@@ -305,7 +308,7 @@ export function TeamChatPanel({
       offers.push({
         key: j.id,
         label: `${j.customerName} · ${j.title}`,
-        line: [STAGE_LABELS[j.stage], j.address].filter(Boolean).join(" · "),
+        line: [stageLabel(j.stage, stageNames), j.address].filter(Boolean).join(" · "),
         job: j,
       });
   } else if (tagAt && tagsIn(room)) {
@@ -320,7 +323,10 @@ export function TeamChatPanel({
     if (o.job && dealAt) {
       const j = o.job;
       if (deals.length < TEAM_DEALS_MAX && !deals.some((d) => d.id === j.id))
-        setDeals([...deals, { id: j.id, name: `${j.customerName} · ${j.title}`, address: j.address, stage: STAGE_LABELS[j.stage] }]);
+        setDeals([
+          ...deals,
+          { id: j.id, name: `${j.customerName} · ${j.title}`, address: j.address, stage: stageLabel(j.stage, stageNames) },
+        ]);
       setText((text.slice(0, dealAt.start) + text.slice(dealAt.start + 1 + dealAt.query.length)).replace(/\s{2,}/g, " "));
       setDealAt(null);
       box.current?.focus();
@@ -1157,6 +1163,8 @@ function ActionCard(props: {
   onDone: () => void;
   onError: (m: string) => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const { action } = props;
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState("");
@@ -1165,18 +1173,18 @@ function ActionCard(props: {
     const r = await pressSolAction(props.lineId, how);
     setBusy(false);
     if (!r.ok) return props.onError(r.message);
-    setSaid(how === "do" ? r.words || actionDoneWords(action) : "Left as it was.");
+    setSaid(how === "do" ? r.words || actionDoneWords(action, stageNames) : "Left as it was.");
     props.onDone();
   };
   const settled = action.done ?? action.dismissed;
   const notYours = actionNotYours(action, props.me, { costs: props.seesCosts });
   return (
     <div className="mt-1 w-full max-w-[85%] rounded-2xl bg-surface p-3 text-sm ring-1 ring-sun-line/40">
-      <p className="font-medium text-ink">{actionQuestion(action)}</p>
+      <p className="font-medium text-ink">{actionQuestion(action, stageNames)}</p>
       {settled ? (
         <p className="mt-1 flex items-center gap-1 text-xs text-muted">
           {action.done ? <Check className="size-3.5 text-sun-line" aria-hidden /> : <X className="size-3.5" aria-hidden />}
-          {action.done ? actionDoneWords(action) : "Left as it was"} · {nameOf(settled.by)}
+          {action.done ? actionDoneWords(action, stageNames) : "Left as it was"} · {nameOf(settled.by)}
         </p>
       ) : said ? (
         <p className="mt-1 text-xs text-muted">{said}</p>
