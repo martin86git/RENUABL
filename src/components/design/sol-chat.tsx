@@ -779,7 +779,7 @@ export function SolChat({
               )}
             </div>
           )}
-          <div className="flex items-center gap-1.5 rounded-2xl px-1.5 ring-1 ring-line-strong focus-within:ring-sun-line">
+          <div className="flex items-center gap-1.5 rounded-2xl bg-surface px-1.5 ring-1 ring-line focus-within:ring-sun-line">
             <input
               ref={picker}
               type="file"
@@ -794,7 +794,7 @@ export function SolChat({
               disabled={files.length >= MAX_FILES}
               aria-label="Add a PDF or a picture"
               title="Add a PDF (an electricity bill, a datasheet) or a picture"
-              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface hover:text-ink disabled:text-muted"
+              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface-2 hover:text-ink disabled:text-muted"
             >
               <Paperclip className="size-4" aria-hidden />
             </button>
