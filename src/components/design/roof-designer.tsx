@@ -1141,6 +1141,7 @@ export function RoofDesigner(props: {
   const openMenu = (to: typeof menu) => {
     setMenu(to);
     setSeek("");
+    setSearchDown(false);
     // The inverter suggestions fold each time a list opens, a press away (19 Nov 2026, Martin).
     setSuggesting(false);
   };
@@ -1670,6 +1671,18 @@ export function RoofDesigner(props: {
   const fills = Boolean(props.tight && !phone && fitPx);
   const fit = phone ? "100%" : fills ? "none" : fitPx ? `${fitPx}px` : FIT;
   const picBox = useRef<HTMLDivElement | null>(null);
+  // The inverter list opens at its top, Sol's suggestion first (21 Nov 2026, Martin: it opened scrolled down to the
+  // search box). The search is focused without scrolling to it, sits in its place near the top, and once scrolled past
+  // stays pinned to the menu's foot, so it is always to hand.
+  const kitMenu = useRef<HTMLDivElement | null>(null);
+  const kitSearchSpot = useRef<HTMLDivElement | null>(null);
+  const [searchDown, setSearchDown] = useState(false);
+  const kitScrolled = () => {
+    const box = kitMenu.current;
+    const spot = kitSearchSpot.current;
+    if (box && spot) setSearchDown(box.scrollTop > spot.offsetTop + spot.offsetHeight);
+  };
+  const focusQuietly = useCallback((el: HTMLInputElement | null) => el?.focus({ preventScroll: true }), []);
   useEffect(() => {
     const el = picBox.current;
     if (!fills || !el || !fitPx) {
@@ -9504,7 +9517,11 @@ export function RoofDesigner(props: {
                       )}
                     </button>
                     {menu === "inverters" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -9594,14 +9611,18 @@ export function RoofDesigner(props: {
                         </p>
                         {fitted.length < MAX_INVERTERS && (
                           <>
-                            <input
-                              autoFocus
-                              value={seek}
-                              onChange={(e) => setSeek(e.target.value)}
-                              placeholder="Search inverters"
-                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                            />
-                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            <div ref={kitSearchSpot} className="min-h-10">
+                              {!searchDown && (
+                                <input
+                                  ref={focusQuietly}
+                                  value={seek}
+                                  onChange={(e) => setSeek(e.target.value)}
+                                  placeholder="Search inverters"
+                                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("inverters", props.inverters)
                                 .filter((i) =>
@@ -9636,6 +9657,17 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
+                            {searchDown && (
+                              <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">
+                                <input
+                                  ref={focusQuietly}
+                                  value={seek}
+                                  onChange={(e) => setSeek(e.target.value)}
+                                  placeholder="Search inverters"
+                                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                                />
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
