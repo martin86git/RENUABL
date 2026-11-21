@@ -34,6 +34,13 @@ import {
   cleanColumns,
   cleanLink,
   footerLines,
+  inksOf,
+  isDefaultStyle,
+  styleOf,
+  styleProblem,
+  DEFAULT_STYLE,
+  HEADING_INK,
+  WORDS_INK,
   moveBlock,
   newBlock,
   renderEdm,
@@ -42,6 +49,7 @@ import {
   type EdmBrand,
   type EdmContent,
   type EdmSender,
+  type EdmStyle,
   type EdmTile,
 } from "@/lib/domain/marketing/edm";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
@@ -195,6 +203,14 @@ export function EdmBuilder({
     return () => window.removeEventListener("keydown", onKey);
   }, [readOnly, mode]);
   const set = (patch: Partial<EdmContent>, key: string | null = null) => change({ ...latest.current, ...patch }, key);
+  const style = styleOf(content);
+  const ink = inksOf(style);
+  /** A colour changed: dragging the picker is one step until it rests, as typing is. */
+  const setStyle = (next: EdmStyle, which: string) => {
+    const { style: _old, ...rest } = latest.current;
+    void _old;
+    change(isDefaultStyle(next) ? rest : { ...rest, style: next }, `style:${which}`);
+  };
   const setBlock = (id: string, patch: BlockPatch) => {
     const now = latest.current;
     // Typing (words, a label, a link, a caption) is one step per field while it carries on.
@@ -285,7 +301,7 @@ export function EdmBuilder({
     };
     fill("heading", r.heading);
     fill("text", r.text);
-    change({ subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
+    change({ ...content, subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
     setUndo(true);
     flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
     return true;
@@ -368,11 +384,11 @@ export function EdmBuilder({
         {/* Down the left: the blocks, dragged onto the email or pressed to add. */}
         <aside className="border-b border-line bg-surface p-4 lg:border-r lg:border-b-0">
           <div className="lg:sticky lg:top-4">
-            <p className="text-[14px] font-medium">Add blocks</p>
+            <p className="text-[14px] font-semibold text-ink">Add blocks</p>
             <p className="mt-0.5 text-[11px] text-muted">Drag one onto the email, or press it to add it.</p>
             {BLOCK_GROUPS.map((g) => (
               <div key={g.name} className="mt-4">
-                <p className="mb-2 text-[11px] text-muted">{g.name}</p>
+                <p className="mb-2 text-[11px] font-medium tracking-wide text-ink-2 uppercase">{g.name}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {g.kinds.map((k) => {
                     const Icon = ICONS[k];
@@ -388,7 +404,7 @@ export function EdmBuilder({
                         }}
                         onDragEnd={() => setDropAt(null)}
                         onClick={() => insert(afterPicked(), k)}
-                        className="group/k flex min-h-10 cursor-grab items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[12px] text-ink-2 hover:border-ink/40 hover:text-ink active:cursor-grabbing disabled:cursor-not-allowed disabled:text-muted"
+                        className="group/k flex min-h-10 cursor-grab items-center gap-2 rounded-lg border border-line-strong bg-surface px-2.5 text-[12px] font-medium text-ink shadow-[var(--shadow-soft)] hover:border-ink/50 hover:text-ink active:cursor-grabbing disabled:cursor-not-allowed disabled:text-muted"
                       >
                         <Icon className="size-4 shrink-0" />
                         <span className="text-left leading-tight">{EDM_BLOCK_WORDS[k]}</span>
@@ -399,6 +415,7 @@ export function EdmBuilder({
                 </div>
               </div>
             ))}
+            <StylePanel style={style} onChange={setStyle} />
             <p className="mt-5 border-t border-line pt-4 text-[11px] leading-snug text-muted">
               Personalise with {MERGE_FIELDS.join(" or ")}. The footer is always on: your business&apos;s name, ABN, how to reach you, why
               they&apos;re getting it and an unsubscribe link (wording in Settings).
@@ -408,7 +425,7 @@ export function EdmBuilder({
 
         {/* The email itself on a dotted canvas, edited where it is. */}
         <div
-          className="relative min-h-[40rem] bg-canvas px-3 py-6 sm:px-6"
+          className="relative min-h-[40rem] bg-line px-3 py-6 sm:px-6"
           style={{ backgroundImage: "radial-gradient(var(--line-strong) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
           onClick={() => (setSelected(null), setAdding(null))}
         >
@@ -440,7 +457,8 @@ export function EdmBuilder({
             </div>
 
             <div
-              className="rounded-2xl bg-white pt-7 pb-6 shadow-[var(--shadow-soft)]"
+              className="rounded-2xl pt-7 pb-6 shadow-[0_6px_24px_rgba(20,20,30,0.12)] ring-1 ring-black/5"
+              style={{ background: style.background }}
               onDragOver={(e) => {
                 if (!dragged(e)) return;
                 e.preventDefault();
@@ -455,7 +473,9 @@ export function EdmBuilder({
                 drop(e, dropAt ?? content.blocks.length);
               }}
             >
-              <p className="px-8 pb-2 text-[15px] font-bold text-[#0b0b0c]">{sender.name}</p>
+              <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
+                {sender.name}
+              </p>
               {content.blocks.length === 0 && (
                 <p
                   className={cn(
@@ -479,6 +499,7 @@ export function EdmBuilder({
                   )}
                   <CanvasBlock
                     block={b}
+                    ink={ink}
                     picked={selected === b.id}
                     onPick={() => (setSelected(b.id), setAdding(null))}
                     onDragEnd={() => setDropAt(null)}
@@ -686,6 +707,7 @@ function AutoText({
   placeholder,
   className,
   align,
+  colour,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -693,6 +715,7 @@ function AutoText({
   placeholder: string;
   className: string;
   align: "left" | "center";
+  colour: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -709,7 +732,7 @@ function AutoText({
       maxLength={max}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      style={{ textAlign: align }}
+      style={{ textAlign: align, color: colour }}
       className={cn("block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-[#b4b5bb]", className)}
     />
   );
@@ -777,6 +800,7 @@ function CanvasBlock({
   onPick,
   onDragEnd,
   colour,
+  ink,
   first,
   last,
   onChange,
@@ -790,6 +814,8 @@ function CanvasBlock({
   onPick: () => void;
   onDragEnd: () => void;
   colour: string;
+  /** The colours a heading and the words are drawn in. */
+  ink: { heading: string; words: string };
   first: boolean;
   last: boolean;
   onChange: (patch: BlockPatch) => void;
@@ -806,7 +832,12 @@ function CanvasBlock({
       onClick={(e) => (e.stopPropagation(), onPick())}
       onFocus={onPick}
       data-edm-block
-      className={cn("group relative mx-5 rounded-lg px-3 py-2", picked ? "ring-2 ring-sun-line" : "hover:ring-1 hover:ring-line-strong")}
+      className={cn(
+        "group relative mx-5 my-1 rounded-lg px-3 py-2",
+        picked ? "outline-2 outline-sun-line outline-solid" : "outline-1 outline-dashed",
+      )}
+      // The dashed edge is drawn in the words' own colour, so it shows on a dark background as on a light one.
+      style={picked ? undefined : { outlineColor: `color-mix(in srgb, ${ink.words} 28%, transparent)` }}
     >
       <div
         className={cn(
@@ -852,7 +883,8 @@ function CanvasBlock({
           align={align}
           onChange={(text) => onChange({ text })}
           placeholder="A heading"
-          className="text-[24px] leading-tight font-semibold text-[#0b0b0c]"
+          className="text-[24px] leading-tight font-semibold"
+          colour={ink.heading}
         />
       )}
       {b.kind === "text" && (
@@ -862,7 +894,8 @@ function CanvasBlock({
           align={align}
           onChange={(text) => onChange({ text })}
           placeholder="Write here…"
-          className="text-[15px] leading-relaxed text-[#3c3d41]"
+          className="text-[15px] leading-relaxed"
+          colour={ink.words}
         />
       )}
       {solAsk && <div onClick={(e) => e.stopPropagation()}>{solAsk}</div>}
@@ -909,7 +942,7 @@ function CanvasBlock({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={`/api/m/i/${t.imageId}`} alt={t.text} className="block w-full rounded-lg" />
                 {t.text && (
-                  <p className="pt-2 text-[13px] text-[#3c3d41]" style={{ textAlign: align }}>
+                  <p className="pt-2 text-[13px]" style={{ textAlign: align, color: ink.words }}>
                     {t.text}
                   </p>
                 )}
@@ -1236,5 +1269,91 @@ function Toggle({ on, onClick, label, children }: { on: boolean; onClick: () => 
     >
       {children}
     </button>
+  );
+}
+
+/** The email's colours: its background and its words, each a picker with its hex, and a word when they won't read. */
+function StylePanel({ style, onChange }: { style: EdmStyle; onChange: (s: EdmStyle, which: string) => void }) {
+  const problem = styleProblem(style);
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className="text-[14px] font-semibold text-ink">Style</p>
+      <ColourField
+        label="Background"
+        value={style.background}
+        onChange={(v) => onChange({ ...style, background: v }, "background")}
+        reset={
+          style.background === DEFAULT_STYLE.background
+            ? null
+            : () => onChange({ ...style, background: DEFAULT_STYLE.background }, "background")
+        }
+      />
+      <ColourField
+        label="Text colour"
+        value={style.text ?? HEADING_INK}
+        note={style.text ? undefined : `Ours: near-black headings, ${WORDS_INK} words`}
+        onChange={(v) => onChange({ ...style, text: v }, "text")}
+        reset={style.text ? () => onChange({ ...style, text: null }, "text") : null}
+      />
+      {problem && <p className="mt-2 text-[12px] leading-snug text-danger">{problem}</p>}
+    </div>
+  );
+}
+
+function ColourField({
+  label,
+  value,
+  note,
+  onChange,
+  reset,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  onChange: (v: string) => void;
+  reset: (() => void) | null;
+}) {
+  const [text, setText] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setText(value);
+  }
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-medium text-ink-2">{label}</span>
+        {reset && (
+          <button type="button" onClick={reset} className="text-[11px] text-muted underline-offset-2 hover:text-ink hover:underline">
+            Back to ours
+          </button>
+        )}
+      </div>
+      <div className="mt-1 flex h-10 items-center gap-2 rounded-lg border border-line-strong bg-surface px-2">
+        <label
+          className="relative size-6 shrink-0 cursor-pointer overflow-hidden rounded-md ring-1 ring-black/15"
+          style={{ background: value }}
+        >
+          <span className="sr-only">Pick a colour for {label.toLowerCase()}</span>
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 cursor-pointer opacity-0"
+          />
+        </label>
+        <input
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            const v = e.target.value.trim();
+            if (/^#[0-9a-f]{6}$/i.test(v)) onChange(v.toLowerCase());
+          }}
+          aria-label={`${label} as a hex colour`}
+          className="w-full bg-transparent font-mono text-[13px] text-ink outline-none"
+        />
+      </div>
+      {note && <p className="mt-1 text-[11px] text-muted">{note}</p>}
+    </div>
   );
 }
