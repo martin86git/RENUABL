@@ -272,7 +272,7 @@ export function SolTerminal(props: {
       title={`${deal.customer}'s deal`}
       className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2 max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
     >
-      Open deal
+      <span className="max-sm:sr-only">Open deal</span>
       <Handshake className="size-3.5" aria-hidden />
     </Link>
   ) : null;
@@ -368,10 +368,13 @@ export function SolTerminal(props: {
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>
-              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-1.5" />}
+              {/* Not on a phone: the banner above already says the stage, heat and size (21 Nov 2026, Martin). */}
+              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-1.5 max-sm:hidden" />}
+              {/* The draft before the buttons that send it, so nothing goes unseen; beside them where the card is wide. */}
+              {hasDraft && <div className="@3xl:hidden">{drafts}</div>}
 
               {!leftIt && typed.done && waiting && (answer || unwritten) && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:gap-1.5">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:flex-nowrap max-sm:gap-1.5">
                   {answer && (
                     <button
                       type="button"
@@ -380,17 +383,19 @@ export function SolTerminal(props: {
                       className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-                      Yes, send it
+                      <span className="max-sm:hidden">Yes, send it</span>
+                      <span className="sm:hidden">Send</span>
+                    </button>
+                  )}
+                  {p.yes && (
+                    <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
+                      <span className="max-sm:hidden">{byChat ? "Write it myself" : `Email ${name} myself`}</span>
+                      <span className="sm:hidden">Write my own</span>
                     </button>
                   )}
                   <button type="button" onClick={() => setLeftIt(true)} disabled={busy !== null} className={quiet}>
                     Not now
                   </button>
-                  {p.yes && (
-                    <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
-                      {byChat ? "Write it myself" : `Email ${name} myself`}
-                    </button>
-                  )}
                   {openDealLink}
                 </div>
               )}
@@ -508,7 +513,7 @@ export function SolTerminal(props: {
               {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
             </div>
           </div>
-          <div className="@3xl:[&>div:first-child]:mt-0">{drafts}</div>
+          <div className="hidden @3xl:block @3xl:[&>div:first-child]:mt-0">{drafts}</div>
         </div>
       </div>
       {!props.inCard && (deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
