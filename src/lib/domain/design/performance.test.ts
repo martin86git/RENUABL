@@ -106,3 +106,20 @@ describe("periodWords", () => {
     expect(periodWords({ from: "2025-12-01", to: "2026-01-21" }, "2026")).toBe("1 Dec 2025 to 21 Jan 2026");
   });
 });
+
+describe("perfSeries", () => {
+  const jobs = [
+    job({ stage: "won", value: 20000, wonAt: "2026-11-05T02:00:00Z" }),
+    job({ stage: "won", value: 5000, wonAt: "2026-11-20T02:00:00Z" }),
+  ];
+  it("days within a month, weeks within a quarter, months beyond", async () => {
+    const { perfSeries } = await import("./performance");
+    const days = perfSeries(jobs, { from: "2026-11-01", to: "2026-11-21" });
+    expect(days).toHaveLength(21);
+    expect(days[4].values.sales).toBe(20000);
+    expect(perfSeries(jobs, { from: "2026-10-01", to: "2026-11-21" })).toHaveLength(8);
+    const months = perfSeries(jobs, { from: "2026-07-01", to: "2026-11-21" });
+    expect(months.map((b) => b.from)).toEqual(["2026-07-01", "2026-08-01", "2026-09-01", "2026-10-01", "2026-11-01"]);
+    expect(months[4]).toMatchObject({ to: "2026-11-21", values: { sales: 25000, sold: 2 } });
+  });
+});

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { FileText, Maximize2, Minimize2, PenTool, ReceiptText, X } from "lucide-react";
+import { FileText, PenTool, ReceiptText, X } from "lucide-react";
 import clsx from "clsx";
 
 /**
@@ -15,7 +15,7 @@ const DESIGNER = "/design/roof";
 /**
  * The window's width (21 Nov 2026, Martin: "the ability to expand horizontally the size of the designer"). Unset, it is
  * 1.62 times its height (the picture's own shape); dragged from either side edge it takes the width chosen, up to the
- * screen less a gutter, kept on the device. A double click on an edge, or the narrow button, goes back to the usual.
+ * screen less a gutter, kept on the device. A double click on an edge goes back to the usual.
  */
 const POP_WIDTH_KEY = "renuabl.design.popup-width";
 const POP_MIN = 720;
@@ -208,7 +208,6 @@ export function DesignDrawer(props: {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
-  const wide = popW !== null && popW >= popMax() - 4;
   useEffect(() => {
     if (!open) return;
     // The page under it doesn't scroll while the design is out; Escape folds it away.
@@ -285,15 +284,6 @@ export function DesignDrawer(props: {
         {/* No bar of its own (8 Nov 2026, Martin: the map taller and wider): the close round sits in the corner, beside the
             designer's own slim row, which keeps it clear. */}
         <div className="absolute right-6 top-4 z-10 flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => keepWidth(wide ? null : popMax())}
-            className="hidden size-9 items-center justify-center rounded-full bg-surface text-ink-2 shadow-sm ring-1 ring-line hover:text-ink sm:flex"
-            aria-label={wide ? "Back to the usual width" : "Widen to the screen"}
-            title={wide ? "Back to the usual width" : "Widen to the screen (or drag either side edge)"}
-          >
-            {wide ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
-          </button>
           <button
             type="button"
             onClick={onFold}

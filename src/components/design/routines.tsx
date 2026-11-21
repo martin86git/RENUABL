@@ -36,7 +36,7 @@ import { loadRoutines, saveRoutineSettings, saveVoiceSetup, chooseVoiceScript, t
 import { PageHead, ui } from "./design-shell";
 import { RoutineBuilder } from "./routines-builder";
 import { CallerAvatar } from "./settings-caller";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 
 /**
  * Routines (20 Nov 2026, Martin: "the routines page itself, shows all agents Voice and Text (sol) and what they have

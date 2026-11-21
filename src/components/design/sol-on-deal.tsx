@@ -26,7 +26,7 @@ import { leadPageFor } from "@/lib/services/hello";
 import { askSolInPanel } from "@/lib/services/sol";
 import { ContextLine } from "./context-line";
 import { DictateButton, withSpoken } from "./dictate";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { CallChooser } from "./call-choice";
 
 const REFRESH_MS = 60_000;
