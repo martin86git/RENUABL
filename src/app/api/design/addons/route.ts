@@ -26,6 +26,8 @@ import { tellStaff } from "@/lib/server/design-staff-note";
 import { allow } from "@/lib/server/rate-limit";
 import { stripeClient } from "@/lib/server/stripe";
 import { voiceStandingFor } from "@/lib/server/voice-calls";
+import { cleanCap } from "@/lib/domain/design/voice-usage";
+import { capOf, setCap, usageOf } from "@/lib/server/design-voice-usage";
 
 const PRIVATE = { "cache-control": "private, no-store" };
 
@@ -39,11 +41,13 @@ export async function GET() {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { businessId, role, permissions } = who.member;
-    const [addOns, number, voice, plan] = await Promise.all([
+    const [addOns, number, voice, plan, usage, cap] = await Promise.all([
       addOnsOf(businessId),
       numberOf(businessId).catch(() => null),
       voiceStandingFor(businessId).catch(() => "not-set-up" as const),
       subscriptionOf(businessId).catch(() => null),
+      usageOf(businessId).catch(() => ({ minutes: 0, texts: 0 })),
+      capOf(businessId).catch(() => null),
     ]);
     return Response.json(
       {
@@ -55,6 +59,9 @@ export async function GET() {
         // The plan's next bill day, so an offer can say when an add-on is first billed.
         nextBill: plan && plan.interval !== "year" && !["canceled", "incomplete_expired"].includes(plan.status) ? plan.periodEnd : null,
         mayAdd: can(role, "members", permissions) && cleanKind(who.member.businessKind) === "retailer",
+        // This month's minutes and texts, and the spending cap in cents (voice-usage.ts).
+        usage,
+        capCents: cap,
       },
       { headers: PRIVATE },
     );
@@ -100,6 +107,14 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, message: "Too many tries. Wait a little." }, { status: 429 });
     const { businessId, email, businessName } = who.member;
     const retailer = cleanKind(who.member.businessKind) === "retailer";
+
+    // The spending cap on minutes and texts beyond the free allowance, in whole dollars.
+    if (read.body.do === "cap") {
+      const cents = cleanCap(read.body.dollars);
+      if (cents === null) return Response.json({ ok: false, message: "Type a cap in whole dollars, up to $5,000." }, { status: 422 });
+      await setCap(businessId, cents);
+      return Response.json({ ok: true, capCents: cents });
+    }
 
     if (read.body.do === "number") {
       if ((await standingOf(businessId, "voice")) !== "on")

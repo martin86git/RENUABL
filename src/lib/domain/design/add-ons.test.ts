@@ -21,9 +21,9 @@ import {
 } from "./add-ons";
 
 describe("add-ons", () => {
-  it("prices Calls & Texts at $29 and Growth at $19 a month (Martin, 16 Nov 2026)", () => {
-    expect(ADD_ON_MONTHLY_CENTS).toEqual({ voice: 2900, marketing: 1900 });
-    expect(addOnPriceWords("voice")).toBe("$29 a month for your business, including GST");
+  it("prices Calls & Texts at $49 and Growth at $19 a month (Martin, 21 Nov 2026)", () => {
+    expect(ADD_ON_MONTHLY_CENTS).toEqual({ voice: 4900, marketing: 1900 });
+    expect(addOnPriceWords("voice")).toBe("$49 a month for your business, including GST");
     expect(addOnPriceWords("voice", null)).toBe("Price on request");
     expect(addOnPriceWords("voice", 4900)).toBe("$49 a month for your business, including GST");
     expect(addOnPriceWords("marketing", 1950)).toBe("$19.50 a month for your business, including GST");

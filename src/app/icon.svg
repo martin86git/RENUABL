@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx="32" cy="32" r="32" gradientUnits="userSpaceOnUse">
+      <stop offset="0.74" stop-color="#FF8A3D" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#FF5A1F" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="s" cx="25" cy="21" r="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF1C2"/>
+      <stop offset="0.22" stop-color="#FFD27A"/>
+      <stop offset="0.58" stop-color="#FF8A3D"/>
+      <stop offset="0.9" stop-color="#FF5A1F"/>
+      <stop offset="1" stop-color="#E8480F"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#g)"/>
+  <circle cx="32" cy="32" r="26" fill="url(#s)"/>
+  <g transform="translate(10 9.6) scale(0.44)" fill="none" stroke="#fff" stroke-opacity="0.85" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85"/>
+    <path d="M22 40C29 37 36 41 35 48"/>
+    <path d="M45 25C37 24 31 28 32 35"/>
+    <path d="M19 59C26 56 32 60 30 67"/>
+    <path d="M45 57C37 57 33 63 36 70"/>
+    <g transform="translate(100 0) scale(-1 1)">
+      <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85"/>
+      <path d="M22 40C29 37 36 41 35 48"/>
+      <path d="M45 25C37 24 31 28 32 35"/>
+      <path d="M19 59C26 56 32 60 30 67"/>
+      <path d="M45 57C37 57 33 63 36 70"/>
+    </g>
+    <path d="M50 18C51 30 49 42 50 54C51 66 49 76 50 84" stroke-opacity="0.6"/>
+  </g>
+</svg>

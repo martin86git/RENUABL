@@ -13,7 +13,9 @@ import {
   costSystem,
   editedLines,
   undecidedLines,
+  editOf,
   lineKey,
+  withOwnKey,
   MAX_LINE_QTY,
   MAX_RATE_PER_WATT,
   centsWords,
@@ -59,9 +61,9 @@ const GROUP_ICONS: Record<(typeof COST_GROUPS)[number], GroupIcon> = {
  * list and in the panel beside it, twice): what is included and its sum, what is left out, what is still to decide.
  */
 function DecidedLine({ lines, edits }: { lines: CostLine[]; edits: Record<string, LineEdit> }) {
-  const on = lines.filter((l) => edits[lineKey(l)]?.on);
-  const out = lines.filter((l) => edits[lineKey(l)]?.removed);
-  const open = lines.filter((l) => !edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  const on = lines.filter((l) => editOf(edits, l)?.on);
+  const out = lines.filter((l) => editOf(edits, l)?.removed);
+  const open = lines.filter((l) => !editOf(edits, l)?.on && !editOf(edits, l)?.removed);
   const sum = editedLines(on, edits).reduce((t, l) => t + l.amount, 0);
   const names = (ls: CostLine[]) => ls.map((l) => l.label.toLowerCase()).join(", ");
   return (
@@ -181,8 +183,8 @@ export function DesignQuote(props: {
   const added = addedLines(edits);
   const marginTyped = edits[MARGIN_KEY]?.amount !== undefined;
   // Hand changes, not counting the costs decided on each job (those are decisions, not changes).
-  const changed = all.filter((l) => edits[lineKey(l)] && !l.confirm).length;
-  const removed = all.filter((l) => edits[lineKey(l)]?.removed && !l.confirm).length;
+  const changed = all.filter((l) => editOf(edits, l) && !l.confirm).length;
+  const removed = all.filter((l) => editOf(edits, l)?.removed && !l.confirm).length;
   // Costs that sometimes apply, not yet included or left out: nothing is published until each is decided.
   const undecided = undecidedLines(all, edits);
   const missing = lines.filter((l) => l.missing).length;
@@ -270,7 +272,8 @@ export function DesignQuote(props: {
 
   /** Changes a line by hand: a quantity and a cost typed over it sit together; null puts the line back as worked out. */
   const edit = (l: CostLine, to: LineEdit | null) => {
-    const next = { ...edits };
+    // An edit kept under the line's older key becomes its own first (`withOwnKey`).
+    const next = { ...withOwnKey(edits, l, all) };
     const key = lineKey(l);
     if (!to) delete next[key];
     else if (to.removed) next[key] = { removed: true };
@@ -449,13 +452,13 @@ export function DesignQuote(props: {
         {COST_GROUPS.map((group) => {
           // A cost decided on each job stays in the list when left out, so it can be included again (beside the quote,
           // it is summed up in one line instead).
-          const rows = all.filter((l) => l.group === group && (l.confirm ? !split : !edits[lineKey(l)]?.removed));
+          const rows = all.filter((l) => l.group === group && (l.confirm ? !split : !editOf(edits, l)?.removed));
           const decided = split ? all.filter((l) => l.group === group && l.confirm) : [];
           if (!rows.length && !decided.length) return null;
           const subtotal = priced.filter((l) => l.group === group).reduce((t, l) => t + l.amount, 0);
           const shut = folded.includes(group);
           const Icon = GROUP_ICONS[group];
-          const flagged = rows.some((l) => l.missing && edits[lineKey(l)]?.amount === undefined && edits[lineKey(l)]?.each === undefined);
+          const flagged = rows.some((l) => l.missing && editOf(edits, l)?.amount === undefined && editOf(edits, l)?.each === undefined);
           return (
             <section key={group} className="overflow-hidden rounded-lg border border-line" aria-label={group}>
               <button
@@ -478,10 +481,10 @@ export function DesignQuote(props: {
               {!shut && (
                 <div className="divide-y divide-line border-t border-line">
                   {rows.map((l, i) => {
-                    const typed = edits[lineKey(l)]?.amount;
-                    const typedQty = edits[lineKey(l)]?.qty;
-                    const typedRate = edits[lineKey(l)]?.rate;
-                    const typedEach = edits[lineKey(l)]?.each;
+                    const typed = editOf(edits, l)?.amount;
+                    const typedQty = editOf(edits, l)?.qty;
+                    const typedRate = editOf(edits, l)?.rate;
+                    const typedEach = editOf(edits, l)?.each;
                     // The line as it stands with any hand changes: a quantity typed over it prices it again.
                     const shown = editedLines([l], edits)[0] ?? l;
                     const unset = l.missing && typed === undefined && typedEach === undefined;
@@ -491,8 +494,8 @@ export function DesignQuote(props: {
                     const eachNow = counted ? (typedEach ?? (many > 0 ? shown.amount / many : 0)) : shown.amount;
                     const boxValue = Math.round(eachNow * 100) / 100;
                     const boxTyped = counted ? typedEach !== undefined || typed !== undefined : typed !== undefined;
-                    const on = Boolean(edits[lineKey(l)]?.on);
-                    const out = Boolean(edits[lineKey(l)]?.removed);
+                    const on = Boolean(editOf(edits, l)?.on);
+                    const out = Boolean(editOf(edits, l)?.removed);
                     const name = l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label;
                     return (
                       <div
@@ -923,8 +926,8 @@ export function DesignQuote(props: {
                 </p>
                 <ul className="mt-2 space-y-1">
                   {confirms.map((l) => {
-                    const on = Boolean(edits[lineKey(l)]?.on);
-                    const out = Boolean(edits[lineKey(l)]?.removed);
+                    const on = Boolean(editOf(edits, l)?.on);
+                    const out = Boolean(editOf(edits, l)?.removed);
                     return (
                       <li
                         key={lineKey(l)}

@@ -3,6 +3,7 @@
  * from the phone assistant's window). Texts go from the business's own number, which comes with the voice add-on
  * (add-ons.ts, business-numbers.ts); RENUABL's own business texts from RENUABL's number (`TWILIO_FROM`).
  */
+import { recordTextSent } from "./design-voice-usage";
 import { normaliseMobile } from "@/lib/domain/contact";
 import {
   TEXTS_SHOWN,
@@ -46,10 +47,13 @@ export async function keepText(
   businessId: string,
   t: { jobId: string | null; customerId: string | null; direction: "in" | "out"; mobile: string; text: string; by: string },
 ): Promise<void> {
+  const id = newId("txt");
   await query(
     `insert into design_texts (business_id, id, job_id, customer_id, direction, mobile, text, by_email) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [businessId, newId("txt"), t.jobId, t.customerId, t.direction, t.mobile, t.text.slice(0, TEXT_IN_MAX), t.by.toLowerCase()],
+    [businessId, id, t.jobId, t.customerId, t.direction, t.mobile, t.text.slice(0, TEXT_IN_MAX), t.by.toLowerCase()],
   );
+  // A text sent from the business's number counts towards Calls & Texts (voice-usage.ts).
+  if (t.direction === "out") await recordTextSent(businessId, id, t.text);
 }
 
 /** The texts on a deal, oldest first (the latest `TEXTS_SHOWN`). The caller has checked the member may see the deal. */
