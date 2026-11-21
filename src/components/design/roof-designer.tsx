@@ -51,7 +51,6 @@ import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { CELLS_UP_TO } from "@/lib/domain/design/illustrated-roof";
 import { FlowLine, PanelArt, RoofArt, WallStrip, useRoofGhost, type ArtFace } from "./illustrated-roof";
-import { DayOverlay, HomeDayCard, useHomeDay } from "./home-day";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -86,7 +85,6 @@ import {
   Brush,
   House,
   Minus,
-  Sunrise,
   LayoutGrid,
   Radio,
   Send,
@@ -101,6 +99,7 @@ import {
   ChevronRight,
   Undo2,
   Zap,
+  Search,
   ZoomIn,
   ZoomOut,
   type LucideIcon,
@@ -412,8 +411,23 @@ const PHONE_BELOW = 640;
 const SIDEWAYS_BELOW = 500;
 const TURN_HINT_KEY = "renuabl.design.turn-hint";
 const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
-/** The bands on a phone: above the picture the kit, the tools and Publish; below it the picture's switch and Ask Sol, then the rail as a toolbar at the foot. */
-const PHONE_BANDS = { above: 214, below: 204, rail: 56 };
+/**
+ * The bands on a phone held upright (21 Nov 2026, Martin: the picture higher and longer, the tools on it). Above the
+ * picture only room for the top half of the kit, which sits on the picture's top edge; below it the toolbar hugging the
+ * picture's foot (`bar`: zoom, Roof, Sides, the picture's switch), then Ask Sol, then the rail as a toolbar at the foot.
+ */
+const PHONE_BANDS = { above: 30, below: 112, rail: 56, bar: 40 };
+/**
+ * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
+ * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
+ */
+const PHONE_TALLEST = 1.4;
+/** How much smaller the rail across the foot is drawn on a phone upright (its knife's sheet is drawn back up, tool-fan.tsx). */
+const PHONE_RAIL_ZOOM = 0.72;
+/** A phone upright opens one zoom press (1.4×) closer than the pop-up does, so the roof reads (21 Nov 2026, Martin). */
+const PHONE_ZOOM = 1.4;
+/** The view's size for a pinch: no closer than this many photo pixels across, no further out than the whole photo. */
+const PINCH_MIN_W = 40;
 
 /** What was read of a face's slope from Google's data, with the way to read it again. */
 /**
@@ -576,6 +590,8 @@ function Dial(props: {
   dark?: boolean;
   /** On a phone, upright or sideways, drawn smaller from the picture's edge so it leaves the roof in view. */
   small?: boolean;
+  /** On a phone upright: its size against the picture's (21 Nov 2026, Martin: in proportion with the map), and its middle down the picture. */
+  fit?: { scale: number; top: string };
   children: React.ReactNode;
 }) {
   // In rem: the dial's radius, and how far out from its centre (the middle of the picture's right edge) the rounds sit.
@@ -590,13 +606,18 @@ function Dial(props: {
     <div
       className={clsx(
         "absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 shadow-lift backdrop-blur-md",
-        props.small && "origin-right scale-[0.7]",
+        props.small && !props.fit && "origin-right scale-[0.7]",
+        props.fit && "origin-right",
         // Black glass, as the menus over the picture (10 Nov 2026, Martin): the map shows through, softened.
         props.dark
           ? "border-sun-line bg-surface/75 text-white ring-2 ring-sun-line backdrop-saturate-150"
           : "border-line bg-surface/75 backdrop-saturate-150",
       )}
-      style={{ width: `${R}rem`, height: `${R * 2}rem` }}
+      style={{
+        width: `${R}rem`,
+        height: `${R * 2}rem`,
+        ...(props.fit ? { scale: String(props.fit.scale), top: props.fit.top } : {}),
+      }}
       role="group"
       aria-label={props.label}
     >
@@ -838,6 +859,8 @@ function RoofPitches(props: {
   onOpen: (open: boolean) => void;
   onPitch: (index: number, pitch: number) => void;
   onAdd: () => void;
+  /** On a phone upright: its middle down the stage, in the picture's own (zoomed) units, so it sits by the picture's middle. */
+  top?: string;
   onRemove: (index: number) => void;
   onNotFlat: () => void;
   /** What Nearmap's heights read for the home's roof, said beside the mark until put away. */
@@ -851,7 +874,7 @@ function RoofPitches(props: {
   const pitch = roofs[active] ?? 0;
   const several = roofs.length > 1;
   return (
-    <div className="absolute left-3 top-1/2 z-30 -translate-y-1/2">
+    <div className="absolute left-3 top-1/2 z-30 -translate-y-1/2" {...(props.top ? { style: { top: props.top, zoom: 0.68 } } : {})}>
       <div className="flex flex-col items-center gap-1.5">
         {roofs.map((p, i) => {
           const isFlat = i === 0 && flat;
@@ -1031,11 +1054,25 @@ const OPENED: typeof WHOLE = {
  * can't move at all while the whole picture is showing, so the hand did nothing). A roof near an edge can be dragged to
  * the middle, and at least half the view always shows the picture.
  */
-/** What a kept view shows on a picture of `across` width to height: wider than the photo, a band across it, the middle kept. */
+/**
+ * What a kept view shows on a picture of `across` width to height, the middle kept: wider than the photo, a band across
+ * it; taller (a phone held upright), a band down it.
+ */
 function shownView(kept: typeof WHOLE, across: number | null): typeof WHOLE {
-  if (!across || across <= ROOF_IMAGE.width / ROOF_IMAGE.height + 0.01) return kept;
-  const h = kept.w / across;
-  return { x: kept.x, w: kept.w, h, y: kept.y + (kept.h - h) / 2 };
+  const photo = ROOF_IMAGE.width / ROOF_IMAGE.height;
+  if (!across || Math.abs(across - photo) <= 0.01) return kept;
+  if (across > photo) {
+    const h = kept.w / across;
+    return { x: kept.x, w: kept.w, h, y: kept.y + (kept.h - h) / 2 };
+  }
+  const w = kept.h * across;
+  return { x: kept.x + (kept.w - w) / 2, w, h: kept.h, y: kept.y };
+}
+/** The kept view (the photo's shape) that shows `shown` on a picture of `across`: shownView turned round. */
+function keptFor(shown: typeof WHOLE, w: number, across: number | null): typeof WHOLE {
+  const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+  const cut = shownView({ x: 0, y: 0, w, h }, across);
+  return { x: shown.x - cut.x, y: shown.y - cut.y, w, h };
 }
 const within = (at: number, size: number, whole: number) => Math.min(Math.max(-size / 2, at), whole - size / 2);
 
@@ -1667,7 +1704,7 @@ export function RoofDesigner(props: {
   const [foldPx, setFoldPx] = useState<number | null>(null);
   // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
   // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
-  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number } | null>(null);
+  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number; across: number } | null>(null);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1687,11 +1724,18 @@ export function RoofDesigner(props: {
       // (A frame not yet shown has no width: that isn't a phone.)
       if (tightNow.current && window.innerWidth > 0 && window.innerWidth < PHONE_BELOW) {
         const across = strip.parentElement?.clientWidth ?? window.innerWidth;
-        const photoH = Math.round((across * ROOF_IMAGE.height) / ROOF_IMAGE.width);
-        const pb = Math.max(PHONE_BANDS.below, Math.round(room - photoH - PHONE_BANDS.above - PHONE_BANDS.rail));
+        // As tall as the screen allows under the kit's half and over the toolbar, Ask Sol and the rail: never shorter
+        // than the photo's own shape, never taller than PHONE_TALLEST times its width.
+        const shortest = Math.round((across * ROOF_IMAGE.height) / ROOF_IMAGE.width);
+        const photoH = Math.round(
+          Math.min(across * PHONE_TALLEST, Math.max(shortest, room - PHONE_BANDS.above - PHONE_BANDS.below - PHONE_BANDS.rail)),
+        );
+        const pb = PHONE_BANDS.below;
         const stripH = Math.round(box.height);
         setStage((was) =>
-          was && was.photoH === photoH && was.pb === pb && was.top === stripH ? was : { top: stripH, pt: PHONE_BANDS.above, pb, photoH },
+          was && was.photoH === photoH && was.pb === pb && was.top === stripH && was.across === across
+            ? was
+            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across },
         );
       } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
@@ -1749,8 +1793,70 @@ export function RoofDesigner(props: {
       .toLowerCase()
       .split(/\s+/)
       .every((word) => text.toLowerCase().includes(word));
+  // A phone upright: the picture as tall as the stage says, so a narrower band of the photo, larger.
+  const phoneAcross = phone && stage && stage.photoH > 0 ? Math.round((stage.across / stage.photoH) * 1000) / 1000 : null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (phoneAcross) setAcross(phoneAcross);
+  }, [phoneAcross]);
+  // Zoom mode on a phone (21 Nov 2026, Martin: a magnifier that, tapped, lets the picture be pinched in and out): while it
+  // is on, a layer over the picture takes the fingers, so no tool acts. Two fingers pinch about where they are; one moves.
+  const [zooming, setZooming] = useState(false);
+  const pinch = useRef<{
+    at: Map<number, { x: number; y: number }>;
+    from: { kept: typeof WHOLE; shown: typeof WHOLE; pts: { x: number; y: number }[] } | null;
+  }>({ at: new Map(), from: null });
+  const pinchFrom = (box: DOMRect) => {
+    const pts = [...pinch.current.at.values()].map((pt) => ({ x: (pt.x - box.left) / box.width, y: (pt.y - box.top) / box.height }));
+    pinch.current.from = pts.length ? { kept: keptView, shown: shownView(keptView, across), pts } : null;
+  };
+  const onPinchDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pinch.current.at.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    pinchFrom(e.currentTarget.getBoundingClientRect());
+  };
+  const onPinchUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    pinch.current.at.delete(e.pointerId);
+    pinchFrom(e.currentTarget.getBoundingClientRect());
+  };
+  const onPinchMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = pinch.current;
+    if (!p.at.has(e.pointerId) || !p.from) return;
+    p.at.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const box = e.currentTarget.getBoundingClientRect();
+    const now = [...p.at.values()].map((pt) => ({ x: (pt.x - box.left) / box.width, y: (pt.y - box.top) / box.height }));
+    const { kept, shown, pts } = p.from;
+    if (now.length !== pts.length) return;
+    const mid = (list: { x: number; y: number }[]) => ({
+      x: list.reduce((n, q) => n + q.x, 0) / list.length,
+      y: list.reduce((n, q) => n + q.y, 0) / list.length,
+    });
+    const gap = (list: { x: number; y: number }[]) =>
+      list.length < 2 ? 1 : Math.hypot((list[0].x - list[1].x) * box.width, (list[0].y - list[1].y) * box.height);
+    const m0 = mid(pts);
+    const m1 = mid(now);
+    const w = Math.min(ROOF_IMAGE.width, Math.max(PINCH_MIN_W, kept.w * (gap(pts) / Math.max(1, gap(now)))));
+    const cut = shownView({ x: 0, y: 0, w, h: (w * ROOF_IMAGE.height) / ROOF_IMAGE.width }, across);
+    // The spot of the photo under the fingers' middle stays under it.
+    const spotX = shown.x + m0.x * shown.w;
+    const spotY = shown.y + m0.y * shown.h;
+    const next = keptFor({ x: spotX - m1.x * cut.w, y: spotY - m1.y * cut.h, w: cut.w, h: cut.h }, w, across);
+    setView({ ...next, x: within(next.x, next.w, ROOF_IMAGE.width), y: within(next.y, next.h, ROOF_IMAGE.height) });
+  };
+  // One zoom press closer the first time the designer is a phone's, from where it opened.
+  const phoneZoomed = useRef(false);
+  useEffect(() => {
+    if (!phone || phoneZoomed.current) return;
+    phoneZoomed.current = true;
+    setView((v) => {
+      const w = v.w / PHONE_ZOOM;
+      const h = v.h / PHONE_ZOOM;
+      return { x: v.x + (v.w - w) / 2, y: v.y + (v.h - h) / 2, w, h };
+    });
+  }, [phone]);
   useEffect(() => {
     const el = picBox.current;
+    if (phoneAcross) return;
     if (!fills || !el || !fitPx) {
       setAcross(null);
       return;
@@ -1761,7 +1867,27 @@ export function RoofDesigner(props: {
     const watch = new ResizeObserver(measure);
     watch.observe(el);
     return () => watch.disconnect();
-  }, [fills, fitPx]);
+  }, [fills, fitPx, phoneAcross]);
+  // On a phone upright Sol's card (his step, or a suggestion) stands under the picture's toolbar, and the band below
+  // grows by its height so Ask Sol and the rail stay under it rather than behind it.
+  const [solCardH, setSolCardH] = useState(0);
+  const solCardWatch = useRef<ResizeObserver | null>(null);
+  const solCardBox = useCallback((el: HTMLDivElement | null) => {
+    solCardWatch.current?.disconnect();
+    solCardWatch.current = null;
+    if (!el) {
+      setSolCardH(0);
+      return;
+    }
+    const measure = () => setSolCardH(Math.round((el.firstElementChild as HTMLElement | null)?.getBoundingClientRect().height ?? 0));
+    measure();
+    solCardWatch.current = new ResizeObserver(measure);
+    if (el.firstElementChild) solCardWatch.current.observe(el.firstElementChild);
+  }, []);
+  const phoneBelow = stage ? stage.pb + (phone && solCardH ? solCardH + 8 : 0) : 0;
+  // The dial for what is picked, on a phone upright: about three fifths of the picture's height, its middle the picture's.
+  const dialFit =
+    phone && stage ? { scale: Math.min(0.7, (stage.photoH * 0.6) / (25 * 16)), top: `${stage.pt + stage.photoH / 2}px` } : null;
   /** A place down the picture, as a share of its height: on a phone the picture starts under the band above it. */
   const picY = (percent: number) =>
     props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
@@ -2271,14 +2397,13 @@ export function RoofDesigner(props: {
         const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
         // The spot under the pointer stays put, read on the picture as shown (a band of the photo when widened).
         const was = shownView(v, acrossNow.current);
-        const shownH = shownView({ x: 0, y: 0, w, h }, acrossNow.current).h;
-        const y = was.y + fy * was.h - fy * shownH - (h - shownH) / 2;
-        return {
-          x: within(v.x + fx * v.w - fx * w, w, ROOF_IMAGE.width),
-          y: within(y, h, ROOF_IMAGE.height),
+        const cut = shownView({ x: 0, y: 0, w, h }, acrossNow.current);
+        const kept = keptFor(
+          { x: was.x + fx * was.w - fx * cut.w, y: was.y + fy * was.h - fy * cut.h, w: cut.w, h: cut.h },
           w,
-          h,
-        };
+          acrossNow.current,
+        );
+        return { x: within(kept.x, w, ROOF_IMAGE.width), y: within(kept.y, h, ROOF_IMAGE.height), w, h };
       });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -3827,16 +3952,6 @@ export function RoofDesigner(props: {
     props.workspace.settings.bill.selfUseShare,
   );
   const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-  // The home's day (10 Nov 2026, Martin: the second dimension of a design is time): the design played through a
-  // summer, autumn or winter day, the sun crossing the roof and the home's power under it (home-day.tsx).
-  const homeDay = useHomeDay({
-    latitude: spot.lat,
-    panels: standingPanels.map((p) => ({ kw: size.watts / 1000, tilt: p.tilt, facing: p.facing, x: p.x, y: p.y })),
-    monthKwh: year,
-    homeDayKwh: finance?.dailyKwh ?? null,
-    batteryKwh: shiftingKwhOf({ battery }),
-    terrain: terrain && terrain !== "none" ? terrain : null,
-  });
   // The system as the quote reads it. Worked out in the domain (systemSpecOf), so a published proposal reads the design the same way.
   const firstListed = props.catalogue[0];
   const spec: SystemSpec = useMemo(
@@ -5893,16 +6008,53 @@ export function RoofDesigner(props: {
     );
   };
 
+  // On a phone, upright or sideways (21 Nov 2026, Martin: it covered the picture and showed one design at a time), the menu
+  // is drawn smaller and wider, within the picture's height, so several designs and more of each show.
+  const compactMenu = props.tight && (phone || sideways);
+  // On a phone held upright (21 Nov 2026, Martin: "the design page should overlay everything like a popup screen"), it
+  // is a sheet over the whole screen with its own close, its type a little smaller (0.85 of full size).
+  const sheetMenu = props.tight && phone;
   const designsMenu = (
     <div
-      data-opened
+      {...(sheetMenu
+        ? { role: "dialog", "aria-label": "Designs" }
+        : compactMenu
+          ? // Its height in an inline style: a class naming the picture's height is drawn back up by globals.css.
+            { style: { maxHeight: "calc(var(--pic-h, 60vh) / 0.78 - 6rem)" } }
+          : { "data-opened": true })}
       className={clsx(
-        "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
-        props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
+        "overflow-y-auto text-ink",
+        sheetMenu
+          ? "fixed inset-0 z-[90] space-y-3 bg-[#2b2e33] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] [zoom:1.25]"
+          : "absolute z-40 rounded-lg border border-line bg-surface shadow-lift",
+        !sheetMenu && (compactMenu ? "space-y-2 p-2" : "space-y-3 p-3"),
+        !sheetMenu && (compactMenu ? "w-[44rem] max-w-[calc((100vw-2.5rem)/0.78)] [zoom:1.15]" : "max-h-[70vh] w-[24rem] max-w-[85vw]"),
+        !sheetMenu && (props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2"),
       )}
     >
+      {sheetMenu && (
+        // Back to the roof on the left: the white cross in the top right corner is the window's, closing the designer.
+        <div className="sticky -top-3 z-10 -mx-4 flex items-center gap-2 border-b border-line bg-[#2b2e33] py-2 pl-2 pr-16">
+          <button
+            type="button"
+            onClick={() => openMenu(false)}
+            aria-label="Back to the roof"
+            title="Back to the roof"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink hover:bg-white/15"
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+          </button>
+          <p className="flex items-center gap-2 text-base font-semibold">
+            <Layers className="size-4" aria-hidden />
+            Designs
+            <span className="text-sm font-normal tabular-nums text-muted">
+              {designs.length} of {MAX_DESIGNS}
+            </span>
+          </p>
+        </div>
+      )}
       {props.tight && !props.sitesOnly && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-line pb-3">
+        <div className={clsx("flex flex-wrap items-center gap-2 border-b border-line", compactMenu ? "pb-2" : "pb-3")}>
           {props.noDeal ? (
             <button
               type="button"
@@ -5962,6 +6114,16 @@ export function RoofDesigner(props: {
                   </span>
                   <span className="block truncate text-xs tabular-nums text-muted">
                     {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                  </span>
+                  {/* The rest of the kit, so designs can be told apart without opening each. */}
+                  <span className="block truncate text-xs text-muted">
+                    {[
+                      d.inverters?.length ? d.inverters.map((v) => v.name).join(" + ") : "No inverter",
+                      d.battery
+                        ? `${(d.battery.kwh * d.battery.qty).toFixed(1)} kWh battery${d.battery.backup ? " with backup" : ""}`
+                        : "No battery",
+                      ...(d.charger ? [`${d.charger.kw} kW EV charger`] : []),
+                    ].join(" · ")}
                   </span>
                 </button>
                 <button
@@ -6055,11 +6217,11 @@ export function RoofDesigner(props: {
         <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
           <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
         </button>
-        <span className="self-center text-xs tabular-nums text-muted">
+        <span className={clsx("self-center text-xs tabular-nums text-muted", sheetMenu && "hidden")}>
           {designs.length} of {MAX_DESIGNS}
         </span>
       </div>
-      <p className="text-xs text-muted">
+      <p className={clsx("text-xs text-muted", compactMenu && !sheetMenu && "hidden")}>
         The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
         options on the next proposal published, and mark the one you recommend.
       </p>
@@ -6067,10 +6229,76 @@ export function RoofDesigner(props: {
   );
 
   // Publish design (8 Nov 2026, Martin: in the pop-up, the picture's top right corner): the same control in either place.
+  // Start this design again: its round, and the question asked first.
+  const resetRound = (
+    <button
+      type="button"
+      onClick={() => setResetAsk(!resetAsk)}
+      aria-expanded={resetAsk}
+      aria-label="Start this design again"
+      title="Start this design again"
+      className={clsx(
+        phone ? "size-[2.625rem] ring-2" : "size-10 ring-[5px]",
+        "flex items-center justify-center rounded-full bg-white shadow-lift ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
+        resetAsk ? "text-sun-line" : "text-muted",
+      )}
+    >
+      <RotateCcw className="size-[18px]" aria-hidden />
+    </button>
+  );
+  const resetQuestion = resetAsk && (
+    <div
+      role="alertdialog"
+      aria-label="Start again"
+      className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
+    >
+      <p className="font-medium">Reset to default and start again?</p>
+      <p className="mt-1 text-white/70">
+        Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
+      </p>
+      <div className="mt-2.5 flex gap-1.5">
+        <button
+          type="button"
+          onClick={resetDesign}
+          className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
+        >
+          Yes, start again
+        </button>
+        <button
+          type="button"
+          onClick={() => setResetAsk(false)}
+          className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
   const publishControl =
     props.sitesOnly && !props.tight ? null : (
       <div className="relative" data-popup data-menu-host>
-        {props.tight ? (
+        {props.tight && phone ? (
+          // On a phone upright (21 Nov 2026, Martin): icons only in the picture's top right corner, level with the kit and
+          // its height: start again, then the designs' round, a little larger, with the open design's number under its mark.
+          <div className="flex h-[3.75rem] items-center gap-1.5">
+            {menu !== "designs" && resetRound}
+            <button
+              type="button"
+              onClick={() => openMenu(menu === "designs" ? false : "designs")}
+              aria-expanded={menu === "designs"}
+              aria-haspopup="true"
+              aria-label={`Design ${active + 1} of ${designs.length}: every design on this roof, a new one, a copy, and Publish`}
+              title="Every design on this roof: a new one, a copy, and Publish"
+              className="flex size-[3.25rem] flex-col items-center justify-center rounded-full bg-primary text-primary-ink shadow-lift tabular-nums hover:bg-forest"
+            >
+              <Layers className="size-5" aria-hidden />
+              <span className="text-[11px] font-semibold leading-none">
+                {active + 1}
+                {designs.length > 1 ? `/${designs.length}` : ""}
+              </span>
+            </button>
+          </div>
+        ) : props.tight ? (
           // In the pop-up the corner is the roof's designs (10 Nov 2026, Martin: there was no plain way to start a second
           // design): the one open, the others either side, and the menu of them all with New design and Publish.
           <div className="flex h-10 items-center rounded-md bg-primary text-primary-ink shadow-lift">
@@ -6166,52 +6394,15 @@ export function RoofDesigner(props: {
           </div>
         )}
         {/* Start again, a round growing out of the design's pill like a bubble from a bubble (12 Nov 2026, Martin: it
-            was missed), in white so it stands apart from the graphite, asked first. */}
-        {props.tight && menu !== "designs" && (
+            was missed), in white so it stands apart from the graphite, asked first. On a phone upright it stands beside
+            the designs' round instead, and its question opens under them. */}
+        {props.tight && !phone && menu !== "designs" && (
           <div className="absolute right-3 top-[2.15rem] flex flex-col items-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => setResetAsk(!resetAsk)}
-              aria-expanded={resetAsk}
-              aria-label="Start this design again"
-              title="Start this design again"
-              className={clsx(
-                "flex size-10 items-center justify-center rounded-full bg-white shadow-lift ring-[5px] ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
-                resetAsk ? "text-sun-line" : "text-muted",
-              )}
-            >
-              <RotateCcw className="size-[18px]" aria-hidden />
-            </button>
-            {resetAsk && (
-              <div
-                role="alertdialog"
-                aria-label="Start again"
-                className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
-              >
-                <p className="font-medium">Reset to default and start again?</p>
-                <p className="mt-1 text-white/70">
-                  Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
-                </p>
-                <div className="mt-2.5 flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={resetDesign}
-                    className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
-                  >
-                    Yes, start again
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResetAsk(false)}
-                    className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            {resetRound}
+            {resetQuestion}
           </div>
         )}
+        {props.tight && phone && menu !== "designs" && resetAsk && <div className="absolute right-0 top-full mt-2">{resetQuestion}</div>}
         {props.tight && menu === "designs" && designsMenu}
         {sending && props.onNote && (
           <div
@@ -6397,7 +6588,12 @@ export function RoofDesigner(props: {
               : clsx("absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center", sideways && "designer-compact-rail")
             : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
-        style={phone && stage ? { top: 8 + stage.top + 6 + stage.pt + stage.photoH + stage.pb + 4 } : undefined}
+        // On a phone upright the row is drawn smaller (21 Nov 2026, Martin: every button smaller); its top in its own zoomed units.
+        style={
+          phone && stage
+            ? { top: (8 + stage.top + 6 + stage.pt + stage.photoH + phoneBelow + 4) / PHONE_RAIL_ZOOM, zoom: PHONE_RAIL_ZOOM }
+            : undefined
+        }
       >
         <BarRow
           row={phone}
@@ -7150,7 +7346,7 @@ export function RoofDesigner(props: {
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
               ref={picBox}
-              className={clsx("glass-dark relative mx-auto", sideways && "designer-compact")}
+              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact")}
               style={
                 {
                   maxWidth: fit,
@@ -7159,9 +7355,9 @@ export function RoofDesigner(props: {
                   ...(phone && stage
                     ? {
                         paddingTop: stage.pt,
-                        paddingBottom: stage.pb,
+                        paddingBottom: phoneBelow,
                         marginBottom: PHONE_BANDS.rail,
-                        "--pic-h": `${stage.photoH + stage.pb}px`,
+                        "--pic-h": `${stage.photoH + phoneBelow}px`,
                       }
                     : {}),
                 } as React.CSSProperties
@@ -7635,7 +7831,17 @@ export function RoofDesigner(props: {
                   Hold Ctrl (⌘ on a Mac) and scroll to zoom
                 </p>
               )}
-              <div className="overflow-hidden rounded-lg bg-surface-2">
+              <div className="relative overflow-hidden rounded-lg bg-surface-2">
+                {zooming && (
+                  <div
+                    className="absolute inset-0 z-[5] touch-none"
+                    aria-label="Pinch to zoom, drag to move"
+                    onPointerDown={onPinchDown}
+                    onPointerMove={onPinchMove}
+                    onPointerUp={onPinchUp}
+                    onPointerCancel={onPinchUp}
+                  />
+                )}
                 <svg
                   ref={svg}
                   viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -7884,16 +8090,6 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
-                  {/* The home's day: night, each panel lit as the sun reaches it, and the sun on its arc. */}
-                  {homeDay.day && homeDay.step && (
-                    <DayOverlay
-                      day={homeDay.day}
-                      step={homeDay.step}
-                      panels={standingPanels.map((p) => p.corners.map(px))}
-                      view={view}
-                      u={u}
-                    />
-                  )}
                   {/* Guide lines, at rest: thin gold lines along the roof edges they were drawn on. */}
                   {!guide &&
                     rules.map((g) => (
@@ -8610,11 +8806,62 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
+              {/* On a phone held upright, a toolbar hugging the picture's foot (21 Nov 2026, Martin): zoom mode (pinch the
+                  picture), the roof from above and the house from its sides as icons, and which picture is under the design. */}
+              {phone && stage && (
+                <div
+                  className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
+                  style={{ top: stage.pt + stage.photoH - 1 }}
+                >
+                  <div
+                    role="toolbar"
+                    aria-label="The picture"
+                    className="flex h-10 items-center gap-0.5 rounded-b-2xl border border-t-0 border-line bg-surface px-1.5 shadow-lift"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setZooming((z) => !z)}
+                      aria-pressed={zooming}
+                      aria-label={zooming ? "Done zooming" : "Zoom: pinch the picture in and out"}
+                      title={zooming ? "Done zooming" : "Zoom: pinch the picture in and out"}
+                      className={clsx(
+                        "flex h-8 items-center justify-center gap-1.5 rounded-full",
+                        zooming ? "bg-sun-line px-3 text-[12px] font-semibold text-white" : "w-8 text-ink hover:bg-canvas",
+                      )}
+                    >
+                      <Search className="size-4" aria-hidden />
+                      {zooming && "Pinch · Done"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => illustrated && toggleIllustrated()}
+                      aria-pressed={!illustrated}
+                      aria-label="The roof from above"
+                      title="The roof from above"
+                      className={clsx(
+                        "flex size-8 items-center justify-center rounded-full",
+                        !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
+                      )}
+                    >
+                      <House className="size-4" aria-hidden />
+                    </button>
+                    {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} icon />}
+                    {props.pictureMenu && <div className="ml-0.5 [zoom:0.8]">{props.pictureMenu}</div>}
+                  </div>
+                </div>
+              )}
 
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
               {props.tight && publishControl && (
-                <div className={clsx("pointer-events-auto absolute z-30", phone ? "right-3 top-[6.75rem]" : "right-4 top-4")}>
+                <div
+                  className={clsx(
+                    "pointer-events-auto absolute",
+                    // Over the roof pitch marks and the pad while its menu is open.
+                    menu === "designs" ? (phone ? "z-[90]" : "z-50") : "z-30",
+                    phone ? "right-3 top-[0.8rem]" : "right-4 top-4",
+                  )}
+                >
                   {publishControl}
                 </div>
               )}
@@ -8623,55 +8870,46 @@ export function RoofDesigner(props: {
                   "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
                   // On a phone it stands over Ask Sol, not beside it.
                   props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
-                  // The day's bar takes the foot of the picture while it plays; sideways the dial for what is picked does.
-                  (homeDay.on || (sideways && picks.length > 0)) && "hidden",
+                  // Sideways the dial for what is picked takes the foot; on a phone upright these are in the toolbar under the picture.
+                  ((sideways && picks.length > 0) || phone) && "hidden",
                 )}
               >
                 <div className="flex items-center gap-2">
-                  {/* The home's day: the design played through a day. */}
-                  <button
-                    onClick={() => (homeDay.on ? homeDay.close() : homeDay.open())}
-                    aria-pressed={homeDay.on}
-                    title="The home's day: the sun across the roof, and the home's power hour by hour"
-                    className={clsx(
-                      "flex h-11 items-center gap-1.5 rounded-full border border-line px-4 text-[13px] font-semibold shadow-lift",
-                      homeDay.on ? "bg-sun-line text-white" : "bg-surface text-ink hover:bg-canvas",
-                    )}
-                  >
-                    <Sunrise className="size-4" aria-hidden />
-                    Day
-                  </button>
                   {/* Roof and Sides (10 Nov 2026, Martin: make Sides stand out; Drawn left this pair and lives in the
                       tools): the roof from above, and the house from its four sides in Nearmap's angled photos. */}
+                  {/* Sideways (21 Nov 2026, Martin) they are icons, one above the other, to leave the roof in view. */}
                   <div
                     role="group"
                     aria-label="The roof from above, or the house from its sides"
-                    className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
+                    className={clsx(
+                      "flex items-center border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift",
+                      sideways ? "flex-col gap-1 rounded-[1.4rem]" : "rounded-full",
+                    )}
                   >
                     <button
                       onClick={() => illustrated && toggleIllustrated()}
                       aria-pressed={!illustrated}
+                      aria-label="The roof from above"
                       title="The roof from above"
                       className={clsx(
-                        "flex h-9 items-center gap-1.5 rounded-full px-3.5",
+                        "flex h-9 items-center gap-1.5 rounded-full",
+                        sideways ? "w-9 justify-center" : "px-3.5",
                         !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
                       )}
                     >
                       <House className="size-4" aria-hidden />
-                      Roof
+                      {!sideways && "Roof"}
                     </button>
-                    {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} tab />}
+                    {props.sidesReady &&
+                      (sideways ? (
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon />
+                      ) : (
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab />
+                      ))}
                   </div>
                 </div>
                 {props.pictureMenu}
               </div>
-              {/* The day's bar, along the foot of the picture like a player's: low, so the roof and the sun stay in view,
-                  and clear of the round that moves the picture (bottom left). The other controls at the foot step aside. */}
-              {homeDay.on && (
-                <div className={clsx("pointer-events-none absolute left-[5.25rem] right-3 z-30", props.tight ? "bottom-7" : "bottom-3")}>
-                  <HomeDayCard state={homeDay} hasBattery={battery !== undefined} hasHome={(finance?.dailyKwh ?? 0) > 0} />
-                </div>
-              )}
               {/* Drawn, with no face traced and none from Google: there is nothing to draw the roof from yet. */}
               {illustrated && !art && modelFaces === "none" && (
                 <p className="pointer-events-none absolute bottom-20 right-3 z-10 w-64 rounded-lg border border-line bg-surface/90 px-3 py-2 text-[12px] text-ink-2 shadow-lift">
@@ -8689,6 +8927,7 @@ export function RoofDesigner(props: {
                   (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}
               {quoteNow.form.pitchSet && (
                 <RoofPitches
+                  {...(phone && stage ? { top: `${Math.round((stage.pt + stage.photoH / 2) / 0.68)}px` } : {})}
                   roofs={roofPitches}
                   flat={quoteNow.form.roof === "flat"}
                   active={roofInUse}
@@ -9466,6 +9705,7 @@ export function RoofDesigner(props: {
                   label="What is picked"
                   dark
                   small={sideways || phone}
+                  {...(dialFit ? { fit: dialFit } : {})}
                   onTurn={null}
                   onClose={() => setPicks([])}
                   closeTitle="Pick none (Esc)"
@@ -9532,6 +9772,7 @@ export function RoofDesigner(props: {
                   <Dial
                     label="Turn the rows"
                     small={sideways || phone}
+                    {...(dialFit ? { fit: dialFit } : {})}
                     // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
                     onTurn={(step) => {
                       const angle = ((((face.angle + step + 90) % 180) + 180) % 180) - 90;
@@ -9565,7 +9806,7 @@ export function RoofDesigner(props: {
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
                   the customer's bill in the figures above the picture.) */}
               <div
-                className={clsx("absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center", phone ? "top-2" : "top-4")}
+                className={clsx("absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center", phone ? "top-[0.8rem]" : "top-4")}
                 role="group"
                 aria-label="System"
                 data-menu-host
@@ -10189,7 +10430,7 @@ export function RoofDesigner(props: {
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
               <div
-                className={clsx("absolute z-20 size-[6.25rem]", phone ? "left-3 top-[4.9rem]" : "left-4 top-4")}
+                className={clsx("absolute z-20 size-[6.25rem]", phone ? "left-3 top-[3.5rem]" : "left-4 top-4")}
                 role="toolbar"
                 aria-label="Select, add a panel, landscape, erase"
               >
@@ -10514,10 +10755,13 @@ export function RoofDesigner(props: {
               )}
               {tips.corner}
               {phone && stage && turnHint && (
-                <div className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center" style={{ top: stage.pt + 8 }}>
-                  <p className="flex items-center gap-2 rounded-full bg-primary/90 py-1.5 pl-3 pr-1.5 text-[12.5px] text-white shadow-lift backdrop-blur-md">
-                    <Smartphone className="size-3.5 rotate-90 text-sun-line" aria-hidden />
-                    Turn your phone sideways for a bigger view
+                <div
+                  className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
+                  style={{ top: stage.pt + stage.photoH - 34 }}
+                >
+                  <p className="flex items-center gap-1.5 rounded-full bg-primary/90 py-0.5 pl-2.5 pr-0.5 text-[11px] text-white shadow-lift backdrop-blur-md">
+                    <Smartphone className="size-3 rotate-90 text-sun-line" aria-hidden />
+                    Turn sideways for a bigger view
                     <button
                       type="button"
                       onClick={putTurnHintAway}
@@ -10542,7 +10786,8 @@ export function RoofDesigner(props: {
                       : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
-                  style={phone && stage ? { top: stage.pt + stage.photoH + 6 } : undefined}
+                  ref={solCardBox}
+                  style={phone && stage ? { top: stage.pt + stage.photoH + PHONE_BANDS.bar + 6 } : undefined}
                 >
                   <SolGuide
                     step={guideNow}
@@ -10617,8 +10862,11 @@ export function RoofDesigner(props: {
                   <div
                     className={clsx(
                       "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
-                      sideways ? "sideways-sol bottom-2" : "bottom-[6.25rem]",
+                      sideways ? "sideways-sol bottom-2" : !phone && "bottom-[6.25rem]",
                     )}
+                    // On a phone it starts under the toolbar at the picture's foot, so the roof stays in view.
+                    ref={solCardBox}
+                    style={phone && stage ? { top: stage.pt + stage.photoH + PHONE_BANDS.bar + 6 } : undefined}
                   >
                     <SolNudges
                       nudges={nudges}
@@ -10675,7 +10923,6 @@ export function RoofDesigner(props: {
               <div
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
-                  homeDay.on && "hidden",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
                   props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
                 )}

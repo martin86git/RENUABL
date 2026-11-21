@@ -26,6 +26,21 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Designer",
+    words: "The designs menu lists each design's inverter, battery and EV charger, and on a phone it opens over the screen.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The Day button is gone from the designer.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright: a larger roof, smaller buttons, and a magnifier under the roof to pinch and zoom.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
     words: "On a phone turned sideways, the designer's buttons are smaller, so the roof is in view.",
   },
   {
