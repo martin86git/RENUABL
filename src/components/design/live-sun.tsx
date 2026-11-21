@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { SolMark } from "./sol-icon";
+import { SolMark, SunBrainLines } from "./sol-icon";
 
 /**
  * Sol as a real sun (18 Nov 2026, Martin: the glossy orb felt "built in an entry level design tool"; take the feel up a
@@ -214,32 +214,14 @@ export function LiveSun({ className, energy = 0, live = true }: { className?: st
   );
 }
 
-/** Two hemispheres seen from above and a few folds, in fine white lines softly blended into the disc. */
+/** The brain in the sun, the same lines as `SolMark`'s, a little brighter while he talks. */
 function SunBrain({ lit }: { lit: boolean }) {
-  const half = (
-    <>
-      <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85" />
-      <path d="M45 25C37 24 31 28 32 35" />
-      <path d="M22 40C29 37 36 41 35 48" />
-      <path d="M44 38C39 41 43 47 38 51" />
-      <path d="M19 59C26 56 32 60 30 67" />
-      <path d="M45 57C37 57 33 63 36 70" />
-      <path d="M33 78C37 74 43 76 44 72" />
-    </>
-  );
   return (
     <svg
       viewBox="11 12 78 78"
       className={clsx("absolute inset-[2%] mix-blend-soft-light transition-opacity duration-700", lit ? "opacity-90" : "opacity-60")}
-      fill="none"
-      stroke="white"
-      strokeWidth={1.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
     >
-      {half}
-      <g transform="translate(100 0) scale(-1 1)">{half}</g>
-      <path d="M50 18C51 30 49 42 50 54C51 66 49 76 50 84" strokeOpacity={0.7} />
+      <SunBrainLines />
     </svg>
   );
 }
