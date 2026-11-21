@@ -19,6 +19,9 @@ describe("sampleRoofLocation", () => {
           expect(JSON.parse(String(init?.body)).input).toContain("112 Leopold Street, South Yarra");
           return Response.json({ suggestions: [{ placePrediction: { placeId: "p1", text: { text: "112 Leopold St" } } }] });
         }
+        if (u.includes("/geocode/json")) {
+          return Response.json({ status: "OK", results: [{ geometry: { location_type: "ROOFTOP" } }] });
+        }
         return Response.json({
           id: "p1",
           location: { latitude: -37.84, longitude: 144.99 },
@@ -33,7 +36,14 @@ describe("sampleRoofLocation", () => {
       }),
     );
     expect(await sampleRoofLocation()).toEqual({ lat: -37.84, lng: 144.99 });
-    await sampleRoofLocation();
-    expect(calls).toHaveLength(2);
+    // One lookup is three requests: autocomplete, the place's details, and how Google placed it (google-places.ts).
+    expect(calls.map((u) => u.replace(/\?.*/, ""))).toEqual([
+      "https://places.googleapis.com/v1/places:autocomplete",
+      "https://places.googleapis.com/v1/places/p1",
+      "https://maps.googleapis.com/maps/api/geocode/json",
+    ]);
+    // Kept in memory: the second call asks Google nothing.
+    expect(await sampleRoofLocation()).toEqual({ lat: -37.84, lng: 144.99 });
+    expect(calls).toHaveLength(3);
   });
 });
