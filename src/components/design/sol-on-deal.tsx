@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
-import { ArrowUp, Handshake, Loader2 } from "lucide-react";
+import { ArrowUp, Handshake, Loader2, Mail } from "lucide-react";
 import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
 import { boxMove } from "@/lib/domain/design/deal-box";
 import { callBackAsked } from "@/lib/domain/design/deal-feed";
@@ -264,13 +264,13 @@ export function SolTerminal(props: {
   };
 
   const quiet =
-    "inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
+    "inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]";
 
   const openDealLink = props.openDeal ? (
     <Link
       href={props.openDeal}
       title={`${deal.customer}'s deal`}
-      className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+      className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2 max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
     >
       Open deal
       <Handshake className="size-3.5" aria-hidden />
@@ -292,12 +292,17 @@ export function SolTerminal(props: {
     />
   );
   const hasDraft = Boolean((!leftIt && p.draft && sol) || (waiting && answer));
-  const words = "block w-full resize-y bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-ink focus:outline-none";
+  const words =
+    "block w-full resize-y bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-ink focus:outline-none max-sm:px-2.5 max-sm:py-1.5 max-sm:text-[12px]";
+  // The head of a draft, small as a mail app's (21 Nov 2026, Martin's reference: a small Mail label over its fields).
+  const draftHead =
+    "flex flex-wrap items-center gap-x-1.5 border-b border-line px-3 py-1.5 text-[11.5px] text-muted max-sm:px-2.5 max-sm:py-1 max-sm:text-[10.5px]";
   const drafts = (
     <>
       {!leftIt && p.draft && sol && (
-        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-          <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
+        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line max-sm:mt-2.5 max-sm:rounded-lg">
+          <div className={draftHead}>
+            <Mail className="size-3 shrink-0" aria-hidden />
             <span>Email to {name}</span>
             {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
             {state === "held" && <span>· held</span>}
@@ -308,8 +313,9 @@ export function SolTerminal(props: {
       )}
 
       {waiting && answer && (
-        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-          <div className="border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
+        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line max-sm:mt-2.5 max-sm:rounded-lg">
+          <div className={draftHead}>
+            <Mail className="size-3 shrink-0" aria-hidden />
             {!byChat ? `Email to ${name}` : asEmail ? `Email to ${name} · also kept in their proposal's chat` : `Reply in ${name}'s chat`}
             {writing && <span className="text-sun-ink"> · writing it again…</span>}
           </div>
@@ -338,7 +344,7 @@ export function SolTerminal(props: {
           onClose={() => setCalling(false)}
         />
       )}
-      <div className="flex gap-3 p-3.5 sm:gap-3.5 sm:p-4">
+      <div className="flex gap-3 p-3 sm:gap-3.5 sm:p-4">
         {/* On a phone his sun is small and sits in his first line, so his words run from the card's left edge. */}
         <span className="max-sm:hidden">
           <SolLive />
@@ -353,9 +359,11 @@ export function SolTerminal(props: {
         >
           <div>
             <div>
-              <p className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink" aria-live="polite">
-                <span className="float-left mr-2 mt-px sm:hidden" aria-hidden>
-                  <SolMark className="size-6" />
+              <p className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink max-sm:text-[13px]" aria-live="polite">
+                {/* On a phone his sun is a small mark leading his words (21 Nov 2026, Martin: it took up space, but it
+                    should still be plain it's Sol), so they run the card's full width. */}
+                <span className="mr-1.5 inline-block size-4 align-[-3px] sm:hidden" aria-hidden>
+                  <SolMark className="size-4" />
                 </span>
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
@@ -363,13 +371,13 @@ export function SolTerminal(props: {
               {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-1.5" />}
 
               {!leftIt && typed.done && waiting && (answer || unwritten) && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:gap-1.5">
                   {answer && (
                     <button
                       type="button"
                       onClick={() => void sendAnswer()}
                       disabled={busy !== null || writing}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       Yes, send it
@@ -388,13 +396,13 @@ export function SolTerminal(props: {
               )}
 
               {!leftIt && typed.done && !waiting && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:gap-1.5">
                   {p.yes && !(p.yes.kind === "call" && !props.phone) && (
                     <button
                       type="button"
                       onClick={yes}
                       disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       {p.yes.label}
@@ -461,7 +469,7 @@ export function SolTerminal(props: {
                   tellSol();
                 }}
                 // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
-                className="mt-3.5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+                className="mt-3.5 flex items-center gap-1 rounded-lg bg-canvas max-sm:mt-2.5 py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
               >
                 <span className="font-mono text-[12px] text-sun-line" aria-hidden>
                   {">"}
@@ -619,13 +627,16 @@ function ComposeFields(props: {
   onSubject: (v: string) => void;
 }) {
   const { mail } = props;
-  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1 text-[12px]";
-  const label = "w-[4.5rem] shrink-0 text-[11.5px] text-muted";
-  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[12px] text-ink outline-none placeholder:text-muted";
+  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1 text-[12px] max-sm:px-2.5 max-sm:py-0.5";
+  const label = "w-[4.5rem] shrink-0 text-[11.5px] text-muted max-sm:w-10 max-sm:text-[10.5px]";
+  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[12px] text-ink outline-none placeholder:text-muted max-sm:text-[11.5px]";
   return (
     <div>
       <label className={row}>
-        <span className={label}>Send from</span>
+        <span className={label}>
+          <span className="max-sm:hidden">Send from</span>
+          <span className="sm:hidden">From</span>
+        </span>
         <select value={props.from} onChange={(e) => props.onFrom(e.target.value)} className={clsx(box, "cursor-pointer")}>
           <option value="">{mail ? `${mail.business} · replies come to ${mail.replyTo}` : "Your business"}</option>
           {(mail?.from ?? []).map((a) => (
@@ -637,7 +648,7 @@ function ComposeFields(props: {
         {mail && mail.from.length === 0 && (
           <Link
             href="/design/inbox"
-            className="shrink-0 text-[12px] text-muted underline hover:text-ink"
+            className="shrink-0 text-[12px] text-muted underline hover:text-ink max-sm:text-[11px]"
             title="Connect your Gmail to send from your own address"
           >
             Use my address
@@ -646,7 +657,7 @@ function ComposeFields(props: {
       </label>
       <div className={row}>
         <span className={label}>To</span>
-        <span className={clsx("min-w-0 flex-1 truncate py-0.5", props.to ? "text-ink" : "text-warning")}>
+        <span className={clsx("min-w-0 flex-1 truncate py-0.5 max-sm:text-[11.5px]", props.to ? "text-ink" : "text-warning")}>
           {props.to ?? `${props.name} has no email on file`}
         </span>
       </div>
