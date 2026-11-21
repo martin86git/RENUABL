@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Marketing",
+    words: "The email editor is drag and drop: drag blocks onto the email, type straight into it, and drag blocks to reorder them.",
+  },
+  {
+    day: "2026-11-21",
     area: "Deals",
     words:
       "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
