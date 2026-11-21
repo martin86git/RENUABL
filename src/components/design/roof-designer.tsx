@@ -71,6 +71,7 @@ import {
   Redo2,
   RotateCcw,
   Ruler,
+  Smartphone,
   SquarePlus,
   Save,
   Star,
@@ -403,6 +404,14 @@ const DIAL_STEPS: [step: number, at: number][] = [
 
 /** Narrower than this, the pop-up is a phone's: the picture across the screen, the controls in bands above and below it. */
 const PHONE_BELOW = 640;
+/**
+ * A phone turned sideways (21 Nov 2026, Martin: "tilting the phone sideways and the designer fills the screen"): wider
+ * than it is tall and no taller than this. The pop-up is then the whole screen (globals.css, the same test) and the
+ * picture takes all the height under the figures.
+ */
+const SIDEWAYS_BELOW = 500;
+const TURN_HINT_KEY = "renuabl.design.turn-hint";
+const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
 /** The bands on a phone: above the picture the kit, the tools and Publish; below it the picture's switch and Ask Sol, then the rail as a toolbar at the foot. */
 const PHONE_BANDS = { above: 214, below: 204, rail: 56 };
 
@@ -565,6 +574,8 @@ function Dial(props: {
   onRemove?: () => void;
   /** Graphite with an orange ring (as Primero's, for what is picked), in place of the light plate. */
   dark?: boolean;
+  /** On a phone, upright or sideways, drawn smaller from the picture's edge so it leaves the roof in view. */
+  small?: boolean;
   children: React.ReactNode;
 }) {
   // In rem: the dial's radius, and how far out from its centre (the middle of the picture's right edge) the rounds sit.
@@ -579,6 +590,7 @@ function Dial(props: {
     <div
       className={clsx(
         "absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 shadow-lift backdrop-blur-md",
+        props.small && "origin-right scale-[0.7]",
         // Black glass, as the menus over the picture (10 Nov 2026, Martin): the map shows through, softened.
         props.dark
           ? "border-sun-line bg-surface/75 text-white ring-2 ring-sun-line backdrop-saturate-150"
@@ -1317,6 +1329,26 @@ export function RoofDesigner(props: {
       // Storage is off: the Designer view opens.
     }
   }, []);
+  // On a phone held upright, a line saying the designer fills the screen turned sideways (21 Nov 2026, Martin), until put
+  // away on this device.
+  const [turnHint, setTurnHint] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTurnHint(window.localStorage.getItem(TURN_HINT_KEY) !== "1");
+    } catch {
+      // Storage is off: the hint shows for the visit.
+      setTurnHint(true);
+    }
+  }, []);
+  const putTurnHintAway = () => {
+    setTurnHint(false);
+    try {
+      window.localStorage.setItem(TURN_HINT_KEY, "1");
+    } catch {
+      // Storage is off: it stays away for the visit.
+    }
+  };
   // The quote's short view (smaller, group totals only), so the picture spreads out; kept on this device like the open state.
   const [quoteShort, setQuoteShort] = useState(false);
   useEffect(() => {
@@ -1636,6 +1668,7 @@ export function RoofDesigner(props: {
   // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
   // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
   const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number } | null>(null);
+  const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
     // Whether this is the pop-up is known a moment after the page: measured again then.
@@ -1647,7 +1680,10 @@ export function RoofDesigner(props: {
     const measure = () => {
       const box = strip.getBoundingClientRect();
       const top = box.top + window.scrollY;
-      const room = window.innerHeight - top - box.height - 8 - 16 - (footRoomNow.current ?? 0);
+      // Sideways the picture runs to the foot of the screen: what stands under it (the address) is a scroll away.
+      const turned = Boolean(tightNow.current) && isSideways();
+      setSideways(turned);
+      const room = window.innerHeight - top - box.height - (turned ? 8 : 8 + 16 + (footRoomNow.current ?? 0));
       // (A frame not yet shown has no width: that isn't a phone.)
       if (tightNow.current && window.innerWidth > 0 && window.innerWidth < PHONE_BELOW) {
         const across = strip.parentElement?.clientWidth ?? window.innerWidth;
@@ -5859,6 +5895,7 @@ export function RoofDesigner(props: {
 
   const designsMenu = (
     <div
+      data-opened
       className={clsx(
         "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
         props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
@@ -6059,8 +6096,10 @@ export function RoofDesigner(props: {
               )}
             >
               <Layers className="size-4" aria-hidden />
+              {/* Sideways the word gives way to the kit beside it: the layers mark says what it is. */}
               <span>
-                Design {active + 1}
+                <span className={clsx(sideways && "sr-only")}>Design </span>
+                {active + 1}
                 {designs.length > 1 ? ` of ${designs.length}` : ""}
               </span>
               {designs.length > 1 && active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-label="primary" />}
@@ -6355,7 +6394,7 @@ export function RoofDesigner(props: {
           props.tight
             ? phone
               ? "absolute inset-x-3 flex h-12 flex-row items-center"
-              : "absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center"
+              : clsx("absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center", sideways && "designer-compact-rail")
             : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
         style={phone && stage ? { top: 8 + stage.top + 6 + stage.pt + stage.photoH + stage.pb + 4 } : undefined}
@@ -6667,7 +6706,9 @@ export function RoofDesigner(props: {
         )}
       </header>
 
-      <div className={clsx("relative", props.tight ? (phone ? "" : "pl-[4.25rem] pr-11") : "mt-5")}>
+      {/* Room for the window's close round on the right: sideways it shares a row with the figures only, so the figures
+          keep clear of it and the picture runs to the edge. */}
+      <div className={clsx("relative", props.tight ? (phone ? "" : sideways ? "pl-12" : "pl-[4.25rem] pr-11") : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -6677,7 +6718,13 @@ export function RoofDesigner(props: {
               className={clsx(
                 "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
                 // On a phone it wraps, and keeps clear of the window's close round in the corner.
-                props.tight ? (phone ? "mb-1.5 mr-11 flex-wrap" : "mb-1.5 flex-nowrap") : "mb-2 flex-wrap",
+                props.tight
+                  ? phone
+                    ? "mb-1.5 mr-11 flex-wrap"
+                    : sideways
+                      ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
+                      : "mb-1.5 flex-nowrap"
+                  : "mb-2 flex-wrap",
               )}
               style={{ maxWidth: fit }}
               aria-label="This design in figures"
@@ -7103,7 +7150,7 @@ export function RoofDesigner(props: {
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
               ref={picBox}
-              className="glass-dark relative mx-auto"
+              className={clsx("glass-dark relative mx-auto", sideways && "designer-compact")}
               style={
                 {
                   maxWidth: fit,
@@ -8576,8 +8623,8 @@ export function RoofDesigner(props: {
                   "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
                   // On a phone it stands over Ask Sol, not beside it.
                   props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
-                  // The day's bar takes the foot of the picture while it plays.
-                  homeDay.on && "hidden",
+                  // The day's bar takes the foot of the picture while it plays; sideways the dial for what is picked does.
+                  (homeDay.on || (sideways && picks.length > 0)) && "hidden",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -8686,7 +8733,8 @@ export function RoofDesigner(props: {
                   reading={pitchReading}
                 />
               )}
-              {!quoteNow.form.pitchSet && (
+              {/* Sideways there is no room for both: Sol's step first, the pitch after it. */}
+              {!quoteNow.form.pitchSet && !(sideways && guideActive) && (
                 <PitchFirst
                   key={`${active}-${pitchGuess?.at === spotKey ? pitchGuess.read.pitch : ""}`}
                   pitch={pitchGuess?.at === spotKey && !pitchGuess.read.flat ? pitchGuess.read.pitch : (quoteNow.form.pitch ?? TILT.roof)}
@@ -9417,6 +9465,7 @@ export function RoofDesigner(props: {
                 <Dial
                   label="What is picked"
                   dark
+                  small={sideways || phone}
                   onTurn={null}
                   onClose={() => setPicks([])}
                   closeTitle="Pick none (Esc)"
@@ -9482,6 +9531,7 @@ export function RoofDesigner(props: {
                 face && (
                   <Dial
                     label="Turn the rows"
+                    small={sideways || phone}
                     // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
                     onTurn={(step) => {
                       const angle = ((((face.angle + step + 90) % 180) + 180) % 180) - 90;
@@ -10463,6 +10513,22 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {tips.corner}
+              {phone && stage && turnHint && (
+                <div className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center" style={{ top: stage.pt + 8 }}>
+                  <p className="flex items-center gap-2 rounded-full bg-primary/90 py-1.5 pl-3 pr-1.5 text-[12.5px] text-white shadow-lift backdrop-blur-md">
+                    <Smartphone className="size-3.5 rotate-90 text-sun-line" aria-hidden />
+                    Turn your phone sideways for a bigger view
+                    <button
+                      type="button"
+                      onClick={putTurnHintAway}
+                      aria-label="Put this away"
+                      className="flex size-6 items-center justify-center rounded-full text-white/60 hover:text-white"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  </p>
+                </div>
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideActive && !menu && !(props.tight && !solAway && (commandReply || commandBusy)) && (
                 <div
@@ -10470,7 +10536,10 @@ export function RoofDesigner(props: {
                     "pointer-events-none absolute inset-x-0 flex justify-center",
                     // Above Sol's box while it is open (16 Nov 2026, Martin: the box hid the step at hand).
                     props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
-                    !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
+                    // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
+                    sideways
+                      ? "sideways-sol bottom-2"
+                      : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
                   style={phone && stage ? { top: stage.pt + stage.photoH + 6 } : undefined}
@@ -10545,7 +10614,12 @@ export function RoofDesigner(props: {
                 !calcOpen &&
                 !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
                 !(!props.tight && commandOpen) && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-[6.25rem] z-30 flex justify-center">
+                  <div
+                    className={clsx(
+                      "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
+                      sideways ? "sideways-sol bottom-2" : "bottom-[6.25rem]",
+                    )}
+                  >
                     <SolNudges
                       nudges={nudges}
                       onAct={actOnNudge}

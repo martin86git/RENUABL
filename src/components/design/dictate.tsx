@@ -32,45 +32,83 @@ export function DictateButton({
   }, [onWords, onHearing]);
   // Leaving the page stops it.
   useEffect(() => () => rec.current?.stop(), []);
+  // A problem is said beside the button (a title never shows on a phone), then goes.
+  useEffect(() => {
+    if (!problem) return;
+    const t = window.setTimeout(() => setProblem(""), 7000);
+    return () => window.clearTimeout(t);
+  }, [problem]);
 
   const stop = () => {
     const r = rec.current;
     rec.current = null;
     r?.stop();
     setOn(false);
-    heard.current?.("");
   };
-  const start = () => {
+  const start = (lang = "en-AU") => {
     const R = recognitionClass();
-    if (!R) return;
+    if (!R) {
+      setProblem(NO_DICTATION);
+      return;
+    }
     setProblem("");
+    // On a phone (21 Nov 2026, Martin: dictation didn't work on mobile): Android's Chrome repeats words in continuous
+    // mode and beeps on every restart, and iPhone's Safari won't start again without a tap. So a phone listens for one
+    // go and stops by itself after a pause; a tap listens again.
+    const phone = dictationOnPhone();
     const r = new R();
-    r.continuous = true;
+    r.continuous = !phone;
     r.interimResults = true;
-    r.lang = "en-AU";
+    r.lang = lang;
+    // What is being said and not yet final: kept so a stop that never gets a final result (Safari) doesn't lose it.
+    let pending = "";
+    let gotWords = false;
     r.onresult = (e) => {
       let now = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const said = e.results[i][0].transcript.trim();
         if (!said) continue;
-        if (e.results[i].isFinal) words.current(said);
-        else now += `${said} `;
+        gotWords = true;
+        if (e.results[i].isFinal) {
+          words.current(said);
+          pending = "";
+        } else now += `${said} `;
       }
-      heard.current?.(now.trim());
+      pending = now.trim();
+      heard.current?.(pending);
     };
     r.onerror = (e) => {
-      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-        setProblem("The microphone isn't allowed for this site: allow it in the address bar.");
+      const why = DICTATION_ERRORS[e.error];
+      if (e.error === "language-not-supported" && lang === "en-AU") {
+        rec.current = null;
+        r.onend = null;
+        start(typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US");
+        return;
+      }
+      if (why) {
+        setProblem(why);
         stop();
       }
     };
-    // Chrome stops after a quiet spell: carry on while it is switched on.
     r.onend = () => {
+      if (pending) {
+        words.current(pending);
+        pending = "";
+      }
+      heard.current?.("");
       if (rec.current !== r) return;
+      if (phone) {
+        rec.current = null;
+        setOn(false);
+        if (!gotWords) setProblem(DICTATION_ERRORS["no-speech"]);
+        return;
+      }
+      // Chrome on a computer stops after a quiet spell: carry on while it is switched on.
       try {
         r.start();
       } catch {
-        /* already starting */
+        rec.current = null;
+        setOn(false);
       }
     };
     rec.current = r;
@@ -78,30 +116,62 @@ export function DictateButton({
       r.start();
       setOn(true);
     } catch {
-      setProblem("The microphone couldn't be started.");
+      rec.current = null;
+      setProblem("The microphone couldn't be started. Tap again, or use the microphone on your keyboard.");
     }
   };
 
   return (
-    <button
-      type="button"
-      disabled={!supported}
-      onClick={() => (on ? stop() : start())}
-      aria-pressed={on}
-      aria-label={on ? "Stop listening" : label}
-      title={problem || (supported ? (on ? "Listening: tap to stop" : "Speak instead of typing") : "Speaking works in Chrome or Edge.")}
-      className={clsx(
-        "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition disabled:text-muted",
-        on
-          ? "animate-pulse bg-positive text-white ring-4 ring-positive/30"
-          : problem
-            ? "text-danger ring-1 ring-danger"
-            : "text-ink-2 hover:bg-canvas hover:text-ink",
-      )}
-    >
-      {supported ? <Mic className="size-4" aria-hidden /> : <MicOff className="size-4" aria-hidden />}
-    </button>
+    <span className="relative inline-flex shrink-0">
+      <button
+        type="button"
+        onClick={() => (on ? stop() : start())}
+        aria-pressed={on}
+        aria-label={on ? "Stop listening" : label}
+        title={problem || (supported ? (on ? "Listening: tap to stop" : "Speak instead of typing") : NO_DICTATION)}
+        className={clsx(
+          "inline-flex size-8 shrink-0 items-center justify-center rounded-full transition",
+          on
+            ? "animate-pulse bg-positive text-white ring-4 ring-positive/30"
+            : problem
+              ? "text-danger ring-1 ring-danger"
+              : supported
+                ? "text-ink-2 hover:bg-canvas hover:text-ink"
+                : "text-muted",
+        )}
+      >
+        {supported ? <Mic className="size-4" aria-hidden /> : <MicOff className="size-4" aria-hidden />}
+      </button>
+      {problem ? (
+        <span
+          role="status"
+          className="absolute bottom-full right-0 z-30 mb-2 w-60 rounded-xl bg-primary px-3 py-2 text-left text-[12.5px] leading-snug text-primary-ink shadow-lg"
+        >
+          {problem}
+        </span>
+      ) : null}
+    </span>
   );
+}
+
+const NO_DICTATION = "This browser can't turn speech into words. Use the microphone on your keyboard instead.";
+
+/** What each of the browser's errors means for the person tapping the microphone. "aborted" is our own stop. */
+const DICTATION_ERRORS: Record<string, string> = {
+  "not-allowed": "The microphone isn't allowed for this site. Allow it in your browser's site settings, then tap again.",
+  "service-not-allowed":
+    "Speech to text is switched off on this device (on an iPhone: Settings, General, Keyboard, Enable Dictation). Or use the microphone on your keyboard.",
+  "audio-capture": "No sound came through from the microphone. Check another app isn't using it, then tap again.",
+  network: "Speech to text needs a connection and couldn't reach it. Tap again, or use the microphone on your keyboard.",
+  "no-speech": "Didn't hear anything. Tap and speak straight away.",
+  "language-not-supported": "This browser can't take dictation in English here. Use the microphone on your keyboard.",
+};
+
+/** A touch screen with no fine pointer: a phone or tablet. */
+function dictationOnPhone(): boolean {
+  if (typeof window === "undefined") return false;
+  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  return coarse || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 /** Adds spoken words where a box's words end, with a space between and a capital to start. */

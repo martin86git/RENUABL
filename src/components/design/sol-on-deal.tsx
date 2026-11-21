@@ -339,7 +339,10 @@ export function SolTerminal(props: {
         />
       )}
       <div className="flex gap-3 p-3.5 sm:gap-3.5 sm:p-4">
-        <SolLive />
+        {/* On a phone his sun is small and sits in his first line, so his words run from the card's left edge. */}
+        <span className="max-sm:hidden">
+          <SolLive />
+        </span>
         {/* Compact on the deal page too (19 Nov 2026, Martin: "sol is taking up too much space. make smarter design. reduce
             text size"): smaller words, and his draft beside his line and buttons wherever the card is wide enough. */}
         <div
@@ -351,6 +354,9 @@ export function SolTerminal(props: {
           <div>
             <div>
               <p className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink" aria-live="polite">
+                <span className="float-left mr-2 mt-px sm:hidden" aria-hidden>
+                  <SolMark className="size-6" />
+                </span>
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>

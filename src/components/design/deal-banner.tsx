@@ -98,38 +98,52 @@ export function DealBanner({
   const where = job.address || customer.address;
 
   return (
-    <section className="overflow-hidden rounded-[24px] bg-primary text-white shadow-[0_8px_30px_rgba(11,11,12,0.10)]">
+    <section className="overflow-hidden rounded-[24px] bg-primary max-sm:rounded-[20px] text-white shadow-[0_8px_30px_rgba(11,11,12,0.10)]">
       <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,34%)]">
         <div
           className={clsx(
-            "flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-4",
-            compact ? "px-5 py-4 sm:px-6" : "p-5 sm:p-6",
+            "min-w-0",
+            // On a phone (21 Nov 2026, Martin): smaller, the kit stacked down the right beside who it's for.
+            "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2.5 max-sm:p-4",
+            "sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4",
+            compact ? "sm:px-6 sm:py-4" : "sm:p-6",
           )}
         >
           <div className="min-w-0">
-            <h1 className={clsx("truncate leading-tight tracking-tight", compact ? "text-[21px]" : "text-[26px] sm:text-[28px]")}>
+            <h1
+              className={clsx(
+                "truncate leading-tight tracking-tight max-sm:text-[20px]",
+                compact ? "text-[21px]" : "text-[26px] sm:text-[28px]",
+              )}
+            >
               {customer.name}
             </h1>
-            <p className="mt-0.5 truncate text-sm text-white/75">
+            <p className="mt-0.5 truncate text-sm text-white/75 max-sm:text-[12.5px]">
               {where || "No address yet"}
               {job.title ? ` · ${job.title}` : ""}
             </p>
-            <div className={clsx("flex flex-wrap items-center gap-2", compact ? "mt-2" : "mt-3")}>
+            <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-2 max-sm:gap-1.5", compact ? "mt-2" : "mt-3")}>
               <Chip>{STAGE_LABELS[job.stage]}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
               {pulse && (
-                <span className="[&>*]:mt-0">
+                <span className="max-sm:hidden [&>*]:mt-0">
                   <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
                 </span>
               )}
             </div>
           </div>
           <Kit figures={figures} compact={compact} />
+          {/* The deal's clock and heat on their own line under both on a phone, where the column beside the kit is narrow. */}
+          {pulse && (
+            <div className="col-span-2 sm:hidden [&>*]:mt-0">
+              <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
+            </div>
+          )}
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}
-        <div className={clsx("relative bg-black/20", compact ? "min-h-[6.5rem]" : "min-h-[8.5rem]")}>
+        <div className={clsx("relative bg-black/20", compact ? "min-h-[6.5rem]" : "min-h-[8.5rem] max-sm:min-h-[6.5rem]")}>
           {picture ? (
             <svg
               viewBox={bannerView(drawing?.viewBox ?? null, 1.5, 1.25)}
@@ -174,28 +188,34 @@ export function DealBanner({
  * do): each part the deal knows, as its icon in the signal orange with its size and a few words under it.
  */
 function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }) {
-  if (!figures.length) return <p className="text-[13px] text-white/60">No system designed yet</p>;
+  if (!figures.length)
+    return <p className="text-[13px] text-white/60 max-sm:max-w-[6rem] max-sm:text-right max-sm:text-[12px]">No system designed yet</p>;
   return (
-    <dl className={clsx("flex flex-wrap", compact ? "gap-x-5 gap-y-2" : "gap-x-6 gap-y-3")}>
+    <dl
+      className={clsx(
+        "flex max-sm:flex-col max-sm:items-start max-sm:gap-y-1.5 sm:flex-wrap",
+        compact ? "sm:gap-x-5 sm:gap-y-2" : "sm:gap-x-6 sm:gap-y-3",
+      )}
+    >
       {figures.map((f) => {
         const Icon = KIT_ICONS[f.label] ?? PanelIcon;
         return (
-          <div key={f.label} className="flex min-w-0 items-center gap-2.5">
+          <div key={f.label} className="flex min-w-0 items-center gap-2.5 max-sm:gap-2">
             <span
               className={clsx(
-                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15",
+                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15 max-sm:size-7",
                 compact ? "size-8" : "size-10",
               )}
               aria-hidden
             >
-              <Icon className={compact ? "size-[18px]" : "size-[22px]"} />
+              <Icon className={clsx("max-sm:size-4", compact ? "size-[18px]" : "size-[22px]")} />
             </span>
             <div className="min-w-0">
               <dt className="sr-only">{f.label}</dt>
-              <dd className={clsx("tabular-nums leading-tight text-white", compact ? "text-[14px]" : "text-[16px]")}>
+              <dd className={clsx("tabular-nums leading-tight text-white max-sm:text-[13px]", compact ? "text-[14px]" : "text-[16px]")}>
                 {f.label === "EV charger" ? "EV charger" : f.value}
               </dd>
-              {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60">{f.note}</dd>}
+              {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60 max-sm:hidden">{f.note}</dd>}
             </div>
           </div>
         );
@@ -252,7 +272,7 @@ const KIT_ICONS: Record<string, (p: IconProps) => React.ReactNode> = {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/15">
+    <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/15 max-sm:h-6 max-sm:px-2.5 max-sm:text-[12px]">
       {children}
     </span>
   );
