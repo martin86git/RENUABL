@@ -4380,18 +4380,23 @@ export function RoofDesigner(props: {
    * outlined in gold with everything off it dimmed; any answer takes the outline away.
    */
   const [lot, setLot] = useState<PropertyLot | null>(null);
+  /** The register didn't answer (down, slow, outside Victoria): Sol still asks, on the picture alone. */
+  const [lotMissedAt, setLotMissedAt] = useState<string | null>(null);
+  const lotKey = `${props.address}|${spot.lat},${spot.lng}`;
+  const lotMissing = lotMissedAt === lotKey;
   useEffect(() => {
     let live = true;
     const q = new URLSearchParams({ address: props.address, lat: String(spot.lat), lng: String(spot.lng) });
     fetch(`/api/design/roof/lot?${q}`)
       .then((r) => (r.ok ? (r.json() as Promise<PropertyLot>) : null))
       .then((found) => {
-        if (!live || !found?.nearby) return;
+        if (!live) return;
+        if (!found?.nearby) return setLotMissedAt(lotKey);
         setLot(found);
         const doubt = registerWarning(found, props.address);
         if (doubt) props.onAddressDoubt?.(doubt);
       })
-      .catch(() => undefined);
+      .catch(() => live && setLotMissedAt(lotKey));
     return () => {
       live = false;
     };
@@ -4742,7 +4747,8 @@ export function RoofDesigner(props: {
     };
   })();
   const guideFacts: GuideFacts = {
-    ...(lot ? { lot: true } : {}),
+    // Always asked first (21 Nov 2026, Martin: a new site opened on "First, the home." when the register didn't answer).
+    ...(props.address.trim() ? { lot: true } : {}),
     roof: quoteNow.form.roof,
     suggested: guideSuggested,
     target: guideTarget,
@@ -10475,7 +10481,14 @@ export function RoofDesigner(props: {
                             doubt: lotDoubt(lot),
                             nearby: props.onPickAddress ? lot.nearby : [],
                           }
-                        : null
+                        : {
+                            address: props.address.split(",")[0],
+                            found: true,
+                            doubt: lotMissing
+                              ? "I couldn't check it against the land register just now: check it's the house in the middle of the picture."
+                              : null,
+                            nearby: [],
+                          }
                     }
                     canSearch={Boolean(props.onSearchAddress)}
                     placing={

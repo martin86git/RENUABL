@@ -2,12 +2,12 @@ import { inAustralia } from "@/lib/server/google-solar";
 import { keptPropertyLot } from "@/lib/server/property-lot";
 import { allow } from "@/lib/server/rate-limit";
 
-export const maxDuration = 30;
+export const maxDuration = 45;
 
 /**
  * GET ?address=&lat=&lng=: the lot the address is registered to on Victoria's land register, in metres on the
  * designer's picture (centred on lat/lng), with the homes round about. 404 when none is found (outside Victoria, or the
- * register can't be reached): the designer then simply asks nothing about the house.
+ * register can't be reached): Sol still asks "Is this the home?", on the picture alone.
  */
 export async function GET(request: Request) {
   const u = new URL(request.url);

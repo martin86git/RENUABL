@@ -25,9 +25,16 @@ async function features(layer: string, filter: string, fields?: string): Promise
   url.searchParams.set("cql_filter", filter);
   url.searchParams.set("count", "300");
   if (fields) url.searchParams.set("propertyName", fields);
-  const res = await fetch(url, { signal: AbortSignal.timeout(8_000), next: { revalidate: 86_400 } });
-  if (!res.ok) throw new Error(`Vicmap ${layer} ${res.status}`);
-  return ((await res.json()) as { features?: Feature[] }).features ?? [];
+  // One more try (21 Nov 2026): the register is sometimes slow or briefly down, and a miss skips the outline.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8_000), next: { revalidate: 86_400 } });
+      if (!res.ok) throw new Error(`Vicmap ${layer} ${res.status}`);
+      return ((await res.json()) as { features?: Feature[] }).features ?? [];
+    } catch (e) {
+      if (attempt >= 1) throw e;
+    }
+  }
 }
 
 const coordinate = (n: number) => n.toFixed(6);
