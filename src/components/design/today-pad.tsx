@@ -517,9 +517,9 @@ export function SolBox({
             placeholder={placeholder}
             className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
+          {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
-            <AttachButton attach={attach} />
-            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
+            <AttachButton attach={attach} plus />
             <button
               type="submit"
               disabled={asking || !ready}
@@ -528,10 +528,12 @@ export function SolBox({
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
+            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
           </div>
         </>
       ) : (
         <div className="flex items-center gap-1.5">
+          <AttachButton attach={attach} plus />
           <SolBadge className="size-5 shrink-0" />
           <label className="sr-only" htmlFor={id}>
             Ask Sol
@@ -548,8 +550,6 @@ export function SolBox({
             placeholder={placeholder}
             className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
           />
-          <AttachButton attach={attach} />
-          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
           <button
             type="submit"
             disabled={asking || !ready}
@@ -558,6 +558,7 @@ export function SolBox({
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>
+          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
         </div>
       )}
     </form>

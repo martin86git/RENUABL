@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, Paperclip, X } from "lucide-react";
+import { FileText, Paperclip, Plus, X } from "lucide-react";
 import { MAX_FILE_CHARS, MAX_FILES, SOL_FILE_TYPES, type SolFile } from "@/lib/domain/design/sol";
 
 function base64Of(f: File): Promise<string> {
@@ -43,8 +43,8 @@ export function useSolAttach() {
 
 export type SolAttach = ReturnType<typeof useSolAttach>;
 
-/** The paperclip: a PDF (a bill, a datasheet) or a picture to put on the message. */
-export function AttachButton({ attach, size = "size-9" }: { attach: SolAttach; size?: string }) {
+/** The paperclip (or a +, as Claude Code's box has): a PDF (a bill, a datasheet) or a picture to put on the message. */
+export function AttachButton({ attach, size = "size-9", plus = false }: { attach: SolAttach; size?: string; plus?: boolean }) {
   const picker = useRef<HTMLInputElement>(null);
   const full = attach.files.length >= MAX_FILES;
   return (
@@ -68,7 +68,7 @@ export function AttachButton({ attach, size = "size-9" }: { attach: SolAttach; s
         title="Attach a PDF (an electricity bill, a datasheet) or a picture"
         className={`inline-flex ${size} shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-canvas hover:text-ink disabled:text-muted`}
       >
-        <Paperclip className="size-[18px]" aria-hidden />
+        {plus ? <Plus className="size-[18px]" aria-hidden /> : <Paperclip className="size-[18px]" aria-hidden />}
       </button>
     </>
   );
