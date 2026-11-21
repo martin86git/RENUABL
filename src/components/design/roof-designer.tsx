@@ -1704,7 +1704,7 @@ export function RoofDesigner(props: {
   const [foldPx, setFoldPx] = useState<number | null>(null);
   // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
   // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
-  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number; across: number } | null>(null);
+  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number; across: number; bleed: number } | null>(null);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1723,7 +1723,10 @@ export function RoofDesigner(props: {
       const room = window.innerHeight - top - box.height - (turned ? 8 : 8 + 16 + (footRoomNow.current ?? 0));
       // (A frame not yet shown has no width: that isn't a phone.)
       if (tightNow.current && window.innerWidth > 0 && window.innerWidth < PHONE_BELOW) {
-        const across = strip.parentElement?.clientWidth ?? window.innerWidth;
+        // Full bleed (21 Nov 2026, Martin): the picture runs the screen's whole width, past the column's own margins.
+        const column = strip.parentElement?.getBoundingClientRect();
+        const bleed = column ? Math.max(0, Math.round(column.left)) : 0;
+        const across = window.innerWidth;
         // As tall as the screen allows under the kit's half and over the toolbar, Ask Sol and the rail: never shorter
         // than the photo's own shape, never taller than PHONE_TALLEST times its width.
         const shortest = Math.round((across * ROOF_IMAGE.height) / ROOF_IMAGE.width);
@@ -1733,9 +1736,9 @@ export function RoofDesigner(props: {
         const pb = PHONE_BANDS.below;
         const stripH = Math.round(box.height);
         setStage((was) =>
-          was && was.photoH === photoH && was.pb === pb && was.top === stripH && was.across === across
+          was && was.photoH === photoH && was.pb === pb && was.top === stripH && was.across === across && was.bleed === bleed
             ? was
-            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across },
+            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across, bleed },
         );
       } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
@@ -7356,6 +7359,9 @@ export function RoofDesigner(props: {
                     ? {
                         paddingTop: stage.pt,
                         paddingBottom: phoneBelow,
+                        marginLeft: -stage.bleed,
+                        marginRight: -stage.bleed,
+                        maxWidth: "none",
                         marginBottom: PHONE_BANDS.rail,
                         "--pic-h": `${stage.photoH + phoneBelow}px`,
                       }
@@ -7831,7 +7837,7 @@ export function RoofDesigner(props: {
                   Hold Ctrl (⌘ on a Mac) and scroll to zoom
                 </p>
               )}
-              <div className="relative overflow-hidden rounded-lg bg-surface-2">
+              <div className={clsx("relative overflow-hidden bg-surface-2", phone ? "rounded-none" : "rounded-lg")}>
                 {zooming && (
                   <div
                     className="absolute inset-0 z-[5] touch-none"
