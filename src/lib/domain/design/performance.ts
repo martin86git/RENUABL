@@ -1,0 +1,189 @@
+import { todayInMarket } from "../market";
+import type { ISODate } from "../types";
+import { WON_STAGES, INSTALLED_STAGES, type Job } from "./crm";
+import { jobHas } from "./customers";
+
+/**
+ * Performance on Today's tray (21 Nov 2026, Martin: "i should also be able to toggle the performance dates (set
+ * different ranges). and i should be able to customise the fields being reported"). Read by rule from the deals the
+ * member may see, each figure against the period before it of the same length. Sales count as the deal-level
+ * dashboard does (deal.ts `dashboard`): a deal at a won stage, on the day it was won, at its price with GST.
+ */
+
+export const PERF_RANGES = [
+  { id: "month", label: "This month" },
+  { id: "last-month", label: "Last month" },
+  { id: "quarter", label: "This quarter" },
+  { id: "last-quarter", label: "Last quarter" },
+  { id: "fy", label: "This financial year" },
+  { id: "30d", label: "Last 30 days" },
+  { id: "90d", label: "Last 90 days" },
+  { id: "custom", label: "Custom" },
+] as const;
+export type PerfRange = (typeof PERF_RANGES)[number]["id"];
+
+export const PERF_METRICS = [
+  { id: "sales", label: "Sales", kind: "dollars" },
+  { id: "sold", label: "Deals sold", kind: "count" },
+  { id: "average", label: "Average deal", kind: "dollars" },
+  { id: "kw", label: "kW sold", kind: "kw" },
+  { id: "batteries", label: "Batteries sold", kind: "count" },
+  { id: "leads", label: "New leads", kind: "count" },
+  { id: "conversion", label: "Leads to sales", kind: "share" },
+  { id: "installs", label: "Installs done", kind: "count" },
+] as const;
+export type PerfMetric = (typeof PERF_METRICS)[number]["id"];
+export type PerfKind = (typeof PERF_METRICS)[number]["kind"];
+
+/** What Performance shows until the member chooses. */
+export const DEFAULT_METRICS: PerfMetric[] = ["sales", "sold", "kw", "leads"];
+
+export interface PerfPeriod {
+  from: ISODate;
+  to: ISODate;
+  /** The period before it of the same length, to compare with. */
+  prevFrom: ISODate;
+  prevTo: ISODate;
+}
+
+const DAY = 86_400_000;
+const at = (d: ISODate) => Date.parse(`${d}T00:00:00Z`);
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+const addDays = (d: ISODate, n: number) => iso(at(d) + n * DAY);
+const two = (n: number) => String(n).padStart(2, "0");
+const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+/** The first of a month `n` months from (y, m), as [year, month]. */
+const shift = (y: number, m: number, n: number): [number, number] => {
+  const k = y * 12 + (m - 1) + n;
+  return [Math.floor(k / 12), (k % 12) + 1];
+};
+const first = (y: number, m: number) => `${y}-${two(m)}-01`;
+const last = (y: number, m: number) => `${y}-${two(m)}-${two(lastDayOf(y, m))}`;
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const isDay = (d: unknown): d is ISODate => typeof d === "string" && ISO_DAY.test(d) && !Number.isNaN(at(d));
+
+/**
+ * The days a range covers, up to today, and the period before it. A period still running (this month, quarter or
+ * year) is compared with the same number of days of the one before; a finished one with the whole one before.
+ */
+export function perfPeriod(range: PerfRange, today: ISODate, custom?: { from: ISODate; to: ISODate } | null): PerfPeriod {
+  const [y, m, d] = today.split("-").map(Number);
+  const running = (from: ISODate, prevFrom: ISODate): PerfPeriod => {
+    const days = Math.round((at(today) - at(from)) / DAY);
+    return { from, to: today, prevFrom, prevTo: addDays(prevFrom, days) };
+  };
+  const whole = (from: ISODate, to: ISODate): PerfPeriod => {
+    const days = Math.round((at(to) - at(from)) / DAY) + 1;
+    return { from, to, prevFrom: addDays(from, -days), prevTo: addDays(from, -1) };
+  };
+  const quarterStart = (qy: number, qm: number): [number, number] => [qy, qm - ((qm - 1) % 3)];
+  switch (range) {
+    case "last-month": {
+      const [ly, lm] = shift(y, m, -1);
+      const [py, pm] = shift(y, m, -2);
+      return { from: first(ly, lm), to: last(ly, lm), prevFrom: first(py, pm), prevTo: last(py, pm) };
+    }
+    case "quarter": {
+      const [qy, qm] = quarterStart(y, m);
+      const [py, pm] = shift(qy, qm, -3);
+      return running(first(qy, qm), first(py, pm));
+    }
+    case "last-quarter": {
+      const [qy, qm] = shift(...quarterStart(y, m), -3);
+      const [ey, em] = shift(qy, qm, 2);
+      const [py, pm] = shift(qy, qm, -3);
+      const [pey, pem] = shift(py, pm, 2);
+      return { from: first(qy, qm), to: last(ey, em), prevFrom: first(py, pm), prevTo: last(pey, pem) };
+    }
+    case "fy": {
+      const fy = m >= 7 ? y : y - 1;
+      return running(`${fy}-07-01`, `${fy - 1}-07-01`);
+    }
+    case "30d":
+      return whole(addDays(today, -29), today);
+    case "90d":
+      return whole(addDays(today, -89), today);
+    case "custom":
+      if (custom && isDay(custom.from) && isDay(custom.to)) {
+        const [from, to] = custom.from <= custom.to ? [custom.from, custom.to] : [custom.to, custom.from];
+        return whole(from, to > today ? today : to);
+      }
+      return perfPeriod("month", today);
+    default: {
+      const [py, pm] = shift(y, m, -1);
+      // The same days of last month, never past its end.
+      return { from: first(y, m), to: today, prevFrom: first(py, pm), prevTo: `${py}-${two(pm)}-${two(Math.min(d, lastDayOf(py, pm)))}` };
+    }
+  }
+}
+
+type PerfJob = Pick<Job, "stage" | "value" | "kw" | "wonAt" | "installedAt" | "createdAt" | "title" | "details"> & { sample?: boolean };
+
+export interface PerfFigure {
+  metric: PerfMetric;
+  label: string;
+  kind: PerfKind;
+  value: number | null;
+  prev: number | null;
+  /** The change on the period before, as a share (0.25 = up a quarter); null with nothing to compare. */
+  change: number | null;
+}
+
+/** The figures for one period, by metric. */
+function figuresIn(jobs: readonly PerfJob[], from: ISODate, to: ISODate): Record<PerfMetric, number | null> {
+  const day = (when: string | null) => (when ? todayInMarket(new Date(when)) : null);
+  const inside = (when: string | null) => {
+    const d = day(when);
+    return d !== null && d >= from && d <= to;
+  };
+  const sold = jobs.filter((j) => WON_STAGES.includes(j.stage) && inside(j.wonAt));
+  const sales = sold.reduce((n, j) => n + (j.value ?? 0), 0);
+  const leads = jobs.filter((j) => inside(j.createdAt)).length;
+  return {
+    sales,
+    sold: sold.length,
+    average: sold.length ? Math.round(sales / sold.length) : null,
+    kw: Math.round(sold.reduce((n, j) => n + (j.kw ?? 0), 0) * 100) / 100,
+    batteries: sold.filter((j) => jobHas(j).battery).length,
+    leads,
+    conversion: leads ? sold.length / leads : null,
+    installs: jobs.filter((j) => INSTALLED_STAGES.includes(j.stage) && inside(j.installedAt)).length,
+  };
+}
+
+/** Each metric asked for, in the order asked, for the period and the one before it. Sample deals are left out. */
+export function performance(jobs: readonly PerfJob[], period: PerfPeriod, metrics: readonly PerfMetric[]): PerfFigure[] {
+  const real = jobs.filter((j) => !j.sample);
+  const now = figuresIn(real, period.from, period.to);
+  const before = figuresIn(real, period.prevFrom, period.prevTo);
+  return metrics.map((metric) => {
+    const meta = PERF_METRICS.find((x) => x.id === metric)!;
+    const value = now[metric];
+    const prev = before[metric];
+    const change = value === null || prev === null || prev === 0 ? null : (value - prev) / prev;
+    return { metric, label: meta.label, kind: meta.kind, value, prev, change };
+  });
+}
+
+/** The metrics kept on the device, cleaned: known ones, once each, in order; none kept is the defaults. */
+export function cleanMetrics(raw: unknown): PerfMetric[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_METRICS];
+  const known = new Set<string>(PERF_METRICS.map((x) => x.id));
+  const out = raw.filter((x): x is PerfMetric => typeof x === "string" && known.has(x)).filter((x, i, all) => all.indexOf(x) === i);
+  return out.length ? out : [...DEFAULT_METRICS];
+}
+
+/** A range kept on the device, cleaned. */
+export function cleanRange(raw: unknown): PerfRange {
+  return PERF_RANGES.some((r) => r.id === raw) ? (raw as PerfRange) : "month";
+}
+
+const DATE = new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", timeZone: "UTC" });
+const DATE_YEAR = new Intl.DateTimeFormat("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+/** "1 Nov to 21 Nov", for under the range; with the year when it isn't `thisYear` or the period spans two. */
+export const periodWords = (p: { from: ISODate; to: ISODate }, thisYear?: string) => {
+  const year = p.from.slice(0, 4) !== p.to.slice(0, 4) || (thisYear !== undefined && p.from.slice(0, 4) !== thisYear);
+  const f = year ? DATE_YEAR : DATE;
+  return `${f.format(at(p.from))} to ${f.format(at(p.to))}`;
+};
