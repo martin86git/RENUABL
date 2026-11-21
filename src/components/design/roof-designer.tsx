@@ -149,6 +149,7 @@ import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
+import { clashRefusal, clashWords, clashesWithSupply, supplyClashes } from "@/lib/domain/design/supply-match";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
@@ -1275,6 +1276,9 @@ export function RoofDesigner(props: {
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
   // Whether the inverter list is showing its suggestions for the panels on the design.
   const [suggesting, setSuggesting] = useState(false);
+  // A three-phase inverter picked for a single-phase home (21 Nov 2026, Martin: warn, never let it on blindly): held here
+  // until the home is set to three phase or another inverter is chosen.
+  const [phaseAsk, setPhaseAsk] = useState<{ inverter: CatalogueInverter; count: number } | null>(null);
   // The string the pointer is over, on the picture or in the list of strings: its check is shown.
   const [hover, setHover] = useState<string | null>(null);
   // The string whose check is open on the picture: opened from its tick or cross in the strings box, never by hovering
@@ -1890,6 +1894,11 @@ export function RoofDesigner(props: {
   // The quote's postcode is the roof's own: the one in the address searched for. One typed before that rule stays only where the address has none.
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
+  // Inverters on the design that can't go on the home's supply: a three-phase one on a single-phase home (`supply-match.ts`).
+  const clashNow = supplyClashes(
+    fitted.map((f) => props.inverters.find((i) => i.sku === f.sku) ?? { name: f.name }),
+    quoteNow.form.phase,
+  );
   const everyQuote = () =>
     designs.map((_, i) => {
       const q = quotes[i] ?? defaultQuote(props.postcode);
@@ -1984,6 +1993,11 @@ export function RoofDesigner(props: {
 
   /** Puts a suggestion on the design in place of whatever inverters were there. Strings on an inverter that is gone go back to the first. */
   const takeSuggestion = (to: InverterSuggestion) => {
+    if (clashesWithSupply(to.inverter, quoteNow.form.phase)) {
+      setPhaseAsk({ inverter: to.inverter, count: to.count });
+      return;
+    }
+    setPhaseAsk(null);
     setFitted(
       Array.from({ length: to.count }, (_, n) => ({
         sku: to.inverter.sku,
@@ -2060,6 +2074,11 @@ export function RoofDesigner(props: {
   };
   const addInverter = (to: CatalogueInverter) => {
     if (fitted.length >= MAX_INVERTERS) return;
+    if (clashesWithSupply(to, quoteNow.form.phase)) {
+      setPhaseAsk({ inverter: to, count: 1 });
+      return;
+    }
+    setPhaseAsk(null);
     setFitted([
       ...fitted,
       {
@@ -3392,6 +3411,14 @@ export function RoofDesigner(props: {
   const [publishing, setPublishing] = useState(false);
   /** Publish: the design is saved, then its proposal is made from it (`onPublish`), and any problem with either is said. */
   const publish = async (note = "") => {
+    // Never a proposal with a three-phase inverter on a single-phase home (21 Nov 2026, Martin).
+    if (clashNow.length) {
+      setSent({
+        ok: false,
+        message: `Not published: ${clashNow.join(", ")} is a three-phase inverter on a single-phase home. Choose a single-phase inverter, or set the home to three phase if it is.`,
+      });
+      return;
+    }
     setPublishing(true);
     setSent(null);
     const kept = await save();
@@ -3688,6 +3715,7 @@ export function RoofDesigner(props: {
       solarVic: { on: Boolean(quoteNow.form.solarVicRebate), bar: solarVicBar(quoteNow.form, summary.panels, props.rates) },
       phase: quoteNow.form.phase,
       inverterKw: fittedKw,
+      supplyClash: clashNow,
     });
   })();
   const light = readinessLight(ready);
@@ -5363,6 +5391,7 @@ export function RoofDesigner(props: {
       case "inverter": {
         const to = pickByQuery(props.inverters, command.query);
         if (!to) return `No inverter on your lists matches “${command.query}”.`;
+        if (clashesWithSupply(to, quoteNow.form.phase)) return clashRefusal(to.name);
         setFitted([
           {
             sku: to.sku,
@@ -9627,6 +9656,47 @@ export function RoofDesigner(props: {
                             )}
                           </div>
                         )}
+                        {phaseAsk && (
+                          <div role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-2.5" data-phase-ask>
+                            <p className="text-sm font-semibold text-danger">Single-phase home</p>
+                            <p className="mt-1 text-xs leading-relaxed text-ink">{clashWords(phaseAsk.inverter.name)}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <button
+                                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-ink"
+                                onClick={() => setPhaseAsk(null)}
+                              >
+                                Choose another
+                              </button>
+                              <button
+                                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold"
+                                title="Only if the home really has a three-phase supply: check the meter box or the bill"
+                                onClick={() => {
+                                  const held = phaseAsk;
+                                  setQuote({ ...quoteNow, form: { ...quoteNow.form, phase: "three" } });
+                                  setPhaseAsk(null);
+                                  setFitted(
+                                    [
+                                      ...(held.count > 1 ? [] : fitted),
+                                      ...Array.from({ length: held.count }, (_, n) => ({
+                                        sku: held.inverter.sku,
+                                        name: held.inverter.name,
+                                        kw: held.inverter.kw,
+                                        x: cm((view.x + view.w * (0.8 - (fitted.length + n) * 0.06) - ROOF_IMAGE.width / 2) * scale),
+                                        y: cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+                                      })),
+                                    ].slice(0, MAX_INVERTERS),
+                                  );
+                                  setSuggesting(false);
+                                  openMenu(false);
+                                  setSeek("");
+                                  setSaved("changed");
+                                }}
+                              >
+                                The home is three phase: set it and add
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <p className={clsx(label, "mt-2 px-2 py-1")}>
                           {fitted.length >= MAX_INVERTERS
                             ? `That is the most a design takes (${MAX_INVERTERS})`
@@ -9663,6 +9733,11 @@ export function RoofDesigner(props: {
                                         <span className="block text-sm font-semibold">{i.name}</span>
                                         <ModelNo sku={i.sku} />
                                         <span className="block text-xs tabular-nums text-muted">
+                                          {clashesWithSupply(i, quoteNow.form.phase) && (
+                                            <span className="font-semibold text-danger">
+                                              Three phase: not for this single-phase home ·{" "}
+                                            </span>
+                                          )}
                                           {i.kw} kW ·{" "}
                                           {i.electrical
                                             ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
