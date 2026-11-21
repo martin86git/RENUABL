@@ -87,7 +87,7 @@ describe("the phone assistant's voice", () => {
     const microsoft = australian.filter((v) => v.provider === "azure");
     expect(microsoft.length).toBeGreaterThanOrEqual(6);
     for (const v of microsoft) expect(v.voiceId).toMatch(/^en-AU-[A-Z][a-z]+Neural$/);
-    expect(voiceLabel({ provider: "deepgram", voiceId: "orion" })).toBe("Deepgram voice orion");
+    expect(voiceLabel({ provider: "deepgram", voiceId: "notonourlist" })).toBe("Deepgram voice notonourlist");
   });
 
   it("knows where a voice's sample is, and which voices have none", () => {
@@ -174,7 +174,7 @@ describe("voiceAccent", () => {
     expect(voiceAccent({ words: "British" })).toBe("British");
     expect(voiceAccent({ words: "New Zealand · Microsoft" })).toBe("New Zealand");
     expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(
-      new Set(["Australian", "New Zealand", "Indian English", "Irish", "South African", "British", "Canadian", "American"]),
+      new Set(["Australian", "New Zealand", "Indian English", "Irish", "South African", "British", "Filipino", "Canadian", "American"]),
     );
   });
 });

@@ -575,10 +575,10 @@ export function SolGuide(props: {
   })();
   if (!body) return null;
   return (
-    <div className="pointer-events-auto w-[min(32rem,calc(100vw-2rem))] rounded-[22px] bg-primary/95 px-4 py-3 text-[14px] text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 backdrop-blur-md">
+    <div className="pointer-events-auto w-[min(46rem,calc(100%-2rem))] rounded-[22px] bg-primary/95 px-4 py-2.5 text-[13px] text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 backdrop-blur-md">
       <div className="flex items-start gap-2.5">
         <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
-        <div className="min-w-0 flex-1 leading-relaxed">{body}</div>
+        <div className="min-w-0 flex-1 leading-snug">{body}</div>
         {props.onBack && (
           <button
             type="button"
