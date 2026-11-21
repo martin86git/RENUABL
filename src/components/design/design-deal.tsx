@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  ArrowLeft,
   ChevronLeft,
   ClipboardList,
   FileText,
@@ -22,7 +23,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -514,6 +515,12 @@ export function DealPage({ id }: { id: string }) {
     name: customer.firstName,
     onNotes: () => notetaker.current?.start(),
   };
+  const deleteDeal = async () => {
+    if (!window.confirm(`Delete this deal for ${customer.name}? Its design and history are kept.`)) return;
+    const res = await deleteJob(id);
+    if (res.ok) router.push(PATHS.pipelines);
+    else setStatus(res.message);
+  };
   const setDetail = (key: string, text: string) => {
     const next = { ...job.details };
     if (text) next[key] = text;
@@ -529,11 +536,12 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)] max-sm:-mr-3 max-sm:w-auto max-sm:gap-2.5 max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
       {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />
-      <div className="min-w-0 space-y-4 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
+      <DealMenu mini {...menu} onDelete={deleteDeal} />
+      <div className="min-w-0 space-y-4 max-sm:space-y-3 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
           <DesignDrawer
             src={tool === "proposal" ? proposalHref(job.id) : designHref(job.id)}
@@ -556,11 +564,12 @@ export function DealPage({ id }: { id: string }) {
             back="Back to the deal"
           />
         )}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {/* On a phone the way back and Delete are on the slim rail, so the deal starts at the top. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 max-sm:gap-y-0">
           <Link
             href={PATHS.pipelines}
             data-tour="deal-back"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink max-sm:hidden"
           >
             <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
           </Link>
@@ -577,17 +586,12 @@ export function DealPage({ id }: { id: string }) {
               Sample deal · Show me around
             </button>
           )}
-          <p className="min-h-4 flex-1 text-right text-xs text-muted" role="status">
+          <p className="min-h-4 flex-1 text-right text-xs text-muted max-sm:min-h-0" role="status">
             {status}
           </p>
           <button
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger"
-            onClick={async () => {
-              if (!window.confirm(`Delete this deal for ${customer.name}? Its design and history are kept.`)) return;
-              const res = await deleteJob(id);
-              if (res.ok) router.push(PATHS.pipelines);
-              else setStatus(res.message);
-            }}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger max-sm:hidden"
+            onClick={() => void deleteDeal()}
           >
             <Trash2 className="size-3.5" aria-hidden /> Delete
           </button>
@@ -678,7 +682,7 @@ export function DealPage({ id }: { id: string }) {
                   aria-selected={tab === key}
                   onClick={() => setTab(key)}
                   className={clsx(
-                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors",
+                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors max-sm:px-2.5 max-sm:text-[12px]",
                     tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                   )}
                 >
@@ -1064,6 +1068,7 @@ function CallMenu({
   toBook = false,
   rail = false,
   round,
+  mini = false,
 }: {
   jobId: string;
   phone: string;
@@ -1075,6 +1080,8 @@ function CallMenu({
   round?: "rail" | "row";
   /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
   rail?: boolean;
+  /** The phone's slim rail: a smaller round. */
+  mini?: boolean;
 }) {
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -1106,7 +1113,7 @@ function CallMenu({
           const r = e.currentTarget.getBoundingClientRect();
           setAt(
             round === "rail"
-              ? { top: r.top, left: r.right + 12 }
+              ? { top: r.top, left: Math.max(8, Math.min(r.right + 12, window.innerWidth - 296)) }
               : rail
                 ? { top: r.top, left: Math.max(8, r.left - 296) }
                 : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
@@ -1126,14 +1133,15 @@ function CallMenu({
           <>
             <span
               className={clsx(
-                "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+                "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+                mini ? "size-9" : "size-12",
                 at ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
                 !phone && "text-muted group-hover:text-muted",
               )}
             >
-              <Phone className="size-5" aria-hidden />
+              <Phone className={mini ? "size-4" : "size-5"} aria-hidden />
             </span>
-            <span className={clsx("text-[11px] font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
+            <span className={clsx(mini ? "text-[9.5px]" : "text-[11px]", "font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
           </>
         ) : (
           <>
@@ -1207,6 +1215,7 @@ function useCentredRail() {
  */
 function DealMenu({
   vertical = false,
+  mini = false,
   tab,
   onTab,
   stage,
@@ -1218,8 +1227,11 @@ function DealMenu({
   phone,
   name,
   onNotes,
+  onDelete,
 }: {
   vertical?: boolean;
+  /** The phone's slim rail (21 Nov 2026, Martin): down the left, hard up to the gutter, the way back to Deals first. */
+  mini?: boolean;
   tab: Tab;
   onTab: (tab: Tab) => void;
   stage: JobStage;
@@ -1231,20 +1243,27 @@ function DealMenu({
   phone: string;
   name: string;
   onNotes: () => void;
+  onDelete?: () => void;
 }) {
   const [railRef, railStyle] = useCentredRail();
   const sold = WON_STAGES.includes(stage);
   const installed = INSTALLED_STAGES.includes(stage);
+  const down = vertical || mini;
+  const size = mini ? "size-9" : "size-12";
+  const icon = mini ? "size-4" : "size-5";
   const round = (on: boolean) =>
     clsx(
-      "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+      "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+      size,
       on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
     );
-  const line = <span className={vertical ? "h-px w-8 shrink-0 bg-line" : "mt-6 h-px w-4 shrink-0 bg-line"} aria-hidden />;
+  const line = (
+    <span className={down ? clsx("h-px shrink-0 bg-line", mini ? "w-6" : "w-8") : "mt-6 h-px w-4 shrink-0 bg-line"} aria-hidden />
+  );
   const page = (key: Tab, label: string, title: string, Icon: typeof Mail) => (
-    <RailRound label={label} title={title} onClick={() => onTab(key)} on={tab === key}>
+    <RailRound mini={mini} label={label} title={title} onClick={() => onTab(key)} on={tab === key}>
       <span className={round(tab === key)}>
-        <Icon className="size-5" aria-hidden />
+        <Icon className={icon} aria-hidden />
       </span>
     </RailRound>
   );
@@ -1254,24 +1273,48 @@ function DealMenu({
       style={vertical ? railStyle : undefined}
       aria-label="This deal"
       className={
-        vertical
-          ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
-          : "-mx-1 flex items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden"
+        mini
+          ? "sticky top-3 z-10 -ml-2.5 flex flex-col items-center gap-2 self-start sm:hidden"
+          : vertical
+            ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+            : "-mx-1 hidden items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex xl:hidden [&::-webkit-scrollbar]:hidden"
       }
     >
+      {mini && (
+        <Link
+          href={PATHS.pipelines}
+          data-tour="deal-back"
+          title="Back to Deals"
+          aria-label="Back to Deals"
+          className="flex size-9 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
+        >
+          <ArrowLeft className="size-[18px]" aria-hidden />
+        </Link>
+      )}
       <RailRound
+        mini={mini}
         tour="deal-design"
         label="Design"
         title={designable ? "Design" : "Give the deal an address to design it"}
         onClick={onDesign}
       >
-        <span className="flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105">
-          <PenTool className="size-5" aria-hidden />
+        <span
+          className={clsx(
+            "flex items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105",
+            size,
+          )}
+        >
+          <PenTool className={icon} aria-hidden />
         </span>
       </RailRound>
-      <RailRound tour="deal-proposal" label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
-        <span className="flex size-12 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition group-hover:text-ink">
-          <FileText className="size-5" aria-hidden />
+      <RailRound mini={mini} tour="deal-proposal" label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
+        <span
+          className={clsx(
+            "flex items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition group-hover:text-ink",
+            size,
+          )}
+        >
+          <FileText className={icon} aria-hidden />
         </span>
       </RailRound>
       {line}
@@ -1281,12 +1324,17 @@ function DealMenu({
         aria-label="Reach the customer"
         data-tour="deal-reach"
         className={clsx(
-          "flex shrink-0 gap-3 rounded-[2.25rem] bg-surface/60 ring-1 ring-line",
-          vertical ? "flex-col items-center px-2.5 py-3" : "items-start px-3 py-2.5",
+          "flex shrink-0 rounded-[2.25rem] bg-surface/60 ring-1 ring-line",
+          mini
+            ? "flex-col items-center gap-2 px-1 py-1.5"
+            : vertical
+              ? "flex-col items-center gap-3 px-2.5 py-3"
+              : "items-start gap-3 px-3 py-2.5",
         )}
       >
         <CallMenu
-          round={vertical ? "rail" : "row"}
+          round={down ? "rail" : "row"}
+          mini={mini}
           jobId={jobId}
           phone={phone}
           name={name}
@@ -1298,6 +1346,7 @@ function DealMenu({
       </div>
       {line}
       <RailRound
+        mini={mini}
         tour="deal-details"
         label="Details"
         title="Details: the deal's details, with its notes and chats inside"
@@ -1305,29 +1354,41 @@ function DealMenu({
         on={NOTES_VIEWS.some(([key]) => key === tab)}
       >
         <span className={round(NOTES_VIEWS.some(([key]) => key === tab))}>
-          <LayoutList className="size-5" aria-hidden />
+          <LayoutList className={icon} aria-hidden />
         </span>
       </RailRound>
       {(sold || installed) && line}
       {sold && (
-        <RailRound label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
+        <RailRound mini={mini} label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
           <span className={round(false)}>
-            <HardHat className="size-5" aria-hidden />
+            <HardHat className={icon} aria-hidden />
           </span>
         </RailRound>
       )}
       {installed && page("service", "Service", "Service: something to put right after the install", Wrench)}
       {line}
-      <RailRound label="Sol" title="Sol on this deal" onClick={() => onTab("sol")} on={tab === "sol"}>
+      <RailRound mini={mini} label="Sol" title="Sol on this deal" onClick={() => onTab("sol")} on={tab === "sol"}>
         <span
           className={clsx(
-            "flex size-12 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition group-hover:bg-forest",
+            "flex items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition group-hover:bg-forest",
+            size,
             tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
           )}
         >
-          <SolBadge className="size-[22px]" />
+          <SolBadge className={mini ? "size-[18px]" : "size-[22px]"} />
         </span>
       </RailRound>
+      {mini && onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Delete this deal"
+          aria-label="Delete this deal"
+          className="mt-1 flex size-8 items-center justify-center rounded-full text-muted hover:text-danger"
+        >
+          <Trash2 className="size-3.5" aria-hidden />
+        </button>
+      )}
     </nav>
   );
 }
@@ -1405,6 +1466,7 @@ function RailRound({
   onClick,
   on,
   tour,
+  mini = false,
   children,
 }: {
   label: string;
@@ -1414,6 +1476,8 @@ function RailRound({
   on?: boolean;
   /** Its place in the tour of a deal (deal-tour.ts). */
   tour?: string;
+  /** On the phone's slim rail: smaller words. */
+  mini?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -1424,10 +1488,12 @@ function RailRound({
       title={title}
       aria-label={title}
       aria-pressed={on}
-      className="group flex flex-col items-center gap-1"
+      className={clsx("group flex flex-col items-center", mini ? "gap-0.5" : "gap-1")}
     >
       {children}
-      <span className={clsx("text-[11px] font-medium", on ? "text-ink" : "text-ink-2")}>{label}</span>
+      <span className={clsx(mini ? "text-[9.5px] leading-tight" : "text-[11px]", "font-medium", on ? "text-ink" : "text-ink-2")}>
+        {label}
+      </span>
     </button>
   );
 }

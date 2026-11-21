@@ -53,7 +53,7 @@ import { SolIcon } from "./sol-icon";
  * who sent it, where it stands, the follow-up due (marked called or emailed) with what the customer has had so far, and
  * when it went out. Signed: by month and week with their totals, each with its signed PDF.
  */
-export function ProposalsPage({ signed }: { signed: boolean }) {
+export function ProposalsPage({ signed, bare = false }: { signed: boolean; bare?: boolean }) {
   const [rows, setRows] = useState<ProposalLine[] | null>(null);
   // The business's own follow-up days (its Routines).
   const [days, setDays] = useState<number[] | undefined>(undefined);
@@ -75,8 +75,8 @@ export function ProposalsPage({ signed }: { signed: boolean }) {
   }, []);
 
   return (
-    <div className={ui.page}>
-      <PageHead eyebrow="Sales" title={signed ? "Proposals Signed" : "Proposals Sent"} />
+    <div className={bare ? undefined : ui.page}>
+      {!bare && <PageHead eyebrow="Sales" title={signed ? "Proposals Signed" : "Proposals Sent"} />}
       {problem && (
         <p className="mt-6 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
           {problem}

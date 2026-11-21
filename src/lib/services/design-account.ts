@@ -159,6 +159,8 @@ export interface MemberLine {
   /** Whether they have signed in and accepted the terms yet. */
   joined: boolean;
   permissions: MemberPermissions;
+  /** When their profile photo was last changed, when they have one. */
+  photo?: number;
 }
 
 type MembersAnswer = Answer & { members?: MemberLine[] };
@@ -226,4 +228,27 @@ export async function choosePlan(email: string, seats: number, code?: string): P
   if (!res.ok || !res.url) return res.message ?? UNREACHABLE;
   window.location.assign(res.url);
   return null;
+}
+
+/** A team member's profile photo, by its version so a new one is fetched and an unchanged one stays cached. */
+export const memberPhotoUrl = (email: string, version: number) =>
+  `/api/design/profile/photo?email=${encodeURIComponent(email)}&v=${version}`;
+
+/** Puts the signed-in person's own profile photo in place; answers its new version, or what went wrong. */
+export async function uploadMyPhoto(file: File): Promise<{ photo?: number; problem?: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const res = await fetch("/api/design/profile/photo", { method: "POST", body: form });
+    const body = (await res.json().catch(() => ({}))) as { ok?: boolean; photo?: number; message?: string };
+    return body.ok && body.photo ? { photo: body.photo } : { problem: body.message ?? UNREACHABLE };
+  } catch {
+    return { problem: UNREACHABLE };
+  }
+}
+
+/** Takes the signed-in person's own profile photo away. */
+export async function removeMyPhoto(): Promise<{ problem?: string }> {
+  const res = await send<Answer>("/api/design/profile/photo", "DELETE");
+  return res.ok ? {} : { problem: res.message ?? UNREACHABLE };
 }

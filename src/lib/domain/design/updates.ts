@@ -31,6 +31,77 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-21",
+    area: "Team chat",
+    words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts beyond the free allowance is 50c a minute and 30c a text, and you're emailed at 80% of your spending cap.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The designs menu lists each design's inverter, battery and EV charger, and on a phone it opens over the screen.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The Day button is gone from the designer.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright: a larger roof, smaller buttons, and a magnifier under the roof to pinch and zoom.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone turned sideways, the designer's buttons are smaller, so the roof is in view.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone, turn it sideways and the designer fills the screen, with the roof as large as it goes.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words:
+      "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts is $49 a month with 30 minutes and 30 texts free, then by use, with a spending cap you set.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Cancelling Calls & Texts or Growth gives 30 days' notice: it stays on until then, and you can change your mind.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
+    day: "2026-11-21",
+    area: "CRM",
+    words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Thirteen more Deepgram voices to pick from: British, Filipino and American, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Ten more voices to pick from: New Zealand, Indian, Irish, South African and British, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
     area: "Sol",
     words: "Set up with Sol takes you through the seven things to set up, and ticks each off as it's done.",
   },
@@ -39,6 +110,11 @@ export const UPDATES: readonly Update[] = [
     area: "Calls",
     words:
       "Calls & Texts now says when it's billed and what calls cost, asks for your number itself, and test calls work while it's set up.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Design tool",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
   },
   {
     day: "2026-11-21",

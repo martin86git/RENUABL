@@ -16,7 +16,15 @@ export interface RoofEdge {
   setback: number;
   /** The face the edge belongs to, when it is a traced face's: its outline, for centring between its ends. */
   face?: Point[];
+  /**
+   * The way that face's rows of panels run, in degrees (as `Face.angle`). A side traced by hand can be a few degrees
+   * off the rows; panels settling against it are squared to the rows, so they match the face's other panels.
+   */
+  rows?: number;
 }
+
+/** A traced side within this many degrees of square to its face's rows is taken to be meant square to them. */
+export const ROWS_WITHIN = 5;
 
 /** Within this many degrees of square, a group is turned square to the edge. */
 export const SQUARE_WITHIN = 8;
@@ -88,7 +96,9 @@ export function settleToEdges(group: readonly LoosePanel[], edges: readonly Roof
     // The group must lie alongside the edge, not off past its ends.
     const along = (centre.x - edge.a.x) * dir.x + (centre.y - edge.a.y) * dir.y;
     if (along < -1 || along > len + 1) continue;
-    const turn = offSquare((Math.atan2(ey, ex) * 180) / Math.PI - a0);
+    const drawn = (Math.atan2(ey, ex) * 180) / Math.PI;
+    const squareTo = edge.rows !== undefined && Math.abs(offSquare(drawn - edge.rows)) <= ROWS_WITHIN ? edge.rows : drawn;
+    const turn = offSquare(squareTo - a0);
     if (Math.abs(turn) > SQUARE_WITHIN) continue;
     const normal = { x: -dir.y, y: dir.x };
     const side = Math.sign((centre.x - edge.a.x) * normal.x + (centre.y - edge.a.y) * normal.y) || 1;

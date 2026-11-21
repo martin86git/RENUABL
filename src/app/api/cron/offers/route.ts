@@ -6,6 +6,9 @@ import { sendInstallReminders } from "@/lib/server/design-reminders";
 import { endTwelveMonthPlans } from "@/lib/server/design-twelve-months";
 import { clearOldDemos } from "@/lib/server/design-demo";
 import { remindWatchers } from "@/lib/server/design-market-watch-repo";
+import { endNoticesDue } from "@/lib/server/design-addons";
+import { chargeLastMonth } from "@/lib/server/design-voice-usage";
+import { stripeClient } from "@/lib/server/stripe";
 
 /**
  * Vercel cron (vercel.json): moves lapsed offers on to the next partner and
@@ -43,8 +46,20 @@ export async function GET(request: Request) {
     console.error("old demos not cleared", e instanceof Error ? e.message : e);
     return 0;
   });
+  // Add-ons cancelled with notice (Calls & Texts, 30 days) whose notice has run out: off the plan, number released.
+  const noticesEnded = await endNoticesDue(stripeClient()).catch((e) => {
+    console.error("add-on notices not ended", e instanceof Error ? e.message : e);
+    return 0;
+  });
+  // Last month's Calls & Texts minutes and texts beyond the free allowance, onto each business's next bill (once).
+  const usageCharged = await chargeLastMonth(stripeClient()).catch((e) => {
+    console.error("voice usage not charged", e instanceof Error ? e.message : e);
+    return 0;
+  });
   return Response.json({
     ok: true,
+    noticesEnded,
+    usageCharged,
     ...offers,
     healthReminders,
     unfinishedBriefs,

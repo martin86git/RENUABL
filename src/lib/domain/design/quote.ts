@@ -287,6 +287,12 @@ export interface LineEdit {
   amount?: number;
   /** How many, typed over the worked-out count: the line is priced again at its cost each, unless a cost is typed too. */
   qty?: number;
+  /**
+   * The cost of one, typed over a counted line (21 Nov 2026, Martin: "the current price field should be for the single
+   * unit qty. then the total should be the qty x by the unit price"): the line is that times how many, so it follows
+   * the count as the design changes. An `amount` typed before this (a whole line's cost) still wins.
+   */
+  each?: number;
   removed?: boolean;
   /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
   on?: boolean;
@@ -375,15 +381,45 @@ export function centsWords(perWatt: number): string {
 }
 
 export function lineKey(line: Pick<CostLine, "group" | "label">): string {
+  // An inverter's name keeps its figures: they are its model ("15kW … 3MPPT"), not a count, and two inverters of one
+  // family on a design are two lines (21 Nov 2026: taking one out of the quote took both). Only a count in front goes.
+  if (line.group === "Inverters") return `${line.group}|${line.label.replace(/^\d+ × /, "# × ")}`.slice(0, 160);
+  return legacyLineKey(line);
+}
+
+/** A line's key as it was before inverters kept their figures: edits kept under it are still read (`editOf`). */
+export function legacyLineKey(line: Pick<CostLine, "group" | "label">): string {
   return `${line.group}|${line.label.replace(/[\d.,]+/g, "#")}`.slice(0, 160);
+}
+
+/** The hand change kept for a line: under its key, else under the key it had before. */
+export function editOf(edits: Record<string, LineEdit>, line: Pick<CostLine, "group" | "label">): LineEdit | undefined {
+  return edits[lineKey(line)] ?? edits[legacyLineKey(line)];
+}
+
+/**
+ * Edits with one kept under a line's older key moved to the line's own key, and to each other line that shared it, so
+ * the next change to this line is its own. The edits as given when there is nothing to move.
+ */
+export function withOwnKey(
+  edits: Record<string, LineEdit>,
+  line: Pick<CostLine, "group" | "label">,
+  lines: readonly Pick<CostLine, "group" | "label">[],
+): Record<string, LineEdit> {
+  const old = legacyLineKey(line);
+  if (old === lineKey(line) || !edits[old]) return edits;
+  const next = { ...edits };
+  for (const l of [line, ...lines]) if (legacyLineKey(l) === old && !next[lineKey(l)]) next[lineKey(l)] = next[old]!;
+  delete next[old];
+  return next;
 }
 
 /** The lines as they stand: the worked-out ones with any hand changes laid over them, and those taken out left out. */
 export function editedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
   const worked = lines
-    .filter((l) => !edits[lineKey(l)]?.removed && (!l.confirm || edits[lineKey(l)]?.on))
+    .filter((l) => !editOf(edits, l)?.removed && (!l.confirm || editOf(edits, l)?.on))
     .map((l) => {
-      const edit = edits[lineKey(l)];
+      const edit = editOf(edits, l);
       let line = l;
       // A quantity typed over a counted line prices it again at its cost each (a line with no cost on file stays at $0).
       if (edit?.qty !== undefined && l.qty !== undefined) {
@@ -398,6 +434,9 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
           label: l.label.replace(/at [\d.]+c a watt/, `at ${centsWords(edit.rate)}c a watt`),
         };
       }
+      // A cost each typed over a counted line: that times how many there are now.
+      if (edit?.each !== undefined && line.qty !== undefined)
+        line = { ...line, amount: Math.round(edit.each * line.qty * 100) / 100, missing: undefined };
       // A cost typed over a line settles it, and wins over the quantity's.
       return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
     });
@@ -439,7 +478,7 @@ export function sharedHome(quotes: readonly QuoteFields[], from: number): QuoteF
 
 /** The costs decided on each job that haven't been included or left out yet: nothing is published while there are any. */
 export function undecidedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
-  return lines.filter((l) => l.confirm && !edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  return lines.filter((l) => l.confirm && !editOf(edits, l)?.on && !editOf(edits, l)?.removed);
 }
 
 /**
@@ -456,7 +495,7 @@ export const VARIATIONS: [line: RegExp, words: string][] = [
 
 /** The costs decided on each job that were left out, in the customer's words: what a proposal says may apply. */
 export function variationsOf(lines: readonly CostLine[], edits: Record<string, LineEdit>): string[] {
-  const out = lines.filter((l) => l.confirm && edits[lineKey(l)]?.removed);
+  const out = lines.filter((l) => l.confirm && editOf(edits, l)?.removed);
   return VARIATIONS.filter(([line]) => out.some((l) => line.test(l.label))).map(([, words]) => words);
 }
 
@@ -467,11 +506,11 @@ export function variationsOf(lines: readonly CostLine[], edits: Record<string, L
  * Add-ons as included, never switched by the customer. RCBOs say how many.
  */
 export function includedExtrasOf(lines: readonly CostLine[], edits: Record<string, LineEdit>): string[] {
-  const kept = lines.filter((l) => l.confirm && edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  const kept = lines.filter((l) => l.confirm && editOf(edits, l)?.on && !editOf(edits, l)?.removed);
   return VARIATIONS.flatMap(([line, words]) => {
     const l = kept.find((x) => line.test(x.label));
     if (!l) return [];
-    const qty = edits[lineKey(l)]?.qty ?? l.qty;
+    const qty = editOf(edits, l)?.qty ?? l.qty;
     return [/^RCBO/i.test(l.label) && qty && qty > 1 ? `${words} (${qty})` : words];
   });
 }
@@ -727,6 +766,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
       if (key.length > 160 || !value || typeof value !== "object") continue;
       const v = value as {
         amount?: unknown;
+        each?: unknown;
         qty?: unknown;
         removed?: unknown;
         on?: unknown;
@@ -765,9 +805,11 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         typeof v.rate === "number" && Number.isFinite(v.rate) && v.rate >= 0 && v.rate <= MAX_RATE_PER_WATT
           ? Math.round(v.rate * 10_000) / 10_000
           : undefined;
-      if (amount !== undefined || qty !== undefined || rate !== undefined || on)
+      const each = money(v.each);
+      if (amount !== undefined || each !== undefined || qty !== undefined || rate !== undefined || on)
         edits[key] = {
           ...(amount !== undefined ? { amount } : {}),
+          ...(each !== undefined ? { each } : {}),
           ...(qty !== undefined ? { qty } : {}),
           ...(rate !== undefined ? { rate } : {}),
           ...(on ? { on: true } : {}),

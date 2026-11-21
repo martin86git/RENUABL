@@ -231,6 +231,7 @@
     display: block;
     position: sticky;
     top: calc(var(--studio-head, 8rem) - 20px);
+    transition: top 0.3s ease-out;
     z-index: 15;
     height: var(--pad-cap, 20px);
     margin: -2.5rem -1.5rem calc(2.5rem - var(--pad-cap, 20px));
@@ -1294,6 +1295,87 @@ html:has(.sales-snap) {
     right: var(--sol-w);
     max-width: calc(100vw - var(--sol-w) - 3rem);
   }
+}
+
+/* The pop-up's tool rounds stand in the grey just left of the window, wherever the window is (21 Nov 2026, Martin: with
+   Sol's panel open the window moved over beside it and the rounds stayed put, on top of the window). `--pop-w` is the
+   window's width as set on it; beside Sol's panel the window keeps a gutter either side for the rounds. */
+.popup-tools {
+  left: calc((100vw - var(--pop-w)) / 2 - 4rem);
+}
+@media (min-width: 1280px) {
+  html.sol-docked section[data-design-popup] {
+    max-width: calc(100vw - var(--sol-w) - 10rem);
+  }
+  html.sol-docked .popup-tools {
+    left: calc((100vw - var(--sol-w) - min(var(--pop-w), 100vw - var(--sol-w) - 10rem)) / 2 - 4rem);
+  }
+}
+
+/* A phone turned sideways (21 Nov 2026, Martin: "it should allow for tilting the phone sideways and the designer fills
+   the screen"): the pop-up is the whole screen, with no window, gutter or shadow round it. The designer inside lays the
+   picture over all the height under its figures (`sideways` in roof-designer.tsx, the same test). */
+@media (orientation: landscape) and (max-height: 500px) {
+  section[data-design-popup][role="dialog"] {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Sideways, Sol's step and his suggestions sit at the foot of the picture as a short card: what he asks, the choices
+   and the buttons run on in rows rather than stacking, and a long step scrolls inside the card. */
+.sideways-sol > * {
+  max-height: calc(var(--pic-h, 20rem) - 5.5rem);
+  overflow-y: auto;
+  padding-block: 0.4rem;
+}
+.sideways-sol .min-w-0.flex-1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+}
+.sideways-sol .min-w-0.flex-1 > * {
+  margin-top: 0;
+}
+.sideways-sol .min-w-0.flex-1 .grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+}
+
+/* Sideways on a phone the picture is only about 250 px tall, so the desktop-sized controls on it covered the roof (21 Nov
+   2026, Martin: "all the buttons / controls are too big for mobile"). Every control group on the picture is drawn
+   smaller (zoom, so its touch area shrinks with it), and so is the rail beside it. The map itself is the picture's first
+   child and keeps its size; anything placed at a point on the map carries an inline style and is left alone, since zoom
+   would move it off its point. Sol's card is shrunk less, so it stays readable. */
+.designer-compact > :not(:first-child):not([style]):not(.sideways-sol) {
+  zoom: 0.68;
+}
+.designer-compact > .sideways-sol {
+  zoom: 0.76;
+}
+/* The figures over the picture, a size smaller too. */
+.designer-compact-strip {
+  zoom: 0.82;
+}
+.designer-compact-rail {
+  zoom: 0.72;
+}
+/* Lists and cards opened from a shrunk control come back to full size, to be read and pressed. */
+.designer-compact [class*="var(--pic-h"],
+.designer-compact [data-opened],
+.designer-compact [role="dialog"],
+.designer-compact [role="menu"],
+.designer-compact [role="listbox"] {
+  zoom: 1.4;
+}
+.designer-compact .sideways-sol [role="dialog"],
+.designer-compact .sideways-sol [role="menu"] {
+  zoom: 1;
 }
 
 /* Sol's guide: the shade analysis loading bar, filling once (19 Nov 2026). */

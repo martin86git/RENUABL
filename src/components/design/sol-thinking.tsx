@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 
 /**
  * What shows while Sol is working on an answer. Three acts (18 Nov 2026, Martin: "it should always start with thinking…

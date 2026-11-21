@@ -14,6 +14,8 @@ export interface TeamRoomView {
   /** `own`: a channel the business added itself (it can be removed). */
   channels: { room: string; label: string; unread: number; own?: boolean }[];
   people: { room: string; email: string; label: string; unread: number; last: string }[];
+  /** Who has a profile photo, by email, with its version. */
+  photos?: Record<string, number>;
   /** With the deal chats followed (deal-team.ts). */
   unread: number;
   /** The deal chats this member follows, for the window's Deals section. */

@@ -7,7 +7,7 @@ import { HERO_LIVE, RAYS, SALES_HERO, VOICE_AGENTS } from "@/lib/domain/design/s
 
 const RAYS_SOON = RAYS.soon;
 import { Sunrise } from "./business-brand";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { LiveSun } from "./live-sun";
 import { Ray, RayStyles } from "./rays";
 

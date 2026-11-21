@@ -32,7 +32,7 @@ import {
   type FeedPost,
 } from "@/lib/domain/design/feed-posts";
 import { SOL_ANSWER_NOTE, winHeadline, type PollResults, type PostKind } from "@/lib/domain/design/feed-social";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import {
   commentOn,
   keepPost,

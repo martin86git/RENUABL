@@ -7,7 +7,7 @@ import { SALES_LOOP } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
 import { useMotionOk } from "./living-hero";
 import { Ray, RayStyles } from "./rays";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /**
  * The sales loop (17 Nov 2026, Martin: lead with the sales team; "in the multi tile slides, each slide isn't engaging.

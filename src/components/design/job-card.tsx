@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cardHeadline, isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
 import { PHOTO_CHECK_BY } from "@/lib/domain/design/photo-check";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import {
   asBuiltDifferences,
   asBuiltFrom,

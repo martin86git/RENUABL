@@ -41,7 +41,8 @@ import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-cha
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
-import { SolBadge, SolIcon, SolMark } from "./sol-icon";
+import { SolIcon } from "./sol-icon";
+import { SolBadge, SolMark } from "./sol-sun";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
@@ -254,7 +255,7 @@ export function TodayPad(props: {
         // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
         <div
           data-tour="today-switch"
-          className="relative z-[16] mt-1 flex justify-center print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
+          className="relative z-[16] mt-1 flex justify-center transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
         >
           <TodaySwitch
             first={firstViewLabel(insights)}
@@ -304,7 +305,16 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <TodayChat name={props.name} views={insights} onAsk={ask} asking={asking} hidden={talking} />
+              <TodayChat
+                name={props.name}
+                views={insights}
+                onAsk={ask}
+                asking={asking}
+                hidden={talking}
+                jobs={props.jobs}
+                today={props.today}
+                items={items}
+              />
             </div>
           </div>
         </div>

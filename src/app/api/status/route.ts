@@ -11,6 +11,7 @@ import { looksLikeHubspotToken } from "@/lib/domain/hubspot-token";
 import { smsConfigured } from "@/lib/server/sms";
 import { storageConfigured } from "@/lib/server/storage";
 import { voiceStatus } from "@/lib/server/voice-calls";
+import { checkMicrosoftVoices, speakingProviders } from "@/lib/server/voice-samples";
 import { numberBuyingStatus } from "@/lib/server/business-numbers";
 import { browserCallStatus } from "@/lib/server/twilio-voice";
 
@@ -36,6 +37,7 @@ export async function GET() {
   }
   const hubToken = hubspotToken();
   const hubspotCheck = hubToken ? await checkHubspot(hubToken) : "not set (HUBSPOT_PRIVATE_APP_TOKEN or HUBSPOT_TOKEN)";
+  const microsoftVoicesCheck = await checkMicrosoftVoices();
   return Response.json(
     {
       stripe: { key: mode, accepted: stripeWorks, webhookSecret: set(process.env.STRIPE_WEBHOOK_SECRET) },
@@ -61,6 +63,10 @@ export async function GET() {
       sms: smsConfigured(),
       // Revo calling new leads (Vapi): switched on, and which settings are in.
       voiceCalls: voiceStatus(),
+      // Which voice makers speak the solar sample line in the voice picker (their keys are set).
+      voiceSamples: speakingProviders(),
+      // A live check of Microsoft's voices: "ok", or what's missing or what Microsoft answered.
+      microsoftVoicesCheck,
       // Buying each business its own number for the voice add-on (business-numbers.ts).
       phoneNumbers: numberBuyingStatus(),
       // Calling customers from the computer (Twilio's Voice SDK): which settings are in.

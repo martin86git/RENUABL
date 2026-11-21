@@ -17,7 +17,7 @@ import {
   type CallLogEntry,
 } from "@/lib/domain/design/call-log";
 import { loadCallLog } from "@/lib/services/call-log";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { useCaller } from "@/lib/services/caller";
 import { CallerAvatar } from "./settings-caller";
 

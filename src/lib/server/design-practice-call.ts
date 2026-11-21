@@ -164,6 +164,12 @@ export async function startPracticeCall(
 }
 
 /** From the webhook: keeps a practice call's status and what is said. Never throws. */
+/** Whose a practice or training call is, by its reference (for its minutes). */
+export async function practiceBusiness(ref: string): Promise<string | null> {
+  const rows = await query<{ business_id: string }>(`select business_id from design_practice_calls where id = $1`, [ref]);
+  return rows[0]?.business_id ?? null;
+}
+
 export async function keepPracticeLive(ref: string, e: LiveEvent): Promise<void> {
   try {
     if (e.kind === "status") {

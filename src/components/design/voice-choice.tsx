@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ChevronDown, Play, Square, VolumeX, X } from "lucide-react";
+import { CircleAlert, Check, ChevronDown, Play, Square, VolumeX, X } from "lucide-react";
 import {
   CALLER_VOICES,
   NO_SAMPLE,
@@ -13,7 +13,7 @@ import {
   type CallerVoice,
   type VoiceChoice as Voice,
 } from "@/lib/domain/design/caller";
-import { loadHiddenVoices } from "@/lib/services/caller";
+import { loadHiddenVoices, voiceSpeakers } from "@/lib/services/caller";
 
 /** The one sample clip playing, wherever the picker is shown: starting another stops it. */
 let sampleNow: HTMLAudioElement | null = null;
@@ -61,17 +61,18 @@ export function VoiceChoice({
   const hidden = given ?? loaded;
   const [playing, setPlaying] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // The voice whose sample just failed to play: its row and play round turn red, with the reason under it.
+  const [failed, setFailed] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let live = true;
-    if (!given) void loadHiddenVoices().then((h) => live && setLoaded(h));
+    void loadHiddenVoices().then((h) => live && setLoaded(h));
     return () => {
       live = false;
       stopSample();
     };
-    // Read once; a picker given its list never asks.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Read once: the hidden voices (unless given) and which makers can speak the solar line.
   }, []);
 
   // A press outside or Escape folds the list.
@@ -98,26 +99,29 @@ export function VoiceChoice({
   }, [voices]);
   const picked = voices.find((v) => voiceKey(v) === value) ?? null;
 
-  const play = (v: CallerVoice) => {
+  const play = (v: Voice) => {
     const key = voiceKey(v);
     stopSample();
     setNote(null);
+    setFailed(null);
     if (playing === key) return setPlaying(null);
-    const url = voiceSampleUrl(v);
+    const url = voiceSampleUrl(v, voiceSpeakers());
     if (!url) return setNote(NO_SAMPLE);
     setPlaying(key);
     const over = () => setPlaying((now) => (now === key ? null : now));
     startSample(url, over, () => {
       over();
-      setNote(NO_SAMPLE);
+      setFailed(key);
+      setNote(sampleFailed(v.label));
     });
   };
 
   const sample = (v: Voice) => {
     const on = playing === voiceKey(v);
-    if (!voiceSampleUrl(v))
+    const broke = failed === voiceKey(v);
+    if (!voiceSampleUrl(v, voiceSpeakers()))
       return (
-        <span className="grid size-8 shrink-0 place-items-center text-muted" title="No sample: hear it on a test call">
+        <span className="grid size-8 shrink-0 place-items-center text-muted" title={NO_SAMPLE}>
           <VolumeX className="size-3.5" aria-hidden />
           <span className="sr-only">No sample to play</span>
         </span>
@@ -129,14 +133,24 @@ export function VoiceChoice({
           e.stopPropagation();
           play(v);
         }}
-        aria-label={on ? `Stop ${v.label}'s sample` : `Hear ${v.label}`}
-        title={on ? "Stop" : `Hear ${v.label}: a sample of the voice, no call`}
+        aria-label={on ? `Stop ${v.label}'s sample` : broke ? `${v.label}'s sample didn't play: try again` : `Hear ${v.label}`}
+        title={on ? "Stop" : broke ? "This sample didn't play. Press to try again." : `Hear ${v.label}: a sample of the voice, no call`}
         className={clsx(
           "grid size-8 shrink-0 place-items-center rounded-full ring-1 transition-colors",
-          on ? "bg-sun-line text-white ring-sun-line" : "bg-surface text-ink ring-line hover:ring-ink-2",
+          on
+            ? "bg-sun-line text-white ring-sun-line"
+            : broke
+              ? "bg-danger text-white ring-danger"
+              : "bg-surface text-ink ring-line hover:ring-ink-2",
         )}
       >
-        {on ? <Square className="size-3" aria-hidden /> : <Play className="size-3 translate-x-px" aria-hidden />}
+        {on ? (
+          <Square className="size-3" aria-hidden />
+        ) : broke ? (
+          <VolumeX className="size-3.5" aria-hidden />
+        ) : (
+          <Play className="size-3 translate-x-px" aria-hidden />
+        )}
       </button>
     );
   };
@@ -196,6 +210,7 @@ export function VoiceChoice({
                 <Option
                   key={voiceKey(v)}
                   on={voiceKey(v) === value}
+                  broke={failed === voiceKey(v)}
                   onPick={() => (onChange(voiceKey(v)), setOpen(false))}
                   after={
                     <>
@@ -219,13 +234,19 @@ export function VoiceChoice({
                 >
                   <span className="block truncate text-sm font-semibold text-ink">{v.label}</span>
                   {accentless(v.words) && <span className="block truncate text-xs text-muted">{accentless(v.words)}</span>}
+                  {failed === voiceKey(v) && (
+                    <span role="alert" className="mt-0.5 flex items-center gap-1 text-xs font-medium text-danger">
+                      <CircleAlert className="size-3.5 shrink-0" aria-hidden />
+                      Sample didn&apos;t play
+                    </span>
+                  )}
                 </Option>
               ))}
             </div>
           ))}
         </div>
       )}
-      {note && <p className="mt-1 px-1 text-xs font-normal text-muted">{note}</p>}
+      {note && <SampleNote text={note} />}
     </div>
   );
 }
@@ -233,9 +254,45 @@ export function VoiceChoice({
 /** A voice's words under its accent's heading, without the accent again ("Australian, relaxed" → "relaxed"). */
 const accentless = (words: string) => words.replace(/^[A-Za-z]+\s*[,·]?\s*/, "");
 
-function Option({ on, onPick, after, children }: { on: boolean; onPick: () => void; after?: React.ReactNode; children: React.ReactNode }) {
+/** Said when a voice's sample was asked for but didn't play (its maker refused, or the clip couldn't be had). */
+const sampleFailed = (label: string) => `${label}'s sample didn't play. Try another voice, or use Test call to hear ${label}.`;
+
+/**
+ * Why a sample didn't play, in red with its mark (21 Nov 2026, Martin: in grey under the list it was camouflaged and
+ * easy to miss), read out as it appears.
+ */
+function SampleNote({ text }: { text: string }) {
   return (
-    <div className={clsx("flex items-center gap-2 rounded-lg pr-1.5", on ? "bg-sun/60" : "hover:bg-surface-2")}>
+    <p
+      role="alert"
+      className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-danger/10 px-2.5 py-2 text-xs font-medium text-danger ring-1 ring-danger/30"
+    >
+      <CircleAlert className="mt-px size-3.5 shrink-0" aria-hidden />
+      <span>{text}</span>
+    </p>
+  );
+}
+
+function Option({
+  on,
+  broke = false,
+  onPick,
+  after,
+  children,
+}: {
+  on: boolean;
+  broke?: boolean;
+  onPick: () => void;
+  after?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={clsx(
+        "flex items-center gap-2 rounded-lg pr-1.5",
+        broke ? "bg-danger/10 ring-1 ring-danger/30 ring-inset" : on ? "bg-sun/60" : "hover:bg-surface-2",
+      )}
+    >
       <button
         type="button"
         role="option"
@@ -253,13 +310,18 @@ function Option({ on, onPick, after, children }: { on: boolean; onPick: () => vo
 
 /**
  * One voice's play round on its own, for places that show the voice an agent speaks in without the list (21 Nov 2026,
- * Martin: the agent's picture card, beside its colours). Its maker's sample, no call; a voice with none says so.
+ * Martin: the agent's picture card, beside its colours). Its sample, no call; a voice with none says so.
  */
 export function VoiceSample({ voice, label }: { voice: CallerVoice | null; label: string }) {
   const [on, setOn] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  useEffect(() => stopSample, []);
-  const url = voiceSampleUrl(voice);
+  const [, setAsked] = useState(false);
+  useEffect(() => {
+    // Asks which makers can speak the solar line, so a Microsoft voice gets its play round once the server says so.
+    void loadHiddenVoices().then(() => setAsked(true));
+    return stopSample;
+  }, []);
+  const url = voiceSampleUrl(voice, voiceSpeakers());
   const play = () => {
     stopSample();
     setNote(null);
@@ -271,7 +333,7 @@ export function VoiceSample({ voice, label }: { voice: CallerVoice | null; label
       () => setOn(false),
       () => {
         setOn(false);
-        setNote(NO_SAMPLE);
+        setNote(sampleFailed(label));
       },
     );
   };
@@ -299,7 +361,7 @@ export function VoiceSample({ voice, label }: { voice: CallerVoice | null; label
           </span>
         )}
       </div>
-      {note && <p className="mt-1 text-xs text-muted">{note}</p>}
+      {note && <SampleNote text={note} />}
     </div>
   );
 }

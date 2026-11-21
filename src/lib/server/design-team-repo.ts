@@ -38,6 +38,7 @@ import {
 import type { DealViewer } from "@/lib/domain/design/account";
 import { siteUrl } from "@/lib/domain/sms";
 import { newId, query, randomToken, transaction } from "./db";
+import { memberPhotoVersions } from "./design-member-photos";
 import { jobById, listJobs, stageNamesOf, stageWordsOf } from "./design-crm-repo";
 import { emailProvider, sendEmail } from "./email";
 
@@ -197,7 +198,7 @@ async function roomsFor(me: TeamMe, members: string[]) {
   const own = await ownChannels(me.businessId);
   const channels: { id: string; label: string; own?: true }[] = [...TEAM_CHANNELS, ...own.map((c) => ({ ...c, own: true as const }))];
   const rooms = [...channels.map((c) => c.id), ...others.map((o) => `dm:${[self, o].sort().join(",")}`)];
-  const [recent, seenRows] = await Promise.all([
+  const [recent, seenRows, photos] = await Promise.all([
     query<{ room: string; by: string; at: string }>(
       `select room, by_email as by, ${moment("at")} as at from design_team_lines
         where business_id = $1 and room = any($2) and at > now() - interval '30 days' order by at desc limit 2000`,
@@ -207,6 +208,7 @@ async function roomsFor(me: TeamMe, members: string[]) {
       `select room, ${moment("seen_at")} as at from design_team_seen where business_id = $1 and email = $2`,
       [me.businessId, self],
     ),
+    memberPhotoVersions(me.businessId),
   ]);
   const seen = Object.fromEntries(seenRows.map((r) => [r.room, r.at]));
   const unread = unreadByRoom(recent, seen, self, new Date());
@@ -221,6 +223,8 @@ async function roomsFor(me: TeamMe, members: string[]) {
       })
       .sort((a, b) => b.last.localeCompare(a.last) || a.label.localeCompare(b.label)),
     unread: Object.values(unread).reduce((a, b) => a + b, 0),
+    /** Who has a profile photo, by email, with its version (design-member-photos.ts). */
+    photos,
   };
 }
 
