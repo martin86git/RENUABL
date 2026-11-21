@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "CRM",
+    words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
+  },
+  {
+    day: "2026-11-21",
     area: "Agents",
     words: "Ten more voices to pick from: New Zealand, Indian, Irish, South African and British, each with a solar sample.",
   },
