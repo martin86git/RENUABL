@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, BatteryCharging, Eye, PhoneCall, Stamp, type LucideIcon } from "lucide-react";
+import { ArrowRight, BatteryCharging, Eye, Lightbulb, PhoneCall, Stamp, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
 import type { TodayView } from "@/lib/domain/design/today-view";
@@ -39,6 +39,8 @@ export function useInsights(): InsightsView[] | null | "failed" {
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
 
+type TrayTab = "performance" | "changes" | "mine";
+
 export function TodayChat(props: {
   name: string | null;
   views: InsightsView[] | null | "failed";
@@ -47,43 +49,108 @@ export function TodayChat(props: {
   onAsk: (q: string, files: SolFile[]) => void;
 }) {
   const views = Array.isArray(props.views) ? props.views : null;
-  const mine = views?.[0]?.scope === "me";
+  const first = views?.[0];
+  const own = views?.[1];
+  const mine = first?.scope === "me";
   const you = props.name ? `, ${props.name}` : "";
+  const [tab, setTab] = useState<TrayTab | null>(null);
+  const tabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
+    { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
+    { key: "changes", label: mine ? "Next wins" : "Worth changing", icon: Lightbulb, count: first?.insights.length },
+    ...(own ? [{ key: "mine" as const, label: "Your own month", icon: UserRound }] : []),
+  ];
+  // As the screenshot Martin chose (21 Nov 2026): the greeting, Sol's box straight under it, and a tray tucked under the
+  // box whose tabs open what was on the cards (the month, what is worth changing) below it, one at a time.
   return (
-    <div className="mx-auto flex w-full max-w-[52rem] flex-col items-center px-1 pb-10 pt-2" inert={props.hidden}>
+    <div
+      className={clsx(
+        "mx-auto flex w-full max-w-[46rem] flex-col items-center px-1 pb-16 pt-2",
+        !tab && "min-h-[calc(100dvh-15rem)] justify-center",
+      )}
+      inert={props.hidden}
+    >
       <span className="relative">
-        <span className="sol-orb sol-breathe inline-flex size-16 items-center justify-center rounded-full">
-          <SolMark className="size-12" />
+        <span className="sol-orb sol-breathe inline-flex size-14 items-center justify-center rounded-full">
+          <SolMark className="size-11" />
         </span>
-        <SolStars className="absolute -right-3 -top-2 size-6" />
+        <SolStars className="absolute -right-3 -top-2 size-5" />
       </span>
-      <h1 className="mt-4 text-center text-[clamp(22px,2.6vw,28px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+      <h1 className="mt-4 text-center text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
         {mine ? `How's your month going${you}?` : `How's the business going${you}?`}
       </h1>
-      <p className="mt-1 text-center text-[13.5px] text-ink-2">
-        {mine ? "From your own deals. Only you see this." : "Sol read your deals this morning. Here's what matters."}
-      </p>
 
-      <div className="mt-6 w-full space-y-10 text-left">
-        {props.views === "failed" ? (
-          <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
-            The month couldn&rsquo;t be read just now. Feed has your deals.
-          </p>
-        ) : !views ? (
-          <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
-        ) : (
-          views.map((v, i) => <ViewPart key={v.scope} view={v} titled={i > 0} />)
-        )}
-      </div>
-
-      <div data-tour="today-sol" className="mt-8 w-full">
+      <div data-tour="today-sol" className="relative z-10 mt-6 w-full">
         <SolBox
+          tall
           onAsk={props.onAsk}
           asking={props.asking}
           placeholder={mine ? "Ask Sol: how do I win a quiet deal back?" : "Ask about the business: why are we down on last month?"}
         />
       </div>
+
+      <div
+        role="tablist"
+        aria-label="About the month"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[22px] bg-surface-2/80 px-3 pb-2 pt-7 ring-1 ring-line/70"
+      >
+        {tabs.map(({ key, label, icon: Icon, count }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab((t) => (t === key ? null : key))}
+            className={clsx(
+              "inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-3 text-[13.5px] transition",
+              tab === key ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:bg-surface/70 hover:text-ink",
+            )}
+          >
+            <Icon className="size-4" aria-hidden />
+            {label}
+            {count ? (
+              <span className="grid min-w-5 place-items-center rounded-full bg-sun-line px-1.5 text-[11px] font-semibold text-white">
+                {count}
+              </span>
+            ) : null}
+          </button>
+        ))}
+        {first && first.month.pace !== "none" && (
+          <span className={clsx("ml-auto mr-1 text-[12px] font-medium", first.month.pace === "ahead" ? "text-positive" : "text-warning")}>
+            {first.month.pace === "ahead" ? "Ahead of the sun" : "Behind the sun"}
+          </span>
+        )}
+      </div>
+
+      {tab && (
+        <div role="tabpanel" className="mt-5 w-full text-left">
+          {props.views === "failed" ? (
+            <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
+              The month couldn&rsquo;t be read just now. Feed has your deals.
+            </p>
+          ) : !first ? (
+            <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
+          ) : tab === "performance" ? (
+            <MonthPanel month={first.month} mine={mine} />
+          ) : tab === "mine" && own ? (
+            <ViewPart view={own} titled={false} />
+          ) : (
+            <Changes view={first} />
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function Changes({ view }: { view: InsightsView }) {
+  return view.insights.length ? (
+    <div className="space-y-2">
+      {view.insights.map((x) => (
+        <InsightRow key={x.key} insight={x} />
+      ))}
+    </div>
+  ) : (
+    <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">{ALL_GOOD}</p>
   );
 }
 
