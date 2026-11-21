@@ -9,6 +9,7 @@ import {
   CircleAlert,
   Eye,
   FileText,
+  HardHat,
   Lightbulb,
   Phone,
   PhoneCall,
@@ -27,6 +28,8 @@ import type { TodayView } from "@/lib/domain/design/today-view";
 import { dollars, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
 import { GoalLine, SunArc } from "./gauges";
+import { SchedulerPage } from "./design-scheduler";
+import { InstallListPage, InstallViewSwitch, type InstallView } from "./install-lists";
 import { SolMark, SolStars } from "./sol-icon";
 import { PipelineView, SolBox } from "./today-pad";
 import { NextCard } from "./canvas-pad";
@@ -61,7 +64,7 @@ export function useInsights(): InsightsView[] | null | "failed" {
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
 
-type TrayTab = "performance" | "changes" | "mine" | "needs" | "pipeline" | "calls" | "proposals" | "sol";
+type TrayTab = "performance" | "changes" | "mine" | "needs" | "pipeline" | "calls" | "proposals" | "installs" | "sol";
 
 export function TodayChat(props: {
   name: string | null;
@@ -89,16 +92,17 @@ export function TodayChat(props: {
     { key: "pipeline", label: "Pipeline", icon: SquareKanban },
     { key: "calls", label: "Calls", icon: Phone },
     { key: "proposals", label: "Proposals", icon: FileText },
+    { key: "installs", label: "Installs", icon: HardHat },
     { key: "sol", label: "Sol's work", icon: Sparkles },
   ];
   // Whose panel isn't about the month: drawn wider than the box, as the pages they come from are.
-  const wide = tab === "pipeline" || tab === "calls" || tab === "proposals";
+  const wide = tab === "pipeline" || tab === "calls" || tab === "proposals" || tab === "installs";
   // As the screenshot Martin chose (21 Nov 2026): the greeting, Sol's box straight under it, and a tray tucked under the
   // box whose tabs open what was on the cards (the month, what is worth changing) below it, one at a time.
   return (
     <div
       className={clsx(
-        "mx-auto flex w-full max-w-[46rem] flex-col items-center px-1 pb-16 pt-2",
+        "mx-auto flex w-full max-w-[54rem] flex-col items-center px-1 pb-16 pt-2",
         !tab && "min-h-[calc(100dvh-15rem)] justify-center",
       )}
       inert={props.hidden}
@@ -125,7 +129,7 @@ export function TodayChat(props: {
       <div
         role="tablist"
         aria-label="About the month"
-        className="no-scrollbar -mt-5 flex w-[calc(100%-2rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[22px] sm:flex-wrap sm:overflow-visible bg-surface-2/80 px-3 pb-2 pt-7 ring-1 ring-line/70"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-surface-2 px-2 pb-1.5 pt-[26px] ring-1 ring-line/70"
       >
         {tabs.map(({ key, label, icon: Icon, count }) => (
           <button
@@ -135,11 +139,11 @@ export function TodayChat(props: {
             aria-selected={tab === key}
             onClick={() => setTab((t) => (t === key ? null : key))}
             className={clsx(
-              "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition",
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12.5px] transition",
               tab === key ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:bg-surface/70 hover:text-ink",
             )}
           >
-            <Icon className="size-4" aria-hidden />
+            <Icon className="size-3.5" aria-hidden />
             {label}
             {count ? (
               <span className="grid min-w-5 place-items-center rounded-full bg-sun-line px-1.5 text-[11px] font-semibold text-white">
@@ -148,11 +152,6 @@ export function TodayChat(props: {
             ) : null}
           </button>
         ))}
-        {first && first.month.pace !== "none" && (
-          <span className={clsx("ml-auto mr-1 text-[12px] font-medium", first.month.pace === "ahead" ? "text-positive" : "text-warning")}>
-            {first.month.pace === "ahead" ? "Ahead of the sun" : "Behind the sun"}
-          </span>
-        )}
       </div>
 
       {tab && (
@@ -165,6 +164,8 @@ export function TodayChat(props: {
             <CallLogPage />
           ) : tab === "proposals" ? (
             <ProposalsPage signed={false} bare />
+          ) : tab === "installs" ? (
+            <TodayInstalls />
           ) : tab === "sol" ? (
             <SolWorkPanel />
           ) : tab === "performance" ? (
@@ -184,6 +185,13 @@ export function TodayChat(props: {
       )}
     </div>
   );
+}
+
+/** Installations in the tray: the calendar or the list, switched here without leaving Today. */
+function TodayInstalls() {
+  const [view, setView] = useState<InstallView>("list");
+  const switcher = <InstallViewSwitch view={view} onView={setView} />;
+  return view === "list" ? <InstallListPage switcher={switcher} /> : <SchedulerPage switcher={switcher} />;
 }
 
 /** What needs the member now, as Today's list has it: the first eight, then a way to the rest on the feed. */
