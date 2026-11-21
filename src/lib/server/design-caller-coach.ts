@@ -34,6 +34,21 @@ import {
 } from "./design-caller-repo";
 import { loadBrand } from "./design-proposal-repo";
 import { withSolCredit } from "./sol-credits";
+import { phoneFacts } from "@/lib/domain/design/add-ons";
+import { numberBuyingOn, numberOf } from "./business-numbers";
+import { subscriptionOf } from "./design-billing-repo";
+import { voiceStandingFor } from "./voice-calls";
+
+/** What the agent is told about its own phone line in its chat (add-ons.ts `phoneFacts`): read fresh each answer. */
+async function phoneFactsFor(businessId: string): Promise<string[]> {
+  const [standing, number, plan] = await Promise.all([
+    voiceStandingFor(businessId).catch(() => "not-set-up" as const),
+    numberOf(businessId).catch(() => null),
+    subscriptionOf(businessId).catch(() => null),
+  ]);
+  const local = number?.e164.replace(/^\+61(\d)(\d{2})(\d{3})(\d{3})$/, "0$1$2 $3 $4") ?? null;
+  return phoneFacts({ standing, number: local, canBuy: numberBuyingOn(), nextBill: plan?.periodEnd ?? null });
+}
 
 export const newNoteId = () => `cn_${randomBytes(6).toString("hex")}`;
 
@@ -76,6 +91,7 @@ export async function coachAssistant(o: {
     deal: o.deal ?? null,
     voices: VOICES,
     voiceNow: caller.voice?.voiceId ?? null,
+    phone: await phoneFactsFor(o.businessId).catch(() => []),
     ...(role === "admin" ? { job: ADMIN_COACH_JOB, fixed: ADMIN_FIXED_RULES } : {}),
   });
   const raw = await withSolCredit(

@@ -3,7 +3,15 @@
 import { useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
-import { ADD_ON_WORDS, ADD_TO_PLAN, addOnPriceWords, standingWords, type AddOnKey } from "@/lib/domain/design/add-ons";
+import {
+  ADD_ON_WORDS,
+  ADD_TO_PLAN,
+  addOnPriceWords,
+  numberStandingWords,
+  standingWords,
+  voiceTerms,
+  type AddOnKey,
+} from "@/lib/domain/design/add-ons";
 import { addAddOn, getBusinessNumber, removeAddOn, useAddOns } from "@/lib/services/addons";
 import { ui } from "./design-shell";
 
@@ -27,7 +35,10 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
   const words = ADD_ON_WORDS[addOn];
   const usable = item.standing === "on" || item.standing === "included";
 
-  const act = async (ask: () => Promise<{ ok: boolean; message?: string; requested?: boolean; number?: string }>, done: string) => {
+  const act = async (
+    ask: () => Promise<{ ok: boolean; message?: string; requested?: boolean; number?: string; numberPending?: boolean }>,
+    done: string,
+  ) => {
     setBusy(true);
     setNote(null);
     const a = await ask();
@@ -38,8 +49,10 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
         ? a.requested
           ? standingWords(addOn, "requested")
           : a.number
-            ? `Your number is ${localNumber(a.number)}.`
-            : done
+            ? `${done} Your business number is ${localNumber(a.number)}.`.trim()
+            : a.numberPending
+              ? `${done} ${a.message ?? ""}`.trim()
+              : done
         : (a.message ?? "That didn't go through."),
     );
   };
@@ -69,7 +82,31 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
           {item.standing === "requested" && <> · {standingWords(addOn, "requested")}</>}
         </p>
         {button}
-        {note && <p className="w-full text-[12px] text-ink-2">{note}</p>}
+        {/* Before it's added: when it is billed, what a call costs, and that the number comes with it. */}
+        {addOn === "voice" && item.standing === "off" && view.mayAdd && (
+          <ul className="w-full space-y-1 text-[12px] leading-snug text-ink-2">
+            {voiceTerms(view.nextBill).map((line) => (
+              <li key={line} className="flex gap-1.5">
+                <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-ink-2" />
+                {line}
+              </li>
+            ))}
+          </ul>
+        )}
+        {/* Once it's on: the number, or where it stands and the way to get it. */}
+        {addOn === "voice" && item.standing === "on" && (
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <p className="min-w-0 flex-1 text-[12px] leading-snug text-ink-2">
+              {numberStandingWords({ number: view.number ? localNumber(view.number.e164) : null, canBuy: view.canBuyNumber })}
+            </p>
+            {!view.number && view.canBuyNumber && view.mayAdd && (
+              <button type="button" className={ui.primary} disabled={busy} onClick={() => void act(getBusinessNumber, "")}>
+                {busy ? "Setting it up…" : "Get my business number"}
+              </button>
+            )}
+          </div>
+        )}
+        {note && <p className="w-full text-[12px] font-medium text-ink">{note}</p>}
       </div>
     );
 
@@ -82,7 +119,7 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
       <p className="text-sm leading-relaxed text-ink-2">{words.what}</p>
       {!usable && (
         <ul className="space-y-1 text-sm text-ink-2">
-          {words.includes.map((line) => (
+          {[...words.includes, ...(addOn === "voice" ? voiceTerms(view.nextBill) : [])].map((line) => (
             <li key={line} className="flex gap-2">
               <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-ink" />
               {line}
@@ -131,10 +168,8 @@ function VoiceNumber({ view, busy, onGet }: { view: NonNullable<ReturnType<typeo
     );
   return (
     <div className="space-y-2 rounded-md bg-canvas p-3 ring-1 ring-line">
-      <p className="text-sm text-ink-2">
-        Your agents call and text from a number of your own. {view.canBuyNumber ? "It's set up in a moment." : "We'll set it up with you."}
-      </p>
-      {view.mayAdd && (
+      <p className="text-sm text-ink-2">{numberStandingWords({ number: null, canBuy: view.canBuyNumber })}</p>
+      {view.mayAdd && view.canBuyNumber && (
         <button type="button" className={ui.primary} disabled={busy} onClick={onGet}>
           {busy ? "Setting it up…" : "Get my business number"}
         </button>
