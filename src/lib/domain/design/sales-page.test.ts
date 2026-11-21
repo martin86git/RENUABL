@@ -22,6 +22,19 @@ describe("the sign-up page for solar businesses", () => {
       ["Calls & Texts", "$29 a month for your business, including GST"],
       ["Growth", "$19 a month for your business, including GST"],
     ]);
+    expect(PRICING.headline).toBe("From $39 a user. Then pay as you go.");
+    expect(PRICING.team.map((t) => [t.title, t.price, t.per])).toEqual([
+      ["Your AI voice sales team", "$29", "a month for your business"],
+      ["Your AI right hand", "50", "credits a user a month, included"],
+      ["Your design studio", "$3", "a site"],
+      ["Your marketing department", "$19", "a month for your business"],
+      ["Your checkout", "1%", "a payment"],
+    ]);
+  });
+
+  it("never calls a monthly add-on pay as you go, or the whole page all-inclusive", () => {
+    for (const t of PRICING.team) if (t.per.includes("a month for your business")) expect(t.how).not.toMatch(/pay as you go/i);
+    for (const line of salesCopy()) expect(line).not.toMatch(/every feature/i);
   });
 
   it("never crosses a price out or calls it a discount", () => {

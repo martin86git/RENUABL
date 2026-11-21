@@ -4,9 +4,21 @@
  * Law): no "best" or "first", no rival named or compared with (3 Nov 2026, Martin: "we don't need to compare"), every coming-soon thing
  * labelled, and every screenshot a real screen of the product with made-up example data.
  */
-import { COMMIT_MONTHS, COMMIT_SEAT_CENTS, ENTERPRISE_FROM, PLAN_WORDS, SEAT_MONTHLY_CENTS, dollars } from "./plans";
-import { ADD_ON_KEYS, ADD_ON_WORDS, addOnPriceWords } from "./add-ons";
-import { SOL_PER_USER } from "./sol-credits";
+import {
+  BATTERY_DESIGN_CENTS,
+  COMMIT_MONTHS,
+  COMMIT_SEAT_CENTS,
+  ENTERPRISE_FROM,
+  PLAN_WORDS,
+  SEAT_MONTHLY_CENTS,
+  TOKEN_CENTS,
+  TOKEN_PACKS,
+  TRIAL_SITES,
+  dollars,
+} from "./plans";
+import { ADD_ON_KEYS, ADD_ON_MONTHLY_CENTS, ADD_ON_WORDS, addOnPriceWords } from "./add-ons";
+import { SOL_PACKS, SOL_PER_USER } from "./sol-credits";
+import { PLATFORM_FEE } from "./proposal-payments";
 
 /**
  * The hero (3 Nov 2026, Martin, after "Pay less. Do more." and "Just ask. It's done." didn't land: witty, not a feature
@@ -800,8 +812,11 @@ export const MARKETPLACE = {
  */
 export const PRICING = {
   eyebrow: "Pricing",
-  headline: "One price a user. Every feature in it.",
-  sub: "Every feature for every user, and no per-signature fees. Add calls and marketing email when you want them.",
+  /* 21 Nov 2026, Martin: "Every feature in it" read as all-inclusive while the designer, calls and marketing email are
+     paid for apart. The CRM is priced a user; everything else has its own card below. "From", because $39 is the
+     12-month plan's price and the plain monthly is $49. */
+  headline: `From ${dollars(COMMIT_SEAT_CENTS)} a user. Then pay as you go.`,
+  sub: "One price a user for the CRM, with no feature tiers and no per-signature fees. Your AI team, the designer and card payments are paid for as you use them.",
   plans: [
     {
       key: "month",
@@ -842,8 +857,86 @@ export const PRICING = {
   tokensTitle: `The designer: ${PLAN_WORDS.token}`,
   tokens: PLAN_WORDS.tokenExplained,
   start: PLAN_WORDS.startExplained,
-  addOnsTitle: "Add-ons for your business",
-  addOnsSub: "One price for the whole business, whatever its size. Add one from Billing when you want it, and take it off any time.",
+  addOnsTitle: "Then build your team, as you need it.",
+  addOnsSub: "Each is priced on its own, for the whole business. Add it from Billing when you want it, and take it off any time.",
+  /**
+   * The pay-as-you-go part, as a team you hire (21 Nov 2026, Martin: "labelled in an exciting way. i.e your AI Voice
+   * Agent sales team, then an equivalent one for Sol, then designer etc"). Each card says how it's charged in its
+   * `how` pill, so a monthly add-on is never called pay per use. The add-ons' monthly allowances aren't shown: they
+   * aren't metered yet, and no page promises them until they are.
+   */
+  team: [
+    {
+      key: "voice",
+      label: ADD_ON_WORDS.voice.name,
+      title: "Your AI voice sales team",
+      price: dollars(ADD_ON_MONTHLY_CENTS.voice ?? 0),
+      per: "a month for your business",
+      how: "Monthly · take it off any time",
+      body: "Phone agents with the names, voices and scripts you give them. They ring your new leads, answer calls to your number and pencil in install days, and every call is written on the deal.",
+      list: [
+        "Your own Australian business number",
+        "A sales agent and a post-sale agent",
+        "Texting from every deal, with replies on it",
+        "Every call says it's an automated assistant",
+      ],
+    },
+    {
+      key: "sol",
+      label: "Sol",
+      title: "Your AI right hand",
+      price: String(SOL_PER_USER),
+      per: "credits a user a month, included",
+      how: `Then pay as you go · from ${dollars(SOL_PACKS[0].cents)}`,
+      body: "Sol knows your deals as you're allowed to see them. He lines up who to chase, drafts the follow-ups, answers the technical questions and turns a call into notes on the deal.",
+      list: [
+        "Most answers take 1 credit, a deeper one 3",
+        `More from ${dollars(SOL_PACKS[0].cents)} for ${SOL_PACKS[0].credits} credits`,
+        "Credits you buy never expire",
+        "He drafts. You check, you send",
+      ],
+    },
+    {
+      key: "designer",
+      label: "Designer",
+      title: "Your design studio",
+      price: dollars(TOKEN_CENTS),
+      per: "a site",
+      how: "Pay as you go",
+      body: `${dollars(BATTERY_DESIGN_CENTS)} a site with a battery. Charged once a roof: change it and send it again as often as you like. Your first month includes ${TRIAL_SITES} free sites.`,
+      list: [
+        "Three designs laid for you, by the installer's rules",
+        "Shade analysis from height data",
+        "Priced as you draw, strings checked",
+        `Credits in packs from ${dollars(TOKEN_PACKS[0] * 100)}, shared by your team`,
+      ],
+    },
+    {
+      key: "marketing",
+      label: ADD_ON_WORDS.marketing.name,
+      title: "Your marketing department",
+      price: dollars(ADD_ON_MONTHLY_CENTS.marketing ?? 0),
+      per: "a month for your business",
+      how: "Monthly · take it off any time",
+      body: "Campaigns and sequences to your contacts and customers in your business's name, written with Sol, and proposals laid out your way.",
+      list: [
+        "Emails built from blocks, written with Sol",
+        "Sequences that run by themselves",
+        "Custom proposals in your own design",
+        "Opens, clicks and unsubscribes reported",
+      ],
+    },
+    {
+      key: "payments",
+      label: "Card payments",
+      title: "Your checkout",
+      price: `${Math.round(PLATFORM_FEE * 100)}%`,
+      per: "a payment",
+      how: "Pay as you go",
+      body: "Customers pay deposits and milestones by card on their proposal, straight into your own Stripe account. Stripe's processing fees are charged by Stripe, as usual.",
+      list: ["Your money, in your account", "The next amount due, worked out for them", "Bank transfer still offered beside it"],
+    },
+  ],
   addOns: ADD_ON_KEYS.map((key) => ({ key, name: ADD_ON_WORDS[key].name, price: addOnPriceWords(key), what: ADD_ON_WORDS[key].what })),
   enterprise: {
     title: "Enterprise",
@@ -868,7 +961,7 @@ export const FAQ: readonly { q: string; a: string }[] = [
   { q: "How does the designer charge?", a: PLAN_WORDS.tokenExplained },
   {
     q: "What else is there to pay for?",
-    a: "Every feature for every user, including Sol. Designer credits are bought as you use them, and Calls & Texts or Growth are added when you want them.",
+    a: `Every user gets the same software, with ${SOL_PER_USER} Sol credits a month. Designer sites, more Sol credits and card payments are paid as you go, and Calls & Texts or Growth are added when you want them.`,
   },
   { q: "Are prices with GST?", a: "Yes. Every price on this page includes GST." },
   {
@@ -1142,6 +1235,7 @@ export function salesCopy(): string[] {
     PRICING.addOnsTitle,
     PRICING.addOnsSub,
     ...PRICING.addOns.flatMap((a) => [a.name, a.price, a.what]),
+    ...PRICING.team.flatMap((t) => [t.label, t.title, t.price, t.per, t.how, t.body, ...t.list]),
     ...FAQ.flatMap((f) => [f.q, f.a]),
     ...PRICING.plans.flatMap((p) => [p.name, p.per, p.note]),
     PRICING.firstMonth,
