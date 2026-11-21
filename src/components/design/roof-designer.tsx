@@ -1746,6 +1746,8 @@ export function RoofDesigner(props: {
         /** Every panel this drag has had on the roof: the group as picked up and any it has added. */
         ids: Set<string>;
         n: number;
+        /** Whether the pointer has gone anywhere since the press: a press alone adds one. */
+        dragged?: boolean;
       }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
@@ -3142,6 +3144,26 @@ export function RoofDesigner(props: {
     press.current = { mode: "band", at: p, face: on?.id ?? null, add: e.shiftKey, moved: false };
   };
 
+  /** The picked array grown (or cut back) to `n` rows or columns on the side whose + is held. */
+  const growTo = (held: Extract<NonNullable<typeof press.current>, { mode: "grow" }>, n: number) => {
+    if (n === held.n) return;
+    held.n = n;
+    const was = held.ids;
+    // Never onto a panel that stands outside the group.
+    const others = standingAll(
+      faces,
+      loose.filter((panel) => !was.has(panel.id)),
+    );
+    const next = growArray(held.base, held.frame, held.side, n, held.seed).filter(
+      (panel) => was.has(panel.id) || !others.some((o) => Math.hypot(o.x - panel.x, o.y - panel.y) < 0.4),
+    );
+    held.ids = new Set([...was, ...next.map((panel) => panel.id)]);
+    const mine = held.ids;
+    setLoose((all) => [...all.filter((panel) => !mine.has(panel.id)), ...next]);
+    setPicks(next.map((panel): Pick => ({ kind: "loose", id: panel.id })));
+    changed();
+  };
+
   const onPointerMove = (e: React.PointerEvent) => {
     pointer.current = pointAt(e);
     const held = press.current;
@@ -3212,23 +3234,8 @@ export function RoofDesigner(props: {
     if (held.mode === "grow") {
       const p = pointAt(e);
       if (!p) return;
-      const n = growCount(held.frame, held.side, held.from, p);
-      if (n === held.n) return;
-      held.n = n;
-      const was = held.ids;
-      // Never onto a panel that stands outside the group.
-      const others = standingAll(
-        faces,
-        loose.filter((panel) => !was.has(panel.id)),
-      );
-      const next = growArray(held.base, held.frame, held.side, n, held.seed).filter(
-        (panel) => was.has(panel.id) || !others.some((o) => Math.hypot(o.x - panel.x, o.y - panel.y) < 0.4),
-      );
-      held.ids = new Set([...was, ...next.map((panel) => panel.id)]);
-      const mine = held.ids;
-      setLoose((all) => [...all.filter((panel) => !mine.has(panel.id)), ...next]);
-      setPicks(next.map((panel): Pick => ({ kind: "loose", id: panel.id })));
-      return changed();
+      if (Math.hypot(p.x - held.from.x, p.y - held.from.y) >= 4 * u * scale) held.dragged = true;
+      return growTo(held, growCount(held.frame, held.side, held.from, p));
     }
     if (held.mode === "msb") {
       const p = pointAt(e);
@@ -3425,6 +3432,8 @@ export function RoofDesigner(props: {
     setSettled((n) => n + 1);
     if (held?.mode === "spin") return setSpinAt(0);
     if (held?.mode === "grow") {
+      // A plain press on a + (21 Nov 2026, Martin: "the + icons… dont do anything"): one more row or column there.
+      if (!held.dragged) return growTo(held, 1);
       // Panels taken away come off any string they were on.
       const here = new Set(loose.map((panel) => `l:${panel.id}`));
       if (strings.some((x) => x.panels.some((k) => k.startsWith("l:") && !here.has(k))))
@@ -8485,7 +8494,7 @@ export function RoofDesigner(props: {
                     const [hx, hy] = px(handle.at);
                     return (
                       <g key={handle.side} style={{ cursor: "pointer" }}>
-                        <title>Drag out to add panels here, or in to take them away</title>
+                        <title>Press to add a row of panels here. Drag out for more, or in to take them away.</title>
                         <circle cx={hx} cy={hy} r={5.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.3 * u} />
                         <path
                           d={`M${hx - 2.6 * u},${hy} h${5.2 * u} M${hx},${hy - 2.6 * u} v${5.2 * u}`}
