@@ -16,8 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Marketing",
-    words:
-      "The email editor is drag and drop: drag blocks onto the email, type straight into it, drag blocks to reorder them, and undo or redo any change.",
+    words: "The email editor is drag and drop: drag blocks onto the email or into a new order, type straight into it, and undo any change.",
   },
   {
     day: "2026-11-21",
