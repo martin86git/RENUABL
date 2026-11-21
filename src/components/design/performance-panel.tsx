@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowDownRight, ArrowUpRight, Check, SlidersHorizontal } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import {
   PERF_METRICS,
   PERF_RANGES,
   cleanMetrics,
   cleanRange,
   perfPeriod,
+  perfSeries,
   performance,
   periodWords,
+  type PerfBucket,
   type PerfFigure,
   type PerfMetric,
   type PerfRange,
@@ -36,14 +38,15 @@ function kept(): { range: PerfRange; custom: { from: ISODate; to: ISODate } | nu
 }
 
 /**
- * Performance in Today's tray (21 Nov 2026, Martin): any of the ranges, the figures the member chooses, each against
- * the period before it. `month` (the goal and the sun, for this month only) is drawn under it.
+ * Performance in Today's tray (21 Nov 2026, Martin: "a much much better job of performance… use a drop down to make it
+ * neat and clean"): the range in one dropdown, the figures chosen as tiles, each with its change on the period before
+ * and small bars across the period. `extra` (the month's goal and the sun, your own month) is drawn under it.
  */
-export function PerformancePanel({ jobs, today, month }: { jobs: JobLine[] | null; today: ISODate; month?: React.ReactNode }) {
+export function PerformancePanel({ jobs, today, extra }: { jobs: JobLine[] | null; today: ISODate; extra?: React.ReactNode }) {
   const [range, setRange] = useState<PerfRange>("month");
   const [custom, setCustom] = useState<{ from: ISODate; to: ISODate } | null>(null);
   const [metrics, setMetrics] = useState<PerfMetric[]>(() => cleanMetrics(null));
-  const [choosing, setChoosing] = useState(false);
+  const [open, setOpen] = useState<"range" | "figures" | null>(null);
   const [ready, setReady] = useState(false);
 
   // Read after the page is up, so the server's page and the browser's agree.
@@ -68,6 +71,8 @@ export function PerformancePanel({ jobs, today, month }: { jobs: JobLine[] | nul
 
   const period = useMemo(() => perfPeriod(range, today, custom), [range, today, custom]);
   const figures = useMemo(() => (jobs ? performance(jobs, period, metrics) : null), [jobs, period, metrics]);
+  const series = useMemo(() => (jobs ? perfSeries(jobs, period) : []), [jobs, period]);
+  const year = today.slice(0, 4);
   const toggle = (m: PerfMetric) =>
     setMetrics((all) =>
       all.includes(m)
@@ -76,118 +81,170 @@ export function PerformancePanel({ jobs, today, month }: { jobs: JobLine[] | nul
           : all
         : PERF_METRICS.map((x) => x.id).filter((x) => x === m || all.includes(x)),
     );
+  const rangeLabel = PERF_RANGES.find((r) => r.id === range)?.label ?? "This month";
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[22px] bg-surface px-5 pb-5 pt-4 ring-1 ring-line/70">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {PERF_RANGES.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              aria-pressed={range === r.id}
-              onClick={() => {
-                setRange(r.id);
-                if (r.id === "custom" && !custom) setCustom({ from: period.from, to: period.to });
-              }}
-              className={clsx(
-                "h-8 rounded-full px-3 text-[12.5px] transition",
-                range === r.id ? "bg-primary text-primary-ink" : "text-ink-2 ring-1 ring-line hover:text-ink",
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-          <div className="relative ml-auto">
-            <button
-              type="button"
-              aria-expanded={choosing}
-              onClick={() => setChoosing((c) => !c)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] text-ink-2 ring-1 ring-line hover:text-ink"
-            >
-              <SlidersHorizontal className="size-3.5" aria-hidden /> Customise
-            </button>
-            {choosing && (
-              <>
-                <button
-                  type="button"
-                  aria-hidden
-                  tabIndex={-1}
-                  className="fixed inset-0 z-20 cursor-default"
-                  onClick={() => setChoosing(false)}
-                />
-                <div className="absolute right-0 top-10 z-30 w-56 rounded-2xl bg-surface p-2 shadow-lift ring-1 ring-line">
-                  <p className="px-2 pb-1 pt-1 text-[11px] font-medium uppercase tracking-[0.12em] text-muted">Figures to show</p>
-                  {PERF_METRICS.map((m) => {
-                    const on = metrics.includes(m.id);
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        role="menuitemcheckbox"
-                        aria-checked={on}
-                        onClick={() => toggle(m.id)}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-[13px] text-ink hover:bg-surface-2"
-                      >
-                        <span
-                          className={clsx(
-                            "grid size-4 shrink-0 place-items-center rounded ring-1",
-                            on ? "bg-primary text-primary-ink ring-primary" : "ring-line-strong",
-                          )}
-                        >
-                          {on && <Check className="size-3" aria-hidden />}
-                        </span>
-                        {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+      <section className="rounded-[24px] bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_-12px_rgba(0,0,0,0.12)] ring-1 ring-line/70 sm:p-6">
+        <header className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-ink">Performance</h2>
+            <p className="mt-0.5 text-[12.5px] text-muted">
+              {periodWords(period, year)} <span className="text-line-strong">·</span> against{" "}
+              {periodWords({ from: period.prevFrom, to: period.prevTo }, year)}
+            </p>
           </div>
-        </div>
+          <div className="flex items-center gap-2">
+            <Menu open={open === "range"} onOpen={(o) => setOpen(o ? "range" : null)} label={rangeLabel} title="Date range">
+              {PERF_RANGES.map((r) => (
+                <MenuRow
+                  key={r.id}
+                  on={range === r.id}
+                  onClick={() => {
+                    setRange(r.id);
+                    if (r.id === "custom" && !custom) setCustom({ from: period.from, to: period.to });
+                    setOpen(null);
+                  }}
+                >
+                  {r.label}
+                </MenuRow>
+              ))}
+            </Menu>
+            <Menu
+              open={open === "figures"}
+              onOpen={(o) => setOpen(o ? "figures" : null)}
+              label={<SlidersHorizontal className="size-4" aria-hidden />}
+              title="Choose the figures"
+              iconOnly
+            >
+              <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-muted">Figures to show</p>
+              {PERF_METRICS.map((m) => (
+                <MenuRow key={m.id} on={metrics.includes(m.id)} check onClick={() => toggle(m.id)}>
+                  {m.label}
+                </MenuRow>
+              ))}
+            </Menu>
+          </div>
+        </header>
 
         {range === "custom" && custom && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
-            <label className="flex items-center gap-2">
-              From
-              <input
-                type="date"
-                value={custom.from}
-                max={today}
-                onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })}
-                className="h-8 rounded-lg bg-canvas px-2 text-ink ring-1 ring-line"
-              />
-            </label>
-            <label className="flex items-center gap-2">
-              to
-              <input
-                type="date"
-                value={custom.to}
-                max={today}
-                onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })}
-                className="h-8 rounded-lg bg-canvas px-2 text-ink ring-1 ring-line"
-              />
-            </label>
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-ink-2">
+            <DateBox label="From" value={custom.from} max={today} onChange={(from) => setCustom({ ...custom, from })} />
+            <DateBox label="to" value={custom.to} max={today} onChange={(to) => setCustom({ ...custom, to })} />
           </div>
         )}
 
-        <p className="mt-3 text-[12px] text-muted">
-          {periodWords(period, today.slice(0, 4))} · against {periodWords({ from: period.prevFrom, to: period.prevTo }, today.slice(0, 4))}
-        </p>
-
         {!figures ? (
-          <div className="mt-4 h-20 animate-pulse rounded-xl bg-surface-2" />
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {metrics.map((m) => (
+              <div key={m} className="h-[136px] animate-pulse rounded-2xl bg-canvas" />
+            ))}
+          </div>
         ) : (
-          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+          <div
+            className={clsx(
+              "mt-5 grid grid-cols-2 gap-3",
+              figures.length > 2 && "lg:grid-cols-4",
+              figures.length === 3 && "lg:grid-cols-3",
+            )}
+          >
             {figures.map((f) => (
-              <Figure key={f.metric} figure={f} />
+              <Tile key={f.metric} figure={f} series={series} />
             ))}
           </div>
         )}
-      </div>
-      {range === "month" && month}
+      </section>
+      {range === "month" && extra}
     </div>
+  );
+}
+
+function Menu(props: {
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  label: React.ReactNode;
+  title: string;
+  iconOnly?: boolean;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!props.open) return;
+    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && props.onOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && props.onOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [props]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={props.open}
+        title={props.title}
+        aria-label={props.iconOnly ? props.title : undefined}
+        onClick={() => props.onOpen(!props.open)}
+        className={clsx(
+          "inline-flex h-9 items-center gap-1.5 rounded-full bg-canvas text-[13px] font-medium text-ink ring-1 ring-line transition hover:ring-line-strong",
+          props.iconOnly ? "w-9 justify-center" : "pl-3.5 pr-2.5",
+        )}
+      >
+        {props.label}
+        {!props.iconOnly && <ChevronDown className={clsx("size-4 text-muted transition", props.open && "rotate-180")} aria-hidden />}
+      </button>
+      {props.open && (
+        <div role="menu" className="absolute right-0 top-11 z-30 w-56 rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line">
+          {props.children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuRow(props: { on: boolean; check?: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role={props.check ? "menuitemcheckbox" : "menuitemradio"}
+      aria-checked={props.on}
+      onClick={props.onClick}
+      className={clsx(
+        "flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] transition hover:bg-canvas",
+        props.on && !props.check ? "font-medium text-ink" : "text-ink-2",
+      )}
+    >
+      {props.check ? (
+        <span
+          className={clsx(
+            "grid size-4 shrink-0 place-items-center rounded-[5px] ring-1",
+            props.on ? "bg-primary text-primary-ink ring-primary" : "ring-line-strong",
+          )}
+        >
+          {props.on && <Check className="size-3" aria-hidden />}
+        </span>
+      ) : null}
+      <span className="flex-1">{props.children}</span>
+      {!props.check && props.on && <Check className="size-4 text-sun-line" aria-hidden />}
+    </button>
+  );
+}
+
+function DateBox(props: { label: string; value: ISODate; max: ISODate; onChange: (v: ISODate) => void }) {
+  return (
+    <label className="flex items-center gap-2">
+      {props.label}
+      <input
+        type="date"
+        value={props.value}
+        max={props.max}
+        onChange={(e) => e.target.value && props.onChange(e.target.value)}
+        className="h-9 rounded-full bg-canvas px-3 text-ink ring-1 ring-line"
+      />
+    </label>
   );
 }
 
@@ -199,20 +256,42 @@ function shown(kind: PerfFigure["kind"], v: number | null): string {
   return String(v);
 }
 
-function Figure({ figure: f }: { figure: PerfFigure }) {
+function Tile({ figure: f, series }: { figure: PerfFigure; series: PerfBucket[] }) {
   const up = f.change !== null && f.change > 0;
   const down = f.change !== null && f.change < 0;
+  const values = series.map((b) => b.values[f.metric] ?? 0);
+  const top = Math.max(...values, 0);
   return (
-    <div className="min-w-0">
-      <div className="font-mono text-[22px] leading-none tracking-[-0.02em] text-ink">{shown(f.kind, f.value)}</div>
-      <div className="mt-1.5 text-[12px] text-ink-2">{f.label}</div>
-      <div
-        className={clsx("mt-1 flex items-center gap-0.5 text-[11.5px]", up ? "text-positive" : down ? "text-warning" : "text-muted")}
-        title={`Before: ${shown(f.kind, f.prev)}`}
-      >
-        {up && <ArrowUpRight className="size-3.5" aria-hidden />}
-        {down && <ArrowDownRight className="size-3.5" aria-hidden />}
-        {f.change === null ? `Before: ${shown(f.kind, f.prev)}` : `${Math.round(Math.abs(f.change) * 100)}% on before`}
+    <div className="flex min-w-0 flex-col rounded-2xl bg-canvas/70 p-4 ring-1 ring-line/60">
+      <div className="text-[12px] font-medium text-ink-2">{f.label}</div>
+      <div className="mt-2 font-mono text-[26px] leading-none tracking-[-0.03em] text-ink">{shown(f.kind, f.value)}</div>
+      <div className="mt-2.5 flex items-center gap-1.5 text-[11.5px]" title={`Before: ${shown(f.kind, f.prev)}`}>
+        {f.change === null ? (
+          <span className="text-muted">Before: {shown(f.kind, f.prev)}</span>
+        ) : (
+          <span
+            className={clsx(
+              "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium",
+              up ? "bg-positive/10 text-positive" : down ? "bg-warning/10 text-warning" : "bg-line/60 text-ink-2",
+            )}
+          >
+            {up && <ArrowUpRight className="size-3" aria-hidden />}
+            {down && <ArrowDownRight className="size-3" aria-hidden />}
+            {Math.round(Math.abs(f.change) * 100)}%
+          </span>
+        )}
+        {f.change !== null && <span className="text-muted">on before</span>}
+      </div>
+      {/* The period in small bars: where in it the figure came from. */}
+      <div className="mt-auto flex h-8 items-end gap-[2px] pt-3" aria-hidden>
+        {values.map((v, i) => (
+          <span
+            key={series[i].from}
+            title={`${series[i].from}: ${shown(f.kind, v)}`}
+            className={clsx("min-w-0 flex-1 rounded-[2px]", v > 0 ? "bg-sun-line/80" : "bg-line/70")}
+            style={{ height: top > 0 && v > 0 ? `${Math.max(14, (v / top) * 100)}%` : "3px" }}
+          />
+        ))}
       </div>
     </div>
   );

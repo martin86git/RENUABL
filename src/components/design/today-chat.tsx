@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
 import {
   ArrowRight,
@@ -9,15 +9,12 @@ import {
   CircleAlert,
   Eye,
   FileText,
-  HardHat,
   Lightbulb,
   Phone,
   PhoneCall,
   Sparkles,
-  SquareKanban,
   Stamp,
   TrendingUp,
-  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import type { ISODate } from "@/lib/domain/types";
@@ -28,11 +25,11 @@ import type { TodayView } from "@/lib/domain/design/today-view";
 import { dollars, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
 import { GoalLine, SunArc } from "./gauges";
-import { SchedulerPage } from "./design-scheduler";
-import { InstallListPage, InstallViewSwitch, type InstallView } from "./install-lists";
+import { loadFeed } from "@/lib/services/deal-feed";
+import type { FeedDeal } from "@/lib/domain/design/deal-feed";
+import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
 import { SolMark, SolStars } from "./sol-icon";
-import { PipelineView, SolBox } from "./today-pad";
-import { NextCard } from "./canvas-pad";
+import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
@@ -64,7 +61,7 @@ export function useInsights(): InsightsView[] | null | "failed" {
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
 
-type TrayTab = "performance" | "changes" | "mine" | "needs" | "pipeline" | "calls" | "proposals" | "installs" | "sol";
+type TrayTab = "performance" | "needs" | "proposals" | "calls" | "sol" | "changes";
 
 export function TodayChat(props: {
   name: string | null;
@@ -83,20 +80,27 @@ export function TodayChat(props: {
   const mine = first?.scope === "me";
   const you = props.name ? `, ${props.name}` : "";
   const [tab, setTab] = useState<TrayTab | null>(null);
+  // The deals Sol has a suggestion on, for Needs you (the feed's own answer, read again as Sol's cards change).
+  const [feed, setFeed] = useState<FeedDeal[] | null>(null);
+  const readFeed = useCallback(async () => {
+    const r = await loadFeed();
+    if (r.ok) setFeed(r.deals);
+  }, []);
+  useEffect(() => {
+    const t = window.setTimeout(() => void readFeed(), 0);
+    return () => window.clearTimeout(t);
+  }, [readFeed]);
+  // 21 Nov 2026, Martin: the tray holds what Sol or a voice agent can act on, with Performance first.
   const tabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
-    { key: "changes", label: mine ? "Next wins" : "Worth changing", icon: Lightbulb, count: first?.insights.length },
-    ...(own ? [{ key: "mine" as const, label: "Your own month", icon: UserRound }] : []),
-    // 21 Nov 2026, Martin: "add needs you, pipeline, calls, proposals and sol's work".
-    { key: "needs", label: "Needs you", icon: CircleAlert, count: props.items?.length },
-    { key: "pipeline", label: "Pipeline", icon: SquareKanban },
-    { key: "calls", label: "Calls", icon: Phone },
+    { key: "needs", label: "Needs you", icon: CircleAlert, count: feed ? dealsNeedingYou(feed).length : undefined },
     { key: "proposals", label: "Proposals", icon: FileText },
-    { key: "installs", label: "Installs", icon: HardHat },
+    { key: "calls", label: "Calls", icon: Phone },
     { key: "sol", label: "Sol's work", icon: Sparkles },
+    { key: "changes", label: mine ? "Next wins" : "Worth changing", icon: Lightbulb, count: first?.insights.length },
   ];
   // Whose panel isn't about the month: drawn wider than the box, as the pages they come from are.
-  const wide = tab === "pipeline" || tab === "calls" || tab === "proposals" || tab === "installs";
+  const wide = tab === "calls" || tab === "proposals";
   // As the screenshot Martin chose (21 Nov 2026): the greeting, Sol's box straight under it, and a tray tucked under the
   // box whose tabs open what was on the cards (the month, what is worth changing) below it, one at a time.
   return (
@@ -129,7 +133,7 @@ export function TodayChat(props: {
       <div
         role="tablist"
         aria-label="About the month"
-        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] flex-nowrap items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-surface-2 px-2 pb-1.5 pt-[26px] ring-1 ring-line/70"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
       >
         {tabs.map(({ key, label, icon: Icon, count }) => (
           <button
@@ -139,8 +143,8 @@ export function TodayChat(props: {
             aria-selected={tab === key}
             onClick={() => setTab((t) => (t === key ? null : key))}
             className={clsx(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-2 text-[12.5px] transition",
-              tab === key ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:bg-surface/70 hover:text-ink",
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition",
+              tab === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
             )}
           >
             <Icon className="size-3.5" aria-hidden />
@@ -157,56 +161,42 @@ export function TodayChat(props: {
       {tab && (
         <div role="tabpanel" className={clsx("mt-5 text-left", wide ? "w-[min(72rem,calc(100vw-3rem))]" : "w-full")}>
           {tab === "needs" ? (
-            <NeedsPanel items={props.items} />
-          ) : tab === "pipeline" ? (
-            <PipelineView jobs={props.jobs} today={props.today} />
+            <TrayNeeds deals={feed} onChanged={() => void readFeed()} />
           ) : tab === "calls" ? (
             <CallLogPage />
           ) : tab === "proposals" ? (
             <ProposalsPage signed={false} bare />
-          ) : tab === "installs" ? (
-            <TodayInstalls />
           ) : tab === "sol" ? (
             <SolWorkPanel />
           ) : tab === "performance" ? (
-            <PerformancePanel jobs={props.jobs} today={props.today} month={first ? <MonthPanel month={first.month} mine={mine} /> : null} />
+            <PerformancePanel
+              jobs={props.jobs}
+              today={props.today}
+              extra={
+                first ? (
+                  <>
+                    <MonthPanel month={first.month} mine={mine} />
+                    {own && (
+                      <div className="pt-2">
+                        <p className="mb-2 px-1 text-[12px] font-medium uppercase tracking-[0.12em] text-muted">Your own month</p>
+                        <ViewPart view={own} titled={false} />
+                      </div>
+                    )}
+                  </>
+                ) : null
+              }
+            />
           ) : props.views === "failed" ? (
             <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
               The month couldn&rsquo;t be read just now. Feed has your deals.
             </p>
           ) : !first ? (
             <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
-          ) : tab === "mine" && own ? (
-            <ViewPart view={own} titled={false} />
           ) : (
             <Changes view={first} />
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-/** Installations in the tray: the calendar or the list, switched here without leaving Today. */
-function TodayInstalls() {
-  const [view, setView] = useState<InstallView>("list");
-  const switcher = <InstallViewSwitch view={view} onView={setView} />;
-  return view === "list" ? <InstallListPage switcher={switcher} /> : <SchedulerPage switcher={switcher} />;
-}
-
-/** What needs the member now, as Today's list has it: the first eight, then a way to the rest on the feed. */
-function NeedsPanel({ items }: { items: NextItem[] | null }) {
-  if (!items) return <div className="h-40 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />;
-  if (!items.length)
-    return <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">Nothing needs you right now.</p>;
-  return (
-    <div className="rounded-[22px] bg-surface px-5 py-2 ring-1 ring-line/70">
-      <div className="divide-y divide-line">
-        {items.slice(0, 8).map((x) => (
-          <NextCard key={x.key} item={x} />
-        ))}
-      </div>
-      {items.length > 8 && <p className="py-3 text-[12.5px] text-ink-2">{items.length - 8} more on your Feed.</p>}
     </div>
   );
 }
