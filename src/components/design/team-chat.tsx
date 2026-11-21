@@ -46,7 +46,6 @@ import {
   TEAM_QUICK_REACTIONS,
   asksSol,
   cleanChannelName,
-  dmRoom,
   dmWith,
   initialsOf,
   isTeamPicture,
@@ -83,12 +82,12 @@ import {
 } from "@/lib/services/team-chat";
 import { dealRoom, jobOfRoom, writerName, type DealChatLine } from "@/lib/domain/design/deal-team";
 import { DEAL_TEAM_CHANGED, openDealChat } from "@/lib/services/deal-team";
-import { TEAM_LEVELS, levelPermissions, type TeamLevel } from "@/lib/domain/design/welcome";
-import { addMember, setMemberPermissions } from "@/lib/services/design-account";
 import { DealTeamChat } from "./deal-team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolChat } from "./sol-chat";
+import { newSolChat } from "@/lib/services/sol";
+import { callerTint } from "@/lib/domain/design/caller";
 import { SolBadge, SolMark } from "./sol-sun";
 import { useSolUnread } from "./sol-dock";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
@@ -146,6 +145,8 @@ export function TeamChatPanel({
   const [error, setError] = useState("");
   /** Which plus in the list is open: a new channel, or someone new to message. */
   const [adding, setAdding] = useState<"channel" | "person" | null>(null);
+  /** Bumped to open Sol's conversation afresh after a new chat is started from the big +. */
+  const [solFresh, setSolFresh] = useState(0);
   // The list down the left is dragged wider or narrower by its edge (12 Nov 2026, Martin: the deals' names were cut off).
   const panelRef = useRef<HTMLDivElement>(null);
   const [listW, setListW] = useState<number>(() => {
@@ -505,37 +506,48 @@ export function TeamChatPanel({
         ))}
         <ListHead
           label="Direct messages"
-          plus="Message someone new"
+          plus="Message someone"
           on={adding === "person"}
           onPlus={() => setAdding((a) => (a === "person" ? null : "person"))}
         />
         {adding === "person" && (
-          <AddPerson
-            mayAdd={view?.mayAddPeople === true}
-            onAdded={(email) => {
+          <PickPerson
+            people={view?.people ?? []}
+            onPick={(r) => {
               setAdding(null);
-              setRoom(dmRoom(me, email));
-              void load();
+              setRoom(r);
             }}
             onClose={() => setAdding(null)}
           />
         )}
         <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
           {view && view.people.length === 0 && (
-            <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Press + to add someone.</p>
+            <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Settings → Users.</p>
           )}
           {view?.people.map((p) => (
             <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
-              <Round email={p.email} small />
+              <Round email={p.email} tinted />
               <span className="truncate">{p.label}</span>
             </RoomButton>
           ))}
         </div>
+        <NewChatButton
+          sol={hasSol}
+          onMessage={() => setAdding("person")}
+          onChannel={() => setAdding("channel")}
+          onSol={async () => {
+            setSide("team");
+            const r = await newSolChat();
+            if (!r.ok) setError(r.message);
+            setSolFresh((n) => n + 1);
+            setRoom(SOL_ROOM);
+          }}
+        />
       </nav>
 
       {solOpen && (
         <div className="flex min-w-0 flex-1 flex-col">
-          <SolChat side onClose={onClose} />
+          <SolChat key={solFresh} side onClose={onClose} />
         </div>
       )}
       {dealJob && (
@@ -1223,18 +1235,83 @@ function CatchUpCard({ summary, onClose }: { summary: CatchUp; onClose: () => vo
   );
 }
 
-function Round({ email, small = false }: { email: string; small?: boolean }) {
+function Round({ email, small = false, tinted = false }: { email: string; small?: boolean; tinted?: boolean }) {
+  // tinted: a person's own avatar in Direct messages (21 Nov 2026, Martin: "dms… list people we chat with to have their
+  // own icon avatar left of their name"), coloured by their email (callerTint) so each reads apart at a glance.
+  const sol = email === SOL_BY;
   return (
     <span
       className={clsx(
         "flex shrink-0 items-center justify-center rounded-full font-semibold",
-        small ? "size-5 text-[9px]" : "size-7 text-[11px]",
-        email === SOL_BY ? "bg-primary" : "bg-primary text-white",
+        tinted ? "size-7 text-[10.5px] text-white ring-2 ring-surface" : small ? "size-5 text-[9px]" : "size-7 text-[11px]",
+        !tinted && (sol ? "bg-primary" : "bg-primary text-white"),
       )}
+      style={tinted && !sol ? { background: `var(--caller-${callerTint(email)})` } : undefined}
       aria-hidden
     >
-      {email === SOL_BY ? <SolBadge className={small ? "size-3.5" : "size-[18px]"} /> : initialsOf(email)}
+      {sol ? <SolBadge className={small ? "size-3.5" : "size-[18px]"} /> : initialsOf(email)}
     </span>
+  );
+}
+
+/**
+ * The big + at the foot of the conversations (21 Nov 2026, Martin: "a big + icon in the bottom left or right… which
+ * allows us to start a new dm with someone, or a chat with sol, or a channel"). Opens a small menu upward; Message
+ * someone lists the people in the business, with Add someone new at its foot.
+ */
+function NewChatButton(props: { sol: boolean; onMessage: () => void; onChannel: () => void; onSol: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const pick = (go: () => void) => {
+    setOpen(false);
+    go();
+  };
+  const row = "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink hover:bg-canvas";
+  return (
+    <div ref={box} className="relative shrink-0 px-3 pb-3 pt-2">
+      {open && (
+        <div role="menu" className="absolute bottom-full left-3 z-20 mb-1 w-56 rounded-xl bg-surface p-1.5 shadow-lg ring-1 ring-line">
+          <button type="button" role="menuitem" className={row} onClick={() => pick(props.onMessage)}>
+            <AtSign className="size-4 text-muted" aria-hidden />
+            Message someone
+          </button>
+          {props.sol && (
+            <button type="button" role="menuitem" className={row} onClick={() => pick(props.onSol)}>
+              <SolBadge className="size-4" />
+              New chat with Sol
+            </button>
+          )}
+          <button type="button" role="menuitem" className={row} onClick={() => pick(props.onChannel)}>
+            <Hash className="size-4 text-muted" aria-hidden />
+            New channel
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        aria-label="Start a new conversation"
+        title="Message someone, chat with Sol or start a channel"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "flex size-11 items-center justify-center rounded-full text-white shadow-md transition",
+          open ? "bg-primary" : "bg-sun-line hover:brightness-105",
+        )}
+      >
+        {open ? <X className="size-5" aria-hidden /> : <Plus className="size-6" strokeWidth={2.4} aria-hidden />}
+      </button>
+    </div>
   );
 }
 
@@ -1309,71 +1386,58 @@ function AddChannel(props: { onAdded: (id: string) => void; onClose: () => void 
 }
 
 /**
- * Someone new to message: everyone already in the business is listed under Direct messages, so this adds a person to
- * the business (the owner's to do, as on Your account), then opens the conversation with them.
+ * Someone to message (21 Nov 2026, Martin: the + by Direct messages asked to add a person to the business as a user or
+ * admin, "that's not what we want in chat"): a search over the people already in the business; a press opens the
+ * conversation. Adding people to the business is Settings → Users, not chat.
  */
-function AddPerson(props: { mayAdd: boolean; onAdded: (email: string) => void; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [level, setLevel] = useState<TeamLevel>("user");
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState("");
-  const who = email.trim().toLowerCase();
-  const valid = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(who);
-  if (!props.mayAdd)
-    return (
-      <p className="px-3 pb-1.5 text-xs text-muted">
-        Everyone in your business is listed here. Only the owner can add someone new, under Your account.
-      </p>
-    );
-  const add = async () => {
-    if (!valid || busy) return;
-    setBusy(true);
-    const made = await addMember(who);
-    const set = made.problem ? made : await setMemberPermissions(who, levelPermissions(level));
-    setBusy(false);
-    if (made.problem) return setProblem(made.problem);
-    if (set.problem) setProblem(set.problem);
-    props.onAdded(who);
-  };
+function PickPerson(props: {
+  people: { room: string; label: string; email: string }[];
+  onPick: (room: string) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = props.people.filter((p) => words.every((w) => `${p.label} ${p.email}`.toLowerCase().includes(w)));
   return (
     <div className="px-2 pb-1.5">
-      <input
-        autoFocus
-        type="email"
-        value={email}
-        onChange={(e) => {
-          setEmail(e.target.value);
-          setProblem("");
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") props.onClose();
-          if (e.key === "Enter") void add();
-        }}
-        aria-label="Their email address"
-        placeholder="Their email"
-        className={ADD_BOX}
-      />
-      <div className="mt-1.5 flex items-center gap-1.5">
-        <select
-          value={level}
-          onChange={(e) => setLevel(e.target.value as TeamLevel)}
-          aria-label="What they can do"
-          title={TEAM_LEVELS.find((l) => l.level === level)?.about}
-          className={clsx(ADD_BOX, "min-w-0 flex-1")}
-        >
-          {TEAM_LEVELS.map((l) => (
-            <option key={l.level} value={l.level}>
-              {l.label}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={() => void add()} disabled={!valid || busy} className={ADD_GO}>
-          {busy ? "Adding…" : "Add"}
-        </button>
+      {props.people.length > 0 && (
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") props.onClose();
+            if (e.key === "Enter" && shown[0]) props.onPick(shown[0].room);
+          }}
+          aria-label="Who to message"
+          placeholder="Who to message"
+          className={ADD_BOX}
+        />
+      )}
+      <div className="mt-1 max-h-48 overflow-y-auto">
+        {shown.map((p) => (
+          <button
+            key={p.room}
+            type="button"
+            title={p.email}
+            onClick={() => props.onPick(p.room)}
+            className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-surface"
+          >
+            <Round email={p.email} tinted />
+            <span className="truncate">{p.label}</span>
+          </button>
+        ))}
+        {props.people.length > 0 && shown.length === 0 && <p className="px-1.5 py-1 text-[11px] text-muted">No one by that name.</p>}
       </div>
-      <p className={clsx("px-1 pt-1 text-[11px]", problem ? "text-danger" : "text-muted")}>
-        {problem || "Adds them to your business as a user on your plan. They sign in with this email; nothing is sent to them."}
-      </p>
+      {props.people.length === 0 && (
+        <p className="px-1 pt-1 text-[11px] text-muted">
+          No one else is in the business yet.{" "}
+          <Link href="/design/settings/users" className="underline hover:text-ink">
+            Add people in Settings
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }
