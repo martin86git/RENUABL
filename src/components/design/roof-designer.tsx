@@ -9625,7 +9625,11 @@ export function RoofDesigner(props: {
                       <PlugZap className="size-5" aria-hidden />
                     </button>
                     {menu === "chargers" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {charger ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -9662,21 +9666,11 @@ export function RoofDesigner(props: {
                             <p className={clsx(label, "mt-2 px-2 py-1")}>
                               {charger ? "Change it" : "Chargers to choose from"} · {(props.chargers ?? []).length} on your lists
                             </p>
-                            <input
-                              value={seek}
-                              onChange={(e) => setSeek(e.target.value)}
-                              placeholder="Search EV chargers"
-                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                            />
-                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {kitSearchHere("Search EV chargers")}
+                            <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("chargers", props.chargers ?? [])
-                                .filter((c) =>
-                                  seek
-                                    .toLowerCase()
-                                    .split(/\s+/)
-                                    .every((word) => `${c.name} ${c.sku}`.toLowerCase().includes(word)),
-                                )
+                                .filter((c) => seeks(`${c.name} ${c.sku}`))
                                 .map((c) => (
                                   <div key={c.sku} className="group flex items-start gap-1">
                                     <button
@@ -9704,6 +9698,7 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
+                            {kitSearchFoot("Search EV chargers")}
                           </>
                         )}
                       </div>
