@@ -5895,6 +5895,7 @@ export function RoofDesigner(props: {
 
   const designsMenu = (
     <div
+      data-opened
       className={clsx(
         "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
         props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
@@ -6393,7 +6394,7 @@ export function RoofDesigner(props: {
           props.tight
             ? phone
               ? "absolute inset-x-3 flex h-12 flex-row items-center"
-              : "absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center"
+              : clsx("absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center", sideways && "designer-compact-rail")
             : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
         style={phone && stage ? { top: 8 + stage.top + 6 + stage.pt + stage.photoH + stage.pb + 4 } : undefined}
@@ -6707,7 +6708,7 @@ export function RoofDesigner(props: {
 
       {/* Room for the window's close round on the right: sideways it shares a row with the figures only, so the figures
           keep clear of it and the picture runs to the edge. */}
-      <div className={clsx("relative", props.tight ? (phone ? "" : sideways ? "pl-[4.25rem]" : "pl-[4.25rem] pr-11") : "mt-5")}>
+      <div className={clsx("relative", props.tight ? (phone ? "" : sideways ? "pl-12" : "pl-[4.25rem] pr-11") : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -6721,7 +6722,7 @@ export function RoofDesigner(props: {
                   ? phone
                     ? "mb-1.5 mr-11 flex-wrap"
                     : sideways
-                      ? "mb-1.5 mr-11 flex-nowrap"
+                      ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
                       : "mb-1.5 flex-nowrap"
                   : "mb-2 flex-wrap",
               )}
@@ -7149,7 +7150,7 @@ export function RoofDesigner(props: {
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
               ref={picBox}
-              className="glass-dark relative mx-auto"
+              className={clsx("glass-dark relative mx-auto", sideways && "designer-compact")}
               style={
                 {
                   maxWidth: fit,
