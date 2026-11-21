@@ -81,6 +81,38 @@ function BrainFolds() {
   );
 }
 
+/** The etched brain on its 120 grid: pressed in with a deeper orange, caught by a pale edge just below. */
+function BrainEtch() {
+  return (
+    <g strokeLinecap="round" strokeLinejoin="round">
+      <g stroke="#B8360A" strokeOpacity="0.38" strokeWidth="2.6">
+        <BrainFolds />
+      </g>
+      <g stroke="#FFF1C2" strokeOpacity="0.35" strokeWidth="1.2" transform="translate(1.2 1.4)">
+        <BrainFolds />
+      </g>
+    </g>
+  );
+}
+
+/**
+ * The same etched brain on its own, for a sun drawn some other way (the live sun on the business page, 21 Nov 2026,
+ * Martin: its large Sol was missing the etched lines). Its box is the sun's disc, which it is clipped to.
+ */
+export function SolBrainEtch({ className }: { className?: string }) {
+  const id = useId().replace(/:/g, "");
+  return (
+    <svg viewBox="15 15 90 90" fill="none" className={className} aria-hidden>
+      <clipPath id={`${id}-disc`}>
+        <circle cx="60" cy="60" r="45" />
+      </clipPath>
+      <g clipPath={`url(#${id}-disc)`}>
+        <BrainEtch />
+      </g>
+    </svg>
+  );
+}
+
 /**
  * Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
  * sun… a little bit bigger… a little more ai tech. but still fundamentally the sun"). One disc, lit like a glass orb:
@@ -120,13 +152,8 @@ export function SolMark({ className, glow = true }: { className?: string; glow?:
         <circle cx="12" cy="12" r="9" />
       </clipPath>
       <g clipPath={`url(#${id}-disc)`}>
-        <g transform="scale(0.2)" strokeLinecap="round" strokeLinejoin="round">
-          <g stroke="#B8360A" strokeOpacity="0.38" strokeWidth="2.6">
-            <BrainFolds />
-          </g>
-          <g stroke="#FFF1C2" strokeOpacity="0.35" strokeWidth="1.2" transform="translate(1.2 1.4)">
-            <BrainFolds />
-          </g>
+        <g transform="scale(0.2)">
+          <BrainEtch />
         </g>
       </g>
       {/* The light along his top edge. */}

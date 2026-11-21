@@ -48,6 +48,8 @@ import { ColleagueWindow } from "./colleague";
 import { RailAgents } from "./rail-agents";
 import { RoutinesRound } from "./routines-round";
 import { AgentsWindow } from "./agents-window";
+import { SetupWizard } from "./setup-wizard";
+import { openSetup } from "@/lib/services/setup";
 import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
@@ -386,6 +388,8 @@ function Shell({
       <CoachWindow />
       <ColleagueWindow />
       {retail && <AgentsWindow />}
+      {/* Sol's setup wizard: what a new business still has to set up (setup.ts). */}
+      {retail && !account.demo && <SetupWizard />}
       {/* The owner viewing as someone else: whose view it is, that nothing can be changed, and the way back. */}
       {account.viewedBy && (
         <div className="sticky top-0 z-[45] flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sun-line px-4 py-2 text-center text-sm text-white print:hidden">
@@ -618,6 +622,7 @@ function Shell({
                 // An installer's connections live here (its menu is My Jobs, the designer and the Marketplace).
                 connections={kind === "installer" ? { href: "/design/connections", waiting: requests } : undefined}
                 unseen={updates}
+                onSetup={retail && !account.demo ? openSetup : undefined}
                 on={
                   settingsOn ||
                   path.startsWith(PATHS.updates) ||

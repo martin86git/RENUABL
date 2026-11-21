@@ -25,6 +25,7 @@ import {
   Users,
   Wind,
   type LucideIcon,
+  ListChecks,
 } from "lucide-react";
 import type { Sky } from "@/lib/domain/weather";
 import clsx from "clsx";
@@ -370,6 +371,8 @@ export function ProfileMenu(props: {
   /** Updates since this member last opened them. */
   unseen: number;
   on: boolean;
+  /** Opens Sol's setup wizard (setup-wizard.tsx), where the shell mounts it. */
+  onSetup?: () => void;
 }) {
   const [open, setOpen, box] = useWindow();
   const row = (label: string, href: string, Icon: LucideIcon, n = 0) => (
@@ -405,6 +408,18 @@ export function ProfileMenu(props: {
           {row("Settings", props.settings, SlidersHorizontal)}
           {row("Your account", props.account, UserRound)}
           {props.connections && row("Connections", props.connections.href, Users, props.connections.waiting)}
+          {props.onSetup && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                props.onSetup?.();
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-ink hover:bg-canvas"
+            >
+              <ListChecks className="size-4" aria-hidden /> <span className="flex-1">Set up with Sol</span>
+            </button>
+          )}
           <div className="my-1 border-t border-line" />
           {row("Industry news", "/design/news", Newspaper)}
           {row("Updates", props.updates, Sparkles, props.unseen)}
