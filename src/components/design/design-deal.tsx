@@ -536,11 +536,10 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)] max-sm:-mr-3 max-sm:w-auto max-sm:gap-2.5 max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:-mx-3 max-sm:w-auto max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
       {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />
-      <DealMenu mini {...menu} onDelete={deleteDeal} />
       <div className="min-w-0 space-y-4 max-sm:space-y-3 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
           <DesignDrawer
@@ -608,8 +607,33 @@ export function DealPage({ id }: { id: string }) {
             figures={bannerFigures(details, job.kw)}
             onDesign={job.lat !== null ? () => openTool("design") : null}
             onPlace={() => setAskPlace("place")}
+            actions={
+              // On a phone, ringing and writing to the customer sit in the banner itself (21 Nov 2026, Martin).
+              <div data-tour="deal-reach" className="flex gap-1.5">
+                <CallMenu
+                  round="banner"
+                  jobId={job.id}
+                  phone={customer.phone}
+                  name={customer.firstName}
+                  onNotes={menu.onNotes}
+                  toBook={PRE_INSTALL_STAGES.includes(job.stage)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setTab("email")}
+                  aria-label={`Email ${customer.firstName || "the customer"}`}
+                  className={clsx(
+                    "flex size-9 items-center justify-center rounded-full ring-1 transition",
+                    tab === "email" ? "bg-white text-ink ring-white" : "bg-white/10 text-white ring-white/15",
+                  )}
+                >
+                  <Mail className="size-4" aria-hidden />
+                </button>
+              </div>
+            }
           />
         </div>
+        <DealPills {...menu} onDelete={deleteDeal} />
         {askPlace && (
           <AskPlace
             name={customer.firstName}
@@ -1076,8 +1100,9 @@ function CallMenu({
   onNotes: () => void;
   /** Sold and not yet installed: the admin assistant can ring to book the installation. */
   toBook?: boolean;
-  /** A round of the deal's menu: down the left ("rail", its choices to its right) or in the row ("row", below). */
-  round?: "rail" | "row";
+  /** A round of the deal's menu: down the left ("rail", its choices to its right), in the row ("row", below), or on the
+   * phone's banner ("banner": a small light round on the graphite, its choices below). */
+  round?: "rail" | "row" | "banner";
   /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
   rail?: boolean;
   /** The phone's slim rail: a smaller round. */
@@ -1112,24 +1137,33 @@ function CallMenu({
           if (at) return setAt(null);
           const r = e.currentTarget.getBoundingClientRect();
           setAt(
-            round === "rail"
-              ? { top: r.top, left: Math.max(8, Math.min(r.right + 12, window.innerWidth - 296)) }
-              : rail
-                ? { top: r.top, left: Math.max(8, r.left - 296) }
-                : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
+            round === "banner"
+              ? { top: r.bottom + 8, left: Math.max(8, Math.min(r.right - 288, window.innerWidth - 296)) }
+              : round === "rail"
+                ? { top: r.top, left: Math.max(8, Math.min(r.right + 12, window.innerWidth - 296)) }
+                : rail
+                  ? { top: r.top, left: Math.max(8, r.left - 296) }
+                  : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
           );
         }}
         className={
-          round
-            ? "group flex flex-col items-center gap-1 disabled:opacity-100"
-            : clsx(
-                rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
-                at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                !phone && "text-muted hover:text-muted",
+          round === "banner"
+            ? clsx(
+                "flex size-9 items-center justify-center rounded-full ring-1 transition disabled:opacity-40",
+                at ? "bg-white text-ink ring-white" : "bg-white/10 text-white ring-white/15",
               )
+            : round
+              ? "group flex flex-col items-center gap-1 disabled:opacity-100"
+              : clsx(
+                  rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+                  at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                  !phone && "text-muted hover:text-muted",
+                )
         }
       >
-        {round ? (
+        {round === "banner" ? (
+          <Phone className="size-4" aria-hidden />
+        ) : round ? (
           <>
             <span
               className={clsx(
@@ -1213,6 +1247,81 @@ function useCentredRail() {
  * notes and chats; then, only once it matters, the Job card (sold) and Service (installed); then Sol. Down the left on
  * a wide screen, floating in the middle of the window; a row under the banner narrower.
  */
+/**
+ * The deal's tools on a phone (21 Nov 2026, Martin: the rail down the left took a fifth of the screen and cut the words
+ * short): one row of pills under the banner that scrolls sideways. Call and Email are in the banner; Sol is the foot
+ * bar's, so he isn't here twice.
+ */
+function DealPills(props: {
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  stage: JobStage;
+  designable: boolean;
+  onDesign: () => void;
+  onProposal: () => void;
+  onCard: () => void;
+  onDelete: () => void;
+}) {
+  const sold = WON_STAGES.includes(props.stage);
+  const installed = INSTALLED_STAGES.includes(props.stage);
+  const inDetails = NOTES_VIEWS.some(([key]) => key === props.tab);
+  const pill = (on: boolean) =>
+    clsx(
+      "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium ring-1 transition",
+      on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line",
+    );
+  return (
+    <nav
+      aria-label="This deal"
+      className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
+    >
+      <button
+        type="button"
+        data-tour="deal-design"
+        onClick={props.onDesign}
+        title={props.designable ? "Design" : "Give the deal an address to design it"}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white"
+      >
+        <PenTool className="size-3.5" aria-hidden />
+        Design
+      </button>
+      <button type="button" data-tour="deal-proposal" onClick={props.onProposal} className={pill(false)}>
+        <FileText className="size-3.5 text-sun-line" aria-hidden />
+        Proposal
+      </button>
+      <button type="button" data-tour="deal-details" onClick={() => props.onTab("details")} className={pill(inDetails)}>
+        <LayoutList className="size-3.5" aria-hidden />
+        Details
+      </button>
+      <button type="button" onClick={() => props.onTab("files")} className={pill(props.tab === "files")}>
+        <Paperclip className="size-3.5" aria-hidden />
+        Files
+      </button>
+      {sold && (
+        <button type="button" onClick={props.onCard} className={pill(false)}>
+          <HardHat className="size-3.5" aria-hidden />
+          Job card
+        </button>
+      )}
+      {installed && (
+        <button type="button" onClick={() => props.onTab("service")} className={pill(props.tab === "service")}>
+          <Wrench className="size-3.5" aria-hidden />
+          Service
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={props.onDelete}
+        title="Delete this deal"
+        aria-label="Delete this deal"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted hover:text-danger"
+      >
+        <Trash2 className="size-3.5" aria-hidden />
+      </button>
+    </nav>
+  );
+}
+
 function DealMenu({
   vertical = false,
   mini = false,
