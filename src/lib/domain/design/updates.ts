@@ -15,8 +15,14 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts beyond the free allowance is 50c a minute and 30c a text, and you're emailed at 80% of your spending cap.",
+  },
+  {
+    day: "2026-11-21",
     area: "Designer",
-    words: "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
+    words:
+      "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
   },
   {
     day: "2026-11-21",
