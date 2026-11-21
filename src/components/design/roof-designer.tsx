@@ -1685,6 +1685,29 @@ export function RoofDesigner(props: {
     if (box && spot) setSearchDown(box.scrollTop > spot.offsetTop + spot.offsetHeight);
   };
   const focusQuietly = useCallback((el: HTMLInputElement | null) => el?.focus({ preventScroll: true }), []);
+  // The same search in the panel, inverter and battery lists (21 Nov 2026, Martin: "do the same for the battery and panel
+  // lists"): its place in the list, and the bar it moves to at the menu's foot once scrolled past.
+  const searchBox = (placeholder: string) => (
+    <input
+      ref={focusQuietly}
+      value={seek}
+      onChange={(e) => setSeek(e.target.value)}
+      placeholder={placeholder}
+      className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+    />
+  );
+  const kitSearchHere = (placeholder: string) => (
+    <div ref={kitSearchSpot} className="min-h-10">
+      {!searchDown && searchBox(placeholder)}
+    </div>
+  );
+  const kitSearchFoot = (placeholder: string) =>
+    searchDown && <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">{searchBox(placeholder)}</div>;
+  const seeks = (text: string) =>
+    seek
+      .toLowerCase()
+      .split(/\s+/)
+      .every((word) => text.toLowerCase().includes(word));
   useEffect(() => {
     const el = picBox.current;
     if (!fills || !el || !fitPx) {
@@ -9393,42 +9416,53 @@ export function RoofDesigner(props: {
                       <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
                     </button>
                     {menu === "panels" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
+                        {kitSearchHere("Search panels")}
                         {[
                           ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
                           ...favourites.sorted("panels", props.catalogue).map((p) => ({ ...p, gone: false })),
-                        ].map((p) => (
-                          <div key={p.sku} className="group flex items-start gap-1">
-                            <button
-                              onClick={() => {
-                                if (!p.gone) choosePanel(p.sku);
-                                openMenu(false);
-                              }}
-                              className={clsx(
-                                "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                                p.sku === chosen && "bg-canvas",
-                              )}
-                            >
-                              <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold">{p.name}</span>
-                                <ModelNo sku={p.sku} />
-                                <span className="block text-xs tabular-nums text-muted">
-                                  {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
-                                  {p.gone ? " · no longer in our range" : ""}
+                        ]
+                          .filter((p) => p.gone || seeks(`${p.name} ${p.sku}`))
+                          .map((p) => (
+                            <div key={p.sku} className="group flex items-start gap-1">
+                              <button
+                                onClick={() => {
+                                  if (!p.gone) choosePanel(p.sku);
+                                  openMenu(false);
+                                }}
+                                className={clsx(
+                                  "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                  p.sku === chosen && "bg-canvas",
+                                )}
+                              >
+                                <Check
+                                  className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold">{p.name}</span>
+                                  <ModelNo sku={p.sku} />
+                                  <span className="block text-xs tabular-nums text-muted">
+                                    {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                                    {p.gone ? " · no longer in our range" : ""}
+                                  </span>
                                 </span>
-                              </span>
-                            </button>
-                            {!p.gone && (
-                              <FavouriteStar
-                                on={favourites.is("panels", p.sku)}
-                                onToggle={() => favourites.toggle("panels", p.sku)}
-                                name={p.name}
-                              />
-                            )}
-                          </div>
-                        ))}
+                              </button>
+                              {!p.gone && (
+                                <FavouriteStar
+                                  on={favourites.is("panels", p.sku)}
+                                  onToggle={() => favourites.toggle("panels", p.sku)}
+                                  name={p.name}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        {kitSearchFoot("Search panels")}
                       </div>
                     )}
                   </div>
@@ -9653,17 +9687,7 @@ export function RoofDesigner(props: {
                         </p>
                         {fitted.length < MAX_INVERTERS && (
                           <>
-                            <div ref={kitSearchSpot} className="min-h-10">
-                              {!searchDown && (
-                                <input
-                                  ref={focusQuietly}
-                                  value={seek}
-                                  onChange={(e) => setSeek(e.target.value)}
-                                  placeholder="Search inverters"
-                                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                                />
-                              )}
-                            </div>
+                            {kitSearchHere("Search inverters")}
                             <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("inverters", props.inverters)
@@ -9699,17 +9723,7 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
-                            {searchDown && (
-                              <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">
-                                <input
-                                  ref={focusQuietly}
-                                  value={seek}
-                                  onChange={(e) => setSeek(e.target.value)}
-                                  placeholder="Search inverters"
-                                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                                />
-                              </div>
-                            )}
+                            {kitSearchFoot("Search inverters")}
                           </>
                         )}
                       </div>
@@ -9755,7 +9769,11 @@ export function RoofDesigner(props: {
                       {battery && <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{batteryKwh} kWh</span>}
                     </button>
                     {menu === "batteries" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {battery ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -9895,13 +9913,8 @@ export function RoofDesigner(props: {
                             </button>
                           </p>
                         )}
-                        <input
-                          value={seek}
-                          onChange={(e) => setSeek(e.target.value)}
-                          placeholder="Search batteries"
-                          className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                        />
-                        <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                        {kitSearchHere("Search batteries")}
+                        <div className="mt-1 space-y-0.5">
                           {favourites
                             .sorted("batteries", batteriesShown)
                             .filter((b) =>
@@ -9937,6 +9950,7 @@ export function RoofDesigner(props: {
                               </div>
                             ))}
                         </div>
+                        {kitSearchFoot("Search batteries")}
                       </div>
                     )}
                   </div>
