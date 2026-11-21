@@ -10,6 +10,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
       { slug: "deal-fields", label: "Deal fields" },
       { slug: "targets", label: "Sales targets" },
       { slug: "lead-inbox", label: "Lead inbox" },
+      { slug: "import", label: "Bring in contacts and deals" },
       { slug: "pylon", label: "Bring in from Pylon" },
     ],
   },

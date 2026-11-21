@@ -9,6 +9,7 @@ import { DealFieldsSettings } from "@/components/design/settings-deal-fields";
 import { DatasheetSettings } from "@/components/design/settings-datasheets";
 import { StandardsSettings } from "@/components/design/settings-standards";
 import { TargetsSettings } from "@/components/design/settings-targets";
+import { CrmImportSettings } from "@/components/design/settings-crm-import";
 import { PylonImportSettings } from "@/components/design/settings-pylon";
 import { LeadInboxSettings } from "@/components/design/settings-lead-inbox";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
@@ -69,6 +70,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <ProposalSettings part={PROPOSAL[section]} />
         ) : section in AFTER_SALE ? (
           <AfterSaleSettings part={AFTER_SALE[section]} />
+        ) : section === "import" ? (
+          <CrmImportSettings />
         ) : section === "pylon" ? (
           <PylonImportSettings />
         ) : section === "lead-inbox" ? (
