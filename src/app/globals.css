@@ -1352,6 +1352,15 @@ html:has(.sales-snap) {
    smaller (zoom, so its touch area shrinks with it), and so is the rail beside it. The map itself is the picture's first
    child and keeps its size; anything placed at a point on the map carries an inline style and is left alone, since zoom
    would move it off its point. Sol's card is shrunk less, so it stays readable. */
+/* The kit (panel, inverter, battery) on a phone upright is drawn larger than the other controls (21 Nov 2026, Martin). */
+.designer-compact > .designer-kit {
+  zoom: 0.8 !important;
+}
+@media (max-width: 380px) {
+  .designer-compact > .designer-kit {
+    zoom: 0.72 !important;
+  }
+}
 .designer-compact > :not(:first-child):not([style]):not(.sideways-sol) {
   zoom: 0.68;
 }

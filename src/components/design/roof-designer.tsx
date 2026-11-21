@@ -417,12 +417,14 @@ const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAY
  * picture only room for the top half of the kit, which sits on the picture's top edge; below it the toolbar hugging the
  * picture's foot (`bar`: zoom, Roof, Sides, the picture's switch), then Ask Sol, then the rail as a toolbar at the foot.
  */
-const PHONE_BANDS = { above: 30, below: 76, rail: 0, bar: 0 };
+const PHONE_BANDS = { above: 34, below: 76, rail: 0, bar: 0 };
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
  */
 const PHONE_TALLEST = 1.4;
+/** How far the figures strip rises on a phone upright to meet the top of the screen: the window's padding and the page's. */
+const PHONE_STRIP_LIFT = 16;
 /** How much smaller the rail across the foot is drawn on a phone upright (its knife's sheet is drawn back up, tool-fan.tsx). */
 const PHONE_RAIL_ZOOM = 0.72;
 /** A phone upright opens one zoom press (1.4×) closer than the pop-up does, so the roof reads (21 Nov 2026, Martin). */
@@ -6950,18 +6952,50 @@ export function RoofDesigner(props: {
                 // On a phone it wraps, and keeps clear of the window's close round in the corner.
                 props.tight
                   ? phone
-                    ? "mb-1.5 mr-11 flex-wrap"
+                    ? // Full bleed across the top of the screen (21 Nov 2026, Martin), the figures in a grid of their own.
+                      "mb-1.5 flex-col !rounded-none"
                     : sideways
                       ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
                       : "mb-1.5 flex-nowrap"
                   : "mb-2 flex-wrap",
               )}
-              style={{ maxWidth: fit }}
+              style={
+                phone && stage
+                  ? { maxWidth: "none", marginLeft: -stage.bleed, marginRight: -stage.bleed, marginTop: -PHONE_STRIP_LIFT }
+                  : { maxWidth: fit }
+              }
               aria-label="This design in figures"
             >
               {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
-              {props.tight ? (
+              {phone ? (
+                // On a phone, three figures across, each with its unit under it; clear of the window's close round on the right.
+                <div
+                  className={clsx(
+                    "grid grid-cols-3 gap-x-2 py-2 pl-4 pr-16 tabular-nums transition-colors duration-300",
+                    growing ? "bg-sun-line" : "",
+                  )}
+                  style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+                >
+                  <p className="min-w-0 leading-tight" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
+                    <span className={clsx("text-[17px] font-semibold", growing ? "text-white" : "text-sun-bright")}>
+                      {liveKw.toFixed(2)}
+                    </span>
+                    <span className="ml-0.5 text-[11px] text-white/60">kW</span>
+                    <span className="block truncate text-[10.5px] text-white/60">
+                      {livePanels} × {panelOf(design).watts} W
+                    </span>
+                  </p>
+                  <p className={clsx("min-w-0 leading-tight", oversize?.over && "text-sun-bright")}>
+                    <span className="text-[17px] font-semibold text-white">{summary.kwhPerDay}</span>
+                    <span className="block truncate text-[10.5px] text-white/60">kWh a day</span>
+                  </p>
+                  <p className="min-w-0 leading-tight" title={battery ? `${battery.qty} modules` : "No battery"}>
+                    <span className="text-[17px] font-semibold text-white">{battery ? batteryKwh : "–"}</span>
+                    <span className="block truncate text-[10.5px] text-white/60">{battery ? "kWh battery" : "no battery"}</span>
+                  </p>
+                </div>
+              ) : props.tight ? (
                 <div
                   className={clsx(
                     "flex items-center gap-x-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums transition-colors duration-300",
@@ -7055,7 +7089,7 @@ export function RoofDesigner(props: {
               <div
                 className={clsx(
                   "relative flex min-w-0 flex-[2.4] items-stretch bg-surface text-ink",
-                  designs.length > 1 ? "" : "rounded-r-lg",
+                  designs.length > 1 || phone ? "" : "rounded-r-lg",
                 )}
                 data-menu-host
               >
@@ -7077,8 +7111,8 @@ export function RoofDesigner(props: {
                   className={clsx(
                     // Clipped, so a figure that runs long never paints under the shade widget beside it.
                     "min-w-0 flex-1 cursor-pointer overflow-hidden",
-                    !shadeOn || (shadeOpen && tool !== "string") ? "rounded-r-lg" : "",
-                    props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
+                    phone ? "flex items-center px-4 py-1.5" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -7093,7 +7127,23 @@ export function RoofDesigner(props: {
                     {!finance && <span className="size-1.5 animate-ping rounded-full bg-danger" aria-hidden />}
                     For this home{!finance && " · Needed"}
                   </p>
-                  {finance && props.tight ? (
+                  {finance && phone ? (
+                    // On a phone, the bill, the saving and the payback as three figures across, each named over it.
+                    <dl className="grid w-full grid-cols-3 gap-x-2 tabular-nums" title="What it does for this home: open the bill">
+                      {(
+                        [
+                          ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
+                          ["Saves a year", dollars(finance.saving), true],
+                          ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
+                        ] as const
+                      ).map(([name, value, gold]) => (
+                        <div key={name} className="min-w-0">
+                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.12em] text-muted">{name}</dt>
+                          <dd className={clsx("truncate text-[13px] font-semibold leading-tight", gold && "text-positive")}>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : finance && props.tight ? (
                     <p
                       className="flex items-center gap-3 whitespace-nowrap text-xs tabular-nums text-muted"
                       title="What it does for this home: open the bill"
@@ -8868,7 +8918,7 @@ export function RoofDesigner(props: {
                     "pointer-events-auto absolute",
                     // Over the roof pitch marks and the pad while its menu is open.
                     menu === "designs" ? (phone ? "z-[90]" : "z-50") : "z-30",
-                    phone ? "right-3 top-[0.8rem]" : "right-4 top-4",
+                    phone ? "right-3 top-[1.25rem]" : "right-4 top-4",
                   )}
                 >
                   {publishControl}
@@ -9818,7 +9868,11 @@ export function RoofDesigner(props: {
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
                   the customer's bill in the figures above the picture.) */}
               <div
-                className={clsx("absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center", phone ? "top-[0.8rem]" : "top-4")}
+                className={clsx(
+                  "absolute z-20 flex -translate-x-1/2 flex-col items-center",
+                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner.
+                  phone ? "designer-kit left-[calc(50%-1.1rem)] top-[0.78rem]" : "left-1/2 top-4",
+                )}
                 role="group"
                 aria-label="System"
                 data-menu-host
