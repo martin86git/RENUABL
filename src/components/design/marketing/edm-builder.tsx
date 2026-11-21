@@ -15,6 +15,7 @@ import {
   MousePointerClick,
   Pencil,
   Plus,
+  Redo2,
   Smartphone,
   Trash2,
   Type,
@@ -45,6 +46,7 @@ import {
 } from "@/lib/domain/marketing/edm";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
 import { uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
+import { emptyHistory, record, redo as redoHistory, undo as undoHistory } from "@/lib/domain/marketing/edm-history";
 import { SolAsk, type SolAskResult } from "./edm-sol-ask";
 import { SolIcon } from "../sol-icon";
 
@@ -65,6 +67,9 @@ const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
   { name: "Basics", kinds: ["heading", "text", "button", "image"] },
   { name: "Layout", kinds: ["tiles", "divider"] },
 ];
+
+/** When a change was made, for grouping typing into one undo step. */
+const clock = () => Date.now();
 
 /** A change to one block: its new fields, or a function of the block as it stands when the change lands. */
 type BlockPatch = Partial<EdmBlock> | ((b: EdmBlock) => Partial<EdmBlock>);
@@ -132,28 +137,81 @@ export function EdmBuilder({
 }) {
   const [mode, setMode] = useState<"builder" | "preview">(readOnly ? "preview" : "builder");
   const [phone, setPhone] = useState(false);
-  const set = (patch: Partial<EdmContent>) => onChange({ ...content, ...patch });
   // The email as it stands now, for changes that land after a wait (a picture uploading): two pictures going into two
   // tiles at once each change the latest email, not the one on screen when their upload began.
   const latest = useRef(content);
   useEffect(() => {
     latest.current = content;
   }, [content]);
+  const [undo, setUndo] = useState(false);
+  const [solMsg, setSolMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Undo and redo (edm-history.ts): every change made here is a step; another email loaded starts a fresh history.
+  const [history, setHistory] = useState(() => emptyHistory<EdmContent>());
+  const [own, setOwn] = useState(content);
+  if (content !== own) {
+    setOwn(content);
+    setHistory(emptyHistory<EdmContent>());
+  }
+  const emit = (next: EdmContent) => {
+    latest.current = next;
+    setOwn(next);
+    onChange(next);
+  };
+  /** Every change to the email goes through here, so it can be undone. A key groups typing in one field. */
+  const change = (next: EdmContent, key: string | null = null) => {
+    const before = latest.current;
+    const now = clock();
+    setHistory((h) => record(h, before, key, now));
+    emit(next);
+  };
+  const step = (way: "undo" | "redo") => {
+    const r = (way === "undo" ? undoHistory : redoHistory)(history, latest.current);
+    if (!r) return;
+    setHistory(r.history);
+    emit(r.value);
+    setUndo(false);
+    setSolMsg(null);
+  };
+  // Ctrl+Z / ⌘Z, and Ctrl+Y or ⇧⌘Z, anywhere in the editor, and on the page itself once a press has taken the focus
+  // away (a block removed): never in another field on the page, which keeps its own undo.
+  const root = useRef<HTMLDivElement>(null);
+  const stepRef = useRef(step);
+  useEffect(() => {
+    stepRef.current = step;
+  });
+  useEffect(() => {
+    if (readOnly || mode !== "builder") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k !== "z" && k !== "y") return;
+      const t = e.target as Node | null;
+      const inside = !!t && !!root.current?.contains(t);
+      if (!inside && t !== document.body && t !== document.documentElement) return;
+      e.preventDefault();
+      stepRef.current(k === "y" || e.shiftKey ? "redo" : "undo");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [readOnly, mode]);
+  const set = (patch: Partial<EdmContent>, key: string | null = null) => change({ ...latest.current, ...patch }, key);
   const setBlock = (id: string, patch: BlockPatch) => {
     const now = latest.current;
-    const next = {
-      ...now,
-      blocks: now.blocks.map((b) => (b.id === id ? { ...b, ...(typeof patch === "function" ? patch(b) : patch) } : b)),
-    };
-    latest.current = next;
-    onChange(next);
+    // Typing (words, a label, a link, a caption) is one step per field while it carries on.
+    const part = typeof patch === "function" ? "" : Object.keys(patch).join();
+    const typed = ["text", "url", "tiles"].includes(part);
+    change(
+      {
+        ...now,
+        blocks: now.blocks.map((b) => (b.id === id ? { ...b, ...(typeof patch === "function" ? patch(b) : patch) } : b)),
+      },
+      typed ? `${part}:${id}` : null,
+    );
   };
 
   // Sol writing the email (edm-sol.ts): from the brief, one part or all four; the last fill can be undone.
   const [brief, setBrief] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [undo, setUndo] = useState<EdmContent | null>(null);
-  const [solMsg, setSolMsg] = useState<{ ok: boolean; text: string } | null>(null);
   // Which field's Sol box is open (its block's id, else the part): what to change, then options to choose from.
   const [asking, setAsking] = useState<string | null>(null);
   const draftFor = (blockId?: string) => {
@@ -186,15 +244,14 @@ export function EdmBuilder({
     return r.ok ? { ok: true, options: r.options ?? [] } : { ok: false, message: r.message };
   }
   function pick(part: Exclude<EdmSolPart, "all">, blockId: string | undefined, line: string) {
-    setUndo(content);
-    if (blockId) onChange({ ...content, blocks: content.blocks.map((b) => (b.id === blockId ? { ...b, text: line } : b)) });
-    else if (part === "subject" || part === "preview") onChange({ ...content, [part]: line });
+    setUndo(true);
+    if (blockId) change({ ...content, blocks: content.blocks.map((b) => (b.id === blockId ? { ...b, text: line } : b)) });
+    else if (part === "subject" || part === "preview") change({ ...content, [part]: line });
     flag(line);
   }
   const putBack = () => {
     if (!undo) return;
-    onChange(undo);
-    setUndo(null);
+    step("undo");
     setSolMsg(null);
   };
   const solAsk = (part: Exclude<EdmSolPart, "all">, current: string, blockId?: string) =>
@@ -216,7 +273,6 @@ export function EdmBuilder({
     const r = await writeWithSol({ part, brief, draft, note });
     setBusy(null);
     if (!r.ok) return (setSolMsg({ ok: false, text: r.message }), false);
-    const before = content;
     let blocks = content.blocks;
     const fill = (kind: "heading" | "text", words: string | undefined) => {
       if (words === undefined) return;
@@ -229,8 +285,8 @@ export function EdmBuilder({
     };
     fill("heading", r.heading);
     fill("text", r.text);
-    onChange({ subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
-    setUndo(before);
+    change({ subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
+    setUndo(true);
     flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
     return true;
   }
@@ -297,8 +353,17 @@ export function EdmBuilder({
     );
 
   return (
-    <div className="space-y-3">
-      <ViewBar mode={mode} readOnly={readOnly} onMode={setMode} phone={phone} onPhone={setPhone} />
+    <div className="space-y-3" ref={root}>
+      <ViewBar
+        mode={mode}
+        readOnly={readOnly}
+        onMode={setMode}
+        phone={phone}
+        onPhone={setPhone}
+        canUndo={history.past.length > 0}
+        canRedo={history.future.length > 0}
+        onStep={step}
+      />
       <div className="grid overflow-hidden rounded-2xl border border-line lg:grid-cols-[17rem_minmax(0,1fr)]">
         {/* Down the left: the blocks, dragged onto the email or pressed to add. */}
         <aside className="border-b border-line bg-surface p-4 lg:border-r lg:border-b-0">
@@ -356,7 +421,7 @@ export function EdmBuilder({
                 <input
                   value={content.subject}
                   maxLength={EDM_LIMITS.subject}
-                  onChange={(e) => set({ subject: e.target.value })}
+                  onChange={(e) => set({ subject: e.target.value }, "subject")}
                   placeholder="What the inbox shows first"
                   className="w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-muted"
                 />
@@ -366,7 +431,7 @@ export function EdmBuilder({
                 <input
                   value={content.preview}
                   maxLength={EDM_LIMITS.preview}
-                  onChange={(e) => set({ preview: e.target.value })}
+                  onChange={(e) => set({ preview: e.target.value }, "preview")}
                   placeholder="Shown after the subject in most inboxes"
                   className="w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-muted"
                 />
@@ -491,7 +556,7 @@ export function EdmBuilder({
                     {solMsg && <p className={solMsg.ok ? "text-positive" : "text-danger"}>{solMsg.text}</p>}
                     {undo && (
                       <button
-                        onClick={() => (onChange(undo), setUndo(null), setSolMsg(null))}
+                        onClick={() => step("undo")}
                         className="inline-flex items-center gap-1 font-medium text-ink underline-offset-4 hover:underline"
                       >
                         <Undo2 className="size-3.5" /> Undo
@@ -527,15 +592,23 @@ function ViewBar({
   onMode,
   phone,
   onPhone,
+  canUndo = false,
+  canRedo = false,
+  onStep,
 }: {
   mode: "builder" | "preview";
   readOnly: boolean;
   onMode: (m: "builder" | "preview") => void;
   phone: boolean;
   onPhone: (p: boolean) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  /** Undo or redo a change; only while editing. */
+  onStep?: (way: "undo" | "redo") => void;
 }) {
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <div role="tablist" aria-label="View" className="inline-flex rounded-full bg-canvas p-1">
         {(readOnly ? (["preview"] as const) : (["builder", "preview"] as const)).map((m) => (
           <button
@@ -553,7 +626,27 @@ function ViewBar({
           </button>
         ))}
       </div>
-      <div className="inline-flex rounded-full bg-canvas p-1">
+      {onStep && mode === "builder" && (
+        <div className="inline-flex rounded-full bg-canvas p-1">
+          {(["undo", "redo"] as const).map((way) => {
+            const label = way === "undo" ? `Undo (${mac ? "⌘Z" : "Ctrl+Z"})` : `Redo (${mac ? "⇧⌘Z" : "Ctrl+Y"})`;
+            return (
+              <button
+                key={way}
+                type="button"
+                aria-label={label}
+                title={label}
+                disabled={way === "undo" ? !canUndo : !canRedo}
+                onClick={() => onStep(way)}
+                className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
+              >
+                {way === "undo" ? <Undo2 className="size-4" /> : <Redo2 className="size-4" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="ml-auto inline-flex rounded-full bg-canvas p-1">
         {[false, true].map((p) => (
           <button
             key={String(p)}
@@ -879,6 +972,12 @@ function LinkInput({
   placeholder?: string;
 }) {
   const [text, setText] = useState(value ?? "");
+  // A link changed from outside (undo, redo) shows; what's typed and not a link yet stays while it is the same link.
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    if (cleanLink(text) !== value) setText(value ?? "");
+  }
   const ok = !text || cleanLink(text) !== null;
   return (
     <input
