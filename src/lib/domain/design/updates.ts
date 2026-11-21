@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Agents",
-    words: "Adding an agent, its voice is picked from a list grouped by accent, with a play button to hear each one first.",
+    words: "Voices are picked from a list grouped by accent, with a play button to hear each first: adding an agent and in Settings.",
   },
   {
     day: "2026-11-21",

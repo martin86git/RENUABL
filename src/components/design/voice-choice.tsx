@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Check, ChevronDown, Play, Square, VolumeX } from "lucide-react";
+import { Check, ChevronDown, Play, Square, VolumeX, X } from "lucide-react";
 import {
+  CALLER_VOICES,
   NO_SAMPLE,
   voiceAccent,
   voiceKey,
@@ -13,28 +14,64 @@ import {
   type VoiceChoice as Voice,
 } from "@/lib/domain/design/caller";
 import { loadHiddenVoices } from "@/lib/services/caller";
-import { startSample, stopSample } from "./settings-caller";
+
+/** The one sample clip playing, wherever the picker is shown: starting another stops it. */
+let sampleNow: HTMLAudioElement | null = null;
+export function stopSample() {
+  sampleNow?.pause();
+  sampleNow = null;
+}
+export function startSample(url: string, over: () => void, failed: () => void) {
+  const clip = new Audio(url);
+  sampleNow = clip;
+  clip.onended = over;
+  clip.onerror = failed;
+  void clip.play().catch(over);
+}
 
 /**
  * Choosing a new agent's voice (21 Nov 2026, Martin: the browser's own dropdown wasn't RENUABL's look, and there was no
  * way to hear a voice before choosing it). A field like the others that opens a list in place, grouped by accent, each
  * voice with a round to hear its maker's sample (no call); the voices the business removed stay off it. `value` is the
  * voice's key ("11labs:…"), "" for Choose later.
+ *
+ * Settings → Phone assistants uses the same picker (21 Nov 2026, Martin): it passes its own options in place of Choose
+ * later (`others`: Default, Another voice), the business's removed voices (`hidden`, so its list and the picker agree)
+ * and `onRemove`, which puts a cross on each voice but the one picked.
  */
-export function VoiceChoice({ value, onChange }: { value: string; onChange: (key: string) => void }) {
+export type OtherChoice = { key: string; label: string; words: string };
+
+export function VoiceChoice({
+  value,
+  onChange,
+  others = [{ key: "", label: "Choose later", words: "" }],
+  hidden: given,
+  onRemove,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (key: string) => void;
+  others?: OtherChoice[];
+  hidden?: string[];
+  onRemove?: (key: string) => void;
+  disabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState<string[]>([]);
+  const hidden = given ?? loaded;
   const [playing, setPlaying] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let live = true;
-    void loadHiddenVoices().then((h) => live && setHidden(h));
+    if (!given) void loadHiddenVoices().then((h) => live && setLoaded(h));
     return () => {
       live = false;
       stopSample();
     };
+    // Read once; a picker given its list never asks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // A press outside or Escape folds the list.
@@ -50,7 +87,10 @@ export function VoiceChoice({ value, onChange }: { value: string; onChange: (key
     };
   }, [open]);
 
-  const voices = useMemo(() => voicesShown(hidden, null), [hidden]);
+  // The voice picked stays on the list even when removed elsewhere.
+  const inUse = CALLER_VOICES.find((v) => voiceKey(v) === value) ?? null;
+  const voices = useMemo(() => voicesShown(hidden, inUse), [hidden, inUse]);
+  const other = others.find((o) => o.key === value) ?? null;
   const groups = useMemo(() => {
     const by = new Map<string, typeof voices>();
     for (const v of voices) by.set(voiceAccent(v), [...(by.get(voiceAccent(v)) ?? []), v]);
@@ -112,6 +152,7 @@ export function VoiceChoice({ value, onChange }: { value: string; onChange: (key
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
+          disabled={disabled}
           aria-haspopup="listbox"
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-2 py-1 text-left font-normal outline-none"
@@ -122,8 +163,13 @@ export function VoiceChoice({ value, onChange }: { value: string; onChange: (key
                 <span className="font-semibold text-ink">{picked.label}</span>
                 <span className="text-muted"> · {picked.words}</span>
               </>
+            ) : other ? (
+              <>
+                <span className={clsx(other.words ? "font-semibold text-ink" : "text-muted")}>{other.label}</span>
+                {other.words && <span className="text-muted"> · {other.words}</span>}
+              </>
             ) : (
-              <span className="text-muted">Choose later</span>
+              <span className="text-muted">Choose a voice</span>
             )}
           </span>
           <ChevronDown className={clsx("size-4 shrink-0 text-muted transition-transform", open && "rotate-180")} aria-hidden />
@@ -137,9 +183,12 @@ export function VoiceChoice({ value, onChange }: { value: string; onChange: (key
           aria-label="Voices"
           className="mt-1.5 max-h-80 overflow-y-auto rounded-xl bg-surface p-1 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.25)] ring-1 ring-line"
         >
-          <Option on={!value} onPick={() => (onChange(""), setOpen(false))}>
-            <span className="text-sm text-ink">Choose later</span>
-          </Option>
+          {others.map((o) => (
+            <Option key={o.key || "later"} on={value === o.key} onPick={() => (onChange(o.key), setOpen(false))}>
+              <span className={clsx("block truncate text-sm text-ink", o.words && "font-semibold")}>{o.label}</span>
+              {o.words && <span className="block truncate text-xs text-muted">{o.words}</span>}
+            </Option>
+          ))}
           {groups.map(([accent, list]) => (
             <div key={accent} role="group" aria-label={accent} className="mt-1">
               <p className="px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">{accent}</p>
@@ -148,7 +197,25 @@ export function VoiceChoice({ value, onChange }: { value: string; onChange: (key
                   key={voiceKey(v)}
                   on={voiceKey(v) === value}
                   onPick={() => (onChange(voiceKey(v)), setOpen(false))}
-                  after={sample(v)}
+                  after={
+                    <>
+                      {sample(v)}
+                      {onRemove && voiceKey(v) !== value && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRemove(voiceKey(v));
+                          }}
+                          aria-label={`Remove ${v.label} from the list`}
+                          title="Remove from the list, for everyone in your business"
+                          className="grid size-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      )}
+                    </>
+                  }
                 >
                   <span className="block truncate text-sm font-semibold text-ink">{v.label}</span>
                   {accentless(v.words) && <span className="block truncate text-xs text-muted">{accentless(v.words)}</span>}
