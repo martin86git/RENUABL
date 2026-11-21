@@ -23,7 +23,7 @@ import {
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { actOnOutbox, editOutbox, loadOutbox, saveAgentSettings, type Outbox, type OutboxEntry } from "@/lib/services/sol-agents";
 import { PATHS } from "./design-shell";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 
 const POLL_MS = 60_000;
 

@@ -129,7 +129,7 @@ export function batteryWords(b: GuideBattery): string {
 
 /** What the design and the deal say right now. */
 export interface GuideFacts {
-  /** The land register has a lot for the address, outlined on the picture: Sol asks "Is this the home?" first. */
+  /** There is an address to confirm: Sol asks "Is this the home?" first, with the land register's lot outlined when it answers. */
   lot?: boolean;
   roof: "tile" | "tin" | "flat";
   /** The size Sol suggests from the bill (null without one), and the bill in words for the line. */

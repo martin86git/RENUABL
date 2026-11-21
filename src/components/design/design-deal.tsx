@@ -21,7 +21,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";

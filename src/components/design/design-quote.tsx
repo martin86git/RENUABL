@@ -37,7 +37,7 @@ import type { RebateRates } from "@/lib/domain/rebates";
 import { priceAdvice, typedCostFlags, type Advice } from "@/lib/domain/design/price-check";
 import { usePricePoints } from "@/lib/services/price-check";
 import { askSolInPanel } from "@/lib/services/sol";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 
 const FOLDED_KEY = "renuabl.design.quote-folded";
 type GroupIcon = (props: { className?: string }) => React.ReactNode;
@@ -431,7 +431,8 @@ export function DesignQuote(props: {
   // strip that folds it away, the column headings once at the top, and the take-out cross only on hover. Beside the
   // quote, the costs decided on each job are one quiet line under their section; their switches are in the panel.
   const priced = editedLines(all, edits);
-  const cols = "grid grid-cols-[minmax(0,1fr)_3.25rem_5.75rem_1.25rem] items-center gap-x-2";
+  // Item, how many, the cost of one, and the line's total: how many times the cost each (21 Nov 2026, Martin).
+  const cols = "grid grid-cols-[minmax(0,1fr)_3.25rem_5.25rem_5rem_1.25rem] items-center gap-x-2";
   const tableBlock = (
     <>
       <div
@@ -440,7 +441,8 @@ export function DesignQuote(props: {
       >
         <span>Item</span>
         <span className="text-right">Qty</span>
-        <span className="text-right">Cost ex GST</span>
+        <span className="text-right">Each ex GST</span>
+        <span className="text-right">Total</span>
         <span />
       </div>
       <div className="space-y-2">
@@ -453,7 +455,7 @@ export function DesignQuote(props: {
           const subtotal = priced.filter((l) => l.group === group).reduce((t, l) => t + l.amount, 0);
           const shut = folded.includes(group);
           const Icon = GROUP_ICONS[group];
-          const flagged = rows.some((l) => l.missing && edits[lineKey(l)]?.amount === undefined);
+          const flagged = rows.some((l) => l.missing && edits[lineKey(l)]?.amount === undefined && edits[lineKey(l)]?.each === undefined);
           return (
             <section key={group} className="overflow-hidden rounded-lg border border-line" aria-label={group}>
               <button
@@ -479,9 +481,16 @@ export function DesignQuote(props: {
                     const typed = edits[lineKey(l)]?.amount;
                     const typedQty = edits[lineKey(l)]?.qty;
                     const typedRate = edits[lineKey(l)]?.rate;
+                    const typedEach = edits[lineKey(l)]?.each;
                     // The line as it stands with any hand changes: a quantity typed over it prices it again.
                     const shown = editedLines([l], edits)[0] ?? l;
-                    const unset = l.missing && typed === undefined;
+                    const unset = l.missing && typed === undefined && typedEach === undefined;
+                    // A counted line's box is the cost of one; a line priced by the watt, or with no count, is its whole cost.
+                    const counted = l.qty !== undefined && !l.watts;
+                    const many = shown.qty ?? 0;
+                    const eachNow = counted ? (typedEach ?? (many > 0 ? shown.amount / many : 0)) : shown.amount;
+                    const boxValue = Math.round(eachNow * 100) / 100;
+                    const boxTyped = counted ? typedEach !== undefined || typed !== undefined : typed !== undefined;
                     const on = Boolean(edits[lineKey(l)]?.on);
                     const out = Boolean(edits[lineKey(l)]?.removed);
                     const name = l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label;
@@ -553,12 +562,15 @@ export function DesignQuote(props: {
                                 type="number"
                                 min="0"
                                 step="1"
-                                value={Math.round(typed ?? shown.amount)}
-                                onChange={(e) => edit(l, { amount: Math.max(0, Number(e.target.value) || 0) })}
-                                aria-label={`Cost of ${l.label}`}
-                                style={{ width: `${String(Math.round(typed ?? shown.amount)).length + 1.6}ch` }}
+                                value={boxValue}
+                                onChange={(e) => {
+                                  const v = Math.max(0, Number(e.target.value) || 0);
+                                  edit(l, counted ? { each: v, amount: undefined } : { amount: v });
+                                }}
+                                aria-label={counted ? `Cost each of ${l.label}` : `Cost of ${l.label}`}
+                                style={{ width: `${String(boxValue).length + 1.6}ch` }}
                                 className={`rounded-md border bg-transparent px-0.5 py-0 text-right tabular-nums outline-none [appearance:textfield] focus:border-forest [&::-webkit-inner-spin-button]:appearance-none ${
-                                  typed !== undefined
+                                  boxTyped
                                     ? "border-sun-line font-semibold"
                                     : unset
                                       ? "border-warning"
@@ -567,6 +579,7 @@ export function DesignQuote(props: {
                               />
                             </span>
                           </div>
+                          <div className="text-right text-[13px] font-medium tabular-nums text-ink">{money(shown.amount)}</div>
                           <div className="text-right">
                             <button
                               hidden={Boolean(l.confirm)}
@@ -622,7 +635,7 @@ export function DesignQuote(props: {
                             </button>
                           </span>
                         )}
-                        {(typed !== undefined || typedQty !== undefined || typedRate !== undefined) &&
+                        {(typed !== undefined || typedEach !== undefined || typedQty !== undefined || typedRate !== undefined) &&
                           (l.missing && typed === 0 && typedQty === undefined ? (
                             <button className="block text-xs text-muted underline underline-offset-2" onClick={() => edit(l, null)}>
                               Left at $0 (no cost on file): undo
@@ -631,7 +644,11 @@ export function DesignQuote(props: {
                             <button className="block text-xs text-sun-ink underline underline-offset-2" onClick={() => edit(l, null)}>
                               Changed by hand: back to {typedQty !== undefined ? `${l.qty} at ` : ""}
                               {typedRate !== undefined && l.watts ? `${centsWords(l.amount / l.watts)}c a watt, ` : ""}
-                              {l.missing ? "no cost" : money(l.amount)}
+                              {l.missing
+                                ? "no cost"
+                                : counted && l.qty
+                                  ? `$${(Math.round((l.amount / l.qty) * 100) / 100).toLocaleString("en-AU")} each`
+                                  : money(l.amount)}
                             </button>
                           ))}
                         {typedFlags[lineKey(l)] && (
@@ -677,7 +694,6 @@ export function DesignQuote(props: {
                         aria-label="What the line is"
                         className="w-full rounded-md border border-transparent bg-transparent px-1 py-0 outline-none hover:border-line focus:border-forest"
                       />
-                      {(e.qty ?? 1) > 1 && <span className="block px-1 text-[11px] text-muted">{money(l.amount)} in all</span>}
                     </div>
                     <div className="text-right">
                       <input
@@ -709,6 +725,7 @@ export function DesignQuote(props: {
                         />
                       </span>
                     </div>
+                    <div className="text-right font-medium tabular-nums text-ink">{money(l.amount)}</div>
                     <div className="text-right">
                       <button
                         className="text-base leading-none text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100"

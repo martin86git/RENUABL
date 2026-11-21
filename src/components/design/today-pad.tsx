@@ -40,7 +40,8 @@ import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-cha
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
-import { SolBadge, SolIcon, SolMark } from "./sol-icon";
+import { SolIcon } from "./sol-icon";
+import { SolBadge, SolMark } from "./sol-sun";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
@@ -303,7 +304,16 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <TodayChat name={props.name} views={insights} onAsk={ask} asking={asking} hidden={talking} />
+              <TodayChat
+                name={props.name}
+                views={insights}
+                onAsk={ask}
+                asking={asking}
+                hidden={talking}
+                jobs={props.jobs}
+                today={props.today}
+                items={items}
+              />
             </div>
           </div>
         </div>
@@ -517,9 +527,9 @@ export function SolBox({
             placeholder={placeholder}
             className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
+          {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
-            <AttachButton attach={attach} />
-            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
+            <AttachButton attach={attach} plus />
             <button
               type="submit"
               disabled={asking || !ready}
@@ -528,10 +538,12 @@ export function SolBox({
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
+            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
           </div>
         </>
       ) : (
         <div className="flex items-center gap-1.5">
+          <AttachButton attach={attach} plus />
           <SolBadge className="size-5 shrink-0" />
           <label className="sr-only" htmlFor={id}>
             Ask Sol
@@ -548,8 +560,6 @@ export function SolBox({
             placeholder={placeholder}
             className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
           />
-          <AttachButton attach={attach} />
-          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
           <button
             type="submit"
             disabled={asking || !ready}
@@ -558,6 +568,7 @@ export function SolBox({
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>
+          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
         </div>
       )}
     </form>

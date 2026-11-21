@@ -15,6 +15,26 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
+    day: "2026-11-21",
+    area: "CRM",
+    words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Thirteen more Deepgram voices to pick from: British, Filipino and American, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Ten more voices to pick from: New Zealand, Indian, Irish, South African and British, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
     area: "Sol",
     words: "Set up with Sol takes you through the seven things to set up, and ticks each off as it's done.",
   },
@@ -23,6 +43,11 @@ export const UPDATES: readonly Update[] = [
     area: "Calls",
     words:
       "Calls & Texts now says when it's billed and what calls cost, asks for your number itself, and test calls work while it's set up.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Design tool",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
   },
   {
     day: "2026-11-21",

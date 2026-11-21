@@ -5,7 +5,7 @@ import { dealTag, dealThread } from "@/lib/domain/design/sol-chat-work";
 import type { SolTurn } from "@/lib/domain/design/sol";
 import { SOL_CHANGED, SOL_TOGGLE, askSol, loadSol } from "@/lib/services/sol";
 import { DictateButton, withSpoken } from "./dictate";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { SolSources } from "./sol-sources";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDesignView } from "./sol-design-view";

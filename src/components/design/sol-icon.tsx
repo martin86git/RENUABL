@@ -32,7 +32,7 @@ export const SolIcon = forwardRef<SVGSVGElement, LucideProps>(function SolIcon(
  * Sol's mark in his own colours at small sizes, where his round would be too much (a chat line, a box): the gold-to-
  * orange sun and its stars, as over his round.
  */
-export function SolBadge({ className }: { className?: string }) {
+export function SolBadgeFlat({ className }: { className?: string }) {
   const id = useId().replace(/:/g, "");
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -54,73 +54,40 @@ export function SolBadge({ className }: { className?: string }) {
   );
 }
 
-/** One half's folds of the brain etched into Sol's sun, on a 120 grid whose middle is the sun's. */
-const BRAIN_HALF = [
-  "M52 20C40 22 34 30 38 38C42 46 30 46 24 40",
-  "M17 54C28 50 34 56 30 64C26 72 36 76 44 72",
-  "M54 40C46 42 44 50 50 54C56 58 50 66 44 62",
-  "M22 78C30 80 32 88 40 88C48 88 50 80 56 82",
-  "M36 99C42 94 48 98 54 96",
-  "M27 28C25 34 19 36 17 44",
-];
-
-/** Both halves, mirrored, and the split down the middle. The stroke is its parent's. */
-function BrainFolds() {
-  return (
+/**
+ * The brain in Sol's sun, the one drawing for every sun (21 Nov 2026, Martin: the large sun's white lines are the look,
+ * "make the small icons match too"): two hemispheres seen from above and a few folds, in fine white lines on a grid
+ * whose box "11 12 78 78" is the disc. The live sun and `SolMark` both draw it, softly blended into the disc.
+ */
+export function SunBrainLines() {
+  const half = (
     <>
-      {BRAIN_HALF.map((d) => (
-        <path key={d} d={d} />
-      ))}
-      <g transform="translate(120 0) scale(-1 1)">
-        {BRAIN_HALF.map((d) => (
-          <path key={d} d={d} />
-        ))}
-      </g>
-      <path d="M60 15C57 30 63 45 60 60C57 75 63 90 60 105" />
+      <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85" />
+      <path d="M45 25C37 24 31 28 32 35" />
+      <path d="M22 40C29 37 36 41 35 48" />
+      <path d="M44 38C39 41 43 47 38 51" />
+      <path d="M19 59C26 56 32 60 30 67" />
+      <path d="M45 57C37 57 33 63 36 70" />
+      <path d="M33 78C37 74 43 76 44 72" />
     </>
   );
-}
-
-/** The etched brain on its 120 grid: pressed in with a deeper orange, caught by a pale edge just below. */
-function BrainEtch() {
   return (
-    <g strokeLinecap="round" strokeLinejoin="round">
-      <g stroke="#B8360A" strokeOpacity="0.38" strokeWidth="2.6">
-        <BrainFolds />
-      </g>
-      <g stroke="#FFF1C2" strokeOpacity="0.35" strokeWidth="1.2" transform="translate(1.2 1.4)">
-        <BrainFolds />
-      </g>
+    <g fill="none" stroke="white" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+      {half}
+      <g transform="translate(100 0) scale(-1 1)">{half}</g>
+      <path d="M50 18C51 30 49 42 50 54C51 66 49 76 50 84" strokeOpacity={0.7} />
     </g>
   );
 }
 
 /**
- * The same etched brain on its own, for a sun drawn some other way (the live sun on the business page, 21 Nov 2026,
- * Martin: its large Sol was missing the etched lines). Its box is the sun's disc, which it is clipped to.
- */
-export function SolBrainEtch({ className }: { className?: string }) {
-  const id = useId().replace(/:/g, "");
-  return (
-    <svg viewBox="15 15 90 90" fill="none" className={className} aria-hidden>
-      <clipPath id={`${id}-disc`}>
-        <circle cx="60" cy="60" r="45" />
-      </clipPath>
-      <g clipPath={`url(#${id}-disc)`}>
-        <BrainEtch />
-      </g>
-    </svg>
-  );
-}
-
-/**
- * Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
+ * The flat drawing of Sol, kept for where WebGL isn't available (`SolMark` in sol-sun.tsx is the live one). Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
  * sun… a little bit bigger… a little more ai tech. but still fundamentally the sun"). One disc, lit like a glass orb:
  * a hot pale core high and to the left, gold through the signal orange to a deeper rim, a fine highlight along its
  * top; and round it one hair-thin orbit with a small bright node travelling it, the only "machine" in the mark. No
  * rays, no dark round behind him. Sized by its box, which it fills; the colours are its own. `glow` adds the soft halo.
  */
-export function SolMark({ className, glow = true }: { className?: string; glow?: boolean }) {
+export function SolMarkFlat({ className, glow = true }: { className?: string; glow?: boolean }) {
   const id = useId().replace(/:/g, "");
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className ? `sol-sun ${className}` : "sol-sun"} aria-hidden>
@@ -144,17 +111,10 @@ export function SolMark({ className, glow = true }: { className?: string; glow?:
       </defs>
       {glow && <circle cx="12" cy="12" r="12" fill={`url(#${id}-glow)`} />}
       <circle cx="12" cy="12" r="9" fill={`url(#${id}-sun)`} />
-      {/* A faint brain etched into the sun from edge to edge (20 Nov 2026, Martin: "a feint brain designed within from
-          edge to edge of the sun"; of four mockups, "Use B, etched"): the folds of two halves and the split between
-          them, pressed in with a deeper orange and caught by a pale edge just below, so it reads as part of the sun
-          and not a drawing on it. Drawn on a 120 grid, clipped to the disc. */}
-      <clipPath id={`${id}-disc`}>
-        <circle cx="12" cy="12" r="9" />
-      </clipPath>
-      <g clipPath={`url(#${id}-disc)`}>
-        <g transform="scale(0.2)">
-          <BrainEtch />
-        </g>
+      {/* The brain, as on the large live sun: fine white lines softly blended into the disc, laid on the disc's box
+          (from 3 to 21, in by 2% as the live sun has it). */}
+      <g opacity={0.6} style={{ mixBlendMode: "soft-light" }} transform="translate(0.923 0.702) scale(0.2215)">
+        <SunBrainLines />
       </g>
       {/* The light along his top edge. */}
       <path d="M5.9 8.6A7.2 7.2 0 0 1 13.4 4.9" stroke="#fff" strokeOpacity="0.55" strokeWidth="0.7" strokeLinecap="round" />

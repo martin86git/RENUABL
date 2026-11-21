@@ -73,7 +73,7 @@ export const SETUP_WORDS: Record<SetupStep, SetupStepWords> = {
   },
   import: {
     title: "Bring in your contacts and deals",
-    sol: "Bring across what you already have, so your history is here from day one. Sold jobs come in from Pylon with a key or its export file, and a contact sheet from any CRM goes into Marketing.",
+    sol: "Bring across what you already have, so your history is here from day one. Upload the export sheet from your old CRM, contacts or deals, and I match its columns for you to check. Nobody already here is changed.",
     action: "Bring them in",
     done: "Your customers are in.",
   },
@@ -103,7 +103,7 @@ export const SETUP_PLACES: Record<SetupStep, { href: string; connect?: "email" |
     ],
   },
   "lead-inbox": { href: "/design/settings/lead-inbox" },
-  import: { href: "/design/settings/pylon", also: [{ label: "A contact sheet, into Marketing", href: "/design/marketing" }] },
+  import: { href: "/design/settings/import", also: [{ label: "Sold jobs from Pylon", href: "/design/settings/pylon" }] },
   proposal: {
     href: "/design/settings/company",
     also: [

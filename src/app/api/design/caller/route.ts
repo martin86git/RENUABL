@@ -14,7 +14,12 @@ import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { textsOnFor } from "@/lib/server/design-texts";
+import { after } from "next/server";
+import { speakingProviders, warmClips } from "@/lib/server/voice-samples";
 import { voiceOnFor } from "@/lib/server/voice-calls";
+
+// Time for the voice samples to be made after the answer (warmClips).
+export const maxDuration = 60;
 
 /** GET: the business's phone assistant (its name, whether it has a picture), the name it speaks for, and whether its calls are on. */
 export async function GET() {
@@ -37,6 +42,8 @@ export async function GET() {
     ]);
     // Setting it up is for an admin: whoever may change the business's settings.
     const mayChange = can(who.member.role, "prices", who.member.permissions);
+    // Every voice's solar sample made ahead, so the play button doesn't wait for it.
+    after(() => warmClips());
     return Response.json({
       ok: true,
       caller,
@@ -47,6 +54,8 @@ export async function GET() {
       mayChange,
       business: brand.name || biz[0]?.name || "",
       hiddenVoices,
+      // The makers whose voices can speak the solar sample line (their key is set): the rest play the maker's clip.
+      speakers: speakingProviders(),
     });
   });
 }

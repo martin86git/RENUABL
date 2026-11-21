@@ -13,7 +13,7 @@ import {
   type CallerVoice,
   type VoiceChoice as Voice,
 } from "@/lib/domain/design/caller";
-import { loadHiddenVoices } from "@/lib/services/caller";
+import { loadHiddenVoices, voiceSpeakers } from "@/lib/services/caller";
 
 /** The one sample clip playing, wherever the picker is shown: starting another stops it. */
 let sampleNow: HTMLAudioElement | null = null;
@@ -65,13 +65,12 @@ export function VoiceChoice({
 
   useEffect(() => {
     let live = true;
-    if (!given) void loadHiddenVoices().then((h) => live && setLoaded(h));
+    void loadHiddenVoices().then((h) => live && setLoaded(h));
     return () => {
       live = false;
       stopSample();
     };
-    // Read once; a picker given its list never asks.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Read once: the hidden voices (unless given) and which makers can speak the solar line.
   }, []);
 
   // A press outside or Escape folds the list.
@@ -103,7 +102,7 @@ export function VoiceChoice({
     stopSample();
     setNote(null);
     if (playing === key) return setPlaying(null);
-    const url = voiceSampleUrl(v);
+    const url = voiceSampleUrl(v, voiceSpeakers());
     if (!url) return setNote(NO_SAMPLE);
     setPlaying(key);
     const over = () => setPlaying((now) => (now === key ? null : now));
@@ -115,9 +114,9 @@ export function VoiceChoice({
 
   const sample = (v: Voice) => {
     const on = playing === voiceKey(v);
-    if (!voiceSampleUrl(v))
+    if (!voiceSampleUrl(v, voiceSpeakers()))
       return (
-        <span className="grid size-8 shrink-0 place-items-center text-muted" title="No sample: hear it on a test call">
+        <span className="grid size-8 shrink-0 place-items-center text-muted" title={NO_SAMPLE}>
           <VolumeX className="size-3.5" aria-hidden />
           <span className="sr-only">No sample to play</span>
         </span>
@@ -253,13 +252,18 @@ function Option({ on, onPick, after, children }: { on: boolean; onPick: () => vo
 
 /**
  * One voice's play round on its own, for places that show the voice an agent speaks in without the list (21 Nov 2026,
- * Martin: the agent's picture card, beside its colours). Its maker's sample, no call; a voice with none says so.
+ * Martin: the agent's picture card, beside its colours). Its sample, no call; a voice with none says so.
  */
 export function VoiceSample({ voice, label }: { voice: CallerVoice | null; label: string }) {
   const [on, setOn] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  useEffect(() => stopSample, []);
-  const url = voiceSampleUrl(voice);
+  const [, setAsked] = useState(false);
+  useEffect(() => {
+    // Asks which makers can speak the solar line, so a Microsoft voice gets its play round once the server says so.
+    void loadHiddenVoices().then(() => setAsked(true));
+    return stopSample;
+  }, []);
+  const url = voiceSampleUrl(voice, voiceSpeakers());
   const play = () => {
     stopSample();
     setNote(null);

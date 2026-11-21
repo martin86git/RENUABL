@@ -143,15 +143,19 @@ import {
   type LiveStatus,
 } from "@/lib/services/live";
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
-import { SolIcon, SolMark, SolStars } from "./sol-icon";
+import { SolIcon, SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
+import { clashRefusal, clashWords, clashesWithSupply, supplyClashes } from "@/lib/domain/design/supply-match";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
+import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
+import { arrayFrame, growArray, growCount, growHandles, type ArrayFrame, type GrowSide } from "@/lib/domain/design/array-grow";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
@@ -1015,6 +1019,12 @@ const OPENED: typeof WHOLE = {
  * can't move at all while the whole picture is showing, so the hand did nothing). A roof near an edge can be dragged to
  * the middle, and at least half the view always shows the picture.
  */
+/** What a kept view shows on a picture of `across` width to height: wider than the photo, a band across it, the middle kept. */
+function shownView(kept: typeof WHOLE, across: number | null): typeof WHOLE {
+  if (!across || across <= ROOF_IMAGE.width / ROOF_IMAGE.height + 0.01) return kept;
+  const h = kept.w / across;
+  return { x: kept.x, w: kept.w, h, y: kept.y + (kept.h - h) / 2 };
+}
 const within = (at: number, size: number, whole: number) => Math.min(Math.max(-size / 2, at), whole - size / 2);
 
 /**
@@ -1135,6 +1145,7 @@ export function RoofDesigner(props: {
   const openMenu = (to: typeof menu) => {
     setMenu(to);
     setSeek("");
+    setSearchDown(false);
     // The inverter suggestions fold each time a list opens, a press away (19 Nov 2026, Martin).
     setSuggesting(false);
   };
@@ -1267,6 +1278,9 @@ export function RoofDesigner(props: {
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
   // Whether the inverter list is showing its suggestions for the panels on the design.
   const [suggesting, setSuggesting] = useState(false);
+  // A three-phase inverter picked for a single-phase home (21 Nov 2026, Martin: warn, never let it on blindly): held here
+  // until the home is set to three phase or another inverter is chosen.
+  const [phaseAsk, setPhaseAsk] = useState<{ inverter: CatalogueInverter; count: number } | null>(null);
   // The string the pointer is over, on the picture or in the list of strings: its check is shown.
   const [hover, setHover] = useState<string | null>(null);
   // The string whose check is open on the picture: opened from its tick or cross in the strings box, never by hovering
@@ -1405,7 +1419,16 @@ export function RoofDesigner(props: {
     setArrayHint(null);
     setOnPanel(false);
   };
-  const [view, setView] = useState(OPENED);
+  // The view as kept is always the photo's own shape. In the pop-up, widened past that shape (21 Nov 2026, Martin:
+  // widening "only widens the grey padding area surrounding the map. i wanted it all to expand together"), the picture
+  // takes the whole width and shows a band of the photo across it: the kept view's width, cut to the picture's shape.
+  const [keptView, setView] = useState(OPENED);
+  const [across, setAcross] = useState<number | null>(null);
+  const acrossNow = useRef<number | null>(null);
+  useEffect(() => {
+    acrossNow.current = across;
+  }, [across]);
+  const view = useMemo(() => shownView(keptView, across), [keptView, across]);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
   // Drawing mode (the photo put away and the roof drawn plainly) has no button now; the code stays for later.
@@ -1650,17 +1673,80 @@ export function RoofDesigner(props: {
     };
   }, []);
   const phone = Boolean(props.tight && stage);
-  const fit = phone ? "100%" : fitPx ? `${fitPx}px` : FIT;
+  // In the pop-up the picture takes the window's whole width, its height the first fold's (21 Nov 2026, Martin: widening
+  // the window should widen the map, not the grey round it); `across` is then its width to height.
+  const fills = Boolean(props.tight && !phone && fitPx);
+  const fit = phone ? "100%" : fills ? "none" : fitPx ? `${fitPx}px` : FIT;
+  const picBox = useRef<HTMLDivElement | null>(null);
+  // The inverter list opens at its top, Sol's suggestion first (21 Nov 2026, Martin: it opened scrolled down to the
+  // search box). The search is focused without scrolling to it, sits in its place near the top, and once scrolled past
+  // stays pinned to the menu's foot, so it is always to hand.
+  const kitMenu = useRef<HTMLDivElement | null>(null);
+  const kitSearchSpot = useRef<HTMLDivElement | null>(null);
+  const [searchDown, setSearchDown] = useState(false);
+  const kitScrolled = () => {
+    const box = kitMenu.current;
+    const spot = kitSearchSpot.current;
+    if (box && spot) setSearchDown(box.scrollTop > spot.offsetTop + spot.offsetHeight);
+  };
+  const focusQuietly = useCallback((el: HTMLInputElement | null) => el?.focus({ preventScroll: true }), []);
+  // The same search in the panel, inverter and battery lists (21 Nov 2026, Martin: "do the same for the battery and panel
+  // lists"): its place in the list, and the bar it moves to at the menu's foot once scrolled past.
+  const searchBox = (placeholder: string) => (
+    <input
+      ref={focusQuietly}
+      value={seek}
+      onChange={(e) => setSeek(e.target.value)}
+      placeholder={placeholder}
+      className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+    />
+  );
+  const kitSearchHere = (placeholder: string) => (
+    <div ref={kitSearchSpot} className="min-h-10">
+      {!searchDown && searchBox(placeholder)}
+    </div>
+  );
+  const kitSearchFoot = (placeholder: string) =>
+    searchDown && <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">{searchBox(placeholder)}</div>;
+  const seeks = (text: string) =>
+    seek
+      .toLowerCase()
+      .split(/\s+/)
+      .every((word) => text.toLowerCase().includes(word));
+  useEffect(() => {
+    const el = picBox.current;
+    if (!fills || !el || !fitPx) {
+      setAcross(null);
+      return;
+    }
+    const tall = (fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+    const measure = () => setAcross(el.clientWidth > 0 ? Math.round((el.clientWidth / tall) * 1000) / 1000 : null);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fills, fitPx]);
   /** A place down the picture, as a share of its height: on a phone the picture starts under the band above it. */
   const picY = (percent: number) =>
     props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
-    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
+    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point & { angle?: number }> | null; others?: LoosePanel[] }
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
-    | { mode: "array"; anchor: LoosePanel }
+    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
+    | {
+        mode: "grow";
+        side: GrowSide;
+        from: Point;
+        base: LoosePanel[];
+        frame: ArrayFrame;
+        seed: string;
+        /** Every panel this drag has had on the roof: the group as picked up and any it has added. */
+        ids: Set<string>;
+        n: number;
+      }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
@@ -1856,6 +1942,11 @@ export function RoofDesigner(props: {
   // The quote's postcode is the roof's own: the one in the address searched for. One typed before that rule stays only where the address has none.
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
+  // Inverters on the design that can't go on the home's supply: a three-phase one on a single-phase home (`supply-match.ts`).
+  const clashNow = supplyClashes(
+    fitted.map((f) => props.inverters.find((i) => i.sku === f.sku) ?? { name: f.name }),
+    quoteNow.form.phase,
+  );
   const everyQuote = () =>
     designs.map((_, i) => {
       const q = quotes[i] ?? defaultQuote(props.postcode);
@@ -1950,6 +2041,11 @@ export function RoofDesigner(props: {
 
   /** Puts a suggestion on the design in place of whatever inverters were there. Strings on an inverter that is gone go back to the first. */
   const takeSuggestion = (to: InverterSuggestion) => {
+    if (clashesWithSupply(to.inverter, quoteNow.form.phase)) {
+      setPhaseAsk({ inverter: to.inverter, count: to.count });
+      return;
+    }
+    setPhaseAsk(null);
     setFitted(
       Array.from({ length: to.count }, (_, n) => ({
         sku: to.inverter.sku,
@@ -2026,6 +2122,11 @@ export function RoofDesigner(props: {
   };
   const addInverter = (to: CatalogueInverter) => {
     if (fitted.length >= MAX_INVERTERS) return;
+    if (clashesWithSupply(to, quoteNow.form.phase)) {
+      setPhaseAsk({ inverter: to, count: 1 });
+      return;
+    }
+    setPhaseAsk(null);
     setFitted([
       ...fitted,
       {
@@ -2130,9 +2231,13 @@ export function RoofDesigner(props: {
       setView((v) => {
         const w = Math.min(ROOF_IMAGE.width, Math.max(40, v.w * (e.deltaY > 0 ? 1.15 : 1 / 1.15)));
         const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+        // The spot under the pointer stays put, read on the picture as shown (a band of the photo when widened).
+        const was = shownView(v, acrossNow.current);
+        const shownH = shownView({ x: 0, y: 0, w, h }, acrossNow.current).h;
+        const y = was.y + fy * was.h - fy * shownH - (h - shownH) / 2;
         return {
           x: within(v.x + fx * v.w - fx * w, w, ROOF_IMAGE.width),
-          y: within(v.y + fy * v.h - fy * h, h, ROOF_IMAGE.height),
+          y: within(y, h, ROOF_IMAGE.height),
           w,
           h,
         };
@@ -2275,11 +2380,12 @@ export function RoofDesigner(props: {
   };
 
   /**
-   * The panels a drag would place: from the first one, out to the pointer. Dragging across adds panels to the
-   * row; dragging up or down adds rows. Everything is in the first panel's own frame, so a turned panel makes a
-   * turned array. Places where a panel already stands are left out.
+   * The panels a drag would place: from the first one, out to the pointer, in one line (21 Nov 2026, Martin: a drag
+   * does one thing; rows are added from the array's handles afterwards). `across` keeps the line along the panel's row;
+   * otherwise it runs whichever way the pointer has gone further, across or along. Everything is in the first panel's
+   * own frame, so a turned panel makes a turned line. Places where a panel already stands are left out.
    */
-  const arrayFrom = (anchor: LoosePanel, p: Point): LoosePanel[] => {
+  const arrayFrom = (anchor: LoosePanel, p: Point, only: "across" | "either" = "either"): LoosePanel[] => {
     const a = (anchor.angle * Math.PI) / 180;
     const dx = p.x - anchor.x;
     const dy = p.y - anchor.y;
@@ -2287,8 +2393,11 @@ export function RoofDesigner(props: {
     const stepX = plan.w + size.gap;
     const stepY = plan.h + size.gap;
     // How many panels the pointer is away from the first, across and along, in that panel's frame.
-    const across = Math.max(-40, Math.min(40, Math.round((dx * Math.cos(a) + dy * Math.sin(a)) / stepX)));
-    const along = Math.max(-20, Math.min(20, Math.round((-dx * Math.sin(a) + dy * Math.cos(a)) / stepY)));
+    const lx = dx * Math.cos(a) + dy * Math.sin(a);
+    const ly = -dx * Math.sin(a) + dy * Math.cos(a);
+    const sideways = only === "across" || Math.abs(lx) >= Math.abs(ly);
+    const across = sideways ? Math.max(-40, Math.min(40, Math.round(lx / stepX))) : 0;
+    const along = sideways ? 0 : Math.max(-20, Math.min(20, Math.round(ly / stepY)));
     const standingNow = designPanels(design).map((panel) => middle(panel.corners));
     const out: LoosePanel[] = [];
     for (let j = 0; j <= Math.abs(along); j++) {
@@ -2330,6 +2439,26 @@ export function RoofDesigner(props: {
       Math.max(...all.map((p) => (p.x - centre.x) * Math.sin(a) - (p.y - centre.y) * Math.cos(a))) + size.long / 2 + 12 * u * scale;
     return { centre, turn: { x: centre.x + reach * Math.sin(a), y: centre.y - reach * Math.cos(a) } };
   })();
+  // Panels picked that lie on one grid have a + handle on each side: dragged out it adds a row or column there,
+  // dragged in it takes them away (`array-grow.ts`). A handle that would sit on a turn handle slides along its side.
+  const growGroup =
+    handles && panelPicks.length > 0 && panelPicks.length === picks.length && panelPicks.every((x) => x.kind === "loose")
+      ? loose.filter((panel) => panelPicks.some((x) => x.kind === "loose" && x.id === panel.id))
+      : [];
+  const growFrame = growGroup.length ? arrayFrame(growGroup, size) : null;
+  const growSpots = growFrame
+    ? growHandles(growFrame, 9 * u * scale).map((handle) => {
+        const turn = grip?.turn ?? spinGroup?.turn;
+        if (!turn || Math.hypot(handle.at.x - turn.x, handle.at.y - turn.y) > 16 * u * scale) return handle;
+        const t = (growFrame.angle * Math.PI) / 180;
+        const slide = 20 * u * scale;
+        const along =
+          handle.side === "top" || handle.side === "bottom" ? { x: Math.cos(t), y: Math.sin(t) } : { x: -Math.sin(t), y: Math.cos(t) };
+        return { ...handle, at: { x: handle.at.x + along.x * slide, y: handle.at.y + along.y * slide } };
+      })
+    : [];
+  const growAt = (p: Point) => growSpots.find((handle) => Math.hypot(p.x - handle.at.x, p.y - handle.at.y) < 7 * u * scale) ?? null;
+
   /** The direction of a point from a centre, in degrees clockwise from straight up. */
   const bearing = (p: Point, centre: Point) => (Math.atan2(p.x - centre.x, -(p.y - centre.y)) * 180) / Math.PI;
 
@@ -2783,7 +2912,7 @@ export function RoofDesigner(props: {
     if (!p) return;
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
+      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: keptView };
       return;
     }
     // A speech bubble opens its thread, whichever tool is on. The bubble is drawn up and to the right of the spot
@@ -2839,6 +2968,23 @@ export function RoofDesigner(props: {
         grabbed === "battery"
           ? { mode: "battery", dx: p.x - at.x, dy: p.y - at.y }
           : { mode: "inverter", n: grabbed, dx: p.x - at.x, dy: p.y - at.y };
+      return;
+    }
+    const growing = growFrame ? growAt(p) : null;
+    if (growing && growFrame) {
+      // A + handle on the picked array's side: dragging it adds rows or columns there, or takes them away.
+      svg.current?.setPointerCapture(e.pointerId);
+      setGhosts([]);
+      press.current = {
+        mode: "grow",
+        side: growing.side,
+        from: p,
+        base: growGroup,
+        frame: growFrame,
+        seed: newId("p"),
+        ids: new Set(growGroup.map((panel) => panel.id)),
+        n: 0,
+      };
       return;
     }
     if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) {
@@ -2904,7 +3050,10 @@ export function RoofDesigner(props: {
       const shown = ghostAt(p);
       if (!shown) return;
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "array", anchor: shown };
+      // Put down in the open (not beside a panel), pulled sideways it adds panels and pulled any other way it pivots
+      // (`pivotDrag`); on a traced face it starts out facing the way the face runs. Beside a panel it only adds.
+      const free = shown.x === p.x && shown.y === p.y;
+      press.current = { mode: "array", anchor: shown, free, pivot: null };
       setLaying(true);
       return setGhosts([shown]);
     }
@@ -3023,7 +3172,7 @@ export function RoofDesigner(props: {
       if (tool === "panel") {
         // Over a panel that is there (or the round beside its array) the arrow has taken over: no outline.
         const p = pointAt(e);
-        const next = p && !key && !onArrayHint(p) ? ghostAt(p) : null;
+        const next = p && !key && !onArrayHint(p) && !growAt(p) ? ghostAt(p) : null;
         setGhosts(next ? [next] : []);
       }
       // Selecting, the next panel shows itself just past a panel's edge (not over a panel, the round, the kit or a handle).
@@ -3032,7 +3181,8 @@ export function RoofDesigner(props: {
         const handle =
           p &&
           ((grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) ||
-            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale));
+            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) ||
+            growAt(p) !== null);
         // Over empty roof, or an empty place in a traced face's rows (8 Nov 2026: inside a face it never showed).
         const next = p && (!under || under.empty) && !on && !handle && !onArrayHint(p) ? edgeGhostAt(p) : null;
         if (next || ghosts.length) setGhosts(next ? [next] : []);
@@ -3043,10 +3193,42 @@ export function RoofDesigner(props: {
       const p = pointAt(e);
       if (!p) return;
       // The row being drawn clicks into place against the panels or roof edge near it (`placeShift`); Alt places it freely.
-      const drawn = arrayFrom(held.anchor, p);
+      let anchor = held.anchor;
+      if (held.free) {
+        // Pulled sideways, the way the panel faces, it adds panels as it lies; pulled any other way it pivots to the pointer.
+        const turned = pivotDrag(anchor, p, planSize(anchor, size).w + size.gap, held.pivot ?? null, e.altKey ? [] : squareAngles);
+        held.pivot = turned.state;
+        anchor = { ...anchor, angle: turned.angle };
+      }
+      const drawn = arrayFrom(anchor, p, held.free ? "across" : "either");
       const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
-      setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
+      let shown = shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn;
+      // Squared to the roof edge it is near as it is drawn, so letting go changes nothing (it used to turn on release).
+      const settle = !e.altKey && shown.length && !joinedToOthers(shown) ? settleToEdges(shown, roofEdges, size) : null;
+      if (settle) shown = applySettle(shown, settle);
+      setGhosts(shown);
       return;
+    }
+    if (held.mode === "grow") {
+      const p = pointAt(e);
+      if (!p) return;
+      const n = growCount(held.frame, held.side, held.from, p);
+      if (n === held.n) return;
+      held.n = n;
+      const was = held.ids;
+      // Never onto a panel that stands outside the group.
+      const others = standingAll(
+        faces,
+        loose.filter((panel) => !was.has(panel.id)),
+      );
+      const next = growArray(held.base, held.frame, held.side, n, held.seed).filter(
+        (panel) => was.has(panel.id) || !others.some((o) => Math.hypot(o.x - panel.x, o.y - panel.y) < 0.4),
+      );
+      held.ids = new Set([...was, ...next.map((panel) => panel.id)]);
+      const mine = held.ids;
+      setLoose((all) => [...all.filter((panel) => !mine.has(panel.id)), ...next]);
+      setPicks(next.map((panel): Pick => ({ kind: "loose", id: panel.id })));
+      return changed();
     }
     if (held.mode === "msb") {
       const p = pointAt(e);
@@ -3130,7 +3312,8 @@ export function RoofDesigner(props: {
       const box = svg.current?.getBoundingClientRect();
       if (!box) return;
       const dx = ((e.clientX - held.x) / box.width) * held.from.w;
-      const dy = ((e.clientY - held.y) / box.height) * held.from.h;
+      // Both by the width: widened, the picture shows less of the photo's height than it is tall.
+      const dy = ((e.clientY - held.y) / box.width) * held.from.w;
       return setView({
         ...held.from,
         x: within(held.from.x - dx, held.from.w, ROOF_IMAGE.width),
@@ -3152,7 +3335,7 @@ export function RoofDesigner(props: {
       const next = byHand(held.picks);
       const labelIds = held.picks.filter((x) => x.kind === "label").map((x) => (x as { id: string }).id);
       held.starts = Object.fromEntries([
-        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y }]),
+        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y, angle: x.angle }]),
         ...labels.filter((l) => labelIds.includes(l.id)).map((l) => [`n:${l.id}`, { x: l.x, y: l.y }]),
       ]);
       setFaces(next.faces);
@@ -3171,7 +3354,11 @@ export function RoofDesigner(props: {
     // Moved panels click into place against the panels or roof edge they come near (`placeShift`); Alt moves them freely.
     const going = loose
       .filter((panel) => starts[`l:${panel.id}`])
-      .map((panel) => ({ ...panel, x: starts[`l:${panel.id}`].x + dx, y: starts[`l:${panel.id}`].y + dy }));
+      .map((panel) => {
+        const start = starts[`l:${panel.id}`];
+        // Each move starts from the angle the panel had when picked up, so a turn shown near an edge is undone on leaving it.
+        return { ...panel, x: start.x + dx, y: start.y + dy, angle: start.angle ?? panel.angle };
+      });
     const shift = e.altKey || !going.length ? null : placeShift(going, held.others ?? [], faces, rules, size);
     if (shift) {
       dx += shift.x;
@@ -3181,7 +3368,13 @@ export function RoofDesigner(props: {
       const start = starts[`${prefix}:${item.id}`];
       return start ? { ...item, x: cm(start.x + dx), y: cm(start.y + dy) } : item;
     };
-    setLoose((all) => all.map((panel) => moved("l", panel)));
+    // Squared to the roof edge they are near while still held, so letting go changes nothing (21 Nov 2026, Martin:
+    // "releasing the mouse clicker can force a slight pivot leaving the array crooked").
+    let placedNow = going.map((panel) => ({ ...panel, x: cm(panel.x + (shift?.x ?? 0)), y: cm(panel.y + (shift?.y ?? 0)) }));
+    const settle = !e.altKey && placedNow.length && !joinedToOthers(placedNow) ? settleToEdges(placedNow, roofEdges, size) : null;
+    if (settle) placedNow = applySettle(placedNow, settle);
+    const now = new Map(placedNow.map((panel) => [panel.id, panel]));
+    setLoose((all) => all.map((panel) => now.get(panel.id) ?? panel));
     setLabels((all) => all.map((label) => moved("n", label)));
     changed();
   };
@@ -3196,9 +3389,18 @@ export function RoofDesigner(props: {
         b: face.points[(i + 1) % face.points.length],
         setback: Math.max(face.setback, wind),
         face: face.points,
+        rows: face.angle,
       })),
     ),
     ...rules.map((g) => ({ a: g.a, b: g.b, setback: wind })),
+  ];
+  // What a row dragged out in the open clicks square to: the panels standing, each traced face's rows and sides, each guide line.
+  const squareAngles = [
+    ...standingAll(faces, loose).map((panel) => panel.angle),
+    ...roofEdges.flatMap((edge) => [
+      (Math.atan2(edge.b.y - edge.a.y, edge.b.x - edge.a.x) * 180) / Math.PI,
+      ...(edge.rows === undefined ? [] : [edge.rows]),
+    ]),
   ];
   /** Whether any of these panels sits against a panel outside them: a group joined to others stays where it joined. */
   const joinedToOthers = (group: readonly LoosePanel[]) => {
@@ -3222,6 +3424,15 @@ export function RoofDesigner(props: {
     // The drag is over: whatever it changed becomes one step to undo.
     setSettled((n) => n + 1);
     if (held?.mode === "spin") return setSpinAt(0);
+    if (held?.mode === "grow") {
+      // Panels taken away come off any string they were on.
+      const here = new Set(loose.map((panel) => `l:${panel.id}`));
+      if (strings.some((x) => x.panels.some((k) => k.startsWith("l:") && !here.has(k))))
+        setStrings(
+          strings.map((x) => ({ ...x, panels: x.panels.filter((k) => !k.startsWith("l:") || here.has(k)) })).filter((x) => x.panels.length),
+        );
+      return;
+    }
     if (held?.mode === "wire") {
       if (held.dragged) tips.nudge("strung-by-hand");
       // A plain click on a panel that was already on the string takes it off.
@@ -3313,6 +3524,14 @@ export function RoofDesigner(props: {
   const [publishing, setPublishing] = useState(false);
   /** Publish: the design is saved, then its proposal is made from it (`onPublish`), and any problem with either is said. */
   const publish = async (note = "") => {
+    // Never a proposal with a three-phase inverter on a single-phase home (21 Nov 2026, Martin).
+    if (clashNow.length) {
+      setSent({
+        ok: false,
+        message: `Not published: ${clashNow.join(", ")} is a three-phase inverter on a single-phase home. Choose a single-phase inverter, or set the home to three phase if it is.`,
+      });
+      return;
+    }
     setPublishing(true);
     setSent(null);
     const kept = await save();
@@ -3609,6 +3828,7 @@ export function RoofDesigner(props: {
       solarVic: { on: Boolean(quoteNow.form.solarVicRebate), bar: solarVicBar(quoteNow.form, summary.panels, props.rates) },
       phase: quoteNow.form.phase,
       inverterKw: fittedKw,
+      supplyClash: clashNow,
     });
   })();
   const light = readinessLight(ready);
@@ -4160,18 +4380,23 @@ export function RoofDesigner(props: {
    * outlined in gold with everything off it dimmed; any answer takes the outline away.
    */
   const [lot, setLot] = useState<PropertyLot | null>(null);
+  /** The register didn't answer (down, slow, outside Victoria): Sol still asks, on the picture alone. */
+  const [lotMissedAt, setLotMissedAt] = useState<string | null>(null);
+  const lotKey = `${props.address}|${spot.lat},${spot.lng}`;
+  const lotMissing = lotMissedAt === lotKey;
   useEffect(() => {
     let live = true;
     const q = new URLSearchParams({ address: props.address, lat: String(spot.lat), lng: String(spot.lng) });
     fetch(`/api/design/roof/lot?${q}`)
       .then((r) => (r.ok ? (r.json() as Promise<PropertyLot>) : null))
       .then((found) => {
-        if (!live || !found?.nearby) return;
+        if (!live) return;
+        if (!found?.nearby) return setLotMissedAt(lotKey);
         setLot(found);
         const doubt = registerWarning(found, props.address);
         if (doubt) props.onAddressDoubt?.(doubt);
       })
-      .catch(() => undefined);
+      .catch(() => live && setLotMissedAt(lotKey));
     return () => {
       live = false;
     };
@@ -4522,7 +4747,8 @@ export function RoofDesigner(props: {
     };
   })();
   const guideFacts: GuideFacts = {
-    ...(lot ? { lot: true } : {}),
+    // Always asked first (21 Nov 2026, Martin: a new site opened on "First, the home." when the register didn't answer).
+    ...(props.address.trim() ? { lot: true } : {}),
     roof: quoteNow.form.roof,
     suggested: guideSuggested,
     target: guideTarget,
@@ -5284,6 +5510,7 @@ export function RoofDesigner(props: {
       case "inverter": {
         const to = pickByQuery(props.inverters, command.query);
         if (!to) return `No inverter on your lists matches “${command.query}”.`;
+        if (clashesWithSupply(to, quoteNow.form.phase)) return clashRefusal(to.name);
         setFitted([
           {
             sku: to.sku,
@@ -6866,6 +7093,7 @@ export function RoofDesigner(props: {
             {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot.
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
+              ref={picBox}
               className="glass-dark relative mx-auto"
               style={
                 {
@@ -8252,6 +8480,23 @@ export function RoofDesigner(props: {
                       />
                     </g>
                   )}
+                  {/* A + on each side of the picked array: dragged out it adds a row or column there, dragged in it takes them away. */}
+                  {growSpots.map((handle) => {
+                    const [hx, hy] = px(handle.at);
+                    return (
+                      <g key={handle.side} style={{ cursor: "pointer" }}>
+                        <title>Drag out to add panels here, or in to take them away</title>
+                        <circle cx={hx} cy={hy} r={5.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.3 * u} />
+                        <path
+                          d={`M${hx - 2.6 * u},${hy} h${5.2 * u} M${hx},${hy - 2.6 * u} v${5.2 * u}`}
+                          stroke="#0b0c0e"
+                          strokeWidth={1.3 * u}
+                          strokeLinecap="round"
+                          fill="none"
+                        />
+                      </g>
+                    );
+                  })}
                   {/* One panel picked: a grip in its middle to drag it by, and a handle above it to turn it with. */}
                   {grip && (
                     <g pointerEvents="none">
@@ -9300,42 +9545,53 @@ export function RoofDesigner(props: {
                       <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
                     </button>
                     {menu === "panels" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
+                        {kitSearchHere("Search panels")}
                         {[
                           ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
                           ...favourites.sorted("panels", props.catalogue).map((p) => ({ ...p, gone: false })),
-                        ].map((p) => (
-                          <div key={p.sku} className="group flex items-start gap-1">
-                            <button
-                              onClick={() => {
-                                if (!p.gone) choosePanel(p.sku);
-                                openMenu(false);
-                              }}
-                              className={clsx(
-                                "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                                p.sku === chosen && "bg-canvas",
-                              )}
-                            >
-                              <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold">{p.name}</span>
-                                <ModelNo sku={p.sku} />
-                                <span className="block text-xs tabular-nums text-muted">
-                                  {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
-                                  {p.gone ? " · no longer in our range" : ""}
+                        ]
+                          .filter((p) => p.gone || seeks(`${p.name} ${p.sku}`))
+                          .map((p) => (
+                            <div key={p.sku} className="group flex items-start gap-1">
+                              <button
+                                onClick={() => {
+                                  if (!p.gone) choosePanel(p.sku);
+                                  openMenu(false);
+                                }}
+                                className={clsx(
+                                  "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                  p.sku === chosen && "bg-canvas",
+                                )}
+                              >
+                                <Check
+                                  className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold">{p.name}</span>
+                                  <ModelNo sku={p.sku} />
+                                  <span className="block text-xs tabular-nums text-muted">
+                                    {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                                    {p.gone ? " · no longer in our range" : ""}
+                                  </span>
                                 </span>
-                              </span>
-                            </button>
-                            {!p.gone && (
-                              <FavouriteStar
-                                on={favourites.is("panels", p.sku)}
-                                onToggle={() => favourites.toggle("panels", p.sku)}
-                                name={p.name}
-                              />
-                            )}
-                          </div>
-                        ))}
+                              </button>
+                              {!p.gone && (
+                                <FavouriteStar
+                                  on={favourites.is("panels", p.sku)}
+                                  onToggle={() => favourites.toggle("panels", p.sku)}
+                                  name={p.name}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        {kitSearchFoot("Search panels")}
                       </div>
                     )}
                   </div>
@@ -9466,7 +9722,11 @@ export function RoofDesigner(props: {
                       )}
                     </button>
                     {menu === "inverters" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -9547,6 +9807,47 @@ export function RoofDesigner(props: {
                             )}
                           </div>
                         )}
+                        {phaseAsk && (
+                          <div role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-2.5" data-phase-ask>
+                            <p className="text-sm font-semibold text-danger">Single-phase home</p>
+                            <p className="mt-1 text-xs leading-relaxed text-ink">{clashWords(phaseAsk.inverter.name)}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <button
+                                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-ink"
+                                onClick={() => setPhaseAsk(null)}
+                              >
+                                Choose another
+                              </button>
+                              <button
+                                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold"
+                                title="Only if the home really has a three-phase supply: check the meter box or the bill"
+                                onClick={() => {
+                                  const held = phaseAsk;
+                                  setQuote({ ...quoteNow, form: { ...quoteNow.form, phase: "three" } });
+                                  setPhaseAsk(null);
+                                  setFitted(
+                                    [
+                                      ...(held.count > 1 ? [] : fitted),
+                                      ...Array.from({ length: held.count }, (_, n) => ({
+                                        sku: held.inverter.sku,
+                                        name: held.inverter.name,
+                                        kw: held.inverter.kw,
+                                        x: cm((view.x + view.w * (0.8 - (fitted.length + n) * 0.06) - ROOF_IMAGE.width / 2) * scale),
+                                        y: cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+                                      })),
+                                    ].slice(0, MAX_INVERTERS),
+                                  );
+                                  setSuggesting(false);
+                                  openMenu(false);
+                                  setSeek("");
+                                  setSaved("changed");
+                                }}
+                              >
+                                The home is three phase: set it and add
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <p className={clsx(label, "mt-2 px-2 py-1")}>
                           {fitted.length >= MAX_INVERTERS
                             ? `That is the most a design takes (${MAX_INVERTERS})`
@@ -9556,14 +9857,8 @@ export function RoofDesigner(props: {
                         </p>
                         {fitted.length < MAX_INVERTERS && (
                           <>
-                            <input
-                              autoFocus
-                              value={seek}
-                              onChange={(e) => setSeek(e.target.value)}
-                              placeholder="Search inverters"
-                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                            />
-                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {kitSearchHere("Search inverters")}
+                            <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("inverters", props.inverters)
                                 .filter((i) =>
@@ -9583,6 +9878,11 @@ export function RoofDesigner(props: {
                                         <span className="block text-sm font-semibold">{i.name}</span>
                                         <ModelNo sku={i.sku} />
                                         <span className="block text-xs tabular-nums text-muted">
+                                          {clashesWithSupply(i, quoteNow.form.phase) && (
+                                            <span className="font-semibold text-danger">
+                                              Three phase: not for this single-phase home ·{" "}
+                                            </span>
+                                          )}
                                           {i.kw} kW ·{" "}
                                           {i.electrical
                                             ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
@@ -9598,6 +9898,7 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
+                            {kitSearchFoot("Search inverters")}
                           </>
                         )}
                       </div>
@@ -9643,7 +9944,11 @@ export function RoofDesigner(props: {
                       {battery && <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{batteryKwh} kWh</span>}
                     </button>
                     {menu === "batteries" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {battery ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -9783,13 +10088,8 @@ export function RoofDesigner(props: {
                             </button>
                           </p>
                         )}
-                        <input
-                          value={seek}
-                          onChange={(e) => setSeek(e.target.value)}
-                          placeholder="Search batteries"
-                          className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                        />
-                        <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                        {kitSearchHere("Search batteries")}
+                        <div className="mt-1 space-y-0.5">
                           {favourites
                             .sorted("batteries", batteriesShown)
                             .filter((b) =>
@@ -9825,6 +10125,7 @@ export function RoofDesigner(props: {
                               </div>
                             ))}
                         </div>
+                        {kitSearchFoot("Search batteries")}
                       </div>
                     )}
                   </div>
@@ -10180,7 +10481,14 @@ export function RoofDesigner(props: {
                             doubt: lotDoubt(lot),
                             nearby: props.onPickAddress ? lot.nearby : [],
                           }
-                        : null
+                        : {
+                            address: props.address.split(",")[0],
+                            found: true,
+                            doubt: lotMissing
+                              ? "I couldn't check it against the land register just now: check it's the house in the middle of the picture."
+                              : null,
+                            nearby: [],
+                          }
                     }
                     canSearch={Boolean(props.onSearchAddress)}
                     placing={
