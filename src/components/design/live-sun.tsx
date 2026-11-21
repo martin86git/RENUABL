@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { SolMark } from "./sol-icon";
+import { SolBrainEtch, SolMark } from "./sol-icon";
 
 /**
  * Sol as a real sun (18 Nov 2026, Martin: the glossy orb felt "built in an entry level design tool"; take the feel up a
@@ -192,5 +192,12 @@ export function LiveSun({ className, energy = 0, live = true }: { className?: st
   }, [live]);
 
   if (failed) return <SolMark className={clsx("size-full", className)} />;
-  return <canvas ref={canvas} className={clsx("block size-full", className)} aria-hidden />;
+  // The etched brain over the disc, as on his small mark, so every Sol looks the same (21 Nov 2026, Martin). The disc
+  // is half the canvas across, in its middle.
+  return (
+    <span className="relative block size-full" aria-hidden>
+      <canvas ref={canvas} className={clsx("block size-full", className)} />
+      <SolBrainEtch className="pointer-events-none absolute inset-1/4 size-1/2" />
+    </span>
+  );
 }

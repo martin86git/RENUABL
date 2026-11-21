@@ -93,13 +93,10 @@ export function AgentWave({ who, size, busy }: { who: Exclude<Who, "sol">; size:
 export function BigSol({
   busy,
   lean,
-  brain = false,
   className = "size-28 sm:size-36",
 }: {
   busy: boolean;
   lean: { x: number; y: number };
-  /** A faint brain drawn in the sun: a sun that thinks (18 Nov 2026, Martin). */
-  brain?: boolean;
   className?: string;
 }) {
   return (
@@ -112,46 +109,7 @@ export function BigSol({
       <span aria-hidden className="pointer-events-none absolute -inset-1/2">
         <LiveSun energy={busy ? 1 : 0} />
       </span>
-      {brain && <SunBrain busy={busy} />}
     </span>
-  );
-}
-
-/**
- * The brain in the sun (18 Nov 2026, Martin: "Sol in its current form but add in a feint brain outline, to show it's a
- * sun brain"): two hemispheres seen from above, a few folds, in fine light lines laid softly over the disc. It
- * brightens a little while he talks.
- */
-function SunBrain({ busy }: { busy: boolean }) {
-  const half = (
-    <>
-      <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85" />
-      <path d="M45 25C37 24 31 28 32 35" />
-      <path d="M22 40C29 37 36 41 35 48" />
-      <path d="M44 38C39 41 43 47 38 51" />
-      <path d="M19 59C26 56 32 60 30 67" />
-      <path d="M45 57C37 57 33 63 36 70" />
-      <path d="M33 78C37 74 43 76 44 72" />
-    </>
-  );
-  return (
-    <svg
-      viewBox="11 12 78 78"
-      aria-hidden
-      className={clsx(
-        "pointer-events-none absolute inset-[2%] mix-blend-soft-light transition-opacity duration-700",
-        busy ? "opacity-90" : "opacity-60",
-      )}
-      fill="none"
-      stroke="white"
-      strokeWidth={1.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      {half}
-      <g transform="translate(100 0) scale(-1 1)">{half}</g>
-      <path d="M50 18C51 30 49 42 50 54C51 66 49 76 50 84" strokeOpacity={0.7} />
-    </svg>
   );
 }
 
@@ -422,7 +380,7 @@ export function LivingHero() {
             >
               <Bubble who="sol" text={sol.shown} busy={sol.busy} tail="shoulder" />
             </div>
-            <BigSol busy={sol.busy} lean={lean} brain className="mx-auto size-40 sm:size-48 lg:size-[15.5rem]" />
+            <BigSol busy={sol.busy} lean={lean} className="mx-auto size-40 sm:size-48 lg:size-[15.5rem]" />
             {/* On a phone the horizon curves under Sol himself. */}
             <Horizon solid className="top-[78%] w-[420vw] lg:hidden" />
           </div>
