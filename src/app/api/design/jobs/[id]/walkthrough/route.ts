@@ -1,3 +1,5 @@
+import { CAP_REACHED } from "@/lib/domain/design/voice-usage";
+import { overCap, recordTextSent } from "@/lib/server/design-voice-usage";
 import { normaliseMobile } from "@/lib/domain/contact";
 import { TEXT_WORDS, cleanText, textRecord } from "@/lib/domain/design/contact-reach";
 import {
@@ -112,6 +114,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       const site = siteUrl();
       if (!site) return Response.json({ ok: false, message: "Texts with a link need SITE_URL set up." }, { status: 503 });
       if (!(await textsOnFor(who.member.businessId))) return Response.json({ ok: false, message: TEXT_WORDS.off }, { status: 409 });
+      if (await overCap(who.member.businessId, "text")) return Response.json({ ok: false, message: CAP_REACHED }, { status: 409 });
       const mobile = normaliseMobile(found.customer.phone);
       if (!mobile) return Response.json({ ok: false, message: TEXT_WORDS.noMobile }, { status: 422 });
       const token = await watchToken(who.member.businessId, id, body.walkthrough);
@@ -121,6 +124,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       if (!clean.ok) return Response.json({ ok: false, message: clean.message }, { status: 422 });
       if ((await sendSms(mobile, clean.text, await textFrom(who.member.businessId))) !== "sent")
         return Response.json({ ok: false, message: TEXT_WORDS.failed }, { status: 502 });
+      await recordTextSent(who.member.businessId, `wt_${token}_${Date.now()}`, clean.text);
       await addActivity(
         who.member.businessId,
         found.customer.id,

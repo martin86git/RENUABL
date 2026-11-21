@@ -4,8 +4,9 @@
  * the business (`design_addons`), charged as an item of its own on the plan's Stripe subscription, shown in Settings →
  * Billing and wherever the feature lives as "Add to your plan". Pure, tested.
  *
- * Prices (16 Nov 2026, Martin): **Calls & Texts** (key `voice`) $29 a month, with the business number, 250 texts and 60
- * voice-agent minutes, Sol credits beyond (`VOICE_INCLUDES`); **Growth** (key `marketing`) $19 a month: custom proposals
+ * Prices (16 Nov 2026, Martin; Calls & Texts raised 21 Nov 2026): **Calls & Texts** (key `voice`) $49 a month, with the
+ * business number, 30 voice-agent minutes and 30 texts free, beyond them charged at cost plus margin (voice-usage.ts);
+ * **Growth** (key `marketing`) $19 a month: custom proposals
  * and marketing email, 2,000 emails a month, then $10 per 5,000 more (`GROWTH_EMAILS`). Custom proposals are no longer
  * sold apart: they come with Growth (`CUSTOM_PROPOSALS` is its key). Prices are Martin's to set; one set to null is
  * "Price on request": pressing Add to your plan asks for it (kept
@@ -14,6 +15,11 @@
  *
  * RENUABL's own business has every add-on, always, at no charge: it is the business they were built on.
  */
+
+import { DEFAULT_CAP_CENTS, VOICE_FREE, VOICE_PRICES } from "./voice-usage";
+
+const money = (cents: number) => (cents % 100 === 0 ? `$${cents / 100}` : `$${(cents / 100).toFixed(2)}`);
+const priceEach = (cents: number) => (cents < 100 ? `${cents}c` : money(cents));
 
 export const ADD_ON_KEYS = ["voice", "marketing"] as const;
 export type AddOnKey = (typeof ADD_ON_KEYS)[number];
@@ -26,12 +32,12 @@ export const cleanAddOnKey = (raw: unknown): AddOnKey | null => (ADD_ON_KEYS.inc
  * Martin how usage is charged before setting it).
  */
 export const ADD_ON_MONTHLY_CENTS: Record<AddOnKey, number | null> = {
-  voice: 2900,
+  voice: 4900,
   marketing: 1900,
 };
 
-/** What Calls & Texts includes each month; beyond it, texts and minutes take Sol credits. Usage isn't metered yet. */
-export const VOICE_INCLUDES = { texts: 250, minutes: 60, textCredits: 1, minuteCredits: 3 } as const;
+/** What Calls & Texts includes free each month; beyond it, minutes and texts are charged (voice-usage.ts). */
+export const VOICE_INCLUDES = VOICE_FREE;
 /** Marketing emails a month with Growth, and the price of each 5,000 more (not charged yet). */
 export const GROWTH_EMAILS = { included: 2000, extraBlock: 5000, extraCents: 1000 } as const;
 
@@ -49,7 +55,7 @@ export const ADD_ON_WORDS: Record<AddOnKey, AddOnWords> = {
     what: "Your own business number, texting from every deal, and phone agents that ring your leads and customers in your business's name.",
     includes: [
       "Your own Australian business number, for calls and texts",
-      "250 texts and 60 voice-agent minutes a month; beyond that, a text takes 1 Sol credit and a minute 3",
+      "30 voice-agent minutes and 30 texts a month included, then charged by the minute and by the text",
       "A sales agent and a post-sale agent with names, voices and scripts you set",
       "Calls coming in to your number answered and put on the right deal",
       "Texting customers from a deal, with replies landing on it",
@@ -216,8 +222,8 @@ export function voiceTerms(nextBill?: string | null): string[] {
     cents === null
       ? "Price on request: nothing is charged until we've agreed it with you."
       : `Billing starts today. The rest of this month is worked out by the day and goes on your next bill${day ? ` on ${day}` : ""}, then it is $${cents / 100} each month, including GST.`,
-    `There's no charge per call or per text. Each month includes ${v.minutes} voice-agent minutes and ${v.texts} texts for your whole business.`,
-    `Beyond those, a minute takes ${v.minuteCredits} Sol credits and a text ${v.textCredits}.`,
+    `Each month includes ${v.minutes} voice-agent minutes and ${v.texts} texts free for your whole business. A call is counted to the whole minute; a long text counts as the parts it goes as.`,
+    `Beyond those, ${priceEach(VOICE_PRICES.minuteCents)} a minute and ${priceEach(VOICE_PRICES.textCents)} a text, including GST, on your next bill. A spending cap you set (${money(DEFAULT_CAP_CENTS)} to start) stops calls and texts going out once reached.`,
     "Your own Australian business number comes with it, at no extra cost.",
     NOTICE_LINE,
   ];

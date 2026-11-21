@@ -14,6 +14,10 @@ export interface AddOnsView {
   /** The plan's next bill day, when it has a live plan. */
   nextBill?: string | null;
   mayAdd: boolean;
+  /** This month's Calls & Texts minutes and texts. */
+  usage?: { minutes: number; texts: number };
+  /** The spending cap beyond the free allowance, in cents. */
+  capCents?: number | null;
 }
 
 export const ADD_ONS_CHANGED = "renuabl:addons";
@@ -46,6 +50,7 @@ export const addAddOn = (key: AddOnKey) => send({ do: "add", key });
 export const removeAddOn = (key: AddOnKey) => send({ do: "remove", key });
 export const keepAddOn = (key: AddOnKey) => send({ do: "keep", key });
 export const getBusinessNumber = () => send({ do: "number" });
+export const setSpendingCap = (dollars: string) => send({ do: "cap", dollars });
 
 let shared: Promise<AddOnsView | null> | null = null;
 

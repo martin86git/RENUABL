@@ -18,7 +18,8 @@ import {
   voiceTerms,
   type AddOnKey,
 } from "@/lib/domain/design/add-ons";
-import { addAddOn, getBusinessNumber, keepAddOn, removeAddOn, useAddOns } from "@/lib/services/addons";
+import { addAddOn, getBusinessNumber, keepAddOn, removeAddOn, setSpendingCap, useAddOns } from "@/lib/services/addons";
+import { DEFAULT_CAP_CENTS, usageWords } from "@/lib/domain/design/voice-usage";
 import { ui } from "./design-shell";
 
 const BILLING = "/design/settings/billing";
@@ -135,6 +136,9 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
       )}
       {item.standing !== "off" && <p className="text-sm font-medium text-ink">{statusLine}</p>}
       {addOn === "voice" && usable && <VoiceNumber view={view} busy={busy} onGet={() => void act(getBusinessNumber, "")} />}
+      {addOn === "voice" && usable && item.standing !== "included" && (
+        <VoiceUsage view={view} busy={busy} onCap={(dollars) => void act(() => setSpendingCap(dollars), "Your spending cap is saved.")} />
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {button}
         {!manage && item.standing === "off" && view.mayAdd && (
@@ -209,6 +213,63 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
       )}
       {note && <p className="text-sm text-ink-2">{note}</p>}
     </section>
+  );
+}
+
+/** This month's minutes and texts against the free allowance, and the spending cap the owner sets. */
+function VoiceUsage({
+  view,
+  busy,
+  onCap,
+}: {
+  view: NonNullable<ReturnType<typeof useAddOns>[0]>;
+  busy: boolean;
+  onCap: (dollars: string) => void;
+}) {
+  const cap = view.capCents ?? DEFAULT_CAP_CENTS;
+  const [editing, setEditing] = useState(false);
+  const [dollars, setDollars] = useState(String(cap / 100));
+  const lines = usageWords(view.usage ?? { minutes: 0, texts: 0 }, cap);
+  return (
+    <div className="space-y-2 rounded-md bg-canvas p-3 ring-1 ring-line">
+      <ul className="space-y-1 text-sm text-ink-2">
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      {view.mayAdd &&
+        (editing ? (
+          <form
+            className="flex flex-wrap items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              onCap(dollars);
+              setEditing(false);
+            }}
+          >
+            <label className="text-sm text-ink-2" htmlFor="voice-cap">
+              Spending cap a month, beyond the free allowance: $
+            </label>
+            <input
+              id="voice-cap"
+              inputMode="numeric"
+              className="w-24 rounded-md bg-surface px-2 py-1 text-sm text-ink ring-1 ring-line"
+              value={dollars}
+              onChange={(e) => setDollars(e.target.value)}
+            />
+            <button type="submit" className={ui.primary} disabled={busy}>
+              Save
+            </button>
+            <button type="button" className={ui.quiet} onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <button type="button" className={ui.quiet} onClick={() => setEditing(true)}>
+            Change the spending cap
+          </button>
+        ))}
+    </div>
   );
 }
 
