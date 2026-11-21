@@ -1312,6 +1312,41 @@ html:has(.sales-snap) {
   }
 }
 
+/* A phone turned sideways (21 Nov 2026, Martin: "it should allow for tilting the phone sideways and the designer fills
+   the screen"): the pop-up is the whole screen, with no window, gutter or shadow round it. The designer inside lays the
+   picture over all the height under its figures (`sideways` in roof-designer.tsx, the same test). */
+@media (orientation: landscape) and (max-height: 500px) {
+  section[data-design-popup][role="dialog"] {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Sideways, Sol's step and his suggestions sit at the foot of the picture as a short card: what he asks, the choices
+   and the buttons run on in rows rather than stacking, and a long step scrolls inside the card. */
+.sideways-sol > * {
+  max-height: calc(var(--pic-h, 20rem) - 5.5rem);
+  overflow-y: auto;
+  padding-block: 0.4rem;
+}
+.sideways-sol .min-w-0.flex-1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+}
+.sideways-sol .min-w-0.flex-1 > * {
+  margin-top: 0;
+}
+.sideways-sol .min-w-0.flex-1 .grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+}
+
 /* Sol's guide: the shade analysis loading bar, filling once (19 Nov 2026). */
 @keyframes sol-shade-fill {
   from {
