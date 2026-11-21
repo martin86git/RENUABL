@@ -45,7 +45,8 @@ import { SolBadge, SolMark } from "./sol-sun";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
-import { answerFor } from "@/lib/domain/design/sol-format";
+import { replyToSol, type SolReply } from "@/lib/domain/design/sol-format";
+import { MessageTools, QuotedWords, ReplyBanner } from "./message-tools";
 import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-attach";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolThinking, SolWorking } from "./sol-thinking";
@@ -189,17 +190,18 @@ export function TodayPad(props: {
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
-  const [replyTo, setReplyTo] = useState<string | null>(null);
-  const ask = async (q: string, files: SolFile[] = [], about: string | null = null) => {
+  const [replyTo, setReplyTo] = useState<SolReply | null>(null);
+  const ask = async (q: string, files: SolFile[] = [], about: SolReply | null = null) => {
     if (asking) return;
     setReplyTo(null);
     const id = Date.now();
     setOnFeed(false);
     setAsking(true);
-    const shownQ = q + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
+    const replied = replyToSol(about, q);
+    const shownQ = (replied.shown ?? q) + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
     setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
-    const r = await askSol(about ? answerFor(about, q) : q, files, null, false, about ? q : undefined);
+    const r = await askSol(replied.said || q, files, null, false, replied.shown);
     setAsking(false);
     let a: TodayAnswer;
     if (!r.ok) a = { text: r.message, more: false };
@@ -212,11 +214,16 @@ export function TodayPad(props: {
   };
   /** A Yes or No goes straight to Sol; Reply answers the question in the box. */
   const answer: OnAnswer = (question, yes) => {
-    if (yes) return void ask(yes, [], question);
-    setReplyTo(question);
+    if (yes) return void ask(yes, [], { kind: "question", text: question });
+    setReplyTo({ kind: "question", text: question });
     window.setTimeout(() => document.getElementById("today-ask")?.focus(), 0);
   };
   const askIn = (q: string, files: SolFile[]) => void ask(q, files, replyTo);
+  /** The reply arrow on a message: the box replies to it. */
+  const replyToMessage = (from: "you" | "sol", text: string) => {
+    setReplyTo({ kind: "message", from, text });
+    window.setTimeout(() => document.getElementById("today-ask")?.focus(), 0);
+  };
   /** Try another answer: his latest answer replaced by a new one to the same question, a different way. */
   const retry = async (id: number) => {
     if (asking) return;
@@ -325,16 +332,18 @@ export function TodayPad(props: {
                 <SolDay key={t.id} {...props} items={items} onGrow={follow} />
               ) : (
                 <div key={t.id} className="space-y-4">
-                  <div className="flex justify-end">
+                  <div className="group/turn flex flex-col items-end">
                     <p className="max-w-[75%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-sun px-4 py-2 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] [font-feature-settings:'cv11','ss03','tnum'] text-ink ring-1 ring-sun-line/25">
-                      {t.q}
+                      <QuotedWords text={t.q} />
                     </p>
+                    <MessageTools text={t.q} onReply={() => replyToMessage("you", t.q)} className="mt-0.5" />
                   </div>
                   <SolSays>
                     <SolWorking busy={!t.a} />
                     {!t.a ? null : (
-                      <div className="sol-prose">
+                      <div className="sol-prose group/turn">
                         <Typed text={t.a.text} onDone={follow} onAnswer={asking ? undefined : answer} />
+                        <MessageTools text={t.a.text} onReply={() => replyToMessage("sol", t.a!.text)} className="-ml-1.5 mt-1" />
                         {t.a.designs?.length ? (
                           <div className="mt-3 max-w-2xl space-y-3">
                             {t.a.designs.map((d) => (
@@ -457,8 +466,8 @@ export function SolBox({
 }: {
   /** Twice as thick (20 Nov 2026, Martin): the words on top, the paperclip, microphone and send along its foot. */
   tall?: boolean;
-  /** One of Sol's questions being answered, shown over the box. */
-  replyTo?: string | null;
+  /** One of Sol's questions being answered, or a message replied to, shown over the box. */
+  replyTo?: SolReply | null;
   onStopReply?: () => void;
   /** The words, and any PDFs or pictures attached (read for Sol). */
   onAsk: (q: string, files: SolFile[]) => void;
@@ -492,16 +501,7 @@ export function SolBox({
         tall ? "rounded-[28px] p-3 pl-5 pt-4" : "rounded-[26px] p-2 pl-4",
       )}
     >
-      {replyTo && (
-        <p className="mb-1.5 mr-2 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
-          <span className="min-w-0 flex-1">
-            Replying to <span className="font-medium text-ink">{replyTo}</span>
-          </span>
-          <button type="button" onClick={onStopReply} className="shrink-0 hover:text-ink">
-            Cancel
-          </button>
-        </p>
-      )}
+      {replyTo && <ReplyBanner reply={replyTo} onStop={() => onStopReply?.()} className="mb-1.5 mr-2 bg-canvas" />}
       <AttachedFiles attach={attach} />
       {tall ? (
         <>

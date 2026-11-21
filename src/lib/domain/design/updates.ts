@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Sol",
+    words: "Hover over any message in a chat with Sol to copy it, or press the arrow to reply to that message.",
+  },
+  {
+    day: "2026-11-21",
     area: "Team chat",
     words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",
   },
