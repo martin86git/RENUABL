@@ -40,7 +40,14 @@ await db.query(`insert into sessions (id_hash, email, role, expires_at) values (
 const profile = mkdtempSync(join(tmpdir(), "renuabl-drive-"));
 const chrome = spawn(
   CHROME,
-  ["--headless=new", "--remote-debugging-port=9334", `--user-data-dir=${profile}`, "--hide-scrollbars", ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean), "about:blank"],
+  [
+    "--headless=new",
+    "--remote-debugging-port=9334",
+    `--user-data-dir=${profile}`,
+    "--hide-scrollbars",
+    ...(process.env.CHROME_FLAGS ?? "").split(" ").filter(Boolean),
+    "about:blank",
+  ],
   {
     stdio: "ignore",
   },

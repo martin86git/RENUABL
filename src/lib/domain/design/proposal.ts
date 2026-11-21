@@ -1006,7 +1006,16 @@ function configuratorFor(
             const extra = withExtra(mix, src.at);
             const out = workOut(extra, at);
             if (!out.ok) continue;
-            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, extra: bp.extra, ev, backup: bp.backup, reserve: Boolean(bp.reserve) });
+            const goal = configKey({
+              size: id,
+              panel: j,
+              inverter: k,
+              battery: bp.id,
+              extra: bp.extra,
+              ev,
+              backup: bp.backup,
+              reserve: Boolean(bp.reserve),
+            });
             const option = optionFrom(extra, mix, at, out, { goal, name: src.name, promise: src.note, recommended: src.pick });
             // The size's roof is sent once, on the size (`variantOf` puts it back).
             variants.push({

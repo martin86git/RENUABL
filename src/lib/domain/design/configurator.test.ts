@@ -97,7 +97,8 @@ describe("the configurator's sizes", () => {
 describe("a proposal with the configurator", () => {
   const { view, internal } = built({ withBattery: true });
   const cfg = view.configurator!;
-  const solar = (size: number) => nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false })!;
+  const solar = (size: number) =>
+    nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false })!;
   const withBatt = (size: number, backup = false, reserve = false) =>
     nearestVariant(cfg, { size, panel: 0, inverter: 0, extra: 0, battery: 0, ev: false, backup, reserve })!;
 
@@ -176,9 +177,9 @@ describe("a proposal with the configurator", () => {
   });
   it("tells the business what was ordered, and to update the design when it differs", () => {
     expect(chosenWords(cfg, cfg.start)).not.toMatch(/Update the design/);
-    expect(chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false }))).toMatch(
-      /no battery. Update the design/,
-    );
+    expect(
+      chosenWords(cfg, configKey({ size: 1, panel: 0, inverter: 0, extra: 0, battery: null, ev: false, backup: false, reserve: false })),
+    ).toMatch(/no battery. Update the design/);
     expect(holdMessage(cfg, cfg.start, "the week of 8 December")).toMatch(/^I'd like to order .*installed the week of 8 December/);
   });
   it("reads a first proposal's configurator as today's", () => {
@@ -271,7 +272,8 @@ describe("inverters that need parts behind every panel, and the mixes' lines sen
 // 19 Nov 2026, Martin: "an option to increase or decrease the storage by adding or removing a module".
 describe("storage a module up or down", () => {
   const cfg = readConfigurator(built({ withBattery: true }).view.configurator!);
-  const at = (extra: number) => nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, extra, ev: false, backup: false, reserve: false })!;
+  const at = (extra: number) =>
+    nearestVariant(cfg, { size: 0, panel: 0, inverter: 0, battery: 0, extra, ev: false, backup: false, reserve: false })!;
 
   it("prices the battery a module fewer and a module more, holding more and costing more", () => {
     expect(at(0).extra ?? 0).toBe(0);

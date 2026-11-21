@@ -43,11 +43,7 @@ export function MobileMenu() {
             </Link>
           </nav>
           {BUSINESS_LINK_SHOWN && (
-            <Link
-              href="/"
-              onClick={() => setOpen(false)}
-              className="mt-4 flex items-center justify-between px-1 text-[14px] text-ink-2"
-            >
+            <Link href="/" onClick={() => setOpen(false)} className="mt-4 flex items-center justify-between px-1 text-[14px] text-ink-2">
               <span>
                 <span className="block text-ink">For solar businesses</span>
                 <span className="block text-[12.5px] text-muted">RENUABL Business, for retailers and installers</span>
