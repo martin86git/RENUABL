@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { Check, Mail, Users } from "lucide-react";
 import { FILM } from "@/lib/domain/design/sales-page";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /**
  * Sol's chapter of the hero film, played as a live chat (16 Nov 2026, Martin: as xAI's Grok Bot page shows its bots,

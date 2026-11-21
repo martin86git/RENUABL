@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { Hash } from "lucide-react";
 import { FILM } from "@/lib/domain/design/sales-page";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { typed, useFocusCamera } from "./film-sol-scene";
 
 /**

@@ -89,7 +89,7 @@ import { DealTeamChat } from "./deal-team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolChat } from "./sol-chat";
-import { SolBadge, SolMark } from "./sol-icon";
+import { SolBadge, SolMark } from "./sol-sun";
 import { useSolUnread } from "./sol-dock";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolThinking, useSolLaunch } from "./sol-thinking";

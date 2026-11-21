@@ -143,7 +143,8 @@ import {
   type LiveStatus,
 } from "@/lib/services/live";
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
-import { SolIcon, SolMark, SolStars } from "./sol-icon";
+import { SolIcon, SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";

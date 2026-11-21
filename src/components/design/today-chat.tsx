@@ -10,7 +10,8 @@ import type { TodayView } from "@/lib/domain/design/today-view";
 import { dollars } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
 import { GoalLine, SunArc } from "./gauges";
-import { SolMark, SolStars } from "./sol-icon";
+import { SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { SolBox } from "./today-pad";
 
 /**
