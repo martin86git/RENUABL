@@ -6008,16 +6008,24 @@ export function RoofDesigner(props: {
     );
   };
 
+  // On a phone, upright or sideways (21 Nov 2026, Martin: it covered the picture and showed one design at a time), the menu
+  // is drawn smaller and wider, within the picture's height, so several designs and more of each show.
+  const compactMenu = props.tight && (phone || sideways);
   const designsMenu = (
     <div
-      data-opened
+      {...(compactMenu
+        ? // Its height in an inline style: a class naming the picture's height is drawn back up by globals.css.
+          { style: { maxHeight: "calc(var(--pic-h, 60vh) / 0.78 - 6rem)" } }
+        : { "data-opened": true })}
       className={clsx(
-        "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
+        "absolute z-40 overflow-y-auto rounded-lg border border-line bg-surface text-ink shadow-lift",
+        compactMenu ? "space-y-2 p-2" : "space-y-3 p-3",
+        compactMenu ? "w-[44rem] max-w-[calc((100vw-2.5rem)/0.78)] [zoom:1.15]" : "max-h-[70vh] w-[24rem] max-w-[85vw]",
         props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
       )}
     >
       {props.tight && !props.sitesOnly && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-line pb-3">
+        <div className={clsx("flex flex-wrap items-center gap-2 border-b border-line", compactMenu ? "pb-2" : "pb-3")}>
           {props.noDeal ? (
             <button
               type="button"
@@ -6077,6 +6085,16 @@ export function RoofDesigner(props: {
                   </span>
                   <span className="block truncate text-xs tabular-nums text-muted">
                     {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                  </span>
+                  {/* The rest of the kit, so designs can be told apart without opening each. */}
+                  <span className="block truncate text-xs text-muted">
+                    {[
+                      d.inverters?.length ? d.inverters.map((v) => v.name).join(" + ") : "No inverter",
+                      d.battery
+                        ? `${(d.battery.kwh * d.battery.qty).toFixed(1)} kWh battery${d.battery.backup ? " with backup" : ""}`
+                        : "No battery",
+                      ...(d.charger ? [`${d.charger.kw} kW EV charger`] : []),
+                    ].join(" · ")}
                   </span>
                 </button>
                 <button
@@ -6174,7 +6192,7 @@ export function RoofDesigner(props: {
           {designs.length} of {MAX_DESIGNS}
         </span>
       </div>
-      <p className="text-xs text-muted">
+      <p className={clsx("text-xs text-muted", compactMenu && "hidden")}>
         The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
         options on the next proposal published, and mark the one you recommend.
       </p>
@@ -8807,7 +8825,14 @@ export function RoofDesigner(props: {
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
               {props.tight && publishControl && (
-                <div className={clsx("pointer-events-auto absolute z-30", phone ? "right-3 top-[0.8rem]" : "right-4 top-4")}>
+                <div
+                  className={clsx(
+                    "pointer-events-auto absolute",
+                    // Over the roof pitch marks and the pad while its menu is open.
+                    menu === "designs" ? "z-50" : "z-30",
+                    phone ? "right-3 top-[0.8rem]" : "right-4 top-4",
+                  )}
+                >
                   {publishControl}
                 </div>
               )}
@@ -8823,24 +8848,35 @@ export function RoofDesigner(props: {
                 <div className="flex items-center gap-2">
                   {/* Roof and Sides (10 Nov 2026, Martin: make Sides stand out; Drawn left this pair and lives in the
                       tools): the roof from above, and the house from its four sides in Nearmap's angled photos. */}
+                  {/* Sideways (21 Nov 2026, Martin) they are icons, one above the other, to leave the roof in view. */}
                   <div
                     role="group"
                     aria-label="The roof from above, or the house from its sides"
-                    className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
+                    className={clsx(
+                      "flex items-center border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift",
+                      sideways ? "flex-col gap-1 rounded-[1.4rem]" : "rounded-full",
+                    )}
                   >
                     <button
                       onClick={() => illustrated && toggleIllustrated()}
                       aria-pressed={!illustrated}
+                      aria-label="The roof from above"
                       title="The roof from above"
                       className={clsx(
-                        "flex h-9 items-center gap-1.5 rounded-full px-3.5",
+                        "flex h-9 items-center gap-1.5 rounded-full",
+                        sideways ? "w-9 justify-center" : "px-3.5",
                         !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
                       )}
                     >
                       <House className="size-4" aria-hidden />
-                      Roof
+                      {!sideways && "Roof"}
                     </button>
-                    {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} tab />}
+                    {props.sidesReady &&
+                      (sideways ? (
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon />
+                      ) : (
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab />
+                      ))}
                   </div>
                 </div>
                 {props.pictureMenu}
