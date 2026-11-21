@@ -9,6 +9,8 @@
 import type Stripe from "stripe";
 import {
   capReached,
+  capStanding,
+  capWarningEmail,
   DEFAULT_CAP_CENTS,
   minutesOf,
   monthBefore,
@@ -22,6 +24,8 @@ import { dbConfigured, query } from "./db";
 import { isNotBilled } from "./design-not-billed";
 import { renuablCrm } from "./renuabl-crm";
 import { gstTaxRate } from "./stripe-billing";
+import { sendEmail } from "./email";
+import { siteUrl } from "@/lib/domain/sms";
 
 let made: Promise<void> | null = null;
 function tables(): Promise<void> {
@@ -46,7 +50,14 @@ function tables(): Promise<void> {
        at timestamptz not null default now(),
        primary key (business_id, month)
      );
-     alter table businesses add column if not exists voice_cap_cents integer;`,
+     alter table businesses add column if not exists voice_cap_cents integer;
+     create table if not exists design_voice_cap_notes (
+       business_id text not null references businesses(id) on delete cascade,
+       month text not null,
+       kind text not null,
+       at timestamptz not null default now(),
+       primary key (business_id, month, kind)
+     );`,
   ).then(
     () => undefined,
     (e) => {
@@ -67,15 +78,61 @@ async function keep(businessId: string, kind: "minute" | "text", ref: string, un
   );
 }
 
-/** A voice-agent call that ended (Vapi's end-of-call report): its minutes, rounded up. */
+/** A voice-agent call that ended (Vapi's end-of-call report): its minutes, rounded up. Then the cap is looked at. */
 export const recordCallMinutes = (businessId: string, callId: string, seconds: number, at = new Date()) =>
-  keep(businessId, "minute", callId, minutesOf(seconds), at).catch((e) =>
-    console.error("call minutes not kept", e instanceof Error ? e.message : e),
-  );
+  keep(businessId, "minute", callId, minutesOf(seconds), at)
+    .then(() => warnNearCap(businessId))
+    .catch((e) => console.error("call minutes not kept", e instanceof Error ? e.message : e));
 
-/** A text sent from the business's number: the parts it goes as. */
+/** A text sent from the business's number: the parts it goes as. Then the cap is looked at. */
 export const recordTextSent = (businessId: string, textId: string, text: string, at = new Date()) =>
-  keep(businessId, "text", textId, textParts(text), at).catch((e) => console.error("text not counted", e instanceof Error ? e.message : e));
+  keep(businessId, "text", textId, textParts(text), at)
+    .then(() => warnNearCap(businessId))
+    .catch((e) => console.error("text not counted", e instanceof Error ? e.message : e));
+
+/**
+ * The owner emailed once a month when the month's charges reach 80% of the spending cap, and once more when they reach
+ * it (voice-usage.ts `capStanding`). Claimed before sending, so a call and a text ending together send it once. Never
+ * for a business RENUABL doesn't charge, or a made-up one (an owner on a .example address).
+ */
+export async function warnNearCap(businessId: string, now = new Date()): Promise<"near" | "reached" | null> {
+  if (!dbConfigured() || (await free(businessId))) return null;
+  const month = usageMonth(now);
+  const [u, cap] = await Promise.all([usageOf(businessId, month), capOf(businessId)]);
+  const kind = capStanding(u, cap);
+  if (!kind) return null;
+  const owner = await query<{ email: string; name: string }>(
+    `select m.email, b.name from business_members m join businesses b on b.id = m.business_id
+      where m.business_id = $1 and m.role = 'owner' limit 1`,
+    [businessId],
+  );
+  const to = owner[0]?.email;
+  if (!to || /\.example$/i.test(to)) return null;
+  const claimed = await query(
+    `insert into design_voice_cap_notes (business_id, month, kind) values ($1,$2,$3) on conflict do nothing returning kind`,
+    [businessId, month, kind],
+  );
+  if (!claimed.length) return null;
+  const site = siteUrl();
+  const mail = capWarningEmail({
+    business: owner[0]?.name || "there",
+    kind,
+    usage: u,
+    capCents: cap,
+    link: site ? `${site}/design/settings/billing` : null,
+  });
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  await sendEmail({
+    to,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.text
+      .split("\n\n")
+      .map((p) => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`)
+      .join(""),
+  }).catch((e) => console.error("cap warning not sent", e instanceof Error ? e.message : e));
+  return kind;
+}
 
 /** A month's use (this month by default). */
 export async function usageOf(businessId: string, month = usageMonth()): Promise<Usage> {
@@ -100,6 +157,8 @@ export async function capOf(businessId: string): Promise<number> {
 export async function setCap(businessId: string, cents: number): Promise<void> {
   await tables();
   await query(`update businesses set voice_cap_cents = $2 where id = $1`, [businessId, cents]);
+  // A new cap starts the month's warnings afresh, so raising it past where the charges stand warns again later.
+  await query(`delete from design_voice_cap_notes where business_id = $1 and month = $2`, [businessId, usageMonth()]);
 }
 
 /** RENUABL's own business, or one RENUABL doesn't bill: never charged or capped. */

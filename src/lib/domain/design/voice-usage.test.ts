@@ -10,6 +10,9 @@ import {
   usageInvoiceLine,
   usageMonth,
   usagePriceWords,
+  capStanding,
+  capWarningEmail,
+  marginOn,
   usageWords,
   VOICE_FREE,
   VOICE_PRICES,
@@ -21,10 +24,10 @@ describe("voice usage", () => {
     expect(usageBill({ minutes: 30, texts: 30 }).cents).toBe(0);
   });
 
-  it("prices beyond the allowance at cost plus margin plus GST", () => {
+  it("prices beyond the allowance at 50c a minute and 30c a text (Martin, 21 Nov 2026)", () => {
+    expect(VOICE_PRICES).toEqual({ minuteCents: 50, textCents: 30 });
     expect(unitPrice(40, 0.5)).toBe(66);
-    expect(unitPrice(9, 0.5)).toBe(15);
-    expect(VOICE_PRICES.minuteCents).toBeGreaterThan(40);
+    expect(marginOn(55, 40)).toBe(0.25);
     const bill = usageBill({ minutes: 42, texts: 35 });
     expect(bill).toEqual({ extraMinutes: 12, extraTexts: 5, cents: 12 * VOICE_PRICES.minuteCents + 5 * VOICE_PRICES.textCents });
   });
@@ -64,6 +67,39 @@ describe("voice usage", () => {
     expect(cleanCap(-5)).toBeNull();
     expect(cleanCap("lots")).toBeNull();
     expect(cleanCap(100_000)).toBeNull();
+  });
+
+  it("warns at 80% of the cap, and when it is reached", () => {
+    const cap = 1000;
+    const at = (minutes: number) => capStanding({ minutes, texts: 0 }, cap);
+    expect(at(30 + 15)).toBeNull(); // $7.50
+    expect(at(30 + 16)).toBe("near"); // $8
+    expect(at(30 + 20)).toBe("reached"); // $10
+    expect(capStanding({ minutes: 24, texts: 0 }, 0)).toBe("near");
+    expect(capStanding({ minutes: 30, texts: 30 }, 0)).toBe("reached");
+    expect(capStanding({ minutes: 5, texts: 5 }, 0)).toBeNull();
+  });
+
+  it("writes the warning in the business's figures", () => {
+    const near = capWarningEmail({
+      business: "Sunrise Solar",
+      kind: "near",
+      usage: { minutes: 46, texts: 10 },
+      capCents: 1000,
+      link: "https://x/b",
+    });
+    expect(near.subject).toContain("80%");
+    expect(near.text).toContain("46 voice-agent minutes");
+    expect(near.text).toContain("https://x/b");
+    const reached = capWarningEmail({
+      business: "Sunrise Solar",
+      kind: "reached",
+      usage: { minutes: 50, texts: 0 },
+      capCents: 1000,
+      link: null,
+    });
+    expect(reached.subject).toContain("reached");
+    expect(reached.text).toContain("still answered");
   });
 
   it("says it plainly", () => {

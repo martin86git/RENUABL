@@ -6,8 +6,8 @@
  * **The month** is the calendar month in the market's time, so the allowance resets on the 1st. **Minutes** are every
  * voice-agent call's length rounded up to the whole minute (as Twilio and Vapi bill), calls out and in, test and
  * training calls included. **Texts** are each text sent from the business's number, a long one counting as the parts it
- * goes as (`textParts`). Beyond the free 30 of each, a minute and a text are charged at our cost plus `VOICE_MARGIN`,
- * with GST (`VOICE_PRICES`), added to the next bill after the month ends.
+ * goes as (`textParts`). Beyond the free 30 of each, a minute is 50c and a text 30c, including GST (`VOICE_PRICES`,
+ * Martin's prices, 21 Nov 2026), added to the next bill after the month ends.
  *
  * **The spending cap** is the most a month's charges beyond the free allowance may come to (`DEFAULT_CAP_CENTS` until
  * the owner sets it; 0 stops at the free allowance). Once reached, the business's agents start no new calls and no
@@ -35,11 +35,16 @@ const GST = 0.1;
 /** A unit's price to the business, including GST, rounded up to the cent. */
 export const unitPrice = (costCents: number, margin = VOICE_MARGIN): number => Math.ceil(costCents * (1 + margin) * (1 + GST) - 1e-9);
 
-/** What a minute and a text cost the business beyond the free allowance, including GST. */
-export const VOICE_PRICES = {
-  minuteCents: unitPrice(VOICE_COSTS.minuteCents),
-  textCents: unitPrice(VOICE_COSTS.textCents),
-} as const;
+/**
+ * What a minute and a text cost the business beyond the free allowance, including GST (21 Nov 2026, Martin: "charge more
+ * for texts - 30c a text and less on the per minute on calls. perhaps 50c / minute"). Set by hand, not from the costs:
+ * `marginOn` says what each leaves over `VOICE_COSTS` once the real costs are set.
+ */
+export const VOICE_PRICES = { minuteCents: 50, textCents: 30 } as const;
+
+/** What a price (GST inclusive) leaves over a cost (ex GST), as a share of the cost: 0.5 is half again. */
+export const marginOn = (priceCents: number, costCents: number): number =>
+  costCents > 0 ? Math.round((priceCents / (1 + GST) / costCents - 1) * 100) / 100 : 0;
 
 /** The spending cap a business starts with, in cents. */
 export const DEFAULT_CAP_CENTS = 10_000;
@@ -125,6 +130,65 @@ export function usageWords(u: Usage, capCents: number): string[] {
       `The cap is reached: ${calls && texts ? "your agents start no new calls and no texts go out" : calls ? "your agents start no new calls" : "no texts go out"} until the 1st. Calls coming in are still answered.`,
     );
   return lines;
+}
+
+// ---------------------------------------------------------------------------
+// Warning the owner as the cap nears (21 Nov 2026, Martin: "add the 80% cap warning email")
+// ---------------------------------------------------------------------------
+
+/** The share of the cap at which the owner is warned. */
+export const CAP_WARN_AT = 0.8;
+
+/**
+ * Where the month's charges stand against the cap: `near` from 80% of it, `reached` at it. A $0 cap warns when either
+ * free allowance is 80% used, and is reached when both are used (calls and texts stop each at its own).
+ */
+export function capStanding(u: Usage, capCents: number): "near" | "reached" | null {
+  if (capCents <= 0) {
+    if (capReached(u, 0)) return "reached";
+    return u.minutes >= VOICE_FREE.minutes * CAP_WARN_AT || u.texts >= VOICE_FREE.texts * CAP_WARN_AT ? "near" : null;
+  }
+  const cents = usageBill(u).cents;
+  if (cents >= capCents) return "reached";
+  return cents >= capCents * CAP_WARN_AT ? "near" : null;
+}
+
+/** The email to the business's owner as the month's charges near or reach the cap. Plain words, the business's own figures. */
+export function capWarningEmail(given: {
+  business: string;
+  kind: "near" | "reached";
+  usage: Usage;
+  capCents: number;
+  link: string | null;
+}): {
+  subject: string;
+  text: string;
+} {
+  const bill = usageBill(given.usage);
+  const cap = given.capCents > 0 ? money(given.capCents) : "$0";
+  const subject =
+    given.kind === "reached"
+      ? `Calls & Texts: this month's spending cap of ${cap} is reached`
+      : `Calls & Texts: 80% of this month's spending cap of ${cap} is used`;
+  const lines = [
+    `Hi ${given.business},`,
+    "",
+    given.kind === "reached"
+      ? "Your calls and texts have reached this month's spending cap. Your agents start no new calls and no texts go out until the 1st. Calls coming in are still answered."
+      : given.capCents > 0
+        ? `Your calls and texts this month have used 80% of your spending cap. At ${cap}, your agents stop starting new calls and no texts go out until the 1st.`
+        : "Your calls and texts this month have used 80% of the free allowance. Your spending cap is $0, so calls and texts stop once it is used, until the 1st.",
+    "",
+    `This month so far: ${given.usage.minutes} voice-agent minutes and ${given.usage.texts} texts (${VOICE_FREE.minutes} of each free).`,
+    bill.cents > 0 ? `Beyond the free allowance: ${money(bill.cents)}, on your next bill.` : "Nothing beyond the free allowance yet.",
+    "",
+    given.link
+      ? `To raise the cap, open Settings, then Billing, then Calls & Texts: ${given.link}`
+      : "To raise the cap, open Settings, then Billing, then Calls & Texts.",
+    "",
+    "RENUABL",
+  ];
+  return { subject, text: lines.join("\n") };
 }
 
 /** Said when a call or text is refused for the cap. */
