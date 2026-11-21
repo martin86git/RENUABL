@@ -196,10 +196,12 @@ export function typedCostFlags(lines: readonly CostLine[], edits: Record<string,
   const out: Record<string, string> = {};
   for (const l of lines) {
     const e = edits[lineKey(l)];
-    if (!l.sku || e?.amount === undefined || e.removed || !(e.amount > 0)) continue;
+    if (!l.sku || !e || e.removed) continue;
     const qty = e.qty ?? l.qty ?? 1;
     if (!(qty > 0)) continue;
-    const typed = e.amount / qty;
+    // A whole line's cost typed (the older way) wins, as it does in the quote; else the cost each.
+    const typed = e.amount !== undefined ? e.amount / qty : l.qty !== undefined ? e.each : undefined;
+    if (typed === undefined || !(typed > 0)) continue;
     const listed =
       !l.missing && l.qty && l.qty > 0 && l.amount > 0 ? l.amount / l.qty : !l.missing && !l.qty && l.amount > 0 ? l.amount : null;
     const was = before.get(l.sku);

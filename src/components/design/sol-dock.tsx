@@ -6,7 +6,7 @@ import type { SolState } from "@/lib/domain/design/sol";
 import { SOL_ASK, SOL_CHANGED, SOL_INDUCTION, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";

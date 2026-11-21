@@ -32,7 +32,7 @@ export const SolIcon = forwardRef<SVGSVGElement, LucideProps>(function SolIcon(
  * Sol's mark in his own colours at small sizes, where his round would be too much (a chat line, a box): the gold-to-
  * orange sun and its stars, as over his round.
  */
-export function SolBadge({ className }: { className?: string }) {
+export function SolBadgeFlat({ className }: { className?: string }) {
   const id = useId().replace(/:/g, "");
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -81,13 +81,13 @@ export function SunBrainLines() {
 }
 
 /**
- * Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
+ * The flat drawing of Sol, kept for where WebGL isn't available (`SolMark` in sol-sun.tsx is the live one). Sol himself: a standalone sun (14 Nov 2026, Martin: "remove the black ring from around Sol. so he'll be standalone
  * sun… a little bit bigger… a little more ai tech. but still fundamentally the sun"). One disc, lit like a glass orb:
  * a hot pale core high and to the left, gold through the signal orange to a deeper rim, a fine highlight along its
  * top; and round it one hair-thin orbit with a small bright node travelling it, the only "machine" in the mark. No
  * rays, no dark round behind him. Sized by its box, which it fills; the colours are its own. `glow` adds the soft halo.
  */
-export function SolMark({ className, glow = true }: { className?: string; glow?: boolean }) {
+export function SolMarkFlat({ className, glow = true }: { className?: string; glow?: boolean }) {
   const id = useId().replace(/:/g, "");
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className ? `sol-sun ${className}` : "sol-sun"} aria-hidden>

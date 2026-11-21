@@ -187,3 +187,38 @@ export const periodWords = (p: { from: ISODate; to: ISODate }, thisYear?: string
   const f = year ? DATE_YEAR : DATE;
   return `${f.format(at(p.from))} to ${f.format(at(p.to))}`;
 };
+
+export interface PerfBucket {
+  from: ISODate;
+  to: ISODate;
+  /** Each metric's figure in this stretch of the period. */
+  values: Record<PerfMetric, number | null>;
+}
+
+/**
+ * The period cut into stretches for the small bars under each figure: days up to a month, weeks up to about four
+ * months, else calendar months (the first and last cut to the period).
+ */
+export function perfSeries(jobs: readonly PerfJob[], period: { from: ISODate; to: ISODate }): PerfBucket[] {
+  const real = jobs.filter((j) => !j.sample);
+  const days = Math.round((at(period.to) - at(period.from)) / DAY) + 1;
+  const spans: [ISODate, ISODate][] = [];
+  if (days <= 31) {
+    for (let i = 0; i < days; i++) spans.push([addDays(period.from, i), addDays(period.from, i)]);
+  } else if (days <= 120) {
+    for (let d = period.from; d <= period.to; d = addDays(d, 7)) {
+      const end = addDays(d, 6);
+      spans.push([d, end > period.to ? period.to : end]);
+    }
+  } else {
+    let [y, m] = period.from.split("-").map(Number);
+    for (;;) {
+      const s = first(y, m) < period.from ? period.from : first(y, m);
+      if (s > period.to) break;
+      const e = last(y, m) > period.to ? period.to : last(y, m);
+      spans.push([s, e]);
+      [y, m] = shift(y, m, 1);
+    }
+  }
+  return spans.map(([from, to]) => ({ from, to, values: figuresIn(real, from, to) }));
+}

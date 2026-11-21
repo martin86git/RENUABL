@@ -5,7 +5,7 @@ import clsx from "clsx";
 import { KNOWLEDGE, MANIFESTO } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
 import { AskBox, BigSol, Bubble, LiveStyles, useAsk, useLean, useMotionOk, useSaying, useTyped, useInView } from "./living-hero";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /**
  * Two of the /business slides (17 Nov 2026, Martin: 90s direct statements, as clean as Apple, with no two slides laid

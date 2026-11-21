@@ -143,7 +143,8 @@ import {
   type LiveStatus,
 } from "@/lib/services/live";
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
-import { SolIcon, SolMark, SolStars } from "./sol-icon";
+import { SolIcon, SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
@@ -152,6 +153,7 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
+import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
@@ -1015,6 +1017,12 @@ const OPENED: typeof WHOLE = {
  * can't move at all while the whole picture is showing, so the hand did nothing). A roof near an edge can be dragged to
  * the middle, and at least half the view always shows the picture.
  */
+/** What a kept view shows on a picture of `across` width to height: wider than the photo, a band across it, the middle kept. */
+function shownView(kept: typeof WHOLE, across: number | null): typeof WHOLE {
+  if (!across || across <= ROOF_IMAGE.width / ROOF_IMAGE.height + 0.01) return kept;
+  const h = kept.w / across;
+  return { x: kept.x, w: kept.w, h, y: kept.y + (kept.h - h) / 2 };
+}
 const within = (at: number, size: number, whole: number) => Math.min(Math.max(-size / 2, at), whole - size / 2);
 
 /**
@@ -1135,6 +1143,7 @@ export function RoofDesigner(props: {
   const openMenu = (to: typeof menu) => {
     setMenu(to);
     setSeek("");
+    setSearchDown(false);
     // The inverter suggestions fold each time a list opens, a press away (19 Nov 2026, Martin).
     setSuggesting(false);
   };
@@ -1405,7 +1414,16 @@ export function RoofDesigner(props: {
     setArrayHint(null);
     setOnPanel(false);
   };
-  const [view, setView] = useState(OPENED);
+  // The view as kept is always the photo's own shape. In the pop-up, widened past that shape (21 Nov 2026, Martin:
+  // widening "only widens the grey padding area surrounding the map. i wanted it all to expand together"), the picture
+  // takes the whole width and shows a band of the photo across it: the kept view's width, cut to the picture's shape.
+  const [keptView, setView] = useState(OPENED);
+  const [across, setAcross] = useState<number | null>(null);
+  const acrossNow = useRef<number | null>(null);
+  useEffect(() => {
+    acrossNow.current = across;
+  }, [across]);
+  const view = useMemo(() => shownView(keptView, across), [keptView, across]);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
   // Drawing mode (the photo put away and the roof drawn plainly) has no button now; the code stays for later.
@@ -1650,17 +1668,46 @@ export function RoofDesigner(props: {
     };
   }, []);
   const phone = Boolean(props.tight && stage);
-  const fit = phone ? "100%" : fitPx ? `${fitPx}px` : FIT;
+  // In the pop-up the picture takes the window's whole width, its height the first fold's (21 Nov 2026, Martin: widening
+  // the window should widen the map, not the grey round it); `across` is then its width to height.
+  const fills = Boolean(props.tight && !phone && fitPx);
+  const fit = phone ? "100%" : fills ? "none" : fitPx ? `${fitPx}px` : FIT;
+  const picBox = useRef<HTMLDivElement | null>(null);
+  // The inverter list opens at its top, Sol's suggestion first (21 Nov 2026, Martin: it opened scrolled down to the
+  // search box). The search is focused without scrolling to it, sits in its place near the top, and once scrolled past
+  // stays pinned to the menu's foot, so it is always to hand.
+  const kitMenu = useRef<HTMLDivElement | null>(null);
+  const kitSearchSpot = useRef<HTMLDivElement | null>(null);
+  const [searchDown, setSearchDown] = useState(false);
+  const kitScrolled = () => {
+    const box = kitMenu.current;
+    const spot = kitSearchSpot.current;
+    if (box && spot) setSearchDown(box.scrollTop > spot.offsetTop + spot.offsetHeight);
+  };
+  const focusQuietly = useCallback((el: HTMLInputElement | null) => el?.focus({ preventScroll: true }), []);
+  useEffect(() => {
+    const el = picBox.current;
+    if (!fills || !el || !fitPx) {
+      setAcross(null);
+      return;
+    }
+    const tall = (fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+    const measure = () => setAcross(el.clientWidth > 0 ? Math.round((el.clientWidth / tall) * 1000) / 1000 : null);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fills, fitPx]);
   /** A place down the picture, as a share of its height: on a phone the picture starts under the band above it. */
   const picY = (percent: number) =>
     props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
-    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
+    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point & { angle?: number }> | null; others?: LoosePanel[] }
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
-    | { mode: "array"; anchor: LoosePanel }
+    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
@@ -2130,9 +2177,13 @@ export function RoofDesigner(props: {
       setView((v) => {
         const w = Math.min(ROOF_IMAGE.width, Math.max(40, v.w * (e.deltaY > 0 ? 1.15 : 1 / 1.15)));
         const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+        // The spot under the pointer stays put, read on the picture as shown (a band of the photo when widened).
+        const was = shownView(v, acrossNow.current);
+        const shownH = shownView({ x: 0, y: 0, w, h }, acrossNow.current).h;
+        const y = was.y + fy * was.h - fy * shownH - (h - shownH) / 2;
         return {
           x: within(v.x + fx * v.w - fx * w, w, ROOF_IMAGE.width),
-          y: within(v.y + fy * v.h - fy * h, h, ROOF_IMAGE.height),
+          y: within(y, h, ROOF_IMAGE.height),
           w,
           h,
         };
@@ -2783,7 +2834,7 @@ export function RoofDesigner(props: {
     if (!p) return;
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
+      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: keptView };
       return;
     }
     // A speech bubble opens its thread, whichever tool is on. The bubble is drawn up and to the right of the spot
@@ -2904,7 +2955,10 @@ export function RoofDesigner(props: {
       const shown = ghostAt(p);
       if (!shown) return;
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "array", anchor: shown };
+      // Put down in the open (not beside a panel, not on a traced face) there is no roof line to follow: the row
+      // follows the drag (`pivotDrag`).
+      const free = shown.x === p.x && shown.y === p.y && !faces.some((f) => inside(p, f.points));
+      press.current = { mode: "array", anchor: shown, free, pivot: null };
       setLaying(true);
       return setGhosts([shown]);
     }
@@ -3043,9 +3097,27 @@ export function RoofDesigner(props: {
       const p = pointAt(e);
       if (!p) return;
       // The row being drawn clicks into place against the panels or roof edge near it (`placeShift`); Alt places it freely.
-      const drawn = arrayFrom(held.anchor, p);
+      let anchor = held.anchor;
+      if (held.free) {
+        // In the open the row runs towards the pointer, turning as it swings; pulled sideways it adds rows instead.
+        const plan = planSize(anchor, size);
+        const turned = pivotDrag(
+          anchor,
+          p,
+          { x: plan.w + size.gap, y: plan.h + size.gap },
+          held.pivot ?? null,
+          e.altKey ? [] : squareAngles,
+        );
+        held.pivot = turned.state;
+        anchor = { ...anchor, angle: turned.angle };
+      }
+      const drawn = arrayFrom(anchor, p);
       const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
-      setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
+      let shown = shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn;
+      // Squared to the roof edge it is near as it is drawn, so letting go changes nothing (it used to turn on release).
+      const settle = !e.altKey && shown.length && !joinedToOthers(shown) ? settleToEdges(shown, roofEdges, size) : null;
+      if (settle) shown = applySettle(shown, settle);
+      setGhosts(shown);
       return;
     }
     if (held.mode === "msb") {
@@ -3130,7 +3202,8 @@ export function RoofDesigner(props: {
       const box = svg.current?.getBoundingClientRect();
       if (!box) return;
       const dx = ((e.clientX - held.x) / box.width) * held.from.w;
-      const dy = ((e.clientY - held.y) / box.height) * held.from.h;
+      // Both by the width: widened, the picture shows less of the photo's height than it is tall.
+      const dy = ((e.clientY - held.y) / box.width) * held.from.w;
       return setView({
         ...held.from,
         x: within(held.from.x - dx, held.from.w, ROOF_IMAGE.width),
@@ -3152,7 +3225,7 @@ export function RoofDesigner(props: {
       const next = byHand(held.picks);
       const labelIds = held.picks.filter((x) => x.kind === "label").map((x) => (x as { id: string }).id);
       held.starts = Object.fromEntries([
-        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y }]),
+        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y, angle: x.angle }]),
         ...labels.filter((l) => labelIds.includes(l.id)).map((l) => [`n:${l.id}`, { x: l.x, y: l.y }]),
       ]);
       setFaces(next.faces);
@@ -3171,7 +3244,11 @@ export function RoofDesigner(props: {
     // Moved panels click into place against the panels or roof edge they come near (`placeShift`); Alt moves them freely.
     const going = loose
       .filter((panel) => starts[`l:${panel.id}`])
-      .map((panel) => ({ ...panel, x: starts[`l:${panel.id}`].x + dx, y: starts[`l:${panel.id}`].y + dy }));
+      .map((panel) => {
+        const start = starts[`l:${panel.id}`];
+        // Each move starts from the angle the panel had when picked up, so a turn shown near an edge is undone on leaving it.
+        return { ...panel, x: start.x + dx, y: start.y + dy, angle: start.angle ?? panel.angle };
+      });
     const shift = e.altKey || !going.length ? null : placeShift(going, held.others ?? [], faces, rules, size);
     if (shift) {
       dx += shift.x;
@@ -3181,7 +3258,13 @@ export function RoofDesigner(props: {
       const start = starts[`${prefix}:${item.id}`];
       return start ? { ...item, x: cm(start.x + dx), y: cm(start.y + dy) } : item;
     };
-    setLoose((all) => all.map((panel) => moved("l", panel)));
+    // Squared to the roof edge they are near while still held, so letting go changes nothing (21 Nov 2026, Martin:
+    // "releasing the mouse clicker can force a slight pivot leaving the array crooked").
+    let placedNow = going.map((panel) => ({ ...panel, x: cm(panel.x + (shift?.x ?? 0)), y: cm(panel.y + (shift?.y ?? 0)) }));
+    const settle = !e.altKey && placedNow.length && !joinedToOthers(placedNow) ? settleToEdges(placedNow, roofEdges, size) : null;
+    if (settle) placedNow = applySettle(placedNow, settle);
+    const now = new Map(placedNow.map((panel) => [panel.id, panel]));
+    setLoose((all) => all.map((panel) => now.get(panel.id) ?? panel));
     setLabels((all) => all.map((label) => moved("n", label)));
     changed();
   };
@@ -3196,9 +3279,18 @@ export function RoofDesigner(props: {
         b: face.points[(i + 1) % face.points.length],
         setback: Math.max(face.setback, wind),
         face: face.points,
+        rows: face.angle,
       })),
     ),
     ...rules.map((g) => ({ a: g.a, b: g.b, setback: wind })),
+  ];
+  // What a row dragged out in the open clicks square to: the panels standing, each traced face's rows and sides, each guide line.
+  const squareAngles = [
+    ...standingAll(faces, loose).map((panel) => panel.angle),
+    ...roofEdges.flatMap((edge) => [
+      (Math.atan2(edge.b.y - edge.a.y, edge.b.x - edge.a.x) * 180) / Math.PI,
+      ...(edge.rows === undefined ? [] : [edge.rows]),
+    ]),
   ];
   /** Whether any of these panels sits against a panel outside them: a group joined to others stays where it joined. */
   const joinedToOthers = (group: readonly LoosePanel[]) => {
@@ -6866,6 +6958,7 @@ export function RoofDesigner(props: {
             {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot.
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
+              ref={picBox}
               className="glass-dark relative mx-auto"
               style={
                 {
@@ -9466,7 +9559,11 @@ export function RoofDesigner(props: {
                       )}
                     </button>
                     {menu === "inverters" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -9556,14 +9653,18 @@ export function RoofDesigner(props: {
                         </p>
                         {fitted.length < MAX_INVERTERS && (
                           <>
-                            <input
-                              autoFocus
-                              value={seek}
-                              onChange={(e) => setSeek(e.target.value)}
-                              placeholder="Search inverters"
-                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                            />
-                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            <div ref={kitSearchSpot} className="min-h-10">
+                              {!searchDown && (
+                                <input
+                                  ref={focusQuietly}
+                                  value={seek}
+                                  onChange={(e) => setSeek(e.target.value)}
+                                  placeholder="Search inverters"
+                                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("inverters", props.inverters)
                                 .filter((i) =>
@@ -9598,6 +9699,17 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
+                            {searchDown && (
+                              <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">
+                                <input
+                                  ref={focusQuietly}
+                                  value={seek}
+                                  onChange={(e) => setSeek(e.target.value)}
+                                  placeholder="Search inverters"
+                                  className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+                                />
+                              </div>
+                            )}
                           </>
                         )}
                       </div>

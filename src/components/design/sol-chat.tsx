@@ -71,7 +71,7 @@ import { SolSources } from "./sol-sources";
 import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
 import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { SolThinking, SolWorking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";

@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { AerialScene, PanelDefs, SolarPanel } from "./aerial-home";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { AFTER_STEPS, COMING_SOON_LABEL, type FeatureStatus } from "@/lib/domain/design/landing";
 
 /**

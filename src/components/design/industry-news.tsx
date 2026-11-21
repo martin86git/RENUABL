@@ -48,7 +48,7 @@ import { PostCard, PostComposer, Talk } from "./feed-posts";
 import { BusinessSheet, FeedActivity, FollowSettings } from "./feed-social";
 import { NO_FOLLOWS, postFollowed, storyFollowed, type Follows } from "@/lib/domain/design/feed-social";
 import { loadFollows } from "@/lib/services/feed-posts";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { listWords, moveShare, priceMovesWords, systemsWords, type PriceMovesNote } from "@/lib/domain/design/product-watch";
 
 const money = (n: number) => "$" + n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });

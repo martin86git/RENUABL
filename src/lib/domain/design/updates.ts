@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
+    day: "2026-11-21",
     area: "CRM",
     words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
   },
@@ -38,6 +43,11 @@ export const UPDATES: readonly Update[] = [
     area: "Calls",
     words:
       "Calls & Texts now says when it's billed and what calls cost, asks for your number itself, and test calls work while it's set up.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Design tool",
+    words: "Dragging out panels on open roof turns the row to follow your pointer, and panels square to an edge before you let go.",
   },
   {
     day: "2026-11-21",

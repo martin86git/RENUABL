@@ -56,7 +56,7 @@ export function SolNudges({
       role="status"
       data-popup
       className={clsx(
-        "pointer-events-auto w-[min(30rem,calc(100%-2rem))] rounded-[22px] bg-primary px-3.5 py-3 text-white shadow-[0_14px_40px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:transition-none",
+        "pointer-events-auto w-[min(46rem,calc(100%-2rem))] rounded-[22px] bg-primary px-3.5 py-2.5 text-white shadow-[0_14px_40px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-2 starting:opacity-0 motion-reduce:transition-none",
         className,
       )}
     >
@@ -70,7 +70,7 @@ export function SolNudges({
           </p>
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <p className="mt-0.5 text-[14px] leading-snug text-white/95">{n.words}</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-white/95">{n.words}</p>
               {n.why && <p className="mt-0.5 text-[12px] leading-snug text-white/55">{n.why}</p>}
             </div>
             {n.picture && <BatteryWallPicture kind={n.picture} />}
