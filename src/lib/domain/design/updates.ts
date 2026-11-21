@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Agents",
+    words: "Ten more voices to pick from: New Zealand, Indian, Irish, South African and British, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
     area: "Sol",
     words: "Set up with Sol takes you through the seven things to set up, and ticks each off as it's done.",
   },
