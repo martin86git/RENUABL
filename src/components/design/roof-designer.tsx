@@ -152,6 +152,7 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
+import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
@@ -1656,11 +1657,11 @@ export function RoofDesigner(props: {
     props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
-    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
+    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point & { angle?: number }> | null; others?: LoosePanel[] }
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
-    | { mode: "array"; anchor: LoosePanel }
+    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
@@ -2904,7 +2905,10 @@ export function RoofDesigner(props: {
       const shown = ghostAt(p);
       if (!shown) return;
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "array", anchor: shown };
+      // Put down in the open (not beside a panel, not on a traced face) there is no roof line to follow: the row
+      // follows the drag (`pivotDrag`).
+      const free = shown.x === p.x && shown.y === p.y && !faces.some((f) => inside(p, f.points));
+      press.current = { mode: "array", anchor: shown, free, pivot: null };
       setLaying(true);
       return setGhosts([shown]);
     }
@@ -3043,9 +3047,27 @@ export function RoofDesigner(props: {
       const p = pointAt(e);
       if (!p) return;
       // The row being drawn clicks into place against the panels or roof edge near it (`placeShift`); Alt places it freely.
-      const drawn = arrayFrom(held.anchor, p);
+      let anchor = held.anchor;
+      if (held.free) {
+        // In the open the row runs towards the pointer, turning as it swings; pulled sideways it adds rows instead.
+        const plan = planSize(anchor, size);
+        const turned = pivotDrag(
+          anchor,
+          p,
+          { x: plan.w + size.gap, y: plan.h + size.gap },
+          held.pivot ?? null,
+          e.altKey ? [] : squareAngles,
+        );
+        held.pivot = turned.state;
+        anchor = { ...anchor, angle: turned.angle };
+      }
+      const drawn = arrayFrom(anchor, p);
       const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
-      setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
+      let shown = shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn;
+      // Squared to the roof edge it is near as it is drawn, so letting go changes nothing (it used to turn on release).
+      const settle = !e.altKey && shown.length && !joinedToOthers(shown) ? settleToEdges(shown, roofEdges, size) : null;
+      if (settle) shown = applySettle(shown, settle);
+      setGhosts(shown);
       return;
     }
     if (held.mode === "msb") {
@@ -3152,7 +3174,7 @@ export function RoofDesigner(props: {
       const next = byHand(held.picks);
       const labelIds = held.picks.filter((x) => x.kind === "label").map((x) => (x as { id: string }).id);
       held.starts = Object.fromEntries([
-        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y }]),
+        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y, angle: x.angle }]),
         ...labels.filter((l) => labelIds.includes(l.id)).map((l) => [`n:${l.id}`, { x: l.x, y: l.y }]),
       ]);
       setFaces(next.faces);
@@ -3171,7 +3193,11 @@ export function RoofDesigner(props: {
     // Moved panels click into place against the panels or roof edge they come near (`placeShift`); Alt moves them freely.
     const going = loose
       .filter((panel) => starts[`l:${panel.id}`])
-      .map((panel) => ({ ...panel, x: starts[`l:${panel.id}`].x + dx, y: starts[`l:${panel.id}`].y + dy }));
+      .map((panel) => {
+        const start = starts[`l:${panel.id}`];
+        // Each move starts from the angle the panel had when picked up, so a turn shown near an edge is undone on leaving it.
+        return { ...panel, x: start.x + dx, y: start.y + dy, angle: start.angle ?? panel.angle };
+      });
     const shift = e.altKey || !going.length ? null : placeShift(going, held.others ?? [], faces, rules, size);
     if (shift) {
       dx += shift.x;
@@ -3181,7 +3207,13 @@ export function RoofDesigner(props: {
       const start = starts[`${prefix}:${item.id}`];
       return start ? { ...item, x: cm(start.x + dx), y: cm(start.y + dy) } : item;
     };
-    setLoose((all) => all.map((panel) => moved("l", panel)));
+    // Squared to the roof edge they are near while still held, so letting go changes nothing (21 Nov 2026, Martin:
+    // "releasing the mouse clicker can force a slight pivot leaving the array crooked").
+    let placedNow = going.map((panel) => ({ ...panel, x: cm(panel.x + (shift?.x ?? 0)), y: cm(panel.y + (shift?.y ?? 0)) }));
+    const settle = !e.altKey && placedNow.length && !joinedToOthers(placedNow) ? settleToEdges(placedNow, roofEdges, size) : null;
+    if (settle) placedNow = applySettle(placedNow, settle);
+    const now = new Map(placedNow.map((panel) => [panel.id, panel]));
+    setLoose((all) => all.map((panel) => now.get(panel.id) ?? panel));
     setLabels((all) => all.map((label) => moved("n", label)));
     changed();
   };
@@ -3196,9 +3228,18 @@ export function RoofDesigner(props: {
         b: face.points[(i + 1) % face.points.length],
         setback: Math.max(face.setback, wind),
         face: face.points,
+        rows: face.angle,
       })),
     ),
     ...rules.map((g) => ({ a: g.a, b: g.b, setback: wind })),
+  ];
+  // What a row dragged out in the open clicks square to: the panels standing, each traced face's rows and sides, each guide line.
+  const squareAngles = [
+    ...standingAll(faces, loose).map((panel) => panel.angle),
+    ...roofEdges.flatMap((edge) => [
+      (Math.atan2(edge.b.y - edge.a.y, edge.b.x - edge.a.x) * 180) / Math.PI,
+      ...(edge.rows === undefined ? [] : [edge.rows]),
+    ]),
   ];
   /** Whether any of these panels sits against a panel outside them: a group joined to others stays where it joined. */
   const joinedToOthers = (group: readonly LoosePanel[]) => {
