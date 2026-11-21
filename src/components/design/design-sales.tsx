@@ -14,6 +14,7 @@ import {
   columnOf,
   isJobStage,
   keyOfDeal,
+  labelOf,
   moveStage,
   moveTo,
   pipelinesFor,
@@ -23,13 +24,15 @@ import {
   type OwnStage,
   type ShownPipeline,
   type StageKey,
+  type StageNames,
 } from "@/lib/domain/design/pipeline-stages";
 import {
   addStage,
   createPipeline,
   deletePipeline,
   deleteStage,
-  loadOwnStages,
+  renameBuiltinStage,
+  stageBookChanged,
   renameStage,
   dollars,
   listJobs,
@@ -79,6 +82,8 @@ export function PipelinesPage() {
   // The pipelines the business keeps and the stages it added; the name being typed for a new or renamed pipeline.
   const [kept, setKept] = useState<KeptPipeline[]>([]);
   const [own, setOwn] = useState<OwnStage[]>([]);
+  // The business's own names for the twelve stages (only those it changed).
+  const [names, setNames] = useState<StageNames>({});
   const [naming, setNaming] = useState<{ mode: "new" | "rename"; name: string } | null>(null);
   // The deal being dragged, and the column it is over.
   const [dragging, setDragging] = useState<string | null>(null);
@@ -111,6 +116,7 @@ export function PipelinesPage() {
       if (gone || !res.ok) return;
       setKept(res.pipelines);
       setOwn(res.stages);
+      setNames(res.names ?? {});
     });
     return () => {
       gone = true;
@@ -187,10 +193,24 @@ export function PipelinesPage() {
     setProblem(null);
     setOwn((now) => [...now, res.stage]);
     if (res.pipeline) keepRow(res.pipeline);
-    void loadOwnStages(true);
+    stageBookChanged();
     return true;
   };
-  const renameOwn = async (stage: OwnStage, name: string) => {
+  /** Renames a stage on the board: one the business added, or one of the twelve (a blank name puts ours back). */
+  const renameAny = async (key: StageKey, name: string) => {
+    if (isJobStage(key)) {
+      const res = await renameBuiltinStage(key, name);
+      if (!res.ok) {
+        setProblem(res.message);
+        return false;
+      }
+      setProblem(null);
+      setNames(res.names);
+      stageBookChanged();
+      return true;
+    }
+    const stage = own.find((s) => s.id === key);
+    if (!stage) return false;
     const res = await renameStage(stage.id, name);
     if (!res.ok) {
       setProblem(res.message);
@@ -198,7 +218,7 @@ export function PipelinesPage() {
     }
     setProblem(null);
     setOwn((now) => now.map((s) => (s.id === stage.id ? res.stage : s)));
-    void loadOwnStages(true);
+    stageBookChanged();
     return true;
   };
   /**
@@ -209,14 +229,14 @@ export function PipelinesPage() {
     const added = own.find((s) => s.id === key);
     const elsewhere = all.some((p) => p.id !== named.id && p.stages.includes(key));
     if (added && !elsewhere) {
-      const base = STAGE_LABELS[added.base];
+      const base = labelOf(added.base, names);
       if (!window.confirm(`Remove the stage "${added.name}" for everyone? Its deals go back to ${base}.`)) return;
       const res = await deleteStage(added.id);
       if (!res.ok) return setProblem(res.message);
       setOwn((now) => now.filter((s) => s.id !== added.id));
       setKept((now) => now.map((k) => ({ ...k, stages: k.stages.filter((x) => x !== added.id) })));
       setJobs((now) => (now ?? []).map((j) => (j.subStage === added.id ? { ...j, subStage: null } : j)));
-      void loadOwnStages(true);
+      stageBookChanged();
       return;
     }
     await savePipelineAs(named, { stages: stages.filter((k) => k !== key) });
@@ -252,7 +272,7 @@ export function PipelinesPage() {
   const deal = (id: string) => `${PATHS.deals}/${id}`;
   // The sample deal a new business starts with opens on the tour of a deal (deal-tour.ts).
   const dealOf = (job: JobLine) => (job.sample ? `${deal(job.id)}?tour=1` : deal(job.id));
-  const choices = stageChoices(own);
+  const choices = stageChoices(own, names);
   const stagePicker = (job: JobLine, className: string) => (
     <select className={className} value={keyOfDeal(job, own)} onChange={(e) => void move(job.id, e.target.value)}>
       {choices.map((c) => (
@@ -411,7 +431,7 @@ export function PipelinesPage() {
             return (
               <section
                 key={stage}
-                aria-label={stageName(stage, own)}
+                aria-label={stageName(stage, own, names)}
                 onDragOver={(e) => {
                   if (movingCol) {
                     e.preventDefault();
@@ -454,6 +474,7 @@ export function PipelinesPage() {
                 <StageHead
                   stage={stage}
                   own={own}
+                  names={names}
                   onGrab={() => setMovingCol(stage)}
                   onLetGo={() => {
                     setMovingCol(null);
@@ -465,7 +486,7 @@ export function PipelinesPage() {
                   count={jobs ? column.length : null}
                   sum={sum}
                   canRemove={stages.length > 1}
-                  onRename={renameOwn}
+                  onRename={renameAny}
                   onRemove={() => void takeOff(stage)}
                 />
                 <ul className="mt-1 flex min-h-24 flex-col gap-2">
@@ -531,7 +552,7 @@ export function PipelinesPage() {
               </section>
             );
           })}
-          <AddStageColumn stages={stages} own={own} pipelineName={named.name} onAdd={addOwnStage} />
+          <AddStageColumn stages={stages} own={own} names={names} pipelineName={named.name} onAdd={addOwnStage} />
         </div>
       ) : (
         <div className={clsx(ui.card, "mt-4 overflow-x-auto")}>
@@ -594,12 +615,14 @@ export function PipelinesPage() {
 }
 
 /**
- * A column's head: the stage's name, its count and value. On hover, a stage the business added can be renamed, and
- * any stage taken off the pipeline (while it keeps one). An added stage says what it counts as.
+ * A column's head: the stage's name, its count and value. On hover, any stage can be renamed (one of the twelve for
+ * the whole business, a blank name putting ours back), moved, or taken off the pipeline (while it keeps one). An
+ * added stage says what it counts as; a renamed one of the twelve, what it was.
  */
 function StageHead({
   stage,
   own,
+  names,
   count,
   sum,
   canRemove,
@@ -613,6 +636,7 @@ function StageHead({
 }: {
   stage: StageKey;
   own: readonly OwnStage[];
+  names: StageNames;
   /** Dragging the head starts moving the column; letting go ends it. */
   onGrab: () => void;
   onLetGo: () => void;
@@ -623,15 +647,20 @@ function StageHead({
   count: number | null;
   sum: number;
   canRemove: boolean;
-  onRename: (stage: OwnStage, name: string) => Promise<boolean>;
+  onRename: (stage: StageKey, name: string) => Promise<boolean>;
   onRemove: () => void;
 }) {
   const added = own.find((s) => s.id === stage) ?? null;
+  // One of the twelve the business has renamed: ours is said under it, and a blank name puts it back.
+  const renamedBuiltin = isJobStage(stage) && names[stage] ? STAGE_LABELS[stage] : null;
+  const shownName = stageName(stage, own, names);
   const [name, setName] = useState<string | null>(null);
   const save = async () => {
-    if (!added || name === null) return;
-    if (!name.trim() || name.trim() === added.name) return setName(null);
-    if (await onRename(added, name)) setName(null);
+    if (name === null) return;
+    const typed = name.trim();
+    // An added stage can't be left nameless; one of the twelve goes back to ours.
+    if (typed === shownName || (!typed && !isJobStage(stage))) return setName(null);
+    if (await onRename(stage, typed)) setName(null);
   };
   return (
     <header
@@ -641,7 +670,7 @@ function StageHead({
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
         // Some browsers start a drag only once something is set.
-        e.dataTransfer.setData("text/plain", stageName(stage, own));
+        e.dataTransfer.setData("text/plain", shownName);
         onGrab();
       }}
       onDragEnd={onLetGo}
@@ -663,17 +692,17 @@ function StageHead({
           />
         ) : (
           <h2 className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink">
-            {stageName(stage, own)} <span className="tabular-nums text-muted">{count ?? ""}</span>
+            {shownName} <span className="tabular-nums text-muted">{count ?? ""}</span>
           </h2>
         )}
         <span className="flex shrink-0 items-center gap-1">
           <span className="text-xs tabular-nums text-muted">{sum ? dollars(sum) : ""}</span>
-          {added && name === null && (
+          {name === null && (
             <button
               title="Rename this stage"
-              aria-label={`Rename ${added.name}`}
+              aria-label={`Rename ${shownName}`}
               className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
-              onClick={() => setName(added.name)}
+              onClick={() => setName(shownName)}
             >
               <Pencil className="size-3.5" aria-hidden />
             </button>
@@ -681,7 +710,7 @@ function StageHead({
           {name === null && !first && (
             <button
               title="Move left"
-              aria-label={`Move ${stageName(stage, own)} left`}
+              aria-label={`Move ${shownName} left`}
               className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
               onClick={() => onStep(-1)}
             >
@@ -691,7 +720,7 @@ function StageHead({
           {name === null && !last && (
             <button
               title="Move right"
-              aria-label={`Move ${stageName(stage, own)} right`}
+              aria-label={`Move ${shownName} right`}
               className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
               onClick={() => onStep(1)}
             >
@@ -701,7 +730,7 @@ function StageHead({
           {canRemove && name === null && (
             <button
               title="Take this stage off the pipeline"
-              aria-label={`Take ${stageName(stage, own)} off this pipeline`}
+              aria-label={`Take ${shownName} off this pipeline`}
               className="rounded p-0.5 text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100"
               onClick={onRemove}
             >
@@ -710,7 +739,11 @@ function StageHead({
           )}
         </span>
       </div>
-      {added && <p className="mt-0.5 text-[11px] text-muted">Counts as {STAGE_LABELS[added.base]}</p>}
+      {added && <p className="mt-0.5 text-[11px] text-muted">Counts as {labelOf(added.base, names)}</p>}
+      {renamedBuiltin && name === null && <p className="mt-0.5 text-[11px] text-muted">Was {renamedBuiltin}</p>}
+      {name !== null && isJobStage(stage) && (
+        <p className="mt-1 text-[11px] text-muted">Renamed for everyone. Clear it to go back to {STAGE_LABELS[stage]}.</p>
+      )}
     </header>
   );
 }
@@ -722,11 +755,13 @@ function StageHead({
 function AddStageColumn({
   stages,
   own,
+  names,
   pipelineName,
   onAdd,
 }: {
   stages: readonly StageKey[];
   own: readonly OwnStage[];
+  names: StageNames;
   pipelineName: string;
   onAdd: (input: { name: string; base: JobStage; after: number }) => Promise<boolean>;
 }) {
@@ -784,7 +819,7 @@ function AddStageColumn({
           <option value={-1}>At the start</option>
           {stages.map((k, i) => (
             <option key={k} value={i}>
-              {stageName(k, own)}
+              {stageName(k, own, names)}
             </option>
           ))}
         </select>
@@ -794,11 +829,11 @@ function AddStageColumn({
         <select className={clsx(ui.input, "mt-1 appearance-auto")} value={counts} onChange={(e) => setBase(e.target.value as JobStage)}>
           {JOB_STAGES.map((s) => (
             <option key={s} value={s}>
-              {STAGE_LABELS[s]}
+              {labelOf(s, names)}
             </option>
           ))}
         </select>
-        <span className="mt-1 block text-[11px]">A deal here is {STAGE_LABELS[counts]} for your figures, Sol and approvals.</span>
+        <span className="mt-1 block text-[11px]">A deal here is {labelOf(counts, names)} for your figures, Sol and approvals.</span>
       </label>
       <div className="flex gap-2">
         <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={() => void save()} disabled={!name.trim() || busy}>

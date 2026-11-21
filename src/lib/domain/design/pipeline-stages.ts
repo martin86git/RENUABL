@@ -25,6 +25,12 @@ export interface OwnStage {
   base: JobStage;
 }
 
+/**
+ * The business's own names for the twelve stages (21 Nov 2026, Martin: "allow renaming the built-in stages too").
+ * Only the words change: every rule still reads the stage itself. A stage not here reads as ours (`STAGE_LABELS`).
+ */
+export type StageNames = Partial<Record<JobStage, string>>;
+
 /** One of the twelve stages, or the id of one the business added. */
 export type StageKey = string;
 
@@ -74,26 +80,49 @@ export function cleanStageName(raw: unknown): string {
     : "";
 }
 
-/** The name a stage key is shown by: an added stage's own name, else the twelve's label. Unknown keys read as nothing. */
-export function stageName(key: StageKey, own: readonly OwnStage[]): string {
-  if (isJobStage(key)) return STAGE_LABELS[key];
+/** One of the twelve by the business's name for it, else ours. */
+export function labelOf(stage: JobStage, names: StageNames = {}): string {
+  return names[stage] || STAGE_LABELS[stage];
+}
+
+/** Names read back from the server or the browser: only the twelve, each a clean name, none the same as ours. */
+export function cleanStageNames(raw: unknown): StageNames {
+  const out: StageNames = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const name = cleanStageName(v);
+    if (isJobStage(k) && name && name !== STAGE_LABELS[k]) out[k] = name;
+  }
+  return out;
+}
+
+/** The name a stage key is shown by: an added stage's own name, else the twelve's (the business's or ours). Unknown keys read as nothing. */
+export function stageName(key: StageKey, own: readonly OwnStage[], names: StageNames = {}): string {
+  if (isJobStage(key)) return labelOf(key, names);
   return own.find((s) => s.id === key)?.name ?? "";
 }
 
-/** A name already used by one of the twelve or another added stage (any case). */
-export function nameTaken(name: string, own: readonly OwnStage[], except: string | null = null): boolean {
+/** A name already used by one of the twelve (as the business names it) or another added stage (any case). `except` is the stage being renamed. */
+export function nameTaken(name: string, own: readonly OwnStage[], except: StageKey | null = null, names: StageNames = {}): boolean {
   const n = name.toLowerCase();
-  return JOB_STAGES.some((s) => STAGE_LABELS[s].toLowerCase() === n) || own.some((s) => s.id !== except && s.name.toLowerCase() === n);
+  return (
+    JOB_STAGES.some((s) => s !== except && labelOf(s, names).toLowerCase() === n) ||
+    own.some((s) => s.id !== except && s.name.toLowerCase() === n)
+  );
 }
 
 type Cleaned<T> = { ok: true; value: T } | { ok: false; message: string };
 
 /** A new stage as sent: a name not already used, and one of the twelve it counts as. */
-export function cleanOwnStageInput(raw: unknown, own: readonly OwnStage[]): Cleaned<Pick<OwnStage, "name" | "base">> {
+export function cleanOwnStageInput(
+  raw: unknown,
+  own: readonly OwnStage[],
+  names: StageNames = {},
+): Cleaned<Pick<OwnStage, "name" | "base">> {
   const r = (raw && typeof raw === "object" ? raw : {}) as { name?: unknown; base?: unknown };
   const name = cleanStageName(r.name);
   if (!name) return { ok: false, message: STAGE_NAME_MISSING };
-  if (nameTaken(name, own)) return { ok: false, message: STAGE_NAME_TAKEN };
+  if (nameTaken(name, own, null, names)) return { ok: false, message: STAGE_NAME_TAKEN };
   if (!isJobStage(r.base)) return { ok: false, message: STAGE_BASE_WRONG };
   return { ok: true, value: { name, base: r.base } };
 }
@@ -193,17 +222,17 @@ export function moveTo(key: StageKey, own: readonly OwnStage[]): { stage: JobSta
 }
 
 /** Every stage a deal can be put at, for a picker: each of the twelve, then the stages added under it. */
-export function stageChoices(own: readonly OwnStage[]): { key: StageKey; name: string; added: boolean }[] {
+export function stageChoices(own: readonly OwnStage[], names: StageNames = {}): { key: StageKey; name: string; added: boolean }[] {
   return JOB_STAGES.flatMap((s) => [
-    { key: s, name: STAGE_LABELS[s], added: false },
+    { key: s, name: labelOf(s, names), added: false },
     ...own.filter((o) => o.base === s).map((o) => ({ key: o.id, name: o.name, added: true })),
   ]);
 }
 
 /** What a move is written on the deal as: "Moved to Site visit booked". */
-export function moveText(stage: JobStage, subStage: string | null, own: readonly OwnStage[]): string {
+export function moveText(stage: JobStage, subStage: string | null, own: readonly OwnStage[], names: StageNames = {}): string {
   const sub = subStage ? own.find((s) => s.id === subStage) : undefined;
-  return `Moved to ${sub?.name ?? STAGE_LABELS[stage]}`;
+  return `Moved to ${sub?.name ?? labelOf(stage, names)}`;
 }
 
 export const PIPELINE_NAME_MISSING = "Give the pipeline a name (up to 40 characters).";
@@ -245,4 +274,21 @@ export function moveStage(stages: readonly StageKey[], from: number, to: number)
   const [key] = out.splice(from, 1);
   out.splice(Math.max(0, Math.min(out.length, to)), 0, key);
   return out;
+}
+
+/**
+ * A built-in stage renamed: the name cleaned and not another stage's, or blank to put ours back.
+ * Answers the names as they now stand, or why not.
+ */
+export function renameBuiltin(stage: unknown, raw: unknown, own: readonly OwnStage[], names: StageNames): Cleaned<StageNames> {
+  if (!isJobStage(stage)) return { ok: false, message: STAGE_BASE_WRONG };
+  const name = cleanStageName(raw);
+  const next: StageNames = { ...names };
+  if (!name || name === STAGE_LABELS[stage]) {
+    delete next[stage];
+    return { ok: true, value: next };
+  }
+  if (nameTaken(name, own, stage, names)) return { ok: false, message: STAGE_NAME_TAKEN };
+  next[stage] = name;
+  return { ok: true, value: next };
 }

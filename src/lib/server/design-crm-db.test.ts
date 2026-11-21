@@ -348,5 +348,17 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     expect(await crm.deleteOwnStage(a, made.stage.id)).toBe(true);
     expect((await crm.jobById(a, who.job!.id))?.job.subStage).toBeNull();
     expect((await crm.listPipelines(a)).find((p) => p.baseId === "sales")?.stages).toEqual(["lead", "designed", "proposal", "won"]);
+
+    // One of the twelve renamed for the business alone: the record names it so, and a blank name puts ours back.
+    expect(await crm.renameBuiltinStage(a, "proposal", "Quote sent")).toEqual({ proposal: "Quote sent" });
+    expect(await crm.stageNamesOf(b)).toEqual({});
+    expect(await crm.renameBuiltinStage(a, "won", "quote sent")).toEqual({ refused: STAGE_NAME_TAKEN });
+    await crm.updateJob(a, who.job!.id, (cur) => cleanJobInput({ stage: "proposal" }, cur), A);
+    const later = await db.query<{ text: string }>(`select text from design_activity where business_id = $1 and job_id = $2`, [
+      a,
+      who.job!.id,
+    ]);
+    expect(later.some((r) => r.text === "Moved to Quote sent")).toBe(true);
+    expect(await crm.renameBuiltinStage(a, "proposal", "")).toEqual({});
   });
 });

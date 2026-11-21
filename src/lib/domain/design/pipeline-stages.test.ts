@@ -6,6 +6,9 @@ import {
   cleanOwnStageInput,
   cleanPipelineSave,
   cleanStageKeys,
+  cleanStageNames,
+  labelOf,
+  renameBuiltin,
   columnOf,
   insertStage,
   moveStage,
@@ -127,5 +130,32 @@ describe("deals at an added stage", () => {
     expect(cleanJobInput({ stage: "proposal" }, there)).toMatchObject({ value: { stage: "proposal", subStage: null } });
     expect(cleanJobInput({ stage: "designed" }, there)).toMatchObject({ value: { subStage: visit.id } });
     expect(cleanJobInput({ stage: "designed", subStage: null }, there)).toMatchObject({ value: { subStage: null } });
+  });
+});
+
+describe("the business's names for the twelve", () => {
+  it("shows its name, else ours, everywhere a stage is named", () => {
+    const names = { designed: "Site visit done" } as const;
+    expect(labelOf("designed", names)).toBe("Site visit done");
+    expect(labelOf("lead", names)).toBe("Lead");
+    expect(stageChoices(own, names).find((c) => c.key === "designed")?.name).toBe("Site visit done");
+    expect(moveText("designed", null, own, names)).toBe("Moved to Site visit done");
+    // Its name is taken: another stage can't use it, and ours is free again.
+    expect(cleanOwnStageInput({ name: "site visit done", base: "lead" }, own, names)).toEqual({ ok: false, message: STAGE_NAME_TAKEN });
+    expect(cleanOwnStageInput({ name: "Designed", base: "lead" }, own, names).ok).toBe(true);
+  });
+
+  it("renames one, refuses a name in use, and puts ours back with a blank", () => {
+    expect(renameBuiltin("lead", "  New enquiry ", own, {})).toEqual({ ok: true, value: { lead: "New enquiry" } });
+    expect(renameBuiltin("lead", "Site visit booked", own, {})).toEqual({ ok: false, message: STAGE_NAME_TAKEN });
+    expect(renameBuiltin("lead", "Won", own, {})).toEqual({ ok: false, message: STAGE_NAME_TAKEN });
+    // Its own name, in another case, is its to keep.
+    expect(renameBuiltin("lead", "LEAD", own, {})).toEqual({ ok: true, value: { lead: "LEAD" } });
+    expect(renameBuiltin("lead", "", own, { lead: "New enquiry" })).toEqual({ ok: true, value: {} });
+    expect(renameBuiltin("nope", "X", own, {}).ok).toBe(false);
+  });
+
+  it("reads back only the twelve, and none the same as ours", () => {
+    expect(cleanStageNames({ lead: "Lead", won: " Sold ", bogus: "x", designed: "" })).toEqual({ won: "Sold" });
   });
 });

@@ -7,7 +7,7 @@
  */
 import { withFiles } from "./form";
 import type { Activity, Customer, Job, JobStage } from "@/lib/domain/design/crm";
-import type { KeptPipeline, OwnStage, StageKey } from "@/lib/domain/design/pipeline-stages";
+import type { KeptPipeline, OwnStage, StageKey, StageNames } from "@/lib/domain/design/pipeline-stages";
 import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteFields, type QuoteForm } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
 
@@ -109,7 +109,7 @@ export const saveJob = (
 export const deleteJob = (id: string) => ask<object>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 /** The pipelines the business keeps (its own, and set ones it renamed or changed) and the stages it added: shared by everyone in it. */
-export const listPipelines = () => ask<{ pipelines: KeptPipeline[]; stages: OwnStage[] }>("/api/design/pipelines");
+export const listPipelines = () => ask<{ pipelines: KeptPipeline[]; stages: OwnStage[]; names: StageNames }>("/api/design/pipelines");
 /** A new pipeline, or with `baseId` a set pipeline renamed or given other stages. */
 export const createPipeline = (input: { name: string; stages: StageKey[]; baseId?: string | null }) =>
   ask<{ pipeline: KeptPipeline }>("/api/design/pipelines", { method: "POST", body: input });
@@ -122,12 +122,23 @@ export const renameStage = (id: string, name: string) =>
   ask<{ stage: OwnStage }>(`/api/design/stages/${encodeURIComponent(id)}`, { method: "PUT", body: { name } });
 export const deleteStage = (id: string) => ask<object>(`/api/design/stages/${encodeURIComponent(id)}`, { method: "DELETE" });
 
-/** The stages the business added, read once a visit (for the stage pickers on a deal and a customer). */
-let ownStagesAsked: Promise<OwnStage[]> | null = null;
-export function loadOwnStages(fresh = false): Promise<OwnStage[]> {
-  if (!ownStagesAsked || fresh)
-    ownStagesAsked = ask<{ stages: OwnStage[] }>("/api/design/stages").then((res) => (res.ok ? res.stages : []));
-  return ownStagesAsked;
+/** Renames one of the twelve built-in stages for the business; a blank name puts ours back. */
+export const renameBuiltinStage = (stage: JobStage, name: string) =>
+  ask<{ names: StageNames }>("/api/design/stages", { method: "PUT", body: { stage, name } });
+
+/** The stages the business added and its names for the twelve, read once a visit (stage pickers and labels outside the board). */
+let stageBookAsked: Promise<{ stages: OwnStage[]; names: StageNames }> | null = null;
+export function loadStageBook(fresh = false): Promise<{ stages: OwnStage[]; names: StageNames }> {
+  if (!stageBookAsked || fresh)
+    stageBookAsked = ask<{ stages: OwnStage[]; names: StageNames }>("/api/design/stages").then((res) =>
+      res.ok ? { stages: res.stages, names: res.names ?? {} } : { stages: [], names: {} },
+    );
+  return stageBookAsked;
+}
+/** Tells every place showing stage names that they changed (read again). */
+export const STAGE_BOOK_EVENT = "renuabl:stage-book";
+export function stageBookChanged() {
+  void loadStageBook(true).then(() => window.dispatchEvent(new Event(STAGE_BOOK_EVENT)));
 }
 export const deletePipeline = (id: string) => ask<object>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "DELETE" });
 

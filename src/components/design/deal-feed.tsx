@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageLabel } from "./stage-select";
 import { ContextLine } from "./context-line";
 import { dealContext } from "@/lib/domain/design/sol-on-deal";
 import { SolLive, SolTerminal, useTyped } from "./sol-on-deal";
@@ -79,7 +80,7 @@ import {
   type FeedMark,
   type LaterChoice,
 } from "@/lib/domain/design/deal-feed";
-import { OPEN_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { OPEN_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
 import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
@@ -2109,6 +2110,8 @@ function sampleRoof(d: FeedDeal): AerialRoofSpec {
  * plain which deal the chat is about.
  */
 function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () => void; onChanged: () => void }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useStageLabel();
   const { deal: d, onClose } = props;
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -2130,7 +2133,7 @@ function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () =
             <p className="truncate text-[16px] font-semibold text-ink">{d.customer}</p>
             <p className="truncate text-[13px] text-ink-2">{d.address || d.suburb || "No address yet"}</p>
             <p className="truncate text-[12px] text-muted">
-              {d.title || "Solar"} · {STAGE_LABELS[d.stage]}
+              {d.title || "Solar"} · {stageWords(d.stage)}
             </p>
           </div>
           <Link

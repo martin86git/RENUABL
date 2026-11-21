@@ -1,5 +1,6 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -30,7 +31,6 @@ import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import clsx from "clsx";
 import { DealTeamChat } from "./deal-team-chat";
 import {
-  STAGE_LABELS,
   type Activity,
   type Customer,
   type CustomerInput,
@@ -233,6 +233,8 @@ function DetailField({ line, onSave }: { line: DealDetail; onSave: (text: string
  * searched and added to.
  */
 export function DealPage({ id }: { id: string }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -441,7 +443,7 @@ export function DealPage({ id }: { id: string }) {
     job && customer
       ? [
           `Deal: ${customer.name}, ${job.title} at ${job.address || "no address yet"}.`,
-          `Stage: ${STAGE_LABELS[job.stage]}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
+          `Stage: ${stageWords(job)}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
         ].join("\n")
       : null,
   );

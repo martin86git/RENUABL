@@ -1,10 +1,11 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { MapPin } from "lucide-react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
-import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
+import type { Customer, Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 import type { BannerFigure } from "@/lib/domain/design/system-summary";
@@ -79,6 +80,8 @@ export function DealBanner({
   /** Slimmer, without the figures (8 Nov 2026, Martin: on any tab but the deal's own the tab's work belongs in the first fold). */
   compact?: boolean;
 }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
   const placed = job.lat !== null && job.lng !== null;
   const [drawing, setDrawing] = useState<JobDrawing | null>(null);
   useEffect(() => {
@@ -115,7 +118,7 @@ export function DealBanner({
               {job.title ? ` · ${job.title}` : ""}
             </p>
             <div className={clsx("flex flex-wrap items-center gap-2", compact ? "mt-2" : "mt-3")}>
-              <Chip>{STAGE_LABELS[job.stage]}</Chip>
+              <Chip>{stageWords(job)}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
               {pulse && (

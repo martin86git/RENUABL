@@ -365,6 +365,13 @@ create table if not exists design_stages (
 );
 create index if not exists design_stages_business on design_stages(business_id, created_at);
 alter table design_jobs add column if not exists sub_stage text;
+-- The business's own names for the twelve stages (domain/design/pipeline-stages.ts StageNames): only the words change.
+create table if not exists design_stage_names (
+  business_id text not null references businesses(id) on delete cascade,
+  stage text not null,
+  name text not null,
+  primary key (business_id, stage)
+);
 -- Proposals (server/design-proposal-repo.ts): a business's branding, the pictures it has put up, and what it has sent.
 -- design_brand: one row a business. design_files: its logo, cover and photos, made safe and small before they are kept;
 -- a picture taken out of the brand kit is only marked removed, so a proposal already sent keeps its pictures.

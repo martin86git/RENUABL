@@ -16,7 +16,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Deals",
-    words: "Pipelines are yours to shape: rename any pipeline, start a new one, add stages of your own, and drag columns into your order.",
+    words:
+      "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
   },
   {
     day: "2026-11-21",
