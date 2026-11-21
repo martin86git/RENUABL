@@ -102,9 +102,9 @@ describe("cancelling with notice", () => {
     expect(addOnUsable(standing)).toBe(true);
   });
 
-  it("gives Calls & Texts 30 days' notice and Growth none", () => {
+  it("gives every add-on 30 days' notice", () => {
     expect(hasNotice("voice")).toBe(true);
-    expect(hasNotice("marketing")).toBe(false);
+    expect(hasNotice("marketing")).toBe(true);
     expect(noticeEnds(new Date("2026-11-21T03:00:00Z")).toISOString()).toBe("2026-12-21T03:00:00.000Z");
   });
 
@@ -116,5 +116,12 @@ describe("cancelling with notice", () => {
     expect(words).toContain("by the day");
     expect(CANCEL_PLAN).toBe("Cancel plan");
     expect(voiceTerms().join(" ")).toContain("30 days' notice");
+  });
+
+  it("tells a Growth business what stops, and says nothing of a number", () => {
+    const words = cancelNoticeWords({ key: "marketing", endsAt: "2026-12-21T03:00:00Z" }).join(" ");
+    expect(words).toContain("Growth has 30 days' notice");
+    expect(words).toContain("stop sending");
+    expect(words).not.toContain("number");
   });
 });

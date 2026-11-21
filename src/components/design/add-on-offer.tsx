@@ -7,6 +7,7 @@ import {
   ADD_ON_WORDS,
   ADD_TO_PLAN,
   CANCEL_PLAN,
+  NOTICE_LINE,
   addOnPriceWords,
   cancelNoticeWords,
   endingWords,
@@ -124,7 +125,7 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
       <p className="text-sm leading-relaxed text-ink-2">{words.what}</p>
       {!usable && (
         <ul className="space-y-1 text-sm text-ink-2">
-          {[...words.includes, ...(addOn === "voice" ? voiceTerms(view.nextBill) : [])].map((line) => (
+          {[...words.includes, ...(addOn === "voice" ? voiceTerms(view.nextBill) : [NOTICE_LINE])].map((line) => (
             <li key={line} className="flex gap-2">
               <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-ink" />
               {line}
@@ -172,14 +173,16 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
         <div role="alertdialog" aria-label={`Cancel ${words.name}`} className="space-y-3 rounded-md bg-canvas p-4 ring-1 ring-line">
           {hasNotice(addOn) ? (
             <ul className="space-y-1.5 text-[13px] leading-snug text-ink-2">
-              {cancelNoticeWords({ endsAt: noticeEnds(new Date()), number: view.number ? localNumber(view.number.e164) : null }).map(
-                (line) => (
-                  <li key={line} className="flex gap-2">
-                    <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-ink-2" />
-                    {line}
-                  </li>
-                ),
-              )}
+              {cancelNoticeWords({
+                key: addOn,
+                endsAt: noticeEnds(new Date()),
+                number: view.number ? localNumber(view.number.e164) : null,
+              }).map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-ink-2" />
+                  {line}
+                </li>
+              ))}
             </ul>
           ) : (
             <p className="text-[13px] text-ink-2">{words.name} comes off your plan now; the rest of this month is credited by the day.</p>

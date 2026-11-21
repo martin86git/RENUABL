@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Billing",
-    words: "Cancelling Calls & Texts gives 30 days' notice: it stays on until then, and you can change your mind.",
+    words: "Cancelling Calls & Texts or Growth gives 30 days' notice: it stays on until then, and you can change your mind.",
   },
   {
     day: "2026-11-21",
