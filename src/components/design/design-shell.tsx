@@ -177,6 +177,16 @@ const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 
  * bar (`lg:pt-9`): the menu's middle lands on the pad's edge.
  */
 const MENU_DROP_PX = 56;
+/**
+ * Scrolled down, the menu rises into the bar's own row, level with the wordmark and the cards at the sides, and what
+ * sticks moves up with it (21 Nov 2026, Martin: Today's Business | Feed switch ran into the lowered menu; "when
+ * scrolling the top banner menu compresses allowing more space on the page"). What sticks then sits this far under the
+ * bar, room for the pad's rounded top edge (.pad-cap), which sticks 20px above --studio-head.
+ */
+const RAISED_GAP_PX = 20;
+/** How far down the page the menu rises, and how near the top it drops again (apart, so it never flickers between). */
+const RAISE_AT_PX = 24;
+const DROP_AT_PX = 4;
 
 function Shell({
   children,
@@ -219,7 +229,8 @@ function Shell({
       return;
     }
     // The sections menu hangs below the bar on a page with a pad: what sticks clears it too.
-    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight + (tool ? 0 : MENU_DROP_PX)}px`);
+    // Raised, it clears the bar and leaves room for the pad's top edge. (A fresh ref each render, so this reads `raised`.)
+    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight + (tool ? 0 : raised ? RAISED_GAP_PX : MENU_DROP_PX)}px`);
     set();
     watchHead.current = new ResizeObserver(set);
     watchHead.current.observe(el);
@@ -288,8 +299,13 @@ function Shell({
   // Once the pad's top has scrolled under the top bar, the gap behind the lowered menu is filled with the pad's own
   // ground, so the page never shows through around it (14 Nov 2026, Martin).
   const [underBar, setUnderBar] = useState(false);
+  // Scrolled down, the lowered menu rises into the bar (RAISED_GAP_PX); back near the top it drops again.
+  const [raised, setRaised] = useState(false);
   useEffect(() => {
-    const look = () => setUnderBar(window.scrollY > 0);
+    const look = () => {
+      setUnderBar(window.scrollY > 0);
+      setRaised((r) => (r ? window.scrollY > DROP_AT_PX : window.scrollY > RAISE_AT_PX));
+    };
     look();
     window.addEventListener("scroll", look, { passive: true });
     return () => window.removeEventListener("scroll", look);
@@ -471,8 +487,8 @@ function Shell({
             )}
           </div>
           <div
-            className="mt-4 flex min-w-0 items-center justify-center"
-            style={tool ? undefined : { transform: `translateY(${MENU_DROP_PX}px)` }}
+            className="mt-4 flex min-w-0 items-center justify-center transition-transform duration-300 ease-out motion-reduce:transition-none"
+            style={tool ? undefined : { transform: `translateY(${raised ? 0 : MENU_DROP_PX}px)` }}
           >
             {/* One pill in liquid glass (19 Nov 2026, Martin: .glass-bar in globals.css; it was flat white). Every
                 round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
@@ -637,7 +653,7 @@ function Shell({
         {!tool && (
           <div
             aria-hidden
-            className={clsx("pad-under pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas", !underBar && "hidden")}
+            className={clsx("pad-under pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas", (!underBar || raised) && "hidden")}
             style={{ height: MENU_DROP_PX + 48 }}
           />
         )}

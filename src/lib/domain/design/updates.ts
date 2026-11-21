@@ -52,7 +52,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Design tool",
-    words: "Dragging out panels on open roof turns the row to follow your pointer, and panels square to an edge before you let go.",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
   },
   {
     day: "2026-11-21",

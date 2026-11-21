@@ -254,7 +254,7 @@ export function TodayPad(props: {
         // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
         <div
           data-tour="today-switch"
-          className="relative z-[16] mt-1 flex justify-center print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
+          className="relative z-[16] mt-1 flex justify-center transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
         >
           <TodaySwitch
             first={firstViewLabel(insights)}
