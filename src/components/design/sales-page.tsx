@@ -129,15 +129,23 @@ function Header({ signedIn }: { signedIn: boolean }) {
         <Link href="/" aria-label="RENUABL Business" className="justify-self-center">
           <Wordmark />
         </Link>
-        {/* Top right is for people who already have an account (18 Nov 2026, Martin): Sign in, or straight back into
-            RENUABL when signed in. Getting started is the page's one button, in the hero and the bar that follows. */}
-        <div className="flex items-center justify-end">
+        {/* Top right (21 Nov 2026, Martin: "We need a get started button next to Sign In"): Sign in, or straight back
+            into RENUABL when signed in, and Get started (to the pricing, as every Get started on the page) when signed out, from 640px: on a phone it crowds the wordmark, and the sticky bar has it. */}
+        <div className="flex items-center justify-end gap-2">
           <Link
             href={signedIn ? "/design" : "/design/sign-in"}
             className="inline-flex h-9 items-center whitespace-nowrap rounded-full px-4 text-[13px] font-semibold text-ink ring-1 ring-line-strong hover:bg-surface"
           >
             {signedIn ? "Open RENUABL" : "Sign in"}
           </Link>
+          {!signedIn && (
+            <a
+              href="#pricing"
+              className="hidden h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-4 sm:inline-flex text-[13px] font-semibold text-white hover:brightness-105"
+            >
+              {SALES_HERO.cta}
+            </a>
+          )}
         </div>
       </div>
     </header>
