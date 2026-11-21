@@ -61,3 +61,43 @@ export function interestEmail(email: string): { subject: string; text: string } 
     text: `${email} registered interest in the RENUABL marketplace from the sign-up page.`,
   };
 }
+
+/**
+ * A request for a demo from the business page (21 Nov 2026, Martin: "request a demo" beside Get started, a white pill so
+ * it doesn't compete): someone who'd rather be shown RENUABL by a person than sign up or open the self-serve demo.
+ */
+export interface DemoRequest {
+  name: string;
+  business: string;
+  email: string;
+  mobile: string | null;
+  note: string | null;
+}
+
+/** A demo request, or why it can't be taken. */
+export function cleanDemoRequest(raw: Record<string, unknown>): DemoRequest | string {
+  const email = normaliseEmail(raw.email);
+  const name = words(raw.name, 80);
+  const business = words(raw.business, 120);
+  const mobile = words(raw.mobile, 20).replace(/[^\d+ ]/g, "");
+  if (!name) return "Tell us your name.";
+  if (!business) return "Tell us your business's name.";
+  if (!email) return "Enter a valid email address.";
+  return { name, business, email, mobile: mobile.length >= 8 ? mobile : null, note: words(raw.note, 1000) || null };
+}
+
+/** The email RENUABL staff get for a demo request. */
+export function demoRequestEmail(d: DemoRequest): { subject: string; text: string } {
+  return {
+    subject: `Demo request: ${d.business}`,
+    text: [
+      `${d.name} from ${d.business} asked for a demo of RENUABL.`,
+      "",
+      `Email: ${d.email}`,
+      `Mobile: ${d.mobile ?? "not given"}`,
+      d.note ? `\nThey said:\n${d.note}` : "",
+      "",
+      "Get in touch within a business day to book it.",
+    ].join("\n"),
+  };
+}

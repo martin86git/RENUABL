@@ -39,7 +39,23 @@ export const SALES_HERO = {
   /** Sol and the voice agents both named (17 Nov 2026, Martin: the home page shouldn't only be about Sol). */
   line: "Sol is the brain: he knows your deals and writes the work up. Your voice agents make the calls: sales, bookings and, soon, tech support.",
   cta: "Get started",
+  /** Beside Get started in a white pill, so it doesn't compete (21 Nov 2026, Martin). */
+  demo: "Request a demo",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
+} as const;
+
+/** The demo request's box (21 Nov 2026, Martin): a person shows them RENUABL; RENUABL's staff are told. */
+export const DEMO_REQUEST = {
+  title: "Request a demo",
+  sub: "Someone from RENUABL will show you round on a short video call. We'll be in touch within a business day to book it.",
+  name: "Your name",
+  business: "Business",
+  email: "Work email",
+  mobile: "Mobile (optional)",
+  note: "What would you like to see? (optional)",
+  send: "Request my demo",
+  sending: "Sending…",
+  close: "Close",
 } as const;
 
 /**
@@ -1228,6 +1244,7 @@ export function salesCopy(): string[] {
     MARKETPLACE.look,
     MARKETPLACE.sub,
     ...MARKETPLACE.sides.flatMap((s) => [s.title, s.body]),
+    ...Object.values(DEMO_REQUEST),
     PRICING.headline,
     PRICING.sub,
     ...PRICING.includes,
