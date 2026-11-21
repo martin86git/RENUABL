@@ -303,7 +303,16 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <TodayChat name={props.name} views={insights} onAsk={ask} asking={asking} hidden={talking} />
+              <TodayChat
+                name={props.name}
+                views={insights}
+                onAsk={ask}
+                asking={asking}
+                hidden={talking}
+                jobs={props.jobs}
+                today={props.today}
+                items={items}
+              />
             </div>
           </div>
         </div>

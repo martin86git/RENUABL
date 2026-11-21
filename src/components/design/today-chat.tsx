@@ -3,15 +3,36 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, BatteryCharging, Eye, Lightbulb, PhoneCall, Stamp, TrendingUp, UserRound, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  BatteryCharging,
+  CircleAlert,
+  Eye,
+  FileText,
+  Lightbulb,
+  Phone,
+  PhoneCall,
+  Sparkles,
+  SquareKanban,
+  Stamp,
+  TrendingUp,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
+import type { ISODate } from "@/lib/domain/types";
+import type { NextItem } from "@/lib/domain/design/next-up";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
 import type { TodayView } from "@/lib/domain/design/today-view";
-import { dollars } from "@/lib/services/crm";
+import { dollars, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
 import { GoalLine, SunArc } from "./gauges";
 import { SolMark, SolStars } from "./sol-icon";
-import { SolBox } from "./today-pad";
+import { PipelineView, SolBox } from "./today-pad";
+import { NextCard } from "./canvas-pad";
+import { CallLogPage } from "./call-log";
+import { ProposalsPage } from "./design-proposals-list";
+import { ReadyForYou, usePrepared } from "./ready-for-you";
 
 /**
  * Today's Business and My month (21 Nov 2026, Martin: the Chat page wasn't a plus, chat is everywhere already; what
@@ -39,7 +60,7 @@ export function useInsights(): InsightsView[] | null | "failed" {
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
 
-type TrayTab = "performance" | "changes" | "mine";
+type TrayTab = "performance" | "changes" | "mine" | "needs" | "pipeline" | "calls" | "proposals" | "sol";
 
 export function TodayChat(props: {
   name: string | null;
@@ -47,6 +68,10 @@ export function TodayChat(props: {
   asking: boolean;
   hidden: boolean;
   onAsk: (q: string, files: SolFile[]) => void;
+  jobs: JobLine[] | null;
+  today: ISODate;
+  /** What needs the member now, most pressing first (next-up.ts). */
+  items: NextItem[] | null;
 }) {
   const views = Array.isArray(props.views) ? props.views : null;
   const first = views?.[0];
@@ -58,7 +83,15 @@ export function TodayChat(props: {
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
     { key: "changes", label: mine ? "Next wins" : "Worth changing", icon: Lightbulb, count: first?.insights.length },
     ...(own ? [{ key: "mine" as const, label: "Your own month", icon: UserRound }] : []),
+    // 21 Nov 2026, Martin: "add needs you, pipeline, calls, proposals and sol's work".
+    { key: "needs", label: "Needs you", icon: CircleAlert, count: props.items?.length },
+    { key: "pipeline", label: "Pipeline", icon: SquareKanban },
+    { key: "calls", label: "Calls", icon: Phone },
+    { key: "proposals", label: "Proposals", icon: FileText },
+    { key: "sol", label: "Sol's work", icon: Sparkles },
   ];
+  // Whose panel isn't about the month: drawn wider than the box, as the pages they come from are.
+  const wide = tab === "pipeline" || tab === "calls" || tab === "proposals";
   // As the screenshot Martin chose (21 Nov 2026): the greeting, Sol's box straight under it, and a tray tucked under the
   // box whose tabs open what was on the cards (the month, what is worth changing) below it, one at a time.
   return (
@@ -91,7 +124,7 @@ export function TodayChat(props: {
       <div
         role="tablist"
         aria-label="About the month"
-        className="no-scrollbar -mt-5 flex w-[calc(100%-2rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[22px] bg-surface-2/80 px-3 pb-2 pt-7 ring-1 ring-line/70"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2rem)] items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[22px] sm:flex-wrap sm:overflow-visible bg-surface-2/80 px-3 pb-2 pt-7 ring-1 ring-line/70"
       >
         {tabs.map(({ key, label, icon: Icon, count }) => (
           <button
@@ -101,7 +134,7 @@ export function TodayChat(props: {
             aria-selected={tab === key}
             onClick={() => setTab((t) => (t === key ? null : key))}
             className={clsx(
-              "inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-3 text-[13.5px] transition",
+              "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition",
               tab === key ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:bg-surface/70 hover:text-ink",
             )}
           >
@@ -122,8 +155,18 @@ export function TodayChat(props: {
       </div>
 
       {tab && (
-        <div role="tabpanel" className="mt-5 w-full text-left">
-          {props.views === "failed" ? (
+        <div role="tabpanel" className={clsx("mt-5 text-left", wide ? "w-[min(72rem,calc(100vw-3rem))]" : "w-full")}>
+          {tab === "needs" ? (
+            <NeedsPanel items={props.items} />
+          ) : tab === "pipeline" ? (
+            <PipelineView jobs={props.jobs} today={props.today} />
+          ) : tab === "calls" ? (
+            <CallLogPage />
+          ) : tab === "proposals" ? (
+            <ProposalsPage signed={false} bare />
+          ) : tab === "sol" ? (
+            <SolWorkPanel />
+          ) : props.views === "failed" ? (
             <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
               The month couldn&rsquo;t be read just now. Feed has your deals.
             </p>
@@ -140,6 +183,36 @@ export function TodayChat(props: {
       )}
     </div>
   );
+}
+
+/** What needs the member now, as Today's list has it: the first eight, then a way to the rest on the feed. */
+function NeedsPanel({ items }: { items: NextItem[] | null }) {
+  if (!items) return <div className="h-40 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />;
+  if (!items.length)
+    return <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">Nothing needs you right now.</p>;
+  return (
+    <div className="rounded-[22px] bg-surface px-5 py-2 ring-1 ring-line/70">
+      <div className="divide-y divide-line">
+        {items.slice(0, 8).map((x) => (
+          <NextCard key={x.key} item={x} />
+        ))}
+      </div>
+      {items.length > 8 && <p className="py-3 text-[12.5px] text-ink-2">{items.length - 8} more on your Feed.</p>}
+    </div>
+  );
+}
+
+/** What Sol has prepared and is waiting on a press to send. */
+function SolWorkPanel() {
+  const { items } = usePrepared();
+  if (!items) return <div className="h-40 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />;
+  if (!items.length)
+    return (
+      <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">
+        Nothing from Sol is waiting on you. What he sends by himself is on your Feed under Sol&rsquo;s work.
+      </p>
+    );
+  return <ReadyForYou compact />;
 }
 
 function Changes({ view }: { view: InsightsView }) {
