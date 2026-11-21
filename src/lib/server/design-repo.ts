@@ -27,6 +27,7 @@ import { MAX_SUPPLIER_LISTS, type SupplierList } from "@/lib/domain/design/prici
 import type { DesignExtras } from "@/lib/domain/design/quote";
 import { newId, query, transaction } from "./db";
 import { linkJobsToRoof } from "./design-crm-repo";
+import { memberPhotoVersions } from "./design-member-photos";
 
 // ---------------------------------------------------------------------------
 // Businesses and members
@@ -146,6 +147,8 @@ export interface MemberLine {
   /** Whether they have signed in and accepted the terms yet. */
   joined: boolean;
   permissions: MemberPermissions;
+  /** When their profile photo was last changed, when they have one (design-member-photos.ts). */
+  photo?: number;
 }
 
 export async function listMembers(businessId: string): Promise<MemberLine[]> {
@@ -154,7 +157,12 @@ export async function listMembers(businessId: string): Promise<MemberLine[]> {
       where business_id = $1 order by (role = 'owner') desc, created_at`,
     [businessId],
   );
-  return rows.map((m) => ({ ...m, permissions: cleanPermissions(m.role === "owner" ? null : m.permissions) }));
+  const photos = await memberPhotoVersions(businessId);
+  return rows.map((m) => ({
+    ...m,
+    permissions: cleanPermissions(m.role === "owner" ? null : m.permissions),
+    ...(photos[m.email] ? { photo: photos[m.email] } : {}),
+  }));
 }
 
 /** Sets what a member may do. Never the owner's (the owner may always do everything). False when there's no such member. */
