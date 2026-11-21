@@ -49,6 +49,7 @@ export function cleanStaffNote(raw: unknown): string | null {
     .slice(0, STAFF_NOTE_MAX);
 }
 
+import { buildIcs, type CalendarEvent } from "../calendar";
 import { LAUNCH_MARKET, marketDateTime } from "../market";
 
 /** A booked demo: when, a link to join, and whether the lead gets a reminder too. */
@@ -139,6 +140,56 @@ export function demoWhen(iso: string, now: Date = new Date()): string {
   return `${date} at ${demoClock(iso)}`;
 }
 
+/** How long a demo is held in the calendar. */
+export const DEMO_MINUTES = 30;
+
+/**
+ * The demo as a calendar event, for the lead or for staff. One id a lead and side, so a new time sent later replaces
+ * the event in a calendar that kept the first rather than adding a second.
+ */
+export function demoEvent(
+  lead: Pick<BusinessLead, "id" | "name" | "email" | "business" | "mobile">,
+  demo: Pick<BookedDemo, "at" | "link">,
+  side: "lead" | "staff",
+): CalendarEvent {
+  const end = new Date(Date.parse(demo.at) + DEMO_MINUTES * 60_000).toISOString();
+  const join = demo.link ? `Join: ${demo.link}` : "";
+  if (side === "lead")
+    return {
+      id: `${lead.id}-demo`,
+      title: "RENUABL demo",
+      description: [
+        "A short video call to show you round RENUABL Business.",
+        join || "We'll send you the link to join, or call you, just before.",
+        "If that time no longer suits, reply to the reminder email and we'll find another.",
+      ].join("\n"),
+      ...(demo.link ? { location: demo.link } : {}),
+      start: demo.at,
+      end,
+    };
+  const who = (lead.name || lead.email).replace(/[\u0000-\u001f]/g, " ").slice(0, 80);
+  return {
+    id: `${lead.id}-demo-staff`,
+    title: `RENUABL demo: ${who}${lead.business ? `, ${lead.business.slice(0, 80)}` : ""}`,
+    description: [`Email: ${lead.email}`, lead.mobile ? `Mobile: ${lead.mobile}` : "", join || "No link to join is on the booking."]
+      .filter(Boolean)
+      .join("\n"),
+    ...(demo.link ? { location: demo.link } : {}),
+    start: demo.at,
+    end,
+  };
+}
+
+/** The .ics file for a demo, to attach to its reminder. */
+export function demoInvite(
+  lead: Pick<BusinessLead, "id" | "name" | "email" | "business" | "mobile">,
+  demo: Pick<BookedDemo, "at" | "link">,
+  side: "lead" | "staff",
+  now: Date = new Date(),
+): { filename: string; content: string; contentType: string } {
+  return { filename: "renuabl-demo.ics", content: buildIcs([demoEvent(lead, demo, side)], now), contentType: "text/calendar" };
+}
+
 /** The reminder to the lead: plain words, RENUABL's, nothing from the browser but the link staff checked. */
 export function leadReminderEmail(
   lead: { name: string | null },
@@ -154,6 +205,8 @@ export function leadReminderEmail(
       "",
       `A reminder that your RENUABL demo is ${when} (Melbourne time).`,
       demo.link ? `Join here: ${demo.link}` : "We'll send you the link to join, or call you, just before.",
+      "",
+      "The calendar invite is attached: open it to add the demo to your calendar.",
       "",
       "If that time no longer suits, reply to this email and we'll find another.",
       "",
@@ -185,6 +238,7 @@ export function staffReminderEmail(
           ? "They were sent a reminder."
           : "They weren't sent a reminder (booked too close)."
         : "They weren't sent a reminder.",
+      "The calendar invite is attached.",
       "Move it to Demo done on /admin afterwards.",
     ]
       .filter((l) => l !== "")

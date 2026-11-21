@@ -4,6 +4,7 @@ import {
   cleanDemoTime,
   cleanStaffNote,
   cleanStage,
+  demoInvite,
   demoWhen,
   isPipelineKind,
   leadBoard,
@@ -128,5 +129,23 @@ describe("a booked demo and its reminders", () => {
       lead("none", "booked", "2026-11-21T01:00:00Z"),
     ]);
     expect(board[1].leads.map((l) => l.id)).toEqual(["soon", "late", "none"]);
+  });
+
+  it("carries a calendar invite: the same event each time, the link, and nothing of staff's in the lead's", () => {
+    const who = { id: "lead_1", name: "Sam Lee", email: "sam@example.com", business: "Bright Sparks", mobile: "0400 000 000" };
+    const at = { at: "2026-11-25T03:00:00.000Z", link: "https://meet.google.com/abc-defg-hij" };
+    const theirs = demoInvite(who, at, "lead", now);
+    expect(theirs.contentType).toBe("text/calendar");
+    expect(theirs.content).toContain("UID:lead_1-demo@renuabl.com.au");
+    expect(theirs.content).toContain("DTSTART:20261125T030000Z");
+    expect(theirs.content).toContain("DTEND:20261125T033000Z");
+    expect(theirs.content).toContain("SUMMARY:RENUABL demo");
+    expect(theirs.content).toContain("meet.google.com");
+    expect(theirs.content).not.toContain("0400");
+    const ours = demoInvite(who, { ...at, link: null }, "staff", now);
+    expect(ours.content).toContain("UID:lead_1-demo-staff@renuabl.com.au");
+    expect(ours.content).toContain("SUMMARY:RENUABL demo: Sam Lee\\, Bright Sparks");
+    expect(ours.content).toContain("0400 000 000");
+    expect(leadReminderEmail({ name: "Sam" }, demo(at.at), now).text).toContain("calendar invite is attached");
   });
 });

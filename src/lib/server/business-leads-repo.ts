@@ -5,6 +5,7 @@
  */
 import {
   PIPELINE_KINDS,
+  demoInvite,
   leadReminderEmail,
   remindersDue,
   staffReminderEmail,
@@ -141,6 +142,7 @@ export async function sendDemoReminders(now: Date = new Date()): Promise<number>
           subject: mail.subject,
           text: mail.text,
           html: htmlOf(mail.text),
+          attachments: [demoInvite(lead, lead.demo, "lead", now)],
           ...(lead.demo.by ? { replyTo: lead.demo.by } : {}),
         }).catch((e) => {
           console.error("demo reminder to the lead failed", e instanceof Error ? e.message : e);
@@ -160,7 +162,13 @@ export async function sendDemoReminders(now: Date = new Date()): Promise<number>
       const to = new Set(leadAlertRecipients(process.env.LEAD_ALERT_EMAILS || process.env.ALERT_EMAILS));
       if (lead.demo.by) to.add(lead.demo.by);
       for (const address of to) {
-        const ok = await sendEmail({ to: address, subject: mail.subject, text: mail.text, html: htmlOf(mail.text) }).catch((e) => {
+        const ok = await sendEmail({
+          to: address,
+          subject: mail.subject,
+          text: mail.text,
+          html: htmlOf(mail.text),
+          attachments: [demoInvite(lead, lead.demo, "staff", now)],
+        }).catch((e) => {
           console.error("demo reminder to staff failed", e instanceof Error ? e.message : e);
           return "skipped" as const;
         });
