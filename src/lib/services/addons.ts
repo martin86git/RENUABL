@@ -11,21 +11,31 @@ export interface AddOnsView {
   number: { e164: string; renuabl: boolean } | null;
   voice: VoiceStanding;
   canBuyNumber: boolean;
+  /** The plan's next bill day, when it has a live plan. */
+  nextBill?: string | null;
   mayAdd: boolean;
 }
 
 export const ADD_ONS_CHANGED = "renuabl:addons";
 
-async function send(body: unknown): Promise<{ ok: boolean; message?: string; requested?: boolean; number?: string }> {
+type Sent = { ok: boolean; message?: string; requested?: boolean; number?: string; numberPending?: boolean };
+
+async function send(body: unknown): Promise<Sent> {
   try {
     const res = await fetch("/api/design/addons", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string; requested?: boolean; number?: string };
+    const json = (await res.json().catch(() => ({}))) as Partial<Sent>;
     if (json.ok) window.dispatchEvent(new Event(ADD_ONS_CHANGED));
-    return { ok: json.ok === true, message: json.message, requested: json.requested, number: json.number };
+    return {
+      ok: json.ok === true,
+      message: json.message,
+      requested: json.requested,
+      number: json.number,
+      numberPending: json.numberPending,
+    };
   } catch {
     return { ok: false, message: "Couldn't reach RENUABL. Try again." };
   }

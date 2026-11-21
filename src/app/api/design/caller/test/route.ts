@@ -7,7 +7,9 @@ import { cleanCallKind, trainingPlacedWords } from "@/lib/domain/design/training
 import { startPracticeCall } from "@/lib/server/design-practice-call";
 
 const WORDS = {
-  off: "Calls aren't switched on for your business yet, so there's nothing to ring you with.",
+  off: "Calls aren't switched on for RENUABL Business right now, so there's nothing to ring you with. We're on it.",
+  addOn:
+    "Calls & Texts isn't on your plan yet, so there's nothing to ring you with. Your business's owner adds it in Your agents (the plus on the bar at the right) or Settings → Billing.",
   "no-number": "Add your mobile under Your account first: that's the number we ring.",
   failed: "The call couldn't be placed just now. Try again in a moment.",
 } as const;
@@ -29,6 +31,7 @@ export async function POST(request: Request) {
     if (out.result === "placed")
       return Response.json({ ok: true, message: (kind === "training" ? trainingPlacedWords : practicePlacedWords)(out.assistant) });
     if (out.result === "failed" && out.credit) return Response.json({ ok: false, message: OUT_OF_CALL_CREDIT }, { status: 502 });
-    return Response.json({ ok: false, message: WORDS[out.result] }, { status: out.result === "failed" ? 502 : 409 });
+    const message = out.result === "off" && out.why === "add-on" ? WORDS.addOn : WORDS[out.result];
+    return Response.json({ ok: false, message }, { status: out.result === "failed" ? 502 : 409 });
   });
 }

@@ -184,8 +184,80 @@ export function voiceStanding(given: { settings: boolean; own: boolean; addOn: b
 export const VOICE_STANDING_WORDS: Record<Exclude<VoiceStanding, "on">, string> = {
   "not-set-up": "Calls aren't switched on for RENUABL Business yet.",
   "add-on": "Voice agents are an add-on to your plan. Add them in Settings → Billing.",
-  number: "Get your business phone number in Settings → Billing to start calling.",
+  number: "Your business phone number isn't set up yet, so customers can't be rung. See Calls & Texts in Settings → Billing.",
 };
+
+const dayWords = (iso: string | null | undefined): string => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime())
+    ? d.toLocaleDateString("en-AU", { day: "numeric", month: "long", timeZone: "Australia/Melbourne" })
+    : "";
+};
+
+/**
+ * What a business is told before it adds Calls & Texts (21 Nov 2026, Martin: the offer said $29 a month but "doesnt tell
+ * me when billing starts - no does it say the charges per call"): the price, when it is billed, what a call or text
+ * costs, and that the number comes with it. `nextBill` is the plan's next bill day when known.
+ */
+export function voiceTerms(nextBill?: string | null): string[] {
+  const cents = ADD_ON_MONTHLY_CENTS.voice;
+  const day = dayWords(nextBill);
+  const v = VOICE_INCLUDES;
+  return [
+    cents === null
+      ? "Price on request: nothing is charged until we've agreed it with you."
+      : `Billing starts today. The rest of this month is worked out by the day and goes on your next bill${day ? ` on ${day}` : ""}, then it is $${cents / 100} each month, including GST.`,
+    `There's no charge per call or per text. Each month includes ${v.minutes} voice-agent minutes and ${v.texts} texts for your whole business.`,
+    `Beyond those, a minute takes ${v.minuteCredits} Sol credits and a text ${v.textCredits}.`,
+    "Your own Australian business number comes with it, at no extra cost.",
+    "Take it off your plan whenever you like.",
+  ];
+}
+
+/** Where the business's own number stands once Calls & Texts is on its plan. */
+export function numberStandingWords(given: { number: string | null; canBuy: boolean }): string {
+  if (given.number) return `Your business number is ${given.number}.`;
+  return given.canBuy
+    ? "Your business number hasn't been set up yet. Press Get my business number and it's ready in a moment."
+    : "Your business number is being set up by RENUABL. We'll email you as soon as it's ready. Until then your agents can ring your own mobile for test and training calls, but not your customers.";
+}
+
+/**
+ * What a voice agent knows about its own phone line, for its chat (21 Nov 2026, Martin: "i asked the sales voice agent
+ * in its chat - hwo do i obtain a phone number and it told me it couldnt help me"): where the business stands and
+ * exactly what to press. Facts only, a line each.
+ */
+export function phoneFacts(given: { standing: VoiceStanding; number: string | null; canBuy: boolean; nextBill?: string | null }): string[] {
+  const name = ADD_ON_WORDS.voice.name;
+  const terms = voiceTerms(given.nextBill);
+  if (given.standing === "on")
+    return [
+      given.number
+        ? `Calls are on. The business's number is ${given.number}: calls and texts go from it, and calls back to it are answered.`
+        : "Calls are on.",
+      terms[1]!,
+      terms[2]!,
+    ];
+  if (given.standing === "not-set-up")
+    return [
+      "Calls aren't switched on for RENUABL Business itself right now. RENUABL has to fix that; nothing the business does will change it.",
+    ];
+  if (given.standing === "add-on")
+    return [
+      `The business can't make calls yet: ${name} isn't on its plan.`,
+      `Its owner adds it with Add to your plan, on the card under the voice agents in Your agents (the plus on the bar at the right), or in Settings → Billing → Add-ons. ${addOnPriceWords("voice")}.`,
+      ...terms,
+      "The business number is asked for automatically as soon as it's added.",
+    ];
+  return [
+    `${name} is on the plan, but the business has no number of its own yet, so customers can't be rung.`,
+    numberStandingWords({ number: null, canBuy: given.canBuy }),
+    given.canBuy
+      ? "Get my business number is on the Calls & Texts card in Your agents (the plus on the bar at the right) and in Settings → Billing → Add-ons. Only the business's owner can press it."
+      : "Nothing more needs pressing. If it has been more than a working day, they can reply to RENUABL's email or write to support.",
+    "Test call and Train (the phone at the top of this chat) work now: they ring the member's own mobile.",
+  ];
+}
 
 /** Marketing is a retailer's add-on (it emails the retailer's own contacts). */
 export function marketingUsable(given: { retailer: boolean; standing: AddOnStanding }): boolean {

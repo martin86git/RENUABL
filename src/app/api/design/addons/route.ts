@@ -30,10 +30,11 @@ export async function GET() {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { businessId, role, permissions } = who.member;
-    const [addOns, number, voice] = await Promise.all([
+    const [addOns, number, voice, plan] = await Promise.all([
       addOnsOf(businessId),
       numberOf(businessId).catch(() => null),
       voiceStandingFor(businessId).catch(() => "not-set-up" as const),
+      subscriptionOf(businessId).catch(() => null),
     ]);
     return Response.json(
       {
@@ -42,11 +43,35 @@ export async function GET() {
         number: number ? { e164: number.e164, renuabl: number.renuabl } : null,
         voice,
         canBuyNumber: numberBuyingOn(),
+        // The plan's next bill day, so an offer can say when an add-on is first billed.
+        nextBill: plan && plan.interval !== "year" && !["canceled", "incomplete_expired"].includes(plan.status) ? plan.periodEnd : null,
         mayAdd: can(role, "members", permissions) && cleanKind(who.member.businessKind) === "retailer",
       },
       { headers: PRIVATE },
     );
   });
+}
+
+const NUMBER_WORDS = {
+  off: "Your number is being set up by RENUABL. We've been told, and will email you as soon as it's ready.",
+  already: "Your business already has its number.",
+  "none-available": "No Australian number is free to buy right now. Try again shortly.",
+  failed: "The number couldn't be set up just now. Nothing was charged for it. Try again shortly.",
+} as const;
+
+/**
+ * The business's own number, bought there and then where buying is on; where it isn't, RENUABL's staff are told so they
+ * set one up by hand. Run when Get my business number is pressed, and by itself as soon as Calls & Texts goes on a plan
+ * (21 Nov 2026, Martin: adding the add-on "doesnt present me with the opportunity to purchase a number").
+ */
+async function getNumber(businessId: string, email: string, businessName: string) {
+  const bought = await buyNumber(businessId, email, businessName).catch(() => ({ result: "failed" as const }));
+  if (bought.result === "off")
+    await tellStaff({
+      subject: `Phone number wanted: ${businessName}`,
+      text: `${businessName} (${email}) has Calls & Texts on its plan and needs its business number, but buying numbers from the app is off (PHONE_NUMBERS_ENABLED). Set one up in /admin → Add-ons, then tell them.`,
+    }).catch(() => false);
+  return bought;
 }
 
 /**
@@ -68,20 +93,11 @@ export async function POST(request: Request) {
     if (read.body.do === "number") {
       if ((await standingOf(businessId, "voice")) !== "on")
         return Response.json({ ok: false, message: "Add voice agents to your plan first." }, { status: 409 });
-      const bought = await buyNumber(businessId, email, businessName);
+      const bought = await getNumber(businessId, email, businessName);
       if (bought.result === "bought") return Response.json({ ok: true, number: bought.e164 });
-      const message = {
-        off: "Numbers can't be bought from the app just yet. We've been told, and will set yours up with you.",
-        already: "Your business already has its number.",
-        "none-available": "No Australian number is free to buy right now. Try again shortly.",
-        failed: "The number couldn't be set up just now. Nothing was charged for it. Try again shortly.",
-      }[bought.result];
-      if (bought.result === "off")
-        await tellStaff({
-          subject: `Phone number wanted: ${businessName}`,
-          text: `${businessName} (${email}) has voice agents on its plan and pressed Get my number, but buying numbers from the app is off (PHONE_NUMBERS_ENABLED). Set one up in /admin → Add-ons.`,
-        }).catch(() => false);
-      return Response.json({ ok: false, message }, { status: bought.result === "already" ? 409 : 503 });
+      // Asked for by hand is not a failure: the business is told where it stands.
+      if (bought.result === "off") return Response.json({ ok: true, numberPending: true, message: NUMBER_WORDS.off });
+      return Response.json({ ok: false, message: NUMBER_WORDS[bought.result] }, { status: bought.result === "already" ? 409 : 503 });
     }
 
     const key = cleanAddOnKey(read.body.key);
@@ -125,6 +141,12 @@ export async function POST(request: Request) {
     const added = await addToSubscription(stripe, { businessId, key, subscriptionId: plan.stripeSubscription, by: email });
     if (added === "ended") return Response.json({ ok: false, message: ADD_REFUSAL_WORDS["no-plan"] }, { status: 409 });
     if (added === "unpriced") return Response.json({ ok: false, message: "It has no price yet." }, { status: 409 });
+    // Calls & Texts is no use without the number, so it is asked for at once.
+    if (key === "voice") {
+      const bought = await getNumber(businessId, email, businessName);
+      if (bought.result === "bought") return Response.json({ ok: true, number: bought.e164 });
+      if (bought.result !== "already") return Response.json({ ok: true, numberPending: true, message: NUMBER_WORDS[bought.result] });
+    }
     return Response.json({ ok: true });
   });
 }

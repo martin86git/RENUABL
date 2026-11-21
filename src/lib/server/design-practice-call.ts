@@ -38,7 +38,8 @@ import { newId, query } from "./db";
 import { numberOf } from "./business-numbers";
 import { callerOf, coachingOf, saveCoaching, scriptFor } from "./design-caller-repo";
 import { loadBrand } from "./design-proposal-repo";
-import { voiceOnFor, voiceSettings } from "./voice-calls";
+import type { VoiceStanding } from "@/lib/domain/design/add-ons";
+import { voiceSettings, voiceStandingFor } from "./voice-calls";
 import { placeVapiCall } from "./vapi-call";
 
 interface PracticeRow {
@@ -74,9 +75,18 @@ export async function startPracticeCall(
   member: { businessId: string; email: string },
   role: CallerKey = "sales",
   kind: CallKind = "practice",
-): Promise<{ result: "placed"; assistant: string } | { result: "off" | "no-number" } | { result: "failed"; credit?: boolean }> {
+): Promise<
+  | { result: "placed"; assistant: string }
+  | { result: "off"; why: VoiceStanding }
+  | { result: "no-number" }
+  | { result: "failed"; credit?: boolean }
+> {
   const s = voiceSettings();
-  if (!s || !(await voiceOnFor(member.businessId).catch(() => false))) return { result: "off" };
+  // A practice call rings only the member's own mobile, so it also goes while the business's own number is still being
+  // set up (from RENUABL's number): a new business can try and train its agent the moment Calls & Texts is on its plan
+  // (21 Nov 2026, Martin: the test call answered "calls arent switched on for your business yet").
+  const standing = s ? await voiceStandingFor(member.businessId).catch(() => "not-set-up" as const) : ("not-set-up" as const);
+  if (!s || (standing !== "on" && standing !== "number")) return { result: "off", why: standing };
   const me = await query<{ mobile: string | null; first_name: string | null }>(
     `select mobile, first_name from business_members where business_id = $1 and lower(email) = lower($2)`,
     [member.businessId, member.email],
