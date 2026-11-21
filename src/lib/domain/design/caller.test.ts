@@ -87,7 +87,7 @@ describe("the phone assistant's voice", () => {
     const microsoft = australian.filter((v) => v.provider === "azure");
     expect(microsoft.length).toBeGreaterThanOrEqual(6);
     for (const v of microsoft) expect(v.voiceId).toMatch(/^en-AU-[A-Z][a-z]+Neural$/);
-    expect(voiceLabel({ provider: "deepgram", voiceId: "orion" })).toBe("Deepgram voice orion");
+    expect(voiceLabel({ provider: "deepgram", voiceId: "notonourlist" })).toBe("Deepgram voice notonourlist");
   });
 
   it("knows where a voice's sample is, and which voices have none", () => {
@@ -172,6 +172,25 @@ describe("voiceAccent", () => {
     expect(voiceAccent({ words: "Australian, relaxed and natural" })).toBe("Australian");
     expect(voiceAccent({ words: "Australian · Microsoft, hear it on a test call" })).toBe("Australian");
     expect(voiceAccent({ words: "British" })).toBe("British");
-    expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(new Set(["Australian", "British", "Canadian", "American"]));
+    expect(voiceAccent({ words: "New Zealand · Microsoft" })).toBe("New Zealand");
+    expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(
+      new Set(["Australian", "New Zealand", "Indian English", "Irish", "South African", "British", "Filipino", "Canadian", "American"]),
+    );
+  });
+});
+
+describe("voice samples", () => {
+  it("plays our solar line where the maker's key is on the site, else the maker's clip", async () => {
+    const { voiceSampleUrl, sampleLine, sampleName, CALLER_VOICES } = await import("./caller");
+    const molly = { provider: "azure" as const, voiceId: "en-NZ-MollyNeural" };
+    expect(voiceSampleUrl(molly)).toBeNull();
+    expect(voiceSampleUrl(molly, ["azure"])).toContain("en-NZ-MollyNeural");
+    expect(voiceSampleUrl({ provider: "vapi", voiceId: "Elliot" }, ["azure", "11labs", "deepgram"])).toBeNull();
+    expect(voiceSampleUrl({ provider: "deepgram", voiceId: "theia" })).not.toBeNull();
+    expect(sampleName(molly)).toBe("Molly");
+    expect(sampleName({ provider: "11labs", voiceId: "somethingTyped123" })).toBe("your assistant");
+    expect(sampleLine("Molly")).toMatch(/automated/);
+    expect(sampleLine("Molly")).not.toMatch(/\d/);
+    expect(new Set(CALLER_VOICES.map((v) => `${v.provider}:${v.voiceId}`)).size).toBe(CALLER_VOICES.length);
   });
 });

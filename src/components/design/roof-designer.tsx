@@ -1016,6 +1016,12 @@ const OPENED: typeof WHOLE = {
  * can't move at all while the whole picture is showing, so the hand did nothing). A roof near an edge can be dragged to
  * the middle, and at least half the view always shows the picture.
  */
+/** What a kept view shows on a picture of `across` width to height: wider than the photo, a band across it, the middle kept. */
+function shownView(kept: typeof WHOLE, across: number | null): typeof WHOLE {
+  if (!across || across <= ROOF_IMAGE.width / ROOF_IMAGE.height + 0.01) return kept;
+  const h = kept.w / across;
+  return { x: kept.x, w: kept.w, h, y: kept.y + (kept.h - h) / 2 };
+}
 const within = (at: number, size: number, whole: number) => Math.min(Math.max(-size / 2, at), whole - size / 2);
 
 /**
@@ -1406,7 +1412,16 @@ export function RoofDesigner(props: {
     setArrayHint(null);
     setOnPanel(false);
   };
-  const [view, setView] = useState(OPENED);
+  // The view as kept is always the photo's own shape. In the pop-up, widened past that shape (21 Nov 2026, Martin:
+  // widening "only widens the grey padding area surrounding the map. i wanted it all to expand together"), the picture
+  // takes the whole width and shows a band of the photo across it: the kept view's width, cut to the picture's shape.
+  const [keptView, setView] = useState(OPENED);
+  const [across, setAcross] = useState<number | null>(null);
+  const acrossNow = useRef<number | null>(null);
+  useEffect(() => {
+    acrossNow.current = across;
+  }, [across]);
+  const view = useMemo(() => shownView(keptView, across), [keptView, across]);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
   // Drawing mode (the photo put away and the roof drawn plainly) has no button now; the code stays for later.
@@ -1651,7 +1666,24 @@ export function RoofDesigner(props: {
     };
   }, []);
   const phone = Boolean(props.tight && stage);
-  const fit = phone ? "100%" : fitPx ? `${fitPx}px` : FIT;
+  // In the pop-up the picture takes the window's whole width, its height the first fold's (21 Nov 2026, Martin: widening
+  // the window should widen the map, not the grey round it); `across` is then its width to height.
+  const fills = Boolean(props.tight && !phone && fitPx);
+  const fit = phone ? "100%" : fills ? "none" : fitPx ? `${fitPx}px` : FIT;
+  const picBox = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = picBox.current;
+    if (!fills || !el || !fitPx) {
+      setAcross(null);
+      return;
+    }
+    const tall = (fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+    const measure = () => setAcross(el.clientWidth > 0 ? Math.round((el.clientWidth / tall) * 1000) / 1000 : null);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fills, fitPx]);
   /** A place down the picture, as a share of its height: on a phone the picture starts under the band above it. */
   const picY = (percent: number) =>
     props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
@@ -2131,9 +2163,13 @@ export function RoofDesigner(props: {
       setView((v) => {
         const w = Math.min(ROOF_IMAGE.width, Math.max(40, v.w * (e.deltaY > 0 ? 1.15 : 1 / 1.15)));
         const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+        // The spot under the pointer stays put, read on the picture as shown (a band of the photo when widened).
+        const was = shownView(v, acrossNow.current);
+        const shownH = shownView({ x: 0, y: 0, w, h }, acrossNow.current).h;
+        const y = was.y + fy * was.h - fy * shownH - (h - shownH) / 2;
         return {
           x: within(v.x + fx * v.w - fx * w, w, ROOF_IMAGE.width),
-          y: within(v.y + fy * v.h - fy * h, h, ROOF_IMAGE.height),
+          y: within(y, h, ROOF_IMAGE.height),
           w,
           h,
         };
@@ -2784,7 +2820,7 @@ export function RoofDesigner(props: {
     if (!p) return;
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
+      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: keptView };
       return;
     }
     // A speech bubble opens its thread, whichever tool is on. The bubble is drawn up and to the right of the spot
@@ -3131,7 +3167,8 @@ export function RoofDesigner(props: {
       const box = svg.current?.getBoundingClientRect();
       if (!box) return;
       const dx = ((e.clientX - held.x) / box.width) * held.from.w;
-      const dy = ((e.clientY - held.y) / box.height) * held.from.h;
+      // Both by the width: widened, the picture shows less of the photo's height than it is tall.
+      const dy = ((e.clientY - held.y) / box.width) * held.from.w;
       return setView({
         ...held.from,
         x: within(held.from.x - dx, held.from.w, ROOF_IMAGE.width),
@@ -6867,6 +6904,7 @@ export function RoofDesigner(props: {
             {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot.
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
+              ref={picBox}
               className="glass-dark relative mx-auto"
               style={
                 {

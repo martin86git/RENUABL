@@ -89,8 +89,14 @@ export async function saveCallerVoice(voice: CallerVoice | null, role: CallerKey
 /** The voices the business has taken off its list, and taking one off or bringing it back (who may change settings). */
 export const loadHiddenVoices = async (): Promise<string[]> => {
   const r = await loadCaller();
-  return r.ok ? ((r as { hiddenVoices?: string[] }).hiddenVoices ?? []) : [];
+  if (!r.ok) return [];
+  speakersNow = (r as { speakers?: string[] }).speakers ?? speakersNow;
+  return (r as { hiddenVoices?: string[] }).hiddenVoices ?? [];
 };
+
+/** The makers whose voices speak the solar sample line on this site, as last told by the server (read with the hidden voices). */
+let speakersNow: string[] = [];
+export const voiceSpeakers = (): readonly string[] => speakersNow;
 export const changeHiddenVoices = (voices: { hide: string } | { show: string } | { all: true }) =>
   ask<{ hiddenVoices: string[] }>("/api/design/caller", {
     method: "PUT",
