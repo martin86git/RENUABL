@@ -721,48 +721,50 @@ button.team-flash:not([aria-pressed="true"]) {
    beautiful… think apple. think tesla"; then "perhaps the background is the charcoal from the theme"). The ground is
    the studio's charcoal with white type and fine light lines, and nothing written is in a pad any more: his words and
    the member's sit straight on it, blocks apart by the room a pad would take, a block that follows on stepped in and
-   joined to the one before. The one colour, and the one pad, is the key point's. */
+   joined to the one before. The one colour, and the one pad, is the key point's.
+   Mist blue since 21 Nov 2026 (Martin: "feeling too harsh in the graphite"; his pick, #E7EBF0): the same layout on a
+   pale blue-grey ground with dark type, cards a step lighter than the ground, fields white. */
 .sol-ground {
-  --canvas: #45484f;
+  --canvas: #dde2e9;
   /* Cards (a draft email, a question, a choice, a design, sources) are lifted off the charcoal in a lighter one, so
      they read as things to act on (17 Nov 2026, Martin: "really hard to tell these cards when all the background is
      the same without contrast"). Words still sit straight on the ground. */
-  --surface: #50545c;
-  --surface-2: rgb(255 255 255 / 0.09);
-  --ink: #ffffff;
-  --ink-2: #e6e7ea;
-  --muted: #a9acb3;
-  --line: rgb(255 255 255 / 0.16);
-  --line-strong: rgb(255 255 255 / 0.28);
-  --primary: #ffffff;
-  --primary-ink: #1d1d1f;
-  --sun: rgb(255 90 31 / 0.18);
-  --sun-ink: #ffb08a;
-  background: #3a3d43;
+  --surface: #f4f6f9;
+  --surface-2: rgb(30 40 56 / 0.06);
+  --ink: #1d1d1f;
+  --ink-2: #3a3d43;
+  --muted: #68707c;
+  --line: rgb(30 40 56 / 0.12);
+  --line-strong: rgb(30 40 56 / 0.24);
+  --primary: #3a3d43;
+  --primary-ink: #ffffff;
+  --sun: rgb(255 90 31 / 0.12);
+  --sun-ink: #b23f0c;
+  background: #e7ebf0;
   color: var(--ink);
 }
-/* A lifted card sits on the charcoal with a soft shadow and a faint light top edge. */
+/* A lifted card sits on the mist with a soft shadow and a faint light top edge. */
 .sol-ground .rounded-2xl.bg-surface,
 .sol-ground .rounded-xl.bg-surface {
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 10px 28px -8px rgb(0 0 0 / 0.45);
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    0 6px 18px -10px rgb(30 40 56 / 0.28);
 }
 /* A choice inside a card (Sol's induction and learning cards) is a darker well, not the card's own grey (20 Nov 2026,
    Martin: "the card and options shouldnt all be the same graphite color"); lit orange on hover. */
 .sol-ground .sol-choice {
-  background-color: #2f3237;
+  background-color: #e1e6ed;
 }
 .sol-ground .sol-choice.sol-choice-on {
-  background-color: rgb(255 90 31 / 0.18);
+  background-color: rgb(255 90 31 / 0.16);
 }
 .sol-ground .sol-choice:hover {
-  background-color: rgb(255 90 31 / 0.14);
+  background-color: rgb(255 90 31 / 0.1);
 }
-/* The fields inside a card (the draft's Cc, subject and words) go a step darker than the card, as wells to type in. */
+/* The fields inside a card (the draft's Cc, subject and words) are white wells to type in. */
 .sol-ground :is(input, textarea, select).bg-surface {
-  background-color: #2f3237;
-  border-color: rgb(255 255 255 / 0.1);
+  background-color: #ffffff;
+  border-color: rgb(30 40 56 / 0.14);
 }
 /* His answers' type (15 Nov 2026, Martin: "the font is too thick - and the font is too big"; then "remove the pads
    for text you and i write and just make the text white"): the interface's own face a size down and lighter than the
@@ -782,7 +784,7 @@ button.team-flash:not([aria-pressed="true"]) {
   -webkit-font-smoothing: antialiased;
 }
 .sol-ground .sol-prose {
-  color: #d6d7db;
+  color: #2e3138;
 }
 /* The key point: the conversation's one highlight and its only pad (no italics: Martin, 15 Nov 2026). A wash of the
    signal colour; on the charcoal it is a tint with a fine orange edge. */
@@ -790,8 +792,8 @@ button.team-flash:not([aria-pressed="true"]) {
   background: color-mix(in srgb, var(--sun-line) 9%, #fff);
 }
 .sol-ground .sol-key {
-  background: rgb(255 90 31 / 0.14);
-  box-shadow: inset 0 0 0 1px rgb(255 90 31 / 0.38);
+  background: rgb(255 90 31 / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(255 90 31 / 0.32);
 }
 /* While Sol can see the page beside his chat, one orange frame runs round the two of them (sol-chat.tsx sets
    `html.sol-seeing`; `sol-docked` is his panel open): a fine line round the page's part of the window and round his
