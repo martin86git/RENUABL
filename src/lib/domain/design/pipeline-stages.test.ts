@@ -8,6 +8,7 @@ import {
   cleanStageKeys,
   columnOf,
   insertStage,
+  moveStage,
   keyOfDeal,
   moveText,
   moveTo,
@@ -43,6 +44,13 @@ describe("a business's own stages", () => {
     expect(insertStage(["lead", "designed"], visit.id, 0)).toEqual(["lead", visit.id, "designed"]);
     expect(insertStage(["lead", "designed"], visit.id, -1)).toEqual([visit.id, "lead", "designed"]);
     expect(insertStage(["lead", "designed"], visit.id, 99)).toEqual(["lead", "designed", visit.id]);
+  });
+
+  it("moves a stage to another place in the run", () => {
+    expect(moveStage(["lead", "designed", "proposal", "won"], 0, 2)).toEqual(["designed", "proposal", "lead", "won"]);
+    expect(moveStage(["lead", "designed", "proposal", "won"], 3, 0)).toEqual(["won", "lead", "designed", "proposal"]);
+    expect(moveStage(["lead", "designed"], 1, 9)).toEqual(["lead", "designed"]);
+    expect(moveStage(["lead", "designed"], 5, 0)).toEqual(["lead", "designed"]);
   });
 
   it("keeps a pipeline's stages in the order sent, known ones only, each once", () => {

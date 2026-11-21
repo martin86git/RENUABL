@@ -4,7 +4,7 @@ import { SAMPLE_DEAL_HINT } from "@/lib/domain/design/deal-tour";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LayoutGrid, List, PenTool, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, LayoutGrid, List, PenTool, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 import { JOB_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
 import { DEFAULT_PIPELINE, cleanPipelineChoice, type PipelineChoice } from "@/lib/domain/design/deal";
@@ -14,6 +14,7 @@ import {
   columnOf,
   isJobStage,
   keyOfDeal,
+  moveStage,
   moveTo,
   pipelinesFor,
   stageChoices,
@@ -82,6 +83,11 @@ export function PipelinesPage() {
   // The deal being dragged, and the column it is over.
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<StageKey | null>(null);
+  // A column being dragged by its head to another place in the pipeline, and the column it is over.
+  const [movingCol, setMovingCol] = useState<StageKey | null>(null);
+  const [colOver, setColOver] = useState<StageKey | null>(null);
+  // The new order shown at once while it saves (put back if the server says no).
+  const [order, setOrder] = useState<{ pipeline: string; stages: StageKey[] } | null>(null);
   const [adding, setAdding] = useState(false);
   // Each open deal's clock and temperature: its marks on the card, and the order to ring in its column.
   const [pulses, setPulses] = useState<Record<string, DealPulse>>({});
@@ -123,7 +129,7 @@ export function PipelinesPage() {
   // Every pipeline the business sees (the set ones as it renamed or changed them, then its own), and the one on show.
   const all = pipelinesFor(kept, own);
   const named = all.find((p) => p.id === choice.pipeline) ?? all[0];
-  const stages = named.stages;
+  const stages = order && order.pipeline === named.id ? order.stages : named.stages;
 
   const pick = (p: ShownPipeline) => {
     const fixed = p.stages.filter(isJobStage);
@@ -214,6 +220,16 @@ export function PipelinesPage() {
       return;
     }
     await savePipelineAs(named, { stages: stages.filter((k) => k !== key) });
+  };
+
+  /** Moves a column to another place in the pipeline on show: shown at once, saved for everyone in the business. */
+  const reorder = async (key: StageKey, to: number) => {
+    const from = stages.indexOf(key);
+    if (from < 0 || from === to) return;
+    const next = moveStage(stages, from, to);
+    setOrder({ pipeline: named.id, stages: next });
+    await savePipelineAs(named, { stages: next });
+    setOrder(null);
   };
 
   const move = async (id: string, key: StageKey) => {
@@ -386,7 +402,7 @@ export function PipelinesPage() {
 
       {choice.view === "cards" ? (
         <div className="mt-4 flex gap-3 overflow-x-auto pb-4">
-          {stages.map((stage) => {
+          {stages.map((stage, at) => {
             // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
             const column = shown
               .filter((j) => columnOf(j, stages, own) === stage)
@@ -397,25 +413,55 @@ export function PipelinesPage() {
                 key={stage}
                 aria-label={stageName(stage, own)}
                 onDragOver={(e) => {
+                  if (movingCol) {
+                    e.preventDefault();
+                    setColOver(stage);
+                    return;
+                  }
                   if (!dragging) return;
                   e.preventDefault();
                   setOver(stage);
                 }}
-                onDragLeave={() => setOver((now) => (now === stage ? null : now))}
+                onDragLeave={() => {
+                  setOver((now) => (now === stage ? null : now));
+                  setColOver((now) => (now === stage ? null : now));
+                }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (dragging) void move(dragging, stage);
+                  if (movingCol) void reorder(movingCol, at);
+                  else if (dragging) void move(dragging, stage);
                   setDragging(null);
                   setOver(null);
+                  setMovingCol(null);
+                  setColOver(null);
                 }}
                 className={clsx(
-                  "flex min-w-72 flex-1 basis-72 snap-start flex-col rounded-lg border bg-surface-2 p-2",
+                  "relative flex min-w-72 flex-1 basis-72 snap-start flex-col rounded-lg border bg-surface-2 p-2",
                   over === stage ? "border-sun-line" : "border-transparent",
+                  movingCol === stage && "opacity-50",
                 )}
               >
+                {movingCol && colOver === stage && movingCol !== stage && (
+                  // Where the column will land: after this one when moving right, before it when moving left.
+                  <span
+                    aria-hidden
+                    className={clsx(
+                      "absolute inset-y-1 w-1 rounded-full bg-sun-line",
+                      stages.indexOf(movingCol) < at ? "-right-2" : "-left-2",
+                    )}
+                  />
+                )}
                 <StageHead
                   stage={stage}
                   own={own}
+                  onGrab={() => setMovingCol(stage)}
+                  onLetGo={() => {
+                    setMovingCol(null);
+                    setColOver(null);
+                  }}
+                  onStep={(by) => void reorder(stage, at + by)}
+                  first={at === 0}
+                  last={at === stages.length - 1}
                   count={jobs ? column.length : null}
                   sum={sum}
                   canRemove={stages.length > 1}
@@ -559,9 +605,21 @@ function StageHead({
   canRemove,
   onRename,
   onRemove,
+  onGrab,
+  onLetGo,
+  onStep,
+  first,
+  last,
 }: {
   stage: StageKey;
   own: readonly OwnStage[];
+  /** Dragging the head starts moving the column; letting go ends it. */
+  onGrab: () => void;
+  onLetGo: () => void;
+  /** Moves the column one place left (-1) or right (1), for keyboards and touch. */
+  onStep: (by: -1 | 1) => void;
+  first: boolean;
+  last: boolean;
   count: number | null;
   sum: number;
   canRemove: boolean;
@@ -576,7 +634,18 @@ function StageHead({
     if (await onRename(added, name)) setName(null);
   };
   return (
-    <header className="group px-2 py-1.5">
+    <header
+      className={clsx("group rounded-md px-2 py-1.5", name === null && "cursor-grab active:cursor-grabbing")}
+      draggable={name === null}
+      title={name === null ? "Drag to move this stage" : undefined}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        // Some browsers start a drag only once something is set.
+        e.dataTransfer.setData("text/plain", stageName(stage, own));
+        onGrab();
+      }}
+      onDragEnd={onLetGo}
+    >
       <div className="flex items-baseline justify-between gap-2">
         {name !== null ? (
           <input
@@ -607,6 +676,26 @@ function StageHead({
               onClick={() => setName(added.name)}
             >
               <Pencil className="size-3.5" aria-hidden />
+            </button>
+          )}
+          {name === null && !first && (
+            <button
+              title="Move left"
+              aria-label={`Move ${stageName(stage, own)} left`}
+              className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
+              onClick={() => onStep(-1)}
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+            </button>
+          )}
+          {name === null && !last && (
+            <button
+              title="Move right"
+              aria-label={`Move ${stageName(stage, own)} right`}
+              className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
+              onClick={() => onStep(1)}
+            >
+              <ChevronRight className="size-3.5" aria-hidden />
             </button>
           )}
           {canRemove && name === null && (

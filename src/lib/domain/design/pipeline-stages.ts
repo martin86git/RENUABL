@@ -237,3 +237,12 @@ export function pipelinesByStage(kept: readonly KeptPipeline[], own: readonly Ow
     return { id: p.id, name: p.name, stages };
   });
 }
+
+/** A pipeline's stages with the one at `from` moved to position `to` (both kept within the run). */
+export function moveStage(stages: readonly StageKey[], from: number, to: number): StageKey[] {
+  const out = [...stages];
+  if (from < 0 || from >= out.length) return out;
+  const [key] = out.splice(from, 1);
+  out.splice(Math.max(0, Math.min(out.length, to)), 0, key);
+  return out;
+}
