@@ -40,7 +40,8 @@ import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-cha
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
-import { SolBadge, SolIcon, SolMark } from "./sol-icon";
+import { SolIcon } from "./sol-icon";
+import { SolBadge, SolMark } from "./sol-sun";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";

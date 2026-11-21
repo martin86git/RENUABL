@@ -10,7 +10,7 @@ import { MarketplaceMark } from "./marketplace-bar";
 import { SolScene, SOL_SCENE_MS } from "./film-sol-scene";
 import { TeamScene, TEAM_SCENE_MS } from "./film-team-scene";
 import { Ray, RayStyles } from "./rays";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /**
  * The hero's product film (16 Nov 2026, Martin: a real film of how the product works today, not misleading, and not so

@@ -10,7 +10,7 @@ import { CONNECT_RESULTS, type CalendarProvider } from "@/lib/domain/design/my-c
 import { connectGmailHere, mailConnected, type MailKind } from "@/lib/services/inbox";
 import { connectMyCalendar } from "@/lib/services/my-calendar";
 import { SETUP_OPEN, loadSetup, putSetupAway, skipSetup, type SetupAnswer } from "@/lib/services/setup";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 const primary =
   "inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:bg-line disabled:text-muted";

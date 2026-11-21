@@ -37,7 +37,7 @@ import type { RebateRates } from "@/lib/domain/rebates";
 import { priceAdvice, typedCostFlags, type Advice } from "@/lib/domain/design/price-check";
 import { usePricePoints } from "@/lib/services/price-check";
 import { askSolInPanel } from "@/lib/services/sol";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 
 const FOLDED_KEY = "renuabl.design.quote-folded";
 type GroupIcon = (props: { className?: string }) => React.ReactNode;

@@ -41,6 +41,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-21",
+    area: "Design tool",
+    words: "Dragging out panels on open roof turns the row to follow your pointer, and panels square to an edge before you let go.",
+  },
+  {
+    day: "2026-11-21",
     area: "Sol",
     words: "Sol's chat is a soft mist blue with dark type, in place of the graphite.",
   },
