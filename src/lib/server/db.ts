@@ -1491,6 +1491,10 @@ create table if not exists design_leads (
   note text,
   at timestamptz not null default now()
 );
+alter table design_leads add column if not exists stage text;
+alter table design_leads add column if not exists stage_at timestamptz;
+alter table design_leads add column if not exists moved_by text;
+alter table design_leads add column if not exists staff_note text;
 create table if not exists design_sol_credits (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
