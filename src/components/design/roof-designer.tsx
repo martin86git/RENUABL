@@ -6182,10 +6182,76 @@ export function RoofDesigner(props: {
   );
 
   // Publish design (8 Nov 2026, Martin: in the pop-up, the picture's top right corner): the same control in either place.
+  // Start this design again: its round, and the question asked first.
+  const resetRound = (
+    <button
+      type="button"
+      onClick={() => setResetAsk(!resetAsk)}
+      aria-expanded={resetAsk}
+      aria-label="Start this design again"
+      title="Start this design again"
+      className={clsx(
+        phone ? "size-[2.625rem] ring-2" : "size-10 ring-[5px]",
+        "flex items-center justify-center rounded-full bg-white shadow-lift ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
+        resetAsk ? "text-sun-line" : "text-muted",
+      )}
+    >
+      <RotateCcw className="size-[18px]" aria-hidden />
+    </button>
+  );
+  const resetQuestion = resetAsk && (
+    <div
+      role="alertdialog"
+      aria-label="Start again"
+      className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
+    >
+      <p className="font-medium">Reset to default and start again?</p>
+      <p className="mt-1 text-white/70">
+        Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
+      </p>
+      <div className="mt-2.5 flex gap-1.5">
+        <button
+          type="button"
+          onClick={resetDesign}
+          className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
+        >
+          Yes, start again
+        </button>
+        <button
+          type="button"
+          onClick={() => setResetAsk(false)}
+          className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
   const publishControl =
     props.sitesOnly && !props.tight ? null : (
       <div className="relative" data-popup data-menu-host>
-        {props.tight ? (
+        {props.tight && phone ? (
+          // On a phone upright (21 Nov 2026, Martin): icons only in the picture's top right corner, level with the kit and
+          // its height: start again, then the designs' round, a little larger, with the open design's number under its mark.
+          <div className="flex h-[3.75rem] items-center gap-1.5">
+            {menu !== "designs" && resetRound}
+            <button
+              type="button"
+              onClick={() => openMenu(menu === "designs" ? false : "designs")}
+              aria-expanded={menu === "designs"}
+              aria-haspopup="true"
+              aria-label={`Design ${active + 1} of ${designs.length}: every design on this roof, a new one, a copy, and Publish`}
+              title="Every design on this roof: a new one, a copy, and Publish"
+              className="flex size-[3.25rem] flex-col items-center justify-center rounded-full bg-primary text-primary-ink shadow-lift tabular-nums hover:bg-forest"
+            >
+              <Layers className="size-5" aria-hidden />
+              <span className="text-[11px] font-semibold leading-none">
+                {active + 1}
+                {designs.length > 1 ? `/${designs.length}` : ""}
+              </span>
+            </button>
+          </div>
+        ) : props.tight ? (
           // In the pop-up the corner is the roof's designs (10 Nov 2026, Martin: there was no plain way to start a second
           // design): the one open, the others either side, and the menu of them all with New design and Publish.
           <div className="flex h-10 items-center rounded-md bg-primary text-primary-ink shadow-lift">
@@ -6281,52 +6347,15 @@ export function RoofDesigner(props: {
           </div>
         )}
         {/* Start again, a round growing out of the design's pill like a bubble from a bubble (12 Nov 2026, Martin: it
-            was missed), in white so it stands apart from the graphite, asked first. */}
-        {props.tight && menu !== "designs" && (
+            was missed), in white so it stands apart from the graphite, asked first. On a phone upright it stands beside
+            the designs' round instead, and its question opens under them. */}
+        {props.tight && !phone && menu !== "designs" && (
           <div className="absolute right-3 top-[2.15rem] flex flex-col items-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => setResetAsk(!resetAsk)}
-              aria-expanded={resetAsk}
-              aria-label="Start this design again"
-              title="Start this design again"
-              className={clsx(
-                "flex size-10 items-center justify-center rounded-full bg-white shadow-lift ring-[5px] ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
-                resetAsk ? "text-sun-line" : "text-muted",
-              )}
-            >
-              <RotateCcw className="size-[18px]" aria-hidden />
-            </button>
-            {resetAsk && (
-              <div
-                role="alertdialog"
-                aria-label="Start again"
-                className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
-              >
-                <p className="font-medium">Reset to default and start again?</p>
-                <p className="mt-1 text-white/70">
-                  Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
-                </p>
-                <div className="mt-2.5 flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={resetDesign}
-                    className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
-                  >
-                    Yes, start again
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResetAsk(false)}
-                    className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            {resetRound}
+            {resetQuestion}
           </div>
         )}
+        {props.tight && phone && menu !== "designs" && resetAsk && <div className="absolute right-0 top-full mt-2">{resetQuestion}</div>}
         {props.tight && menu === "designs" && designsMenu}
         {sending && props.onNote && (
           <div
@@ -8778,7 +8807,7 @@ export function RoofDesigner(props: {
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
               {props.tight && publishControl && (
-                <div className={clsx("pointer-events-auto absolute z-30", phone ? "right-3 top-[5.2rem]" : "right-4 top-4")}>
+                <div className={clsx("pointer-events-auto absolute z-30", phone ? "right-3 top-[0.8rem]" : "right-4 top-4")}>
                   {publishControl}
                 </div>
               )}
