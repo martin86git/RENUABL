@@ -7,7 +7,19 @@ describe("an inverter against the home's supply", () => {
     expect(inverterPhase({ name: "Sungrow SG8.0RT", phase: "three" })).toBe("three");
     expect(inverterPhase({ name: "GoodWe 10kW Three Phase Hybrid" })).toBe("three");
     expect(inverterPhase({ name: "Fronius Primo 5.0 single phase" })).toBe("single");
-    expect(inverterPhase({ name: "Sungrow SG5.0RS" })).toBeNull();
+    expect(inverterPhase({ name: "Enphase IQ8" })).toBeNull();
+  });
+  it("reads Sungrow's model code when the name doesn't say, or says it wrong", () => {
+    expect(inverterPhase({ name: "Sungrow SG5.0RS" })).toBe("single");
+    expect(inverterPhase({ name: "Sungrow 20kW Multi MPPT String Solar Inverter", sku: "SGWSG20RT" })).toBe("three");
+    expect(inverterPhase({ name: "Sungrow 20kw Single Phase 3MPPT Hybrid Inverter", sku: "SGWSH20RT" })).toBe("three");
+    expect(inverterPhase({ name: "Sungrow 15kW Hybrid", sku: "SGWSH15T" })).toBe("three");
+    expect(inverterPhase({ name: "Sungrow 50kW", sku: "SGWSG50CX-P2" })).toBe("three");
+    expect(inverterPhase({ name: "Sungrow 8kW Hybrid", sku: "SGWSH8.0RS-ADA" })).toBe("single");
+    // What the list says still wins, and other makers' codes aren't read.
+    expect(inverterPhase({ name: "Sungrow", sku: "SGWSG20RT", phase: "single" })).toBe("single");
+    expect(inverterPhase({ name: "Goodwe 5kW Inverter", sku: "GDWGW5000-DNS-30" })).toBeNull();
+    expect(clashesWithSupply({ name: "Sungrow 20kW Multi MPPT String Solar Inverter", sku: "SGWSG20RT" }, "single")).toBe(true);
   });
   it("stops only a three-phase inverter on a single-phase home", () => {
     const three = { name: "Sungrow SG10RT", phase: "three" as const };

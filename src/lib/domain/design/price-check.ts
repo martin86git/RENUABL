@@ -10,7 +10,7 @@
  *
  * Each says nothing when there are too few jobs to judge by. Advice only: the person sets the price.
  */
-import { lineKey, type CostLine, type LineEdit } from "./quote";
+import { editOf, lineKey, type CostLine, type LineEdit } from "./quote";
 import { internalForChoice, viewForChoice, type OptionKey, type ProposalInternal, type ProposalView } from "./proposal";
 
 /** One proposal as a price point: what was offered, at what margin, and whether it was signed. */
@@ -195,7 +195,7 @@ export function typedCostFlags(lines: readonly CostLine[], edits: Record<string,
     for (const c of p.costs) if (!before.has(c.sku)) before.set(c.sku, { each: c.each, at: p.at });
   const out: Record<string, string> = {};
   for (const l of lines) {
-    const e = edits[lineKey(l)];
+    const e = editOf(edits, l);
     if (!l.sku || !e || e.removed) continue;
     const qty = e.qty ?? l.qty ?? 1;
     if (!(qty > 0)) continue;

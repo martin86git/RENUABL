@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Designer",
+    words: "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
+  },
+  {
+    day: "2026-11-21",
     area: "Billing",
     words: "Calls & Texts is $49 a month with 30 minutes and 30 texts free, then by use, with a spending cap you set.",
   },
