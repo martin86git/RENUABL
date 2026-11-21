@@ -482,6 +482,8 @@ alter table design_addons add column if not exists status text not null default 
 alter table design_addons add column if not exists stripe_item text;
 alter table design_addons add column if not exists by_email text;
 alter table design_addons add column if not exists requested_at timestamptz;
+-- Notice given to cancel (Calls & Texts, 30 days): still on and billed until then, then ended by the daily cron.
+alter table design_addons add column if not exists ends_at timestamptz;
 -- Each business's own phone number for its voice agents and texts (server/business-numbers.ts): bought on Twilio,
 -- imported into Vapi; one live number a business, released when the voice add-on ends.
 create table if not exists design_phone_numbers (

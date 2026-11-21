@@ -6,13 +6,19 @@ import Link from "next/link";
 import {
   ADD_ON_WORDS,
   ADD_TO_PLAN,
+  CANCEL_PLAN,
+  NOTICE_LINE,
   addOnPriceWords,
+  cancelNoticeWords,
+  endingWords,
+  hasNotice,
+  noticeEnds,
   numberStandingWords,
   standingWords,
   voiceTerms,
   type AddOnKey,
 } from "@/lib/domain/design/add-ons";
-import { addAddOn, getBusinessNumber, removeAddOn, useAddOns } from "@/lib/services/addons";
+import { addAddOn, getBusinessNumber, keepAddOn, removeAddOn, useAddOns } from "@/lib/services/addons";
 import { ui } from "./design-shell";
 
 const BILLING = "/design/settings/billing";
@@ -33,7 +39,8 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
   const item = view.addOns.find((a) => a.key === addOn);
   if (!item) return null;
   const words = ADD_ON_WORDS[addOn];
-  const usable = item.standing === "on" || item.standing === "included";
+  const usable = item.standing === "on" || item.standing === "included" || item.standing === "ending";
+  const statusLine = item.standing === "ending" ? endingWords(addOn, item.endsAt) : standingWords(addOn, item.standing);
 
   const act = async (
     ask: () => Promise<{ ok: boolean; message?: string; requested?: boolean; number?: string; numberPending?: boolean }>,
@@ -77,8 +84,7 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-canvas px-3 py-2.5 ring-1 ring-line">
         <p className="min-w-0 text-[13px] text-ink-2">
-          <span className="font-medium text-ink">{words.name}</span> ·{" "}
-          {usable ? standingWords(addOn, item.standing) : addOnPriceWords(addOn, item.cents)}
+          <span className="font-medium text-ink">{words.name}</span> · {usable ? statusLine : addOnPriceWords(addOn, item.cents)}
           {item.standing === "requested" && <> · {standingWords(addOn, "requested")}</>}
         </p>
         {button}
@@ -94,7 +100,7 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
           </ul>
         )}
         {/* Once it's on: the number, or where it stands and the way to get it. */}
-        {addOn === "voice" && item.standing === "on" && (
+        {addOn === "voice" && (item.standing === "on" || item.standing === "ending") && (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <p className="min-w-0 flex-1 text-[12px] leading-snug text-ink-2">
               {numberStandingWords({ number: view.number ? localNumber(view.number.e164) : null, canBuy: view.canBuyNumber })}
@@ -119,7 +125,7 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
       <p className="text-sm leading-relaxed text-ink-2">{words.what}</p>
       {!usable && (
         <ul className="space-y-1 text-sm text-ink-2">
-          {[...words.includes, ...(addOn === "voice" ? voiceTerms(view.nextBill) : [])].map((line) => (
+          {[...words.includes, ...(addOn === "voice" ? voiceTerms(view.nextBill) : [NOTICE_LINE])].map((line) => (
             <li key={line} className="flex gap-2">
               <span aria-hidden className="mt-2 size-1 shrink-0 rounded-full bg-ink" />
               {line}
@@ -127,7 +133,7 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
           ))}
         </ul>
       )}
-      {item.standing !== "off" && <p className="text-sm font-medium text-ink">{standingWords(addOn, item.standing)}</p>}
+      {item.standing !== "off" && <p className="text-sm font-medium text-ink">{statusLine}</p>}
       {addOn === "voice" && usable && <VoiceNumber view={view} busy={busy} onGet={() => void act(getBusinessNumber, "")} />}
       <div className="flex flex-wrap items-center gap-3">
         {button}
@@ -136,23 +142,71 @@ export function AddOnOffer({ addOn, compact = false, manage = false }: { addOn: 
             See it in Billing
           </Link>
         )}
-        {manage && view.mayAdd && (item.standing === "on" || item.standing === "requested") && (
+        {manage && view.mayAdd && item.standing === "requested" && (
           <button
             type="button"
             className={ui.quiet}
             disabled={busy}
-            onClick={() => (confirmEnd ? void act(() => removeAddOn(addOn), `${words.name} is off your plan.`) : setConfirmEnd(true))}
+            onClick={() => void act(() => removeAddOn(addOn), `${words.name} isn't asked for any more.`)}
           >
-            {confirmEnd
-              ? addOn === "voice"
-                ? "Yes, take it off and give up our number"
-                : "Yes, take it off my plan"
-              : item.standing === "requested"
-                ? "Cancel the request"
-                : "Take it off my plan"}
+            Cancel the request
+          </button>
+        )}
+        {manage && view.mayAdd && item.standing === "on" && !confirmEnd && (
+          <button type="button" className={ui.quiet} disabled={busy} onClick={() => setConfirmEnd(true)}>
+            {CANCEL_PLAN}
+          </button>
+        )}
+        {manage && view.mayAdd && item.standing === "ending" && (
+          <button
+            type="button"
+            className={ui.quiet}
+            disabled={busy}
+            onClick={() => void act(() => keepAddOn(addOn), `${words.name} stays on your plan.`)}
+          >
+            Keep {words.name}
           </button>
         )}
       </div>
+      {/* Before cancelling: the notice, what is billed, and what happens to the number. */}
+      {manage && confirmEnd && item.standing === "on" && (
+        <div role="alertdialog" aria-label={`Cancel ${words.name}`} className="space-y-3 rounded-md bg-canvas p-4 ring-1 ring-line">
+          {hasNotice(addOn) ? (
+            <ul className="space-y-1.5 text-[13px] leading-snug text-ink-2">
+              {cancelNoticeWords({
+                key: addOn,
+                endsAt: noticeEnds(new Date()),
+                number: view.number ? localNumber(view.number.e164) : null,
+              }).map((line) => (
+                <li key={line} className="flex gap-2">
+                  <span aria-hidden className="mt-[7px] size-1 shrink-0 rounded-full bg-ink-2" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[13px] text-ink-2">{words.name} comes off your plan now; the rest of this month is credited by the day.</p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={ui.primary}
+              disabled={busy}
+              onClick={() =>
+                void act(
+                  () => removeAddOn(addOn),
+                  hasNotice(addOn) ? `${words.name} is cancelled. It stays on until its notice ends.` : `${words.name} is off your plan.`,
+                )
+              }
+            >
+              {busy ? "Cancelling…" : `Yes, cancel ${words.name}`}
+            </button>
+            <button type="button" className={ui.quiet} disabled={busy} onClick={() => setConfirmEnd(false)}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      )}
       {note && <p className="text-sm text-ink-2">{note}</p>}
     </section>
   );

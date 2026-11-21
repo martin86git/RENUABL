@@ -7,10 +7,19 @@ import {
   addOnRequestNote,
   addRefusal,
   cleanAddOnKey,
+  hasNotice,
 } from "@/lib/domain/design/add-ons";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { buyNumber, numberBuyingOn, numberOf } from "@/lib/server/business-numbers";
-import { addOnsOf, addToSubscription, removeFromSubscription, requestAddOn, standingOf } from "@/lib/server/design-addons";
+import {
+  addOnsOf,
+  addToSubscription,
+  giveNotice,
+  removeFromSubscription,
+  requestAddOn,
+  standingOf,
+  withdrawNotice,
+} from "@/lib/server/design-addons";
 import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { tellStaff } from "@/lib/server/design-staff-note";
@@ -76,7 +85,9 @@ async function getNumber(businessId: string, email: string, businessName: string
 
 /**
  * POST { do: "add", key } → a priced add-on put on the plan's Stripe subscription now, an unpriced one asked for (kept,
- * RENUABL's staff told); { do: "remove", key } → taken off the plan (voice also releases the number); { do: "number" } →
+ * RENUABL's staff told); { do: "remove", key } → cancelled: Calls & Texts with 30 days' notice (on and billed until then,
+ * then off the plan and the number released by the daily cron), anything else at once; { do: "keep", key } → a cancel
+ * withdrawn while its notice runs; { do: "number" } →
  * the business's own phone number bought (voice add-on on, buying switched on). The owner only.
  */
 export async function POST(request: Request) {
@@ -105,9 +116,23 @@ export async function POST(request: Request) {
 
     if (read.body.do === "remove") {
       const standing = await standingOf(businessId, key);
+      if (standing === "ending") return Response.json({ ok: true, already: true });
       if (standing !== "on" && standing !== "requested")
         return Response.json({ ok: false, message: "It isn't on your plan." }, { status: 409 });
+      // Calls & Texts carries 30 days' notice: it stays on, and billed, until then (add-ons.ts CANCEL_NOTICE_DAYS).
+      if (standing === "on" && hasNotice(key)) {
+        const endsAt = await giveNotice(businessId, key, email);
+        return Response.json({ ok: true, endsAt });
+      }
       await removeFromSubscription(stripeClient(), businessId, key);
+      return Response.json({ ok: true });
+    }
+
+    // Changed their mind while the notice runs.
+    if (read.body.do === "keep") {
+      if ((await standingOf(businessId, key)) !== "ending")
+        return Response.json({ ok: false, message: "It isn't cancelled." }, { status: 409 });
+      await withdrawNotice(businessId, key);
       return Response.json({ ok: true });
     }
 

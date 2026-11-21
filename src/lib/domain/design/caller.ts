@@ -326,3 +326,23 @@ export const TINT_NAMES = ["Teal", "Blue", "Orange", "Violet", "Pink", "Gold"] a
 
 /** The initial shown when there is no photo. */
 export const callerInitial = (name: string) => (speakableName(name).charAt(0) || "S").toUpperCase();
+
+/**
+ * The Azure Speech region from whatever was typed into AZURE_SPEECH_REGION (21 Nov 2026, Martin: Microsoft's voices
+ * still didn't play): the region's name ("australiaeast"), as the portal shows it ("Australia East"), or an endpoint
+ * the portal lists ("https://australiaeast.api.cognitive.microsoft.com/", "australiaeast.tts.speech.microsoft.com").
+ * Null when no region can be read (a custom domain such as "<name>.cognitiveservices.azure.com" names no region).
+ */
+export function azureRegionFrom(raw: string | undefined | null): string | null {
+  const typed = (raw ?? "").trim().toLowerCase();
+  if (!typed) return null;
+  const host = /^(?:https?:\/\/)?([a-z0-9.-]+\.(?:microsoft\.com|azure\.com))(?:[/:?#]|$)/.exec(typed)?.[1];
+  if (host) {
+    if (host.endsWith(".cognitiveservices.azure.com")) return null;
+    const first = host.split(".")[0];
+    return /^[a-z0-9]{3,30}$/.test(first) ? first : null;
+  }
+  if (!/^[a-z0-9 _-]+$/.test(typed)) return null;
+  const region = typed.replace(/[^a-z0-9]/g, "");
+  return /^[a-z0-9]{3,30}$/.test(region) ? region : null;
+}

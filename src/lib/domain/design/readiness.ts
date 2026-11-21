@@ -7,7 +7,7 @@
 export type ReadinessState = "pass" | "fix" | "check";
 
 export interface ReadinessItem {
-  id: "panels" | "inverter" | "strings" | "unstrung" | "ratio" | "edges" | "pitch" | "costs" | "priced" | "solarVic" | "export";
+  id: "panels" | "inverter" | "supply" | "strings" | "unstrung" | "ratio" | "edges" | "pitch" | "costs" | "priced" | "solarVic" | "export";
   state: ReadinessState;
   /** What it is, in a few words. */
   label: string;
@@ -39,6 +39,8 @@ export interface ReadinessInput {
   phase: "single" | "three";
   /** The inverters' total rating, kW. */
   inverterKw: number;
+  /** Inverters on the design that can't go on the home's supply (three phase on single), by name (`supply-match.ts`). */
+  supplyClash?: readonly string[];
 }
 
 /** A single-phase connection's usual export limit without the distributor's approval, kW (VERIFY with each network). */
@@ -60,6 +62,14 @@ export function readiness(input: ReadinessInput): ReadinessItem[] {
       ? { id: "inverter", state: "pass", label: "Inverter", words: "Chosen." }
       : { id: "inverter", state: "fix", label: "Inverter", words: "Choose an inverter for these panels.", goTo: "kit" },
   );
+  if (input.supplyClash?.length)
+    add({
+      id: "supply",
+      state: "fix",
+      label: "Supply",
+      words: `${input.supplyClash.join(", ")} ${input.supplyClash.length === 1 ? "is a three-phase inverter" : "are three-phase inverters"} on a single-phase home: choose a single-phase one, or set the home to three phase if it is.`,
+      goTo: "kit",
+    });
   if (input.ratio)
     add(
       input.ratio.over

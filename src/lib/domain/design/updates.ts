@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Billing",
+    words: "Cancelling Calls & Texts or Growth gives 30 days' notice: it stays on until then, and you can change your mind.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
+    day: "2026-11-21",
     area: "CRM",
     words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
   },
@@ -38,6 +48,11 @@ export const UPDATES: readonly Update[] = [
     area: "Calls",
     words:
       "Calls & Texts now says when it's billed and what calls cost, asks for your number itself, and test calls work while it's set up.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Design tool",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
   },
   {
     day: "2026-11-21",

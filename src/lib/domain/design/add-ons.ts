@@ -81,13 +81,20 @@ export function addOnPriceWords(key: AddOnKey, cents: number | null = ADD_ON_MON
 }
 
 /** Where an add-on stands for a business, as read from its row (none: never asked for or ended). */
-export type AddOnRow = { status: "on" | "requested"; stripeItem: string | null } | null;
+export type AddOnRow = {
+  status: "on" | "requested";
+  stripeItem: string | null;
+  /** Notice given (Calls & Texts): it stays on, and billed, until this moment, then comes off and the number is released. */
+  endsAt?: string | null;
+} | null;
 
 export type AddOnStanding =
   /** RENUABL's own business: always on, never charged. */
   | "included"
   /** On the business's plan. */
   | "on"
+  /** Cancelled with notice given: still on and billed until the notice ends (`AddOnRow.endsAt`). */
+  | "ending"
   /** Asked for while unpriced: waiting for RENUABL to confirm the price and switch it on. */
   | "requested"
   /** Not on the plan: offered. */
@@ -95,13 +102,13 @@ export type AddOnStanding =
 
 export function addOnStanding(given: { own: boolean; row: AddOnRow }): AddOnStanding {
   if (given.own) return "included";
-  if (given.row?.status === "on") return "on";
+  if (given.row?.status === "on") return given.row.endsAt ? "ending" : "on";
   if (given.row?.status === "requested") return "requested";
   return "off";
 }
 
 /** Whether the business may use the add-on now. */
-export const addOnUsable = (standing: AddOnStanding): boolean => standing === "included" || standing === "on";
+export const addOnUsable = (standing: AddOnStanding): boolean => standing === "included" || standing === "on" || standing === "ending";
 
 /** What pressing Add to your plan does: buy it now (priced), ask for it (unpriced), or nothing to do. */
 export type AddOnAction = "buy" | "request" | "none";
@@ -145,6 +152,8 @@ export function standingWords(key: AddOnKey, standing: AddOnStanding): string {
       return `${name} is included for RENUABL's own business.`;
     case "on":
       return `${name} is on your plan.`;
+    case "ending":
+      return `${name} is cancelled and stays on until its notice ends.`;
     case "requested":
       return `You've asked for ${name}. We'll confirm the price with you, then switch it on.`;
     case "off":
@@ -210,9 +219,73 @@ export function voiceTerms(nextBill?: string | null): string[] {
     `There's no charge per call or per text. Each month includes ${v.minutes} voice-agent minutes and ${v.texts} texts for your whole business.`,
     `Beyond those, a minute takes ${v.minuteCredits} Sol credits and a text ${v.textCredits}.`,
     "Your own Australian business number comes with it, at no extra cost.",
-    "Take it off your plan whenever you like.",
+    NOTICE_LINE,
   ];
 }
+
+// ---------------------------------------------------------------------------
+// Cancelling with notice (21 Nov 2026, Martin)
+// ---------------------------------------------------------------------------
+
+/**
+ * Every add-on carries 30 days' notice to cancel (Calls & Texts first; Growth too, the same day, Martin: "apply the
+ * same 30 days notice to growth"). (21 Nov 2026, Martin: "the grace period should be 30 days - which is
+ * the period of time the user has to commit to when they purchase, and the amount of notice to cancel the number").
+ * Cancelling keeps it on, number and all, and billed for 30 days from that moment; then it comes off the plan (the
+ * Stripe item removed, prorated to that day) and the number is released. Cancelled on day 15 of a billing month: that
+ * month's fee stands, and the next month is billed only up to the notice's end, by the day. Growth's custom proposals
+ * and marketing email work until then too.
+ */
+export const CANCEL_NOTICE_DAYS = 30;
+
+/** Which add-ons carry notice to cancel. */
+export const hasNotice = (key: AddOnKey): boolean => ADD_ON_KEYS.includes(key);
+
+/** The line in an add-on's terms before it is added. */
+export const NOTICE_LINE = `Cancel any time with ${CANCEL_NOTICE_DAYS} days' notice: it stays on, and billed, for ${CANCEL_NOTICE_DAYS} days after you cancel.`;
+
+/** When notice given at `from` ends. */
+export const noticeEnds = (from: Date): Date => new Date(from.getTime() + CANCEL_NOTICE_DAYS * 86_400_000);
+
+/** The words on the button that cancels an add-on (Martin: "it should also say cancel plan and not take it off"). */
+export const CANCEL_PLAN = "Cancel plan";
+
+/**
+ * What a business is told before it cancels an add-on, with the day the notice would end (if cancelled now) and, for
+ * Calls & Texts, its number when it has one. Shown above the button that confirms.
+ */
+export function cancelNoticeWords(given: { key?: AddOnKey; endsAt: Date | string; number?: string | null }): string[] {
+  const key = given.key ?? "voice";
+  const name = ADD_ON_WORDS[key].name;
+  const day = dayWords(typeof given.endsAt === "string" ? given.endsAt : given.endsAt.toISOString());
+  const head = [
+    `${name} has ${CANCEL_NOTICE_DAYS} days' notice. If you cancel now it stays on, and is billed, until ${day}.`,
+    `This billing month's fee isn't refunded. If ${day} falls in your next billing month, that month is billed only up to ${day}, by the day.`,
+  ];
+  const last = `You can change your mind any time before ${day}.`;
+  if (key === "voice") {
+    const number = given.number ? `your business number ${given.number}` : "your business number";
+    return [
+      ...head,
+      `On ${day} it comes off your plan and ${number} is released. Calls and texts to it stop reaching you, and it can't be got back.`,
+      "To keep the number, move it to another phone provider before then.",
+      last,
+    ];
+  }
+  return [
+    ...head,
+    `On ${day} it comes off your plan: proposals you publish from then on use the standard design, marketing campaigns and sequences stop sending, and your contacts and past emails are kept.`,
+    last,
+  ];
+}
+
+/** Where a cancelled Calls & Texts stands while its notice runs. */
+export const endingWords = (key: AddOnKey, endsAt: string | null | undefined): string => {
+  const day = dayWords(endsAt);
+  return key === "voice"
+    ? `${ADD_ON_WORDS[key].name} is cancelled. It stays on, and is billed, until ${day}; then it comes off your plan and your business number is released.`
+    : `${ADD_ON_WORDS[key].name} is cancelled and comes off your plan on ${day}.`;
+};
 
 /** Where the business's own number stands once Calls & Texts is on its plan. */
 export function numberStandingWords(given: { number: string | null; canBuy: boolean }): string {
