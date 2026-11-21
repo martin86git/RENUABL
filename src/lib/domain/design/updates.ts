@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Agents",
+    words: "Adding an agent, its voice is picked from a list grouped by accent, with a play button to hear each one first.",
+  },
+  {
+    day: "2026-11-21",
     area: "Today",
     words: "Today opens on how the month is going and what's worth changing. Salespeople see their own month.",
   },
@@ -107,7 +112,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-20",
     area: "Floating bar",
     words:
-      "The bar on the right is slimmer and graphite, with team chat in its foot and Routines under it to match. Names show when you point at a round.",
+      "The bar on the right is slimmer and graphite, with team chat in its foot and Routines under it. Names show when you point at a round.",
   },
   {
     day: "2026-11-20",
@@ -381,8 +386,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-17",
     area: "Sol",
-    words:
-      "Ask Sol to set up a call and he puts up a card: it checks first if the customer agreed another time, books it on your press, gives you the Meet link to click and offers a reminder 1 hour, 30 or 10 minutes before.",
+    words: "Ask Sol to set up a call: a card checks the time the customer agreed, books it on your press, and offers a reminder before.",
   },
   {
     day: "2026-11-17",
@@ -499,8 +503,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
     area: "Sol",
-    words:
-      "Ask Sol to set up a call and he books it in your Google Calendar with a Google Meet link, then gives you the link to send. Connect your calendar again from the date tile first.",
+    words: "Sol books calls in your Google Calendar with a Meet link to send. Connect your calendar again from the date tile first.",
   },
   {
     day: "2026-11-16",
@@ -814,8 +817,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
-    words:
-      "Your chief of staff always speaks in a different voice from your phone assistant, and can't take its name, so nobody takes the two for the same person.",
+    words: "Your chief of staff never shares a voice or name with your phone assistant, so nobody mistakes one for the other.",
   },
   {
     day: "2026-11-13",
@@ -826,7 +828,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-13",
     area: "Calls",
     words:
-      "Your team's own voice assistant, a chief of staff: call it from the app (or ring the team line with your PIN) and ask about your deals. Customers never reach it.",
+      "A chief of staff for your team: call it from the app or the team line with your PIN to ask about your deals. Customers never reach it.",
   },
   {
     day: "2026-11-13",

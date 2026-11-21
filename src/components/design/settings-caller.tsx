@@ -297,11 +297,11 @@ const same = (a: CallerVoice | null, b: CallerVoice | null) => a?.provider === b
  */
 /** The one sample clip playing, wherever the picker is shown: starting another stops it. */
 let sampleNow: HTMLAudioElement | null = null;
-function stopSample() {
+export function stopSample() {
   sampleNow?.pause();
   sampleNow = null;
 }
-function startSample(url: string, over: () => void, failed: () => void) {
+export function startSample(url: string, over: () => void, failed: () => void) {
   const clip = new Audio(url);
   sampleNow = clip;
   clip.onended = over;
