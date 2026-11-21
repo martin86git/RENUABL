@@ -18,14 +18,29 @@ describe("a row dragged out from the first panel", () => {
     expect(pivotDrag({ ...anchor, angle: 30 }, at(2, 40), step, null).state).toEqual({ mode: "row" });
   });
 
-  it("stays a straight row however the pointer wanders afterwards", () => {
+  it("starts to pivot as soon as the pointer leaves the row's line, however the drag began", () => {
     const begun = pivotDrag(anchor, at(1, 5), step, null);
-    expect(pivotDrag(anchor, at(6, 50), step, begun.state)).toEqual({ angle: 0, state: { mode: "row" } });
+    expect(begun.state).toEqual({ mode: "row" });
+    const swung = pivotDrag(anchor, at(6, 20), step, begun.state);
+    expect(swung.state?.mode).toBe("pivot");
+    expect(swung.angle).toBeCloseTo(20);
+    // And goes on pivoting when it comes back near the line (it clicks back square within a few degrees).
+    expect(pivotDrag(anchor, at(6, 8), step, swung.state).angle).toBeCloseTo(8);
+  });
+
+  it("turns the way the panel faces with the pointer, all the way round", () => {
+    let state: PivotState | null = null;
+    let angle = 0;
+    for (let deg = 20; deg <= 180; deg += 10) ({ angle, state } = pivotDrag(anchor, at(4, deg), step, state));
+    // Swung half way round from north it faces south.
+    expect(angle).toBeCloseTo(180);
+    for (let deg = 190; deg <= 270; deg += 10) ({ angle, state } = pivotDrag(anchor, at(4, deg), step, state));
+    expect(angle).toBeCloseTo(270);
   });
 
   it("pivots towards the pointer when pulled any other way", () => {
     const out = pivotDrag(anchor, at(2, 35), step, null);
-    expect(out.state).toEqual({ mode: "pivot" });
+    expect(out.state?.mode).toBe("pivot");
     expect(out.angle).toBeCloseTo(35);
   });
 
@@ -53,7 +68,7 @@ describe("a row dragged out from the first panel", () => {
     expect(pivotDrag(anchor, at(5, 35), step, null, [123]).angle).toBeCloseTo(33);
     expect(pivotDrag(anchor, at(5, 35), step, null, [50]).angle).toBeCloseTo(35);
     // And the way it was put down, when the pointer swings back to it.
-    expect(pivotDrag(anchor, at(5, 3), step, { mode: "pivot" }).angle).toBeCloseTo(0);
+    expect(pivotDrag(anchor, at(5, 3), step, { mode: "pivot", angle: 6 }).angle).toBeCloseTo(0);
   });
 });
 
