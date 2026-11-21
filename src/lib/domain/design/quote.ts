@@ -287,6 +287,12 @@ export interface LineEdit {
   amount?: number;
   /** How many, typed over the worked-out count: the line is priced again at its cost each, unless a cost is typed too. */
   qty?: number;
+  /**
+   * The cost of one, typed over a counted line (21 Nov 2026, Martin: "the current price field should be for the single
+   * unit qty. then the total should be the qty x by the unit price"): the line is that times how many, so it follows
+   * the count as the design changes. An `amount` typed before this (a whole line's cost) still wins.
+   */
+  each?: number;
   removed?: boolean;
   /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
   on?: boolean;
@@ -398,6 +404,9 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
           label: l.label.replace(/at [\d.]+c a watt/, `at ${centsWords(edit.rate)}c a watt`),
         };
       }
+      // A cost each typed over a counted line: that times how many there are now.
+      if (edit?.each !== undefined && line.qty !== undefined)
+        line = { ...line, amount: Math.round(edit.each * line.qty * 100) / 100, missing: undefined };
       // A cost typed over a line settles it, and wins over the quantity's.
       return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
     });
@@ -727,6 +736,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
       if (key.length > 160 || !value || typeof value !== "object") continue;
       const v = value as {
         amount?: unknown;
+        each?: unknown;
         qty?: unknown;
         removed?: unknown;
         on?: unknown;
@@ -765,9 +775,11 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         typeof v.rate === "number" && Number.isFinite(v.rate) && v.rate >= 0 && v.rate <= MAX_RATE_PER_WATT
           ? Math.round(v.rate * 10_000) / 10_000
           : undefined;
-      if (amount !== undefined || qty !== undefined || rate !== undefined || on)
+      const each = money(v.each);
+      if (amount !== undefined || each !== undefined || qty !== undefined || rate !== undefined || on)
         edits[key] = {
           ...(amount !== undefined ? { amount } : {}),
+          ...(each !== undefined ? { each } : {}),
           ...(qty !== undefined ? { qty } : {}),
           ...(rate !== undefined ? { rate } : {}),
           ...(on ? { on: true } : {}),
