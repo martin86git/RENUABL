@@ -327,8 +327,8 @@ export function DesignDrawer(props: {
         <nav
           data-design-popup
           aria-label="This deal's tools"
-          className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
-          style={{ left: `calc((100vw - ${popWidth(popW)}) / 2 - 4rem)` }}
+          className="popup-tools fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
+          style={{ "--pop-w": popWidth(popW) } as React.CSSProperties}
         >
           <button
             type="button"

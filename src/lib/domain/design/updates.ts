@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
+    day: "2026-11-21",
     area: "CRM",
     words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
   },

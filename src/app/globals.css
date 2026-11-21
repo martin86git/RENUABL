@@ -1296,6 +1296,21 @@ html:has(.sales-snap) {
   }
 }
 
+/* The pop-up's tool rounds stand in the grey just left of the window, wherever the window is (21 Nov 2026, Martin: with
+   Sol's panel open the window moved over beside it and the rounds stayed put, on top of the window). `--pop-w` is the
+   window's width as set on it; beside Sol's panel the window keeps a gutter either side for the rounds. */
+.popup-tools {
+  left: calc((100vw - var(--pop-w)) / 2 - 4rem);
+}
+@media (min-width: 1280px) {
+  html.sol-docked section[data-design-popup] {
+    max-width: calc(100vw - var(--sol-w) - 10rem);
+  }
+  html.sol-docked .popup-tools {
+    left: calc((100vw - var(--sol-w) - min(var(--pop-w), 100vw - var(--sol-w) - 10rem)) / 2 - 4rem);
+  }
+}
+
 /* Sol's guide: the shade analysis loading bar, filling once (19 Nov 2026). */
 @keyframes sol-shade-fill {
   from {
