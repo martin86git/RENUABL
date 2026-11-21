@@ -165,3 +165,13 @@ describe("the phone assistant's voice", () => {
     expect(w).toContain("test");
   });
 });
+
+describe("voiceAccent", () => {
+  it("reads each voice's accent from its first word", async () => {
+    const { voiceAccent, CALLER_VOICES } = await import("./caller");
+    expect(voiceAccent({ words: "Australian, relaxed and natural" })).toBe("Australian");
+    expect(voiceAccent({ words: "Australian · Microsoft, hear it on a test call" })).toBe("Australian");
+    expect(voiceAccent({ words: "British" })).toBe("British");
+    expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(new Set(["Australian", "British", "Canadian", "American"]));
+  });
+});

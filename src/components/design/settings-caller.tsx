@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { Camera, Check, GraduationCap, MessageCircle, Phone, PhoneCall, Play, RotateCcw, Square, Trash2, VolumeX, X } from "lucide-react";
+import { Camera, GraduationCap, MessageCircle, Phone, PhoneCall, Play, RotateCcw, Square, Trash2, VolumeX } from "lucide-react";
 import {
   CALLER_COPY,
   CALLER_NAME_MAX,
@@ -17,7 +17,6 @@ import {
   voiceKey,
   voiceLabel,
   voicesRemoved,
-  voicesShown,
   voiceSampleUrl,
   type CallerVoice,
 } from "@/lib/domain/design/caller";
@@ -36,6 +35,7 @@ import {
 } from "@/lib/services/caller";
 import { installFirstMessage, ROLE_WORDS, CALLER_ROLES, type CallerKey, type CallerRole } from "@/lib/domain/install-call";
 import { ui } from "./design-shell";
+import { VoiceChoice, startSample, stopSample } from "./voice-choice";
 import { COACH_COPY } from "@/lib/domain/design/coaching";
 import { openCoach } from "@/lib/services/coaching";
 
@@ -295,20 +295,6 @@ const same = (a: CallerVoice | null, b: CallerVoice | null) => a?.provider === b
  * one, or any voice by its ID; saved on a press, and heard on a short call to the member's own mobile. `compact` is the
  * same picker in one column with no card, for the assistant's own chat (13 Nov 2026, Martin).
  */
-/** The one sample clip playing, wherever the picker is shown: starting another stops it. */
-let sampleNow: HTMLAudioElement | null = null;
-function stopSample() {
-  sampleNow?.pause();
-  sampleNow = null;
-}
-function startSample(url: string, over: () => void, failed: () => void) {
-  const clip = new Audio(url);
-  sampleNow = clip;
-  clip.onended = over;
-  clip.onerror = failed;
-  void clip.play().catch(over);
-}
-
 export function VoicePicker({
   caller,
   callsOn,
@@ -414,45 +400,6 @@ export function VoicePicker({
     onStatus(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.message });
   };
 
-  const row = (label: string, words: string, picked: boolean, onPick: () => void, key: string, voice?: CallerVoice) => (
-    <div key={key} className="flex min-w-0 items-center gap-1.5">
-      {pickButton(label, words, picked, onPick)}
-      {voice && sampleButton(voice, label)}
-      {voice && !picked && (
-        <button
-          type="button"
-          onClick={() => void changeHidden({ hide: voiceKey(voice) })}
-          aria-label={`Remove ${label} from the list`}
-          title="Remove from the list"
-          className="grid size-7 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
-        >
-          <X className="size-3.5" aria-hidden />
-        </button>
-      )}
-    </div>
-  );
-
-  const pickButton = (label: string, words: string, picked: boolean, onPick: () => void) => (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={onPick}
-      className={clsx(
-        "flex min-w-0 flex-1 items-center gap-3 rounded-md px-3 py-2 text-left text-sm ring-1",
-        picked ? "bg-surface-2 ring-ink" : "ring-line hover:ring-ink-2",
-      )}
-      aria-pressed={picked}
-    >
-      <span
-        className={clsx("grid size-4 shrink-0 place-items-center rounded-full ring-1", picked ? "bg-primary ring-primary" : "ring-line")}
-      >
-        {picked && <Check className="size-3 text-primary-ink" aria-hidden />}
-      </span>
-      <span className="font-medium text-ink">{label}</span>
-      <span className="truncate text-ink-2">{words}</span>
-    </button>
-  );
-
   return (
     <div className={compact ? "" : clsx(ui.card, "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -482,41 +429,23 @@ export function VoicePicker({
         Pick one that suits the name, and press play to hear a voice&apos;s sample. Train and Test call both ring the mobile on your
         account, in the voice saved here.
       </p>
-      {(["female", "male"] as const).map((sex) => (
-        <div key={sex} className="mt-3">
-          <p className={ui.eyebrow}>{sex === "female" ? "Female voices" : "Male voices"}</p>
-          <div className={clsx("mt-1.5 grid gap-1.5", !compact && "sm:grid-cols-2")}>
-            {voicesShown(hidden, caller.voice)
-              .filter((v) => v.sex === sex)
-              .map((v) =>
-                row(
-                  v.label,
-                  v.words,
-                  !own && same(v, caller.voice),
-                  () => {
-                    setOwn(false);
-                    void choose({ provider: v.provider, voiceId: v.voiceId });
-                  },
-                  `${v.provider}:${v.voiceId}`,
-                  { provider: v.provider, voiceId: v.voiceId },
-                ),
-              )}
-          </div>
-        </div>
-      ))}
-      <div className={clsx("mt-3 grid gap-1.5", !compact && "sm:grid-cols-2")}>
-        {row(
-          "Default",
-          "The site's usual voice",
-          !own && !caller.voice,
-          () => {
-            setOwn(false);
-            void choose(null);
-          },
-          "default",
-        )}
-        {row("Another voice", "By its ID from Vapi or ElevenLabs", own, () => setOwn(true), "own")}
-      </div>
+      <VoiceChoice
+        value={own ? "own" : caller.voice && ours ? voiceKey(caller.voice) : caller.voice ? "own" : "default"}
+        onChange={(key) => {
+          if (key === "own") return setOwn(true);
+          setOwn(false);
+          if (key === "default") return void choose(null);
+          const v = CALLER_VOICES.find((c) => voiceKey(c) === key);
+          if (v) void choose({ provider: v.provider, voiceId: v.voiceId });
+        }}
+        others={[
+          { key: "default", label: "Default", words: "The site's usual voice" },
+          { key: "own", label: "Another voice", words: "By its ID from Vapi or ElevenLabs" },
+        ]}
+        hidden={hidden}
+        onRemove={(key) => void changeHidden({ hide: key })}
+        disabled={busy}
+      />
       {removed.length > 0 && (
         <div className="mt-3 rounded-md bg-canvas px-3 py-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -552,17 +481,23 @@ export function VoicePicker({
       )}
       {own && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <select
-            className={clsx(ui.input, "w-auto")}
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as CallerVoice["provider"])}
-          >
+          <div role="radiogroup" aria-label="Who makes the voice" className="flex flex-wrap gap-1 rounded-full bg-canvas p-1">
             {VOICE_PROVIDERS.map((p) => (
-              <option key={p.id} value={p.id}>
+              <button
+                key={p.id}
+                type="button"
+                role="radio"
+                aria-checked={provider === p.id}
+                onClick={() => setProvider(p.id)}
+                className={clsx(
+                  "rounded-full px-3 py-1.5 text-xs font-medium",
+                  provider === p.id ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
+                )}
+              >
                 {p.label}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
           <input
             className={clsx(ui.input, "max-w-64")}
             placeholder="Voice ID"

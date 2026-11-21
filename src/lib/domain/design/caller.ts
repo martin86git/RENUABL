@@ -167,6 +167,9 @@ export function voicesShown(hidden: readonly string[], inUse: CallerVoice | null
   return CALLER_VOICES.filter((v) => !gone.has(voiceKey(v)) || voiceKey(v) === using);
 }
 
+/** A voice's accent, its first word ("Australian, relaxed" → "Australian"), to group the list by. */
+export const voiceAccent = (v: Pick<VoiceChoice, "words">): string => v.words.split(/[\s,·(]/)[0] || "Other";
+
 /** The voices put away, to bring back. */
 export const voicesRemoved = (hidden: readonly string[], inUse: CallerVoice | null): VoiceChoice[] => {
   const shown = new Set(voicesShown(hidden, inUse).map(voiceKey));
