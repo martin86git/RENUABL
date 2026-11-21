@@ -6562,7 +6562,8 @@ export function RoofDesigner(props: {
                     openMenu(menu === "bill" ? false : "bill");
                   }}
                   className={clsx(
-                    "min-w-0 flex-1 cursor-pointer",
+                    // Clipped, so a figure that runs long never paints under the shade widget beside it.
+                    "min-w-0 flex-1 cursor-pointer overflow-hidden",
                     !shadeOn || (shadeOpen && tool !== "string") ? "rounded-r-lg" : "",
                     props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
@@ -6584,12 +6585,16 @@ export function RoofDesigner(props: {
                       className="flex items-center gap-3 whitespace-nowrap text-xs tabular-nums text-muted"
                       title="What it does for this home: open the bill"
                     >
-                      <span>
-                        Bill{" "}
-                        <b className="text-[14px] font-semibold text-ink">
-                          {dollars(finance.billNow)} → {dollars(finance.billAfter)}
-                        </b>
-                      </span>
+                      {/* Left out while the shade widget sits beside them: the pop-up's strip has no room for both
+                          (the widget lay over Payback). The bill is a press away. */}
+                      {!(shadeOn && !(shadeOpen && tool !== "string")) && (
+                        <span>
+                          Bill{" "}
+                          <b className="text-[14px] font-semibold text-ink">
+                            {dollars(finance.billNow)} → {dollars(finance.billAfter)}
+                          </b>
+                        </span>
+                      )}
                       <span>
                         Saves <b className="text-[14px] font-semibold text-positive">{dollars(finance.saving)}</b>/yr
                       </span>
