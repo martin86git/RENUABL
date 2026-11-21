@@ -62,6 +62,15 @@ export const pinTurn = (at: string, role: "you" | "sol", pinned: boolean) => pos
 /** Said on the window to open or shut Sol's panel from anywhere (the rail, a "#" link). */
 export const SOL_TOGGLE = "renuabl:sol-toggle";
 /**
+ * On a phone, a deal page shows Sol's card for that deal as a sheet over the foot (21 Nov 2026, Martin). While one is
+ * on screen it sets `data-deal-sol` on <html>, and the foot bar's Sol round toggles that sheet instead of his panel.
+ */
+export const DEAL_SOL_TOGGLE = "renuabl:deal-sol-toggle";
+export function toggleSolHere(phone: boolean) {
+  const deal = phone && typeof document !== "undefined" && document.documentElement.dataset.dealSol === "1";
+  window.dispatchEvent(new Event(deal ? DEAL_SOL_TOGGLE : SOL_TOGGLE));
+}
+/**
  * Said on the window with a question: opens Sol's panel and asks him (the search, "Ask Sol"). `detail` is the words,
  * or `{ text, shown }` when the words are a long instruction and the chat should show a short line for it.
  */

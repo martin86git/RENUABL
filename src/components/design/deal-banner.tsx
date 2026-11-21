@@ -133,20 +133,16 @@ export function DealBanner({
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
               {pulse && (
-                <span className="max-sm:hidden [&>*]:mt-0">
+                <span className="[&>*]:mt-0 max-sm:basis-full">
                   <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
                 </span>
               )}
             </div>
           </div>
-          <div className="max-sm:hidden">
+          {/* On a phone (21 Nov 2026, Martin): Call and Email, then the kit down the right edge, its words left of each icon. */}
+          <div className="max-sm:flex max-sm:flex-col max-sm:items-end max-sm:gap-2.5">
+            {actions && <div className="sm:hidden">{actions}</div>}
             <Kit figures={figures} compact={compact} />
-          </div>
-          {actions && <div className="sm:hidden">{actions}</div>}
-          {/* On a phone the kit is one row of badges, with the deal's clock and heat after it (21 Nov 2026, Martin). */}
-          <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:hidden [&>div]:mt-0">
-            <KitBadges figures={figures} />
-            {pulse && <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />}
           </div>
         </div>
 
@@ -242,26 +238,26 @@ function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }
   return (
     <dl
       className={clsx(
-        "flex max-sm:flex-col max-sm:items-start max-sm:gap-y-1 sm:flex-wrap",
+        "flex max-sm:flex-col max-sm:items-end max-sm:gap-y-1.5 sm:flex-wrap",
         compact ? "sm:gap-x-5 sm:gap-y-2" : "sm:gap-x-6 sm:gap-y-3",
       )}
     >
       {figures.map((f) => {
         const Icon = KIT_ICONS[f.label] ?? PanelIcon;
         return (
-          <div key={f.label} className="flex min-w-0 items-center gap-2.5 max-sm:gap-2">
+          <div key={f.label} className="flex min-w-0 items-center gap-2.5 max-sm:flex-row-reverse max-sm:gap-2">
             <span
               className={clsx(
-                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15 max-sm:size-6",
+                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15 max-sm:size-8",
                 compact ? "size-8" : "size-10",
               )}
               aria-hidden
             >
-              <Icon className={clsx("max-sm:size-3.5", compact ? "size-[18px]" : "size-[22px]")} />
+              <Icon className={clsx("max-sm:size-[17px]", compact ? "size-[18px]" : "size-[22px]")} />
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 max-sm:text-right">
               <dt className="sr-only">{f.label}</dt>
-              <dd className={clsx("tabular-nums leading-tight text-white max-sm:text-[12px]", compact ? "text-[14px]" : "text-[16px]")}>
+              <dd className={clsx("tabular-nums leading-tight text-white max-sm:text-[13px]", compact ? "text-[14px]" : "text-[16px]")}>
                 {f.label === "EV charger" ? "EV charger" : f.value}
               </dd>
               {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60 max-sm:hidden">{f.note}</dd>}
@@ -274,26 +270,6 @@ function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }
 }
 
 /** The kit on a phone: one row of small badges, an icon and its size each (21 Nov 2026, Martin). */
-function KitBadges({ figures }: { figures: BannerFigure[] }) {
-  if (!figures.length) return <span className="text-[11.5px] text-white/60">No system designed yet</span>;
-  return (
-    <>
-      {figures.map((f) => {
-        const Icon = KIT_ICONS[f.label] ?? PanelIcon;
-        return (
-          <span
-            key={f.label}
-            className="inline-flex h-[22px] items-center gap-1 rounded-full bg-white/10 px-2 text-[11px] tabular-nums text-white ring-1 ring-white/15"
-          >
-            <Icon className="size-3 text-sun-line" />
-            <span className="sr-only">{f.label}: </span>
-            {f.label === "EV charger" ? "EV charger" : f.value}
-          </span>
-        );
-      })}
-    </>
-  );
-}
 
 type IconProps = { className?: string };
 const LINE = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
