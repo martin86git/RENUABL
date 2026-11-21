@@ -8,6 +8,11 @@ import {
   addOnRequestNote,
   addOnStanding,
   addOnUsable,
+  CANCEL_PLAN,
+  cancelNoticeWords,
+  hasNotice,
+  noticeEnds,
+  voiceTerms,
   addRefusal,
   cleanAddOnKey,
   marketingUsable,
@@ -87,5 +92,29 @@ describe("add-ons", () => {
     const note = addOnRequestNote({ key: "voice", business: "Sunrise Solar", by: "sam@example.com" });
     expect(note).toContain("Calls & Texts");
     expect(note).toContain("/admin");
+  });
+});
+
+describe("cancelling with notice", () => {
+  it("keeps Calls & Texts on, and usable, while the notice runs", () => {
+    const standing = addOnStanding({ own: false, row: { status: "on", stripeItem: "si_1", endsAt: "2026-12-21T00:00:00Z" } });
+    expect(standing).toBe("ending");
+    expect(addOnUsable(standing)).toBe(true);
+  });
+
+  it("gives Calls & Texts 30 days' notice and Growth none", () => {
+    expect(hasNotice("voice")).toBe(true);
+    expect(hasNotice("marketing")).toBe(false);
+    expect(noticeEnds(new Date("2026-11-21T03:00:00Z")).toISOString()).toBe("2026-12-21T03:00:00.000Z");
+  });
+
+  it("tells the business what cancelling costs and what happens to the number", () => {
+    const words = cancelNoticeWords({ endsAt: "2026-12-21T03:00:00Z", number: "0420 116 418" }).join(" ");
+    expect(words).toContain("30 days' notice");
+    expect(words).toContain("21 December");
+    expect(words).toContain("0420 116 418 is released");
+    expect(words).toContain("by the day");
+    expect(CANCEL_PLAN).toBe("Cancel plan");
+    expect(voiceTerms().join(" ")).toContain("30 days' notice");
   });
 });

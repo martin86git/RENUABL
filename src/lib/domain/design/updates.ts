@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
+    area: "Billing",
+    words: "Cancelling Calls & Texts gives 30 days' notice: it stays on until then, and you can change your mind.",
+  },
+  {
+    day: "2026-11-21",
     area: "Designer",
     words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
   },

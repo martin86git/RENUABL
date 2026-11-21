@@ -14,6 +14,7 @@ import {
   addOnStanding,
   addOnUsable,
   cleanAddOnKey,
+  noticeEnds,
   type AddOnKey,
   type AddOnRow,
   type AddOnStanding,
@@ -36,13 +37,14 @@ export async function hasAddOn(businessId: string, addOn: string): Promise<boole
 }
 
 async function rowOf(businessId: string, key: AddOnKey): Promise<AddOnRow> {
-  const rows = await query<{ status: string; stripe_item: string | null }>(
-    `select status, stripe_item from design_addons where business_id = $1 and add_on = $2 and ended_at is null`,
+  const rows = await query<{ status: string; stripe_item: string | null; ends_at: string | null }>(
+    `select status, stripe_item, to_char(ends_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ends_at
+       from design_addons where business_id = $1 and add_on = $2 and ended_at is null`,
     [businessId, key],
   );
   const r = rows[0];
   if (!r) return null;
-  return { status: r.status === "requested" ? "requested" : "on", stripeItem: r.stripe_item };
+  return { status: r.status === "requested" ? "requested" : "on", stripeItem: r.stripe_item, endsAt: r.ends_at };
 }
 
 /** RENUABL's own business, or one RENUABL doesn't bill (design-not-billed.ts): every add-on included. */
@@ -62,9 +64,63 @@ export async function addOnOn(businessId: string, key: AddOnKey): Promise<boolea
 }
 
 /** Every add-on with where it stands and its price, for Billing and the offers. */
-export async function addOnsOf(businessId: string): Promise<{ key: AddOnKey; standing: AddOnStanding; cents: number | null }[]> {
+export async function addOnsOf(
+  businessId: string,
+): Promise<{ key: AddOnKey; standing: AddOnStanding; cents: number | null; endsAt: string | null }[]> {
   const keys = Object.keys(ADD_ON_WORDS) as AddOnKey[];
-  return Promise.all(keys.map(async (key) => ({ key, standing: await standingOf(businessId, key), cents: ADD_ON_MONTHLY_CENTS[key] })));
+  return Promise.all(
+    keys.map(async (key) => ({
+      key,
+      standing: await standingOf(businessId, key),
+      cents: ADD_ON_MONTHLY_CENTS[key],
+      endsAt: (await rowOf(businessId, key).catch(() => null))?.endsAt ?? null,
+    })),
+  );
+}
+
+/**
+ * Notice given to cancel (Calls & Texts, `CANCEL_NOTICE_DAYS`): it stays on, number and all, and billed until the notice
+ * ends, when the daily cron takes it off (`endNoticesDue`). Answers when it ends; null when it isn't on or notice is
+ * already running (then nothing changes).
+ */
+export async function giveNotice(businessId: string, key: AddOnKey, by: string, now = new Date()): Promise<string | null> {
+  const rows = await query<{ ends_at: string }>(
+    `update design_addons set ends_at = $3, by_email = $4
+      where business_id = $1 and add_on = $2 and status = 'on' and ended_at is null and ends_at is null
+      returning to_char(ends_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ends_at`,
+    [businessId, key, noticeEnds(now).toISOString(), by.toLowerCase()],
+  );
+  return rows[0]?.ends_at ?? null;
+}
+
+/** The business changed its mind while the notice ran: it stays on as before. */
+export async function withdrawNotice(businessId: string, key: AddOnKey): Promise<boolean> {
+  const rows = await query(
+    `update design_addons set ends_at = null where business_id = $1 and add_on = $2 and ended_at is null and ends_at is not null returning add_on`,
+    [businessId, key],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * The daily cron: every add-on whose notice has run out taken off its plan (the Stripe item removed, prorated to the
+ * day the notice ended) and ended, which for voice releases the number. Answers how many.
+ */
+export async function endNoticesDue(stripe: Stripe | null, now = new Date()): Promise<number> {
+  const due = await query<{ business_id: string; add_on: string; ends_at: Date }>(
+    `select business_id, add_on, ends_at from design_addons where ended_at is null and ends_at is not null and ends_at <= $1`,
+    [now.toISOString()],
+  );
+  let n = 0;
+  for (const d of due) {
+    const key = cleanAddOnKey(d.add_on);
+    if (!key) continue;
+    await removeFromSubscription(stripe, d.business_id, key, new Date(d.ends_at)).catch((e) =>
+      console.error("add-on notice not ended", e instanceof Error ? e.message : e),
+    );
+    n++;
+  }
+  return n;
 }
 
 /** An unpriced add-on asked for: kept as asked for (nothing charged). False when it is already asked for or on. */
@@ -86,7 +142,8 @@ export async function switchOn(businessId: string, key: AddOnKey, by: string, st
     `insert into design_addons (business_id, add_on, status, by_email, stripe_item, since, ended_at)
      values ($1, $2, 'on', $3, $4, now(), null)
      on conflict (business_id, add_on) do update set status = 'on', by_email = $3, stripe_item = coalesce($4, design_addons.stripe_item),
-       since = case when design_addons.status = 'on' and design_addons.ended_at is null then design_addons.since else now() end, ended_at = null`,
+       since = case when design_addons.status = 'on' and design_addons.ended_at is null then design_addons.since else now() end,
+       ends_at = case when design_addons.ended_at is null then design_addons.ends_at else null end, ended_at = null`,
     [businessId, key, by.toLowerCase(), stripeItem],
   );
 }
@@ -170,14 +227,27 @@ export async function addToSubscription(
   return { item: item.id };
 }
 
-/** An add-on taken off the plan: its subscription item removed (prorated), then ended here. */
-export async function removeFromSubscription(stripe: Stripe | null, businessId: string, key: AddOnKey): Promise<void> {
+/**
+ * An add-on taken off the plan: its subscription item removed (prorated), then ended here. `at` is the moment billing
+ * stops (a notice's end, which the daily cron reaches up to a day late), so the proration counts to then, not to now.
+ */
+export async function removeFromSubscription(stripe: Stripe | null, businessId: string, key: AddOnKey, at?: Date): Promise<void> {
   const row = await rowOf(businessId, key);
-  if (row?.stripeItem && stripe)
-    await stripe.subscriptionItems.del(row.stripeItem, { proration_behavior: "create_prorations" }).catch((e) => {
-      // Already gone at Stripe (the plan ended): nothing to take off.
-      console.error("add-on item not removed", e instanceof Error ? e.message : e);
-    });
+  if (row?.stripeItem && stripe) {
+    const item = row.stripeItem;
+    const del = (prorationDate?: number) =>
+      stripe.subscriptionItems.del(item, {
+        proration_behavior: "create_prorations",
+        ...(prorationDate ? { proration_date: prorationDate } : {}),
+      });
+    // Stripe takes a proration date only inside the current billing period: past it, prorate to now.
+    await del(at ? Math.floor(at.getTime() / 1000) : undefined)
+      .catch(() => (at ? del() : Promise.reject(new Error("not removed"))))
+      .catch((e) => {
+        // Already gone at Stripe (the plan ended): nothing to take off.
+        console.error("add-on item not removed", e instanceof Error ? e.message : e);
+      });
+  }
   await endAddOn(businessId, key);
 }
 
