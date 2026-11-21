@@ -250,3 +250,56 @@ function Option({ on, onPick, after, children }: { on: boolean; onPick: () => vo
     </div>
   );
 }
+
+/**
+ * One voice's play round on its own, for places that show the voice an agent speaks in without the list (21 Nov 2026,
+ * Martin: the agent's picture card, beside its colours). Its maker's sample, no call; a voice with none says so.
+ */
+export function VoiceSample({ voice, label }: { voice: CallerVoice | null; label: string }) {
+  const [on, setOn] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => stopSample, []);
+  const url = voiceSampleUrl(voice);
+  const play = () => {
+    stopSample();
+    setNote(null);
+    if (on) return setOn(false);
+    if (!url) return setNote(NO_SAMPLE);
+    setOn(true);
+    startSample(
+      url,
+      () => setOn(false),
+      () => {
+        setOn(false);
+        setNote(NO_SAMPLE);
+      },
+    );
+  };
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{label}</span>
+        {url ? (
+          <button
+            type="button"
+            onClick={play}
+            aria-label={on ? `Stop ${label}` : `Hear ${label}`}
+            title={on ? "Stop" : "Hear the voice: a sample, no call"}
+            className={clsx(
+              "grid size-8 shrink-0 place-items-center rounded-full ring-1 transition-colors",
+              on ? "bg-sun-line text-white ring-sun-line" : "bg-surface text-ink ring-line hover:ring-ink-2",
+            )}
+          >
+            {on ? <Square className="size-3" aria-hidden /> : <Play className="size-3 translate-x-px" aria-hidden />}
+          </button>
+        ) : (
+          <span className="grid size-8 shrink-0 place-items-center text-muted" title={NO_SAMPLE}>
+            <VolumeX className="size-3.5" aria-hidden />
+            <span className="sr-only">{NO_SAMPLE}</span>
+          </span>
+        )}
+      </div>
+      {note && <p className="mt-1 text-xs text-muted">{note}</p>}
+    </div>
+  );
+}
