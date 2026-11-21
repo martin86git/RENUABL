@@ -30,7 +30,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import type { VapiEvent } from "@/lib/domain/voice-agent";
 import { dbConfigured, newId, query, randomToken } from "./db";
 import { viewerOf } from "./design-context";
-import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { customerDetail, jobById, listCustomers, listJobs, stageNamesOf } from "./design-crm-repo";
 import { hashPassword, passwordMatches } from "./design-passwords";
 import { memberByEmail, type Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
@@ -150,8 +150,12 @@ const serverUrl = (site: string, ref: string) => `${site.replace(/\/$/, "")}/api
 
 /** The member's deals in brief, as Sol's facts are. */
 async function factsFor(member: Member): Promise<string> {
-  const [jobs, open] = await Promise.all([listJobs(member.businessId, viewerOf(member)), casesToResolve(member.businessId)]);
-  return canvasFacts(jobs, open, todayInMarket());
+  const [jobs, open, names] = await Promise.all([
+    listJobs(member.businessId, viewerOf(member)),
+    casesToResolve(member.businessId),
+    stageNamesOf(member.businessId),
+  ]);
+  return canvasFacts(jobs, open, todayInMarket(), names);
 }
 
 /**
@@ -294,13 +298,13 @@ export async function colleagueTool(row: CallRow, name: string, args: unknown): 
   if (!member) return "Not yet: ask for their PIN first.";
   const viewer = viewerOf(member);
   if (name === COLLEAGUE_TOOLS.day) return factsFor(member);
-  const jobs = await listJobs(member.businessId, viewer);
-  if (name === COLLEAGUE_TOOLS.stage) return dealsAtStage(jobs, s(input.stage), todayInMarket());
+  const [jobs, stageNames] = await Promise.all([listJobs(member.businessId, viewer), stageNamesOf(member.businessId)]);
+  if (name === COLLEAGUE_TOOLS.stage) return dealsAtStage(jobs, s(input.stage), todayInMarket(), stageNames);
   if (name === COLLEAGUE_TOOLS.find) {
     const visible = new Set(jobs.map((j) => j.customerId));
     const phones = new Map((await listCustomers(member.businessId)).filter((c) => visible.has(c.id)).map((c) => [c.id, c.phone]));
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
-    return found.length ? found.map(dealLine).join("\n") : "No deal matches that.";
+    return found.length ? found.map((j) => dealLine(j, stageNames)).join("\n") : "No deal matches that.";
   }
   if (name === COLLEAGUE_TOOLS.details) {
     const got = await jobById(member.businessId, s(input.deal_id), viewer);
@@ -311,7 +315,7 @@ export async function colleagueTool(row: CallRow, name: string, args: unknown): 
     const details = Object.entries(job.details).filter(([, v]) => v);
     return [
       `Customer: ${customer.name}${customer.sample ? " (a made-up sample customer)" : ""} · phone ${customer.phone || "none"} · email ${customer.email || "none"} · ${customer.address || "no address"}`,
-      `Deal: ${dealLine({ ...job, customerName: customer.name })}`,
+      `Deal: ${dealLine({ ...job, customerName: customer.name }, stageNames)}`,
       `Owner: ${job.owner ?? "no one yet"}${job.wonAt ? ` · sold ${job.wonAt.slice(0, 10)}` : ""}`,
       details.length ? `Details: ${details.map(([k, v]) => `${k}: ${v}`).join("; ")}` : "",
       activity.length

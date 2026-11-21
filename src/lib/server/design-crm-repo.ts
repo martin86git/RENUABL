@@ -45,6 +45,7 @@ import {
   cleanOwnStageInput,
   cleanStageName,
   cleanStageNames,
+  dealStageName,
   renameBuiltin,
   insertStage,
   moveText,
@@ -122,7 +123,13 @@ async function link(q: Q, businessId: string, only: { jobId?: string; roofKey?: 
       designed ? "designed" : job.stage,
     ]);
     if (designed)
-      await record(q, businessId, { customerId: job.customer_id, jobId: job.id, kind: "stage", text: stageMoveText("designed"), by });
+      await record(q, businessId, {
+        customerId: job.customer_id,
+        jobId: job.id,
+        kind: "stage",
+        text: stageMoveText("designed", await stageNamesIn(q, businessId)),
+        by,
+      });
   }
 }
 
@@ -654,7 +661,7 @@ export async function addOwnStage(
     await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
     const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
     if (own.length >= MAX_OWN_STAGES) return { refused: OWN_STAGES_FULL };
-    const input = cleanOwnStageInput(raw, own, await namesIn(q, businessId));
+    const input = cleanOwnStageInput(raw, own, await stageNamesIn(q, businessId));
     if (!input.ok) return { refused: input.message };
     const made = await q<OwnStage>(
       `insert into design_stages (id, business_id, name, base, created_by) values ($2,$1,$3,$4,$5) returning ${STAGE}`,
@@ -689,7 +696,7 @@ export async function renameOwnStage(businessId: string, id: string, raw: unknow
     if (!own.some((s) => s.id === id)) return null;
     const name = cleanStageName(raw);
     if (!name) return { refused: STAGE_NAME_MISSING };
-    if (nameTaken(name, own, id, await namesIn(q, businessId))) return { refused: STAGE_NAME_TAKEN };
+    if (nameTaken(name, own, id, await stageNamesIn(q, businessId))) return { refused: STAGE_NAME_TAKEN };
     const rows = await q<OwnStage>(`update design_stages set name = $3 where business_id = $1 and id = $2 returning ${STAGE}`, [
       businessId,
       id,
@@ -781,14 +788,23 @@ export async function overview(businessId: string, viewer?: DealViewer): Promise
 // ---------------------------------------------------------------------------
 
 type Ask = typeof query;
-const namesIn = async (q: Ask, businessId: string): Promise<StageNames> => {
+export const stageNamesIn = async (q: Ask, businessId: string): Promise<StageNames> => {
   const rows = await q<{ stage: string; name: string }>(`select stage, name from design_stage_names where business_id = $1`, [businessId]);
   return cleanStageNames(Object.fromEntries(rows.map((r) => [r.stage, r.name])));
 };
 
+/**
+ * A deal's stage in the business's own words, for the server to put on what it sends (a feed card, a call list, Sol's
+ * facts): the added stage it sits at, else its name for the stage, else ours.
+ */
+export async function stageWordsOf(businessId: string): Promise<(job: { stage: JobStage; subStage?: string | null }) => string> {
+  const [own, names] = await Promise.all([listOwnStages(businessId), stageNamesIn(query, businessId)]);
+  return (job) => dealStageName(job, own, names);
+}
+
 /** The business's names for the twelve stages (only those it changed). */
 export async function stageNamesOf(businessId: string): Promise<StageNames> {
-  return namesIn(query, businessId);
+  return stageNamesIn(query, businessId);
 }
 
 /** Renames one of the twelve for the business, or puts ours back with a blank name. Answers the names as they now stand. */
@@ -796,7 +812,7 @@ export async function renameBuiltinStage(businessId: string, stage: unknown, raw
   return transaction(async (q) => {
     await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
     const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
-    const next = renameBuiltin(stage, raw, own, await namesIn(q, businessId));
+    const next = renameBuiltin(stage, raw, own, await stageNamesIn(q, businessId));
     if (!next.ok) return { refused: next.message };
     await q(`delete from design_stage_names where business_id = $1`, [businessId]);
     for (const [k, v] of Object.entries(next.value)) {

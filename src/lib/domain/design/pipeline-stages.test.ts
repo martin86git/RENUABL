@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { cleanJobInput } from "./crm";
+import { panelTabsFor, stagePill } from "./deal-feed";
+import { pipelineBoard } from "./today-pad";
+import { stageNamed } from "./sol";
+import { actionDoneWords, stageChoicesText, type ChatAction } from "./sol-chat-work";
+import { triggerWords } from "./custom-routines";
 import {
   STAGE_NAME_TAKEN,
   baseAt,
@@ -7,6 +12,8 @@ import {
   cleanPipelineSave,
   cleanStageKeys,
   cleanStageNames,
+  dealStageName,
+  moveTexts,
   labelOf,
   renameBuiltin,
   columnOf,
@@ -157,5 +164,32 @@ describe("the business's names for the twelve", () => {
 
   it("reads back only the twelve, and none the same as ours", () => {
     expect(cleanStageNames({ lead: "Lead", won: " Sold ", bogus: "x", designed: "" })).toEqual({ won: "Sold" });
+  });
+});
+
+describe("the business's names, everywhere a stage is named", () => {
+  const names = { proposal: "Quote sent", won: "Signed" } as const;
+
+  it("reads a deal at an added stage by that stage, else by the business's name", () => {
+    expect(dealStageName({ stage: "designed", subStage: visit.id }, own, names)).toBe("Site visit booked");
+    expect(dealStageName({ stage: "proposal" }, own, names)).toBe("Quote sent");
+    expect(dealStageName({ stage: "lead" }, own, names)).toBe("Lead");
+  });
+
+  it("finds a move on the record whatever the stage was called", () => {
+    expect(moveTexts("designed", own, names).sort()).toEqual(["Moved to Designed", "Moved to Site visit booked"]);
+    expect(moveTexts("proposal", own, names).sort()).toEqual(["Moved to Proposal sent", "Moved to Quote sent"]);
+  });
+
+  it("puts the business's name on Today's pills, toggles and board, and in Sol's facts and words", () => {
+    expect(stagePill("won", names).words).toBe("Signed");
+    expect(stagePill("lead", names).words).toBe("New lead");
+    expect(panelTabsFor(["won", "ordered"], names).map((t) => t.label)).toEqual(["Signed", "Ordered", "All"]);
+    expect(pipelineBoard([], 6, names).map((b) => b.label)).toEqual(["Lead", "Designed", "Quote sent", "Signed"]);
+    expect(stageNamed("quote sent", names)).toBe("proposal");
+    expect(stageNamed("proposal sent", names)).toBe("proposal");
+    expect(stageChoicesText(names)).toContain("proposal: Quote sent");
+    expect(actionDoneWords({ kind: "stage", stage: "won" } as ChatAction, names)).toBe("Marked Signed");
+    expect(triggerWords({ kind: "stage", stage: "proposal" }, names)).toBe("A deal reaches Quote sent");
   });
 });

@@ -16,7 +16,6 @@ import { randomBytes } from "node:crypto";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import type { DealForChat } from "@/lib/domain/design/assistant-deals";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { suburbOfAddress } from "@/lib/domain/design/deal-feed";
 import { assistantDealCalls, assistantDeals } from "@/lib/server/design-call-log-repo";
 import { callTranscriptsFor } from "@/lib/server/call-transcripts";
@@ -36,7 +35,7 @@ import {
 } from "@/lib/server/design-caller-repo";
 import { ADMIN_FIXED_RULES, cleanCallerKey } from "@/lib/domain/install-call";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
-import { jobById } from "@/lib/server/design-crm-repo";
+import { jobById, stageWordsOf } from "@/lib/server/design-crm-repo";
 import { allow } from "@/lib/server/rate-limit";
 
 const PRIVATE = { "cache-control": "private, no-store" };
@@ -141,7 +140,7 @@ export async function POST(request: Request) {
         about: `${first}'s deal`,
         customer: found.customer.name,
         deal: found.job.title,
-        stage: STAGE_LABELS[found.job.stage],
+        stage: (await stageWordsOf(who.member.businessId))(found.job),
         suburb: suburbOfAddress(found.job.address ?? ""),
         standing: across.find((a) => a.jobId === found.job.id)?.standing ?? "spoke",
         calls,

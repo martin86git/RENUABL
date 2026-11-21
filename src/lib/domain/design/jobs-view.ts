@@ -7,7 +7,7 @@
 import { addDaysISO } from "../scheduling";
 import type { ISODate } from "../types";
 import { gateOf, preApprovalOf, solarVicOf } from "./approvals";
-import { INSTALLED_STAGES, OPEN_STAGES, PRE_INSTALL_STAGES, STAGE_LABELS, type Job, type JobStage } from "./crm";
+import { INSTALLED_STAGES, OPEN_STAGES, PRE_INSTALL_STAGES, stageLabel, type Job, type JobStage, type StageNames } from "./crm";
 import { AFTER_STEP_WORDS, nextAfterStep } from "./deal";
 
 export type JobPhase = "selling" | "ready" | "installing" | "finishing" | "done";
@@ -35,10 +35,10 @@ export function phaseOf(j: PhaseJob, today: ISODate): JobPhase | null {
 }
 
 /** The quick filters within a stage, in order. */
-export function filtersFor(phase: JobPhase): { id: string; label: string }[] {
+export function filtersFor(phase: JobPhase, names: StageNames = {}): { id: string; label: string }[] {
   switch (phase) {
     case "selling":
-      return OPEN_STAGES.map((s) => ({ id: s, label: STAGE_LABELS[s] }));
+      return OPEN_STAGES.map((s) => ({ id: s, label: stageLabel(s, names) }));
     case "ready":
       return [
         { id: "preapproval", label: "Pre-approval" },
@@ -165,4 +165,4 @@ export function phaseNote(jobs: readonly (PhaseJob & Pick<Job, "value" | "instal
 }
 
 /** The job's stage in words for its row: "Proposal sent", "Installed 3 Nov". */
-export const stageWords = (stage: JobStage) => STAGE_LABELS[stage];
+export const stageWords = (stage: JobStage, names: StageNames = {}) => stageLabel(stage, names);

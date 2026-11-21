@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { useStageLabel } from "./stage-select";
 import { ContextLine } from "./context-line";
 import { dealContext } from "@/lib/domain/design/sol-on-deal";
@@ -133,6 +134,8 @@ export function DealFeed(props: {
   day?: React.ReactNode;
   onDismissDay?: () => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const { me } = props;
   const [showAll, setShowAll] = useState(false);
   // The deal picked in the deals panel, shown as its card on the left.
@@ -658,7 +661,7 @@ export function DealFeed(props: {
           }}
           onNew={props.onNew}
           adding={props.adding}
-          tabs={panelTabsFor(pickedPipeline?.stages ?? null)}
+          tabs={panelTabsFor(pickedPipeline?.stages ?? null, stageNames)}
           picker={
             admin ? (
               <FeedPicker
@@ -2034,7 +2037,9 @@ const STAGE_TONES: Record<StageTone, string> = {
  * lead pill, blue with its icon, on the feed too, and the same for each stage).
  */
 function StagePill({ stage, className }: { stage: JobStage; className?: string }) {
-  const pill = stagePill(stage);
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
+  const pill = stagePill(stage, stageNames);
   const Icon = STAGE_ICONS[stage] ?? Stamp;
   return (
     <span

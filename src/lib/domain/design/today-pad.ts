@@ -6,7 +6,7 @@
  * agenda, stepping to the next working day; Pipeline is the deals being sold as a board, or the numbers. Sol's box sits
  * at the foot. Pure, tested.
  */
-import { STAGE_LABELS, type Activity, type ActivityKind, type Customer, type Job, type JobStage } from "./crm";
+import { stageLabel, type StageNames, type Activity, type ActivityKind, type Customer, type Job, type JobStage } from "./crm";
 import type { NextItem } from "./next-up";
 import { VIC_PUBLIC_HOLIDAYS } from "../scheduling";
 
@@ -65,10 +65,17 @@ export interface BeforeCall {
  * What to know before ringing the customer on the list's first item (as Primero's pre-call card, from the business's
  * own record): the deal in a line, the last touch, and what is still open.
  */
-export function beforeYouCall(input: { job: Job; customer: Customer; activity: readonly Activity[]; today: string }): BeforeCall {
+export function beforeYouCall(input: {
+  job: Job;
+  customer: Customer;
+  activity: readonly Activity[];
+  today: string;
+  /** The business's own names for the stages. */
+  names?: StageNames;
+}): BeforeCall {
   const { job, customer, today } = input;
   const deal = [
-    STAGE_LABELS[job.stage],
+    stageLabel(job.stage, input.names),
     job.value ? `$${Math.round(job.value).toLocaleString("en-AU")}` : null,
     job.kw ? `${job.kw} kW` : null,
     job.installDate ? `installs ${job.installDate}` : null,
@@ -180,12 +187,12 @@ export function agendaFor(
 export const BOARD_STAGES: readonly JobStage[] = ["lead", "designed", "proposal", "won"];
 
 /** The deals being sold as a board: each stage with its count, value and its deals, the latest changed first. */
-export function pipelineBoard<J extends Job>(jobs: readonly J[], perStage = 6) {
+export function pipelineBoard<J extends Job>(jobs: readonly J[], perStage = 6, names: StageNames = {}) {
   return BOARD_STAGES.map((stage) => {
     const at = jobs.filter((j) => j.stage === stage).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return {
       stage,
-      label: STAGE_LABELS[stage],
+      label: stageLabel(stage, names),
       count: at.length,
       value: Math.round(at.reduce((n, j) => n + (j.value ?? 0), 0)),
       jobs: at.slice(0, perStage),

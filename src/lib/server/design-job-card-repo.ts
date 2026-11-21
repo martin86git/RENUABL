@@ -9,10 +9,9 @@ import { systemDetails } from "@/lib/domain/design/deal";
 import { jobDrawing, stringsInWords, type Installer, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
 import { designSummary, type RoofDesign } from "@/lib/domain/design/roof-design";
 import { cleanAsBuilt, type AsBuilt, type AsBuiltInput, type Designed } from "@/lib/domain/design/as-built";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { query, transaction } from "./db";
 import { loadPrefs } from "./design-after-sale-repo";
-import { jobById, record } from "./design-crm-repo";
+import { jobById, record, stageWordsOf } from "./design-crm-repo";
 import { NO_DESIGN, savedFor } from "./design-proposal-repo";
 import { linkedBusiness } from "./design-job-shares-repo";
 import { BUSINESS_LINK } from "@/lib/domain/design/job-shares";
@@ -96,7 +95,7 @@ export async function jobCard(
       title: job.title,
       address: job.address || customer.address,
       installDate: job.installDate,
-      stage: STAGE_LABELS[job.stage],
+      stage: (await stageWordsOf(member.businessId))(job),
     },
     customer: { name: customer.name, phone: customer.phone, ...(forInstaller ? {} : { email: customer.email }) },
     details,

@@ -143,9 +143,21 @@ export const MAX_JOBS_PER_CUSTOMER = 50;
 export const CUSTOMERS_FULL = `A business can keep up to ${MAX_CUSTOMERS.toLocaleString("en-AU")} customers for now.`;
 export const JOBS_FULL = `A customer can have up to ${MAX_JOBS_PER_CUSTOMER} jobs for now.`;
 
-/** What a move between stages is recorded as: "Moved to Proposal sent". */
-export function stageMoveText(stage: JobStage): string {
-  return `Moved to ${STAGE_LABELS[stage]}`;
+/**
+ * The business's own names for the twelve stages (21 Nov 2026, Martin: rename the built-in stages, then "use the new
+ * stage names everywhere else too"). Only the words change: every rule reads the stage itself. A stage not here reads
+ * as ours. Kept per business (`design_stage_names`, pipeline-stages.ts).
+ */
+export type StageNames = Partial<Record<JobStage, string>>;
+
+/** One of the twelve in words: the business's name for it, else ours. */
+export function stageLabel(stage: JobStage, names: StageNames = {}): string {
+  return names[stage] || STAGE_LABELS[stage];
+}
+
+/** What a move between stages is recorded as: "Moved to Proposal sent" (or the business's name for it). */
+export function stageMoveText(stage: JobStage, names: StageNames = {}): string {
+  return `Moved to ${stageLabel(stage, names)}`;
 }
 
 /**

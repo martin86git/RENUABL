@@ -2,7 +2,10 @@ import type { Heat } from "./deal-heat";
 import { countdownWords, type OutboxState } from "./sol-agents";
 import { LAUNCH_MARKET, marketDateTime, todayInMarket } from "../market";
 import { nextWorkingDay } from "./today-pad";
-import { STAGE_LABELS, type JobStage } from "./crm";
+import { STAGE_LABELS, type JobStage, type StageNames } from "./crm";
+
+/** A feed deal's stage in words: the business's own (set by the server), else ours. */
+export const stageOf = (d: Pick<FeedDeal, "stage" | "stageName">): string => d.stageName || STAGE_LABELS[d.stage];
 import { askNeedWords, type AskType, type DealLine } from "./deal-team";
 import { CALL_HEADLINES } from "../call-headlines";
 
@@ -38,6 +41,8 @@ export interface FeedDeal {
   source?: string;
   title: string;
   stage: JobStage;
+  /** The deal's stage in the business's own words: a stage it added that the deal sits at, else its name for the stage. */
+  stageName?: string;
   value: number | null;
   kw: number | null;
   batteryKwh: number | null;
@@ -159,7 +164,7 @@ export function caption(d: FeedDeal, now = new Date()): string {
     case "won":
       return d.installDate ? "Signed. Install booked." : "Signed. Needs an install date.";
     default:
-      return STAGE_LABELS[d.stage];
+      return stageOf(d);
   }
 }
 
@@ -486,7 +491,7 @@ export const contacted = (d: Pick<FeedDeal, "events">) =>
 
 /** Where a new arrival has got to, in words: "Not called yet", "Sam called", "Designed", "Proposal sent". */
 export function arrivalWords(d: FeedDeal): { words: string; waiting: boolean } {
-  if (d.stage !== "lead") return { words: STAGE_LABELS[d.stage], waiting: false };
+  if (d.stage !== "lead") return { words: stageOf(d), waiting: false };
   const touch = d.events.find((e) => e.kind === "call" || e.kind === "email" || e.kind === "reply");
   if (!touch) return { words: "Not contacted yet", waiting: true };
   const who = touch.by && touch.by !== "Sol" ? `${touch.by} ` : "";
@@ -578,8 +583,10 @@ const STAGE_PILLS: Partial<Record<JobStage, { words: string; tone: StageTone }>>
 };
 
 /** A stage's pill: its words and colour; a stage without one of its own reads as its label, in the quiet grey. */
-export function stagePill(stage: JobStage): { words: string; tone: StageTone } {
-  return STAGE_PILLS[stage] ?? { words: STAGE_LABELS[stage], tone: "approvals" };
+export function stagePill(stage: JobStage, names: StageNames = {}): { words: string; tone: StageTone } {
+  const pill = STAGE_PILLS[stage] ?? { words: STAGE_LABELS[stage], tone: "approvals" as const };
+  // The business's own name for the stage wins over our short pill words.
+  return names[stage] ? { ...pill, words: names[stage] } : pill;
 }
 
 /**
@@ -609,9 +616,12 @@ const TAB_WORDS: Partial<Record<JobStage, string>> = {
  * toggle buttons"): every deal, or a pipeline that starts with a lead, splits New leads / In progress / All; any other
  * pipeline has a toggle for each of its stages, then All.
  */
-export function panelTabsFor(stages: readonly JobStage[] | null): { id: PanelTab; label: string }[] {
+export function panelTabsFor(stages: readonly JobStage[] | null, names: StageNames = {}): { id: PanelTab; label: string }[] {
   if (!stages || stages.includes("lead")) return PANEL_TABS;
-  return [...stages.map((st) => ({ id: st as PanelTab, label: TAB_WORDS[st] ?? stagePill(st).words })), { id: "all", label: "All" }];
+  return [
+    ...stages.map((st) => ({ id: st as PanelTab, label: names[st] || TAB_WORDS[st] || stagePill(st).words })),
+    { id: "all", label: "All" },
+  ];
 }
 
 /** What a row says under its name: a customer waiting on a reply, or where the proposal is. */

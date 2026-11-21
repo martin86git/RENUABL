@@ -70,3 +70,8 @@ export function StageSelect({
     </select>
   );
 }
+
+/** The business's own names for the twelve stages, for `stageLabel(stage, names)` and the domain's `names` arguments. */
+export function useStageNames(): StageNames {
+  return useStageBook().names;
+}

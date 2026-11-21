@@ -15,7 +15,7 @@
  * can be renamed and given other stages too: that is kept as a saved row that
  * stands in for the set one (`baseId`), and removing it puts the set one back.
  */
-import { JOB_STAGES, STAGE_LABELS, type JobStage } from "./crm";
+import { JOB_STAGES, STAGE_LABELS, stageLabel, type JobStage, type StageNames } from "./crm";
 import { PIPELINES, type Pipeline } from "./deal";
 
 /** A stage a business added: its name, and the stage it counts as. */
@@ -29,7 +29,7 @@ export interface OwnStage {
  * The business's own names for the twelve stages (21 Nov 2026, Martin: "allow renaming the built-in stages too").
  * Only the words change: every rule still reads the stage itself. A stage not here reads as ours (`STAGE_LABELS`).
  */
-export type StageNames = Partial<Record<JobStage, string>>;
+export type { StageNames };
 
 /** One of the twelve stages, or the id of one the business added. */
 export type StageKey = string;
@@ -81,9 +81,7 @@ export function cleanStageName(raw: unknown): string {
 }
 
 /** One of the twelve by the business's name for it, else ours. */
-export function labelOf(stage: JobStage, names: StageNames = {}): string {
-  return names[stage] || STAGE_LABELS[stage];
-}
+export const labelOf = stageLabel;
 
 /** Names read back from the server or the browser: only the twelve, each a clean name, none the same as ours. */
 export function cleanStageNames(raw: unknown): StageNames {
@@ -291,4 +289,20 @@ export function renameBuiltin(stage: unknown, raw: unknown, own: readonly OwnSta
   if (nameTaken(name, own, stage, names)) return { ok: false, message: STAGE_NAME_TAKEN };
   next[stage] = name;
   return { ok: true, value: next };
+}
+
+/** A deal's stage in the business's words: the added stage it sits at (counting as its stage), else its name for the stage. */
+export function dealStageName(
+  job: { stage: JobStage; subStage?: string | null },
+  own: readonly OwnStage[],
+  names: StageNames = {},
+): string {
+  const sub = job.subStage ? own.find((s) => s.id === job.subStage && s.base === job.stage) : undefined;
+  return sub?.name ?? labelOf(job.stage, names);
+}
+
+/** Every record line that means a move to a stage, whatever the stage has been called: ours, the business's name, its added stages under it. */
+export function moveTexts(stage: JobStage, own: readonly OwnStage[], names: StageNames = {}): string[] {
+  const words = new Set([STAGE_LABELS[stage], labelOf(stage, names), ...own.filter((s) => s.base === stage).map((s) => s.name)]);
+  return [...words].map((w) => `Moved to ${w}`);
 }
