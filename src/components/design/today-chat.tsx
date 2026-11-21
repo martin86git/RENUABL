@@ -30,6 +30,7 @@ import { GoalLine, SunArc } from "./gauges";
 import { SolMark, SolStars } from "./sol-icon";
 import { PipelineView, SolBox } from "./today-pad";
 import { NextCard } from "./canvas-pad";
+import { PerformancePanel } from "./performance-panel";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -166,14 +167,14 @@ export function TodayChat(props: {
             <ProposalsPage signed={false} bare />
           ) : tab === "sol" ? (
             <SolWorkPanel />
+          ) : tab === "performance" ? (
+            <PerformancePanel jobs={props.jobs} today={props.today} month={first ? <MonthPanel month={first.month} mine={mine} /> : null} />
           ) : props.views === "failed" ? (
             <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
               The month couldn&rsquo;t be read just now. Feed has your deals.
             </p>
           ) : !first ? (
             <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
-          ) : tab === "performance" ? (
-            <MonthPanel month={first.month} mine={mine} />
           ) : tab === "mine" && own ? (
             <ViewPart view={own} titled={false} />
           ) : (
