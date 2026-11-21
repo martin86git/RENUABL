@@ -1,3 +1,5 @@
+import { CAP_REACHED } from "@/lib/domain/design/voice-usage";
+import { overCap } from "@/lib/server/design-voice-usage";
 import { normaliseMobile } from "@/lib/domain/contact";
 import { TEXT_WORDS, cleanText, textRecord } from "@/lib/domain/design/contact-reach";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
@@ -52,6 +54,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
     if (!found) return Response.json({ ok: false, message: TEXT_WORDS.missing }, { status: 404 });
     if (!(await textsOnFor(who.member.businessId))) return Response.json({ ok: false, message: TEXT_WORDS.off }, { status: 409 });
+    if (await overCap(who.member.businessId, "text")) return Response.json({ ok: false, message: CAP_REACHED }, { status: 409 });
     const mobile = normaliseMobile(found.customer.phone);
     if (!mobile) return Response.json({ ok: false, message: TEXT_WORDS.noMobile }, { status: 422 });
     const name = found.customer.firstName || found.customer.name;

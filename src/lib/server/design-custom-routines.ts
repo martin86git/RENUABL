@@ -5,6 +5,7 @@
  * cron: a wait until it's over, a check that stops the run when it no longer holds, and an action through the agent's
  * usual way (Sol's outbox for an email, the deal's texts for a text, `queueCall` for a call), each with its own guards.
  */
+import { overCap } from "./design-voice-usage";
 import { normaliseMobile } from "@/lib/domain/contact";
 import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
 import {
@@ -270,6 +271,7 @@ async function act(business: { id: string; name: string }, r: CustomRoutine, run
       if (!mobile) return { next: true, did: "No mobile on file: skipped the text" };
       if (await textsStopped(business.id, customer.id)) return { next: true, did: "They replied STOP: skipped the text" };
       if (await isDemoBusiness(business.id)) return { next: true, did: "A demo sends nothing" };
+      if (await overCap(business.id, "text")) return { next: true, did: "This month's spending cap is reached: skipped the text" };
       const brand = await loadBrand(business.id, business.name);
       const name = brand.name || business.name;
       const words = await writeWithSol(business.id, "text", step.about, {

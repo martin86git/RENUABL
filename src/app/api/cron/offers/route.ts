@@ -7,6 +7,7 @@ import { endTwelveMonthPlans } from "@/lib/server/design-twelve-months";
 import { clearOldDemos } from "@/lib/server/design-demo";
 import { remindWatchers } from "@/lib/server/design-market-watch-repo";
 import { endNoticesDue } from "@/lib/server/design-addons";
+import { chargeLastMonth } from "@/lib/server/design-voice-usage";
 import { stripeClient } from "@/lib/server/stripe";
 
 /**
@@ -50,9 +51,15 @@ export async function GET(request: Request) {
     console.error("add-on notices not ended", e instanceof Error ? e.message : e);
     return 0;
   });
+  // Last month's Calls & Texts minutes and texts beyond the free allowance, onto each business's next bill (once).
+  const usageCharged = await chargeLastMonth(stripeClient()).catch((e) => {
+    console.error("voice usage not charged", e instanceof Error ? e.message : e);
+    return 0;
+  });
   return Response.json({
     ok: true,
     noticesEnded,
+    usageCharged,
     ...offers,
     healthReminders,
     unfinishedBriefs,

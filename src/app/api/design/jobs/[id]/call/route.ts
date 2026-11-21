@@ -1,3 +1,4 @@
+import { CAP_REACHED } from "@/lib/domain/design/voice-usage";
 import { OUT_OF_CALL_CREDIT } from "@/lib/domain/call-credit";
 import { gateOf } from "@/lib/domain/design/approvals";
 import { PRE_INSTALL_STAGES } from "@/lib/domain/design/crm";
@@ -20,6 +21,7 @@ const words = (name: string): Record<string, string> => ({
   "no-number": `There's no mobile on this customer's record for ${name} to call.`,
   already: `${name} already has a call lined up for this deal.`,
   failed: `${name} couldn't line up the call just now. Try again in a moment.`,
+  cap: CAP_REACHED,
 });
 
 /**

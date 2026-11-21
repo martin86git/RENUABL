@@ -18,6 +18,7 @@
  * an assistant, the caller is found on the business's deals by their number (else made a new lead), and the same
  * assistant answers. It speaks under the name the business gave it (design_caller, Settings → Phone assistant).
  */
+import { overCap } from "./design-voice-usage";
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { outOfCallCredit } from "@/lib/domain/call-credit";
 import { placeVapiCall } from "./vapi-call";
@@ -184,7 +185,9 @@ export interface VoiceRow {
 }
 
 export type QueueResult =
-  { result: "off" | "missing" | "no-number" | "already" } | { result: "failed"; credit?: boolean } | { result: "placed"; when: string };
+  | { result: "off" | "missing" | "no-number" | "already" | "cap" }
+  | { result: "failed"; credit?: boolean }
+  | { result: "placed"; when: string };
 
 /**
  * Calls a deal's customer: a new lead (`mode: "lead"`), or a customer who asked about their proposal (`"proposal"`,
@@ -208,6 +211,8 @@ export async function queueCall(o: {
 }): Promise<QueueResult> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(o.businessId))) return { result: "off" };
+  // The month's spending cap (voice-usage.ts): no new calls until the 1st. Calls coming in are still answered.
+  if (await overCap(o.businessId, "minute")) return { result: "cap" };
   try {
     const found = await jobById(o.businessId, o.jobId);
     if (!found) return { result: "missing" };

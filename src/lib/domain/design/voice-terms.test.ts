@@ -7,15 +7,15 @@ describe("what a business is told before adding Calls & Texts", () => {
     const lines = voiceTerms("2026-12-05T00:00:00Z");
     expect(lines[0]).toContain("Billing starts today");
     expect(lines[0]).toContain("on 5 December");
-    expect(lines[0]).toContain("$29 each month");
+    expect(lines[0]).toContain("$49 each month");
     expect(voiceTerms(null)[0]).toContain("next bill, then");
   });
 
   it("says what a call costs and that the number comes with it", () => {
     const all = voiceTerms().join(" ");
-    expect(all).toContain("no charge per call");
-    expect(all).toContain("60 voice-agent minutes and 250 texts");
-    expect(all).toContain("a minute takes 3 Sol credits and a text 1");
+    expect(all).toContain("30 voice-agent minutes and 30 texts free");
+    expect(all).toContain("30 voice-agent minutes and 30 texts");
+    expect(all).toMatch(/\d+c a minute and \d+c a text/);
     expect(all).toContain("business number comes with it");
   });
 });
@@ -34,7 +34,7 @@ describe("what a voice agent can say about its phone line", () => {
   it("tells a business without the add-on how to add it and what it costs", () => {
     const facts = phoneFacts({ standing: "add-on", number: null, canBuy: false }).join(" ");
     expect(facts).toContain("Add to your plan");
-    expect(facts).toContain("$29 a month");
+    expect(facts).toContain("$49 a month");
     expect(facts).toContain("asked for automatically");
   });
 
