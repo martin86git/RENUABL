@@ -6011,19 +6011,48 @@ export function RoofDesigner(props: {
   // On a phone, upright or sideways (21 Nov 2026, Martin: it covered the picture and showed one design at a time), the menu
   // is drawn smaller and wider, within the picture's height, so several designs and more of each show.
   const compactMenu = props.tight && (phone || sideways);
+  // On a phone held upright (21 Nov 2026, Martin: "the design page should overlay everything like a popup screen"), it
+  // is a sheet over the whole screen with its own close, its type a little smaller (0.85 of full size).
+  const sheetMenu = props.tight && phone;
   const designsMenu = (
     <div
-      {...(compactMenu
-        ? // Its height in an inline style: a class naming the picture's height is drawn back up by globals.css.
-          { style: { maxHeight: "calc(var(--pic-h, 60vh) / 0.78 - 6rem)" } }
-        : { "data-opened": true })}
+      {...(sheetMenu
+        ? { role: "dialog", "aria-label": "Designs" }
+        : compactMenu
+          ? // Its height in an inline style: a class naming the picture's height is drawn back up by globals.css.
+            { style: { maxHeight: "calc(var(--pic-h, 60vh) / 0.78 - 6rem)" } }
+          : { "data-opened": true })}
       className={clsx(
-        "absolute z-40 overflow-y-auto rounded-lg border border-line bg-surface text-ink shadow-lift",
-        compactMenu ? "space-y-2 p-2" : "space-y-3 p-3",
-        compactMenu ? "w-[44rem] max-w-[calc((100vw-2.5rem)/0.78)] [zoom:1.15]" : "max-h-[70vh] w-[24rem] max-w-[85vw]",
-        props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
+        "overflow-y-auto text-ink",
+        sheetMenu
+          ? "fixed inset-0 z-[90] space-y-3 bg-[#2b2e33] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] [zoom:1.25]"
+          : "absolute z-40 rounded-lg border border-line bg-surface shadow-lift",
+        !sheetMenu && (compactMenu ? "space-y-2 p-2" : "space-y-3 p-3"),
+        !sheetMenu && (compactMenu ? "w-[44rem] max-w-[calc((100vw-2.5rem)/0.78)] [zoom:1.15]" : "max-h-[70vh] w-[24rem] max-w-[85vw]"),
+        !sheetMenu && (props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2"),
       )}
     >
+      {sheetMenu && (
+        // Back to the roof on the left: the white cross in the top right corner is the window's, closing the designer.
+        <div className="sticky -top-3 z-10 -mx-4 flex items-center gap-2 border-b border-line bg-[#2b2e33] py-2 pl-2 pr-16">
+          <button
+            type="button"
+            onClick={() => openMenu(false)}
+            aria-label="Back to the roof"
+            title="Back to the roof"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink hover:bg-white/15"
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+          </button>
+          <p className="flex items-center gap-2 text-base font-semibold">
+            <Layers className="size-4" aria-hidden />
+            Designs
+            <span className="text-sm font-normal tabular-nums text-muted">
+              {designs.length} of {MAX_DESIGNS}
+            </span>
+          </p>
+        </div>
+      )}
       {props.tight && !props.sitesOnly && (
         <div className={clsx("flex flex-wrap items-center gap-2 border-b border-line", compactMenu ? "pb-2" : "pb-3")}>
           {props.noDeal ? (
@@ -6188,11 +6217,11 @@ export function RoofDesigner(props: {
         <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
           <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
         </button>
-        <span className="self-center text-xs tabular-nums text-muted">
+        <span className={clsx("self-center text-xs tabular-nums text-muted", sheetMenu && "hidden")}>
           {designs.length} of {MAX_DESIGNS}
         </span>
       </div>
-      <p className={clsx("text-xs text-muted", compactMenu && "hidden")}>
+      <p className={clsx("text-xs text-muted", compactMenu && !sheetMenu && "hidden")}>
         The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
         options on the next proposal published, and mark the one you recommend.
       </p>
@@ -8829,7 +8858,7 @@ export function RoofDesigner(props: {
                   className={clsx(
                     "pointer-events-auto absolute",
                     // Over the roof pitch marks and the pad while its menu is open.
-                    menu === "designs" ? "z-50" : "z-30",
+                    menu === "designs" ? (phone ? "z-[90]" : "z-50") : "z-30",
                     phone ? "right-3 top-[0.8rem]" : "right-4 top-4",
                   )}
                 >
