@@ -45,4 +45,34 @@ describe.skipIf(!url)("RENUABL Business's sales pipeline (database)", () => {
     expect(await repo.moveBusinessLead(waiting.id, "won", "staff@renuabl.test")).toBe(false);
     expect(await repo.moveBusinessLead("lead_nothere", "won", "staff@renuabl.test")).toBe(false);
   });
+
+  it("books a demo, reminds the lead and then staff once each, and starts afresh on a new time", async () => {
+    const billing = await import("./design-billing-repo");
+    const repo = await import("./business-leads-repo");
+    await billing.recordLead("enterprise", { email: `jo${MARK}`, name: "Jo Park", business: "Coastline" });
+    const jo = (await repo.listBusinessLeads()).find((l) => l.email === `jo${MARK}`)!;
+    const at = new Date(Date.now() + 30 * 60_000).toISOString(); // half an hour away: staff due, the lead's window gone
+
+    expect(await repo.bookDemo(jo.id, { at, link: "https://meet.google.com/x", remindLead: true }, "Staff@renuabl.test")).toBe(true);
+    const booked = (await repo.listBusinessLeads()).find((l) => l.id === jo.id)!;
+    expect(booked.stage).toBe("booked");
+    expect(booked.demo).toMatchObject({
+      link: "https://meet.google.com/x",
+      remindLead: true,
+      by: "staff@renuabl.test",
+      staffReminded: false,
+    });
+
+    await repo.sendDemoReminders();
+    await repo.sendDemoReminders();
+    const after = (await repo.listBusinessLeads()).find((l) => l.id === jo.id)!;
+    expect(after.demo).toMatchObject({ staffReminded: true, leadReminded: false });
+
+    // A new time, twenty hours out: both reminders wait again, and the lead's is due now.
+    const later = new Date(Date.now() + 20 * 3_600_000).toISOString();
+    await repo.bookDemo(jo.id, { at: later, link: null, remindLead: true }, "staff@renuabl.test");
+    await repo.sendDemoReminders();
+    const again = (await repo.listBusinessLeads()).find((l) => l.id === jo.id)!;
+    expect(again.demo).toMatchObject({ staffReminded: false, leadReminded: true, link: null });
+  });
 });

@@ -7,8 +7,10 @@ import { cn } from "@/components/ui/primitives";
 import {
   BUSINESS_LEAD_STAGES,
   KIND_WORDS,
+  LEAD_REMIND_HOURS,
   STAFF_NOTE_MAX,
   STAGE_WORDS,
+  demoWhen,
   leadBoard,
   type BusinessLead,
   type BusinessLeadStage,
@@ -72,8 +74,10 @@ function LeadRow({ lead }: { lead: BusinessLead }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(lead.staffNote ?? "");
   const [noting, setNoting] = useState(false);
+  const [booking, setBooking] = useState(false);
 
   const move = async (stage: BusinessLeadStage) => {
+    if (stage === "booked") return setBooking(true);
     setBusy(true);
     const r = await post({ id: lead.id, stage });
     setBusy(false);
@@ -117,6 +121,12 @@ function LeadRow({ lead }: { lead: BusinessLead }) {
           </p>
           {lead.note && <p className="mt-1.5 whitespace-pre-wrap text-[13.5px] text-ink-2">&ldquo;{lead.note}&rdquo;</p>}
           {lead.staffNote && !noting && <p className="mt-1.5 whitespace-pre-wrap text-[13px] text-ink">Note: {lead.staffNote}</p>}
+          {lead.stage === "booked" && lead.demo && !booking && <DemoLine lead={lead} onChange={() => setBooking(true)} />}
+          {lead.stage === "booked" && !lead.demo && !booking && (
+            <button type="button" onClick={() => setBooking(true)} className="mt-1.5 text-[13px] text-warning underline underline-offset-4">
+              No time on this demo yet: add it for the reminders
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <label className="sr-only" htmlFor={`stage-${lead.id}`}>
@@ -140,6 +150,7 @@ function LeadRow({ lead }: { lead: BusinessLead }) {
           </button>
         </div>
       </div>
+      {booking && <BookDemo lead={lead} onDone={() => setBooking(false)} />}
       {noting && (
         <div className="mt-3 space-y-2">
           <textarea
@@ -165,5 +176,114 @@ function LeadRow({ lead }: { lead: BusinessLead }) {
         </div>
       )}
     </li>
+  );
+}
+
+/** When the demo is and which reminders go: staff an hour before, the lead the day before when ticked. */
+function DemoLine({ lead, onChange }: { lead: BusinessLead; onChange: () => void }) {
+  const demo = lead.demo!;
+  const [now] = useState(() => Date.now());
+  const passed = Date.parse(demo.at) <= now;
+  const them = !demo.remindLead
+    ? "No reminder to them"
+    : demo.leadReminded
+      ? "Their reminder sent"
+      : `They're reminded ${LEAD_REMIND_HOURS} hours before`;
+  const you = demo.staffReminded ? "your reminder sent" : "you're reminded an hour before";
+  return (
+    <p className="mt-1.5 text-[13px] text-ink">
+      <span className="font-medium">Demo {demoWhen(demo.at)}</span>
+      {demo.link && (
+        <>
+          {" · "}
+          <a href={demo.link} target="_blank" rel="noreferrer noopener" className="underline underline-offset-4">
+            link to join
+          </a>
+        </>
+      )}
+      <span className="text-muted">{passed ? " · it has passed: move it to Demo done" : ` · ${them}, ${you}`}</span>
+      {" · "}
+      <button type="button" onClick={onChange} className="text-ink-2 underline underline-offset-4">
+        Change time
+      </button>
+    </p>
+  );
+}
+
+/** Melbourne's day and clock for an ISO time, for the form's boxes. */
+function melbourneParts(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Melbourne" }).format(d);
+  const time = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Australia/Melbourne",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(d);
+  return { date, time };
+}
+
+/** Booking the demo moves the lead to Demo booked; the reminders go from the ten-minute cron. */
+function BookDemo({ lead, onDone }: { lead: BusinessLead; onDone: () => void }) {
+  const router = useRouter();
+  const start = lead.demo ? melbourneParts(lead.demo.at) : { date: "", time: "10:00" };
+  const [date, setDate] = useState(start.date);
+  const [time, setTime] = useState(start.time);
+  const [link, setLink] = useState(lead.demo?.link ?? "");
+  const [remindLead, setRemindLead] = useState(lead.demo ? lead.demo.remindLead : true);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const first = (lead.name ?? "").trim().split(/\s+/)[0] || "them";
+
+  const save = async () => {
+    setBusy(true);
+    setProblem("");
+    const r = await post({ id: lead.id, demo: { date, time, link, remindLead } });
+    setBusy(false);
+    if (!r.ok) return setProblem(r.message ?? "That didn't go through.");
+    onDone();
+    router.refresh();
+  };
+
+  const box = "h-9 rounded-lg border border-line bg-surface px-2 text-[14px]";
+  return (
+    <div className="mt-3 space-y-2.5 rounded-xl border border-line p-3">
+      <p className="text-[13px] font-medium">Book the demo (Melbourne time)</p>
+      <div className="flex flex-wrap gap-2">
+        <input type="date" aria-label="Day" value={date} onChange={(e) => setDate(e.target.value)} className={box} />
+        <input type="time" aria-label="Time" value={time} onChange={(e) => setTime(e.target.value)} className={box} />
+        <input
+          type="url"
+          aria-label="Link to join"
+          placeholder="Link to join (Google Meet, Zoom…), optional"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+          className={`${box} min-w-[16rem] flex-1`}
+        />
+      </div>
+      <label className="flex items-start gap-2 text-[13px]">
+        <input type="checkbox" checked={remindLead} onChange={(e) => setRemindLead(e.target.checked)} className="mt-0.5" />
+        <span>Email {first} a reminder the day before, from RENUABL, with the link (replies come to you)</span>
+      </label>
+      <p className="text-[12px] text-muted">You and the lead alert addresses are emailed an hour before.</p>
+      {problem && (
+        <p className="text-[13px] text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={busy || !date || !time}
+          onClick={() => void save()}
+          className="h-9 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas disabled:bg-surface-2 disabled:text-muted"
+        >
+          {lead.demo ? "Save the new time" : "Book it"}
+        </button>
+        <button type="button" onClick={onDone} className="h-9 px-3 text-[13px] text-ink-2">
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
