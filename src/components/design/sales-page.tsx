@@ -89,7 +89,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
       {/* RENUABL Business: the network's side for retailers and installers (the front page since 19 Nov 2026; the homeowner homepage is kept at /homeowners). */}
-      <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-3 px-5 lg:px-8">
+      <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-2 px-4 sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-5 lg:px-8">
         <div className="relative">
           <button
             type="button"
@@ -126,22 +126,22 @@ function Header({ signedIn }: { signedIn: boolean }) {
             </>
           )}
         </div>
-        <Link href="/" aria-label="RENUABL Business" className="justify-self-center">
+        <Link href="/" aria-label="RENUABL Business" className="justify-self-start sm:justify-self-center">
           <Wordmark />
         </Link>
         {/* Top right (21 Nov 2026, Martin: "We need a get started button next to Sign In"): Sign in, or straight back
-            into RENUABL when signed in, and Get started (to the pricing, as every Get started on the page) when signed out, from 640px: on a phone it crowds the wordmark, and the sticky bar has it. */}
-        <div className="flex items-center justify-end gap-2">
+            into RENUABL when signed in, and Get started (to the pricing, as every Get started on the page) when signed out. On a phone (21 Nov 2026, Martin: "show it on phones too, make them smaller") both are smaller and the wordmark sits beside the menu, so they fit. */}
+        <div className="flex items-center justify-end gap-1.5 sm:gap-2">
           <Link
             href={signedIn ? "/design" : "/design/sign-in"}
-            className="inline-flex h-9 items-center whitespace-nowrap rounded-full px-4 text-[13px] font-semibold text-ink ring-1 ring-line-strong hover:bg-surface"
+            className="inline-flex h-8 items-center whitespace-nowrap rounded-full px-3 text-[12px] sm:h-9 sm:px-4 sm:text-[13px] font-semibold text-ink ring-1 ring-line-strong hover:bg-surface"
           >
             {signedIn ? "Open RENUABL" : "Sign in"}
           </Link>
           {!signedIn && (
             <a
               href="#pricing"
-              className="hidden h-9 items-center whitespace-nowrap rounded-full bg-sun-line px-4 sm:inline-flex text-[13px] font-semibold text-white hover:brightness-105"
+              className="inline-flex h-8 items-center whitespace-nowrap rounded-full bg-sun-line px-3 text-[12px] sm:h-9 sm:px-4 sm:text-[13px] font-semibold text-white hover:brightness-105"
             >
               {SALES_HERO.cta}
             </a>
