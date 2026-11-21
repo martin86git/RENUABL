@@ -25,6 +25,7 @@ import {
   Wrench,
   type LucideIcon,
   Mail,
+  ArrowLeft,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
@@ -663,9 +664,17 @@ function Shell({
 
       {/* On a phone: the wordmark, Search and the day across the top. */}
       <div className="flex items-center gap-3 px-4 pb-1 pt-3 print:hidden lg:hidden">
-        <Link href={PATHS.home} aria-label="RENUABL, today">
-          <Wordmark className="text-[16px]" />
-        </Link>
+        {/^\/design\/deals\/[^/]+$/.test(path) ? (
+          // On a deal, the way back to Deals takes the wordmark's place (21 Nov 2026, Martin).
+          <Link href={PATHS.pipelines} className="-ml-1 inline-flex h-9 items-center gap-1.5 pr-2 text-[15px] font-medium text-ink">
+            <ArrowLeft className="size-[18px]" aria-hidden />
+            Deals
+          </Link>
+        ) : (
+          <Link href={PATHS.home} aria-label="RENUABL, today">
+            <Wordmark className="text-[16px]" />
+          </Link>
+        )}
         {retail && (
           <button
             type="button"
@@ -704,7 +713,7 @@ function Shell({
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
         aria-label="Sections, on a phone"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
+        className="phone-tabbar fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
           const lit = !more && t.match(path);

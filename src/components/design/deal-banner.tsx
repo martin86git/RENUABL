@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { MapPin } from "lucide-react";
+import { ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
+import type { ReactNode } from "react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
@@ -66,6 +67,7 @@ export function DealBanner({
   onDesign,
   onPlace,
   compact = false,
+  actions,
 }: {
   job: Job;
   customer: Customer;
@@ -78,7 +80,11 @@ export function DealBanner({
   onPlace: () => void;
   /** Slimmer, without the figures (8 Nov 2026, Martin: on any tab but the deal's own the tab's work belongs in the first fold). */
   compact?: boolean;
+  /** On a phone, the ways of reaching the customer (Call, Email), in the banner's top right corner. */
+  actions?: ReactNode;
 }) {
+  // On a phone the roof is a strip; a tap opens it tall to look at the layout, and the design from there (21 Nov 2026).
+  const [roofOpen, setRoofOpen] = useState(false);
   const placed = job.lat !== null && job.lng !== null;
   const [drawing, setDrawing] = useState<JobDrawing | null>(null);
   useEffect(() => {
@@ -133,20 +139,24 @@ export function DealBanner({
               )}
             </div>
           </div>
-          <Kit figures={figures} compact={compact} />
-          {/* The deal's clock and heat on their own line under both on a phone, where the column beside the kit is narrow. */}
-          {pulse && (
-            <div className="col-span-2 sm:hidden [&>*]:mt-0">
-              <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
-            </div>
-          )}
+          <div className="max-sm:hidden">
+            <Kit figures={figures} compact={compact} />
+          </div>
+          {actions && <div className="sm:hidden">{actions}</div>}
+          {/* On a phone the kit is one row of badges, with the deal's clock and heat after it (21 Nov 2026, Martin). */}
+          <div className="col-span-2 flex flex-wrap items-center gap-1.5 sm:hidden [&>div]:mt-0">
+            <KitBadges figures={figures} />
+            {pulse && <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />}
+          </div>
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}
         <div
           className={clsx(
             "relative bg-black/20",
-            compact ? "min-h-[6.5rem] max-sm:min-h-[4.5rem]" : "min-h-[8.5rem] max-sm:min-h-[4.5rem]",
+            compact ? "min-h-[6.5rem]" : "min-h-[8.5rem]",
+            roofOpen ? "max-sm:min-h-[17rem]" : "max-sm:min-h-[4.5rem]",
+            "transition-[min-height] duration-300",
           )}
         >
           {picture ? (
@@ -176,11 +186,45 @@ export function DealBanner({
           {picture && onDesign && (
             <button
               type="button"
-              onClick={onDesign}
+              onClick={() => {
+                // On a phone the first tap opens the strip tall; the design is a tap on its own button from there.
+                if (!roofOpen && window.matchMedia("(max-width: 639px)").matches) setRoofOpen(true);
+                else onDesign();
+              }}
               title={job.projectId ? "Open the design" : "Design this roof"}
               className="absolute inset-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sun-line"
-              aria-label={job.projectId ? "Open the design" : "Design this roof"}
+              aria-label={roofOpen ? (job.projectId ? "Open the design" : "Design this roof") : "Show the roof larger"}
             />
+          )}
+          {picture && !roofOpen && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white sm:hidden"
+            >
+              <Maximize2 className="size-3.5" />
+            </span>
+          )}
+          {picture && roofOpen && (
+            <div className="absolute inset-x-2 bottom-2 flex items-center justify-between sm:hidden">
+              <button
+                type="button"
+                onClick={() => setRoofOpen(false)}
+                className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-3 text-[12px] font-medium text-white"
+              >
+                <ChevronUp className="size-3.5" aria-hidden />
+                Smaller
+              </button>
+              {onDesign && (
+                <button
+                  type="button"
+                  onClick={onDesign}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3 text-[12px] font-semibold text-white"
+                >
+                  <PenTool className="size-3.5" aria-hidden />
+                  {job.projectId ? "Open the design" : "Design it"}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -226,6 +270,28 @@ function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }
         );
       })}
     </dl>
+  );
+}
+
+/** The kit on a phone: one row of small badges, an icon and its size each (21 Nov 2026, Martin). */
+function KitBadges({ figures }: { figures: BannerFigure[] }) {
+  if (!figures.length) return <span className="text-[11.5px] text-white/60">No system designed yet</span>;
+  return (
+    <>
+      {figures.map((f) => {
+        const Icon = KIT_ICONS[f.label] ?? PanelIcon;
+        return (
+          <span
+            key={f.label}
+            className="inline-flex h-[22px] items-center gap-1 rounded-full bg-white/10 px-2 text-[11px] tabular-nums text-white ring-1 ring-white/15"
+          >
+            <Icon className="size-3 text-sun-line" />
+            <span className="sr-only">{f.label}: </span>
+            {f.label === "EV charger" ? "EV charger" : f.value}
+          </span>
+        );
+      })}
+    </>
   );
 }
 

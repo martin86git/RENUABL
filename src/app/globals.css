@@ -1489,3 +1489,12 @@ html:has(.sales-snap) {
     inset 0 0 0 1px rgb(255 122 61 / 0.5),
     0 16px 36px -20px rgb(255 90 31 / 0.5);
 }
+
+/* On a phone, while something is being typed, the foot bar steps aside so the keyboard doesn't push it up over the box
+   being typed in (21 Nov 2026, Martin, Safari on iPhone). */
+@media (max-width: 1023px) and (pointer: coarse) {
+  body:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
+    .phone-tabbar {
+    display: none;
+  }
+}
