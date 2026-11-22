@@ -174,6 +174,25 @@ const explainer = ({ icon, head, says }) =>
      };`,
   );
 
+/**
+ * The real product, as each email's proof (22 Nov 2026, Martin: "add a screenshot from the actual portal that aligns with
+ * the email messaging"): a part of a screenshot taken in the portal on the local example business (made-up customers),
+ * framed as a window on black. `crop` is the part shown, as shares of the screenshot.
+ */
+const product = (file, crop, tag) => {
+  const fw = Math.min(1080, (560 * crop.w * 1.6) / crop.h);
+  const fh = (fw * crop.h) / (crop.w * 1.6);
+  return page(
+    `<div class="glow"></div><div class="frame" style="width:${fw}px;height:${fh}px;left:${(W - fw) / 2}px;top:${(H - fh) / 2 - 8}px">
+      <div class="shot" style="background-image:url('${shot(file)}');background-size:${100 / crop.w}% ${100 / crop.h}%;background-position:${(crop.x / (1 - crop.w)) * 100}% ${(crop.y / (1 - crop.h)) * 100}%"></div></div>
+      <div class="tag">${tag}</div><div class="mark">RENUABL</div>`,
+    `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
+     .frame{position:absolute;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 40px 120px rgba(0,0,0,.85)}
+     .shot{position:absolute;inset:0;background-repeat:no-repeat}
+     .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+  );
+};
+
 /** Each picture: a page, and for a moving one how many frames, how long each shows and how long the last holds. */
 const ART = {
   /** The launch: the products as a staggered stack of cards, dealt in one by one. */
@@ -285,6 +304,46 @@ const ART = {
 
   ...Object.fromEntries(Object.entries(EXPLAINERS).map(([name, e]) => [name, { frames: 40, delay: 80, hold: 3800, html: explainer(e) }])),
 
+  /** Sol in the product: a question typed on Today and his answer. */
+  "product-sol.jpg": { html: product("today-sol-ask.webp", { x: 0.21, y: 0.21, w: 0.57, h: 0.66 }, "In RENUABL · Today") },
+  /** A voice agent in the product: Charlie's window, on a call now. */
+  "product-voice.jpg": { html: product("charlie-window.webp", { x: 0.277, y: 0.142, w: 0.668, h: 0.716 }, "In RENUABL · Talk to Charlie") },
+
+  /** The saving (22 Nov 2026, Martin: "$49 per month is… less than $2 per calendar day… you cant employ anyone on less than $2 per day"). */
+  "price-voice.jpg": {
+    html: page(
+      `<div class="sky"></div><div class="who">${AGENT(150, "#ff5a1f", "big")}</div>
+       <div class="say"><small>Your voice agent, with your own number</small><h1>Less than<br><b>$2 a day.</b></h1>
+       <p>$49 a month is $1.61 a day. Nobody can be hired for that.</p></div><div class="mark">RENUABL</div>`,
+      `.sky{position:absolute;inset:0;background:radial-gradient(circle at 78% 50%,rgba(255,90,31,.3),transparent 36%)}
+       .who{position:absolute;left:830px;top:262px}.big .agent-glow{inset:-30%;filter:blur(30px)}
+       .say{position:absolute;left:84px;top:150px;width:640px}
+       .say small{font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:#ff8f4a}
+       .say h1{margin-top:18px;font-size:92px;line-height:1;font-weight:600;letter-spacing:-.04em}.say h1 b{color:#ff7a2e;font-weight:600}
+       .say p{margin-top:26px;font-size:26px;color:rgba(255,255,255,.62)}`,
+    ),
+  },
+
+  /**
+   * The band at the foot of every email (22 Nov 2026, Martin: "design something into the footer of each email - to
+   * reinforce a message… marketplace coming soon"): RENUABL Marketplace's blue round with its two roofs, and the line.
+   * Taken as the top 1200 x 300 of the page.
+   */
+  "footer-marketplace.jpg": {
+    clipH: 300,
+    html: page(
+      `<div class="band"><span class="m"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5 8 7l6 5.5"/><path d="M4 11v8h8v-8"/><path d="M11 9.5 16 5l6 5.5"/><path d="M14 19h6v-8"/></svg></span>
+        <div><small>RENUABL Marketplace · Coming soon</small><b>Find crews. Win installs. Trade stock.</b><em>One network for solar retailers, installers and inspectors.</em></div></div>`,
+      `body{background:#05060a}.band{position:absolute;left:0;top:0;width:1200px;height:300px;display:flex;align-items:center;gap:40px;padding:0 80px;
+         background:radial-gradient(ellipse at 10% 50%,rgba(60,110,255,.28),transparent 45%),#05060a;border-top:1px solid rgba(255,255,255,.08)}
+       .m{flex:none;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;
+         background:radial-gradient(circle at 35% 25%,#8fb0ff 0 10%,#3b6bff 45%,#1f3fc4 100%);box-shadow:inset 0 2px 1px rgba(255,255,255,.5),0 14px 40px rgba(59,107,255,.45)}
+       small{display:block;font-size:16px;letter-spacing:.22em;text-transform:uppercase;color:#7fa2ff}
+       b{display:block;margin-top:10px;font-size:46px;font-weight:600;letter-spacing:-.03em}
+       em{display:block;margin-top:8px;font-style:normal;font-size:20px;color:rgba(255,255,255,.55)}`,
+    ),
+  },
+
   /** The CRM: the Today feed, the product's own screen on black. */
   "today.jpg": {
     html: page(
@@ -305,29 +364,32 @@ const ART = {
     ),
   },
 
-  /** The close, as a 1990s mail-order coupon: dashed border, a starburst, ticks and a YES! box. */
+  /**
+   * The close: a mail-order coupon in RENUABL's own look (22 Nov 2026, Martin: the cream-paper one was "off brand"). The
+   * 1990s are in the form only (the cut line, the YES box, the ticks, the badge); the type, colours and dark ground are
+   * the product's.
+   */
   "coupon.jpg": {
     html: page(
-      `<div class="paper"><div class="cut">✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</div>
-        <div class="coupon">
-          <div class="burst"><b>FIRST<br>MONTH<br>FREE!</b></div>
-          <h1><span class="box">✓</span> YES! I want my<br><u>AI sales force.</u></h1>
-          <ul><li>✔ Voice agents that ring every new lead</li><li>✔ Sol, the brain of the business</li>
-            <li>✔ The AI designer: roofs priced as they're drawn</li><li>✔ Every feature, for every user</li></ul>
-          <p class="fine">NO CONTRACT · CANCEL ANY TIME · PRICES INCLUDE GST</p>
-        </div></div>`,
-      `body{background:#f6efd9}
-       .paper{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.015) 0 2px,transparent 2px 4px),#f6efd9}
-       .cut{position:absolute;left:40px;top:22px;font-family:"Courier New",monospace;font-size:18px;color:#3a3a3a;letter-spacing:.1em;white-space:nowrap}
-       .coupon{position:absolute;left:40px;top:56px;right:40px;bottom:36px;border:5px dashed #151515;background:#fffaf0;padding:34px 48px}
-       h1{font-family:"Arial Black","Segoe UI Black",Impact,sans-serif;font-size:54px;line-height:1.02;color:#111;letter-spacing:-.01em}
-       h1 u{text-decoration:none;background:linear-gradient(transparent 58%,#ffd400 58%);padding:0 6px}
-       .box{display:inline-grid;place-items:center;width:52px;height:52px;border:5px solid #111;font-size:40px;color:#ff3b0a;vertical-align:-6px;margin-right:10px}
-       ul{list-style:none;margin-top:26px;font-family:Georgia,"Times New Roman",serif;font-size:25px;line-height:1.55;color:#151515;font-weight:700}
-       .fine{position:absolute;left:48px;bottom:26px;font-family:"Courier New",monospace;font-weight:700;font-size:16px;letter-spacing:.12em;color:#333}
-       .burst{position:absolute;right:56px;top:34px;width:250px;height:250px;display:grid;place-items:center;transform:rotate(12deg);
-         background:#ff3b0a;clip-path:polygon(50% 0,58% 14%,73% 4%,75% 20%,92% 17%,86% 32%,100% 40%,88% 51%,99% 63%,84% 67%,88% 84%,72% 81%,66% 97%,54% 86%,43% 99%,37% 84%,21% 91%,21% 75%,4% 73%,13% 60%,0 50%,12% 40%,3% 26%,19% 23%,18% 6%,34% 13%,42% 0)}
-       .burst b{font-family:"Arial Black",Impact,sans-serif;font-size:34px;line-height:1;text-align:center;color:#fff;text-shadow:3px 3px 0 #111}`,
+      `<div class="sky"></div><div class="cut">✂</div><div class="coupon">
+        <div class="badge"><b>First month</b><span>free</span></div>
+        <h1><span class="box"><i></i></span>Yes. I want my <b>AI sales force.</b></h1>
+        <ul><li>Voice agents that ring every new lead</li><li>Sol, the brain of the business</li>
+          <li>The AI designer: roofs priced as they're drawn</li><li>Every feature, for every user</li></ul>
+        <p class="fine">No contract · Cancel any time · Prices include GST</p></div><div class="mark">RENUABL</div>`,
+      `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 85% 0%,rgba(255,90,31,.25),transparent 50%)}
+       .coupon{position:absolute;left:56px;top:56px;right:56px;bottom:72px;border:2px dashed rgba(255,122,46,.75);border-radius:26px;padding:48px 56px;
+         background:linear-gradient(180deg,rgba(36,39,46,.96),rgba(20,22,27,.96))}
+       .cut{position:absolute;left:36px;top:34px;font-size:28px;color:#ff7a2e;transform:rotate(-90deg)}
+       h1{font-size:50px;line-height:1.08;font-weight:600;letter-spacing:-.03em;max-width:640px}h1 b{color:#ff7a2e;font-weight:600}
+       .box{display:inline-grid;place-items:center;width:46px;height:46px;border:3px solid #fff;border-radius:10px;margin-right:18px;vertical-align:-4px}
+       .box i{width:22px;height:12px;border-left:4px solid #ff7a2e;border-bottom:4px solid #ff7a2e;transform:rotate(-45deg) translate(2px,-3px)}
+       ul{list-style:none;margin-top:30px;font-size:24px;line-height:1.7;color:rgba(255,255,255,.85)}
+       ul li::before{content:"✓";color:#ff7a2e;font-weight:700;margin-right:16px}
+       .fine{position:absolute;left:56px;bottom:30px;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+       .badge{position:absolute;right:56px;top:48px;width:190px;height:190px;border-radius:50%;display:grid;place-content:center;text-align:center;transform:rotate(10deg);
+         background:radial-gradient(circle at 35% 25%,#ffb08a 0 10%,#ff6a2c 45%,#e8470f 100%);box-shadow:inset 0 2px 1px rgba(255,255,255,.55),0 16px 40px rgba(255,90,31,.45)}
+       .badge b{font-size:24px;font-weight:600}.badge span{font-size:52px;font-weight:700;letter-spacing:-.03em;line-height:1}`,
     ),
   },
 };
@@ -510,8 +572,8 @@ for (const [name, art] of Object.entries(ART)) {
   await send("Page.navigate", { url: pathToFileURL(file).href });
   await sleep(1200);
   if (!art.frames) {
-    await sharp(await grab())
-      .resize(W, H)
+    await sharp(await grab(art.clipH ? { x: 0, y: 0, width: W, height: art.clipH } : undefined))
+      .resize(W, art.clipH ?? H)
       .jpeg({ quality: 86, mozjpeg: true })
       .toFile(join(OUT, name));
   } else {

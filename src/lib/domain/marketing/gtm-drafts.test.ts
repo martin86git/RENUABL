@@ -5,7 +5,17 @@ import { ADD_ON_MONTHLY_CENTS } from "@/lib/domain/design/add-ons";
 import { SEAT_MONTHLY_CENTS, dollars } from "@/lib/domain/design/plans";
 import { cleanContent, contentProblem } from "./edm";
 import { claimsToCheck } from "./edm-sol";
-import { GTM_EMAILS, GTM_PICTURES, MAX_WORDS, SOL_TYPES, gtmSequence, pictureKeyOf, withPictures } from "./gtm-drafts";
+import {
+  GTM_EMAILS,
+  GTM_PICTURES,
+  MAX_WORDS,
+  PRICE_DAY_LINE,
+  SOL_TYPES,
+  voiceAday,
+  gtmSequence,
+  pictureKeyOf,
+  withPictures,
+} from "./gtm-drafts";
 import { cleanSequence, sequenceProblem } from "./sequences";
 
 const allText = (c: (typeof GTM_EMAILS)[number]) => [c.subject, c.preview, ...c.blocks.map((b) => b.text)].join(" ");
@@ -23,7 +33,8 @@ describe("the launch drafts", () => {
 
   it("open each email with a picture whose file is in the site", () => {
     for (const c of GTM_EMAILS) {
-      const key = pictureKeyOf(c.blocks[0]);
+      const first = c.blocks.find((b) => b.kind === "image")!;
+      const key = pictureKeyOf(first);
       expect(key && GTM_PICTURES[key]).toBeTruthy();
       expect(existsSync(join(process.cwd(), "public", GTM_PICTURES[key!].file))).toBe(true);
     }
@@ -32,6 +43,22 @@ describe("the launch drafts", () => {
   it("say in words what Sol types in the pictures, kept in step with the picture tool", () => {
     const art = readFileSync(join(process.cwd(), "tools/marketing/launch-art.mjs"), "utf8");
     for (const words of Object.values(SOL_TYPES)) expect(art).toContain(JSON.stringify(words).slice(1, -1));
+    expect(art).toContain(PRICE_DAY_LINE);
+  });
+
+  it("open on the hook and end on the Marketplace band", () => {
+    for (const c of GTM_EMAILS) {
+      expect(c.blocks[0].kind).toBe("heading");
+      expect(pictureKeyOf(c.blocks.at(-1)!)).toBe("footer");
+      expect(c.blocks.at(-1)!.url).toBe("https://www.renuabl.com.au/design/marketplace");
+    }
+  });
+
+  it("puts Calls & Texts at less than $2 a day, in every month", () => {
+    expect(voiceAday()).toBeLessThan(2);
+    expect(voiceAday(4900)).toBeCloseTo(1.61, 2);
+    expect(4900 / 100 / 28).toBeLessThan(2);
+    expect(PRICE_DAY_LINE).toBe("$49 a month is $1.61 a day.");
   });
 
   it("are short: a glance, not a read", () => {

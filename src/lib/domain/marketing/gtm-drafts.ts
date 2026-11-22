@@ -4,14 +4,19 @@
  * huge leap for solar and those who adopt… influenced by tesla, space x and apple… imagery should be high end… a series
  * that educates the recipient on the features and benefits"). It replaces the drafts of 15 Nov 2026.
  *
- * Cut down the same day (Martin: "far too much text - noone has enough time in their day to read about something that
- * they have no idea that it serves any incentive for them"; Sol, the voice agent's audio icon and the AI designer
- * marketed as products, the way Apple does; the AI sales force email exciting and instantly obvious, a call in progress
- * animated; stacked cards of the features; "bring it home with the 90's style direct marketing"). "One giant leap": a
- * launch campaign (the products as stacked cards) and a six-email series started by opening it, each one product, one
- * moving or still picture, one headline, a line or two (`MAX_WORDS`) and one button, ending on a mail-order coupon. The strategy, the send plan and the review copy are in docs/marketing/launch-strategy.md; keep the two in
- * step. Every claim is something the product does today, worded as the business page words it; no rival named, no
- * best, first, leading or guaranteed, prices from plans.ts and add-ons.ts, only {firstName} and {company}.
+ * Cut down the same day (Martin: "far too much text"; Sol, the voice agent's audio icon and the AI designer marketed as
+ * products, the way Apple does; a call in progress animated; stacked cards of the features; a 1990s direct-mail close),
+ * then given hooks (Martin: "we have good headlines. but we need customer winning HOOKS"; the voice agents "less than $2
+ * per calendar day… you cant employ anyone on less than $2 per day… the savings are really important"), the real
+ * product beside each claim ("a screenshot from the actual portal that aligns with the email messaging"), and a band at
+ * the foot of every email for the Marketplace, coming soon.
+ *
+ * Each email: the hook as its heading, the product's moving picture, the card Sol types, the product itself, a line only
+ * where something must be said in words (a price, the P.S.), one button, then the Marketplace band. The strategy and the
+ * review copy are in docs/marketing/launch-strategy.md; keep the two in step. Every claim is something the product does
+ * today; no rival named, no best, first, leading or guaranteed (Martin asked for "the first truly AI empowered sales
+ * force": "first" needs proof under the Australian Consumer Law, so it isn't said), prices from plans.ts and
+ * add-ons.ts, only {firstName} and {company}.
  *
  * The pictures (`GTM_PICTURES`) are files in public/design/launch/, drawn by tools/marketing/launch-art.mjs; the route
  * that adds the drafts (`/api/design/marketing/gtm`) reads them into RENUABL's own Marketing pictures and puts each
@@ -25,9 +30,21 @@ import type { SequenceDraft, SequenceStep } from "./sequences";
 const SITE = "https://www.renuabl.com.au/";
 const DEMO = `${SITE}business/demo`;
 const PRICING = `${SITE}#pricing`;
+const MARKETPLACE = `${SITE}design/marketplace`;
 
 const PLAN_AFTER = `${dollars(SEAT_MONTHLY_CENTS)} a user a month`;
-const VOICE = `${dollars(ADD_ON_MONTHLY_CENTS.voice ?? 0)} a month`;
+const VOICE_CENTS = ADD_ON_MONTHLY_CENTS.voice ?? 0;
+const VOICE = `${dollars(VOICE_CENTS)} a month`;
+
+/**
+ * What a month of Calls & Texts comes to a day, averaged over the year (365.25 / 12 days a month): $49 is $1.61. Even in
+ * February, the shortest month, it is $1.75, so "less than $2 a day" holds in every month while this is under $2.
+ */
+export const voiceAday = (cents = VOICE_CENTS) => cents / 100 / (365.25 / 12);
+export const VOICE_DAY_WORDS = voiceAday() < 2 ? "less than $2 a day" : `about $${Math.ceil(voiceAday())} a day`;
+
+/** The line on the price card (price-voice.jpg in the picture tool says it too; a test keeps them in step). */
+export const PRICE_DAY_LINE = `${dollars(VOICE_CENTS)} a month is $${voiceAday().toFixed(2)} a day.`;
 
 /** The most words an email's own text may run to: a glance, not a read. */
 export const MAX_WORDS = 45;
@@ -60,44 +77,56 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
   },
   call: { file: "/design/launch/call.gif", alt: "A RENUABL voice agent on a call with a new lead, booking them in (example)" },
   xvoice: { file: "/design/launch/explain-voice.gif", alt: SOL_TYPES.xvoice },
+  pvoice: {
+    file: "/design/launch/product-voice.jpg",
+    alt: "In RENUABL: a voice agent's window, on a call with a customer now (example data)",
+  },
+  pricev: {
+    file: "/design/launch/price-voice.jpg",
+    alt: `Your voice agent, with your own number: ${VOICE_DAY_WORDS}. ${PRICE_DAY_LINE}`,
+  },
   sol: { file: "/design/launch/sol.gif", alt: SOL_TYPES.sol },
+  psol: { file: "/design/launch/product-sol.jpg", alt: "In RENUABL: Sol on Today, saying who to call and what to say (example data)" },
   designer: { file: "/design/launch/designer.gif", alt: "RENUABL's AI designer laying panels on a roof in one press (example home)" },
   xdesigner: { file: "/design/launch/explain-designer.gif", alt: SOL_TYPES.xdesigner },
   today: { file: "/design/launch/today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
   xcrm: { file: "/design/launch/explain-crm.gif", alt: SOL_TYPES.xcrm },
   runs: { file: "/design/launch/runs.jpg", alt: "RENUABL's install calendar after the sale (example data)" },
   xruns: { file: "/design/launch/explain-runs.gif", alt: SOL_TYPES.xruns },
-  coupon: { file: "/design/launch/coupon.jpg", alt: "YES! I want my AI sales force. First month free. No contract, cancel any time." },
+  coupon: { file: "/design/launch/coupon.jpg", alt: "Yes. I want my AI sales force. First month free. No contract, cancel any time." },
+  footer: {
+    file: "/design/launch/footer-marketplace.jpg",
+    alt: "RENUABL Marketplace, coming soon: find crews, win installs, trade stock.",
+  },
 };
 
 /** The picture key a draft's block stands for, read from its id (`gtm<email>pic<key>`). */
 export const pictureKeyOf = (b: EdmBlock): string | null => (b.kind === "image" ? (b.id.match(/pic([a-z]+)$/)?.[1] ?? null) : null);
 
 /**
- * One email: the product's picture, its name as the heading, then the explainer card Sol types (or a second picture),
- * a line only where something must be said in words (a price, the P.S.), and one button.
+ * One email: the hook as its heading, its pictures (the product moving, Sol's card, the product itself), a line only
+ * where something must be said in words, one button, then the Marketplace band.
  */
 function email(
   key: string,
   pictures: [keyof typeof GTM_PICTURES, ...(keyof typeof GTM_PICTURES)[]],
   subject: string,
   preview: string,
-  heading: string,
+  hook: string,
   words: string[],
   button: [string, string],
 ): EdmContent {
   const block = (id: string, b: Omit<EdmBlock, "id" | "imageId">): EdmBlock => ({ id: `gtm${key}${id}`, imageId: null, ...b });
-  const picture = (k: string) => block(`pic${k}`, { kind: "image", text: GTM_PICTURES[k].alt, url: button[1], align: "center" });
-  const [hero, ...rest] = pictures;
+  const picture = (k: string, url = button[1]) => block(`pic${k}`, { kind: "image", text: GTM_PICTURES[k].alt, url, align: "center" });
   return {
     subject,
     preview,
     blocks: [
-      picture(hero),
-      block("h", { kind: "heading", text: heading, url: null, align: "left" }),
-      ...rest.map(picture),
+      block("h", { kind: "heading", text: hook, url: null, align: "left" }),
+      ...pictures.map((k) => picture(k)),
       ...(words.length ? [block("t", { kind: "text", text: words.join("\n\n"), url: null, align: "left" })] : []),
       block("b", { kind: "button", text: button[0], url: button[1], align: "left" }),
+      picture("footer", MARKETPLACE),
     ],
   };
 }
@@ -116,43 +145,51 @@ export function withPictures(c: EdmContent, ids: Record<string, string>): EdmCon
 export const GTM_CAMPAIGN_NAME = "One giant leap · launch";
 export const GTM_SEQUENCE_NAME = "One giant leap · the series";
 
-/** The launch: Sol sits still, then types who he is; under him the products as a stack of cards. */
+/** The launch: the hook, Sol introducing himself, the products as a stack of cards. */
 export const GTM_LAUNCH: EdmContent = email(
   "l",
   ["solintro", "cards"],
-  "One giant leap for solar",
-  "Your AI sales force is here.",
-  "One giant leap for solar.",
+  "Solar just got an AI sales force",
+  "Your leads answered in minutes. Your emails written. Your systems designed with you.",
+  "Solar just got an AI sales force.",
   [],
   ["See it work", SITE],
 );
 
-/** The series: one product an email, Apple style, its card typed by Sol, then the deal, 1990s mail-order style. */
+/** The series: a hook an email, the product moving, Sol's card, the product itself; then the deal. */
 const SERIES: { wait: number; content: EdmContent }[] = [
   {
     wait: 2,
     content: email(
       "a",
-      ["call", "xvoice"],
-      "It's on the phone with your new lead",
-      "Voice agents that ring every lead and book them in.",
-      "Voice agents.",
-      [`Calls go out in calling hours. Calls & Texts, ${VOICE}.`],
+      ["call", "xvoice", "pvoice", "pricev"],
+      `An AI salesperson for ${VOICE_DAY_WORDS}`,
+      "It rings every new lead in minutes and books them in. Nobody can be hired for that.",
+      `An AI salesperson for ${VOICE_DAY_WORDS}.`,
+      [`Calls & Texts is ${VOICE} with your own business number, on top of your RENUABL plan. Calls go out in calling hours.`],
       ["Hear it call", SITE],
     ),
   },
   {
     wait: 3,
-    content: email("b", ["sol"], "Meet Sol", "The brain of your business.", "Meet Sol.", [], ["Meet Sol", SITE]),
+    content: email(
+      "b",
+      ["sol", "psol"],
+      "Who should you call this morning?",
+      "Sol knows. And he's written what to say.",
+      "Know who to call, and what to say. Every morning.",
+      [],
+      ["Meet Sol", SITE],
+    ),
   },
   {
     wait: 3,
     content: email(
       "c",
       ["designer", "xdesigner"],
-      "Your roofs, designed",
-      "One press. Three priced designs.",
-      "The AI designer.",
+      "Quote it before you leave the driveway",
+      "One press. Three priced designs. Signed online.",
+      "Quote it before you leave the driveway.",
       [],
       ["Try the designer", DEMO],
     ),
@@ -161,10 +198,10 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     wait: 3,
     content: email(
       "d",
-      ["today", "xcrm"],
-      "The CRM that does the typing",
-      "Calls written up. Follow-ups drafted.",
-      "A CRM that types.",
+      ["xcrm", "today"],
+      "Stop typing up your calls",
+      "Calls written up. Follow-ups drafted. Emailed leads turned into deals.",
+      "Stop typing up your calls.",
       [],
       ["See Today", DEMO],
     ),
@@ -173,10 +210,10 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     wait: 3,
     content: email(
       "e",
-      ["runs", "xruns"],
-      "Signed. Then it runs itself.",
-      "Ordering, approvals, installs and job cards in one place.",
-      "After the sale.",
+      ["xruns", "runs"],
+      "Signed? It's already moving.",
+      "The order, approvals and the job card, from the moment they sign.",
+      "Signed? It's already moving.",
       [],
       ["See after the sale", SITE],
     ),
@@ -186,14 +223,14 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     content: email(
       "f",
       ["coupon"],
-      `YES! Your first month is ${firstMonthWords}`,
+      `Yes: your first month is ${firstMonthWords}`,
       "No contract. Cancel any time. Every feature, every user.",
       "Here's the deal.",
       [
         `Your first month is ${firstMonthWords}. Then it's ${PLAN_AFTER}. No contract. Cancel any time.`,
         "P.S. Leads go to whoever answers soonest. Let yours answer this week.",
       ],
-      ["YES! Start now", PRICING],
+      ["Yes, start now", PRICING],
     ),
   },
 ];
