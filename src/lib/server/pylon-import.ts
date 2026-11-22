@@ -14,6 +14,7 @@ import {
   dealFromPylon,
   designUrl,
   fillFromPylon,
+  pylonSaid,
   isPylonPage,
   pdfName,
   projectUrl,
@@ -51,7 +52,7 @@ function ensureTable(): Promise<void> {
        at timestamptz not null default now(),
        primary key (business_id, source, ref)
      );
-     alter table design_imports add column if not exists filled_at timestamptz;
+     alter table design_imports add column if not exists equipment_at timestamptz;
      alter table design_imports add column if not exists pdf_at timestamptz`,
   ).then(
     () => undefined,
@@ -84,7 +85,14 @@ async function pylonGet(url: string, key: string, retried = false): Promise<unkn
     return pylonGet(url, key, true);
   }
   if (res.status === 404) return null;
-  if (!res.ok) throw new PylonProblem(PYLON_WORDS.down);
+  if (!res.ok) {
+    // Pylon answers in RFC 7807 problem details: its own words say what it didn't like.
+    const said = await res.json().catch(() => null);
+    const title =
+      said && typeof said === "object" && typeof (said as { title?: unknown }).title === "string" ? (said as { title: string }).title : "";
+    console.error(`[pylon-import] Pylon answered ${res.status} for ${new URL(url).pathname}${title ? `: ${title}` : ""}`);
+    throw new PylonProblem(res.status >= 500 ? PYLON_WORDS.down : pylonSaid(res.status, title));
+  }
   return res.json().catch(() => {
     throw new PylonProblem(PYLON_WORDS.down);
   });
@@ -322,7 +330,7 @@ export async function fillLeft(businessId: string, pdfs: boolean): Promise<numbe
   const rows = await query<{ n: string }>(
     `select count(*) as n from design_imports i
        join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
-      where i.business_id = $1 and i.source = 'pylon' and (i.filled_at is null or ($2::boolean and i.pdf_at is null))`,
+      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null))`,
     [businessId, pdfs],
   );
   return Number(rows[0]?.n ?? 0);
@@ -332,7 +340,7 @@ export async function fillLeft(businessId: string, pdfs: boolean): Promise<numbe
 const markDone = (businessId: string, ref: string, what: "filled" | "pdf" | "both") =>
   query(
     `update design_imports set
-            filled_at = case when $3 in ('filled', 'both') then coalesce(filled_at, now()) else filled_at end,
+            equipment_at = case when $3 in ('filled', 'both') then coalesce(equipment_at, now()) else equipment_at end,
             pdf_at = case when $3 in ('pdf', 'both') then coalesce(pdf_at, now()) else pdf_at end
       where business_id = $1 and source = 'pylon' and ref = $2`,
     [businessId, ref, what],
@@ -414,7 +422,7 @@ async function fillOne(
     await markDone(businessId, t.ref, "pdf");
   }
   const battery = Boolean(deal.job.details.battery || deal.job.details.batteryStorage);
-  return { id: t.ref, result: "filled", filled, battery, pdf };
+  return { id: t.ref, result: "filled", filled, battery, pdf, design: Boolean(design) };
 }
 
 /**
@@ -430,9 +438,9 @@ export async function fillFromPylonRun(
   await ensureTable();
   const fields = typedFields((await loadPrefs(businessId)).dealFields);
   const todo = await query<{ ref: string; job_id: string; need_fill: boolean }>(
-    `select i.ref, i.job_id, i.filled_at is null as need_fill from design_imports i
+    `select i.ref, i.job_id, i.equipment_at is null as need_fill from design_imports i
        join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
-      where i.business_id = $1 and i.source = 'pylon' and (i.filled_at is null or ($2::boolean and i.pdf_at is null))
+      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null))
       order by i.at, i.ref limit $3`,
     [businessId, pdfs, PYLON_BATCH],
   );
