@@ -16,7 +16,6 @@ import {
   Maximize,
   Minus,
   MessageCircle,
-  MousePointer2,
   PenTool,
   Redo2,
   RotateCcw,
@@ -33,7 +32,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { SolMark } from "./sol-sun";
 
 type TrayTool = "select" | "panel" | "erase" | "trace" | "string" | "rule" | "label" | "comment" | "pan";
@@ -42,7 +41,6 @@ const GROUPS: { title: string; items: { tool: TrayTool; icon: LucideIcon; name: 
   {
     title: "Draw",
     items: [
-      { tool: "select", icon: MousePointer2, name: "Select" },
       { tool: "erase", icon: Eraser, name: "Erase" },
       { tool: "trace", icon: PenTool, name: "Trace roof" },
     ],
@@ -263,6 +261,8 @@ export function SolController(props: {
   onTilt: (by: number) => void;
   onDelete: () => void;
   onDone: () => void;
+  /** A press and hold on a 1° button begins (true) and ends (false): its turns are one step to undo. */
+  onHold?: (holding: boolean) => void;
   /** Upright: how tall the plate is. */
   height?: number;
 }) {
@@ -276,9 +276,9 @@ export function SolController(props: {
   const thumb = (by: -1 | 1) => {
     const Turn = by < 0 ? RotateCcw : RotateCw;
     return (
-      <button
-        type="button"
-        onClick={() => props.onTurn(by)}
+      <HoldButton
+        onStep={(times) => props.onTurn(by * times)}
+        onHold={props.onHold}
         aria-label={`Turn 1 degree ${by < 0 ? "anticlockwise" : "clockwise"}`}
         className={clsx(
           "pointer-events-auto flex flex-col items-center justify-center rounded-full bg-[#3a3d43] text-white shadow-[0_6px_18px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/10 active:scale-95 active:bg-[#4a4e55] motion-reduce:active:scale-100",
@@ -287,7 +287,7 @@ export function SolController(props: {
       >
         <Turn className={upright ? "size-6" : "size-5"} aria-hidden />
         <span className="mt-0.5 text-[11px] font-semibold tabular-nums text-white/80">1°</span>
-      </button>
+      </HoldButton>
     );
   };
   const orient = props.panels > 0 && (
@@ -450,5 +450,91 @@ export function SolEmerging({ tray, held }: { tray: boolean; held: LucideIcon | 
         <Plus className="size-7" strokeWidth={3} />
       </span>
     </span>
+  );
+}
+
+/** How long a press is held before it repeats, and how often it repeats then. */
+const HOLD_START_MS = 380;
+const HOLD_EVERY_MS = 90;
+/** A slow redraw never jumps more than this in one go. */
+const HOLD_MOST_AT_ONCE = 5;
+
+/**
+ * A button that steps once on a press and keeps stepping while held (22 Nov 2026, Martin: "press and hold and it should
+ * continue to successively add or subtract 1 deg so I don't have to keep tapping"). A keyboard press steps once.
+ */
+function HoldButton({
+  onStep,
+  onHold,
+  className,
+  children,
+  "aria-label": label,
+}: {
+  /** How many steps are due: one on the press, then as many as the time held since the last asks for. */
+  onStep: (times: number) => void;
+  onHold?: (holding: boolean) => void;
+  className?: string;
+  children: ReactNode;
+  "aria-label": string;
+}) {
+  const step = useRef(onStep);
+  const held = useRef(false);
+  const timer = useRef<number | null>(null);
+  const due = useRef(0);
+  const last = useRef(0);
+  const owed = () => {
+    const now = Date.now();
+    const times = Math.min(HOLD_MOST_AT_ONCE, Math.max(1, Math.round((now - last.current) / HOLD_EVERY_MS)));
+    last.current = now;
+    return times;
+  };
+  // Each repeat waits until the last step has been drawn (this runs after every render), so it turns from where the
+  // panels now are, never from a stale copy, however slow the redraw.
+  useEffect(() => {
+    step.current = onStep;
+    if (!held.current || timer.current !== null) return;
+    timer.current = window.setTimeout(
+      () => {
+        timer.current = null;
+        if (held.current) step.current(owed());
+      },
+      Math.max(HOLD_EVERY_MS, due.current - Date.now()),
+    );
+  });
+  const stop = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    if (held.current) {
+      held.current = false;
+      onHold?.(false);
+    }
+  };
+  useEffect(() => stop, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      className={clsx(className, "touch-none select-none [-webkit-touch-callout:none]")}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        stop();
+        held.current = true;
+        due.current = Date.now() + HOLD_START_MS;
+        last.current = due.current - HOLD_EVERY_MS;
+        onHold?.(true);
+        step.current(1);
+      }}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onContextMenu={(e) => e.preventDefault()}
+      onClick={(e) => {
+        // A keyboard press (no pointer) steps once; a pointer's press already stepped.
+        if (e.detail === 0) step.current(1);
+      }}
+    >
+      {children}
+    </button>
   );
 }

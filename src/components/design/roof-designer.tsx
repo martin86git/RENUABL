@@ -11073,37 +11073,59 @@ export function RoofDesigner(props: {
                       </button>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (tool === "panel" && !panelCard) {
+                  <div className="relative">
+                    {/* Select, the pointer, beside it (22 Nov 2026, Martin: "we are missing the pointer… only discoverable in
+                      the tools menu"): the tool every other is left for, lit while in hand. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPanelCard(false);
+                        setPhonePitch(false);
                         pickTool("select");
-                        return;
-                      }
-                      setPhonePitch(false);
-                      if (tool !== "panel") pickTool("panel");
-                      setPanelCard((v) => !v);
-                    }}
-                    aria-pressed={tool === "panel"}
-                    aria-label={tool === "panel" ? "Put Add a panel down" : "Add a panel"}
-                    title={tool === "panel" ? "Adding panels: press to stop" : "Add a panel"}
-                    className={clsx(
-                      "relative flex items-center justify-center rounded-full border shadow-lift",
-                      sideways ? "size-9" : "size-11",
-                      tool === "panel" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink",
-                    )}
-                  >
-                    <SquarePlus className="size-5" aria-hidden />
-                    {addLandscape !== null && (
-                      <span
-                        aria-hidden
-                        className={clsx(
-                          "absolute -bottom-0.5 -right-0.5 block rounded-[2px] border border-current bg-inherit",
-                          addLandscape ? "h-2 w-3" : "h-3 w-2",
-                        )}
-                      />
-                    )}
-                  </button>
+                      }}
+                      aria-pressed={tool === "select"}
+                      aria-label="Select"
+                      title="Select: press a panel to pick it, drag to move it"
+                      className={clsx(
+                        "absolute bottom-0 right-full mr-2 flex items-center justify-center rounded-full border shadow-lift",
+                        sideways ? "size-9" : "size-11",
+                        tool === "select" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink",
+                      )}
+                    >
+                      <MousePointer2 className="size-5" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (tool === "panel" && !panelCard) {
+                          pickTool("select");
+                          return;
+                        }
+                        setPhonePitch(false);
+                        if (tool !== "panel") pickTool("panel");
+                        setPanelCard((v) => !v);
+                      }}
+                      aria-pressed={tool === "panel"}
+                      aria-label={tool === "panel" ? "Put Add a panel down" : "Add a panel"}
+                      title={tool === "panel" ? "Adding panels: press to stop" : "Add a panel"}
+                      className={clsx(
+                        "relative flex items-center justify-center rounded-full border shadow-lift",
+                        sideways ? "size-9" : "size-11",
+                        tool === "panel" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink",
+                      )}
+                    >
+                      <SquarePlus className="size-5" aria-hidden />
+                      {addLandscape !== null && (
+                        <span
+                          aria-hidden
+                          className={clsx(
+                            "absolute -bottom-0.5 -right-0.5 block rounded-[2px] border border-current bg-inherit",
+                            addLandscape ? "h-2 w-3" : "h-3 w-2",
+                          )}
+                        />
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
               <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
@@ -11161,6 +11183,11 @@ export function RoofDesigner(props: {
                     onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
                     onDelete={removePicked}
                     onDone={() => setPicks([])}
+                    // Held, its turns are one step to undo (the history waits while sliding, as for the tilt slider).
+                    onHold={(holding) => {
+                      sliding.current = holding;
+                      if (!holding) setSettled((n) => n + 1);
+                    }}
                     height={140}
                   />
                 </div>
