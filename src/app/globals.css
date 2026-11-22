@@ -1574,6 +1574,12 @@ html:has(.sales-snap) {
     border-radius: 0.5rem;
     background: transparent;
     box-shadow: none;
+    /* 22 Nov 2026, Martin: the values read too large beside the 12px labels. !important beats the 16px touch-screen
+       floor above; an iPhone doesn't zoom into them (maximum-scale=1, design-shell.tsx) and Android never does. */
+    font-size: 13px !important;
+  }
+  .deal-fields :is(input, select, textarea)::placeholder {
+    font-size: 13px;
   }
   .deal-fields textarea {
     height: auto;
