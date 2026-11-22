@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { AudioLines, Plus } from "lucide-react";
 import { AGENT_WORDS } from "@/lib/domain/design/agents";
+import { tintOf } from "@/lib/domain/design/caller";
 import { useLiveCallsNow } from "@/lib/services/assistant-call";
 import { useCallerInfo } from "@/lib/services/caller";
 import { openAgents } from "@/lib/services/agents";
@@ -52,8 +53,16 @@ export function PhoneVoiceTab({ onOpen }: { onOpen: () => void }) {
           dock ? "text-ink" : "text-muted",
         )}
       >
-        <span className={clsx("relative flex h-9 w-14 items-center justify-center rounded-full", dock && "bg-sun")}>
-          <AudioLines className="size-[22px]" aria-hidden />
+        {/* A round of its own in colour (22 Nov 2026, Martin: "update the voice icon in the doc to have a color"): the
+            graphite of the agents' faces with the wave in the first agent's colour, as Designer is its orange round. */}
+        <span
+          className={clsx(
+            "relative grid size-9 place-items-center rounded-full bg-[#3a3d43] shadow-sm",
+            dock && "ring-2 ring-sun-line/40 ring-offset-1",
+          )}
+          style={{ color: `var(--caller-${tintOf(agents[0]?.who ?? { name: "" })})` }}
+        >
+          <AudioLines className="size-5" aria-hidden />
           {live > 0 && (
             <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
               {live}
