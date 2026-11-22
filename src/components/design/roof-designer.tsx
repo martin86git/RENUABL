@@ -420,7 +420,9 @@ const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAY
  * picture only room for the top half of the kit, which sits on the picture's top edge; below it the toolbar hugging the
  * picture's foot (`bar`: zoom, Roof, Sides, the picture's switch), then Ask Sol, then the rail as a toolbar at the foot.
  */
-const PHONE_BANDS = { above: 34, below: 76, rail: 0, bar: 0 };
+// Below: room for Sol's card under the picture (22 Nov 2026, Martin: "very squashed in"; the slimmer figures gave the map
+// the room to move up).
+const PHONE_BANDS = { above: 34, below: 156, rail: 0, bar: 0 };
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
@@ -6328,7 +6330,7 @@ export function RoofDesigner(props: {
       aria-label="Start this design again"
       title="Start this design again"
       className={clsx(
-        phone || sideways ? "size-[2.625rem] ring-2" : "size-10 ring-[5px]",
+        phone || sideways ? "size-8 ring-[3px]" : "size-10 ring-[5px]",
         "flex items-center justify-center rounded-full bg-white shadow-lift ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
         resetAsk ? "text-sun-line" : "text-muted",
       )}
@@ -6370,8 +6372,8 @@ export function RoofDesigner(props: {
         {props.tight && (phone || sideways) ? (
           // On a phone upright (21 Nov 2026, Martin): icons only in the picture's top right corner, level with the kit and
           // its height: start again, then the designs' round, a little larger, with the open design's number under its mark.
-          <div className="flex h-[3.75rem] items-center gap-1.5">
-            {menu !== "designs" && resetRound}
+          // The designs' round larger, start again half set into it underneath, as on a computer (22 Nov 2026, Martin).
+          <div className="relative flex h-[3.75rem] items-center">
             <button
               type="button"
               onClick={() => openMenu(menu === "designs" ? false : "designs")}
@@ -6379,14 +6381,15 @@ export function RoofDesigner(props: {
               aria-haspopup="true"
               aria-label={`Design ${active + 1} of ${designs.length}: every design on this roof, a new one, a copy, and Publish`}
               title="Every design on this roof: a new one, a copy, and Publish"
-              className="flex size-[3.25rem] flex-col items-center justify-center rounded-full bg-primary text-primary-ink shadow-lift tabular-nums hover:bg-forest"
+              className="flex size-[3.75rem] flex-col items-center justify-center rounded-full bg-primary pb-1.5 text-primary-ink shadow-lift tabular-nums hover:bg-forest"
             >
-              <Layers className="size-5" aria-hidden />
-              <span className="text-[11px] font-semibold leading-none">
+              <Layers className="size-[22px]" aria-hidden />
+              <span className="text-[12px] font-semibold leading-none">
                 {active + 1}
                 {designs.length > 1 ? `/${designs.length}` : ""}
               </span>
             </button>
+            {menu !== "designs" && <div className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-[45%]">{resetRound}</div>}
           </div>
         ) : props.tight ? (
           // In the pop-up the corner is the roof's designs (10 Nov 2026, Martin: there was no plain way to start a second
@@ -6493,7 +6496,7 @@ export function RoofDesigner(props: {
           </div>
         )}
         {props.tight && (phone || sideways) && menu !== "designs" && resetAsk && (
-          <div className="absolute right-0 top-full mt-2">{resetQuestion}</div>
+          <div className="absolute right-0 top-full mt-6">{resetQuestion}</div>
         )}
         {props.tight && menu === "designs" && designsMenu}
         {sending && props.onNote && (
@@ -7109,29 +7112,29 @@ export function RoofDesigner(props: {
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
               {phone ? (
                 // On a phone, three figures across, each with its unit under it; clear of the window's close round on the right.
+                // One slim line (22 Nov 2026, Martin: the two bars took room the map and Sol needed).
                 <div
                   className={clsx(
-                    "grid grid-cols-3 gap-x-2 py-2 pl-4 pr-16 tabular-nums transition-colors duration-300",
+                    "flex items-baseline gap-x-3 whitespace-nowrap py-1 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
                     growing ? "bg-sun-line" : "",
                   )}
-                  style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+                  style={{ paddingTop: "max(0.25rem, env(safe-area-inset-top))" }}
                 >
-                  <p className="min-w-0 leading-tight" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
-                    <span className={clsx("text-[17px] font-semibold", growing ? "text-white" : "text-sun-bright")}>
+                  <p className="min-w-0 truncate" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
+                    <span className={clsx("text-[15px] font-semibold", growing ? "text-white" : "text-sun-bright")}>
                       {liveKw.toFixed(2)}
                     </span>
-                    <span className="ml-0.5 text-[11px] text-white/60">kW</span>
-                    <span className="block truncate text-[10.5px] text-white/60">
-                      {livePanels} × {panelOf(design).watts} W
+                    <span className="ml-0.5 text-[10.5px] text-white/60">
+                      kW · {livePanels}×{panelOf(design).watts}W
                     </span>
                   </p>
-                  <p className={clsx("min-w-0 leading-tight", oversize?.over && "text-sun-bright")}>
-                    <span className="text-[17px] font-semibold text-white">{summary.kwhPerDay}</span>
-                    <span className="block truncate text-[10.5px] text-white/60">kWh a day</span>
+                  <p className={clsx("shrink-0", oversize?.over && "text-sun-bright")}>
+                    <span className="text-[15px] font-semibold text-white">{summary.kwhPerDay}</span>
+                    <span className="ml-0.5 text-[10.5px] text-white/60">kWh/day</span>
                   </p>
-                  <p className="min-w-0 leading-tight" title={battery ? `${battery.qty} modules` : "No battery"}>
-                    <span className="text-[17px] font-semibold text-white">{battery ? batteryKwh : "–"}</span>
-                    <span className="block truncate text-[10.5px] text-white/60">{battery ? "kWh battery" : "no battery"}</span>
+                  <p className="shrink-0" title={battery ? `${battery.qty} modules` : "No battery"}>
+                    <span className="text-[15px] font-semibold text-white">{battery ? batteryKwh : "–"}</span>
+                    <span className="ml-0.5 text-[10.5px] text-white/60">{battery ? "kWh batt" : "no batt"}</span>
                   </p>
                 </div>
               ) : props.tight ? (
@@ -7251,7 +7254,7 @@ export function RoofDesigner(props: {
                     // Clipped, so a figure that runs long never paints under the shade widget beside it.
                     "min-w-0 flex-1 cursor-pointer overflow-hidden",
                     (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
-                    phone ? "flex items-center px-4 py-1.5" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    phone ? "flex items-center py-1 pl-4 pr-[4.5rem]" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -7268,17 +7271,31 @@ export function RoofDesigner(props: {
                   </p>
                   {finance && phone ? (
                     // On a phone, the bill, the saving and the payback as three figures across, each named over it.
-                    <dl className="grid w-full grid-cols-3 gap-x-2 tabular-nums" title="What it does for this home: open the bill">
+                    <dl
+                      className="flex w-full items-baseline gap-x-3 whitespace-nowrap tabular-nums"
+                      title="What it does for this home: open the bill"
+                    >
                       {(
                         [
-                          ["Bill", `${dollars(finance.billNow)} → ${dollars(finance.billAfter)}`, false],
-                          ["Saves a year", dollars(finance.saving), true],
+                          // On a narrow phone the bill after alone, so the line fits beside the window's close round.
+                          [
+                            "Bill",
+                            <>
+                              <span className="max-[409px]:hidden">{dollars(finance.billNow)}→</span>
+                              {dollars(finance.billAfter)}
+                            </>,
+                            false,
+                          ],
+                          ["Saves", `${dollars(finance.saving)}/yr`, true],
                           ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
                         ] as const
                       ).map(([name, value, gold]) => (
-                        <div key={name} className="min-w-0">
-                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.12em] text-muted">{name}</dt>
-                          <dd className={clsx("truncate text-[13px] font-semibold leading-tight", gold && "text-positive")}>{value}</dd>
+                        <div key={name} className={clsx("flex items-baseline gap-1", name === "Bill" ? "min-w-0" : "shrink-0")}>
+                          <dt className="text-[8px] font-medium uppercase tracking-[0.08em] text-muted">
+                            {name}
+                            {name === "Bill" && <span className="min-[410px]:hidden"> after</span>}
+                          </dt>
+                          <dd className={clsx("truncate text-[12px] font-semibold leading-tight", gold && "text-positive")}>{value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -11017,7 +11034,7 @@ export function RoofDesigner(props: {
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
                   style={
-                    sideDeck ? solNotch(0, 34) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
                 >
@@ -11096,7 +11113,7 @@ export function RoofDesigner(props: {
                       : !phone && "bottom-[6.25rem]",
                   )}
                   style={
-                    sideDeck ? solNotch(0, 34) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
                 >
@@ -11118,29 +11135,60 @@ export function RoofDesigner(props: {
               {/* The hand to grab the map, in reach on a phone (22 Nov 2026, Martin: "an easy way of selecting the grab
                   tool… grab the map and reposition and recenter the rooftop"): one round, lit while in hand; again puts it down. */}
               {solHolds && !(picks.length > 0 && !solTray) && (
-                <button
-                  type="button"
-                  onClick={() => pickTool(tool === "pan" ? "select" : "pan")}
-                  aria-pressed={tool === "pan"}
-                  aria-label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
-                  title={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
-                  // With Sol's plate up under the picture, it sits on the picture's foot to his right (the panel round to his left).
-                  // Sideways, as upright: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
+                <div
+                  className="pointer-events-auto absolute z-[55]"
+                  // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
                   style={
                     deckUp
                       ? { left: "calc(50% + 3.75rem)", top: foot ?? 0, transform: "translate(-50%, -50%)" }
                       : sideways
                         ? { left: "calc(50% + 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
-                        : undefined
+                        : { left: "calc(50% + 3.75rem)", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
                   }
-                  className={clsx(
-                    "pointer-events-auto absolute z-[55] flex items-center justify-center rounded-full border shadow-lift",
-                    deckUp ? "size-11" : sideways ? "size-9" : "bottom-7 left-4 size-[3.25rem]",
-                    tool === "pan" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
-                  )}
                 >
-                  <Hand className={sideways ? "size-5" : "size-6"} aria-hidden />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => pickTool(tool === "pan" ? "select" : "pan")}
+                    aria-pressed={tool === "pan"}
+                    aria-label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                    title={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                    className={clsx(
+                      "flex items-center justify-center rounded-full border shadow-lift",
+                      sideways ? "size-9" : "size-11",
+                      tool === "pan" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Hand className={sideways ? "size-5" : "size-6"} aria-hidden />
+                  </button>
+                  {/* Erase beside the hand (22 Nov 2026, Martin: out of Sol's tools, onto the map). */}
+                  <button
+                    type="button"
+                    onClick={() => pickTool(tool === "erase" ? "select" : "erase")}
+                    aria-pressed={tool === "erase"}
+                    aria-label={tool === "erase" ? "Put the eraser down" : "Erase: press or drag across what to take away"}
+                    title={tool === "erase" ? "Put the eraser down" : "Erase: press or drag across what to take away"}
+                    className={clsx(
+                      "absolute bottom-0 left-full ml-2 flex items-center justify-center rounded-full border shadow-lift",
+                      sideways ? "size-9" : "size-11",
+                      tool === "erase" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Eraser className={sideways ? "size-[18px]" : "size-5"} aria-hidden />
+                  </button>
+                </div>
+              )}
+              {/* Sol's card under the picture, an outlined box whose outline runs round him (22 Nov 2026, Martin): a ring
+                  of the same line round his round, meeting the box's edge at its notch. */}
+              {(deckUp || sideDeckUp) && (guideShown || nudgeShown) && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute z-[54] rounded-full border-[1.5px] border-sun-line/70"
+                  style={
+                    sideDeckUp
+                      ? { left: "50%", bottom: sideDeckH, width: 60, height: 60, transform: "translate(-50%, 50%)" }
+                      : { left: "50%", top: foot ?? 0, width: 60, height: 60, transform: "translate(-50%, -50%)" }
+                  }
+                />
               )}
               {/* The panel round, on the map's bottom centre on a phone (22 Nov 2026, Martin: out of Sol's tool kit, on the map):
                   a press takes up Add a panel and asks which way they go down; a press with it in hand puts it down. */}
@@ -11322,7 +11370,7 @@ export function RoofDesigner(props: {
                       sliding.current = holding;
                       if (!holding) setSettled((n) => n + 1);
                     }}
-                    height={140}
+                    height={stage?.pb ?? 140}
                   />
                 </div>
               )}
@@ -11379,13 +11427,20 @@ export function RoofDesigner(props: {
                     aria-expanded={!solAway && commandOpen}
                     data-popup
                     // Sideways with his plate at the foot, his middle on its top edge, as upright (the dock is drawn at 0.68).
-                    style={sideDeckUp ? { transform: `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)` } : undefined}
+                    // His middle on the plate's top edge (the picture's foot upright), worked out from how far that edge
+                    // stands above where he sits (the dock is drawn at 0.68, his middle 43.5 px up).
+                    style={
+                      sideDeckUp
+                        ? { transform: `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)` }
+                        : deckUp && stage
+                          ? { transform: `translateY(${-Math.max(0, (stage.pb - 43.5) / 0.68)}px)` }
+                          : undefined
+                    }
                     title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
                     className={clsx(
                       "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
                       // On a phone, with something picked, his card is this round grown open: no second pill under it.
                       // Upright with his plate under the picture, he rises to sit on the picture's foot, in its notch.
-                      deckUp && "-translate-y-[48px]",
                       "transition-transform duration-300 motion-reduce:transition-none",
                       // On a phone Sol is a round of his own, a tool and a + coming out of him: no words.
                       solHolds && "!size-[4.5rem] !gap-0 !p-0 justify-center",

@@ -10,7 +10,6 @@ import { clsx } from "clsx";
 import {
   Cable,
   ChevronRight,
-  Eraser,
   Hand,
   LayoutGrid,
   House,
@@ -42,7 +41,7 @@ const GROUPS: { title: string; items: { tool: TrayTool; icon: LucideIcon; name: 
   {
     title: "Draw",
     items: [
-      { tool: "erase", icon: Eraser, name: "Erase" },
+      // Erase is on the map beside the hand (22 Nov 2026, Martin).
       { tool: "trace", icon: PenTool, name: "Trace roof" },
     ],
   },
