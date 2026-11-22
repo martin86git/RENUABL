@@ -1848,7 +1848,8 @@ function CountdownView({
 
 /** A countdown's settings: the day and time it ends, in the market's time, and how the timer behaves. */
 function CountdownFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
-  const passed = b.endsAt ? endsAtMs(b.endsAt) <= Date.now() : false;
+  const [now] = useState(Date.now);
+  const passed = b.endsAt ? endsAtMs(b.endsAt) <= now : false;
   return (
     <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
       <label className="block text-[12px] text-muted">
