@@ -1844,3 +1844,11 @@ html:has(.sales-snap) {
       0 22px 60px rgba(11, 11, 12, 0.38);
   }
 }
+
+/* While a tour lights another place, a deal's Sol sheet (and its tab) on a phone steps aside, so it never covers the
+   round being pointed at; it comes back on Sol's own step and when the tour ends (23 Nov 2026, Martin). */
+@media (max-width: 639px) {
+  html[data-spotlight]:not([data-spotlight*="deal-sol"]) :is(.deal-sol-sheet, .deal-sol-tab) {
+    display: none !important;
+  }
+}
