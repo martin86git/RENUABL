@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Designer",
+    words: "A datasheet shared from another business is marked to check until someone in your business confirms it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
     words: "Product datasheets are shared across RENUABL: one any business adds is there for every business to design with.",
   },
   {

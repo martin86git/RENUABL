@@ -37,6 +37,8 @@ export interface SavedSheet {
    * any user then becomes available to all users"). Never says whose: `checkedBy` is `SHARED_BY`.
    */
   shared?: boolean;
+  /** A shared sheet a person at the other business checked. It is still to check here until this business confirms it. */
+  checkedElsewhere?: boolean;
 }
 
 /** Who a shared sheet's figures are said to be checked by: never the other business's name or a person's email. */

@@ -70,6 +70,10 @@ describe.skipIf(!url)("product datasheets (database)", () => {
     expect(JSON.stringify(theirs)).not.toContain("alpha");
     expect(JSON.stringify(theirs)).not.toContain("owner");
     expect((await sheets.businessDatasheets(b)).panels["NEW-475"].voc).toBe(36.4);
+    // Checked where it came from, and still to check here until someone at this business confirms it.
+    expect(theirs[0]!.unchecked && theirs[0]!.checkedElsewhere).toBe(true);
+    expect((await sheets.businessDatasheets(b)).panels["NEW-475"].unchecked).toBe("/design/settings/datasheets");
+    expect((await sheets.businessDatasheets(a)).panels["NEW-475"].unchecked).toBeUndefined();
     expect(await sheets.deleteSheet(b, "panel", "NEW-475")).toBe(false);
     expect(Object.keys((await sheets.businessDatasheets(a)).panels)).toEqual(["NEW-475"]);
     // The business that added it sees its own, not a shared copy.
@@ -93,6 +97,7 @@ describe.skipIf(!url)("product datasheets (database)", () => {
     const own = (await sheets.listSheets(b))[0]!;
     expect(own.shared).toBeUndefined();
     expect(own.checkedBy).toBe("sam@beta-sheets.test");
+    expect(own.unchecked).toBe(false);
     expect(own.figures.basis).toMatch(/read and checked by sam on /);
     expect(await sheets.adoptSharedSheet(b, "panel", "NEW-475", B)).toBe(false);
     expect(await sheets.adoptSharedSheet(b, "inverter", "NOT-THERE", B)).toBe(false);
@@ -123,6 +128,7 @@ describe.skipIf(!url)("product datasheets (database)", () => {
     ).toBe(true);
     const found = (await sheets.listSheets(b)).find((s) => s.sku === "FOUND-440")!;
     expect(found.shared && found.unchecked).toBe(true);
+    expect(found.checkedElsewhere).toBe(false);
     expect((await sheets.businessDatasheets(b)).panels["FOUND-440"].unchecked).toBe("https://example.com/f.pdf");
     expect(found.figures.basis).toMatch(/found online for another business on RENUABL/);
   });
