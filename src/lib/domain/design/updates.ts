@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Today",
+    words: "Pages answer taps sooner on phones: Sol's sun does less work in the background, and his cards type their lines more lightly.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
     words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
   },
   {
