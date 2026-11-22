@@ -121,7 +121,7 @@ export function SolTray(props: {
         role="dialog"
         aria-label="Sol's tools"
         data-popup
-        className="fixed inset-x-0 bottom-0 z-[95] flex max-h-[88dvh] flex-col rounded-t-[22px] bg-[#26282c] text-white shadow-[0_-12px_32px_rgba(0,0,0,0.35)]"
+        className="fixed inset-x-0 bottom-0 z-[95] mx-auto flex max-h-[88dvh] max-w-[52rem] flex-col rounded-t-[22px] bg-[#26282c] text-white shadow-[0_-12px_32px_rgba(0,0,0,0.35)]"
       >
         <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 pt-2">
           <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-white/25" aria-hidden />
@@ -149,74 +149,77 @@ export function SolTray(props: {
               <X className="size-4" aria-hidden />
             </button>
           </div>
-          {GROUPS.map((group) => (
-            <section key={group.title} className="mt-2.5">
-              <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">{group.title}</h4>
+          {/* Sideways (a wide, short screen) the groups sit two across, so more of them fit before it scrolls. */}
+          <div className="sm:grid sm:grid-cols-2 sm:gap-x-6">
+            {GROUPS.map((group) => (
+              <section key={group.title} className="mt-2.5">
+                <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">{group.title}</h4>
+                <div className="grid grid-cols-4 justify-items-center gap-y-2">
+                  {group.items.map(({ tool, icon: Icon, name }) => (
+                    <Item
+                      key={tool}
+                      icon={<Icon className="size-[18px]" aria-hidden />}
+                      name={name}
+                      on={props.tool === tool}
+                      onClick={() => pick(tool)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+            <section className="mt-2.5">
+              <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">Check</h4>
               <div className="grid grid-cols-4 justify-items-center gap-y-2">
-                {group.items.map(({ tool, icon: Icon, name }) => (
-                  <Item
-                    key={tool}
-                    icon={<Icon className="size-[18px]" aria-hidden />}
-                    name={name}
-                    on={props.tool === tool}
-                    onClick={() => pick(tool)}
-                  />
-                ))}
+                <Item
+                  icon={<SunMedium className="size-[18px]" aria-hidden />}
+                  name="Shade"
+                  on={props.shadeOn}
+                  onClick={then(props.onShade)}
+                />
+                <Item
+                  icon={<TriangleRight className="size-[18px]" aria-hidden />}
+                  name={props.pitchWords}
+                  on={props.pitchShown}
+                  onClick={then(props.onPitch)}
+                />
+                <Item
+                  icon={<WandSparkles className="size-[18px]" aria-hidden />}
+                  name="Design it for me"
+                  onClick={then(() => props.onDesignForMe?.())}
+                  disabled={!props.onDesignForMe}
+                />
               </div>
             </section>
-          ))}
-          <section className="mt-2.5">
-            <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">Check</h4>
-            <div className="grid grid-cols-4 justify-items-center gap-y-2">
-              <Item
-                icon={<SunMedium className="size-[18px]" aria-hidden />}
-                name="Shade"
-                on={props.shadeOn}
-                onClick={then(props.onShade)}
-              />
-              <Item
-                icon={<TriangleRight className="size-[18px]" aria-hidden />}
-                name={props.pitchWords}
-                on={props.pitchShown}
-                onClick={then(props.onPitch)}
-              />
-              <Item
-                icon={<WandSparkles className="size-[18px]" aria-hidden />}
-                name="Design it for me"
-                onClick={then(() => props.onDesignForMe?.())}
-                disabled={!props.onDesignForMe}
-              />
-            </div>
-          </section>
-          <section className="mt-2.5">
-            <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">View</h4>
-            <div className="grid grid-cols-4 justify-items-center gap-y-2">
-              <Item
-                icon={<Search className="size-[18px]" aria-hidden />}
-                name="Pinch zoom"
-                on={props.zooming}
-                onClick={then(props.onZoom)}
-              />
-              <Item
-                icon={<Hand className="size-[18px]" aria-hidden />}
-                name="Move map"
-                on={props.tool === "pan"}
-                onClick={() => pick("pan")}
-              />
-              <Item icon={<Maximize className="size-[18px]" aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
-              <Item
-                icon={<House className="size-[18px]" aria-hidden />}
-                name={props.drawn ? "Photo" : "Drawn roof"}
-                onClick={then(props.onDrawn)}
-              />
-            </div>
-            <div className="mt-2.5 flex items-center gap-2">
-              <Item icon={<Undo2 className="size-[18px]" aria-hidden />} name="Undo" onClick={props.onUndo} />
-              <Item icon={<Redo2 className="size-[18px]" aria-hidden />} name="Redo" onClick={props.onRedo} />
-              {props.sides && <div className="rounded-full bg-white/10 p-0.5">{props.sides}</div>}
-              {props.pictureMenu && <div className="ml-auto">{props.pictureMenu}</div>}
-            </div>
-          </section>
+            <section className="mt-2.5">
+              <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">View</h4>
+              <div className="grid grid-cols-4 justify-items-center gap-y-2">
+                <Item
+                  icon={<Search className="size-[18px]" aria-hidden />}
+                  name="Pinch zoom"
+                  on={props.zooming}
+                  onClick={then(props.onZoom)}
+                />
+                <Item
+                  icon={<Hand className="size-[18px]" aria-hidden />}
+                  name="Move map"
+                  on={props.tool === "pan"}
+                  onClick={() => pick("pan")}
+                />
+                <Item icon={<Maximize className="size-[18px]" aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
+                <Item
+                  icon={<House className="size-[18px]" aria-hidden />}
+                  name={props.drawn ? "Photo" : "Drawn roof"}
+                  onClick={then(props.onDrawn)}
+                />
+              </div>
+              <div className="mt-2.5 flex items-center gap-2">
+                <Item icon={<Undo2 className="size-[18px]" aria-hidden />} name="Undo" onClick={props.onUndo} />
+                <Item icon={<Redo2 className="size-[18px]" aria-hidden />} name="Redo" onClick={props.onRedo} />
+                {props.sides && <div className="rounded-full bg-white/10 p-0.5">{props.sides}</div>}
+                {props.pictureMenu && <div className="ml-auto">{props.pictureMenu}</div>}
+              </div>
+            </section>
+          </div>
         </div>
         {/* The designer's own row (save, ready to install, strings, shade, record and the rest) stands in this strip. */}
         <div
