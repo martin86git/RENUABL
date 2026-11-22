@@ -50,7 +50,7 @@ import { RoutinesRound } from "./routines-round";
 import { AgentsWindow } from "./agents-window";
 import { SetupWizard } from "./setup-wizard";
 import { openSetup } from "@/lib/services/setup";
-import { TeamChatButton } from "./team-chat";
+import { TeamChatButton, useTeamUnread } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
@@ -125,6 +125,9 @@ const PHONE_TABS: PhoneTab[] = [
   { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
+  // Team chat in the foot bar (22 Nov 2026, Martin: "we need to introduce the team chat into the bottom nav"): its own
+  // page on a phone, with this member's unread team lines on it.
+  { label: "Team", href: PATHS.team, icon: MessagesSquare, match: (p) => p.startsWith(PATHS.team) },
 ];
 
 /**
@@ -216,6 +219,8 @@ function Shell({
   const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.business));
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
   const unread = useUnreadMessages(retail);
+  // This member's unread team chat lines, for the Team tab on a phone's foot bar.
+  const teamUnread = useTeamUnread();
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -727,7 +732,7 @@ function Shell({
         aria-label="Sections, on a phone"
         className={clsx(
           "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
-          kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
+          kind === "installer" ? "grid-cols-5" : "grid-cols-6",
         )}
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
@@ -741,7 +746,7 @@ function Shell({
                 Sol
               </div>
             ) : null;
-          const n = t.href === PATHS.messages ? unread : 0;
+          const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
           return [
             sol,
             <Link

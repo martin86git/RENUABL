@@ -10,6 +10,7 @@ import clsx from "clsx";
 import {
   AtSign,
   Check,
+  ChevronLeft,
   FileText,
   Hash,
   MessagesSquare,
@@ -105,6 +106,27 @@ const SOL_WAIT_MS = 120_000;
  */
 const SOL_ROOM = "sol";
 
+/** Under this width (px) the panel shows the list or one room, not both side by side. */
+const NARROW_PANEL = 560;
+
+/** Back from a room to the list of conversations, when the panel is too narrow to show both. */
+function BackToList({ onBack, icon = false }: { onBack: () => void; icon?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      aria-label="Back to conversations"
+      className={clsx(
+        "flex shrink-0 items-center gap-1 rounded-full text-sm font-medium text-ink-2 hover:bg-canvas hover:text-ink",
+        icon ? "size-9 justify-center" : "px-2 py-1.5",
+      )}
+    >
+      <ChevronLeft className="size-5" aria-hidden />
+      {!icon && "Conversations"}
+    </button>
+  );
+}
+
 /**
  * The team chat (1 Nov 2026, as Primero's): channels and the people down the left, the room on the right. Lines run
  * oldest first, your own on the right; hover one to reply to it (as iMessage: the reply carries a quote of it, which
@@ -158,6 +180,19 @@ export function TeamChatPanel({
       return TEAM_LIST.width;
     }
   });
+  // On a phone, or a window as narrow (22 Nov 2026, Martin: team chat in the phone's foot bar), the list and the room
+  // can't sit side by side: the list fills the panel, a room opens in its place, and its back arrow brings the list back.
+  const [narrow, setNarrow] = useState(false);
+  const [listShown, setListShown] = useState(true);
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const fit = () => setNarrow(el.clientWidth < NARROW_PANEL);
+    fit();
+    const watch = new ResizeObserver(fit);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [side]);
   const keepListW = (w: number) => {
     const sized = teamListWidth(w, panelRef.current?.clientWidth ?? 800);
     setListW(sized);
@@ -204,6 +239,7 @@ export function TeamChatPanel({
 
   const setRoom = (r: string) => {
     setRoomState(r);
+    setListShown(false);
     setView(null);
     setEditing(null);
     setReacting(null);
@@ -448,18 +484,24 @@ export function TeamChatPanel({
       <div ref={panelRef} className="flex h-full min-h-0 bg-surface text-ink">
         <nav
           aria-label="Conversations"
-          style={{ width: listW }}
-          className="relative flex shrink-0 flex-col border-r border-line bg-canvas/60"
+          style={{ width: narrow ? "100%" : listW }}
+          className={clsx(
+            "relative flex shrink-0 flex-col bg-canvas/60",
+            !narrow && "border-r border-line",
+            narrow && !listShown && "hidden",
+          )}
         >
-          <Grip
-            label="Drag to make the list wider or narrower"
-            className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize"
-            onDrag={(dx, _dy, start) => keepListW(start.width + dx)}
-            start={() => ({ width: listW, height: 0 })}
-            onReset={() => keepListW(TEAM_LIST.width)}
-            keys={(k) => (k === "ArrowLeft" ? keepListW(listW - 16) : k === "ArrowRight" ? keepListW(listW + 16) : undefined)}
-            orientation="vertical"
-          />
+          {!narrow && (
+            <Grip
+              label="Drag to make the list wider or narrower"
+              className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize"
+              onDrag={(dx, _dy, start) => keepListW(start.width + dx)}
+              start={() => ({ width: listW, height: 0 })}
+              onReset={() => keepListW(TEAM_LIST.width)}
+              keys={(k) => (k === "ArrowLeft" ? keepListW(listW - 16) : k === "ArrowRight" ? keepListW(listW + 16) : undefined)}
+              orientation="vertical"
+            />
+          )}
           <div className="px-2 pt-3">{sides}</div>
           <DealChatsList
             deals={view?.dealChats ?? []}
@@ -552,14 +594,20 @@ export function TeamChatPanel({
         </nav>
 
         {solOpen && (
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className={clsx("flex min-w-0 flex-1 flex-col", narrow && listShown && "hidden")}>
+            {narrow && (
+              <div className="border-b border-line px-2 py-1.5">
+                <BackToList onBack={() => setListShown(true)} />
+              </div>
+            )}
             <SolChat key={solFresh} side onClose={onClose} />
           </div>
         )}
         {dealJob && (
-          <div className="flex min-w-0 flex-1 flex-col">
-            <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-              <div className="min-w-0">
+          <div className={clsx("flex min-w-0 flex-1 flex-col", narrow && listShown && "hidden")}>
+            <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3 max-sm:px-2">
+              {narrow && <BackToList onBack={() => setListShown(true)} icon />}
+              <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
                   <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
                   {dealOpen ? `${dealOpen.customer} · ${dealOpen.title}` : "Deal chat"}
@@ -602,7 +650,11 @@ export function TeamChatPanel({
           </div>
         )}
         <div
-          className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line", elsewhere && "hidden")}
+          className={clsx(
+            "relative flex min-w-0 flex-1 flex-col",
+            dropping && "ring-2 ring-inset ring-sun-line",
+            (elsewhere || (narrow && listShown)) && "hidden",
+          )}
           onDragOver={(e) => {
             if (e.dataTransfer.types.includes("Files")) {
               e.preventDefault();
@@ -616,8 +668,9 @@ export function TeamChatPanel({
             addFiles([...e.dataTransfer.files]);
           }}
         >
-          <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <div className="min-w-0">
+          <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3 max-sm:px-2">
+            {narrow && <BackToList onBack={() => setListShown(true)} icon />}
+            <div className="min-w-0 flex-1">
               <p className="flex items-center gap-1 truncate text-sm font-semibold">
                 {channel && <Hash className="size-3.5 text-muted" aria-hidden />}
                 {channel ? channel.label : roomLabel(room, me)}
@@ -2007,7 +2060,7 @@ export function TeamChatPage() {
   const [account] = useDesignAccount();
   if (!account?.signedIn || !("email" in account) || !account.email) return null;
   return (
-    <div className="h-[calc(100dvh-12rem)] min-h-[28rem] overflow-hidden rounded-2xl ring-1 ring-line">
+    <div className="h-[calc(100dvh-12rem)] min-h-[28rem] overflow-hidden rounded-2xl ring-1 ring-line max-sm:h-[calc(100dvh-17rem)] max-sm:min-h-[22rem]">
       <TeamChatPanel me={account.email} />
     </div>
   );
