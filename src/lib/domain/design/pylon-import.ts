@@ -40,6 +40,12 @@ export const PYLON_WORDS = {
   down: "Pylon couldn't be reached just now. Try again in a minute.",
 } as const;
 
+/** Pylon turned a request down for a reason of its own: said with its status and words, so it can be put right. */
+export function pylonSaid(status: number, title: string): string {
+  const words = title.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  return `Pylon turned the request down (${status}${words ? `: ${words}` : ""}). Tell RENUABL, so it can be put right.`;
+}
+
 /** A key as pasted: trimmed, a leading "Bearer " and quotes forgiven; null when it can't be one. */
 export function cleanPylonKey(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -81,7 +87,7 @@ export const projectUrl = (id: string) => `${PYLON_API}/v1/solar_projects/${enco
 
 /** The design's fields we read (Pylon requires `fields[solar_designs]`). */
 export function designUrl(id: string): string {
-  const fields = "title,summary,pricing,proposal_quote,module_types,inverter_types,storage_types,ev_charger_types,locale";
+  const fields = "title,summary,pricing,proposal_quote,module_types,inverter_types,ev_charger_types,locale";
   return `${PYLON_API}/v1/solar_designs/${encodeURIComponent(id)}?fields[solar_designs]=${fields}`;
 }
 
@@ -631,6 +637,6 @@ export function fillFromPylon(
 
 /** What became of one deal filled in. */
 export type PylonFillOutcome =
-  | { id: string; result: "filled"; filled: number; battery: boolean; pdf: boolean }
+  | { id: string; result: "filled"; filled: number; battery: boolean; pdf: boolean; design: boolean }
   | { id: string; result: "gone" }
   | { id: string; result: "failed"; why: string };

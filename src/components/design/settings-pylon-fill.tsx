@@ -8,7 +8,17 @@ import { PYLON_FILL_WORDS } from "@/lib/domain/design/pylon-import";
 import { fillFromPylon, pylonFillLeft } from "@/lib/services/pylon-import";
 import { PATHS, ui } from "./design-shell";
 
-type Run = { done: number; total: number; batteries: number; pdfs: number; failed: number; running: boolean; stopped: boolean };
+type Run = {
+  done: number;
+  total: number;
+  batteries: number;
+  pdfs: number;
+  failed: number;
+  gone: number;
+  noDesign: number;
+  running: boolean;
+  stopped: boolean;
+};
 
 /**
  * Filling in deals brought in from Pylon's export (22 Nov 2026, Martin: they all read as solar only). Uses the key typed
@@ -36,7 +46,7 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
   const go = async () => {
     stop.current = false;
     setProblem(null);
-    let state: Run = { done: 0, total: left.left, batteries: 0, pdfs: 0, failed: 0, running: true, stopped: false };
+    let state: Run = { done: 0, total: left.left, batteries: 0, pdfs: 0, failed: 0, gone: 0, noDesign: 0, running: true, stopped: false };
     setRun(state);
     for (;;) {
       if (stop.current) {
@@ -52,6 +62,8 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
       for (const r of res.results) {
         if (r.result === "failed") state = { ...state, failed: state.failed + 1 };
         else state = { ...state, done: state.done + 1 };
+        if (r.result === "gone") state = { ...state, gone: state.gone + 1 };
+        if (r.result === "filled" && !r.design) state = { ...state, noDesign: state.noDesign + 1 };
         if (r.result === "filled")
           state = { ...state, batteries: state.batteries + (r.battery ? 1 : 0), pdfs: state.pdfs + (r.pdf ? 1 : 0) };
       }
@@ -122,6 +134,8 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
           <p className="mt-2 text-sm text-ink-2">
             {n(run.done)} of {n(run.total)} deals filled in · {n(run.batteries)} with a battery
             {run.pdfs > 0 && ` · ${n(run.pdfs)} PDFs kept`}
+            {run.noDesign > 0 && ` · ${n(run.noDesign)} with no design in Pylon`}
+            {run.gone > 0 && ` · ${n(run.gone)} no longer in Pylon`}
             {run.failed > 0 && ` · ${n(run.failed)} couldn't be read`}
           </p>
           {!run.running && !run.stopped && (

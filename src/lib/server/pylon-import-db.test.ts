@@ -55,7 +55,9 @@ function fakePylon(projects: Record<string, ReturnType<typeof project>>, status 
       return Response.json({ data: Object.values(projects).map((p) => p.data), links: { next: null } });
     const p = u.pathname.match(/^\/v1\/solar_projects\/(.+)$/);
     if (p) return projects[p[1]] ? Response.json(projects[p[1]]) : new Response("{}", { status: 404 });
-    if (u.pathname.startsWith("/v1/solar_designs/")) return Response.json(design);
+    // Pylon turns down a field its design object doesn't list (storage_types isn't one).
+    if (u.pathname.startsWith("/v1/solar_designs/"))
+      return /storage_types/.test(u.search) ? Response.json({ title: "Invalid field" }, { status: 400 }) : Response.json(design);
     return new Response("{}", { status: 404 });
   });
 }
@@ -166,7 +168,6 @@ describe.skipIf(!url)("bringing sold jobs in from Pylon (database)", () => {
         attributes: {
           ...design.data.attributes,
           summary: { dc_output_kw: 6.6, storage_kwh: 16 },
-          storage_types: [{ description: "Sample 16 kWh battery", quantity: 1 }],
         },
       },
     };
@@ -177,7 +178,9 @@ describe.skipIf(!url)("bringing sold jobs in from Pylon (database)", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request, init?: RequestInit) =>
-        new URL(String(input)).pathname.startsWith("/v1/solar_designs/") ? Response.json(withBattery) : fake(input, init),
+        new URL(String(input)).pathname.startsWith("/v1/solar_designs/") && !/storage_types/.test(String(input))
+          ? Response.json(withBattery)
+          : fake(input, init),
       ),
     );
     expect(await pylon.fillLeft(a, false)).toBeGreaterThan(0);
@@ -193,7 +196,7 @@ describe.skipIf(!url)("bringing sold jobs in from Pylon (database)", () => {
     const after = await crm.jobById(a, ref.job_id);
     expect(before?.job.lat).toBeNull();
     expect(after?.job).toMatchObject({ title: "Solar and battery", lat: -37.86, lng: 145.06 });
-    expect(after?.job.details).toMatchObject({ systemType: "Solar and battery", battery: "Sample 16 kWh battery", nmi: "6305999999" });
+    expect(after?.job.details).toMatchObject({ systemType: "Solar and battery", batteryStorage: "16 kWh", nmi: "6305999999" });
     const again = await pylon.fillFromPylonRun(a, KEY, false, A);
     expect(again.results).toEqual([]);
   });
