@@ -417,7 +417,8 @@ const HOME_HINT_KEY = "renuabl.design.home-hint";
 const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
 /** On a computer, Sol's round in the pop-up's foot: his middle above the picture's foot, and the notch his plate leaves. */
 const DESK_SOL_MIDDLE = 64;
-const DESK_NOTCH = 44;
+/** The graphite tray along the pop-up's foot on a computer (22 Nov 2026, Martin: "graphite tray end to end"), px tall. */
+const DESK_TRAY = 72;
 
 /** A round in the desktop pop-up's foot row (Select, Add a panel, the hand, Erase), lit while its tool is in hand. */
 function FootRound(props: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -7699,10 +7700,12 @@ export function RoofDesigner(props: {
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
               ref={picBox}
-              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact")}
+              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact", deskFoot && "desk-tray")}
               style={
                 {
                   maxWidth: fit,
+                  // What stands at the picture's foot rises above the tray, however tall Sol's card makes it.
+                  ...(deskFoot ? { "--tray-h": `${sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY}px` } : {}),
                   ...(fitPx ? { "--pic-h": `${Math.round((fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width)}px` } : {}),
                   // A phone: a band above the picture and one below, where the controls stand.
                   ...(phone && stage
@@ -9154,7 +9157,7 @@ export function RoofDesigner(props: {
                     />
                   )}
                   {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - 30 * u})`}>
+                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : 30) * u})`}>
                     <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
                     <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
                       5 m
@@ -9194,6 +9197,7 @@ export function RoofDesigner(props: {
                 </div>
               )}
               <div
+                data-lift
                 className={clsx(
                   "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
                   // On a phone it stands over Ask Sol, not beside it.
@@ -9246,7 +9250,7 @@ export function RoofDesigner(props: {
               )}
               {/* The Drawn view's wall: the inverter, battery, switchboard and EV charger standing where they go. */}
               {art && (
-                <div className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
+                <div data-lift className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
                   <WallStrip kit={wallKit} panels={summary.panels} />
                 </div>
               )}
@@ -11222,6 +11226,15 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               )}
+              {/* The graphite tray end to end along the picture's foot on a computer (22 Nov 2026, Martin): the foot row
+                  stands in it, and Sol's step or suggestion forms inside it, the tray growing to hold the card. */}
+              {deskFoot && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-[29] rounded-t-[22px] bg-[#26282c] shadow-[0_-10px_30px_rgba(0,0,0,0.25)] transition-[height] duration-300 motion-reduce:transition-none"
+                  style={{ height: sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY }}
+                />
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideShown && (
                 <div
@@ -11242,7 +11255,9 @@ export function RoofDesigner(props: {
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
                   style={
                     sideDeck
-                      ? solNotch(0, deskFoot ? DESK_NOTCH : 40)
+                      ? deskFoot
+                        ? undefined
+                        : solNotch(0, 40)
                       : underUp && foot !== null
                         ? ({
                             top: foot,
@@ -11332,7 +11347,9 @@ export function RoofDesigner(props: {
                   )}
                   style={
                     sideDeck
-                      ? solNotch(0, deskFoot ? DESK_NOTCH : 40)
+                      ? deskFoot
+                        ? undefined
+                        : solNotch(0, 40)
                       : underUp && foot !== null
                         ? ({
                             top: foot,
@@ -11406,7 +11423,7 @@ export function RoofDesigner(props: {
               )}
               {/* Sol's card under the picture, an outlined box whose outline runs round him (22 Nov 2026, Martin): a ring
                   of the same line round his round, meeting the box's edge at its notch. */}
-              {(deckUp || sideDeckUp) && (guideShown || nudgeShown) && (
+              {(deckUp || sideDeckUp) && !deskFoot && (guideShown || nudgeShown) && (
                 <span
                   aria-hidden
                   className="pointer-events-none absolute z-[54] rounded-full border-[1.5px] border-sun-line/70"
@@ -11492,7 +11509,7 @@ export function RoofDesigner(props: {
                   </div>
                 </div>
               )}
-              <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
+              <div data-lift className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"
@@ -11601,11 +11618,20 @@ export function RoofDesigner(props: {
                     Record
                   </button>
                 )}
+                {/* The peak of the tray behind Sol (22 Nov 2026, Martin: Sol "a little higher than the icons either side… like
+                    a mountain peak"): a graphite round risen with him out of the tray's top edge. */}
+                {deskFoot && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-3 left-1/2 size-24 -translate-x-1/2 rounded-full bg-[#26282c] transition-transform duration-300 motion-reduce:transition-none"
+                    style={sideDeckUp ? { transform: `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)` } : undefined}
+                  />
+                )}
                 {/* The foot row on a computer (22 Nov 2026, Martin: the phone's bottom tool bar on the desktop designer):
                     Select and Add a panel to Sol's left, the hand and Erase to his right, risen with him when his plate is up. */}
                 {deskFoot && (
                   <div
-                    className="pointer-events-none absolute inset-x-0 bottom-3.5 transition-transform duration-300 motion-reduce:transition-none"
+                    className="pointer-events-none absolute inset-x-0 -bottom-3.5 transition-transform duration-300 motion-reduce:transition-none"
                     style={sideDeckUp ? { transform: `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)` } : undefined}
                   >
                     <div className="pointer-events-auto absolute bottom-0 right-[calc(50%+2.875rem)] flex items-end gap-2">
