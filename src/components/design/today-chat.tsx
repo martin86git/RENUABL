@@ -22,8 +22,10 @@ import type { NextItem } from "@/lib/domain/design/next-up";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
 import type { TodayView } from "@/lib/domain/design/today-view";
-import { dollars, type JobLine } from "@/lib/services/crm";
+import { dollars, loadWeather, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
+import { todayHeading } from "@/lib/domain/design/today-view";
+import { SKY_EMOJI, type Sky } from "@/lib/domain/weather";
 import { GoalLine, SunArc } from "./gauges";
 import { loadFeed } from "@/lib/services/deal-feed";
 import type { FeedDeal } from "@/lib/domain/design/deal-feed";
@@ -58,6 +60,29 @@ export function useInsights(): InsightsView[] | null | "failed" {
   return views;
 }
 
+/** Today's date, and the weather now beside it as an emoji and a small temperature (left out when it can't be had). */
+function TodayDate({ today }: { today: ISODate }) {
+  const [weather, setWeather] = useState<{ degrees: number | null; sky: Sky | null } | null>(null);
+  useEffect(() => {
+    let on = true;
+    void loadWeather().then((r) => on && r.ok && setWeather({ degrees: r.degrees, sky: r.sky ?? null }));
+    return () => {
+      on = false;
+    };
+  }, []);
+  return (
+    <h1 className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-3 text-center text-[22px] sm:text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+      <span>{todayHeading(today)}</span>
+      {weather && (weather.sky || weather.degrees !== null) && (
+        <span className="inline-flex translate-y-0.5 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[14px] tracking-normal text-white">
+          {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
+          {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
+        </span>
+      )}
+    </h1>
+  );
+}
+
 /** The first view's name on the switch: Business for the owner and admins, My month for everyone else. */
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
@@ -79,7 +104,6 @@ export function TodayChat(props: {
   const first = views?.[0];
   const own = views?.[1];
   const mine = first?.scope === "me";
-  const you = props.name ? `, ${props.name}` : "";
   const [tab, setTab] = useState<TrayTab | null>(null);
   // The deals Sol has a suggestion on, for Needs you (the feed's own answer, read again as Sol's cards change).
   const [feed, setFeed] = useState<FeedDeal[] | null>(null);
@@ -112,15 +136,15 @@ export function TodayChat(props: {
       )}
       inert={props.hidden}
     >
-      <span className="relative">
+      {/* 22 Nov 2026, Martin: no Sol round in the middle on a phone (he is in the foot bar), and the day with its weather
+          in place of "How's the business going". */}
+      <span className="relative hidden sm:inline-flex">
         <span className="sol-orb sol-breathe inline-flex size-14 items-center justify-center rounded-full">
           <SolMark className="size-11" />
         </span>
         <SolStars className="absolute -right-3 -top-2 size-5" />
       </span>
-      <h1 className="mt-4 text-center text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
-        {mine ? `How's your month going${you}?` : `How's the business going${you}?`}
-      </h1>
+      <TodayDate today={props.today} />
 
       <div data-tour="today-sol" className="relative z-10 mt-6 w-full">
         <SolBox

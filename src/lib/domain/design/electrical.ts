@@ -268,10 +268,11 @@ export function checkString(input: {
       basis,
       coldVoc,
     };
-  // Figures found online and not yet checked by a person: the string is never passed outright on them (3 Nov 2026).
+  // Figures found online, or shared by another business, and not yet checked by a person here: the string is never
+  // passed outright on them (3 Nov 2026; shared ones 22 Nov 2026).
   if (panel.unchecked || inverter.unchecked)
     lines.push({
-      what: "Its figures were found online and aren't checked yet",
+      what: "Its figures haven't been checked by your business yet",
       value: "",
       limit: "confirm them in Settings, Product datasheets",
       ok: null,

@@ -9873,7 +9873,7 @@ export function RoofDesigner(props: {
                               </span>
                               {s.e.unchecked ? (
                                 <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                  <span className="text-sun-ink">Found online, not checked yet</span>
+                                  <span className="text-sun-ink">Not checked by your business yet</span>
                                   <a
                                     href={`/api/design/datasheets/file?kind=${s.kind}&sku=${encodeURIComponent(s.sku)}`}
                                     target="_blank"
