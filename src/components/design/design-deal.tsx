@@ -1371,7 +1371,7 @@ function DealPills(props: {
   return (
     <nav
       aria-label="This deal"
-      className="flex justify-between gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
+      className="deal-pills relative z-10 -mt-8 flex justify-between gap-1 overflow-x-auto px-1 pt-1.5 pb-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
     >
       <PillRound
         label="Design"
@@ -1420,7 +1420,7 @@ function PillRound({
     >
       <span
         className={clsx(
-          "flex size-10 items-center justify-center rounded-full ring-1 transition",
+          "flex size-10 items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.28)] ring-1 transition",
           main
             ? "bg-sun-line text-white ring-sun-line"
             : on
