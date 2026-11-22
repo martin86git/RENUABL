@@ -15,7 +15,6 @@ import {
   FileText,
   LayoutDashboard,
   Menu,
-  MessageCircle,
   MessagesSquare,
   PenTool,
   Search,
@@ -120,12 +119,12 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
 
 // The designer beside Sol (22 Nov 2026, Martin: "we need the designer icon in the bottom menu bar… rapid lookup of
 // existing deal or new address to design on the spot"): it opens the design tool's home, with its one search for a
-// deal or an address, over the page.
+// deal or an address, over the page. Messages left the bar (22 Nov 2026, Martin: "remove the chat icon from the tool
+// bar in mobile view. this will allow all icons to be a little larger"); it is under More.
 const PHONE_TABS: PhoneTab[] = [
   { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
-  { label: "Messages", href: PATHS.messages, icon: MessageCircle, match: (p) => p.startsWith(PATHS.messages) },
 ];
 
 /**
@@ -728,14 +727,14 @@ function Shell({
         aria-label="Sections, on a phone"
         className={clsx(
           "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
-          retail || kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
+          kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
         )}
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
           const lit = !more && t.match(path);
           const sol =
             retail && i === 2 ? (
-              <div key="sol" className="flex min-h-14 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-medium text-ink">
+              <div key="sol" className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink">
                 <span className="-mt-5">
                   <SolNavButton phone />
                 </span>
@@ -751,7 +750,8 @@ function Shell({
               onClick={() => setMore(false)}
               aria-current={lit ? "page" : undefined}
               className={clsx(
-                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+                "flex flex-col items-center justify-center gap-1 font-medium",
+                retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
                 lit ? "text-ink" : "text-muted",
               )}
             >
@@ -760,11 +760,11 @@ function Shell({
                   "relative flex items-center justify-center rounded-full",
                   // The designer is the orange round it is in the top menu.
                   t.href === PATHS.designer
-                    ? clsx("size-7 bg-sun-line text-white shadow-sm", lit && "ring-2 ring-sun-line/30 ring-offset-1")
-                    : clsx("h-7 w-12", lit && "bg-sun"),
+                    ? clsx(retail ? "size-9" : "size-7", "bg-sun-line text-white shadow-sm", lit && "ring-2 ring-sun-line/30 ring-offset-1")
+                    : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && "bg-sun"),
                 )}
               >
-                <t.icon className="size-[18px]" aria-hidden />
+                <t.icon className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
                 {n > 0 && (
                   <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
                     {n}
@@ -780,12 +780,20 @@ function Shell({
           onClick={() => setMore(!more)}
           aria-expanded={more}
           className={clsx(
-            "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+            "flex flex-col items-center justify-center gap-1 font-medium",
+            retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
             more ? "text-ink" : "text-muted",
           )}
         >
-          <span className={clsx("flex h-7 w-12 items-center justify-center rounded-full", more && "bg-sun")}>
-            <Menu className="size-[18px]" aria-hidden />
+          <span
+            className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
+          >
+            <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+            {retail && unread > 0 && (
+              <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                {unread}
+              </span>
+            )}
           </span>
           More
         </button>
@@ -843,6 +851,7 @@ function Shell({
                 { label: "Team chat", href: PATHS.team, n: 0 },
                 ...(retail
                   ? [
+                      { label: "Messages", href: PATHS.messages, n: unread },
                       { label: "Notifications", href: PATHS.notifications, n: mentions },
                       { label: "Email", href: PATHS.inbox, n: mail },
                     ]
