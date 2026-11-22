@@ -39,6 +39,7 @@ import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
+import { PhoneVoiceTab } from "./phone-voice";
 import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
@@ -122,10 +123,14 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
 // existing deal or new address to design on the spot"): it opens the design tool's home, with its one search for a
 // deal or an address, over the page. Messages left the bar (22 Nov 2026, Martin: "remove the chat icon from the tool
 // bar in mobile view. this will allow all icons to be a little larger"); it is under More.
+// A retailer's foot bar (22 Nov 2026, Martin: "replace the today icon out with voice agent… Deals will shift into
+// today's position, designer will shift into deals position and voice will shift into designers position"): Deals,
+// Designer, Sol raised in the middle (he goes to Today), Voice, More. Voice is a button (`PhoneVoiceTab`), not a link.
+const VOICE_TAB = "Voice";
 const PHONE_TABS: PhoneTab[] = [
-  { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
+  { label: VOICE_TAB, href: PATHS.home, icon: PenTool, match: () => false },
 ];
 
 /**
@@ -749,6 +754,17 @@ function Shell({
               </div>
             ) : null;
           const n = t.href === PATHS.messages ? unread : 0;
+          if (retail && t.label === VOICE_TAB)
+            return [
+              sol,
+              <PhoneVoiceTab
+                key={t.label}
+                onOpen={() => {
+                  setMore(false);
+                  leaveSol();
+                }}
+              />,
+            ];
           return [
             sol,
             <Link

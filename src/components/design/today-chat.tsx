@@ -12,6 +12,7 @@ import {
   Lightbulb,
   Phone,
   PhoneCall,
+  Rows3,
   Sparkles,
   Stamp,
   TrendingUp,
@@ -370,7 +371,7 @@ function InsightRow({ insight }: { insight: Insight }) {
 
 /** Business (or My month) | Feed, at the top of Today. */
 export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
-  // 22 Nov 2026, Martin: "we can do better on the pill shapes". A segmented control: a soft recessed track, two halves of
+  // 22 Nov 2026, Martin: "I don't notice [Feed] sometimes", then "we can do better on the pill shapes". A segmented control: a soft recessed track, two halves of
   // one width, and a white thumb that slides to the one open, each with its icon.
   const tabs = [
     ["chat", first, TrendingUp],
@@ -397,7 +398,7 @@ export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: 
           onClick={() => onView(v)}
           className={clsx(
             "relative z-[1] flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium transition-colors",
-            view === v ? "text-ink" : "text-ink-2 hover:text-ink",
+            view === v ? "text-ink" : "text-ink/80 hover:text-ink",
           )}
         >
           <Icon className={clsx("size-[15px]", view === v ? "text-sun-line" : "opacity-70")} aria-hidden />

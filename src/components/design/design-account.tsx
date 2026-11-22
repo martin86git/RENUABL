@@ -34,6 +34,7 @@ import {
 import { PlanCodeField, type AppliedCode } from "./plan-code-field";
 import { PLAN_CODE_WORDS } from "@/lib/domain/design/plan-codes";
 import { MemberAvatar } from "./member-avatar";
+import { SignInPageSection } from "./sign-in-page-section";
 import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from "@/lib/services/design-store";
 
 const SIGN_IN = "/design/sign-in";
@@ -658,6 +659,8 @@ export function DesignAccountPage() {
             </form>
           </section>
         )}
+
+        <SignInPageSection owner={owner} />
 
         <PhotoSection
           email={account.email}
