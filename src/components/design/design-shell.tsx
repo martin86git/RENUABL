@@ -24,7 +24,6 @@ import {
   Wrench,
   type LucideIcon,
   Mail,
-  ArrowLeft,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
@@ -40,6 +39,7 @@ import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
 import { PhoneVoiceTab } from "./phone-voice";
+import { PhoneTop } from "./phone-top";
 import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
@@ -686,30 +686,12 @@ function Shell({
         {tool && sectionPages}
       </header>
 
-      {/* On a phone: the wordmark, Search and the day across the top. */}
-      <div className="flex items-center gap-3 px-4 pb-1 pt-3 print:hidden lg:hidden">
-        {/^\/design\/deals\/[^/]+$/.test(path) ? (
-          // On a deal, the way back to Deals takes the wordmark's place (21 Nov 2026, Martin).
-          <Link href={PATHS.pipelines} className="-ml-1 inline-flex h-9 items-center gap-1.5 pr-2 text-[15px] font-medium text-ink">
-            <ArrowLeft className="size-[18px]" aria-hidden />
-            Deals
-          </Link>
-        ) : (
-          <Link href={PATHS.home} aria-label="RENUABL, today">
-            <Wordmark className="text-[16px]" />
-          </Link>
-        )}
-        {retail && (
-          <button
-            type="button"
-            onClick={() => setSearching(true)}
-            aria-label="Search, or ask Sol"
-            className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
-          >
-            <Search className="size-4" aria-hidden />
-          </button>
-        )}
-      </div>
+      {/* On a phone: the wordmark, Search and the day across the top; once scrolled away, the wordmark small at the top. */}
+      <PhoneTop
+        home={PATHS.home}
+        back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
+        onSearch={retail ? () => setSearching(true) : undefined}
+      />
 
       {tool ? (
         <div data-sol-page className="relative min-w-0 lg:pt-5">
