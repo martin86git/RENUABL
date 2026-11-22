@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Your account",
+    words: "Your team's own sign-in page, with your logo and a private code in its address. Copy it from Your account.",
+  },
+  {
+    day: "2026-11-23",
     area: "Everywhere",
     words: "When Safari won't take dictation, the microphone says why and the next tap opens your keyboard to use its own.",
   },
