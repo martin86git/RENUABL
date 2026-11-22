@@ -176,7 +176,9 @@ describe("voiceAccent", () => {
     expect(voiceAccent({ words: "Australian · Microsoft, hear it on a test call" })).toBe("Australian");
     expect(voiceAccent({ words: "British" })).toBe("British");
     expect(voiceAccent({ words: "New Zealand · Microsoft" })).toBe("New Zealand");
-    expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(new Set(["Australian", "British", "Filipino", "Canadian", "American"]));
+    expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(
+      new Set(["Australian", "British", "Swedish", "Italian", "Irish", "Filipino", "Canadian", "American"]),
+    );
   });
 });
 

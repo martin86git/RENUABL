@@ -82,6 +82,16 @@ const LISTED_VOICES: readonly VoiceChoice[] = [
   { provider: "11labs", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", words: "British, steady", sex: "male" },
   { provider: "11labs", voiceId: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice", words: "British, clear", sex: "female" },
   { provider: "11labs", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily", words: "British, soft", sex: "female" },
+  // European accents, not English (22 Nov 2026, Martin: "introduce any other non Microsoft voices for New Zealand,
+  // Australian or European but not English"). ElevenLabs' own ready-made voices with a Swedish, Italian or Irish
+  // accent, by the IDs ElevenLabs has long published; written from memory, since neither ElevenLabs' nor Deepgram's
+  // list could be read from here. Giovanni, Mimi and Fin are older voices ElevenLabs may since have retired: VERIFY
+  // each by its play button on the live site (one that isn't on ElevenLabs' list shows "Sample didn't play") and on a
+  // test call. No non-Microsoft New Zealand voice is known to us, and Australian ones are Charlie, Hyperion and Theia.
+  { provider: "11labs", voiceId: "XB0fDUnXU5powFXDhCwa", label: "Charlotte", words: "Swedish, warm", sex: "female" },
+  { provider: "11labs", voiceId: "zrHiDhphv9ZnVXBqCLjz", label: "Mimi", words: "Swedish, bright", sex: "female" },
+  { provider: "11labs", voiceId: "zcAOhNBS3c14rBihAFp1", label: "Giovanni", words: "Italian, warm", sex: "male" },
+  { provider: "11labs", voiceId: "D38z5RcWu1voky8WS1ja", label: "Fin", words: "Irish, friendly", sex: "male" },
   // More of Deepgram's Aura-2 voices (21 Nov 2026, Martin: "i do like some of the deepgram voices"). Names from
   // memory, not read from Deepgram's list here: VERIFY each by its play button (the sample is Deepgram speaking it).
   { provider: "deepgram", voiceId: "draco", label: "Draco", words: "British · Deepgram", sex: "male" },
