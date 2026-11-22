@@ -23,6 +23,9 @@ export function DictateButton({
   const supported = useSpeechSupported();
   const [on, setOn] = useState(false);
   const [problem, setProblem] = useState("");
+  // Safari turned dictation down on this device: the next tap opens the keyboard instead, whose own microphone works.
+  const [refused, setRefused] = useState(false);
+  const button = useRef<HTMLButtonElement | null>(null);
   const rec = useRef<Recognition | null>(null);
   const words = useRef(onWords);
   const heard = useRef(onHearing);
@@ -86,6 +89,7 @@ export function DictateButton({
         return;
       }
       if (why) {
+        if (e.error === "service-not-allowed") setRefused(true);
         setProblem(why);
         stop();
       }
@@ -125,7 +129,12 @@ export function DictateButton({
     <span className="relative inline-flex shrink-0">
       <button
         type="button"
-        onClick={() => (on ? stop() : start())}
+        ref={button}
+        onClick={() => {
+          if (on) return stop();
+          if (refused) return openKeyboard(button.current, () => setProblem(KEYBOARD_NOW));
+          start();
+        }}
         aria-pressed={on}
         aria-label={on ? "Stop listening" : label}
         title={problem || (supported ? (on ? "Listening: tap to stop" : "Speak instead of typing") : NO_DICTATION)}
@@ -159,13 +168,36 @@ const NO_DICTATION = "This browser can't turn speech into words. Use the microph
 /** What each of the browser's errors means for the person tapping the microphone. "aborted" is our own stop. */
 const DICTATION_ERRORS: Record<string, string> = {
   "not-allowed": "The microphone isn't allowed for this site. Allow it in your browser's site settings, then tap again.",
+  // Safari's dictation for web pages runs through Siri, so it can be refused while the keyboard's own microphone works
+  // (22 Nov 2026, Martin: "How come I can use the microphone dictation elsewhere but not here?").
   "service-not-allowed":
-    "Speech to text is switched off on this device (on an iPhone: Settings, General, Keyboard, Enable Dictation). Or use the microphone on your keyboard.",
+    "Safari won't let web pages take dictation on this phone (it needs Siri switched on: Settings, Siri). Tap the microphone again to open your keyboard, and use its microphone.",
   "audio-capture": "No sound came through from the microphone. Check another app isn't using it, then tap again.",
   network: "Speech to text needs a connection and couldn't reach it. Tap again, or use the microphone on your keyboard.",
   "no-speech": "Didn't hear anything. Tap and speak straight away.",
   "language-not-supported": "This browser can't take dictation in English here. Use the microphone on your keyboard.",
 };
+
+const KEYBOARD_NOW = "Your keyboard is open: tap the microphone on it to speak.";
+
+/**
+ * Puts the cursor in the message box the button sits in, at the end of its words, so the phone's keyboard opens with
+ * its own microphone. Must be called from the tap itself (Safari opens the keyboard only for a person's tap).
+ */
+function openKeyboard(from: HTMLElement | null, then: () => void) {
+  let box: HTMLTextAreaElement | HTMLInputElement | null = null;
+  for (let at = from?.parentElement ?? null, up = 0; at && up < 6 && !box; at = at.parentElement, up++)
+    box = at.querySelector("textarea, input[type=text], input:not([type])");
+  if (!box) return;
+  box.focus();
+  const end = box.value.length;
+  try {
+    box.setSelectionRange(end, end);
+  } catch {
+    // Some inputs don't take a selection.
+  }
+  then();
+}
 
 /** A touch screen with no fine pointer: a phone or tablet. */
 function dictationOnPhone(): boolean {
