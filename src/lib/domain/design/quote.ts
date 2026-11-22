@@ -576,10 +576,33 @@ export function stcValue(
   rates: RebateRates,
   stcPrice: number,
 ): number {
+  return stcSplit(system, postcode, date, rates, stcPrice).total;
+}
+
+/** The STCs split into the panels' (STC) and the battery's (BSTC), each its certificates and dollars; the two add up to `total`. */
+export interface StcSplit {
+  solar: { certificates: number; value: number };
+  battery: { certificates: number; value: number };
+  total: number;
+}
+
+export function stcSplit(
+  system: { pvKw: number; batteryKwh: number },
+  postcode: string | null,
+  date: string,
+  rates: RebateRates,
+  stcPrice: number,
+): StcSplit {
   const rating = (postcode && zoneRating(postcode)?.rating) || DEFAULT_ZONE_RATING;
   const solar = Math.floor(system.pvKw * rating * deemingYears(date, rates));
   const battery = Math.floor(taperedKwh(system.batteryKwh, rates) * batteryFactor(date, rates));
-  return Math.round((solar + battery) * stcPrice);
+  const total = Math.round((solar + battery) * stcPrice);
+  const solarValue = Math.round(solar * stcPrice);
+  return {
+    solar: { certificates: solar, value: solarValue },
+    battery: { certificates: battery, value: total - solarValue },
+    total,
+  };
 }
 
 // ---------------------------------------------------------------------------

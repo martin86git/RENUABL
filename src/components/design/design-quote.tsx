@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Plus, Rows3, Wrench, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Minus, Plus, Rows3, Wrench, Zap } from "lucide-react";
 import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -28,7 +28,7 @@ import {
   solarVicBar,
   solarVicFor,
   solarVicNote,
-  stcValue,
+  stcSplit,
   type CostLine,
   type LineEdit,
   type QuoteFields,
@@ -174,7 +174,8 @@ export function DesignQuote(props: {
     });
   const empty = spec.panels === 0;
   const costing = costSystem(spec, form, workspace);
-  const stc = stcValue(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
+  const stcs = stcSplit(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
+  const stc = stcs.total;
 
   const all = costing.lines;
   // Every hand change: lines typed over or taken out, lines of the business's own, the margin typed over.
@@ -270,6 +271,8 @@ export function DesignQuote(props: {
   const { onNet } = props;
   useEffect(() => onNet(net), [onNet, net]);
 
+  /** The counted line just included, whose "How many?" box takes the focus. */
+  const [askMany, setAskMany] = useState<string | null>(null);
   /** Changes a line by hand: a quantity and a cost typed over it sit together; null puts the line back as worked out. */
   const edit = (l: CostLine, to: LineEdit | null) => {
     // An edit kept under the line's older key becomes its own first (`withOwnKey`).
@@ -811,15 +814,27 @@ export function DesignQuote(props: {
           </button>
         </p>
       )}
-      {[
-        ["Price inc. GST", money(totals.priceIncGst)],
-        [`After STCs (${money(stc)})`, money(totals.priceIncGst - stc)],
-      ].map(([k, v]) => (
-        <div key={k} className="flex justify-between font-semibold">
-          <dt>{k}</dt>
-          <dd className="tabular-nums">{v}</dd>
+      <div className="flex justify-between font-semibold">
+        <dt>Price inc. GST</dt>
+        <dd className="tabular-nums">{money(totals.priceIncGst)}</dd>
+      </div>
+      {/* The STCs split into the panels' and the battery's (22 Nov 2026, Martin: "StC breakdown needs to show (StC / BSTC)"). */}
+      {stcs.solar.certificates > 0 && (
+        <div className="flex justify-between text-positive">
+          <dt>STC Solar Incentive ({stcs.solar.certificates} STCs)</dt>
+          <dd className="tabular-nums">-{money(stcs.solar.value)}</dd>
         </div>
-      ))}
+      )}
+      {stcs.battery.certificates > 0 && (
+        <div className="flex justify-between text-positive">
+          <dt>BSTC Battery Incentive ({stcs.battery.certificates} STCs)</dt>
+          <dd className="tabular-nums">-{money(stcs.battery.value)}</dd>
+        </div>
+      )}
+      <div className="flex justify-between font-semibold">
+        <dt>After STCs ({money(stc)})</dt>
+        <dd className="tabular-nums">{money(totals.priceIncGst - stc)}</dd>
+      </div>
     </dl>
   );
   const priceCheckBox = advice.length > 0 && <PriceCheck advice={advice} typed={Object.keys(typedFlags).length} />;
@@ -928,16 +943,19 @@ export function DesignQuote(props: {
                   {confirms.map((l) => {
                     const on = Boolean(editOf(edits, l)?.on);
                     const out = Boolean(editOf(edits, l)?.removed);
+                    // A counted line (RCBOs) asks how many once it is included.
+                    const many = on && l.qty !== undefined && !l.watts ? (editOf(edits, l)?.qty ?? l.qty) : null;
+                    const setMany = (n: number) => edit(l, { qty: Math.max(1, Math.min(MAX_LINE_QTY, Math.round(n) || 1)) });
                     return (
                       <li
                         key={lineKey(l)}
                         className={
                           on || out
-                            ? "flex items-center gap-2 rounded-md px-1.5 py-1"
-                            : "flex items-center gap-2 rounded-md bg-sun px-1.5 py-1 shadow-[inset_3px_0_0_var(--sun-line)]"
+                            ? "flex flex-wrap items-center gap-2 rounded-md px-1.5 py-1"
+                            : "flex flex-wrap items-center gap-2 rounded-md bg-sun px-1.5 py-1 shadow-[inset_3px_0_0_var(--sun-line)]"
                         }
                       >
-                        <span className="min-w-0 flex-1 text-xs text-ink">{l.label}</span>
+                        <span className="min-w-0 flex-1 text-xs text-ink">{l.label.replace(/^\d+ × /, "")}</span>
                         <span
                           role="radiogroup"
                           aria-label={l.label}
@@ -947,7 +965,10 @@ export function DesignQuote(props: {
                             type="button"
                             role="radio"
                             aria-checked={on}
-                            onClick={() => edit(l, { on: true })}
+                            onClick={() => {
+                              edit(l, { on: true });
+                              if (l.qty !== undefined && !l.watts) setAskMany(lineKey(l));
+                            }}
                             className={
                               on ? "rounded-[5px] bg-ink px-2 py-0.5 text-canvas" : "rounded-[5px] px-2 py-0.5 text-ink-2 hover:text-ink"
                             }
@@ -966,6 +987,42 @@ export function DesignQuote(props: {
                             Leave out
                           </button>
                         </span>
+                        {many !== null && (
+                          <span className="flex basis-full items-center justify-end gap-2 text-[11px] text-ink-2">
+                            How many?
+                            <span className="flex items-center rounded-md border border-line bg-surface">
+                              <button
+                                type="button"
+                                aria-label={`One fewer ${l.label.replace(/^\d+ × /, "")}`}
+                                disabled={many <= 1}
+                                onClick={() => setMany(many - 1)}
+                                className="grid size-6 place-items-center text-ink-2 hover:text-ink disabled:text-line"
+                              >
+                                <Minus className="size-3" aria-hidden />
+                              </button>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                max={MAX_LINE_QTY}
+                                value={many}
+                                autoFocus={askMany === lineKey(l)}
+                                onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => setMany(Number(e.target.value))}
+                                aria-label={`How many ${l.label.replace(/^\d+ × /, "")}`}
+                                className="w-9 bg-transparent text-center text-xs font-semibold tabular-nums text-ink outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                type="button"
+                                aria-label={`One more ${l.label.replace(/^\d+ × /, "")}`}
+                                onClick={() => setMany(many + 1)}
+                                className="grid size-6 place-items-center text-ink-2 hover:text-ink"
+                              >
+                                <Plus className="size-3" aria-hidden />
+                              </button>
+                            </span>
+                          </span>
+                        )}
                       </li>
                     );
                   })}
