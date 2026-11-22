@@ -74,64 +74,39 @@ export interface VoiceChoice extends CallerVoice {
  * and Microsoft publishes no clip we can play, so each must be heard on a test call first. If Vapi turns a call away
  * with one of these, the call goes once more in the usual voice (withoutSpeedSettings in voice-agent.ts).
  */
-export const CALLER_VOICES: readonly VoiceChoice[] = [
+const LISTED_VOICES: readonly VoiceChoice[] = [
   { provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie", words: "Australian, relaxed and natural", sex: "male" },
   { provider: "deepgram", voiceId: "hyperion", label: "Hyperion", words: "Australian, caring and warm", sex: "male" },
   { provider: "deepgram", voiceId: "theia", label: "Theia", words: "Australian, polite and sincere", sex: "female" },
-  {
-    provider: "azure",
-    voiceId: "en-AU-NatashaNeural",
-    label: "Natasha",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "female",
-  },
-  {
-    provider: "azure",
-    voiceId: "en-AU-AnnetteNeural",
-    label: "Annette",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "female",
-  },
-  {
-    provider: "azure",
-    voiceId: "en-AU-CarlyNeural",
-    label: "Carly",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "female",
-  },
-  {
-    provider: "azure",
-    voiceId: "en-AU-FreyaNeural",
-    label: "Freya",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "female",
-  },
-  {
-    provider: "azure",
-    voiceId: "en-AU-WilliamNeural",
-    label: "William",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "male",
-  },
-  {
-    provider: "azure",
-    voiceId: "en-AU-DarrenNeural",
-    label: "Darren",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "male",
-  },
-  {
-    provider: "azure",
-    voiceId: "en-AU-DuncanNeural",
-    label: "Duncan",
-    words: "Australian · Microsoft, hear it on a test call",
-    sex: "male",
-  },
-  { provider: "azure", voiceId: "en-AU-KenNeural", label: "Ken", words: "Australian · Microsoft, hear it on a test call", sex: "male" },
   { provider: "11labs", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George", words: "British, warm", sex: "male" },
   { provider: "11labs", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", words: "British, steady", sex: "male" },
   { provider: "11labs", voiceId: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice", words: "British, clear", sex: "female" },
   { provider: "11labs", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily", words: "British, soft", sex: "female" },
+  // European accents, not English (22 Nov 2026, Martin: "introduce any other non Microsoft voices for New Zealand,
+  // Australian or European but not English"). ElevenLabs' own ready-made voices with a Swedish, Italian or Irish
+  // accent, by the IDs ElevenLabs has long published; written from memory, since neither ElevenLabs' nor Deepgram's
+  // list could be read from here. Giovanni, Mimi and Fin are older voices ElevenLabs may since have retired: VERIFY
+  // each by its play button on the live site (one that isn't on ElevenLabs' list shows "Sample didn't play") and on a
+  // test call. No non-Microsoft New Zealand voice is known to us, and Australian ones are Charlie, Hyperion and Theia.
+  { provider: "11labs", voiceId: "XB0fDUnXU5powFXDhCwa", label: "Charlotte", words: "Swedish, warm", sex: "female" },
+  { provider: "11labs", voiceId: "zrHiDhphv9ZnVXBqCLjz", label: "Mimi", words: "Swedish, bright", sex: "female" },
+  { provider: "11labs", voiceId: "zcAOhNBS3c14rBihAFp1", label: "Giovanni", words: "Italian, warm", sex: "male" },
+  { provider: "11labs", voiceId: "D38z5RcWu1voky8WS1ja", label: "Fin", words: "Irish, friendly", sex: "male" },
+  // More of Deepgram's Aura-2 voices (21 Nov 2026, Martin: "i do like some of the deepgram voices"). Names from
+  // memory, not read from Deepgram's list here: VERIFY each by its play button (the sample is Deepgram speaking it).
+  { provider: "deepgram", voiceId: "draco", label: "Draco", words: "British · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "pandora", label: "Pandora", words: "British · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "amalthea", label: "Amalthea", words: "Filipino · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "thalia", label: "Thalia", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "andromeda", label: "Andromeda", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "helena", label: "Helena", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "luna", label: "Luna", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "asteria", label: "Asteria", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "apollo", label: "Apollo", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "arcas", label: "Arcas", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "aries", label: "Aries", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "orion", label: "Orion", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "zeus", label: "Zeus", words: "American · Deepgram", sex: "male" },
   { provider: "vapi", voiceId: "Elliot", label: "Elliot", words: "Canadian, young and calm (Vapi's default)", sex: "male" },
   { provider: "vapi", voiceId: "Dan", label: "Dan", words: "British", sex: "male" },
   { provider: "vapi", voiceId: "Kai", label: "Kai", words: "American, adult", sex: "male" },
@@ -142,6 +117,83 @@ export const CALLER_VOICES: readonly VoiceChoice[] = [
   { provider: "vapi", voiceId: "Layla", label: "Layla", words: "American, young", sex: "female" },
   { provider: "vapi", voiceId: "Tara", label: "Tara", words: "American", sex: "female" },
 ];
+/**
+ * Microsoft's voices (18 and 21 Nov 2026), taken off the list on 22 Nov 2026 (Martin: "perhaps lets just remove
+ * microsoft voices for now"): their previews need an Azure Speech key the site doesn't have (Microsoft refused the one
+ * set), and Vapi taking Microsoft's full voice names on a call was never confirmed. Kept here so an agent already
+ * speaking in one is still named and heard; set `MICROSOFT_VOICES_SHOWN` to put them back on the list.
+ */
+export const MICROSOFT_VOICES_SHOWN = false;
+export const MICROSOFT_VOICES: readonly VoiceChoice[] = [
+  {
+    provider: "azure",
+    voiceId: "en-AU-NatashaNeural",
+    label: "Natasha",
+    words: "Australian · Microsoft",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-AnnetteNeural",
+    label: "Annette",
+    words: "Australian · Microsoft",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-CarlyNeural",
+    label: "Carly",
+    words: "Australian · Microsoft",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-FreyaNeural",
+    label: "Freya",
+    words: "Australian · Microsoft",
+    sex: "female",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-WilliamNeural",
+    label: "William",
+    words: "Australian · Microsoft",
+    sex: "male",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-DarrenNeural",
+    label: "Darren",
+    words: "Australian · Microsoft",
+    sex: "male",
+  },
+  {
+    provider: "azure",
+    voiceId: "en-AU-DuncanNeural",
+    label: "Duncan",
+    words: "Australian · Microsoft",
+    sex: "male",
+  },
+  { provider: "azure", voiceId: "en-AU-KenNeural", label: "Ken", words: "Australian · Microsoft", sex: "male" },
+  { provider: "azure", voiceId: "en-NZ-MollyNeural", label: "Molly", words: "New Zealand · Microsoft", sex: "female" },
+  { provider: "azure", voiceId: "en-NZ-MitchellNeural", label: "Mitchell", words: "New Zealand · Microsoft", sex: "male" },
+  { provider: "azure", voiceId: "en-IN-NeerjaNeural", label: "Neerja", words: "Indian English · Microsoft", sex: "female" },
+  { provider: "azure", voiceId: "en-IN-PrabhatNeural", label: "Prabhat", words: "Indian English · Microsoft", sex: "male" },
+  { provider: "azure", voiceId: "en-IE-EmilyNeural", label: "Emily", words: "Irish · Microsoft", sex: "female" },
+  { provider: "azure", voiceId: "en-IE-ConnorNeural", label: "Connor", words: "Irish · Microsoft", sex: "male" },
+  { provider: "azure", voiceId: "en-ZA-LeahNeural", label: "Leah", words: "South African · Microsoft", sex: "female" },
+  { provider: "azure", voiceId: "en-ZA-LukeNeural", label: "Luke", words: "South African · Microsoft", sex: "male" },
+  { provider: "azure", voiceId: "en-GB-SoniaNeural", label: "Sonia", words: "British · Microsoft", sex: "female" },
+  { provider: "azure", voiceId: "en-GB-RyanNeural", label: "Ryan", words: "British · Microsoft", sex: "male" },
+];
+
+/** The voices offered in every picker. */
+export const CALLER_VOICES: readonly VoiceChoice[] = MICROSOFT_VOICES_SHOWN
+  ? [...LISTED_VOICES.slice(0, 3), ...MICROSOFT_VOICES, ...LISTED_VOICES.slice(3)]
+  : LISTED_VOICES;
+
+/** Every voice we know by name, offered or not: for naming a voice an agent already speaks in. */
+export const KNOWN_VOICES: readonly VoiceChoice[] = [...LISTED_VOICES, ...MICROSOFT_VOICES];
 
 /**
  * Voices a business has taken off its list (18 Nov 2026, Martin: "i need to be able to remove the voices i dont
@@ -167,6 +219,9 @@ export function voicesShown(hidden: readonly string[], inUse: CallerVoice | null
   return CALLER_VOICES.filter((v) => !gone.has(voiceKey(v)) || voiceKey(v) === using);
 }
 
+/** A voice's accent, its words up to the first comma or dot ("New Zealand · Microsoft" → "New Zealand"), to group the list by. */
+export const voiceAccent = (v: Pick<VoiceChoice, "words">): string => v.words.split(/[,·(]/)[0].trim() || "Other";
+
 /** The voices put away, to bring back. */
 export const voicesRemoved = (hidden: readonly string[], inUse: CallerVoice | null): VoiceChoice[] => {
   const shown = new Set(voicesShown(hidden, inUse).map(voiceKey));
@@ -180,6 +235,9 @@ export const VOICE_PROVIDERS: { id: CallerVoice["provider"]; label: string }[] =
   { id: "azure", label: "Microsoft" },
 ];
 
+/** The makers a voice may be typed in for ("Another voice"): Microsoft only while its voices are offered. */
+export const OFFERED_PROVIDERS = VOICE_PROVIDERS.filter((p) => p.id !== "azure" || MICROSOFT_VOICES_SHOWN);
+
 /** A voice sent from the browser, checked: a known provider and an ID of letters and digits. Null is "the default". */
 export function cleanVoice(raw: unknown): CallerVoice | null | "bad" {
   if (raw === null || raw === undefined || raw === "") return null;
@@ -191,10 +249,28 @@ export function cleanVoice(raw: unknown): CallerVoice | null | "bad" {
 }
 
 /**
- * Where a voice's sample clip is, for the play button beside it (18 Nov 2026, Martin: hear a voice without a call):
- * Deepgram publishes one for each Aura-2 voice at a fixed address; ElevenLabs lists one for each of its ready-made
- * voices (its address changes, so the server asks ElevenLabs' public list for it); Vapi publishes none we can fetch.
- * The clip is the maker's own recording of the voice, not the agent's words.
+ * The line every voice says on its play button (21 Nov 2026, Martin: the makers' own clips were about anything; he
+ * wanted each to be about solar). Spoken by the voice's own maker where the site has that maker's key
+ * (`SPEAKING_PROVIDERS`); else the maker's own clip, where it publishes one. No figure, price or promise; it says the
+ * caller is automated, as every call does. Change `SAMPLE_LINE_VERSION` with the words so clips kept are made again.
+ */
+export const SAMPLE_LINE_VERSION = 1;
+export const sampleLine = (name: string) =>
+  `Hi, it's ${name}, the automated assistant from your solar company. I'm calling about the solar and battery quote you asked for. Have you got a minute to go through it?`;
+
+/** The makers whose voices we can have speak our line, given their key. Vapi offers no way to, so its voices have none. */
+export const SPEAKING_PROVIDERS = ["11labs", "deepgram", "azure"] as const satisfies readonly CallerVoice["provider"][];
+export type SpeakingProvider = (typeof SPEAKING_PROVIDERS)[number];
+export const canSpeak = (p: CallerVoice["provider"]): p is SpeakingProvider => (SPEAKING_PROVIDERS as readonly string[]).includes(p);
+
+/** The name a voice gives in its sample: its name on our list, else a plain one. */
+export const sampleName = (v: CallerVoice) =>
+  KNOWN_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId)?.label ?? "your assistant";
+
+/**
+ * Where a voice's maker keeps its own sample clip, the fallback when the site can't have it speak our line: Deepgram
+ * publishes one for each Aura-2 voice at a fixed address; ElevenLabs lists one for each of its ready-made voices (its
+ * address changes, so the server asks ElevenLabs' public list for it); Vapi and Microsoft publish none we can fetch.
  */
 export function voiceSample(v: CallerVoice | null): { from: "deepgram"; url: string } | { from: "11labs"; voiceId: string } | null {
   if (!v) return null;
@@ -206,9 +282,14 @@ export function voiceSample(v: CallerVoice | null): { from: "deepgram"; url: str
   return null;
 }
 
-/** The address the picker plays a voice's sample from, or null when it has none. */
-export function voiceSampleUrl(v: CallerVoice | null): string | null {
-  return v && voiceSample(v) ? `/api/design/caller/voice-sample?provider=${v.provider}&id=${encodeURIComponent(v.voiceId)}` : null;
+/**
+ * The address the picker plays a voice's sample from, or null when it has none: the maker's clip, or our line where
+ * the site has that maker's key (`speakers`, told by the server).
+ */
+export function voiceSampleUrl(v: CallerVoice | null, speakers: readonly string[] = []): string | null {
+  if (!v) return null;
+  const playable = voiceSample(v) || (canSpeak(v.provider) && speakers.includes(v.provider));
+  return playable ? `/api/design/caller/voice-sample?provider=${v.provider}&id=${encodeURIComponent(v.voiceId)}` : null;
 }
 
 /** Where ElevenLabs keeps the clips its list points to: nothing else is fetched on its say-so. */
@@ -230,7 +311,7 @@ export const VOICE_BAD = "That isn't a voice ID we can use: letters and numbers 
 /** The voice's name for the page: one of ours by its name, else "ElevenLabs voice 21m00…". */
 export function voiceLabel(v: CallerVoice | null): string {
   if (!v) return "Vapi's default voice";
-  const ours = CALLER_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId);
+  const ours = KNOWN_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId);
   if (ours) return ours.label;
   return `${VOICE_PROVIDERS.find((p) => p.id === v.provider)?.label ?? "Vapi"} voice ${v.voiceId.length > 12 ? `${v.voiceId.slice(0, 8)}…` : v.voiceId}`;
 }
@@ -274,3 +355,23 @@ export const TINT_NAMES = ["Teal", "Blue", "Orange", "Violet", "Pink", "Gold"] a
 
 /** The initial shown when there is no photo. */
 export const callerInitial = (name: string) => (speakableName(name).charAt(0) || "S").toUpperCase();
+
+/**
+ * The Azure Speech region from whatever was typed into AZURE_SPEECH_REGION (21 Nov 2026, Martin: Microsoft's voices
+ * still didn't play): the region's name ("australiaeast"), as the portal shows it ("Australia East"), or an endpoint
+ * the portal lists ("https://australiaeast.api.cognitive.microsoft.com/", "australiaeast.tts.speech.microsoft.com").
+ * Null when no region can be read (a custom domain such as "<name>.cognitiveservices.azure.com" names no region).
+ */
+export function azureRegionFrom(raw: string | undefined | null): string | null {
+  const typed = (raw ?? "").trim().toLowerCase();
+  if (!typed) return null;
+  const host = /^(?:https?:\/\/)?([a-z0-9.-]+\.(?:microsoft\.com|azure\.com))(?:[/:?#]|$)/.exec(typed)?.[1];
+  if (host) {
+    if (host.endsWith(".cognitiveservices.azure.com")) return null;
+    const first = host.split(".")[0];
+    return /^[a-z0-9]{3,30}$/.test(first) ? first : null;
+  }
+  if (!/^[a-z0-9 _-]+$/.test(typed)) return null;
+  const region = typed.replace(/[^a-z0-9]/g, "");
+  return /^[a-z0-9]{3,30}$/.test(region) ? region : null;
+}

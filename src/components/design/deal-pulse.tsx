@@ -47,15 +47,18 @@ export function DealPulseBadges({ clock, heat }: { clock: DealClock | null; heat
     <div className="mt-2 flex flex-wrap items-center gap-2">
       {clock && (
         <div
-          className={clsx("inline-flex items-center gap-2 rounded-full px-2.5 py-1 ring-1", BAND[clock.band].ring)}
+          className={clsx(
+            "inline-flex items-center gap-2 rounded-full px-2.5 py-1 ring-1 max-sm:gap-1.5 max-sm:px-2 max-sm:py-0.5",
+            BAND[clock.band].ring,
+          )}
           title={`Day ${clock.day} since the lead came in. The usual time from new lead to signed sale is ${clock.total} days: green with more than two thirds left, amber with more than a third, then red.`}
         >
-          <span className={clsx("text-[12px] font-semibold tabular-nums", BAND[clock.band].text)}>{clock.words}</span>
+          <span className={clsx("text-[12px] font-semibold tabular-nums max-sm:text-[11px]", BAND[clock.band].text)}>{clock.words}</span>
           <span className="flex gap-[2px]" aria-hidden>
             {Array.from({ length: clock.total }, (_, i) => (
               <span
                 key={i}
-                className={clsx("h-2.5 w-[2px] rounded-full", i < Math.max(0, clock.left) ? BAND[clock.band].bar : "bg-ink/15")}
+                className={clsx("h-2.5 w-[2px] rounded-full max-sm:h-2", i < Math.max(0, clock.left) ? BAND[clock.band].bar : "bg-ink/15")}
               />
             ))}
           </span>
@@ -67,7 +70,10 @@ export function DealPulseBadges({ clock, heat }: { clock: DealClock | null; heat
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           title="How engaged the customer is: press for why"
-          className={clsx("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1", h.ring)}
+          className={clsx(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ring-1 max-sm:px-2 max-sm:py-0.5 max-sm:text-[11px]",
+            h.ring,
+          )}
         >
           <span className={clsx("size-2 rounded-full", h.dot)} aria-hidden />
           {h.label}

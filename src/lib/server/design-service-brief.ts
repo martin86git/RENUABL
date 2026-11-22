@@ -4,7 +4,6 @@
  * something new happens on it, so opening a case again costs nothing.
  */
 import { asBuiltInWords } from "@/lib/domain/design/as-built";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import {
   SERVICE_BRIEF_PROMPT,
   SERVICE_BRIEF_SCHEMA,
@@ -21,7 +20,7 @@ import type { ServiceCase } from "@/lib/domain/design/service";
 import { parseApiKey, redactSecrets } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
 import { chatLines } from "./design-chat-repo";
-import { customerDetail, jobById } from "./design-crm-repo";
+import { customerDetail, jobById, stageWordsOf } from "./design-crm-repo";
 import { asBuiltOf } from "./design-job-card-repo";
 import { query } from "./db";
 import { withSolCredit } from "./sol-credits";
@@ -65,7 +64,7 @@ export async function caseBrief(member: { businessId: string; email: string }, c
     {
       customer: customer.name,
       title: job.title,
-      stage: STAGE_LABELS[job.stage],
+      stage: (await stageWordsOf(businessId))(job),
       installDate: job.installDate,
       installer: job.details?.installer || null,
       system: [job.kw ? `${job.kw} kW solar` : "", built ? asBuiltInWords(built).replace(/\n/g, "; ") : ""].filter(Boolean).join(". "),

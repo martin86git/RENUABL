@@ -19,12 +19,12 @@ describe("the sign-up page for solar businesses", () => {
     expect(PRICING.plans.map((p) => p.price)).toEqual(["$49", "$39"]);
     expect(PRICING.firstMonth).toBe("Your first month is free, on either plan, with 6 free sites in the designer. Prices include GST.");
     expect(PRICING.addOns.map((a) => [a.name, a.price])).toEqual([
-      ["Calls & Texts", "$29 a month for your business, including GST"],
+      ["Calls & Texts", "$49 a month for your business, including GST"],
       ["Growth", "$19 a month for your business, including GST"],
     ]);
     expect(PRICING.headline).toBe("From $39 a user. Then pay as you go.");
     expect(PRICING.team.map((t) => [t.title, t.price, t.per])).toEqual([
-      ["Your AI voice sales team", "$29", "a month for your business"],
+      ["Your AI voice sales team", "$49", "a month for your business"],
       ["Your AI right hand", "50", "credits a user a month, included"],
       ["Your design studio", "$3", "a site"],
       ["Your marketing department", "$19", "a month for your business"],

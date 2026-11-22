@@ -1,17 +1,42 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
-import { ArrowRight, BatteryCharging, Eye, PhoneCall, Stamp, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  BatteryCharging,
+  CircleAlert,
+  Eye,
+  FileText,
+  Lightbulb,
+  Phone,
+  PhoneCall,
+  Sparkles,
+  Stamp,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
+import type { ISODate } from "@/lib/domain/types";
+import type { NextItem } from "@/lib/domain/design/next-up";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
 import type { TodayView } from "@/lib/domain/design/today-view";
-import { dollars } from "@/lib/services/crm";
+import { dollars, loadWeather, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
+import { todayHeading } from "@/lib/domain/design/today-view";
+import { SKY_EMOJI, type Sky } from "@/lib/domain/weather";
 import { GoalLine, SunArc } from "./gauges";
-import { SolMark, SolStars } from "./sol-icon";
+import { loadFeed } from "@/lib/services/deal-feed";
+import type { FeedDeal } from "@/lib/domain/design/deal-feed";
+import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
+import { SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { SolBox } from "./today-pad";
+import { PerformancePanel } from "./performance-panel";
+import { CallLogPage } from "./call-log";
+import { ProposalsPage } from "./design-proposals-list";
+import { ReadyForYou, usePrepared } from "./ready-for-you";
 
 /**
  * Today's Business and My month (21 Nov 2026, Martin: the Chat page wasn't a plus, chat is everywhere already; what
@@ -35,9 +60,34 @@ export function useInsights(): InsightsView[] | null | "failed" {
   return views;
 }
 
+/** Today's date, and the weather now beside it as an emoji and a small temperature (left out when it can't be had). */
+function TodayDate({ today }: { today: ISODate }) {
+  const [weather, setWeather] = useState<{ degrees: number | null; sky: Sky | null } | null>(null);
+  useEffect(() => {
+    let on = true;
+    void loadWeather().then((r) => on && r.ok && setWeather({ degrees: r.degrees, sky: r.sky ?? null }));
+    return () => {
+      on = false;
+    };
+  }, []);
+  return (
+    <h1 className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-3 text-center text-[22px] sm:text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+      <span>{todayHeading(today)}</span>
+      {weather && (weather.sky || weather.degrees !== null) && (
+        <span className="inline-flex translate-y-0.5 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[14px] tracking-normal text-white">
+          {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
+          {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
+        </span>
+      )}
+    </h1>
+  );
+}
+
 /** The first view's name on the switch: Business for the owner and admins, My month for everyone else. */
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
+
+type TrayTab = "performance" | "needs" | "proposals" | "calls" | "sol" | "changes";
 
 export function TodayChat(props: {
   name: string | null;
@@ -45,45 +95,159 @@ export function TodayChat(props: {
   asking: boolean;
   hidden: boolean;
   onAsk: (q: string, files: SolFile[]) => void;
+  jobs: JobLine[] | null;
+  today: ISODate;
+  /** What needs the member now, most pressing first (next-up.ts). */
+  items: NextItem[] | null;
 }) {
   const views = Array.isArray(props.views) ? props.views : null;
-  const mine = views?.[0]?.scope === "me";
-  const you = props.name ? `, ${props.name}` : "";
+  const first = views?.[0];
+  const own = views?.[1];
+  const mine = first?.scope === "me";
+  const [tab, setTab] = useState<TrayTab | null>(null);
+  // The deals Sol has a suggestion on, for Needs you (the feed's own answer, read again as Sol's cards change).
+  const [feed, setFeed] = useState<FeedDeal[] | null>(null);
+  const readFeed = useCallback(async () => {
+    const r = await loadFeed();
+    if (r.ok) setFeed(r.deals);
+  }, []);
+  useEffect(() => {
+    const t = window.setTimeout(() => void readFeed(), 0);
+    return () => window.clearTimeout(t);
+  }, [readFeed]);
+  // 21 Nov 2026, Martin: the tray holds what Sol or a voice agent can act on, with Performance first.
+  const tabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
+    { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
+    { key: "needs", label: "Needs you", icon: CircleAlert, count: feed ? dealsNeedingYou(feed).length : undefined },
+    { key: "proposals", label: "Proposals", icon: FileText },
+    { key: "calls", label: "Calls", icon: Phone },
+    { key: "sol", label: "Sol's work", icon: Sparkles },
+    { key: "changes", label: mine ? "Next wins" : "Worth changing", icon: Lightbulb, count: first?.insights.length },
+  ];
+  // Whose panel isn't about the month: drawn wider than the box, as the pages they come from are.
+  const wide = tab === "calls" || tab === "proposals";
+  // As the screenshot Martin chose (21 Nov 2026): the greeting, Sol's box straight under it, and a tray tucked under the
+  // box whose tabs open what was on the cards (the month, what is worth changing) below it, one at a time.
   return (
-    <div className="mx-auto flex w-full max-w-[52rem] flex-col items-center px-1 pb-10 pt-2" inert={props.hidden}>
-      <span className="relative">
-        <span className="sol-orb sol-breathe inline-flex size-16 items-center justify-center rounded-full">
-          <SolMark className="size-12" />
+    <div
+      className={clsx(
+        "mx-auto flex w-full max-w-[54rem] flex-col items-center px-1 pb-16 pt-2",
+        !tab && "min-h-[calc(100dvh-15rem)] justify-center",
+      )}
+      inert={props.hidden}
+    >
+      {/* 22 Nov 2026, Martin: no Sol round in the middle on a phone (he is in the foot bar), and the day with its weather
+          in place of "How's the business going". */}
+      <span className="relative hidden sm:inline-flex">
+        <span className="sol-orb sol-breathe inline-flex size-14 items-center justify-center rounded-full">
+          <SolMark className="size-11" />
         </span>
-        <SolStars className="absolute -right-3 -top-2 size-6" />
+        <SolStars className="absolute -right-3 -top-2 size-5" />
       </span>
-      <h1 className="mt-4 text-center text-[clamp(22px,2.6vw,28px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
-        {mine ? `How's your month going${you}?` : `How's the business going${you}?`}
-      </h1>
-      <p className="mt-1 text-center text-[13.5px] text-ink-2">
-        {mine ? "From your own deals. Only you see this." : "Sol read your deals this morning. Here's what matters."}
-      </p>
+      <TodayDate today={props.today} />
 
-      <div className="mt-6 w-full space-y-10 text-left">
-        {props.views === "failed" ? (
-          <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
-            The month couldn&rsquo;t be read just now. Feed has your deals.
-          </p>
-        ) : !views ? (
-          <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
-        ) : (
-          views.map((v, i) => <ViewPart key={v.scope} view={v} titled={i > 0} />)
-        )}
-      </div>
-
-      <div data-tour="today-sol" className="mt-8 w-full">
+      <div data-tour="today-sol" className="relative z-10 mt-6 w-full">
         <SolBox
+          tall
           onAsk={props.onAsk}
           asking={props.asking}
           placeholder={mine ? "Ask Sol: how do I win a quiet deal back?" : "Ask about the business: why are we down on last month?"}
         />
       </div>
+
+      <div
+        role="tablist"
+        aria-label="About the month"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
+      >
+        {tabs.map(({ key, label, icon: Icon, count }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab((t) => (t === key ? null : key))}
+            className={clsx(
+              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition",
+              tab === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
+            )}
+          >
+            <Icon className="size-3.5" aria-hidden />
+            {label}
+            {count ? (
+              <span className="grid min-w-5 place-items-center rounded-full bg-sun-line px-1.5 text-[11px] font-semibold text-white">
+                {count}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+
+      {tab && (
+        <div role="tabpanel" className={clsx("mt-5 text-left", wide ? "w-[min(72rem,calc(100vw-3rem))]" : "w-full")}>
+          {tab === "needs" ? (
+            <TrayNeeds deals={feed} onChanged={() => void readFeed()} />
+          ) : tab === "calls" ? (
+            <CallLogPage />
+          ) : tab === "proposals" ? (
+            <ProposalsPage signed={false} bare />
+          ) : tab === "sol" ? (
+            <SolWorkPanel />
+          ) : tab === "performance" ? (
+            <PerformancePanel
+              jobs={props.jobs}
+              today={props.today}
+              extra={
+                first ? (
+                  <>
+                    <MonthPanel month={first.month} mine={mine} />
+                    {own && (
+                      <div className="pt-2">
+                        <p className="mb-2 px-1 text-[12px] font-medium uppercase tracking-[0.12em] text-muted">Your own month</p>
+                        <ViewPart view={own} titled={false} />
+                      </div>
+                    )}
+                  </>
+                ) : null
+              }
+            />
+          ) : props.views === "failed" ? (
+            <p className="rounded-2xl bg-surface p-5 text-[13.5px] text-ink-2 ring-1 ring-line">
+              The month couldn&rsquo;t be read just now. Feed has your deals.
+            </p>
+          ) : !first ? (
+            <div className="h-56 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />
+          ) : (
+            <Changes view={first} />
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+/** What Sol has prepared and is waiting on a press to send. */
+function SolWorkPanel() {
+  const { items } = usePrepared();
+  if (!items) return <div className="h-40 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />;
+  if (!items.length)
+    return (
+      <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">
+        Nothing from Sol is waiting on you. What he sends by himself is on your Feed under Sol&rsquo;s work.
+      </p>
+    );
+  return <ReadyForYou compact />;
+}
+
+function Changes({ view }: { view: InsightsView }) {
+  return view.insights.length ? (
+    <div className="space-y-2">
+      {view.insights.map((x) => (
+        <InsightRow key={x.key} insight={x} />
+      ))}
+    </div>
+  ) : (
+    <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">{ALL_GOOD}</p>
   );
 }
 

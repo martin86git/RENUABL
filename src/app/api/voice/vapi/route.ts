@@ -1,10 +1,11 @@
+import { recordCallMinutes } from "@/lib/server/design-voice-usage";
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { readVapiEvent, VOICE_SECRET_HEADER } from "@/lib/domain/voice-agent";
 import { readLiveEvent } from "@/lib/domain/live-call";
 import { answerInbound, handleCallEnded, handleToolCall, keepLive, voiceCallByRef, voiceSettings } from "@/lib/server/voice-calls";
 import { isPracticeRef } from "@/lib/domain/design/practice-call";
-import { keepPracticeLive, lockInFromTraining, writeUpTraining } from "@/lib/server/design-practice-call";
+import { keepPracticeLive, lockInFromTraining, practiceBusiness, writeUpTraining } from "@/lib/server/design-practice-call";
 import { TRAINING_TOOL } from "@/lib/domain/design/training-call";
 
 function sameSecret(given: string | null, expected: string): boolean {
@@ -46,6 +47,11 @@ export async function POST(request: Request) {
         await new Promise((r) => setTimeout(r, 3_000));
         await writeUpTraining(ref);
       });
+    // Test and training calls count towards Calls & Texts' minutes like any other.
+    if (event.type === "end-of-call-report" && event.callId) {
+      const businessId = await practiceBusiness(ref).catch(() => null);
+      if (businessId) await recordCallMinutes(businessId, event.callId, event.durationSeconds);
+    }
     if (event.type === "tool-calls") {
       // A training call's one tool locks a rule the trainer confirmed into the script; nothing else is connected.
       const results = [];
@@ -87,6 +93,8 @@ export async function POST(request: Request) {
   }
 
   if (event.type === "end-of-call-report" && row) {
+    // Every voice-agent call's minutes count towards Calls & Texts (voice-usage.ts), calls in as well as out.
+    if (row.business_id) await recordCallMinutes(row.business_id, event.callId ?? `${row.id}_${Date.now()}`, event.durationSeconds);
     after(() => handleCallEnded(row, event).catch((e) => console.error("voice call end not handled", e instanceof Error ? e.message : e)));
   }
   return Response.json({});

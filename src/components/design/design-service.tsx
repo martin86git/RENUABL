@@ -1,10 +1,11 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Mail, Phone, Plus, Search, Wrench } from "lucide-react";
 import clsx from "clsx";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import {
   MAX_ISSUE,
   MAX_NOTE,
@@ -26,7 +27,8 @@ import type { ServiceLine } from "@/lib/server/design-service-repo";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import { SOL_CHANGED, SOL_TOGGLE, askSol } from "@/lib/services/sol";
 import { PATHS, ui } from "./design-shell";
-import { SolMark, SolStars } from "./sol-icon";
+import { SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { SolDesignView } from "./sol-design-view";
 import { SolThinking, SolWorking } from "./sol-thinking";
 import type { SolFile } from "@/lib/domain/design/sol";
@@ -155,6 +157,8 @@ const isBrief = (b: BriefState | undefined): b is CaseBrief => Boolean(b && type
  * the customer.
  */
 export function ServicePlanner() {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [cases, setCases] = useState<ServiceLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [filter, setFilter] = useState<PlannerFilter>("to-resolve");
@@ -468,7 +472,7 @@ export function ServicePlanner() {
                         )}
                         {c.address && <p className="truncate">{c.address}</p>}
                         <p className="text-xs text-muted">
-                          {STAGE_LABELS[c.stage]}
+                          {stageLabel(c.stage, stageNames)}
                           {c.installDate && ` · install day ${shortDate(c.installDate)}`}
                           {c.installer && ` · ${c.installer}`} · raised by {who(c.raisedBy)}
                         </p>

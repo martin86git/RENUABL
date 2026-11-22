@@ -75,9 +75,9 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   };
 
   return (
-    <div className={clsx(ui.card, "p-4")}>
+    <div className={clsx(ui.card, "deal-email p-4 max-sm:p-3")}>
       {status && !status.canSend && (
-        <p className="mb-3 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning">
+        <p className="mb-3 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning max-sm:mb-2 max-sm:text-[11px]">
           Email isn&apos;t set up on this site yet, so it can&apos;t be sent from here. You can still log an email you sent elsewhere as a
           note.
         </p>

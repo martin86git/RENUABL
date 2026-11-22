@@ -9,7 +9,7 @@
  * 4. **Who answers what**: when a question isn't Sol's to answer, he names the teammate who usually answers that kind.
  */
 
-import { JOB_STAGES, STAGE_LABELS, type JobStage } from "./crm";
+import { JOB_STAGES, stageLabel, type JobStage, type StageNames } from "./crm";
 import { itemKey, type OrderState } from "./orders";
 import type { CostGroup } from "./quote";
 import { SOL_BY } from "./team-chat";
@@ -98,14 +98,24 @@ export const WORK_SCHEMA = {
   },
 } as const;
 
-/** The stages Sol may mark a deal at, as he is shown them: "won: Won". */
-export const STAGE_CHOICES = JOB_STAGES.map((s) => `${s}: ${STAGE_LABELS[s]}`).join(", ");
+/** The stages Sol may mark a deal at, as he is shown them: "won: Won" (or the business's name for it). */
+export const stageChoicesText = (names: StageNames = {}) => JOB_STAGES.map((s) => `${s}: ${stageLabel(s, names)}`).join(", ");
+export const STAGE_CHOICES = stageChoicesText();
 
 /** What Sol is asked when he reads a line for work. `asked`: the line tags him, so the order and stage changes are his too. */
-export function workPrompt(input: { asker: string; line: string; today: string; deals: string; context: string; asked?: boolean }): string {
+export function workPrompt(input: {
+  asker: string;
+  line: string;
+  today: string;
+  deals: string;
+  context: string;
+  asked?: boolean;
+  /** The business's own names for the stages. */
+  names?: StageNames;
+}): string {
   const asked = input.asked
     ? `- order-add: more of a product is wanted on a deal's order ("add 2 more panels to Smith's order"): put the product in the line's own words in text and how many in qty.\n` +
-      `- stage: a deal should be marked at a stage ("mark the Lees as installed"): give the stage's id from: ${STAGE_CHOICES}.\n`
+      `- stage: a deal should be marked at a stage ("mark the Lees as installed"): give the stage's id from: ${stageChoicesText(input.names)}.\n`
     : "";
   return (
     `You read the team chat of a solar business to spare them typing. ${input.asker} just wrote the line below${input.asked ? ", asking you by name" : ""}. Today is ${input.today} (Melbourne).\n` +
@@ -163,9 +173,9 @@ const dayWords = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 /** The card's line: what pressing it will do. */
-export function actionWords(a: ChatAction): string {
+export function actionWords(a: ChatAction, names: StageNames = {}): string {
   if (a.kind === "install-date") return `Move ${a.deal}'s install to ${dayWords(a.date!)}`;
-  if (a.kind === "stage") return `Mark ${a.deal} as ${a.stage ? STAGE_LABELS[a.stage] : "moved on"}`;
+  if (a.kind === "stage") return `Mark ${a.deal} as ${a.stage ? stageLabel(a.stage, names) : "moved on"}`;
   if (a.kind === "order-add") return `Add ${a.qty} × ${a.item ?? a.text} to ${a.deal}'s order`;
   if (a.kind === "note") return `Add a note to ${a.deal}: "${a.text}"`;
   const when = a.dueAt
@@ -182,7 +192,7 @@ export function actionWords(a: ChatAction): string {
 }
 
 /** The card's question, answered Yes or No: "Move Chloe Tran · Solar's install to Fri, 6 Nov?". */
-export const actionQuestion = (a: ChatAction) => `${actionWords(a)}?`;
+export const actionQuestion = (a: ChatAction, names: StageNames = {}) => `${actionWords(a, names)}?`;
 
 /** What Sol says above the card. */
 export const actionLead = (a: ChatAction) =>
@@ -197,9 +207,9 @@ export const actionLead = (a: ChatAction) =>
           : "Want me to change the date?";
 
 /** What a Yes did, said on the card for everyone. */
-export function actionDoneWords(a: ChatAction): string {
+export function actionDoneWords(a: ChatAction, names: StageNames = {}): string {
   if (a.kind === "install-date") return `Install moved to ${dayWords(a.date!)}`;
-  if (a.kind === "stage") return `Marked ${a.stage ? STAGE_LABELS[a.stage] : "moved on"}`;
+  if (a.kind === "stage") return `Marked ${a.stage ? stageLabel(a.stage, names) : "moved on"}`;
   if (a.kind === "order-add") return "Added to the order";
   if (a.kind === "note") return "Note added to the deal";
   return "Reminder set";

@@ -109,6 +109,8 @@ describe("a roof opened again", () => {
     expect(leftOffWords({ panels: 16, kw: 7.6, batteryKwh: 24 })).toBe(
       "Here's where we left off: 16 panels, 7.60 kW with a battery of 24 kWh. Picking up from here:",
     );
-    expect(leftOffWords({ panels: 1, kw: 0.5, batteryKwh: null })).toBe("Here's where we left off: 1 panel, 0.50 kW. Picking up from here:");
+    expect(leftOffWords({ panels: 1, kw: 0.5, batteryKwh: null })).toBe(
+      "Here's where we left off: 1 panel, 0.50 kW. Picking up from here:",
+    );
   });
 });

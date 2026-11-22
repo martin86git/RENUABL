@@ -5,7 +5,7 @@
  * and the panel that shows it is drawn under the answer: the journey, today, sales, upcoming or completed installs.
  * Without Claude, the words of the question pick the panel. Pure, tested.
  */
-import { STAGE_LABELS, type Job } from "./crm";
+import { stageLabel, type Job, type StageNames } from "./crm";
 import { journey, journeyStopOf, JOURNEY_WORDS, type JourneyStop } from "./journey";
 
 export const CANVAS_PANELS = ["journey", "today", "sales", "upcoming", "completed"] as const;
@@ -37,7 +37,7 @@ const ALL_PATHS = Object.fromEntries(Object.keys(JOURNEY_WORDS).map((k) => [k, "
  * The business as plain lines for Claude to answer from: the journey's counts, then each live job with its stop, stage,
  * value and install date (customer first names only, at most 60 jobs). Nothing more: no emails, phones or addresses.
  */
-export function canvasFacts(jobs: readonly CanvasJob[], serviceOpen: number, today: string): string {
+export function canvasFacts(jobs: readonly CanvasJob[], serviceOpen: number, today: string, names: StageNames = {}): string {
   const lines = [`Today is ${today}.`, "Jobs at each stop of the journey:"];
   for (const s of journey(jobs, serviceOpen, ALL_PATHS)) lines.push(`- ${s.name} (${s.what}): ${s.count}`);
   // Sales: what was sold this month and so far this financial year (from 1 July).
@@ -59,7 +59,7 @@ export function canvasFacts(jobs: readonly CanvasJob[], serviceOpen: number, tod
     const bits = [
       `${first}: ${j.title}`,
       `stop ${stop ? JOURNEY_WORDS[stop].name : "none"}`,
-      `stage ${STAGE_LABELS[j.stage]}`,
+      `stage ${stageLabel(j.stage, names)}`,
       j.value ? `value $${Math.round(j.value).toLocaleString("en-AU")}` : null,
       j.kw ? `${j.kw} kW` : null,
       j.wonAt ? `sold ${j.wonAt.slice(0, 10)}` : null,

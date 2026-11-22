@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  MICROSOFT_VOICES,
+  OFFERED_PROVIDERS,
   CALLER_NAME_MAX,
   CALLER_TINTS,
   CALLER_VOICES,
@@ -83,11 +85,12 @@ describe("the phone assistant's voice", () => {
     expect(voiceProvider("deepgram")).toBe("deepgram");
     expect(voiceProvider("azure")).toBe("azure");
     expect(voiceProvider("playht")).toBeNull();
-    // Microsoft's Australian voices, by the names Microsoft gives them.
-    const microsoft = australian.filter((v) => v.provider === "azure");
-    expect(microsoft.length).toBeGreaterThanOrEqual(6);
-    for (const v of microsoft) expect(v.voiceId).toMatch(/^en-AU-[A-Z][a-z]+Neural$/);
-    expect(voiceLabel({ provider: "deepgram", voiceId: "orion" })).toBe("Deepgram voice orion");
+    // Microsoft's voices are off the list for now (22 Nov 2026), kept by the names Microsoft gives them.
+    expect(CALLER_VOICES.some((v) => v.provider === "azure")).toBe(false);
+    for (const v of MICROSOFT_VOICES) expect(v.voiceId).toMatch(/^en-[A-Z]{2}-[A-Z][a-z]+Neural$/);
+    expect(OFFERED_PROVIDERS.map((p) => p.id)).not.toContain("azure");
+    expect(voiceLabel({ provider: "azure", voiceId: "en-AU-KenNeural" })).toBe("Ken");
+    expect(voiceLabel({ provider: "deepgram", voiceId: "notonourlist" })).toBe("Deepgram voice notonourlist");
   });
 
   it("knows where a voice's sample is, and which voices have none", () => {
@@ -110,16 +113,16 @@ describe("the phone assistant's voice", () => {
   });
 
   it("takes voices off the list and brings them back, never the one in use", () => {
-    const ken = "azure:en-AU-KenNeural";
+    const ken = "vapi:Kai";
     const tara = "vapi:Tara";
     expect(cleanHiddenVoices([ken, ken, "nonsense:x", 7])).toEqual([ken]);
     const hidden = hideVoice(hideVoice([], ken), tara);
     expect(hidden).toEqual([ken, tara]);
-    expect(voicesShown(hidden, null).some((v) => v.label === "Ken" || v.label === "Tara")).toBe(false);
+    expect(voicesShown(hidden, null).some((v) => v.label === "Kai" || v.label === "Tara")).toBe(false);
     expect(voicesShown(hidden, null)).toHaveLength(CALLER_VOICES.length - 2);
     // The voice an agent speaks in stays on its list though it was removed.
-    expect(voicesShown(hidden, { provider: "azure", voiceId: "en-AU-KenNeural" }).some((v) => v.label === "Ken")).toBe(true);
-    expect(voicesRemoved(hidden, { provider: "azure", voiceId: "en-AU-KenNeural" }).map((v) => v.label)).toEqual(["Tara"]);
+    expect(voicesShown(hidden, { provider: "vapi", voiceId: "Kai" }).some((v) => v.label === "Kai")).toBe(true);
+    expect(voicesRemoved(hidden, { provider: "vapi", voiceId: "Kai" }).map((v) => v.label)).toEqual(["Tara"]);
     expect(showVoice(hidden, ken)).toEqual([tara]);
     expect(voiceKey({ provider: "vapi", voiceId: "Tara" })).toBe(tara);
   });
@@ -163,5 +166,34 @@ describe("the phone assistant's voice", () => {
     const w = testCallWords("Ella", "RENUABL");
     expect(w).toContain("it's Ella, RENUABL's automated assistant");
     expect(w).toContain("test");
+  });
+});
+
+describe("voiceAccent", () => {
+  it("reads each voice's accent from its first word", async () => {
+    const { voiceAccent, CALLER_VOICES } = await import("./caller");
+    expect(voiceAccent({ words: "Australian, relaxed and natural" })).toBe("Australian");
+    expect(voiceAccent({ words: "Australian · Microsoft, hear it on a test call" })).toBe("Australian");
+    expect(voiceAccent({ words: "British" })).toBe("British");
+    expect(voiceAccent({ words: "New Zealand · Microsoft" })).toBe("New Zealand");
+    expect(new Set(CALLER_VOICES.map(voiceAccent))).toEqual(
+      new Set(["Australian", "British", "Swedish", "Italian", "Irish", "Filipino", "Canadian", "American"]),
+    );
+  });
+});
+
+describe("voice samples", () => {
+  it("plays our solar line where the maker's key is on the site, else the maker's clip", async () => {
+    const { voiceSampleUrl, sampleLine, sampleName, CALLER_VOICES } = await import("./caller");
+    const molly = { provider: "azure" as const, voiceId: "en-NZ-MollyNeural" };
+    expect(voiceSampleUrl(molly)).toBeNull();
+    expect(voiceSampleUrl(molly, ["azure"])).toContain("en-NZ-MollyNeural");
+    expect(voiceSampleUrl({ provider: "vapi", voiceId: "Elliot" }, ["azure", "11labs", "deepgram"])).toBeNull();
+    expect(voiceSampleUrl({ provider: "deepgram", voiceId: "theia" })).not.toBeNull();
+    expect(sampleName(molly)).toBe("Molly");
+    expect(sampleName({ provider: "11labs", voiceId: "somethingTyped123" })).toBe("your assistant");
+    expect(sampleLine("Molly")).toMatch(/automated/);
+    expect(sampleLine("Molly")).not.toMatch(/\d/);
+    expect(new Set(CALLER_VOICES.map((v) => `${v.provider}:${v.voiceId}`)).size).toBe(CALLER_VOICES.length);
   });
 });

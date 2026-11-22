@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { AI_TEAM } from "@/lib/domain/design/sales-page";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /**
  * RENUABL Business's brand on its own page (16 Nov 2026, Martin: "it feels very much like a brand… renuabl business
@@ -56,7 +56,12 @@ export function Sunrise({ className, size = "large", light }: { className?: stri
             : "radial-gradient(closest-side, rgba(255,150,70,0.9) 0%, rgba(255,90,31,0.7) 30%, rgba(255,90,31,0.26) 55%, rgba(255,90,31,0.07) 78%, rgba(255,90,31,0) 100%)",
         }}
       />
-      <div className={clsx("absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent to-transparent", light ? "via-ink/15" : "via-white/35")} />
+      <div
+        className={clsx(
+          "absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent to-transparent",
+          light ? "via-ink/15" : "via-white/35",
+        )}
+      />
     </div>
   );
 }

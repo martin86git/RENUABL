@@ -11,6 +11,18 @@ import clsx from "clsx";
  * opens it here; inside the drawer the designer is the real page in a frame, shown bare (`embed=1`).
  */
 const DESIGNER = "/design/roof";
+
+/**
+ * The window's width (21 Nov 2026, Martin: "the ability to expand horizontally the size of the designer"). Unset, it is
+ * 1.62 times its height (the picture's own shape); dragged from either side edge it takes the width chosen, up to the
+ * screen less a gutter, kept on the device. A double click on an edge goes back to the usual.
+ */
+const POP_WIDTH_KEY = "renuabl.design.popup-width";
+const POP_MIN = 720;
+const POP_USUAL = "calc(min(92dvh, 62rem) * 1.62)";
+const popWidth = (px: number | null) => `min(calc(100vw - 3rem), ${px ? `${px}px` : POP_USUAL})`;
+// On a wide screen the tools' rounds sit in the grey left of the window, so room is kept for them.
+const popMax = () => window.innerWidth - (window.innerWidth >= 1280 ? 176 : 48);
 const OPEN_EVENT = "renuabl:open-design";
 
 /** True inside the drawer's frame. */
@@ -158,6 +170,44 @@ export function DesignDrawer(props: {
     window.addEventListener("message", hear);
     return () => window.removeEventListener("message", hear);
   }, []);
+  const [popW, setPopW] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    try {
+      const kept = Number(window.localStorage.getItem(POP_WIDTH_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (kept >= POP_MIN) setPopW(kept);
+    } catch {
+      /* no storage: the usual width */
+    }
+  }, []);
+  const keepWidth = (px: number | null) => {
+    setPopW(px);
+    try {
+      if (px) window.localStorage.setItem(POP_WIDTH_KEY, String(Math.round(px)));
+      else window.localStorage.removeItem(POP_WIDTH_KEY);
+    } catch {
+      /* not kept */
+    }
+  };
+  // Dragging a side edge: the window stays centred, so its width is twice the pointer's distance from the middle.
+  const dragEdge = (e: React.PointerEvent) => {
+    e.preventDefault();
+    setDragging(true);
+    let last: number | null = popW;
+    const move = (m: PointerEvent) => {
+      last = Math.max(POP_MIN, Math.min(popMax(), Math.abs(m.clientX - window.innerWidth / 2) * 2));
+      setPopW(last);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setDragging(false);
+      keepWidth(last);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   useEffect(() => {
     if (!open) return;
     // The page under it doesn't scroll while the design is out; Escape folds it away.
@@ -223,9 +273,11 @@ export function DesignDrawer(props: {
         aria-modal={open}
         aria-label={tool.kind === "proposal" ? "Proposal" : "Design"}
         aria-hidden={!open}
+        style={{ "--pop-w": popWidth(popW) } as React.CSSProperties}
         className={clsx(
-          "fixed inset-0 z-[60] m-auto flex flex-col overflow-hidden bg-canvas transition duration-200 ease-out motion-reduce:transition-none",
-          "sm:h-[min(92dvh,62rem)] sm:w-[min(calc(100vw-3rem),calc(min(92dvh,62rem)*1.62))] sm:rounded-[28px] sm:shadow-[0_30px_80px_rgba(11,11,12,0.28)] sm:ring-1 sm:ring-line",
+          "fixed inset-0 z-[60] m-auto flex flex-col overflow-hidden bg-canvas ease-out motion-reduce:transition-none",
+          dragging ? "transition-none" : "transition duration-200",
+          "sm:h-[min(92dvh,62rem)] sm:w-[var(--pop-w)] sm:rounded-[28px] sm:shadow-[0_30px_80px_rgba(11,11,12,0.28)] sm:ring-1 sm:ring-line",
           open ? "scale-100 opacity-100" : "pointer-events-none scale-[0.97] opacity-0",
         )}
       >
@@ -248,8 +300,25 @@ export function DesignDrawer(props: {
           key={frame}
           src={frame}
           title={tool.kind === "proposal" ? "Proposal" : "Design tool"}
-          className="min-h-0 w-full flex-1 border-0"
+          className={clsx("min-h-0 w-full flex-1 border-0", dragging && "pointer-events-none")}
         />
+        {/* The side edges: drag to widen or narrow, double click for the usual width. */}
+        {(["left-0", "right-0"] as const).map((side) => (
+          <div
+            key={side}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Drag to change the window's width"
+            title="Drag to change the width · double click for the usual"
+            onPointerDown={dragEdge}
+            onDoubleClick={() => keepWidth(null)}
+            className={clsx("group absolute inset-y-0 z-20 hidden w-3 cursor-ew-resize items-center justify-center sm:flex", side)}
+          >
+            <span
+              className={clsx("h-16 w-1 rounded-full bg-ink/15 opacity-0 transition group-hover:opacity-100", dragging && "opacity-100")}
+            />
+          </div>
+        ))}
       </section>
       {/* Its tools as rounds in the grey just left of the window (wide screens): the designer's orange round, the quote and
           the proposal's, the one open ringed. A site with no deal has them too (9 Nov 2026, Martin): its Proposal says why
@@ -258,8 +327,8 @@ export function DesignDrawer(props: {
         <nav
           data-design-popup
           aria-label="This deal's tools"
-          className="fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
-          style={{ left: "calc((100vw - min(calc(100vw - 3rem), calc(min(92dvh, 62rem) * 1.62))) / 2 - 4rem)" }}
+          className="popup-tools fixed top-1/2 z-[61] hidden -translate-y-1/2 flex-col gap-3 xl:flex"
+          style={{ "--pop-w": popWidth(popW) } as React.CSSProperties}
         >
           <button
             type="button"

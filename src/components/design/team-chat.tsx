@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { CustomerConversations } from "./customer-conversations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,7 +31,7 @@ import {
   type CatchUp,
   type ChatAction,
 } from "@/lib/domain/design/sol-chat-work";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import { TEAM_LIST, TEAM_WINDOW, readWindowSize, teamListWidth, teamWindowSize } from "@/lib/domain/design/team-window";
 import { matches } from "@/lib/domain/design/find";
 import { handleOf } from "@/lib/domain/design/mentions";
@@ -46,9 +47,7 @@ import {
   TEAM_QUICK_REACTIONS,
   asksSol,
   cleanChannelName,
-  dmRoom,
   dmWith,
-  initialsOf,
   isTeamPicture,
   nameOf,
   replyQuote,
@@ -83,13 +82,13 @@ import {
 } from "@/lib/services/team-chat";
 import { dealRoom, jobOfRoom, writerName, type DealChatLine } from "@/lib/domain/design/deal-team";
 import { DEAL_TEAM_CHANGED, openDealChat } from "@/lib/services/deal-team";
-import { TEAM_LEVELS, levelPermissions, type TeamLevel } from "@/lib/domain/design/welcome";
-import { addMember, setMemberPermissions } from "@/lib/services/design-account";
 import { DealTeamChat } from "./deal-team-chat";
 import { useDesignAccount } from "./design-account";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolChat } from "./sol-chat";
-import { SolBadge, SolMark } from "./sol-icon";
+import { newSolChat } from "@/lib/services/sol";
+import { MemberAvatar, MemberPhotos } from "./member-avatar";
+import { SolBadge, SolMark } from "./sol-sun";
 import { useSolUnread } from "./sol-dock";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolThinking, useSolLaunch } from "./sol-thinking";
@@ -132,6 +131,8 @@ export function TeamChatPanel({
   /** Customers' lines waiting and this member's unread mentions: the count on the Customers side. */
   customers?: number;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   // Team or Customers (10 Nov 2026, Martin: the bell went; customer chat is a toggle in team chat).
   const [side, setSide] = useState<"team" | "customers">("team");
   const [room, setRoomState] = useState<string>(() => {
@@ -146,6 +147,8 @@ export function TeamChatPanel({
   const [error, setError] = useState("");
   /** Which plus in the list is open: a new channel, or someone new to message. */
   const [adding, setAdding] = useState<"channel" | "person" | null>(null);
+  /** Bumped to open Sol's conversation afresh after a new chat is started from the big +. */
+  const [solFresh, setSolFresh] = useState(0);
   // The list down the left is dragged wider or narrower by its edge (12 Nov 2026, Martin: the deals' names were cut off).
   const panelRef = useRef<HTMLDivElement>(null);
   const [listW, setListW] = useState<number>(() => {
@@ -305,7 +308,7 @@ export function TeamChatPanel({
       offers.push({
         key: j.id,
         label: `${j.customerName} · ${j.title}`,
-        line: [STAGE_LABELS[j.stage], j.address].filter(Boolean).join(" · "),
+        line: [stageLabel(j.stage, stageNames), j.address].filter(Boolean).join(" · "),
         job: j,
       });
   } else if (tagAt && tagsIn(room)) {
@@ -320,7 +323,10 @@ export function TeamChatPanel({
     if (o.job && dealAt) {
       const j = o.job;
       if (deals.length < TEAM_DEALS_MAX && !deals.some((d) => d.id === j.id))
-        setDeals([...deals, { id: j.id, name: `${j.customerName} · ${j.title}`, address: j.address, stage: STAGE_LABELS[j.stage] }]);
+        setDeals([
+          ...deals,
+          { id: j.id, name: `${j.customerName} · ${j.title}`, address: j.address, stage: stageLabel(j.stage, stageNames) },
+        ]);
       setText((text.slice(0, dealAt.start) + text.slice(dealAt.start + 1 + dealAt.query.length)).replace(/\s{2,}/g, " "));
       setDealAt(null);
       box.current?.focus();
@@ -438,631 +444,647 @@ export function TeamChatPanel({
       </div>
     );
   return (
-    <div ref={panelRef} className="flex h-full min-h-0 bg-surface text-ink">
-      <nav
-        aria-label="Conversations"
-        style={{ width: listW }}
-        className="relative flex shrink-0 flex-col border-r border-line bg-canvas/60"
-      >
-        <Grip
-          label="Drag to make the list wider or narrower"
-          className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize"
-          onDrag={(dx, _dy, start) => keepListW(start.width + dx)}
-          start={() => ({ width: listW, height: 0 })}
-          onReset={() => keepListW(TEAM_LIST.width)}
-          keys={(k) => (k === "ArrowLeft" ? keepListW(listW - 16) : k === "ArrowRight" ? keepListW(listW + 16) : undefined)}
-          orientation="vertical"
-        />
-        <div className="px-2 pt-3">{sides}</div>
-        <DealChatsList
-          deals={view?.dealChats ?? []}
-          room={room}
-          onPick={(id) => setRoom(dealRoom(id))}
-          onStart={(id) => void openDeal(id)}
-          jobs={jobs}
-          needJobs={() => jobs === null && void listJobs().then((r) => setJobs(r.ok ? r.jobs : []))}
-        />
-        <ListHead
-          label="Channels"
-          plus="Add a channel"
-          on={adding === "channel"}
-          onPlus={() => setAdding((a) => (a === "channel" ? null : "channel"))}
-        />
-        {adding === "channel" && (
-          <AddChannel
-            onAdded={(id) => {
-              setAdding(null);
-              setRoom(id);
-              void load();
-            }}
-            onClose={() => setAdding(null)}
+    <MemberPhotos.Provider value={view?.photos ?? NO_PHOTOS}>
+      <div ref={panelRef} className="flex h-full min-h-0 bg-surface text-ink">
+        <nav
+          aria-label="Conversations"
+          style={{ width: listW }}
+          className="relative flex shrink-0 flex-col border-r border-line bg-canvas/60"
+        >
+          <Grip
+            label="Drag to make the list wider or narrower"
+            className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize"
+            onDrag={(dx, _dy, start) => keepListW(start.width + dx)}
+            start={() => ({ width: listW, height: 0 })}
+            onReset={() => keepListW(TEAM_LIST.width)}
+            keys={(k) => (k === "ArrowLeft" ? keepListW(listW - 16) : k === "ArrowRight" ? keepListW(listW + 16) : undefined)}
+            orientation="vertical"
           />
-        )}
-        {(view?.channels ?? TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: 0, own: false }))).map((c) => (
-          <div key={c.room} className="group relative">
-            <RoomButton on={room === c.room} unread={c.unread} onClick={() => setRoom(c.room)}>
-              <Hash className="size-3.5 shrink-0 text-muted" aria-hidden />
-              <span className="truncate">{c.label}</span>
-            </RoomButton>
-            {c.own && view?.mayRemoveChannels && (
-              <button
-                type="button"
-                title={`Remove ${c.label}`}
-                aria-label={`Remove the channel ${c.label}`}
-                onClick={async () => {
-                  if (!window.confirm(`Remove the channel ${c.label} for everyone? What was said in it goes too.`)) return;
-                  const r = await removeTeamChannel(c.room);
-                  if (!r.ok) return setError(r.message);
-                  if (room === c.room) setRoom("deals");
-                  void load();
-                }}
-                className="absolute right-2.5 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-full bg-surface text-muted ring-1 ring-line hover:text-danger group-focus-within:grid group-hover:grid"
-              >
-                <X className="size-3" aria-hidden />
-              </button>
-            )}
-          </div>
-        ))}
-        <ListHead
-          label="Direct messages"
-          plus="Message someone new"
-          on={adding === "person"}
-          onPlus={() => setAdding((a) => (a === "person" ? null : "person"))}
-        />
-        {adding === "person" && (
-          <AddPerson
-            mayAdd={view?.mayAddPeople === true}
-            onAdded={(email) => {
-              setAdding(null);
-              setRoom(dmRoom(me, email));
-              void load();
-            }}
-            onClose={() => setAdding(null)}
+          <div className="px-2 pt-3">{sides}</div>
+          <DealChatsList
+            deals={view?.dealChats ?? []}
+            room={room}
+            onPick={(id) => setRoom(dealRoom(id))}
+            onStart={(id) => void openDeal(id)}
+            jobs={jobs}
+            needJobs={() => jobs === null && void listJobs().then((r) => setJobs(r.ok ? r.jobs : []))}
           />
-        )}
-        <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
-          {view && view.people.length === 0 && (
-            <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Press + to add someone.</p>
+          <ListHead
+            label="Channels"
+            plus="Add a channel"
+            on={adding === "channel"}
+            onPlus={() => setAdding((a) => (a === "channel" ? null : "channel"))}
+          />
+          {adding === "channel" && (
+            <AddChannel
+              onAdded={(id) => {
+                setAdding(null);
+                setRoom(id);
+                void load();
+              }}
+              onClose={() => setAdding(null)}
+            />
           )}
-          {view?.people.map((p) => (
-            <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
-              <Round email={p.email} small />
-              <span className="truncate">{p.label}</span>
-            </RoomButton>
+          {(view?.channels ?? TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: 0, own: false }))).map((c) => (
+            <div key={c.room} className="group relative">
+              <RoomButton on={room === c.room} unread={c.unread} onClick={() => setRoom(c.room)}>
+                <Hash className="size-3.5 shrink-0 text-muted" aria-hidden />
+                <span className="truncate">{c.label}</span>
+              </RoomButton>
+              {c.own && view?.mayRemoveChannels && (
+                <button
+                  type="button"
+                  title={`Remove ${c.label}`}
+                  aria-label={`Remove the channel ${c.label}`}
+                  onClick={async () => {
+                    if (!window.confirm(`Remove the channel ${c.label} for everyone? What was said in it goes too.`)) return;
+                    const r = await removeTeamChannel(c.room);
+                    if (!r.ok) return setError(r.message);
+                    if (room === c.room) setRoom("deals");
+                    void load();
+                  }}
+                  className="absolute right-2.5 top-1/2 hidden size-6 -translate-y-1/2 place-items-center rounded-full bg-surface text-muted ring-1 ring-line hover:text-danger group-focus-within:grid group-hover:grid"
+                >
+                  <X className="size-3" aria-hidden />
+                </button>
+              )}
+            </div>
           ))}
-        </div>
-      </nav>
+          <ListHead
+            label="Direct messages"
+            plus="Message someone"
+            on={adding === "person"}
+            onPlus={() => setAdding((a) => (a === "person" ? null : "person"))}
+          />
+          {adding === "person" && (
+            <PickPerson
+              people={view?.people ?? []}
+              onPick={(r) => {
+                setAdding(null);
+                setRoom(r);
+              }}
+              onClose={() => setAdding(null)}
+            />
+          )}
+          <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
+            {view && view.people.length === 0 && (
+              <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Settings → Users.</p>
+            )}
+            {view?.people.map((p) => (
+              <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
+                <Round email={p.email} tinted />
+                <span className="truncate">{p.label}</span>
+              </RoomButton>
+            ))}
+          </div>
+          <NewChatButton
+            sol={hasSol}
+            onMessage={() => setAdding("person")}
+            onChannel={() => setAdding("channel")}
+            onSol={async () => {
+              setSide("team");
+              const r = await newSolChat();
+              if (!r.ok) setError(r.message);
+              setSolFresh((n) => n + 1);
+              setRoom(SOL_ROOM);
+            }}
+          />
+        </nav>
 
-      {solOpen && (
-        <div className="flex min-w-0 flex-1 flex-col">
-          <SolChat side onClose={onClose} />
-        </div>
-      )}
-      {dealJob && (
-        <div className="flex min-w-0 flex-1 flex-col">
+        {solOpen && (
+          <div className="flex min-w-0 flex-1 flex-col">
+            <SolChat key={solFresh} side onClose={onClose} />
+          </div>
+        )}
+        {dealJob && (
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                  <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
+                  {dealOpen ? `${dealOpen.customer} · ${dealOpen.title}` : "Deal chat"}
+                </p>
+                {dealOpen?.address && <p className="truncate text-xs text-ink-2">{dealOpen.address}</p>}
+                <p className="truncate text-[11px] text-muted">Everyone who may see the deal · never seen by customers</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Link
+                  href={`/design/deals/${dealJob}?tab=team`}
+                  aria-pressed={onOpenDeal ? dealShown === dealJob : undefined}
+                  onClick={(e) => {
+                    if (!onOpenDeal || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                    // In the window the deal comes out beside the chat (16 Nov 2026, Martin), not as a page of its own.
+                    e.preventDefault();
+                    onOpenDeal(dealJob);
+                  }}
+                  className={clsx(
+                    "rounded-full px-2.5 py-1 text-[12px] font-medium ring-1",
+                    onOpenDeal && dealShown === dealJob ? "bg-ink text-white ring-ink" : "text-ink-2 ring-line hover:text-ink",
+                  )}
+                >
+                  {onOpenDeal && dealShown === dealJob ? "Deal open" : "Open deal"}
+                </Link>
+                {onClose && (
+                  <button
+                    type="button"
+                    aria-label="Close"
+                    onClick={onClose}
+                    className="rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-ink"
+                  >
+                    <X className="size-4" />
+                  </button>
+                )}
+              </div>
+            </header>
+            <div className="min-h-0 flex-1 px-4 py-3">
+              <DealTeamChat key={dealJob} jobId={dealJob} fill />
+            </div>
+          </div>
+        )}
+        <div
+          className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line", elsewhere && "hidden")}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("Files")) {
+              e.preventDefault();
+              setDropping(true);
+            }
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDropping(false);
+            addFiles([...e.dataTransfer.files]);
+          }}
+        >
           <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
-                <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
-                {dealOpen ? `${dealOpen.customer} · ${dealOpen.title}` : "Deal chat"}
+              <p className="flex items-center gap-1 truncate text-sm font-semibold">
+                {channel && <Hash className="size-3.5 text-muted" aria-hidden />}
+                {channel ? channel.label : roomLabel(room, me)}
               </p>
-              {dealOpen?.address && <p className="truncate text-xs text-ink-2">{dealOpen.address}</p>}
-              <p className="truncate text-[11px] text-muted">Everyone who may see the deal · never seen by customers</p>
+              <p className="truncate text-[11px] text-muted">
+                {channel ? "Everyone in the business" : "Just the two of you"} · never seen by customers
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Link
-                href={`/design/deals/${dealJob}?tab=team`}
-                aria-pressed={onOpenDeal ? dealShown === dealJob : undefined}
-                onClick={(e) => {
-                  if (!onOpenDeal || e.metaKey || e.ctrlKey || e.shiftKey) return;
-                  // In the window the deal comes out beside the chat (16 Nov 2026, Martin), not as a page of its own.
-                  e.preventDefault();
-                  onOpenDeal(dealJob);
-                }}
-                className={clsx(
-                  "rounded-full px-2.5 py-1 text-[12px] font-medium ring-1",
-                  onOpenDeal && dealShown === dealJob ? "bg-ink text-white ring-ink" : "text-ink-2 ring-line hover:text-ink",
-                )}
-              >
-                {onOpenDeal && dealShown === dealJob ? "Deal open" : "Open deal"}
-              </Link>
+              {channel && hasSol && missed?.room === room && missed.n >= CATCH_UP_MIN && caught?.room !== room && (
+                <button
+                  type="button"
+                  disabled={catching}
+                  onClick={async () => {
+                    setCatching(true);
+                    const r = await catchUpRoom(room, missed.n);
+                    setCatching(false);
+                    if (!r.ok) return setError(r.message);
+                    setCaught({ room, summary: r.summary });
+                  }}
+                  title={`Sol sums up the ${missed.n} messages you missed here`}
+                  className="flex h-7 items-center gap-1.5 rounded-full bg-primary px-2.5 text-[11px] font-medium text-white hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
+                >
+                  <SolBadge className="size-3.5" />
+                  {catching ? "Catching up…" : `Catch me up · ${missed.n}`}
+                </button>
+              )}
+              {channel && view?.solJoinsIn !== undefined && (
+                <SolJoinsSwitch
+                  on={view.solJoinsIn}
+                  may={!!view.maySwitchSol}
+                  onChange={async (on) => {
+                    setView((v) => (v ? { ...v, solJoinsIn: on } : v));
+                    const r = await setSolJoinsIn(on);
+                    if (!r.ok) {
+                      setView((v) => (v ? { ...v, solJoinsIn: !on } : v));
+                      setError(r.message);
+                    }
+                  }}
+                />
+              )}
               {onClose && (
                 <button
                   type="button"
-                  aria-label="Close"
                   onClick={onClose}
-                  className="rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-ink"
+                  aria-label="Close the team chat"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
                 >
-                  <X className="size-4" />
+                  <X className="size-4" aria-hidden />
                 </button>
               )}
             </div>
           </header>
-          <div className="min-h-0 flex-1 px-4 py-3">
-            <DealTeamChat key={dealJob} jobId={dealJob} fill />
-          </div>
-        </div>
-      )}
-      <div
-        className={clsx("relative flex min-w-0 flex-1 flex-col", dropping && "ring-2 ring-inset ring-sun-line", elsewhere && "hidden")}
-        onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files")) {
-            e.preventDefault();
-            setDropping(true);
-          }
-        }}
-        onDragLeave={() => setDropping(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDropping(false);
-          addFiles([...e.dataTransfer.files]);
-        }}
-      >
-        <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-          <div className="min-w-0">
-            <p className="flex items-center gap-1 truncate text-sm font-semibold">
-              {channel && <Hash className="size-3.5 text-muted" aria-hidden />}
-              {channel ? channel.label : roomLabel(room, me)}
-            </p>
-            <p className="truncate text-[11px] text-muted">
-              {channel ? "Everyone in the business" : "Just the two of you"} · never seen by customers
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {channel && hasSol && missed?.room === room && missed.n >= CATCH_UP_MIN && caught?.room !== room && (
-              <button
-                type="button"
-                disabled={catching}
-                onClick={async () => {
-                  setCatching(true);
-                  const r = await catchUpRoom(room, missed.n);
-                  setCatching(false);
-                  if (!r.ok) return setError(r.message);
-                  setCaught({ room, summary: r.summary });
-                }}
-                title={`Sol sums up the ${missed.n} messages you missed here`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-primary px-2.5 text-[11px] font-medium text-white hover:brightness-110 disabled:bg-surface-2 disabled:text-muted"
-              >
-                <SolBadge className="size-3.5" />
-                {catching ? "Catching up…" : `Catch me up · ${missed.n}`}
-              </button>
-            )}
-            {channel && view?.solJoinsIn !== undefined && (
-              <SolJoinsSwitch
-                on={view.solJoinsIn}
-                may={!!view.maySwitchSol}
-                onChange={async (on) => {
-                  setView((v) => (v ? { ...v, solJoinsIn: on } : v));
-                  const r = await setSolJoinsIn(on);
-                  if (!r.ok) {
-                    setView((v) => (v ? { ...v, solJoinsIn: !on } : v));
-                    setError(r.message);
-                  }
-                }}
-              />
-            )}
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close the team chat"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            )}
-          </div>
-        </header>
 
-        <div className="staff-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 pt-5">
-          {caught?.room === room && <CatchUpCard summary={caught.summary} onClose={() => setCaught(null)} />}
-          {lines === null && !error && <p className="text-sm text-muted">Opening…</p>}
-          {lines?.length === 0 && (
-            <p className="text-sm text-muted">
-              {channel
-                ? `Nothing said in ${channel.label} yet. Type @ to tag someone, @Sol to ask Sol, or # to bring in a deal.`
-                : `Nothing said yet. Say hello to ${nameOf(other ?? "").split(" ")[0] || "them"}.`}
-            </p>
-          )}
-          {lines?.map((l, i) => {
-            const mine = l.by === me.toLowerCase();
-            const head = lines[i - 1]?.by !== l.by || Date.parse(l.at) - Date.parse(lines[i - 1]?.at ?? "") > 15 * 60_000;
-            const isEditing = editing?.id === l.id;
-            return (
-              <div
-                key={l.id}
-                id={`tl-${l.id}`}
-                className={clsx(
-                  "group/line relative flex scroll-my-6 flex-col rounded-2xl transition-colors duration-700",
-                  mine ? "items-end" : "items-start",
-                  flash === l.id && "bg-sun/70",
-                )}
-              >
-                {head && (
-                  <p className={clsx("mb-0.5 mt-2 flex items-center gap-1.5 px-1 text-[11px] text-muted", mine && "flex-row-reverse")}>
-                    {!mine && <Round email={l.by} small />}
-                    <span className="font-medium text-ink-2">{mine ? "You" : nameOf(l.by)}</span> · {when(l.at)}
-                  </p>
-                )}
-                {l.replyTo && <Quoted reply={l.replyTo} mine={mine} me={me} onShow={showLine} />}
-                {l.files?.length ? <Files files={l.files} mine={mine} /> : null}
-                {isEditing ? (
-                  <div className="flex w-[85%] flex-col items-end gap-1">
-                    <textarea
-                      autoFocus
-                      value={editing.text}
-                      onChange={(e) => setEditing({ id: l.id, text: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          void saveEdit();
-                        }
-                        if (e.key === "Escape") setEditing(null);
-                      }}
-                      aria-label="Change your message"
-                      className="max-h-40 min-h-9 w-full resize-none rounded-2xl border border-ink bg-surface px-3 py-1.5 text-sm outline-none [field-sizing:content]"
-                    />
-                    <p className="text-[11px] text-muted">
-                      Enter to save · Esc to cancel ·{" "}
-                      <button type="button" onClick={() => void saveEdit()} className="font-semibold text-ink underline">
-                        Save
-                      </button>
+          <div className="staff-scroll min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 pt-5">
+            {caught?.room === room && <CatchUpCard summary={caught.summary} onClose={() => setCaught(null)} />}
+            {lines === null && !error && <p className="text-sm text-muted">Opening…</p>}
+            {lines?.length === 0 && (
+              <p className="text-sm text-muted">
+                {channel
+                  ? `Nothing said in ${channel.label} yet. Type @ to tag someone, @Sol to ask Sol, or # to bring in a deal.`
+                  : `Nothing said yet. Say hello to ${nameOf(other ?? "").split(" ")[0] || "them"}.`}
+              </p>
+            )}
+            {lines?.map((l, i) => {
+              const mine = l.by === me.toLowerCase();
+              const head = lines[i - 1]?.by !== l.by || Date.parse(l.at) - Date.parse(lines[i - 1]?.at ?? "") > 15 * 60_000;
+              const isEditing = editing?.id === l.id;
+              return (
+                <div
+                  key={l.id}
+                  id={`tl-${l.id}`}
+                  className={clsx(
+                    "group/line relative flex scroll-my-6 flex-col rounded-2xl transition-colors duration-700",
+                    mine ? "items-end" : "items-start",
+                    flash === l.id && "bg-sun/70",
+                  )}
+                >
+                  {head && (
+                    <p className={clsx("mb-0.5 mt-2 flex items-center gap-1.5 px-1 text-[11px] text-muted", mine && "flex-row-reverse")}>
+                      {!mine && <Round email={l.by} small />}
+                      <span className="font-medium text-ink-2">{mine ? "You" : nameOf(l.by)}</span> · {when(l.at)}
                     </p>
-                  </div>
-                ) : (
-                  l.text && (
-                    <p
-                      title={when(l.at)}
-                      className={clsx(
-                        "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm",
-                        mine ? "bg-primary text-white" : l.by === SOL_BY ? "bg-sun text-ink" : "bg-canvas text-ink",
-                      )}
-                    >
-                      {l.by === SOL_BY && <SolBadge className="mr-1 inline size-3.5 -translate-y-px" />}
-                      <Tagged text={l.text} members={members} dark={mine} />
-                    </p>
-                  )
-                )}
-                {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
-                {l.action && (
-                  <ActionCard
-                    lineId={l.id}
-                    action={l.action}
-                    me={me}
-                    seesCosts={view?.seesCosts !== false}
-                    onDone={() => void load()}
-                    onError={setError}
-                  />
-                )}
-                {(l.diagrams?.length || l.charts?.length) && (
-                  <div className="mt-1 w-full max-w-[85%] space-y-2">
-                    {l.diagrams?.map((d, k) => (
-                      <SolDiagramView key={`d${k}`} diagram={d} />
-                    ))}
-                    {l.charts?.map((c, k) => (
-                      <SolChartView key={`c${k}`} chart={c} />
-                    ))}
-                  </div>
-                )}
-                {l.deals?.length ? <Deals deals={l.deals} onOpenChat={(id) => void openDeal(id)} /> : null}
-                {l.reactions && (
-                  <div className={clsx("mt-1 flex max-w-[85%] flex-wrap gap-1", mine && "justify-end")}>
-                    {Object.entries(l.reactions).map(([emoji, who]) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => void react(l.id, emoji)}
-                        title={`${who.map(nameOf).join(", ")} reacted with ${emoji}`}
-                        aria-pressed={who.includes(me.toLowerCase())}
+                  )}
+                  {l.replyTo && <Quoted reply={l.replyTo} mine={mine} me={me} onShow={showLine} />}
+                  {l.files?.length ? <Files files={l.files} mine={mine} /> : null}
+                  {isEditing ? (
+                    <div className="flex w-[85%] flex-col items-end gap-1">
+                      <textarea
+                        autoFocus
+                        value={editing.text}
+                        onChange={(e) => setEditing({ id: l.id, text: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            void saveEdit();
+                          }
+                          if (e.key === "Escape") setEditing(null);
+                        }}
+                        aria-label="Change your message"
+                        className="max-h-40 min-h-9 w-full resize-none rounded-2xl border border-ink bg-surface px-3 py-1.5 text-sm outline-none [field-sizing:content]"
+                      />
+                      <p className="text-[11px] text-muted">
+                        Enter to save · Esc to cancel ·{" "}
+                        <button type="button" onClick={() => void saveEdit()} className="font-semibold text-ink underline">
+                          Save
+                        </button>
+                      </p>
+                    </div>
+                  ) : (
+                    l.text && (
+                      <p
+                        title={when(l.at)}
                         className={clsx(
-                          "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ring-1",
-                          who.includes(me.toLowerCase()) ? "bg-sun ring-sun-line" : "bg-surface ring-line hover:ring-ink",
+                          "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm",
+                          mine ? "bg-primary text-white" : l.by === SOL_BY ? "bg-sun text-ink" : "bg-canvas text-ink",
                         )}
                       >
-                        <span>{emoji}</span>
-                        <span className="font-semibold text-ink-2">{who.length}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {!isEditing && (
-                  <div
-                    className={clsx(
-                      "absolute -top-3 z-10 flex items-center gap-0.5 rounded-full bg-surface p-0.5 shadow-md ring-1 ring-line transition-opacity",
-                      mine ? "right-0" : "left-0",
-                      reacting === l.id
-                        ? "opacity-100"
-                        : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/line:pointer-events-auto group-hover/line:opacity-100",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => replyTo(l)}
-                      aria-label="Reply"
-                      title="Reply"
-                      className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-canvas hover:text-ink"
+                        {l.by === SOL_BY && <SolBadge className="mr-1 inline size-3.5 -translate-y-px" />}
+                        <Tagged text={l.text} members={members} dark={mine} />
+                      </p>
+                    )
+                  )}
+                  {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
+                  {l.action && (
+                    <ActionCard
+                      lineId={l.id}
+                      action={l.action}
+                      me={me}
+                      seesCosts={view?.seesCosts !== false}
+                      onDone={() => void load()}
+                      onError={setError}
+                    />
+                  )}
+                  {(l.diagrams?.length || l.charts?.length) && (
+                    <div className="mt-1 w-full max-w-[85%] space-y-2">
+                      {l.diagrams?.map((d, k) => (
+                        <SolDiagramView key={`d${k}`} diagram={d} />
+                      ))}
+                      {l.charts?.map((c, k) => (
+                        <SolChartView key={`c${k}`} chart={c} />
+                      ))}
+                    </div>
+                  )}
+                  {l.deals?.length ? <Deals deals={l.deals} onOpenChat={(id) => void openDeal(id)} /> : null}
+                  {l.reactions && (
+                    <div className={clsx("mt-1 flex max-w-[85%] flex-wrap gap-1", mine && "justify-end")}>
+                      {Object.entries(l.reactions).map(([emoji, who]) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => void react(l.id, emoji)}
+                          title={`${who.map(nameOf).join(", ")} reacted with ${emoji}`}
+                          aria-pressed={who.includes(me.toLowerCase())}
+                          className={clsx(
+                            "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ring-1",
+                            who.includes(me.toLowerCase()) ? "bg-sun ring-sun-line" : "bg-surface ring-line hover:ring-ink",
+                          )}
+                        >
+                          <span>{emoji}</span>
+                          <span className="font-semibold text-ink-2">{who.length}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!isEditing && (
+                    <div
+                      className={clsx(
+                        "absolute -top-3 z-10 flex items-center gap-0.5 rounded-full bg-surface p-0.5 shadow-md ring-1 ring-line transition-opacity",
+                        mine ? "right-0" : "left-0",
+                        reacting === l.id
+                          ? "opacity-100"
+                          : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/line:pointer-events-auto group-hover/line:opacity-100",
+                      )}
                     >
-                      <Reply className="size-3.5" aria-hidden />
-                    </button>
-                    <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
-                    {TEAM_QUICK_REACTIONS.map((e) => (
                       <button
-                        key={e}
                         type="button"
-                        onClick={() => void react(l.id, e)}
-                        aria-label={`React with ${e}`}
-                        className="flex size-7 items-center justify-center rounded-full text-sm hover:bg-canvas"
+                        onClick={() => replyTo(l)}
+                        aria-label="Reply"
+                        title="Reply"
+                        className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-canvas hover:text-ink"
                       >
-                        {e}
+                        <Reply className="size-3.5" aria-hidden />
                       </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setReacting(reacting === l.id ? null : l.id)}
-                      aria-label="More reactions"
-                      title="More reactions"
-                      className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-                    >
-                      <SmilePlus className="size-3.5" aria-hidden />
-                    </button>
-                    {mine && l.text && (
+                      <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
+                      {TEAM_QUICK_REACTIONS.map((e) => (
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => void react(l.id, e)}
+                          aria-label={`React with ${e}`}
+                          className="flex size-7 items-center justify-center rounded-full text-sm hover:bg-canvas"
+                        >
+                          {e}
+                        </button>
+                      ))}
                       <button
                         type="button"
-                        onClick={() => {
-                          setReacting(null);
-                          setEditing({ id: l.id, text: l.text });
-                        }}
-                        aria-label="Edit"
-                        title="Edit"
+                        onClick={() => setReacting(reacting === l.id ? null : l.id)}
+                        aria-label="More reactions"
+                        title="More reactions"
                         className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
                       >
-                        <Pencil className="size-3.5" aria-hidden />
+                        <SmilePlus className="size-3.5" aria-hidden />
                       </button>
-                    )}
-                    {mine && (
-                      <button
-                        type="button"
-                        onClick={() => void remove(l)}
-                        aria-label="Delete"
-                        title="Delete"
-                        className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-danger"
-                      >
-                        <Trash2 className="size-3.5" aria-hidden />
-                      </button>
-                    )}
-                  </div>
-                )}
-                {reacting === l.id && (
-                  <div className={clsx("absolute top-6 z-20", mine ? "right-0" : "left-0")}>
-                    <EmojiGrid onPick={(e) => void react(l.id, e)} onClose={() => setReacting(null)} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div ref={end} />
-        </div>
-
-        {error && <p className="px-4 pb-1 text-xs text-danger">{error}</p>}
-        {solShown.showing && (
-          <div className="px-4 pb-1">
-            <SolThinking say="Sol is answering…" launching={solShown.launching} />
+                      {mine && l.text && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReacting(null);
+                            setEditing({ id: l.id, text: l.text });
+                          }}
+                          aria-label="Edit"
+                          title="Edit"
+                          className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+                        >
+                          <Pencil className="size-3.5" aria-hidden />
+                        </button>
+                      )}
+                      {mine && (
+                        <button
+                          type="button"
+                          onClick={() => void remove(l)}
+                          aria-label="Delete"
+                          title="Delete"
+                          className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-danger"
+                        >
+                          <Trash2 className="size-3.5" aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {reacting === l.id && (
+                    <div className={clsx("absolute top-6 z-20", mine ? "right-0" : "left-0")}>
+                      <EmojiGrid onPick={(e) => void react(l.id, e)} onClose={() => setReacting(null)} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div ref={end} />
           </div>
-        )}
-        {offers.length > 0 && (
-          <ul
-            role="listbox"
-            aria-label={dealAt ? "Deals" : "People to tag"}
-            className="mx-3 mb-1 overflow-hidden rounded-xl border border-line bg-surface shadow-lg"
+
+          {error && <p className="px-4 pb-1 text-xs text-danger">{error}</p>}
+          {solShown.showing && (
+            <div className="px-4 pb-1">
+              <SolThinking say="Sol is answering…" launching={solShown.launching} />
+            </div>
+          )}
+          {offers.length > 0 && (
+            <ul
+              role="listbox"
+              aria-label={dealAt ? "Deals" : "People to tag"}
+              className="mx-3 mb-1 overflow-hidden rounded-xl border border-line bg-surface shadow-lg"
+            >
+              {offers.map((o, i) => (
+                <li key={o.key} role="option" aria-selected={i === chosen}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickOffer(o)}
+                    onMouseEnter={() => setHi(i)}
+                    className={clsx("flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm", i === chosen && "bg-canvas")}
+                  >
+                    {dealAt ? (
+                      <SquareKanban className="size-3.5 shrink-0 text-muted" aria-hidden />
+                    ) : o.key === SOL_BY ? (
+                      <SolBadge className="size-3.5 shrink-0" />
+                    ) : (
+                      <AtSign className="size-3.5 shrink-0 text-muted" aria-hidden />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{o.label}</span>
+                      {o.line && <span className="block truncate text-xs text-muted">{o.line}</span>}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+            className="border-t border-line p-3"
           >
-            {offers.map((o, i) => (
-              <li key={o.key} role="option" aria-selected={i === chosen}>
+            {answering && (
+              <div className="mb-2 flex items-start gap-2 rounded-xl border-l-[3px] border-sun-line bg-canvas py-1.5 pl-2.5 pr-1">
+                <Reply className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold text-ink-2">
+                    Replying to {answering.by === me.toLowerCase() ? "yourself" : nameOf(answering.by)}
+                  </p>
+                  <p className="truncate text-xs text-muted">{answering.text}</p>
+                </div>
                 <button
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => pickOffer(o)}
-                  onMouseEnter={() => setHi(i)}
-                  className={clsx("flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm", i === chosen && "bg-canvas")}
+                  onClick={() => setReplying(null)}
+                  aria-label="Don't reply to this message"
+                  title="Don't reply (Esc)"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink"
                 >
-                  {dealAt ? (
-                    <SquareKanban className="size-3.5 shrink-0 text-muted" aria-hidden />
-                  ) : o.key === SOL_BY ? (
-                    <SolBadge className="size-3.5 shrink-0" />
-                  ) : (
-                    <AtSign className="size-3.5 shrink-0 text-muted" aria-hidden />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{o.label}</span>
-                    {o.line && <span className="block truncate text-xs text-muted">{o.line}</span>}
-                  </span>
+                  <X className="size-3.5" aria-hidden />
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send();
-          }}
-          className="border-t border-line p-3"
-        >
-          {answering && (
-            <div className="mb-2 flex items-start gap-2 rounded-xl border-l-[3px] border-sun-line bg-canvas py-1.5 pl-2.5 pr-1">
-              <Reply className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-ink-2">
-                  Replying to {answering.by === me.toLowerCase() ? "yourself" : nameOf(answering.by)}
-                </p>
-                <p className="truncate text-xs text-muted">{answering.text}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReplying(null)}
-                aria-label="Don't reply to this message"
-                title="Don't reply (Esc)"
-                className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-ink"
-              >
-                <X className="size-3.5" aria-hidden />
-              </button>
-            </div>
-          )}
-          {(files.length > 0 || deals.length > 0) && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {deals.map((d) => (
-                <span key={d.id} className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-canvas py-1 pl-2.5 pr-1 text-xs">
-                  <SquareKanban className="size-3.5 shrink-0 text-sun-line" aria-hidden />
-                  <span className="truncate">{d.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setDeals(deals.filter((x) => x.id !== d.id))}
-                    aria-label={`Take off ${d.name}`}
-                    className="rounded-full p-0.5 text-muted hover:text-ink"
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
-                </span>
-              ))}
-              {files.map((f, i) => (
-                <span key={i} className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-canvas py-1 pl-2.5 pr-1 text-xs">
-                  <FileText className="size-3.5 shrink-0 text-sun-line" aria-hidden />
-                  <span className="truncate">{f.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                    aria-label={`Take off ${f.name}`}
-                    className="rounded-full p-0.5 text-muted hover:text-ink"
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="relative flex items-end gap-1.5 rounded-2xl bg-canvas px-1.5 ring-1 ring-line focus-within:ring-sun-line">
-            <input
-              ref={picker}
-              type="file"
-              multiple
-              accept={TEAM_FILE_ACCEPT}
-              className="hidden"
-              onChange={(e) => {
-                addFiles([...(e.target.files ?? [])]);
-                e.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => picker.current?.click()}
-              aria-label="Send a file or picture"
-              title="Send a file or picture (or paste a screenshot, or drop files here)"
-              className="mb-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
-            >
-              <Paperclip className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEmojis(!emojis)}
-              aria-label="Add an emoji"
-              aria-expanded={emojis}
-              className="mb-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
-            >
-              <SmilePlus className="size-4" aria-hidden />
-            </button>
-            {emojis && (
-              <div className="absolute bottom-full left-0 z-20 mb-2">
-                <EmojiGrid
-                  onPick={(e) => {
-                    setText((t) => (t + e).slice(0, TEAM_LINE_MAX));
-                    box.current?.focus();
-                  }}
-                  onClose={() => setEmojis(false)}
-                />
               </div>
             )}
-            <textarea
-              ref={box}
-              value={heard ? withSpoken(text, heard) : text}
-              rows={1}
-              maxLength={TEAM_LINE_MAX}
-              onChange={(e) => {
-                const caret = e.target.selectionStart ?? e.target.value.length;
-                setText(e.target.value);
-                setDealAt(typingDeal(e.target.value, caret));
-                setTagAt(tagsIn(room) ? typingTag(e.target.value, caret) : null);
-                setHi(0);
-              }}
-              onPaste={(e) => {
-                const pasted = [...e.clipboardData.files];
-                if (pasted.length) {
-                  e.preventDefault();
-                  addFiles(pasted);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (offers.length) {
-                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setHi((h) => (h + (e.key === "ArrowDown" ? 1 : offers.length - 1)) % offers.length);
-                    return;
-                  }
-                  if (e.key === "Enter" || e.key === "Tab") {
-                    e.preventDefault();
-                    if (offers[chosen]) pickOffer(offers[chosen]);
-                    return;
-                  }
-                  if (e.key === "Escape") {
-                    e.stopPropagation();
-                    setDealAt(null);
-                    setTagAt(null);
-                    return;
-                  }
-                }
-                if (e.key === "Escape" && answering) {
-                  e.stopPropagation();
-                  setReplying(null);
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-              placeholder={channel ? `Message ${channel.label} (@ to tag, # for a deal)` : `Message ${nameOf(other ?? "")}`}
-              aria-label="Your message"
-              className="max-h-40 min-h-[2.75rem] w-full min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2.5 text-left text-sm outline-none [field-sizing:content] placeholder:text-muted"
-            />
-            <div className="mb-1.5">
-              <DictateButton
-                label="Speak your message"
-                onHearing={setHeard}
-                onWords={(w) => setText((t) => withSpoken(t, w).slice(0, TEAM_LINE_MAX))}
+            {(files.length > 0 || deals.length > 0) && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {deals.map((d) => (
+                  <span
+                    key={d.id}
+                    className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-canvas py-1 pl-2.5 pr-1 text-xs"
+                  >
+                    <SquareKanban className="size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    <span className="truncate">{d.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setDeals(deals.filter((x) => x.id !== d.id))}
+                      aria-label={`Take off ${d.name}`}
+                      className="rounded-full p-0.5 text-muted hover:text-ink"
+                    >
+                      <X className="size-3" aria-hidden />
+                    </button>
+                  </span>
+                ))}
+                {files.map((f, i) => (
+                  <span key={i} className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-canvas py-1 pl-2.5 pr-1 text-xs">
+                    <FileText className="size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    <span className="truncate">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                      aria-label={`Take off ${f.name}`}
+                      className="rounded-full p-0.5 text-muted hover:text-ink"
+                    >
+                      <X className="size-3" aria-hidden />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="relative flex items-end gap-1.5 rounded-2xl bg-canvas px-1.5 ring-1 ring-line focus-within:ring-sun-line">
+              <input
+                ref={picker}
+                type="file"
+                multiple
+                accept={TEAM_FILE_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  addFiles([...(e.target.files ?? [])]);
+                  e.target.value = "";
+                }}
               />
-            </div>
-            <button
-              type="submit"
-              disabled={sending || (!text.trim() && !files.length && !deals.length)}
-              aria-label="Send"
-              className="mb-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="size-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
+              <button
+                type="button"
+                onClick={() => picker.current?.click()}
+                aria-label="Send a file or picture"
+                title="Send a file or picture (or paste a screenshot, or drop files here)"
+                className="mb-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
               >
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            </button>
-          </div>
-        </form>
+                <Paperclip className="size-4" aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmojis(!emojis)}
+                aria-label="Add an emoji"
+                aria-expanded={emojis}
+                className="mb-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
+              >
+                <SmilePlus className="size-4" aria-hidden />
+              </button>
+              {emojis && (
+                <div className="absolute bottom-full left-0 z-20 mb-2">
+                  <EmojiGrid
+                    onPick={(e) => {
+                      setText((t) => (t + e).slice(0, TEAM_LINE_MAX));
+                      box.current?.focus();
+                    }}
+                    onClose={() => setEmojis(false)}
+                  />
+                </div>
+              )}
+              <textarea
+                ref={box}
+                value={heard ? withSpoken(text, heard) : text}
+                rows={1}
+                maxLength={TEAM_LINE_MAX}
+                onChange={(e) => {
+                  const caret = e.target.selectionStart ?? e.target.value.length;
+                  setText(e.target.value);
+                  setDealAt(typingDeal(e.target.value, caret));
+                  setTagAt(tagsIn(room) ? typingTag(e.target.value, caret) : null);
+                  setHi(0);
+                }}
+                onPaste={(e) => {
+                  const pasted = [...e.clipboardData.files];
+                  if (pasted.length) {
+                    e.preventDefault();
+                    addFiles(pasted);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (offers.length) {
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setHi((h) => (h + (e.key === "ArrowDown" ? 1 : offers.length - 1)) % offers.length);
+                      return;
+                    }
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault();
+                      if (offers[chosen]) pickOffer(offers[chosen]);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.stopPropagation();
+                      setDealAt(null);
+                      setTagAt(null);
+                      return;
+                    }
+                  }
+                  if (e.key === "Escape" && answering) {
+                    e.stopPropagation();
+                    setReplying(null);
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+                placeholder={channel ? `Message ${channel.label} (@ to tag, # for a deal)` : `Message ${nameOf(other ?? "")}`}
+                aria-label="Your message"
+                className="max-h-40 min-h-[2.75rem] w-full min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2.5 text-left text-sm outline-none [field-sizing:content] placeholder:text-muted"
+              />
+              <div className="mb-1.5">
+                <DictateButton
+                  label="Speak your message"
+                  onHearing={setHeard}
+                  onWords={(w) => setText((t) => withSpoken(t, w).slice(0, TEAM_LINE_MAX))}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={sending || (!text.trim() && !files.length && !deals.length)}
+                aria-label="Send"
+                className="mb-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="size-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M12 19V5M5 12l7-7 7 7" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </MemberPhotos.Provider>
   );
 }
 
@@ -1141,6 +1163,8 @@ function ActionCard(props: {
   onDone: () => void;
   onError: (m: string) => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const { action } = props;
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState("");
@@ -1149,18 +1173,18 @@ function ActionCard(props: {
     const r = await pressSolAction(props.lineId, how);
     setBusy(false);
     if (!r.ok) return props.onError(r.message);
-    setSaid(how === "do" ? r.words || actionDoneWords(action) : "Left as it was.");
+    setSaid(how === "do" ? r.words || actionDoneWords(action, stageNames) : "Left as it was.");
     props.onDone();
   };
   const settled = action.done ?? action.dismissed;
   const notYours = actionNotYours(action, props.me, { costs: props.seesCosts });
   return (
     <div className="mt-1 w-full max-w-[85%] rounded-2xl bg-surface p-3 text-sm ring-1 ring-sun-line/40">
-      <p className="font-medium text-ink">{actionQuestion(action)}</p>
+      <p className="font-medium text-ink">{actionQuestion(action, stageNames)}</p>
       {settled ? (
         <p className="mt-1 flex items-center gap-1 text-xs text-muted">
           {action.done ? <Check className="size-3.5 text-sun-line" aria-hidden /> : <X className="size-3.5" aria-hidden />}
-          {action.done ? actionDoneWords(action) : "Left as it was"} · {nameOf(settled.by)}
+          {action.done ? actionDoneWords(action, stageNames) : "Left as it was"} · {nameOf(settled.by)}
         </p>
       ) : said ? (
         <p className="mt-1 text-xs text-muted">{said}</p>
@@ -1223,18 +1247,82 @@ function CatchUpCard({ summary, onClose }: { summary: CatchUp; onClose: () => vo
   );
 }
 
-function Round({ email, small = false }: { email: string; small?: boolean }) {
+function Round({ email, small = false, tinted = false }: { email: string; small?: boolean; tinted?: boolean }) {
+  // A member's own profile photo where they have one (member-avatar.tsx); tinted: their initials on a colour of their
+  // own in Direct messages (21 Nov 2026, Martin), else on the graphite as before.
+  if (email === SOL_BY)
+    return (
+      <span className={clsx("flex shrink-0 items-center justify-center rounded-full bg-primary", small ? "size-5" : "size-7")} aria-hidden>
+        <SolBadge className={small ? "size-3.5" : "size-[18px]"} />
+      </span>
+    );
   return (
-    <span
-      className={clsx(
-        "flex shrink-0 items-center justify-center rounded-full font-semibold",
-        small ? "size-5 text-[9px]" : "size-7 text-[11px]",
-        email === SOL_BY ? "bg-primary" : "bg-primary text-white",
+    <MemberAvatar
+      email={email}
+      plain={!tinted}
+      className={tinted ? "size-7 text-[10.5px] ring-2 ring-surface" : small ? "size-5 text-[9px]" : "size-7 text-[11px]"}
+    />
+  );
+}
+
+/**
+ * The big + at the foot of the conversations (21 Nov 2026, Martin: "a big + icon in the bottom left or right… which
+ * allows us to start a new dm with someone, or a chat with sol, or a channel"). Opens a small menu upward; Message
+ * someone lists the people in the business, with Add someone new at its foot.
+ */
+function NewChatButton(props: { sol: boolean; onMessage: () => void; onChannel: () => void; onSol: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  const pick = (go: () => void) => {
+    setOpen(false);
+    go();
+  };
+  const row = "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink hover:bg-canvas";
+  return (
+    <div ref={box} className="relative shrink-0 px-3 pb-3 pt-2">
+      {open && (
+        <div role="menu" className="absolute bottom-full left-3 z-20 mb-1 w-56 rounded-xl bg-surface p-1.5 shadow-lg ring-1 ring-line">
+          <button type="button" role="menuitem" className={row} onClick={() => pick(props.onMessage)}>
+            <AtSign className="size-4 text-muted" aria-hidden />
+            Message someone
+          </button>
+          {props.sol && (
+            <button type="button" role="menuitem" className={row} onClick={() => pick(props.onSol)}>
+              <SolBadge className="size-4" />
+              New chat with Sol
+            </button>
+          )}
+          <button type="button" role="menuitem" className={row} onClick={() => pick(props.onChannel)}>
+            <Hash className="size-4 text-muted" aria-hidden />
+            New channel
+          </button>
+        </div>
       )}
-      aria-hidden
-    >
-      {email === SOL_BY ? <SolBadge className={small ? "size-3.5" : "size-[18px]"} /> : initialsOf(email)}
-    </span>
+      <button
+        type="button"
+        aria-label="Start a new conversation"
+        title="Message someone, chat with Sol or start a channel"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "flex size-11 items-center justify-center rounded-full text-white shadow-md transition",
+          open ? "bg-primary" : "bg-sun-line hover:brightness-105",
+        )}
+      >
+        {open ? <X className="size-5" aria-hidden /> : <Plus className="size-6" strokeWidth={2.4} aria-hidden />}
+      </button>
+    </div>
   );
 }
 
@@ -1259,6 +1347,9 @@ function ListHead(props: { label: string; plus: string; on: boolean; onPlus: () 
     </p>
   );
 }
+
+/** No one's photo known yet (one object, so the provider's value doesn't change every render). */
+const NO_PHOTOS: Record<string, number> = {};
 
 const ADD_BOX =
   "w-full rounded-lg bg-surface px-2 py-1 text-[12.5px] text-ink ring-1 ring-line focus:outline-none focus:ring-2 focus:ring-sun-line";
@@ -1309,71 +1400,58 @@ function AddChannel(props: { onAdded: (id: string) => void; onClose: () => void 
 }
 
 /**
- * Someone new to message: everyone already in the business is listed under Direct messages, so this adds a person to
- * the business (the owner's to do, as on Your account), then opens the conversation with them.
+ * Someone to message (21 Nov 2026, Martin: the + by Direct messages asked to add a person to the business as a user or
+ * admin, "that's not what we want in chat"): a search over the people already in the business; a press opens the
+ * conversation. Adding people to the business is Settings → Users, not chat.
  */
-function AddPerson(props: { mayAdd: boolean; onAdded: (email: string) => void; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [level, setLevel] = useState<TeamLevel>("user");
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState("");
-  const who = email.trim().toLowerCase();
-  const valid = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(who);
-  if (!props.mayAdd)
-    return (
-      <p className="px-3 pb-1.5 text-xs text-muted">
-        Everyone in your business is listed here. Only the owner can add someone new, under Your account.
-      </p>
-    );
-  const add = async () => {
-    if (!valid || busy) return;
-    setBusy(true);
-    const made = await addMember(who);
-    const set = made.problem ? made : await setMemberPermissions(who, levelPermissions(level));
-    setBusy(false);
-    if (made.problem) return setProblem(made.problem);
-    if (set.problem) setProblem(set.problem);
-    props.onAdded(who);
-  };
+function PickPerson(props: {
+  people: { room: string; label: string; email: string }[];
+  onPick: (room: string) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = props.people.filter((p) => words.every((w) => `${p.label} ${p.email}`.toLowerCase().includes(w)));
   return (
     <div className="px-2 pb-1.5">
-      <input
-        autoFocus
-        type="email"
-        value={email}
-        onChange={(e) => {
-          setEmail(e.target.value);
-          setProblem("");
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") props.onClose();
-          if (e.key === "Enter") void add();
-        }}
-        aria-label="Their email address"
-        placeholder="Their email"
-        className={ADD_BOX}
-      />
-      <div className="mt-1.5 flex items-center gap-1.5">
-        <select
-          value={level}
-          onChange={(e) => setLevel(e.target.value as TeamLevel)}
-          aria-label="What they can do"
-          title={TEAM_LEVELS.find((l) => l.level === level)?.about}
-          className={clsx(ADD_BOX, "min-w-0 flex-1")}
-        >
-          {TEAM_LEVELS.map((l) => (
-            <option key={l.level} value={l.level}>
-              {l.label}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={() => void add()} disabled={!valid || busy} className={ADD_GO}>
-          {busy ? "Adding…" : "Add"}
-        </button>
+      {props.people.length > 0 && (
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") props.onClose();
+            if (e.key === "Enter" && shown[0]) props.onPick(shown[0].room);
+          }}
+          aria-label="Who to message"
+          placeholder="Who to message"
+          className={ADD_BOX}
+        />
+      )}
+      <div className="mt-1 max-h-48 overflow-y-auto">
+        {shown.map((p) => (
+          <button
+            key={p.room}
+            type="button"
+            title={p.email}
+            onClick={() => props.onPick(p.room)}
+            className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-surface"
+          >
+            <Round email={p.email} tinted />
+            <span className="truncate">{p.label}</span>
+          </button>
+        ))}
+        {props.people.length > 0 && shown.length === 0 && <p className="px-1.5 py-1 text-[11px] text-muted">No one by that name.</p>}
       </div>
-      <p className={clsx("px-1 pt-1 text-[11px]", problem ? "text-danger" : "text-muted")}>
-        {problem || "Adds them to your business as a user on your plan. They sign in with this email; nothing is sent to them."}
-      </p>
+      {props.people.length === 0 && (
+        <p className="px-1 pt-1 text-[11px] text-muted">
+          No one else is in the business yet.{" "}
+          <Link href="/design/settings/users" className="underline hover:text-ink">
+            Add people in Settings
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }

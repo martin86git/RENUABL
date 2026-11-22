@@ -1,10 +1,10 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CornerDownLeft, Phone, Search, SquareKanban, UserRound } from "lucide-react";
 import clsx from "clsx";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { PHONE_FROM, digitsOf, looksLikePhone, looksLikeQuestion, matches } from "@/lib/domain/design/find";
 import { listCustomers, listJobs, type CustomerLine, type JobLine } from "@/lib/services/crm";
 import { SOL_ASK } from "@/lib/services/sol";
@@ -26,6 +26,8 @@ interface Hit {
  * asked. Arrows and Enter choose. The business's customers and deals are read once when it opens.
  */
 export function PageSearch(props: { open: boolean; onClose: () => void; customer: (id: string) => string; deal: (id: string) => string }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
   const router = useRouter();
   const [q, setQ] = useState("");
   const [at, setAt] = useState(0);
@@ -76,7 +78,7 @@ export function PageSearch(props: { open: boolean; onClose: () => void; customer
               key: `d:${j.id}`,
               kind: "deal" as const,
               title: `${j.customerName} · ${j.title}`,
-              line: [STAGE_LABELS[j.stage], j.address].filter(Boolean).join(" · "),
+              line: [stageWords(j), j.address].filter(Boolean).join(" · "),
               href: props.deal(j.id),
             })),
         ];

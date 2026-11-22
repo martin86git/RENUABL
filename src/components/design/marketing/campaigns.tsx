@@ -229,16 +229,24 @@ export function CampaignEditor({ id }: { id: string }) {
   const changed = () => setSaved("unsaved");
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link href="/design/marketing/campaigns" className="text-[13px] text-muted hover:text-ink">
-          ← Campaigns
+    <div className="space-y-4">
+      {/* One row: back, the campaign's name, where it stands and what can be done with it. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Link href="/design/marketing/campaigns" className="text-[13px] text-muted hover:text-ink" aria-label="Back to campaigns">
+          ←
         </Link>
+        <input
+          value={name}
+          disabled={!draft}
+          onChange={(e) => (setName(e.target.value), changed())}
+          aria-label="Campaign name"
+          className="min-w-0 flex-1 basis-64 rounded-md bg-transparent px-1 py-0.5 text-[18px] font-semibold tracking-tight outline-none hover:bg-surface focus:bg-surface"
+        />
         <StateBadge state={c.status} />
         {draft && (
           <span className="text-[12px] text-muted">{saved === "saved" ? "Saved" : saved === "saving" ? "Saving…" : "Not saved yet"}</span>
         )}
-        <span className="ml-auto flex gap-2">
+        <span className="flex gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -265,19 +273,9 @@ export function CampaignEditor({ id }: { id: string }) {
         </span>
       </div>
 
-      <input
-        value={name}
-        disabled={!draft}
-        onChange={(e) => (setName(e.target.value), changed())}
-        aria-label="Campaign name"
-        className="w-full bg-transparent text-[22px] font-semibold tracking-tight outline-none"
-      />
-
       {c.status !== "draft" && <ReportStrip counts={c.counts} />}
 
-      <div className={box}>
-        <EdmBuilder content={content} brand={brand} sender={sender} readOnly={!draft} onChange={(next) => (setContent(next), changed())} />
-      </div>
+      <EdmBuilder content={content} brand={brand} sender={sender} readOnly={!draft} onChange={(next) => (setContent(next), changed())} />
 
       {draft ? (
         <SendPanel

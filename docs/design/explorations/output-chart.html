@@ -1,148 +1,433 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>What it makes · exploration</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-<style>
-  :root { --ink: #0b0b0c; --muted: #8a8a90; --line: #ececef; --sun: #ff5a1f; --sun2: #ffb23f; --use: #0b0b0c; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: #f5f5f7; font-family: Inter, system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
-  .page { max-width: 880px; margin: 0 auto; padding: 56px 20px; }
-  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
-  .card { margin-top: 18px; background: #fff; border-radius: 28px; padding: 36px 40px 32px; box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 20px 60px rgba(0,0,0,.05); }
-  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
-  .hero { font-size: 64px; font-weight: 300; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
-  .hero small { font-size: 22px; font-weight: 400; letter-spacing: -0.01em; color: var(--muted); margin-left: 6px; }
-  .sub { margin-top: 10px; font-size: 15px; color: var(--muted); min-height: 22px; transition: opacity .25s; }
-  .sub b { color: var(--ink); font-weight: 500; }
-  .seg { display: inline-flex; background: #f0f0f3; border-radius: 999px; padding: 3px; }
-  .seg button { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: var(--muted); padding: 7px 14px; border-radius: 999px; cursor: pointer; transition: all .25s; }
-  .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-  .chart { position: relative; margin-top: 34px; height: 240px; display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; gap: 0; }
-  .col { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; cursor: pointer; }
-  .bar { width: 18px; border-radius: 999px; background: linear-gradient(to top, var(--sun), var(--sun2)); transform-origin: bottom; transform: scaleY(0); transition: transform .9s cubic-bezier(.2,.9,.25,1.15), opacity .3s, width .3s; }
-  .ready .bar { transform: scaleY(1); }
-  .chart.picked .col:not(.on) .bar { opacity: .28; }
-  .col.on .bar { width: 22px; }
-  .usemark { position: absolute; width: 30px; height: 2px; border-radius: 2px; background: var(--use); opacity: 0; transition: opacity .4s, bottom .6s cubic-bezier(.2,.9,.25,1); }
-  .withuse .usemark { opacity: .85; }
-  .chart.picked.withuse .col:not(.on) .usemark { opacity: .25; }
-  .tip { position: absolute; bottom: 100%; margin-bottom: 10px; white-space: nowrap; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500; background: var(--ink); color: #fff; padding: 5px 9px; border-radius: 8px; opacity: 0; transform: translateY(4px); transition: all .25s; pointer-events: none; }
-  .col.on .tip { opacity: 1; transform: none; }
-  .months { display: grid; grid-template-columns: repeat(12, 1fr); margin-top: 14px; }
-  .months span { text-align: center; font-size: 12px; color: var(--muted); font-weight: 500; transition: color .25s; }
-  .months span.on { color: var(--ink); }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 32px; border-top: 1px solid var(--line); }
-  .stat { padding: 20px 0 0; }
-  .stat + .stat { padding-left: 24px; border-left: 1px solid var(--line); }
-  .stat .k { font-size: 12px; color: var(--muted); }
-  .stat .v { margin-top: 6px; font-size: 26px; font-weight: 400; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-  .stat .v small { font-size: 13px; color: var(--muted); margin-left: 3px; }
-  .ring { display: inline-block; width: 22px; height: 22px; vertical-align: -3px; margin-right: 8px; }
-  .legend { display: flex; gap: 18px; margin-top: 18px; font-size: 12px; color: var(--muted); opacity: 0; transition: opacity .4s; }
-  .withuse ~ .legend, .legend.show { opacity: 1; }
-  .legend i { display: inline-block; vertical-align: middle; margin-right: 6px; }
-  .note { margin-top: 22px; font-size: 12.5px; color: var(--muted); }
-  @media (max-width: 600px) { .card { padding: 26px 20px; } .hero { font-size: 46px; } .bar { width: 12px; } .col.on .bar { width: 15px; } .usemark { width: 20px; } .stats { grid-template-columns: 1fr; } .stat + .stat { padding-left: 0; border-left: 0; } }
-  @media (prefers-reduced-motion: reduce) { .bar, .usemark, .tip { transition: none; } }
-</style>
-</head>
-<body>
-<div class="page">
-  <div class="eyebrow">What it makes</div>
-  <div class="card" id="card">
-    <div class="top">
-      <div>
-        <div class="hero" id="hero">9,971<small>kWh a year</small></div>
-        <div class="sub" id="sub">About <b>27 kWh</b> on an average day. Tap a month.</div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>What it makes · exploration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #0b0b0c;
+        --muted: #8a8a90;
+        --line: #ececef;
+        --sun: #ff5a1f;
+        --sun2: #ffb23f;
+        --use: #0b0b0c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f5f5f7;
+        font-family: Inter, system-ui, sans-serif;
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+      .page {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 56px 20px;
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .card {
+        margin-top: 18px;
+        background: #fff;
+        border-radius: 28px;
+        padding: 36px 40px 32px;
+        box-shadow:
+          0 1px 2px rgba(0, 0, 0, 0.04),
+          0 20px 60px rgba(0, 0, 0, 0.05);
+      }
+      .top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      .hero {
+        font-size: 64px;
+        font-weight: 300;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+      .hero small {
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: -0.01em;
+        color: var(--muted);
+        margin-left: 6px;
+      }
+      .sub {
+        margin-top: 10px;
+        font-size: 15px;
+        color: var(--muted);
+        min-height: 22px;
+        transition: opacity 0.25s;
+      }
+      .sub b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .seg {
+        display: inline-flex;
+        background: #f0f0f3;
+        border-radius: 999px;
+        padding: 3px;
+      }
+      .seg button {
+        border: 0;
+        background: transparent;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--muted);
+        padding: 7px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: all 0.25s;
+      }
+      .seg button[aria-pressed="true"] {
+        background: #fff;
+        color: var(--ink);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+      }
+      .chart {
+        position: relative;
+        margin-top: 34px;
+        height: 240px;
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        align-items: end;
+        gap: 0;
+      }
+      .col {
+        position: relative;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        cursor: pointer;
+      }
+      .bar {
+        width: 18px;
+        border-radius: 999px;
+        background: linear-gradient(to top, var(--sun), var(--sun2));
+        transform-origin: bottom;
+        transform: scaleY(0);
+        transition:
+          transform 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.15),
+          opacity 0.3s,
+          width 0.3s;
+      }
+      .ready .bar {
+        transform: scaleY(1);
+      }
+      .chart.picked .col:not(.on) .bar {
+        opacity: 0.28;
+      }
+      .col.on .bar {
+        width: 22px;
+      }
+      .usemark {
+        position: absolute;
+        width: 30px;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--use);
+        opacity: 0;
+        transition:
+          opacity 0.4s,
+          bottom 0.6s cubic-bezier(0.2, 0.9, 0.25, 1);
+      }
+      .withuse .usemark {
+        opacity: 0.85;
+      }
+      .chart.picked.withuse .col:not(.on) .usemark {
+        opacity: 0.25;
+      }
+      .tip {
+        position: absolute;
+        bottom: 100%;
+        margin-bottom: 10px;
+        white-space: nowrap;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--ink);
+        color: #fff;
+        padding: 5px 9px;
+        border-radius: 8px;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: all 0.25s;
+        pointer-events: none;
+      }
+      .col.on .tip {
+        opacity: 1;
+        transform: none;
+      }
+      .months {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        margin-top: 14px;
+      }
+      .months span {
+        text-align: center;
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 500;
+        transition: color 0.25s;
+      }
+      .months span.on {
+        color: var(--ink);
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 32px;
+        border-top: 1px solid var(--line);
+      }
+      .stat {
+        padding: 20px 0 0;
+      }
+      .stat + .stat {
+        padding-left: 24px;
+        border-left: 1px solid var(--line);
+      }
+      .stat .k {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .stat .v {
+        margin-top: 6px;
+        font-size: 26px;
+        font-weight: 400;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat .v small {
+        font-size: 13px;
+        color: var(--muted);
+        margin-left: 3px;
+      }
+      .ring {
+        display: inline-block;
+        width: 22px;
+        height: 22px;
+        vertical-align: -3px;
+        margin-right: 8px;
+      }
+      .legend {
+        display: flex;
+        gap: 18px;
+        margin-top: 18px;
+        font-size: 12px;
+        color: var(--muted);
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+      .withuse ~ .legend,
+      .legend.show {
+        opacity: 1;
+      }
+      .legend i {
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+      .note {
+        margin-top: 22px;
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      @media (max-width: 600px) {
+        .card {
+          padding: 26px 20px;
+        }
+        .hero {
+          font-size: 46px;
+        }
+        .bar {
+          width: 12px;
+        }
+        .col.on .bar {
+          width: 15px;
+        }
+        .usemark {
+          width: 20px;
+        }
+        .stats {
+          grid-template-columns: 1fr;
+        }
+        .stat + .stat {
+          padding-left: 0;
+          border-left: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bar,
+        .usemark,
+        .tip {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="eyebrow">What it makes</div>
+      <div class="card" id="card">
+        <div class="top">
+          <div>
+            <div class="hero" id="hero">9,971<small>kWh a year</small></div>
+            <div class="sub" id="sub">About <b>27 kWh</b> on an average day. Tap a month.</div>
+          </div>
+          <div class="seg" role="group" aria-label="Show">
+            <button type="button" aria-pressed="true" data-v="out">Output</button>
+            <button type="button" aria-pressed="false" data-v="use">With your use</button>
+          </div>
+        </div>
+        <div class="chart" id="chart"></div>
+        <div class="months" id="months"></div>
+        <div class="legend" id="legend">
+          <span
+            ><i style="width: 10px; height: 10px; border-radius: 99px; background: linear-gradient(var(--sun2), var(--sun))"></i>Solar
+            made</span
+          >
+          <span><i style="width: 16px; height: 2px; background: var(--ink)"></i>What your home uses</span>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="k">Sunniest month</div>
+            <div class="v" id="best"></div>
+          </div>
+          <div class="stat">
+            <div class="k">Darkest month</div>
+            <div class="v" id="worst"></div>
+          </div>
+          <div class="stat">
+            <div class="k">Of your year's use</div>
+            <div class="v" id="cover"></div>
+          </div>
+        </div>
+        <div class="note">An estimate from a long-run sunshine record for each panel's tilt and direction. It leaves out shade.</div>
       </div>
-      <div class="seg" role="group" aria-label="Show">
-        <button type="button" aria-pressed="true" data-v="out">Output</button>
-        <button type="button" aria-pressed="false" data-v="use">With your use</button>
-      </div>
     </div>
-    <div class="chart" id="chart"></div>
-    <div class="months" id="months"></div>
-    <div class="legend" id="legend">
-      <span><i style="width:10px;height:10px;border-radius:99px;background:linear-gradient(var(--sun2),var(--sun))"></i>Solar made</span>
-      <span><i style="width:16px;height:2px;background:var(--ink)"></i>What your home uses</span>
-    </div>
-    <div class="stats">
-      <div class="stat"><div class="k">Sunniest month</div><div class="v" id="best"></div></div>
-      <div class="stat"><div class="k">Darkest month</div><div class="v" id="worst"></div></div>
-      <div class="stat"><div class="k">Of your year's use</div><div class="v" id="cover"></div></div>
-    </div>
-    <div class="note">An estimate from a long-run sunshine record for each panel's tilt and direction. It leaves out shade.</div>
-  </div>
-</div>
-<script>
-  const NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-  const DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
-  const shape = [1,.99,.96,.72,.55,.44,.47,.58,.74,.95,1,1];
-  const total = 9971, sum = shape.reduce((a,b)=>a+b,0);
-  const make = shape.map(s => Math.round(s / sum * total));
-  const useShape = [.92,.86,.9,.96,1.06,1.16,1.18,1.12,1,.94,.9,.92];
-  const useTotal = 7200, us = useShape.reduce((a,b)=>a+b,0);
-  const use = useShape.map(s => Math.round(s / us * useTotal));
-  const max = Math.max(...make, ...use) * 1.08;
-  const fmt = n => n.toLocaleString("en-AU");
-  const chart = document.getElementById("chart"), months = document.getElementById("months"), card = document.getElementById("card");
-  let picked = null, withUse = false;
+    <script>
+      const NAMES = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+      const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      const shape = [1, 0.99, 0.96, 0.72, 0.55, 0.44, 0.47, 0.58, 0.74, 0.95, 1, 1];
+      const total = 9971,
+        sum = shape.reduce((a, b) => a + b, 0);
+      const make = shape.map((s) => Math.round((s / sum) * total));
+      const useShape = [0.92, 0.86, 0.9, 0.96, 1.06, 1.16, 1.18, 1.12, 1, 0.94, 0.9, 0.92];
+      const useTotal = 7200,
+        us = useShape.reduce((a, b) => a + b, 0);
+      const use = useShape.map((s) => Math.round((s / us) * useTotal));
+      const max = Math.max(...make, ...use) * 1.08;
+      const fmt = (n) => n.toLocaleString("en-AU");
+      const chart = document.getElementById("chart"),
+        months = document.getElementById("months"),
+        card = document.getElementById("card");
+      let picked = null,
+        withUse = false;
 
-  make.forEach((m, i) => {
-    const col = document.createElement("div");
-    col.className = "col";
-    col.innerHTML = `<div class="tip">${fmt(m)} kWh</div><div class="usemark" style="bottom:${use[i]/max*100}%"></div><div class="bar" style="height:${m/max*100}%;transition-delay:${i*45}ms"></div>`;
-    col.onclick = () => pick(picked === i ? null : i);
-    col.onmouseenter = () => matchMedia("(hover:hover)").matches && pick(i);
-    chart.appendChild(col);
-    const l = document.createElement("span"); l.textContent = NAMES[i][0]; months.appendChild(l);
-  });
-  chart.onmouseleave = () => matchMedia("(hover:hover)").matches && pick(null);
+      make.forEach((m, i) => {
+        const col = document.createElement("div");
+        col.className = "col";
+        col.innerHTML = `<div class="tip">${fmt(m)} kWh</div><div class="usemark" style="bottom:${(use[i] / max) * 100}%"></div><div class="bar" style="height:${(m / max) * 100}%;transition-delay:${i * 45}ms"></div>`;
+        col.onclick = () => pick(picked === i ? null : i);
+        col.onmouseenter = () => matchMedia("(hover:hover)").matches && pick(i);
+        chart.appendChild(col);
+        const l = document.createElement("span");
+        l.textContent = NAMES[i][0];
+        months.appendChild(l);
+      });
+      chart.onmouseleave = () => matchMedia("(hover:hover)").matches && pick(null);
 
-  const hero = document.getElementById("hero"), sub = document.getElementById("sub");
-  function count(to) {
-    const from = Number(hero.dataset.n || 0); hero.dataset.n = to;
-    const t0 = performance.now();
-    const step = t => { const k = Math.min(1, (t - t0) / 450), e = 1 - Math.pow(1 - k, 3);
-      hero.firstChild.nodeValue = fmt(Math.round(from + (to - from) * e)); if (k < 1) requestAnimationFrame(step); };
-    requestAnimationFrame(step);
-  }
-  function pick(i) {
-    picked = i;
-    chart.classList.toggle("picked", i !== null);
-    [...chart.children].forEach((c, k) => c.classList.toggle("on", k === i));
-    [...months.children].forEach((c, k) => c.classList.toggle("on", k === i));
-    if (i === null) {
+      const hero = document.getElementById("hero"),
+        sub = document.getElementById("sub");
+      function count(to) {
+        const from = Number(hero.dataset.n || 0);
+        hero.dataset.n = to;
+        const t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 450),
+            e = 1 - Math.pow(1 - k, 3);
+          hero.firstChild.nodeValue = fmt(Math.round(from + (to - from) * e));
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+      function pick(i) {
+        picked = i;
+        chart.classList.toggle("picked", i !== null);
+        [...chart.children].forEach((c, k) => c.classList.toggle("on", k === i));
+        [...months.children].forEach((c, k) => c.classList.toggle("on", k === i));
+        if (i === null) {
+          count(total);
+          hero.lastChild.textContent = "kWh a year";
+          sub.innerHTML = withUse
+            ? `Your home uses about <b>${fmt(useTotal)} kWh</b> a year.`
+            : `About <b>${Math.round(total / 365)} kWh</b> on an average day. Tap a month.`;
+          return;
+        }
+        count(make[i]);
+        hero.lastChild.textContent = `kWh in ${NAMES[i]}`;
+        const day = Math.round(make[i] / DAYS[i]),
+          gap = make[i] - use[i];
+        sub.innerHTML = withUse
+          ? gap >= 0
+            ? `About <b>${fmt(gap)} kWh</b> more than your home uses. The rest is exported.`
+            : `About <b>${fmt(-gap)} kWh</b> short of what your home uses. That comes from the grid.`
+          : `About <b>${day} kWh</b> a day.`;
+      }
+      document.querySelectorAll(".seg button").forEach(
+        (b) =>
+          (b.onclick = () => {
+            withUse = b.dataset.v === "use";
+            document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+            chart.classList.toggle("withuse", withUse);
+            document.getElementById("legend").classList.toggle("show", withUse);
+            pick(picked);
+          }),
+      );
+      const best = make.indexOf(Math.max(...make)),
+        worst = make.indexOf(Math.min(...make));
+      document.getElementById("best").innerHTML = `${NAMES[best]}<small>${Math.round(make[best] / DAYS[best])} kWh a day</small>`;
+      document.getElementById("worst").innerHTML = `${NAMES[worst]}<small>${Math.round(make[worst] / DAYS[worst])} kWh a day</small>`;
+      const covered = make.reduce((a, m, i) => a + Math.min(m, use[i]) * 0.55, 0);
+      document.getElementById("cover").innerHTML = `${Math.round((covered / useTotal) * 100)}%<small>from the roof</small>`;
+      hero.dataset.n = 0;
       count(total);
-      hero.lastChild.textContent = "kWh a year";
-      sub.innerHTML = withUse ? `Your home uses about <b>${fmt(useTotal)} kWh</b> a year.` : `About <b>${Math.round(total/365)} kWh</b> on an average day. Tap a month.`;
-      return;
-    }
-    count(make[i]);
-    hero.lastChild.textContent = `kWh in ${NAMES[i]}`;
-    const day = Math.round(make[i] / DAYS[i]), gap = make[i] - use[i];
-    sub.innerHTML = withUse
-      ? (gap >= 0 ? `About <b>${fmt(gap)} kWh</b> more than your home uses. The rest is exported.` : `About <b>${fmt(-gap)} kWh</b> short of what your home uses. That comes from the grid.`)
-      : `About <b>${day} kWh</b> a day.`;
-  }
-  document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
-    withUse = b.dataset.v === "use";
-    document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b));
-    chart.classList.toggle("withuse", withUse);
-    document.getElementById("legend").classList.toggle("show", withUse);
-    pick(picked);
-  });
-  const best = make.indexOf(Math.max(...make)), worst = make.indexOf(Math.min(...make));
-  document.getElementById("best").innerHTML = `${NAMES[best]}<small>${Math.round(make[best]/DAYS[best])} kWh a day</small>`;
-  document.getElementById("worst").innerHTML = `${NAMES[worst]}<small>${Math.round(make[worst]/DAYS[worst])} kWh a day</small>`;
-  const covered = make.reduce((a, m, i) => a + Math.min(m, use[i]) * 0.55, 0);
-  document.getElementById("cover").innerHTML = `${Math.round(covered / useTotal * 100)}%<small>from the roof</small>`;
-  hero.dataset.n = 0; count(total);
-  requestAnimationFrame(() => requestAnimationFrame(() => chart.classList.add("ready")));
-</script>
-</body>
+      requestAnimationFrame(() => requestAnimationFrame(() => chart.classList.add("ready")));
+    </script>
+  </body>
 </html>

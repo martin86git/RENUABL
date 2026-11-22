@@ -69,7 +69,7 @@ describe("datasheets found online", () => {
     };
     const checked = checkString({ panels: 10, panel, inverter, mppt: 0, sharing: 1 });
     expect(checked.verdict).toBe("caution");
-    expect(checked.words).toMatch(/found online/);
+    expect(checked.words).toMatch(/checked by your business/);
     expect(checkString({ panels: 10, panel: { ...panel, unchecked: undefined }, inverter, mppt: 0, sharing: 1 }).verdict).toBe("good");
   });
 });

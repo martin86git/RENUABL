@@ -70,6 +70,8 @@ export const metadata: Metadata = {
   robots: searchIndexing() ? undefined : { index: false, follow: false },
   openGraph: { type: "website", siteName: "RENUABL", locale: "en_AU" },
   twitter: { card: "summary_large_image" },
+  // Added to an iPhone's home screen, it opens full screen like an app (21 Nov 2026, Martin; manifest.ts).
+  appleWebApp: { capable: true, title: "RENUABL", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

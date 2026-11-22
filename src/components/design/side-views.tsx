@@ -19,7 +19,7 @@ const VIEWS = [
  * what stands on it and the walls. Opened from the picture's corner; each side asked for only when shown, through
  * RENUABL's server so Nearmap's key never reaches the browser.
  */
-export function SideViewsButton({ lat, lng, tab }: { lat: number; lng: number; tab?: boolean }) {
+export function SideViewsButton({ lat, lng, tab, icon }: { lat: number; lng: number; tab?: boolean; icon?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -27,14 +27,17 @@ export function SideViewsButton({ lat, lng, tab }: { lat: number; lng: number; t
         type="button"
         onClick={() => setOpen(true)}
         title="See the house from its four sides (Nearmap's angled photos)"
+        aria-label={icon ? "Sides: the house from its four sides" : undefined}
         className={
-          tab
-            ? "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-ink hover:bg-canvas"
-            : "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+          icon
+            ? "flex size-9 items-center justify-center rounded-full text-ink hover:bg-canvas"
+            : tab
+              ? "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-ink hover:bg-canvas"
+              : "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
         }
       >
-        <Rotate3d className={tab ? "size-4" : "size-3.5"} aria-hidden />
-        Sides
+        <Rotate3d className={tab || icon ? "size-4" : "size-3.5"} aria-hidden />
+        {!icon && "Sides"}
       </button>
       {/* On the page body: the picture's corner sits in a moved (transformed) part of the page. */}
       {open && createPortal(<SideViewsWindow lat={lat} lng={lng} onClose={() => setOpen(false)} />, document.body)}

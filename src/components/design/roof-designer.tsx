@@ -51,7 +51,6 @@ import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { CELLS_UP_TO } from "@/lib/domain/design/illustrated-roof";
 import { FlowLine, PanelArt, RoofArt, WallStrip, useRoofGhost, type ArtFace } from "./illustrated-roof";
-import { DayOverlay, HomeDayCard, useHomeDay } from "./home-day";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
@@ -71,6 +70,8 @@ import {
   Redo2,
   RotateCcw,
   Ruler,
+  Share,
+  Smartphone,
   SquarePlus,
   Save,
   Star,
@@ -85,7 +86,6 @@ import {
   Brush,
   House,
   Minus,
-  Sunrise,
   LayoutGrid,
   Radio,
   Send,
@@ -100,6 +100,7 @@ import {
   ChevronRight,
   Undo2,
   Zap,
+  Search,
   ZoomIn,
   ZoomOut,
   type LucideIcon,
@@ -143,15 +144,20 @@ import {
   type LiveStatus,
 } from "@/lib/services/live";
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
-import { SolIcon, SolMark, SolStars } from "./sol-icon";
+import { SolIcon, SolStars } from "./sol-icon";
+import { SolMark } from "./sol-sun";
+import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
+import { clashRefusal, clashWords, clashesWithSupply, supplyClashes } from "@/lib/domain/design/supply-match";
 import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
+import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
+import { arrayFrame, growArray, growCount, growHandles, type ArrayFrame, type GrowSide } from "@/lib/domain/design/array-grow";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
@@ -362,6 +368,7 @@ const SHORTCUTS: [keys: string, does: string][] = [
 import { KnifeMenu, ToolFan } from "./tool-fan";
 import { lotDoubt, registerWarning, titleCase, type NearbyHome, type PropertyLot } from "@/lib/domain/design/property-lot";
 import type { Address } from "@/lib/domain/types";
+import { HOME_SCREEN_LEAD, HOME_SCREEN_STEPS, phoneBrowserOf, type PhoneBrowser } from "@/lib/domain/design/home-screen";
 
 const GLASS = "rounded-2xl border border-line bg-surface/75 shadow-lift backdrop-blur-md backdrop-saturate-150";
 /**
@@ -399,8 +406,36 @@ const DIAL_STEPS: [step: number, at: number][] = [
 
 /** Narrower than this, the pop-up is a phone's: the picture across the screen, the controls in bands above and below it. */
 const PHONE_BELOW = 640;
-/** The bands on a phone: above the picture the kit, the tools and Publish; below it the picture's switch and Ask Sol, then the rail as a toolbar at the foot. */
-const PHONE_BANDS = { above: 214, below: 204, rail: 56 };
+/**
+ * A phone turned sideways (21 Nov 2026, Martin: "tilting the phone sideways and the designer fills the screen"): wider
+ * than it is tall and no taller than this. The pop-up is then the whole screen (globals.css, the same test) and the
+ * picture takes all the height under the figures.
+ */
+const SIDEWAYS_BELOW = 500;
+const TURN_HINT_KEY = "renuabl.design.turn-hint";
+const HOME_HINT_KEY = "renuabl.design.home-hint";
+const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
+/**
+ * The bands on a phone held upright (21 Nov 2026, Martin: the picture higher and longer, the tools on it). Above the
+ * picture only room for the top half of the kit, which sits on the picture's top edge; below it the toolbar hugging the
+ * picture's foot (`bar`: zoom, Roof, Sides, the picture's switch), then Ask Sol, then the rail as a toolbar at the foot.
+ */
+// Below: room for Sol's card under the picture (22 Nov 2026, Martin: "very squashed in"; the slimmer figures gave the map
+// the room to move up).
+const PHONE_BANDS = { above: 34, below: 156, rail: 0, bar: 0 };
+/**
+ * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
+ * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
+ */
+const PHONE_TALLEST = 1.4;
+/** How far the figures strip rises on a phone upright to meet the top of the screen: the window's padding and the page's. */
+const PHONE_STRIP_LIFT = 16;
+/** How much smaller the rail across the foot is drawn on a phone upright (its knife's sheet is drawn back up, tool-fan.tsx). */
+const PHONE_RAIL_ZOOM = 0.72;
+/** A phone upright opens one zoom press (1.4×) closer than the pop-up does, so the roof reads (21 Nov 2026, Martin). */
+const PHONE_ZOOM = 1.4;
+/** The view's size for a pinch: no closer than this many photo pixels across, no further out than the whole photo. */
+const PINCH_MIN_W = 40;
 
 /** What was read of a face's slope from Google's data, with the way to read it again. */
 /**
@@ -561,6 +596,10 @@ function Dial(props: {
   onRemove?: () => void;
   /** Graphite with an orange ring (as Primero's, for what is picked), in place of the light plate. */
   dark?: boolean;
+  /** On a phone, upright or sideways, drawn smaller from the picture's edge so it leaves the roof in view. */
+  small?: boolean;
+  /** On a phone upright: its size against the picture's (21 Nov 2026, Martin: in proportion with the map), and its middle down the picture. */
+  fit?: { scale: number; top: string };
   children: React.ReactNode;
 }) {
   // In rem: the dial's radius, and how far out from its centre (the middle of the picture's right edge) the rounds sit.
@@ -575,12 +614,18 @@ function Dial(props: {
     <div
       className={clsx(
         "absolute right-0 top-[56%] z-10 -translate-y-1/2 rounded-l-full border border-r-0 shadow-lift backdrop-blur-md",
+        props.small && !props.fit && "origin-right scale-[0.7]",
+        props.fit && "origin-right",
         // Black glass, as the menus over the picture (10 Nov 2026, Martin): the map shows through, softened.
         props.dark
           ? "border-sun-line bg-surface/75 text-white ring-2 ring-sun-line backdrop-saturate-150"
           : "border-line bg-surface/75 backdrop-saturate-150",
       )}
-      style={{ width: `${R}rem`, height: `${R * 2}rem` }}
+      style={{
+        width: `${R}rem`,
+        height: `${R * 2}rem`,
+        ...(props.fit ? { scale: String(props.fit.scale), top: props.fit.top } : {}),
+      }}
       role="group"
       aria-label={props.label}
     >
@@ -822,6 +867,8 @@ function RoofPitches(props: {
   onOpen: (open: boolean) => void;
   onPitch: (index: number, pitch: number) => void;
   onAdd: () => void;
+  /** On a phone upright: its middle down the stage, in the picture's own (zoomed) units, so it sits by the picture's middle. */
+  top?: string;
   onRemove: (index: number) => void;
   onNotFlat: () => void;
   /** What Nearmap's heights read for the home's roof, said beside the mark until put away. */
@@ -835,7 +882,7 @@ function RoofPitches(props: {
   const pitch = roofs[active] ?? 0;
   const several = roofs.length > 1;
   return (
-    <div className="absolute left-3 top-1/2 z-30 -translate-y-1/2">
+    <div className="absolute left-3 top-1/2 z-30 -translate-y-1/2" {...(props.top ? { style: { top: props.top, zoom: 0.68 } } : {})}>
       <div className="flex flex-col items-center gap-1.5">
         {roofs.map((p, i) => {
           const isFlat = i === 0 && flat;
@@ -1015,6 +1062,26 @@ const OPENED: typeof WHOLE = {
  * can't move at all while the whole picture is showing, so the hand did nothing). A roof near an edge can be dragged to
  * the middle, and at least half the view always shows the picture.
  */
+/**
+ * What a kept view shows on a picture of `across` width to height, the middle kept: wider than the photo, a band across
+ * it; taller (a phone held upright), a band down it.
+ */
+function shownView(kept: typeof WHOLE, across: number | null): typeof WHOLE {
+  const photo = ROOF_IMAGE.width / ROOF_IMAGE.height;
+  if (!across || Math.abs(across - photo) <= 0.01) return kept;
+  if (across > photo) {
+    const h = kept.w / across;
+    return { x: kept.x, w: kept.w, h, y: kept.y + (kept.h - h) / 2 };
+  }
+  const w = kept.h * across;
+  return { x: kept.x + (kept.w - w) / 2, w, h: kept.h, y: kept.y };
+}
+/** The kept view (the photo's shape) that shows `shown` on a picture of `across`: shownView turned round. */
+function keptFor(shown: typeof WHOLE, w: number, across: number | null): typeof WHOLE {
+  const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+  const cut = shownView({ x: 0, y: 0, w, h }, across);
+  return { x: shown.x - cut.x, y: shown.y - cut.y, w, h };
+}
 const within = (at: number, size: number, whole: number) => Math.min(Math.max(-size / 2, at), whole - size / 2);
 
 /**
@@ -1135,6 +1202,7 @@ export function RoofDesigner(props: {
   const openMenu = (to: typeof menu) => {
     setMenu(to);
     setSeek("");
+    setSearchDown(false);
     // The inverter suggestions fold each time a list opens, a press away (19 Nov 2026, Martin).
     setSuggesting(false);
   };
@@ -1267,6 +1335,9 @@ export function RoofDesigner(props: {
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
   // Whether the inverter list is showing its suggestions for the panels on the design.
   const [suggesting, setSuggesting] = useState(false);
+  // A three-phase inverter picked for a single-phase home (21 Nov 2026, Martin: warn, never let it on blindly): held here
+  // until the home is set to three phase or another inverter is chosen.
+  const [phaseAsk, setPhaseAsk] = useState<{ inverter: CatalogueInverter; count: number } | null>(null);
   // The string the pointer is over, on the picture or in the list of strings: its check is shown.
   const [hover, setHover] = useState<string | null>(null);
   // The string whose check is open on the picture: opened from its tick or cross in the strings box, never by hovering
@@ -1303,6 +1374,66 @@ export function RoofDesigner(props: {
       // Storage is off: the Designer view opens.
     }
   }, []);
+  // On a phone held upright, a line saying the designer fills the screen turned sideways (21 Nov 2026, Martin), until put
+  // away on this device.
+  const [turnHint, setTurnHint] = useState(false);
+  // Sideways, how tall Sol's plate at the foot is on screen, so he and the rounds beside him sit on its top edge.
+  const [sideDeckH, setSideDeckH] = useState(0);
+  const sideDeckBox = useRef<ResizeObserver | null>(null);
+  const sideDeckRef = useCallback((el: HTMLDivElement | null) => {
+    sideDeckBox.current?.disconnect();
+    sideDeckBox.current = null;
+    if (!el) {
+      setSideDeckH(0);
+      return;
+    }
+    const read = () => setSideDeckH(Math.round(el.getBoundingClientRect().height));
+    read();
+    sideDeckBox.current = new ResizeObserver(read);
+    sideDeckBox.current.observe(el);
+  }, []);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTurnHint(window.localStorage.getItem(TURN_HINT_KEY) !== "1");
+    } catch {
+      // Storage is off: the hint shows for the visit.
+      setTurnHint(true);
+    }
+  }, []);
+  const putTurnHintAway = () => {
+    setTurnHint(false);
+    try {
+      window.localStorage.setItem(TURN_HINT_KEY, "1");
+    } catch {
+      // Storage is off: it stays away for the visit.
+    }
+  };
+  // Sideways in a phone's browser, how to open RENUABL from the Home Screen for the full screen (22 Nov 2026, Martin: Safari's
+  // bars took the room, and a page can't hide them). Never once opened from the Home Screen; until put away on this device.
+  const [homeHint, setHomeHint] = useState<PhoneBrowser | null>(null);
+  useEffect(() => {
+    try {
+      const top = window.top ?? window;
+      const standalone =
+        (top.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+        top.matchMedia("(display-mode: standalone)").matches ||
+        top.matchMedia("(display-mode: fullscreen)").matches;
+      if (standalone || window.localStorage.getItem(HOME_HINT_KEY) === "1") return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHomeHint(phoneBrowserOf(navigator.userAgent, navigator.maxTouchPoints));
+    } catch {
+      // Storage or the top window can't be read: no hint.
+    }
+  }, []);
+  const putHomeHintAway = () => {
+    setHomeHint(null);
+    try {
+      window.localStorage.setItem(HOME_HINT_KEY, "1");
+    } catch {
+      // Storage is off: it stays away for the visit.
+    }
+  };
   // The quote's short view (smaller, group totals only), so the picture spreads out; kept on this device like the open state.
   const [quoteShort, setQuoteShort] = useState(false);
   useEffect(() => {
@@ -1405,7 +1536,16 @@ export function RoofDesigner(props: {
     setArrayHint(null);
     setOnPanel(false);
   };
-  const [view, setView] = useState(OPENED);
+  // The view as kept is always the photo's own shape. In the pop-up, widened past that shape (21 Nov 2026, Martin:
+  // widening "only widens the grey padding area surrounding the map. i wanted it all to expand together"), the picture
+  // takes the whole width and shows a band of the photo across it: the kept view's width, cut to the picture's shape.
+  const [keptView, setView] = useState(OPENED);
+  const [across, setAcross] = useState<number | null>(null);
+  const acrossNow = useRef<number | null>(null);
+  useEffect(() => {
+    acrossNow.current = across;
+  }, [across]);
+  const view = useMemo(() => shownView(keptView, across), [keptView, across]);
   const [selected, setSelected] = useState<string | null>(first.faces[0]?.id ?? null);
   const [picks, setPicks] = useState<Pick[]>([]);
   // Drawing mode (the photo put away and the roof drawn plainly) has no button now; the code stays for later.
@@ -1612,7 +1752,8 @@ export function RoofDesigner(props: {
   const [foldPx, setFoldPx] = useState<number | null>(null);
   // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
   // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
-  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number } | null>(null);
+  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number; across: number; bleed: number } | null>(null);
+  const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
     // Whether this is the pop-up is known a moment after the page: measured again then.
@@ -1624,15 +1765,28 @@ export function RoofDesigner(props: {
     const measure = () => {
       const box = strip.getBoundingClientRect();
       const top = box.top + window.scrollY;
-      const room = window.innerHeight - top - box.height - 8 - 16 - (footRoomNow.current ?? 0);
+      // Sideways the picture runs to the foot of the screen: what stands under it (the address) is a scroll away.
+      const turned = Boolean(tightNow.current) && isSideways();
+      setSideways(turned);
+      const room = window.innerHeight - top - box.height - (turned ? 8 : 8 + 16 + (footRoomNow.current ?? 0));
       // (A frame not yet shown has no width: that isn't a phone.)
       if (tightNow.current && window.innerWidth > 0 && window.innerWidth < PHONE_BELOW) {
-        const across = strip.parentElement?.clientWidth ?? window.innerWidth;
-        const photoH = Math.round((across * ROOF_IMAGE.height) / ROOF_IMAGE.width);
-        const pb = Math.max(PHONE_BANDS.below, Math.round(room - photoH - PHONE_BANDS.above - PHONE_BANDS.rail));
+        // Full bleed (21 Nov 2026, Martin): the picture runs the screen's whole width, past the column's own margins.
+        const column = strip.parentElement?.getBoundingClientRect();
+        const bleed = column ? Math.max(0, Math.round(column.left)) : 0;
+        const across = window.innerWidth;
+        // As tall as the screen allows under the kit's half and over the toolbar, Ask Sol and the rail: never shorter
+        // than the photo's own shape, never taller than PHONE_TALLEST times its width.
+        const shortest = Math.round((across * ROOF_IMAGE.height) / ROOF_IMAGE.width);
+        const photoH = Math.round(
+          Math.min(across * PHONE_TALLEST, Math.max(shortest, room - PHONE_BANDS.above - PHONE_BANDS.below - PHONE_BANDS.rail)),
+        );
+        const pb = PHONE_BANDS.below;
         const stripH = Math.round(box.height);
         setStage((was) =>
-          was && was.photoH === photoH && was.pb === pb && was.top === stripH ? was : { top: stripH, pt: PHONE_BANDS.above, pb, photoH },
+          was && was.photoH === photoH && was.pb === pb && was.top === stripH && was.across === across && was.bleed === bleed
+            ? was
+            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across, bleed },
         );
       } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
@@ -1650,17 +1804,165 @@ export function RoofDesigner(props: {
     };
   }, []);
   const phone = Boolean(props.tight && stage);
-  const fit = phone ? "100%" : fitPx ? `${fitPx}px` : FIT;
+  // Sol holds the tools on a phone, upright or turned sideways (22 Nov 2026, Martin): his tray and his card for what is picked.
+  const solHolds = Boolean(props.tight && (phone || sideways));
+  // In the pop-up the picture takes the window's whole width, its height the first fold's (21 Nov 2026, Martin: widening
+  // the window should widen the map, not the grey round it); `across` is then its width to height.
+  const fills = Boolean(props.tight && !phone && fitPx);
+  const fit = phone ? "100%" : fills ? "none" : fitPx ? `${fitPx}px` : FIT;
+  const picBox = useRef<HTMLDivElement | null>(null);
+  // The inverter list opens at its top, Sol's suggestion first (21 Nov 2026, Martin: it opened scrolled down to the
+  // search box). The search is focused without scrolling to it, sits in its place near the top, and once scrolled past
+  // stays pinned to the menu's foot, so it is always to hand.
+  const kitMenu = useRef<HTMLDivElement | null>(null);
+  const kitSearchSpot = useRef<HTMLDivElement | null>(null);
+  const [searchDown, setSearchDown] = useState(false);
+  const kitScrolled = () => {
+    const box = kitMenu.current;
+    const spot = kitSearchSpot.current;
+    if (box && spot) setSearchDown(box.scrollTop > spot.offsetTop + spot.offsetHeight);
+  };
+  const focusQuietly = useCallback((el: HTMLInputElement | null) => el?.focus({ preventScroll: true }), []);
+  // The same search in the panel, inverter and battery lists (21 Nov 2026, Martin: "do the same for the battery and panel
+  // lists"): its place in the list, and the bar it moves to at the menu's foot once scrolled past.
+  const searchBox = (placeholder: string) => (
+    <input
+      ref={focusQuietly}
+      value={seek}
+      onChange={(e) => setSeek(e.target.value)}
+      placeholder={placeholder}
+      className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
+    />
+  );
+  const kitSearchHere = (placeholder: string) => (
+    <div ref={kitSearchSpot} className="min-h-10">
+      {!searchDown && searchBox(placeholder)}
+    </div>
+  );
+  const kitSearchFoot = (placeholder: string) =>
+    searchDown && <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">{searchBox(placeholder)}</div>;
+  const seeks = (text: string) =>
+    seek
+      .toLowerCase()
+      .split(/\s+/)
+      .every((word) => text.toLowerCase().includes(word));
+  // A phone upright: the picture as tall as the stage says, so a narrower band of the photo, larger.
+  const phoneAcross = phone && stage && stage.photoH > 0 ? Math.round((stage.across / stage.photoH) * 1000) / 1000 : null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (phoneAcross) setAcross(phoneAcross);
+  }, [phoneAcross]);
+  // Zoom mode on a phone (21 Nov 2026, Martin: a magnifier that, tapped, lets the picture be pinched in and out): while it
+  // is on, a layer over the picture takes the fingers, so no tool acts. Two fingers pinch about where they are; one moves.
+  const [zooming, setZooming] = useState(false);
+  // Sol holds the tools on a phone upright (sol-tray.tsx): his tray, and the roof pitch marks shown only when asked for.
+  const [solTray, setSolTray] = useState(false);
+  // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
+  const [panelCard, setPanelCard] = useState(false);
+  const [phonePitch, setPhonePitch] = useState(false);
+  const pinch = useRef<{
+    at: Map<number, { x: number; y: number }>;
+    from: { kept: typeof WHOLE; shown: typeof WHOLE; pts: { x: number; y: number }[] } | null;
+  }>({ at: new Map(), from: null });
+  const pinchFrom = (box: DOMRect) => {
+    const pts = [...pinch.current.at.values()].map((pt) => ({ x: (pt.x - box.left) / box.width, y: (pt.y - box.top) / box.height }));
+    pinch.current.from = pts.length ? { kept: keptView, shown: shownView(keptView, across), pts } : null;
+  };
+  const onPinchDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pinch.current.at.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    pinchFrom(e.currentTarget.getBoundingClientRect());
+  };
+  const onPinchUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    pinch.current.at.delete(e.pointerId);
+    pinchFrom(e.currentTarget.getBoundingClientRect());
+  };
+  const onPinchMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const p = pinch.current;
+    if (!p.at.has(e.pointerId) || !p.from) return;
+    p.at.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const box = e.currentTarget.getBoundingClientRect();
+    const now = [...p.at.values()].map((pt) => ({ x: (pt.x - box.left) / box.width, y: (pt.y - box.top) / box.height }));
+    const { kept, shown, pts } = p.from;
+    if (now.length !== pts.length) return;
+    const mid = (list: { x: number; y: number }[]) => ({
+      x: list.reduce((n, q) => n + q.x, 0) / list.length,
+      y: list.reduce((n, q) => n + q.y, 0) / list.length,
+    });
+    const gap = (list: { x: number; y: number }[]) =>
+      list.length < 2 ? 1 : Math.hypot((list[0].x - list[1].x) * box.width, (list[0].y - list[1].y) * box.height);
+    const m0 = mid(pts);
+    const m1 = mid(now);
+    const w = Math.min(ROOF_IMAGE.width, Math.max(PINCH_MIN_W, kept.w * (gap(pts) / Math.max(1, gap(now)))));
+    const cut = shownView({ x: 0, y: 0, w, h: (w * ROOF_IMAGE.height) / ROOF_IMAGE.width }, across);
+    // The spot of the photo under the fingers' middle stays under it.
+    const spotX = shown.x + m0.x * shown.w;
+    const spotY = shown.y + m0.y * shown.h;
+    const next = keptFor({ x: spotX - m1.x * cut.w, y: spotY - m1.y * cut.h, w: cut.w, h: cut.h }, w, across);
+    setView({ ...next, x: within(next.x, next.w, ROOF_IMAGE.width), y: within(next.y, next.h, ROOF_IMAGE.height) });
+  };
+  // One zoom press closer the first time the designer is a phone's, from where it opened.
+  const phoneZoomed = useRef(false);
+  useEffect(() => {
+    if (!phone || phoneZoomed.current) return;
+    phoneZoomed.current = true;
+    setView((v) => {
+      const w = v.w / PHONE_ZOOM;
+      const h = v.h / PHONE_ZOOM;
+      return { x: v.x + (v.w - w) / 2, y: v.y + (v.h - h) / 2, w, h };
+    });
+  }, [phone]);
+  useEffect(() => {
+    const el = picBox.current;
+    if (phoneAcross) return;
+    if (!fills || !el || !fitPx) {
+      setAcross(null);
+      return;
+    }
+    const tall = (fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width;
+    const measure = () => setAcross(el.clientWidth > 0 ? Math.round((el.clientWidth / tall) * 1000) / 1000 : null);
+    measure();
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, [fills, fitPx, phoneAcross]);
+  // Sol's cards stand over the foot of the picture on a phone upright, above his round, so the band below never grows.
+  const phoneBelow = stage ? stage.pb : 0;
+  // What Sol's round says on a phone upright: what is picked, else the tool in hand, else that he holds the tools.
+  const phoneSolWords =
+    picks.length > 0
+      ? `Sol · ${picks.length} picked`
+      : phonePitch
+        ? "Sol · Pitch"
+        : tool !== "select" && tool !== "panel"
+          ? `Sol · ${TOOLS.find((x) => x.tool === tool)?.name ?? "tools"}`
+          : "Sol · tools";
+  // The dial for what is picked, on a phone upright: about three fifths of the picture's height, its middle the picture's.
+  const dialFit =
+    phone && stage ? { scale: Math.min(0.7, (stage.photoH * 0.6) / (25 * 16)), top: `${stage.pt + stage.photoH / 2}px` } : null;
   /** A place down the picture, as a share of its height: on a phone the picture starts under the band above it. */
   const picY = (percent: number) =>
     props.tight && stage ? `calc(${stage.pt}px + ${((percent * stage.photoH) / 100).toFixed(1)}px)` : `${percent}%`;
   // A press that may turn into a drag: of what is picked, of a box to pick with, or of the picture itself.
   const press = useRef<
-    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point> | null; others?: LoosePanel[] }
+    | { mode: "move"; at: Point; picks: Pick[]; starts: Record<string, Point & { angle?: number }> | null; others?: LoosePanel[] }
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
-    | { mode: "array"; anchor: LoosePanel }
+    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
+    | {
+        mode: "grow";
+        side: GrowSide;
+        from: Point;
+        base: LoosePanel[];
+        frame: ArrayFrame;
+        seed: string;
+        /** Every panel this drag has had on the roof: the group as picked up and any it has added. */
+        ids: Set<string>;
+        n: number;
+        /** Whether the pointer has gone anywhere since the press: a press alone adds one. */
+        dragged?: boolean;
+      }
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
@@ -1677,7 +1979,23 @@ export function RoofDesigner(props: {
     () => ({ faces, loose, strings, labels, panel, fitted, rules, battery, charger }),
     [faces, loose, strings, labels, panel, fitted, rules, battery, charger],
   );
-  const history = useRef({ past: [] as (typeof drawing)[], future: [] as (typeof drawing)[], last: drawing, restoring: false });
+  const history = useRef({
+    past: [] as (typeof drawing)[],
+    future: [] as (typeof drawing)[],
+    last: drawing,
+    restoring: false,
+    // A thumb's double tap takes its first tap's turn back: the history goes back to how it stood before that tap.
+    takeBack: null as { len: number } | null,
+  });
+  // Where the history stood as a thumb on Sol's controller was pressed, for a double tap to go back to.
+  const thumbMark = useRef<{ len: number } | null>(null);
+  // How many steps can be undone, and how many there were when the panels now picked were picked: once a change is made
+  // with them picked, Undo comes into sight on Sol's controller (22 Nov 2026, Martin: "it's easy to make a mistake").
+  const [pastLen, setPastLen] = useState(0);
+  const [pickBase, setPickBase] = useState<number | null>(null);
+  if (picks.length && (pickBase === null || pastLen < pickBase)) setPickBase(pastLen);
+  if (!picks.length && pickBase !== null) setPickBase(null);
+  const changedSincePicked = pickBase !== null && pastLen > pickBase;
   // Bumped when a drag ends, so the drawing is looked at again once the pointer has let go.
   const [settled, setSettled] = useState(0);
   // A slider being dragged changes the drawing at every notch: it is one step too.
@@ -1698,6 +2016,15 @@ export function RoofDesigner(props: {
   useEffect(() => {
     const h = history.current;
     if (h.last === drawing) return;
+    if (h.takeBack) {
+      // The double tap's turn back: as if the first tap had never been made (whether or not it was recorded yet).
+      h.past.length = Math.min(h.past.length, h.takeBack.len);
+      h.takeBack = null;
+      h.future = [];
+      h.last = drawing;
+      setPastLen(h.past.length);
+      return;
+    }
     if (h.restoring) {
       // This change is an undo or redo itself: it is where we are now, not a new step.
       h.restoring = false;
@@ -1710,6 +2037,7 @@ export function RoofDesigner(props: {
     if (h.past.length > 100) h.past.shift();
     h.future = [];
     h.last = drawing;
+    setPastLen(h.past.length);
   }, [drawing, settled]);
 
   const restore = (to: typeof drawing) => {
@@ -1733,13 +2061,27 @@ export function RoofDesigner(props: {
     const back = h.past.pop();
     if (!back) return;
     h.future.push(h.last);
+    setPastLen(h.past.length);
     restore(back);
+  };
+  // Undo from Sol's controller keeps what is still there picked, so the next try is one tap away.
+  const undoKeepingPicks = () => {
+    const was = picks;
+    const back = history.current.past.at(-1);
+    undo();
+    if (!back) return;
+    setPicks(
+      was.filter((k) =>
+        k.kind === "loose" ? back.loose.some((l) => l.id === k.id) : k.kind === "label" ? back.labels.some((l) => l.id === k.id) : false,
+      ),
+    );
   };
   const redo = () => {
     const h = history.current;
     const forward = h.future.pop();
     if (!forward) return;
     h.past.push(h.last);
+    setPastLen(h.past.length);
     restore(forward);
   };
 
@@ -1856,6 +2198,11 @@ export function RoofDesigner(props: {
   // The quote's postcode is the roof's own: the one in the address searched for. One typed before that rule stays only where the address has none.
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
+  // Inverters on the design that can't go on the home's supply: a three-phase one on a single-phase home (`supply-match.ts`).
+  const clashNow = supplyClashes(
+    fitted.map((f) => props.inverters.find((i) => i.sku === f.sku) ?? { name: f.name }),
+    quoteNow.form.phase,
+  );
   const everyQuote = () =>
     designs.map((_, i) => {
       const q = quotes[i] ?? defaultQuote(props.postcode);
@@ -1950,6 +2297,11 @@ export function RoofDesigner(props: {
 
   /** Puts a suggestion on the design in place of whatever inverters were there. Strings on an inverter that is gone go back to the first. */
   const takeSuggestion = (to: InverterSuggestion) => {
+    if (clashesWithSupply(to.inverter, quoteNow.form.phase)) {
+      setPhaseAsk({ inverter: to.inverter, count: to.count });
+      return;
+    }
+    setPhaseAsk(null);
     setFitted(
       Array.from({ length: to.count }, (_, n) => ({
         sku: to.inverter.sku,
@@ -2026,6 +2378,11 @@ export function RoofDesigner(props: {
   };
   const addInverter = (to: CatalogueInverter) => {
     if (fitted.length >= MAX_INVERTERS) return;
+    if (clashesWithSupply(to, quoteNow.form.phase)) {
+      setPhaseAsk({ inverter: to, count: 1 });
+      return;
+    }
+    setPhaseAsk(null);
     setFitted([
       ...fitted,
       {
@@ -2130,12 +2487,15 @@ export function RoofDesigner(props: {
       setView((v) => {
         const w = Math.min(ROOF_IMAGE.width, Math.max(40, v.w * (e.deltaY > 0 ? 1.15 : 1 / 1.15)));
         const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
-        return {
-          x: within(v.x + fx * v.w - fx * w, w, ROOF_IMAGE.width),
-          y: within(v.y + fy * v.h - fy * h, h, ROOF_IMAGE.height),
+        // The spot under the pointer stays put, read on the picture as shown (a band of the photo when widened).
+        const was = shownView(v, acrossNow.current);
+        const cut = shownView({ x: 0, y: 0, w, h }, acrossNow.current);
+        const kept = keptFor(
+          { x: was.x + fx * was.w - fx * cut.w, y: was.y + fy * was.h - fy * cut.h, w: cut.w, h: cut.h },
           w,
-          h,
-        };
+          acrossNow.current,
+        );
+        return { x: within(kept.x, w, ROOF_IMAGE.width), y: within(kept.y, h, ROOF_IMAGE.height), w, h };
       });
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -2275,11 +2635,12 @@ export function RoofDesigner(props: {
   };
 
   /**
-   * The panels a drag would place: from the first one, out to the pointer. Dragging across adds panels to the
-   * row; dragging up or down adds rows. Everything is in the first panel's own frame, so a turned panel makes a
-   * turned array. Places where a panel already stands are left out.
+   * The panels a drag would place: from the first one, out to the pointer, in one line (21 Nov 2026, Martin: a drag
+   * does one thing; rows are added from the array's handles afterwards). `across` keeps the line along the panel's row;
+   * otherwise it runs whichever way the pointer has gone further, across or along. Everything is in the first panel's
+   * own frame, so a turned panel makes a turned line. Places where a panel already stands are left out.
    */
-  const arrayFrom = (anchor: LoosePanel, p: Point): LoosePanel[] => {
+  const arrayFrom = (anchor: LoosePanel, p: Point, only: "across" | "either" = "either"): LoosePanel[] => {
     const a = (anchor.angle * Math.PI) / 180;
     const dx = p.x - anchor.x;
     const dy = p.y - anchor.y;
@@ -2287,8 +2648,11 @@ export function RoofDesigner(props: {
     const stepX = plan.w + size.gap;
     const stepY = plan.h + size.gap;
     // How many panels the pointer is away from the first, across and along, in that panel's frame.
-    const across = Math.max(-40, Math.min(40, Math.round((dx * Math.cos(a) + dy * Math.sin(a)) / stepX)));
-    const along = Math.max(-20, Math.min(20, Math.round((-dx * Math.sin(a) + dy * Math.cos(a)) / stepY)));
+    const lx = dx * Math.cos(a) + dy * Math.sin(a);
+    const ly = -dx * Math.sin(a) + dy * Math.cos(a);
+    const sideways = only === "across" || Math.abs(lx) >= Math.abs(ly);
+    const across = sideways ? Math.max(-40, Math.min(40, Math.round(lx / stepX))) : 0;
+    const along = sideways ? 0 : Math.max(-20, Math.min(20, Math.round(ly / stepY)));
     const standingNow = designPanels(design).map((panel) => middle(panel.corners));
     const out: LoosePanel[] = [];
     for (let j = 0; j <= Math.abs(along); j++) {
@@ -2330,6 +2694,26 @@ export function RoofDesigner(props: {
       Math.max(...all.map((p) => (p.x - centre.x) * Math.sin(a) - (p.y - centre.y) * Math.cos(a))) + size.long / 2 + 12 * u * scale;
     return { centre, turn: { x: centre.x + reach * Math.sin(a), y: centre.y - reach * Math.cos(a) } };
   })();
+  // Panels picked that lie on one grid have a + handle on each side: dragged out it adds a row or column there,
+  // dragged in it takes them away (`array-grow.ts`). A handle that would sit on a turn handle slides along its side.
+  const growGroup =
+    handles && panelPicks.length > 0 && panelPicks.length === picks.length && panelPicks.every((x) => x.kind === "loose")
+      ? loose.filter((panel) => panelPicks.some((x) => x.kind === "loose" && x.id === panel.id))
+      : [];
+  const growFrame = growGroup.length ? arrayFrame(growGroup, size) : null;
+  const growSpots = growFrame
+    ? growHandles(growFrame, 9 * u * scale).map((handle) => {
+        const turn = grip?.turn ?? spinGroup?.turn;
+        if (!turn || Math.hypot(handle.at.x - turn.x, handle.at.y - turn.y) > 16 * u * scale) return handle;
+        const t = (growFrame.angle * Math.PI) / 180;
+        const slide = 20 * u * scale;
+        const along =
+          handle.side === "top" || handle.side === "bottom" ? { x: Math.cos(t), y: Math.sin(t) } : { x: -Math.sin(t), y: Math.cos(t) };
+        return { ...handle, at: { x: handle.at.x + along.x * slide, y: handle.at.y + along.y * slide } };
+      })
+    : [];
+  const growAt = (p: Point) => growSpots.find((handle) => Math.hypot(p.x - handle.at.x, p.y - handle.at.y) < 7 * u * scale) ?? null;
+
   /** The direction of a point from a centre, in degrees clockwise from straight up. */
   const bearing = (p: Point, centre: Point) => (Math.atan2(p.x - centre.x, -(p.y - centre.y)) * 180) / Math.PI;
 
@@ -2783,7 +3167,7 @@ export function RoofDesigner(props: {
     if (!p) return;
     if (tool === "pan") {
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: view };
+      press.current = { mode: "pan", x: e.clientX, y: e.clientY, from: keptView };
       return;
     }
     // A speech bubble opens its thread, whichever tool is on. The bubble is drawn up and to the right of the spot
@@ -2839,6 +3223,23 @@ export function RoofDesigner(props: {
         grabbed === "battery"
           ? { mode: "battery", dx: p.x - at.x, dy: p.y - at.y }
           : { mode: "inverter", n: grabbed, dx: p.x - at.x, dy: p.y - at.y };
+      return;
+    }
+    const growing = growFrame ? growAt(p) : null;
+    if (growing && growFrame) {
+      // A + handle on the picked array's side: dragging it adds rows or columns there, or takes them away.
+      svg.current?.setPointerCapture(e.pointerId);
+      setGhosts([]);
+      press.current = {
+        mode: "grow",
+        side: growing.side,
+        from: p,
+        base: growGroup,
+        frame: growFrame,
+        seed: newId("p"),
+        ids: new Set(growGroup.map((panel) => panel.id)),
+        n: 0,
+      };
       return;
     }
     if (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) {
@@ -2904,7 +3305,10 @@ export function RoofDesigner(props: {
       const shown = ghostAt(p);
       if (!shown) return;
       svg.current?.setPointerCapture(e.pointerId);
-      press.current = { mode: "array", anchor: shown };
+      // Put down in the open (not beside a panel), pulled sideways it adds panels and pulled any other way it pivots
+      // (`pivotDrag`); on a traced face it starts out facing the way the face runs. Beside a panel it only adds.
+      const free = shown.x === p.x && shown.y === p.y;
+      press.current = { mode: "array", anchor: shown, free, pivot: null };
       setLaying(true);
       return setGhosts([shown]);
     }
@@ -2993,6 +3397,26 @@ export function RoofDesigner(props: {
     press.current = { mode: "band", at: p, face: on?.id ?? null, add: e.shiftKey, moved: false };
   };
 
+  /** The picked array grown (or cut back) to `n` rows or columns on the side whose + is held. */
+  const growTo = (held: Extract<NonNullable<typeof press.current>, { mode: "grow" }>, n: number) => {
+    if (n === held.n) return;
+    held.n = n;
+    const was = held.ids;
+    // Never onto a panel that stands outside the group.
+    const others = standingAll(
+      faces,
+      loose.filter((panel) => !was.has(panel.id)),
+    );
+    const next = growArray(held.base, held.frame, held.side, n, held.seed).filter(
+      (panel) => was.has(panel.id) || !others.some((o) => Math.hypot(o.x - panel.x, o.y - panel.y) < 0.4),
+    );
+    held.ids = new Set([...was, ...next.map((panel) => panel.id)]);
+    const mine = held.ids;
+    setLoose((all) => [...all.filter((panel) => !mine.has(panel.id)), ...next]);
+    setPicks(next.map((panel): Pick => ({ kind: "loose", id: panel.id })));
+    changed();
+  };
+
   const onPointerMove = (e: React.PointerEvent) => {
     pointer.current = pointAt(e);
     const held = press.current;
@@ -3023,7 +3447,7 @@ export function RoofDesigner(props: {
       if (tool === "panel") {
         // Over a panel that is there (or the round beside its array) the arrow has taken over: no outline.
         const p = pointAt(e);
-        const next = p && !key && !onArrayHint(p) ? ghostAt(p) : null;
+        const next = p && !key && !onArrayHint(p) && !growAt(p) ? ghostAt(p) : null;
         setGhosts(next ? [next] : []);
       }
       // Selecting, the next panel shows itself just past a panel's edge (not over a panel, the round, the kit or a handle).
@@ -3032,7 +3456,8 @@ export function RoofDesigner(props: {
         const handle =
           p &&
           ((grip && Math.hypot(p.x - grip.turn.x, p.y - grip.turn.y) < 8 * u * scale) ||
-            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale));
+            (spinGroup && Math.hypot(p.x - spinGroup.turn.x, p.y - spinGroup.turn.y) < 10 * u * scale) ||
+            growAt(p) !== null);
         // Over empty roof, or an empty place in a traced face's rows (8 Nov 2026: inside a face it never showed).
         const next = p && (!under || under.empty) && !on && !handle && !onArrayHint(p) ? edgeGhostAt(p) : null;
         if (next || ghosts.length) setGhosts(next ? [next] : []);
@@ -3043,10 +3468,27 @@ export function RoofDesigner(props: {
       const p = pointAt(e);
       if (!p) return;
       // The row being drawn clicks into place against the panels or roof edge near it (`placeShift`); Alt places it freely.
-      const drawn = arrayFrom(held.anchor, p);
+      let anchor = held.anchor;
+      if (held.free) {
+        // Pulled sideways, the way the panel faces, it adds panels as it lies; pulled any other way it pivots to the pointer.
+        const turned = pivotDrag(anchor, p, planSize(anchor, size).w + size.gap, held.pivot ?? null, e.altKey ? [] : squareAngles);
+        held.pivot = turned.state;
+        anchor = { ...anchor, angle: turned.angle };
+      }
+      const drawn = arrayFrom(anchor, p, held.free ? "across" : "either");
       const shift = e.altKey ? null : placeShift(drawn, standingAll(faces, loose), faces, rules, size);
-      setGhosts(shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn);
+      let shown = shift ? drawn.map((g) => ({ ...g, x: cm(g.x + shift.x), y: cm(g.y + shift.y) })) : drawn;
+      // Squared to the roof edge it is near as it is drawn, so letting go changes nothing (it used to turn on release).
+      const settle = !e.altKey && shown.length && !joinedToOthers(shown) ? settleToEdges(shown, roofEdges, size) : null;
+      if (settle) shown = applySettle(shown, settle);
+      setGhosts(shown);
       return;
+    }
+    if (held.mode === "grow") {
+      const p = pointAt(e);
+      if (!p) return;
+      if (Math.hypot(p.x - held.from.x, p.y - held.from.y) >= 4 * u * scale) held.dragged = true;
+      return growTo(held, growCount(held.frame, held.side, held.from, p));
     }
     if (held.mode === "msb") {
       const p = pointAt(e);
@@ -3130,7 +3572,8 @@ export function RoofDesigner(props: {
       const box = svg.current?.getBoundingClientRect();
       if (!box) return;
       const dx = ((e.clientX - held.x) / box.width) * held.from.w;
-      const dy = ((e.clientY - held.y) / box.height) * held.from.h;
+      // Both by the width: widened, the picture shows less of the photo's height than it is tall.
+      const dy = ((e.clientY - held.y) / box.width) * held.from.w;
       return setView({
         ...held.from,
         x: within(held.from.x - dx, held.from.w, ROOF_IMAGE.width),
@@ -3152,7 +3595,7 @@ export function RoofDesigner(props: {
       const next = byHand(held.picks);
       const labelIds = held.picks.filter((x) => x.kind === "label").map((x) => (x as { id: string }).id);
       held.starts = Object.fromEntries([
-        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y }]),
+        ...next.loose.filter((x) => next.ids.includes(x.id)).map((x) => [`l:${x.id}`, { x: x.x, y: x.y, angle: x.angle }]),
         ...labels.filter((l) => labelIds.includes(l.id)).map((l) => [`n:${l.id}`, { x: l.x, y: l.y }]),
       ]);
       setFaces(next.faces);
@@ -3171,7 +3614,11 @@ export function RoofDesigner(props: {
     // Moved panels click into place against the panels or roof edge they come near (`placeShift`); Alt moves them freely.
     const going = loose
       .filter((panel) => starts[`l:${panel.id}`])
-      .map((panel) => ({ ...panel, x: starts[`l:${panel.id}`].x + dx, y: starts[`l:${panel.id}`].y + dy }));
+      .map((panel) => {
+        const start = starts[`l:${panel.id}`];
+        // Each move starts from the angle the panel had when picked up, so a turn shown near an edge is undone on leaving it.
+        return { ...panel, x: start.x + dx, y: start.y + dy, angle: start.angle ?? panel.angle };
+      });
     const shift = e.altKey || !going.length ? null : placeShift(going, held.others ?? [], faces, rules, size);
     if (shift) {
       dx += shift.x;
@@ -3181,7 +3628,13 @@ export function RoofDesigner(props: {
       const start = starts[`${prefix}:${item.id}`];
       return start ? { ...item, x: cm(start.x + dx), y: cm(start.y + dy) } : item;
     };
-    setLoose((all) => all.map((panel) => moved("l", panel)));
+    // Squared to the roof edge they are near while still held, so letting go changes nothing (21 Nov 2026, Martin:
+    // "releasing the mouse clicker can force a slight pivot leaving the array crooked").
+    let placedNow = going.map((panel) => ({ ...panel, x: cm(panel.x + (shift?.x ?? 0)), y: cm(panel.y + (shift?.y ?? 0)) }));
+    const settle = !e.altKey && placedNow.length && !joinedToOthers(placedNow) ? settleToEdges(placedNow, roofEdges, size) : null;
+    if (settle) placedNow = applySettle(placedNow, settle);
+    const now = new Map(placedNow.map((panel) => [panel.id, panel]));
+    setLoose((all) => all.map((panel) => now.get(panel.id) ?? panel));
     setLabels((all) => all.map((label) => moved("n", label)));
     changed();
   };
@@ -3196,9 +3649,18 @@ export function RoofDesigner(props: {
         b: face.points[(i + 1) % face.points.length],
         setback: Math.max(face.setback, wind),
         face: face.points,
+        rows: face.angle,
       })),
     ),
     ...rules.map((g) => ({ a: g.a, b: g.b, setback: wind })),
+  ];
+  // What a row dragged out in the open clicks square to: the panels standing, each traced face's rows and sides, each guide line.
+  const squareAngles = [
+    ...standingAll(faces, loose).map((panel) => panel.angle),
+    ...roofEdges.flatMap((edge) => [
+      (Math.atan2(edge.b.y - edge.a.y, edge.b.x - edge.a.x) * 180) / Math.PI,
+      ...(edge.rows === undefined ? [] : [edge.rows]),
+    ]),
   ];
   /** Whether any of these panels sits against a panel outside them: a group joined to others stays where it joined. */
   const joinedToOthers = (group: readonly LoosePanel[]) => {
@@ -3222,6 +3684,17 @@ export function RoofDesigner(props: {
     // The drag is over: whatever it changed becomes one step to undo.
     setSettled((n) => n + 1);
     if (held?.mode === "spin") return setSpinAt(0);
+    if (held?.mode === "grow") {
+      // A plain press on a + (21 Nov 2026, Martin: "the + icons… dont do anything"): one more row or column there.
+      if (!held.dragged) return growTo(held, 1);
+      // Panels taken away come off any string they were on.
+      const here = new Set(loose.map((panel) => `l:${panel.id}`));
+      if (strings.some((x) => x.panels.some((k) => k.startsWith("l:") && !here.has(k))))
+        setStrings(
+          strings.map((x) => ({ ...x, panels: x.panels.filter((k) => !k.startsWith("l:") || here.has(k)) })).filter((x) => x.panels.length),
+        );
+      return;
+    }
     if (held?.mode === "wire") {
       if (held.dragged) tips.nudge("strung-by-hand");
       // A plain click on a panel that was already on the string takes it off.
@@ -3313,6 +3786,14 @@ export function RoofDesigner(props: {
   const [publishing, setPublishing] = useState(false);
   /** Publish: the design is saved, then its proposal is made from it (`onPublish`), and any problem with either is said. */
   const publish = async (note = "") => {
+    // Never a proposal with a three-phase inverter on a single-phase home (21 Nov 2026, Martin).
+    if (clashNow.length) {
+      setSent({
+        ok: false,
+        message: `Not published: ${clashNow.join(", ")} is a three-phase inverter on a single-phase home. Choose a single-phase inverter, or set the home to three phase if it is.`,
+      });
+      return;
+    }
     setPublishing(true);
     setSent(null);
     const kept = await save();
@@ -3563,16 +4044,6 @@ export function RoofDesigner(props: {
     props.workspace.settings.bill.selfUseShare,
   );
   const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
-  // The home's day (10 Nov 2026, Martin: the second dimension of a design is time): the design played through a
-  // summer, autumn or winter day, the sun crossing the roof and the home's power under it (home-day.tsx).
-  const homeDay = useHomeDay({
-    latitude: spot.lat,
-    panels: standingPanels.map((p) => ({ kw: size.watts / 1000, tilt: p.tilt, facing: p.facing, x: p.x, y: p.y })),
-    monthKwh: year,
-    homeDayKwh: finance?.dailyKwh ?? null,
-    batteryKwh: shiftingKwhOf({ battery }),
-    terrain: terrain && terrain !== "none" ? terrain : null,
-  });
   // The system as the quote reads it. Worked out in the domain (systemSpecOf), so a published proposal reads the design the same way.
   const firstListed = props.catalogue[0];
   const spec: SystemSpec = useMemo(
@@ -3609,6 +4080,7 @@ export function RoofDesigner(props: {
       solarVic: { on: Boolean(quoteNow.form.solarVicRebate), bar: solarVicBar(quoteNow.form, summary.panels, props.rates) },
       phase: quoteNow.form.phase,
       inverterKw: fittedKw,
+      supplyClash: clashNow,
     });
   })();
   const light = readinessLight(ready);
@@ -4160,18 +4632,23 @@ export function RoofDesigner(props: {
    * outlined in gold with everything off it dimmed; any answer takes the outline away.
    */
   const [lot, setLot] = useState<PropertyLot | null>(null);
+  /** The register didn't answer (down, slow, outside Victoria): Sol still asks, on the picture alone. */
+  const [lotMissedAt, setLotMissedAt] = useState<string | null>(null);
+  const lotKey = `${props.address}|${spot.lat},${spot.lng}`;
+  const lotMissing = lotMissedAt === lotKey;
   useEffect(() => {
     let live = true;
     const q = new URLSearchParams({ address: props.address, lat: String(spot.lat), lng: String(spot.lng) });
     fetch(`/api/design/roof/lot?${q}`)
       .then((r) => (r.ok ? (r.json() as Promise<PropertyLot>) : null))
       .then((found) => {
-        if (!live || !found?.nearby) return;
+        if (!live) return;
+        if (!found?.nearby) return setLotMissedAt(lotKey);
         setLot(found);
         const doubt = registerWarning(found, props.address);
         if (doubt) props.onAddressDoubt?.(doubt);
       })
-      .catch(() => undefined);
+      .catch(() => live && setLotMissedAt(lotKey));
     return () => {
       live = false;
     };
@@ -4522,7 +4999,8 @@ export function RoofDesigner(props: {
     };
   })();
   const guideFacts: GuideFacts = {
-    ...(lot ? { lot: true } : {}),
+    // Always asked first (21 Nov 2026, Martin: a new site opened on "First, the home." when the register didn't answer).
+    ...(props.address.trim() ? { lot: true } : {}),
     roof: quoteNow.form.roof,
     suggested: guideSuggested,
     target: guideTarget,
@@ -5284,6 +5762,7 @@ export function RoofDesigner(props: {
       case "inverter": {
         const to = pickByQuery(props.inverters, command.query);
         if (!to) return `No inverter on your lists matches “${command.query}”.`;
+        if (clashesWithSupply(to, quoteNow.form.phase)) return clashRefusal(to.name);
         setFitted([
           {
             sku: to.sku,
@@ -5621,15 +6100,53 @@ export function RoofDesigner(props: {
     );
   };
 
+  // On a phone, upright or sideways (21 Nov 2026, Martin: it covered the picture and showed one design at a time), the menu
+  // is drawn smaller and wider, within the picture's height, so several designs and more of each show.
+  const compactMenu = props.tight && (phone || sideways);
+  // On a phone held upright (21 Nov 2026, Martin: "the design page should overlay everything like a popup screen"), it
+  // is a sheet over the whole screen with its own close, its type a little smaller (0.85 of full size).
+  const sheetMenu = props.tight && phone;
   const designsMenu = (
     <div
+      {...(sheetMenu
+        ? { role: "dialog", "aria-label": "Designs" }
+        : compactMenu
+          ? // Its height in an inline style: a class naming the picture's height is drawn back up by globals.css.
+            { style: { maxHeight: "calc(var(--pic-h, 60vh) / 0.78 - 6rem)" } }
+          : { "data-opened": true })}
       className={clsx(
-        "absolute z-40 max-h-[70vh] w-[24rem] max-w-[85vw] space-y-3 overflow-y-auto rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
-        props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2",
+        "overflow-y-auto text-ink",
+        sheetMenu
+          ? "fixed inset-0 z-[90] space-y-3 bg-[#2b2e33] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] [zoom:1.25]"
+          : "absolute z-40 rounded-lg border border-line bg-surface shadow-lift",
+        !sheetMenu && (compactMenu ? "space-y-2 p-2" : "space-y-3 p-3"),
+        !sheetMenu && (compactMenu ? "w-[44rem] max-w-[calc((100vw-2.5rem)/0.78)] [zoom:1.15]" : "max-h-[70vh] w-[24rem] max-w-[85vw]"),
+        !sheetMenu && (props.tight ? "right-0 top-full mt-2" : "left-0 top-full mt-2"),
       )}
     >
+      {sheetMenu && (
+        // Back to the roof on the left: the white cross in the top right corner is the window's, closing the designer.
+        <div className="sticky -top-3 z-10 -mx-4 flex items-center gap-2 border-b border-line bg-[#2b2e33] py-2 pl-2 pr-16">
+          <button
+            type="button"
+            onClick={() => openMenu(false)}
+            aria-label="Back to the roof"
+            title="Back to the roof"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink hover:bg-white/15"
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+          </button>
+          <p className="flex items-center gap-2 text-base font-semibold">
+            <Layers className="size-4" aria-hidden />
+            Designs
+            <span className="text-sm font-normal tabular-nums text-muted">
+              {designs.length} of {MAX_DESIGNS}
+            </span>
+          </p>
+        </div>
+      )}
       {props.tight && !props.sitesOnly && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-line pb-3">
+        <div className={clsx("flex flex-wrap items-center gap-2 border-b border-line", compactMenu ? "pb-2" : "pb-3")}>
           {props.noDeal ? (
             <button
               type="button"
@@ -5689,6 +6206,16 @@ export function RoofDesigner(props: {
                   </span>
                   <span className="block truncate text-xs tabular-nums text-muted">
                     {sum.panels} panels · {sum.kw.toFixed(2)} kW · {d.panel?.name ?? props.catalogue[0]?.name ?? "Panel"}
+                  </span>
+                  {/* The rest of the kit, so designs can be told apart without opening each. */}
+                  <span className="block truncate text-xs text-muted">
+                    {[
+                      d.inverters?.length ? d.inverters.map((v) => v.name).join(" + ") : "No inverter",
+                      d.battery
+                        ? `${(d.battery.kwh * d.battery.qty).toFixed(1)} kWh battery${d.battery.backup ? " with backup" : ""}`
+                        : "No battery",
+                      ...(d.charger ? [`${d.charger.kw} kW EV charger`] : []),
+                    ].join(" · ")}
                   </span>
                 </button>
                 <button
@@ -5782,11 +6309,11 @@ export function RoofDesigner(props: {
         <button className={button} disabled={designs.length >= MAX_DESIGNS} onClick={() => addDesign(true)}>
           <Copy className="mr-1.5 size-4" aria-hidden /> Copy this one
         </button>
-        <span className="self-center text-xs tabular-nums text-muted">
+        <span className={clsx("self-center text-xs tabular-nums text-muted", sheetMenu && "hidden")}>
           {designs.length} of {MAX_DESIGNS}
         </span>
       </div>
-      <p className="text-xs text-muted">
+      <p className={clsx("text-xs text-muted", compactMenu && !sheetMenu && "hidden")}>
         The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
         options on the next proposal published, and mark the one you recommend.
       </p>
@@ -5794,10 +6321,77 @@ export function RoofDesigner(props: {
   );
 
   // Publish design (8 Nov 2026, Martin: in the pop-up, the picture's top right corner): the same control in either place.
+  // Start this design again: its round, and the question asked first.
+  const resetRound = (
+    <button
+      type="button"
+      onClick={() => setResetAsk(!resetAsk)}
+      aria-expanded={resetAsk}
+      aria-label="Start this design again"
+      title="Start this design again"
+      className={clsx(
+        phone || sideways ? "size-8 ring-[3px]" : "size-10 ring-[5px]",
+        "flex items-center justify-center rounded-full bg-white shadow-lift ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
+        resetAsk ? "text-sun-line" : "text-muted",
+      )}
+    >
+      <RotateCcw className="size-[18px]" aria-hidden />
+    </button>
+  );
+  const resetQuestion = resetAsk && (
+    <div
+      role="alertdialog"
+      aria-label="Start again"
+      className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
+    >
+      <p className="font-medium">Reset to default and start again?</p>
+      <p className="mt-1 text-white/70">
+        Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
+      </p>
+      <div className="mt-2.5 flex gap-1.5">
+        <button
+          type="button"
+          onClick={resetDesign}
+          className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
+        >
+          Yes, start again
+        </button>
+        <button
+          type="button"
+          onClick={() => setResetAsk(false)}
+          className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
   const publishControl =
     props.sitesOnly && !props.tight ? null : (
       <div className="relative" data-popup data-menu-host>
-        {props.tight ? (
+        {props.tight && (phone || sideways) ? (
+          // On a phone upright (21 Nov 2026, Martin): icons only in the picture's top right corner, level with the kit and
+          // its height: start again, then the designs' round, a little larger, with the open design's number under its mark.
+          // The designs' round larger, start again half set into it underneath, as on a computer (22 Nov 2026, Martin).
+          <div className="relative flex h-[3.75rem] items-center">
+            <button
+              type="button"
+              onClick={() => openMenu(menu === "designs" ? false : "designs")}
+              aria-expanded={menu === "designs"}
+              aria-haspopup="true"
+              aria-label={`Design ${active + 1} of ${designs.length}: every design on this roof, a new one, a copy, and Publish`}
+              title="Every design on this roof: a new one, a copy, and Publish"
+              className="flex size-[3.75rem] flex-col items-center justify-center rounded-full bg-primary pb-1.5 text-primary-ink shadow-lift tabular-nums hover:bg-forest"
+            >
+              <Layers className="size-[22px]" aria-hidden />
+              <span className="text-[12px] font-semibold leading-none">
+                {active + 1}
+                {designs.length > 1 ? `/${designs.length}` : ""}
+              </span>
+            </button>
+            {menu !== "designs" && <div className="absolute left-1/2 top-full -translate-x-1/2 -translate-y-[45%]">{resetRound}</div>}
+          </div>
+        ) : props.tight ? (
           // In the pop-up the corner is the roof's designs (10 Nov 2026, Martin: there was no plain way to start a second
           // design): the one open, the others either side, and the menu of them all with New design and Publish.
           <div className="flex h-10 items-center rounded-md bg-primary text-primary-ink shadow-lift">
@@ -5823,8 +6417,10 @@ export function RoofDesigner(props: {
               )}
             >
               <Layers className="size-4" aria-hidden />
+              {/* Sideways the word gives way to the kit beside it: the layers mark says what it is. */}
               <span>
-                Design {active + 1}
+                <span className={clsx(sideways && "sr-only")}>Design </span>
+                {active + 1}
                 {designs.length > 1 ? ` of ${designs.length}` : ""}
               </span>
               {designs.length > 1 && active === primary && <Star className="size-3 fill-sun-line text-sun-line" aria-label="primary" />}
@@ -5891,51 +6487,16 @@ export function RoofDesigner(props: {
           </div>
         )}
         {/* Start again, a round growing out of the design's pill like a bubble from a bubble (12 Nov 2026, Martin: it
-            was missed), in white so it stands apart from the graphite, asked first. */}
-        {props.tight && menu !== "designs" && (
+            was missed), in white so it stands apart from the graphite, asked first. On a phone upright it stands beside
+            the designs' round instead, and its question opens under them. */}
+        {props.tight && !phone && !sideways && menu !== "designs" && (
           <div className="absolute right-3 top-[2.15rem] flex flex-col items-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => setResetAsk(!resetAsk)}
-              aria-expanded={resetAsk}
-              aria-label="Start this design again"
-              title="Start this design again"
-              className={clsx(
-                "flex size-10 items-center justify-center rounded-full bg-white shadow-lift ring-[5px] ring-primary transition duration-200 ease-out hover:text-sun-line starting:-translate-y-3 starting:scale-50 starting:opacity-0 motion-reduce:transition-none",
-                resetAsk ? "text-sun-line" : "text-muted",
-              )}
-            >
-              <RotateCcw className="size-[18px]" aria-hidden />
-            </button>
-            {resetAsk && (
-              <div
-                role="alertdialog"
-                aria-label="Start again"
-                className="w-64 rounded-xl bg-primary/95 p-3 text-[13px] text-white shadow-lift ring-1 ring-white/10 backdrop-blur-md"
-              >
-                <p className="font-medium">Reset to default and start again?</p>
-                <p className="mt-1 text-white/70">
-                  Design {active + 1}&apos;s panels, inverter, battery, strings and traced roof faces are taken off.
-                </p>
-                <div className="mt-2.5 flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={resetDesign}
-                    className="rounded-full bg-sun-line px-3 py-1 text-[12.5px] font-medium text-white hover:brightness-110"
-                  >
-                    Yes, start again
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResetAsk(false)}
-                    className="rounded-full px-3 py-1 text-[12.5px] font-medium text-white/80 ring-1 ring-white/20 hover:bg-white/10"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            {resetRound}
+            {resetQuestion}
           </div>
+        )}
+        {props.tight && (phone || sideways) && menu !== "designs" && resetAsk && (
+          <div className="absolute right-0 top-full mt-6">{resetQuestion}</div>
         )}
         {props.tight && menu === "designs" && designsMenu}
         {sending && props.onNote && (
@@ -6105,8 +6666,81 @@ export function RoofDesigner(props: {
     </div>
   );
 
+  // Sol's step and suggestions, when shown.
+  const guideShown =
+    guideActive && !menu && !(solHolds && (picks.length > 0 || solTray)) && !(props.tight && !solAway && (commandReply || commandBusy));
+  const nudgeShown =
+    !guideActive &&
+    !solQuiet &&
+    !(solHolds && (picks.length > 0 || solTray)) &&
+    nudges.length > 0 &&
+    !menu &&
+    !opening &&
+    !calcOpen &&
+    !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
+    !(!props.tight && commandOpen);
+  // On a phone upright, what Sol says and his controller for what is picked are moulded round him under the picture, not
+  // over it (22 Nov 2026, Martin: "the objective is not to overlay the map"): he rises to sit on the picture's foot,
+  // in a notch of the plate under it.
+  const foot = stage ? stage.pt + stage.photoH : null;
+  const underUp = solHolds && !sideways && foot !== null && !solTray;
+  const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown);
+  // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
+  // (22 Nov 2026, Martin: the same places as upright), with Sol and the rounds beside him on its top edge.
+  const sideDeck = solHolds && sideways && !solTray && picks.length === 0 && (guideShown || nudgeShown);
+  const sideDeckUp = sideDeck && sideDeckH > 0;
+  // On a phone, the whole array(s) of what is picked, when that is more than is picked: Sol's controller offers them all
+  // (22 Nov 2026, Martin: "when I select a single panel… select the whole array").
+  const wholeArray = (() => {
+    if (!solHolds || solTray || !picks.length || picks.length > 400) return null;
+    const keys = new Set<string>();
+    const all: Pick[] = [];
+    for (const pick of picks) {
+      if (keys.has(keyOf(pick))) continue;
+      const found = arrayOf(pick);
+      for (const one of found?.picks ?? [pick]) {
+        const key = keyOf(one);
+        if (keys.has(key)) continue;
+        keys.add(key);
+        all.push(one);
+      }
+    }
+    return all.length > picks.length ? all : null;
+  })();
   return (
     <div data-design-popup className={clsx(props.tight && "relative p-2")}>
+      {solHolds && (
+        <SolTray
+          open={solTray}
+          onClose={() => setSolTray(false)}
+          onAsk={() => {
+            setAwayFrom(null);
+            setCommandOpen(true);
+            requestAnimationFrame(() => commandBox.current?.focus());
+          }}
+          tool={tool}
+          onTool={(t) => {
+            setPhonePitch(false);
+            pickTool(t);
+          }}
+          shadeOn={shadeOn}
+          onShade={toggleShade}
+          drawn={illustrated}
+          onDrawn={toggleIllustrated}
+          zooming={zooming}
+          onZoom={() => setZooming((z) => !z)}
+          pitchShown={phonePitch}
+          onPitch={() => setPhonePitch((v) => !v)}
+          pitchWords={quoteNow.form.roof === "flat" ? "Pitch: flat" : `Pitch ${quoteNow.form.pitch ?? TILT.roof}°`}
+          {...(costsHidden ? {} : { onDesignForMe: () => setMineIntro(true) })}
+          onUndo={undo}
+          onRedo={redo}
+          onWhole={() => setView(WHOLE)}
+          {...(props.sidesReady ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} icon /> } : {})}
+          {...(props.pictureMenu ? { pictureMenu: props.pictureMenu } : {})}
+          footRoom={78}
+        />
+      )}
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
           and the address being designed; then which design this is and its quote on the left, and publishing it and
           its proposal on the right. A firmer line under it sets it off from the work below. */}
@@ -6117,15 +6751,30 @@ export function RoofDesigner(props: {
           // a rail of rounds down the left, beside the picture, each saying what it is on hover.
           // On a phone the rail lies across the foot, under Ask Sol: a toolbar in reach of a thumb.
           props.tight
-            ? phone
-              ? "absolute inset-x-3 flex h-12 flex-row items-center"
-              : "absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center"
+            ? solHolds
+              ? clsx("absolute inset-x-3 flex h-12 flex-row items-center", !solTray && "hidden")
+              : clsx("absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center", sideways && "designer-compact-rail")
             : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
-        style={phone && stage ? { top: 8 + stage.top + 6 + stage.pt + stage.photoH + stage.pb + 4 } : undefined}
+        // On a phone upright the row is drawn smaller (21 Nov 2026, Martin: every button smaller); its top in its own zoomed units.
+        style={
+          solHolds
+            ? // On a phone the designer's own row sits at the foot of Sol's tray, shown only while the tray is up.
+              {
+                position: "fixed",
+                top: "auto",
+                bottom: 14 / PHONE_RAIL_ZOOM,
+                zIndex: 96,
+                zoom: PHONE_RAIL_ZOOM,
+                // Within the tray's width when the phone is sideways (the tray is 52rem at most, centred).
+                maxWidth: `calc((52rem - 1.5rem) / ${PHONE_RAIL_ZOOM})`,
+                marginInline: "auto",
+              }
+            : undefined
+        }
       >
         <BarRow
-          row={phone}
+          row={solHolds}
           quick={
             props.tight ? (
               <>
@@ -6431,7 +7080,9 @@ export function RoofDesigner(props: {
         )}
       </header>
 
-      <div className={clsx("relative", props.tight ? (phone ? "" : "pl-[4.25rem] pr-11") : "mt-5")}>
+      {/* Room for the window's close round on the right: sideways it shares a row with the figures only, so the figures
+          keep clear of it and the picture runs to the edge. */}
+      <div className={clsx("relative", props.tight ? (solHolds ? "" : "pl-[4.25rem] pr-11") : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -6441,14 +7092,52 @@ export function RoofDesigner(props: {
               className={clsx(
                 "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
                 // On a phone it wraps, and keeps clear of the window's close round in the corner.
-                props.tight ? (phone ? "mb-1.5 mr-11 flex-wrap" : "mb-1.5 flex-nowrap") : "mb-2 flex-wrap",
+                props.tight
+                  ? phone
+                    ? // Full bleed across the top of the screen (21 Nov 2026, Martin), the figures in a grid of their own.
+                      "mb-1.5 flex-col !rounded-none"
+                    : sideways
+                      ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
+                      : "mb-1.5 flex-nowrap"
+                  : "mb-2 flex-wrap",
               )}
-              style={{ maxWidth: fit }}
+              style={
+                phone && stage
+                  ? { maxWidth: "none", marginLeft: -stage.bleed, marginRight: -stage.bleed, marginTop: -PHONE_STRIP_LIFT }
+                  : { maxWidth: fit }
+              }
               aria-label="This design in figures"
             >
               {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
-              {props.tight ? (
+              {phone ? (
+                // On a phone, three figures across, each with its unit under it; clear of the window's close round on the right.
+                // One slim line (22 Nov 2026, Martin: the two bars took room the map and Sol needed).
+                <div
+                  className={clsx(
+                    "flex items-baseline gap-x-3 whitespace-nowrap py-1 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
+                    growing ? "bg-sun-line" : "",
+                  )}
+                  style={{ paddingTop: "max(0.25rem, env(safe-area-inset-top))" }}
+                >
+                  <p className="min-w-0 truncate" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
+                    <span className={clsx("text-[15px] font-semibold", growing ? "text-white" : "text-sun-bright")}>
+                      {liveKw.toFixed(2)}
+                    </span>
+                    <span className="ml-0.5 text-[10.5px] text-white/60">
+                      kW · {livePanels}×{panelOf(design).watts}W
+                    </span>
+                  </p>
+                  <p className={clsx("shrink-0", oversize?.over && "text-sun-bright")}>
+                    <span className="text-[15px] font-semibold text-white">{summary.kwhPerDay}</span>
+                    <span className="ml-0.5 text-[10.5px] text-white/60">kWh/day</span>
+                  </p>
+                  <p className="shrink-0" title={battery ? `${battery.qty} modules` : "No battery"}>
+                    <span className="text-[15px] font-semibold text-white">{battery ? batteryKwh : "–"}</span>
+                    <span className="ml-0.5 text-[10.5px] text-white/60">{battery ? "kWh batt" : "no batt"}</span>
+                  </p>
+                </div>
+              ) : props.tight ? (
                 <div
                   className={clsx(
                     "flex items-center gap-x-4 border-r border-white/15 px-3.5 py-1.5 text-xs tabular-nums transition-colors duration-300",
@@ -6542,7 +7231,7 @@ export function RoofDesigner(props: {
               <div
                 className={clsx(
                   "relative flex min-w-0 flex-[2.4] items-stretch bg-surface text-ink",
-                  designs.length > 1 ? "" : "rounded-r-lg",
+                  designs.length > 1 || phone ? "" : "rounded-r-lg",
                 )}
                 data-menu-host
               >
@@ -6562,9 +7251,10 @@ export function RoofDesigner(props: {
                     openMenu(menu === "bill" ? false : "bill");
                   }}
                   className={clsx(
-                    "min-w-0 flex-1 cursor-pointer",
-                    !shadeOn || (shadeOpen && tool !== "string") ? "rounded-r-lg" : "",
-                    props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    // Clipped, so a figure that runs long never paints under the shade widget beside it.
+                    "min-w-0 flex-1 cursor-pointer overflow-hidden",
+                    (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
+                    phone ? "flex items-center py-1 pl-4 pr-[4.5rem]" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -6579,17 +7269,51 @@ export function RoofDesigner(props: {
                     {!finance && <span className="size-1.5 animate-ping rounded-full bg-danger" aria-hidden />}
                     For this home{!finance && " · Needed"}
                   </p>
-                  {finance && props.tight ? (
+                  {finance && phone ? (
+                    // On a phone, the bill, the saving and the payback as three figures across, each named over it.
+                    <dl
+                      className="flex w-full items-baseline gap-x-3 whitespace-nowrap tabular-nums"
+                      title="What it does for this home: open the bill"
+                    >
+                      {(
+                        [
+                          // On a narrow phone the bill after alone, so the line fits beside the window's close round.
+                          [
+                            "Bill",
+                            <>
+                              <span className="max-[409px]:hidden">{dollars(finance.billNow)}→</span>
+                              {dollars(finance.billAfter)}
+                            </>,
+                            false,
+                          ],
+                          ["Saves", `${dollars(finance.saving)}/yr`, true],
+                          ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
+                        ] as const
+                      ).map(([name, value, gold]) => (
+                        <div key={name} className={clsx("flex items-baseline gap-1", name === "Bill" ? "min-w-0" : "shrink-0")}>
+                          <dt className="text-[8px] font-medium uppercase tracking-[0.08em] text-muted">
+                            {name}
+                            {name === "Bill" && <span className="min-[410px]:hidden"> after</span>}
+                          </dt>
+                          <dd className={clsx("truncate text-[12px] font-semibold leading-tight", gold && "text-positive")}>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : finance && props.tight ? (
                     <p
                       className="flex items-center gap-3 whitespace-nowrap text-xs tabular-nums text-muted"
                       title="What it does for this home: open the bill"
                     >
-                      <span>
-                        Bill{" "}
-                        <b className="text-[14px] font-semibold text-ink">
-                          {dollars(finance.billNow)} → {dollars(finance.billAfter)}
-                        </b>
-                      </span>
+                      {/* Left out while the shade widget sits beside them: the pop-up's strip has no room for both
+                          (the widget lay over Payback). The bill is a press away. */}
+                      {!(shadeOn && !(shadeOpen && tool !== "string")) && (
+                        <span>
+                          Bill{" "}
+                          <b className="text-[14px] font-semibold text-ink">
+                            {dollars(finance.billNow)} → {dollars(finance.billAfter)}
+                          </b>
+                        </span>
+                      )}
                       <span>
                         Saves <b className="text-[14px] font-semibold text-positive">{dollars(finance.saving)}</b>/yr
                       </span>
@@ -6861,7 +7585,8 @@ export function RoofDesigner(props: {
             {/* The picture's height as a variable, so the kit lists that open on it scroll inside it, clear of the tools at its foot.
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
-              className="glass-dark relative mx-auto"
+              ref={picBox}
+              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact")}
               style={
                 {
                   maxWidth: fit,
@@ -6870,9 +7595,12 @@ export function RoofDesigner(props: {
                   ...(phone && stage
                     ? {
                         paddingTop: stage.pt,
-                        paddingBottom: stage.pb,
+                        paddingBottom: phoneBelow,
+                        marginLeft: -stage.bleed,
+                        marginRight: -stage.bleed,
+                        maxWidth: "none",
                         marginBottom: PHONE_BANDS.rail,
-                        "--pic-h": `${stage.photoH + stage.pb}px`,
+                        "--pic-h": `${stage.photoH + phoneBelow}px`,
                       }
                     : {}),
                 } as React.CSSProperties
@@ -7346,7 +8074,17 @@ export function RoofDesigner(props: {
                   Hold Ctrl (⌘ on a Mac) and scroll to zoom
                 </p>
               )}
-              <div className="overflow-hidden rounded-lg bg-surface-2">
+              <div className={clsx("relative overflow-hidden bg-surface-2", phone ? "rounded-none" : "rounded-lg")}>
+                {zooming && (
+                  <div
+                    className="absolute inset-0 z-[5] touch-none"
+                    aria-label="Pinch to zoom, drag to move"
+                    onPointerDown={onPinchDown}
+                    onPointerMove={onPinchMove}
+                    onPointerUp={onPinchUp}
+                    onPointerCancel={onPinchUp}
+                  />
+                )}
                 <svg
                   ref={svg}
                   viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
@@ -7595,16 +8333,6 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
-                  {/* The home's day: night, each panel lit as the sun reaches it, and the sun on its arc. */}
-                  {homeDay.day && homeDay.step && (
-                    <DayOverlay
-                      day={homeDay.day}
-                      step={homeDay.step}
-                      panels={standingPanels.map((p) => p.corners.map(px))}
-                      view={view}
-                      u={u}
-                    />
-                  )}
                   {/* Guide lines, at rest: thin gold lines along the roof edges they were drawn on. */}
                   {!guide &&
                     rules.map((g) => (
@@ -8247,6 +8975,23 @@ export function RoofDesigner(props: {
                       />
                     </g>
                   )}
+                  {/* A + on each side of the picked array: dragged out it adds a row or column there, dragged in it takes them away. */}
+                  {growSpots.map((handle) => {
+                    const [hx, hy] = px(handle.at);
+                    return (
+                      <g key={handle.side} style={{ cursor: "pointer" }}>
+                        <title>Press to add a row of panels here. Drag out for more, or in to take them away.</title>
+                        <circle cx={hx} cy={hy} r={5.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.3 * u} />
+                        <path
+                          d={`M${hx - 2.6 * u},${hy} h${5.2 * u} M${hx},${hy - 2.6 * u} v${5.2 * u}`}
+                          stroke="#0b0c0e"
+                          strokeWidth={1.3 * u}
+                          strokeLinecap="round"
+                          fill="none"
+                        />
+                      </g>
+                    );
+                  })}
                   {/* One panel picked: a grip in its middle to drag it by, and a handle above it to turn it with. */}
                   {grip && (
                     <g pointerEvents="none">
@@ -8304,11 +9049,34 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
+              {/* Zoom mode on a phone: what it does, and the way out, at the picture's foot. */}
+              {phone && stage && zooming && (
+                <div
+                  className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
+                  style={{ top: stage.pt + stage.photoH - 44 }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setZooming(false)}
+                    className="flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-lift"
+                  >
+                    <Search className="size-3.5" aria-hidden />
+                    Pinch to zoom · Done
+                  </button>
+                </div>
+              )}
 
               {/* Which picture of the roof is under the design: Google's or a Nearmap capture (3 Nov 2026, as Primero's). */}
               {/* In the pop-up, Publish in the top right corner, and the picture's switch level with Ask Sol. */}
               {props.tight && publishControl && (
-                <div className={clsx("pointer-events-auto absolute z-30", phone ? "right-3 top-[6.75rem]" : "right-4 top-4")}>
+                <div
+                  className={clsx(
+                    "pointer-events-auto absolute",
+                    // Over the roof pitch marks and the pad while its menu is open.
+                    menu === "designs" ? (phone ? "z-[90]" : "z-50") : "z-30",
+                    phone ? "right-3 top-[1.25rem]" : sideways ? "right-3 top-3" : "right-4 top-4",
+                  )}
+                >
                   {publishControl}
                 </div>
               )}
@@ -8317,55 +9085,46 @@ export function RoofDesigner(props: {
                   "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
                   // On a phone it stands over Ask Sol, not beside it.
                   props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
-                  // The day's bar takes the foot of the picture while it plays.
-                  homeDay.on && "hidden",
+                  // Sideways the dial for what is picked takes the foot; on a phone upright these are in the toolbar under the picture.
+                  solHolds && "hidden",
                 )}
               >
                 <div className="flex items-center gap-2">
-                  {/* The home's day: the design played through a day. */}
-                  <button
-                    onClick={() => (homeDay.on ? homeDay.close() : homeDay.open())}
-                    aria-pressed={homeDay.on}
-                    title="The home's day: the sun across the roof, and the home's power hour by hour"
-                    className={clsx(
-                      "flex h-11 items-center gap-1.5 rounded-full border border-line px-4 text-[13px] font-semibold shadow-lift",
-                      homeDay.on ? "bg-sun-line text-white" : "bg-surface text-ink hover:bg-canvas",
-                    )}
-                  >
-                    <Sunrise className="size-4" aria-hidden />
-                    Day
-                  </button>
                   {/* Roof and Sides (10 Nov 2026, Martin: make Sides stand out; Drawn left this pair and lives in the
                       tools): the roof from above, and the house from its four sides in Nearmap's angled photos. */}
+                  {/* Sideways (21 Nov 2026, Martin) they are icons, one above the other, to leave the roof in view. */}
                   <div
                     role="group"
                     aria-label="The roof from above, or the house from its sides"
-                    className="flex items-center rounded-full border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift"
+                    className={clsx(
+                      "flex items-center border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift",
+                      sideways ? "flex-col gap-1 rounded-[1.4rem]" : "rounded-full",
+                    )}
                   >
                     <button
                       onClick={() => illustrated && toggleIllustrated()}
                       aria-pressed={!illustrated}
+                      aria-label="The roof from above"
                       title="The roof from above"
                       className={clsx(
-                        "flex h-9 items-center gap-1.5 rounded-full px-3.5",
+                        "flex h-9 items-center gap-1.5 rounded-full",
+                        sideways ? "w-9 justify-center" : "px-3.5",
                         !illustrated ? "bg-sun-line text-white" : "text-ink hover:bg-canvas",
                       )}
                     >
                       <House className="size-4" aria-hidden />
-                      Roof
+                      {!sideways && "Roof"}
                     </button>
-                    {props.sidesReady && <SideViewsButton lat={spot.lat} lng={spot.lng} tab />}
+                    {props.sidesReady &&
+                      (sideways ? (
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon />
+                      ) : (
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab />
+                      ))}
                   </div>
                 </div>
                 {props.pictureMenu}
               </div>
-              {/* The day's bar, along the foot of the picture like a player's: low, so the roof and the sun stay in view,
-                  and clear of the round that moves the picture (bottom left). The other controls at the foot step aside. */}
-              {homeDay.on && (
-                <div className={clsx("pointer-events-none absolute left-[5.25rem] right-3 z-30", props.tight ? "bottom-7" : "bottom-3")}>
-                  <HomeDayCard state={homeDay} hasBattery={battery !== undefined} hasHome={(finance?.dailyKwh ?? 0) > 0} />
-                </div>
-              )}
               {/* Drawn, with no face traced and none from Google: there is nothing to draw the roof from yet. */}
               {illustrated && !art && modelFaces === "none" && (
                 <p className="pointer-events-none absolute bottom-20 right-3 z-10 w-64 rounded-lg border border-line bg-surface/90 px-3 py-2 text-[12px] text-ink-2 shadow-lift">
@@ -8381,8 +9140,9 @@ export function RoofDesigner(props: {
 
               {/* The roof's pitch (1 Nov 2026, Martin, as Primero's): until a person has set it for this home, a card asks for it
                   (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}
-              {quoteNow.form.pitchSet && (
+              {quoteNow.form.pitchSet && (!solHolds || phonePitch) && (
                 <RoofPitches
+                  {...(phone && stage ? { top: `${Math.round((stage.pt + stage.photoH / 2) / 0.68)}px` } : {})}
                   roofs={roofPitches}
                   flat={quoteNow.form.roof === "flat"}
                   active={roofInUse}
@@ -8427,7 +9187,8 @@ export function RoofDesigner(props: {
                   reading={pitchReading}
                 />
               )}
-              {!quoteNow.form.pitchSet && (
+              {/* Sideways there is no room for both: Sol's step first, the pitch after it. */}
+              {!quoteNow.form.pitchSet && !(sideways && guideActive) && (
                 <PitchFirst
                   key={`${active}-${pitchGuess?.at === spotKey ? pitchGuess.read.pitch : ""}`}
                   pitch={pitchGuess?.at === spotKey && !pitchGuess.read.flat ? pitchGuess.read.pitch : (quoteNow.form.pitch ?? TILT.roof)}
@@ -8700,6 +9461,7 @@ export function RoofDesigner(props: {
                   them, or over them when they are low on the picture. */}
               {tool === "select" &&
                 pickedPanels.length > 0 &&
+                !solHolds &&
                 (() => {
                   const corners = pickedPanels.flatMap((p) => looseCorners(p, size));
                   const xs = corners.map((c) => ((ROOF_IMAGE.width / 2 + c.x / scale - view.x) / view.w) * 100);
@@ -9111,7 +9873,7 @@ export function RoofDesigner(props: {
                               </span>
                               {s.e.unchecked ? (
                                 <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                  <span className="text-sun-ink">Found online, not checked yet</span>
+                                  <span className="text-sun-ink">Not checked by your business yet</span>
                                   <a
                                     href={`/api/design/datasheets/file?kind=${s.kind}&sku=${encodeURIComponent(s.sku)}`}
                                     target="_blank"
@@ -9155,74 +9917,80 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               ) : picks.length > 0 ? (
-                <Dial
-                  label="What is picked"
-                  dark
-                  onTurn={null}
-                  onClose={() => setPicks([])}
-                  closeTitle="Pick none (Esc)"
-                  onRemove={removePicked}
-                >
-                  <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
-                    {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "1 panel") : `${picks.length} picked`}
-                  </p>
-                  {pickedPanels.length > 0 && (
-                    <>
-                      {/* Portrait or landscape for the picked panels, as two small drawn panels (as Primero's). */}
-                      <div className="mt-2 flex justify-end gap-1" role="radiogroup" aria-label="The picked panels' way round">
-                        {([false, true] as const).map((land) => {
-                          const on = pickedPanels.every((p) => Boolean(p.across) === land);
-                          return (
-                            <button
-                              key={String(land)}
-                              type="button"
-                              role="radio"
-                              aria-checked={on}
-                              title={land ? "Lay them landscape" : "Lay them portrait"}
-                              onClick={() => turnLandscape(land)}
-                              className={clsx(
-                                "flex size-9 items-center justify-center rounded-lg transition",
-                                on ? "bg-sun-line text-white" : "bg-white/10 text-white/75 hover:bg-white/20 hover:text-white",
-                              )}
-                            >
-                              <PanelDrawing landscape={land} size={20} />
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <label className="mt-2 block">
-                        <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">Tilt</span>
-                        <span className="block text-[1.75rem] font-semibold leading-none tabular-nums text-white">
-                          {pickedTilt === null ? "mixed" : `${pickedTilt}°`}
-                        </span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={TILT.max}
-                          value={pickedTilt ?? TILT.roof}
-                          onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
-                          {...slides}
-                          className="mt-2 block w-full"
-                        />
-                      </label>
-                      <p className="mt-2.5 text-xs leading-snug text-white/75">
-                        {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
-                      </p>
-                      {pickedFacing !== null && pickedTilt !== null && (
-                        <>
-                          <p className="text-xs font-semibold leading-snug text-white">{besideFlat(pickedTilt, pickedFacing)}</p>
-                          <p className="text-xs leading-snug text-white/60">
-                            {bestTilt(pickedFacing) === 0 ? "Flat is best" : `${bestTilt(pickedFacing)}° is best`}
-                          </p>
-                        </>
-                      )}
-                    </>
-                  )}
-                </Dial>
+                solHolds ? null : (
+                  <Dial
+                    label="What is picked"
+                    dark
+                    small={sideways || phone}
+                    {...(dialFit ? { fit: dialFit } : {})}
+                    onTurn={null}
+                    onClose={() => setPicks([])}
+                    closeTitle="Pick none (Esc)"
+                    onRemove={removePicked}
+                  >
+                    <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">
+                      {picks.length === 1 ? (picks[0].kind === "label" ? "Label" : "1 panel") : `${picks.length} picked`}
+                    </p>
+                    {pickedPanels.length > 0 && (
+                      <>
+                        {/* Portrait or landscape for the picked panels, as two small drawn panels (as Primero's). */}
+                        <div className="mt-2 flex justify-end gap-1" role="radiogroup" aria-label="The picked panels' way round">
+                          {([false, true] as const).map((land) => {
+                            const on = pickedPanels.every((p) => Boolean(p.across) === land);
+                            return (
+                              <button
+                                key={String(land)}
+                                type="button"
+                                role="radio"
+                                aria-checked={on}
+                                title={land ? "Lay them landscape" : "Lay them portrait"}
+                                onClick={() => turnLandscape(land)}
+                                className={clsx(
+                                  "flex size-9 items-center justify-center rounded-lg transition",
+                                  on ? "bg-sun-line text-white" : "bg-white/10 text-white/75 hover:bg-white/20 hover:text-white",
+                                )}
+                              >
+                                <PanelDrawing landscape={land} size={20} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <label className="mt-2 block">
+                          <span className="block text-[10px] font-medium uppercase tracking-[0.12em] text-white/60">Tilt</span>
+                          <span className="block text-[1.75rem] font-semibold leading-none tabular-nums text-white">
+                            {pickedTilt === null ? "mixed" : `${pickedTilt}°`}
+                          </span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={TILT.max}
+                            value={pickedTilt ?? TILT.roof}
+                            onChange={(e) => amend((p) => ({ ...p, tilt: Number(e.target.value) }))}
+                            {...slides}
+                            className="mt-2 block w-full"
+                          />
+                        </label>
+                        <p className="mt-2.5 text-xs leading-snug text-white/75">
+                          {pickedFacing === null ? "Facing different ways" : `Facing ${compass(pickedFacing)} (${pickedFacing}°)`}
+                        </p>
+                        {pickedFacing !== null && pickedTilt !== null && (
+                          <>
+                            <p className="text-xs font-semibold leading-snug text-white">{besideFlat(pickedTilt, pickedFacing)}</p>
+                            <p className="text-xs leading-snug text-white/60">
+                              {bestTilt(pickedFacing) === 0 ? "Flat is best" : `${bestTilt(pickedFacing)}° is best`}
+                            </p>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </Dial>
+                )
               ) : (
                 face && (
                   <Dial
                     label="Turn the rows"
+                    small={sideways || phone}
+                    {...(dialFit ? { fit: dialFit } : {})}
                     // The rows run the same turned half way round, so their angle stays between a quarter turn either way.
                     onTurn={(step) => {
                       const angle = ((((face.angle + step + 90) % 180) + 180) % 180) - 90;
@@ -9256,7 +10024,11 @@ export function RoofDesigner(props: {
                   beneath, centred under the three. (Which design is open is in the bar at the top of the page, and
                   the customer's bill in the figures above the picture.) */}
               <div
-                className={clsx("absolute left-1/2 z-20 flex -translate-x-1/2 flex-col items-center", phone ? "top-2" : "top-4")}
+                className={clsx(
+                  "absolute z-20 flex -translate-x-1/2 flex-col items-center",
+                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner.
+                  phone ? "designer-kit left-[calc(50%-1.1rem)] top-[0.78rem]" : "left-1/2 top-4",
+                )}
                 role="group"
                 aria-label="System"
                 data-menu-host
@@ -9295,42 +10067,53 @@ export function RoofDesigner(props: {
                       <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
                     </button>
                     {menu === "panels" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 overflow-y-auto rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
+                        {kitSearchHere("Search panels")}
                         {[
                           ...(panel && !chosenPanel ? [{ ...panel, sizeKnown: true, gone: true }] : []),
                           ...favourites.sorted("panels", props.catalogue).map((p) => ({ ...p, gone: false })),
-                        ].map((p) => (
-                          <div key={p.sku} className="group flex items-start gap-1">
-                            <button
-                              onClick={() => {
-                                if (!p.gone) choosePanel(p.sku);
-                                openMenu(false);
-                              }}
-                              className={clsx(
-                                "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
-                                p.sku === chosen && "bg-canvas",
-                              )}
-                            >
-                              <Check className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")} aria-hidden />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-semibold">{p.name}</span>
-                                <ModelNo sku={p.sku} />
-                                <span className="block text-xs tabular-nums text-muted">
-                                  {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
-                                  {p.gone ? " · no longer in our range" : ""}
+                        ]
+                          .filter((p) => p.gone || seeks(`${p.name} ${p.sku}`))
+                          .map((p) => (
+                            <div key={p.sku} className="group flex items-start gap-1">
+                              <button
+                                onClick={() => {
+                                  if (!p.gone) choosePanel(p.sku);
+                                  openMenu(false);
+                                }}
+                                className={clsx(
+                                  "flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left hover:bg-canvas",
+                                  p.sku === chosen && "bg-canvas",
+                                )}
+                              >
+                                <Check
+                                  className={clsx("mt-0.5 size-4 shrink-0", p.sku === chosen ? "text-ink" : "invisible")}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold">{p.name}</span>
+                                  <ModelNo sku={p.sku} />
+                                  <span className="block text-xs tabular-nums text-muted">
+                                    {p.watts} W · {p.sizeKnown ? `${p.long} × ${p.short} m` : "size not on file"}
+                                    {p.gone ? " · no longer in our range" : ""}
+                                  </span>
                                 </span>
-                              </span>
-                            </button>
-                            {!p.gone && (
-                              <FavouriteStar
-                                on={favourites.is("panels", p.sku)}
-                                onToggle={() => favourites.toggle("panels", p.sku)}
-                                name={p.name}
-                              />
-                            )}
-                          </div>
-                        ))}
+                              </button>
+                              {!p.gone && (
+                                <FavouriteStar
+                                  on={favourites.is("panels", p.sku)}
+                                  onToggle={() => favourites.toggle("panels", p.sku)}
+                                  name={p.name}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        {kitSearchFoot("Search panels")}
                       </div>
                     )}
                   </div>
@@ -9355,7 +10138,11 @@ export function RoofDesigner(props: {
                       <PlugZap className="size-5" aria-hidden />
                     </button>
                     {menu === "chargers" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {charger ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -9392,21 +10179,11 @@ export function RoofDesigner(props: {
                             <p className={clsx(label, "mt-2 px-2 py-1")}>
                               {charger ? "Change it" : "Chargers to choose from"} · {(props.chargers ?? []).length} on your lists
                             </p>
-                            <input
-                              value={seek}
-                              onChange={(e) => setSeek(e.target.value)}
-                              placeholder="Search EV chargers"
-                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                            />
-                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {kitSearchHere("Search EV chargers")}
+                            <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("chargers", props.chargers ?? [])
-                                .filter((c) =>
-                                  seek
-                                    .toLowerCase()
-                                    .split(/\s+/)
-                                    .every((word) => `${c.name} ${c.sku}`.toLowerCase().includes(word)),
-                                )
+                                .filter((c) => seeks(`${c.name} ${c.sku}`))
                                 .map((c) => (
                                   <div key={c.sku} className="group flex items-start gap-1">
                                     <button
@@ -9434,6 +10211,7 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
+                            {kitSearchFoot("Search EV chargers")}
                           </>
                         )}
                       </div>
@@ -9461,7 +10239,11 @@ export function RoofDesigner(props: {
                       )}
                     </button>
                     {menu === "inverters" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -9542,6 +10324,47 @@ export function RoofDesigner(props: {
                             )}
                           </div>
                         )}
+                        {phaseAsk && (
+                          <div role="alert" className="mt-2 rounded-lg border border-danger/40 bg-danger/10 p-2.5" data-phase-ask>
+                            <p className="text-sm font-semibold text-danger">Single-phase home</p>
+                            <p className="mt-1 text-xs leading-relaxed text-ink">{clashWords(phaseAsk.inverter.name)}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <button
+                                className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-ink"
+                                onClick={() => setPhaseAsk(null)}
+                              >
+                                Choose another
+                              </button>
+                              <button
+                                className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold"
+                                title="Only if the home really has a three-phase supply: check the meter box or the bill"
+                                onClick={() => {
+                                  const held = phaseAsk;
+                                  setQuote({ ...quoteNow, form: { ...quoteNow.form, phase: "three" } });
+                                  setPhaseAsk(null);
+                                  setFitted(
+                                    [
+                                      ...(held.count > 1 ? [] : fitted),
+                                      ...Array.from({ length: held.count }, (_, n) => ({
+                                        sku: held.inverter.sku,
+                                        name: held.inverter.name,
+                                        kw: held.inverter.kw,
+                                        x: cm((view.x + view.w * (0.8 - (fitted.length + n) * 0.06) - ROOF_IMAGE.width / 2) * scale),
+                                        y: cm((view.y + view.h * 0.36 - ROOF_IMAGE.height / 2) * scale),
+                                      })),
+                                    ].slice(0, MAX_INVERTERS),
+                                  );
+                                  setSuggesting(false);
+                                  openMenu(false);
+                                  setSeek("");
+                                  setSaved("changed");
+                                }}
+                              >
+                                The home is three phase: set it and add
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <p className={clsx(label, "mt-2 px-2 py-1")}>
                           {fitted.length >= MAX_INVERTERS
                             ? `That is the most a design takes (${MAX_INVERTERS})`
@@ -9551,14 +10374,8 @@ export function RoofDesigner(props: {
                         </p>
                         {fitted.length < MAX_INVERTERS && (
                           <>
-                            <input
-                              autoFocus
-                              value={seek}
-                              onChange={(e) => setSeek(e.target.value)}
-                              placeholder="Search inverters"
-                              className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                            />
-                            <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                            {kitSearchHere("Search inverters")}
+                            <div className="mt-1 space-y-0.5">
                               {favourites
                                 .sorted("inverters", props.inverters)
                                 .filter((i) =>
@@ -9578,6 +10395,11 @@ export function RoofDesigner(props: {
                                         <span className="block text-sm font-semibold">{i.name}</span>
                                         <ModelNo sku={i.sku} />
                                         <span className="block text-xs tabular-nums text-muted">
+                                          {clashesWithSupply(i, quoteNow.form.phase) && (
+                                            <span className="font-semibold text-danger">
+                                              Three phase: not for this single-phase home ·{" "}
+                                            </span>
+                                          )}
                                           {i.kw} kW ·{" "}
                                           {i.electrical
                                             ? `${i.electrical.mppts.length} inputs, up to ${i.electrical.maxVoltage} V · strings can be checked`
@@ -9593,6 +10415,7 @@ export function RoofDesigner(props: {
                                   </div>
                                 ))}
                             </div>
+                            {kitSearchFoot("Search inverters")}
                           </>
                         )}
                       </div>
@@ -9638,7 +10461,11 @@ export function RoofDesigner(props: {
                       {battery && <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{batteryKwh} kWh</span>}
                     </button>
                     {menu === "batteries" && (
-                      <div className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2">
+                      <div
+                        ref={kitMenu}
+                        onScroll={kitScrolled}
+                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                      >
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {battery ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -9778,13 +10605,8 @@ export function RoofDesigner(props: {
                             </button>
                           </p>
                         )}
-                        <input
-                          value={seek}
-                          onChange={(e) => setSeek(e.target.value)}
-                          placeholder="Search batteries"
-                          className="block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none focus:border-forest"
-                        />
-                        <div className="mt-1 max-h-[40vh] space-y-0.5 overflow-y-auto">
+                        {kitSearchHere("Search batteries")}
+                        <div className="mt-1 space-y-0.5">
                           {favourites
                             .sorted("batteries", batteriesShown)
                             .filter((b) =>
@@ -9820,6 +10642,7 @@ export function RoofDesigner(props: {
                               </div>
                             ))}
                         </div>
+                        {kitSearchFoot("Search batteries")}
                       </div>
                     )}
                   </div>
@@ -9829,7 +10652,7 @@ export function RoofDesigner(props: {
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
               <div
-                className={clsx("absolute z-20 size-[6.25rem]", phone ? "left-3 top-[4.9rem]" : "left-4 top-4")}
+                className={clsx("absolute z-20 size-[6.25rem]", solHolds ? "hidden" : "left-4 top-4")}
                 role="toolbar"
                 aria-label="Select, add a panel, landscape, erase"
               >
@@ -10152,18 +10975,68 @@ export function RoofDesigner(props: {
                   </ToolFan>
                 </div>
               )}
-              {tips.corner}
+              {!(solHolds && picks.length > 0) && tips.corner}
+              {phone && stage && turnHint && !zooming && (
+                <div
+                  className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
+                  style={{ top: stage.pt + stage.photoH - (solHolds ? 34 + 64 : 34) }}
+                >
+                  <p className="flex items-center gap-1.5 rounded-full bg-primary/90 py-0.5 pl-2.5 pr-0.5 text-[11px] text-white shadow-lift backdrop-blur-md">
+                    <Smartphone className="size-3 rotate-90 text-sun-line" aria-hidden />
+                    Turn sideways for a bigger view
+                    <button
+                      type="button"
+                      onClick={putTurnHintAway}
+                      aria-label="Put this away"
+                      className="flex size-6 items-center justify-center rounded-full text-white/60 hover:text-white"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  </p>
+                </div>
+              )}
+              {sideways && solHolds && homeHint && !zooming && (
+                <div className="pointer-events-auto absolute left-2 top-2 z-20 max-w-[17rem]">
+                  <p className="flex items-start gap-1.5 rounded-2xl bg-primary/90 py-1.5 pl-2.5 pr-0.5 text-[11px] leading-snug text-white shadow-lift backdrop-blur-md">
+                    {homeHint === "ios" ? (
+                      <Share className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    ) : (
+                      <Maximize className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    )}
+                    <span>
+                      {HOME_SCREEN_LEAD} <span className="font-semibold">{HOME_SCREEN_STEPS[homeHint]}</span>.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={putHomeHintAway}
+                      aria-label="Put this away"
+                      className="-my-1 flex size-7 shrink-0 items-center justify-center rounded-full text-white/60 hover:text-white"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  </p>
+                </div>
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
-              {guideActive && !menu && !(props.tight && !solAway && (commandReply || commandBusy)) && (
+              {guideShown && (
                 <div
                   className={clsx(
                     "pointer-events-none absolute inset-x-0 flex justify-center",
                     // Above Sol's box while it is open (16 Nov 2026, Martin: the box hid the step at hand).
                     props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
-                    !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
+                    // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
+                    (underUp || sideDeck) && "sol-moulded",
+                    sideways
+                      ? sideDeck
+                        ? "sideways-sol sideways-deck bottom-0"
+                        : "sideways-sol bottom-[5.5rem]"
+                      : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
-                  style={phone && stage ? { top: stage.pt + stage.photoH + 6 } : undefined}
+                  style={
+                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                  }
+                  ref={sideDeck ? sideDeckRef : undefined}
                 >
                   <SolGuide
                     step={guideNow}
@@ -10175,7 +11048,14 @@ export function RoofDesigner(props: {
                             doubt: lotDoubt(lot),
                             nearby: props.onPickAddress ? lot.nearby : [],
                           }
-                        : null
+                        : {
+                            address: props.address.split(",")[0],
+                            found: true,
+                            doubt: lotMissing
+                              ? "I couldn't check it against the land register just now: check it's the house in the middle of the picture."
+                              : null,
+                            nearby: [],
+                          }
                     }
                     canSearch={Boolean(props.onSearchAddress)}
                     placing={
@@ -10220,31 +11100,209 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {/* Sol beside the design: one suggestion or question at a time, over Ask Sol, never while his panel is out. */}
-              {!guideActive &&
-                !solQuiet &&
-                nudges.length > 0 &&
-                !menu &&
-                !opening &&
-                !calcOpen &&
-                !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
-                !(!props.tight && commandOpen) && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-[6.25rem] z-30 flex justify-center">
-                    <SolNudges
-                      nudges={nudges}
-                      onAct={actOnNudge}
-                      onDismiss={(id) => {
-                        setResumeSaid(true);
-                        setNudgesAside((a) => [...a, id]);
-                      }}
-                      resume={resumeLine}
-                      focus={nudgeFocus}
-                      onBack={nudgeDone.length ? nudgeBack : guideOn && guideAnswered.length ? guideBack : null}
-                    />
-                  </div>
-                )}
+              {nudgeShown && (
+                <div
+                  className={clsx(
+                    "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
+                    // Sideways it stands above Sol's round, which holds the tools there too.
+                    (underUp || sideDeck) && "sol-moulded",
+                    sideways
+                      ? sideDeck
+                        ? "sideways-sol sideways-deck bottom-0"
+                        : "sideways-sol bottom-[5.5rem]"
+                      : !phone && "bottom-[6.25rem]",
+                  )}
+                  style={
+                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                  }
+                  ref={sideDeck ? sideDeckRef : undefined}
+                >
+                  <SolNudges
+                    nudges={nudges}
+                    onAct={actOnNudge}
+                    onDismiss={(id) => {
+                      setResumeSaid(true);
+                      setNudgesAside((a) => [...a, id]);
+                    }}
+                    resume={resumeLine}
+                    focus={nudgeFocus}
+                    onBack={nudgeDone.length ? nudgeBack : guideOn && guideAnswered.length ? guideBack : null}
+                  />
+                </div>
+              )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
-              <div className="absolute bottom-8 left-4 z-10">
+              {/* The hand to grab the map, in reach on a phone (22 Nov 2026, Martin: "an easy way of selecting the grab
+                  tool… grab the map and reposition and recenter the rooftop"): one round, lit while in hand; again puts it down. */}
+              {solHolds && !(picks.length > 0 && !solTray) && (
+                <div
+                  className="pointer-events-auto absolute z-[55]"
+                  // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
+                  style={
+                    deckUp
+                      ? { left: "calc(50% + 3.75rem)", top: foot ?? 0, transform: "translate(-50%, -50%)" }
+                      : sideways
+                        ? { left: "calc(50% + 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
+                        : { left: "calc(50% + 3.75rem)", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => pickTool(tool === "pan" ? "select" : "pan")}
+                    aria-pressed={tool === "pan"}
+                    aria-label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                    title={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                    className={clsx(
+                      "flex items-center justify-center rounded-full border shadow-lift",
+                      sideways ? "size-9" : "size-11",
+                      tool === "pan" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Hand className={sideways ? "size-5" : "size-6"} aria-hidden />
+                  </button>
+                  {/* Erase beside the hand (22 Nov 2026, Martin: out of Sol's tools, onto the map). */}
+                  <button
+                    type="button"
+                    onClick={() => pickTool(tool === "erase" ? "select" : "erase")}
+                    aria-pressed={tool === "erase"}
+                    aria-label={tool === "erase" ? "Put the eraser down" : "Erase: press or drag across what to take away"}
+                    title={tool === "erase" ? "Put the eraser down" : "Erase: press or drag across what to take away"}
+                    className={clsx(
+                      "absolute bottom-0 left-full ml-2 flex items-center justify-center rounded-full border shadow-lift",
+                      sideways ? "size-9" : "size-11",
+                      tool === "erase" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
+                    )}
+                  >
+                    <Eraser className={sideways ? "size-[18px]" : "size-5"} aria-hidden />
+                  </button>
+                </div>
+              )}
+              {/* Sol's card under the picture, an outlined box whose outline runs round him (22 Nov 2026, Martin): a ring
+                  of the same line round his round, meeting the box's edge at its notch. */}
+              {(deckUp || sideDeckUp) && (guideShown || nudgeShown) && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute z-[54] rounded-full border-[1.5px] border-sun-line/70"
+                  style={
+                    sideDeckUp
+                      ? { left: "50%", bottom: sideDeckH, width: 60, height: 60, transform: "translate(-50%, 50%)" }
+                      : { left: "50%", top: foot ?? 0, width: 60, height: 60, transform: "translate(-50%, -50%)" }
+                  }
+                />
+              )}
+              {/* The panel round, on the map's bottom centre on a phone (22 Nov 2026, Martin: out of Sol's tool kit, on the map):
+                  a press takes up Add a panel and asks which way they go down; a press with it in hand puts it down. */}
+              {solHolds && !solTray && picks.length === 0 && (
+                <div
+                  className="pointer-events-auto absolute z-[55] flex flex-col items-center"
+                  style={
+                    sideways
+                      ? { left: "calc(50% - 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
+                      : deckUp
+                        ? { left: "calc(50% - 3.75rem)", top: (foot ?? 300) + 22, transform: "translate(-50%, -100%)" }
+                        : { left: "50%", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
+                  }
+                >
+                  {panelCard && tool === "panel" && (
+                    <div
+                      className="mb-2 w-56 rounded-2xl bg-surface p-1.5 text-ink shadow-lift ring-1 ring-line"
+                      role="radiogroup"
+                      aria-label="New panels"
+                    >
+                      <span className="grid grid-cols-2 gap-1.5">
+                        {([false, true] as const).map((land) => (
+                          <button
+                            key={String(land)}
+                            type="button"
+                            role="radio"
+                            aria-checked={addLandscape === land}
+                            onClick={() => {
+                              setAddLandscape(land);
+                              setPanelCard(false);
+                            }}
+                            className={clsx(
+                              "flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-semibold",
+                              addLandscape === land ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-2",
+                            )}
+                          >
+                            <PanelDrawing landscape={land} size={24} />
+                            {land ? "Landscape" : "Portrait"}
+                          </button>
+                        ))}
+                      </span>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={addLandscape === null}
+                        onClick={() => {
+                          setAddLandscape(null);
+                          setPanelCard(false);
+                        }}
+                        className={clsx(
+                          "mt-1.5 w-full rounded-xl px-2 py-1.5 text-[11px] font-medium",
+                          addLandscape === null ? "bg-sun text-sun-ink" : "text-muted",
+                        )}
+                      >
+                        Follow the roof face
+                      </button>
+                    </div>
+                  )}
+                  <div className="relative">
+                    {/* Select, the pointer, beside it (22 Nov 2026, Martin: "we are missing the pointer… only discoverable in
+                      the tools menu"): the tool every other is left for, lit while in hand. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPanelCard(false);
+                        setPhonePitch(false);
+                        pickTool("select");
+                      }}
+                      aria-pressed={tool === "select"}
+                      aria-label="Select"
+                      title="Select: press a panel to pick it, drag to move it"
+                      className={clsx(
+                        "absolute bottom-0 right-full mr-2 flex items-center justify-center rounded-full border shadow-lift",
+                        sideways ? "size-9" : "size-11",
+                        tool === "select" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink",
+                      )}
+                    >
+                      <MousePointer2 className="size-5" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (tool === "panel" && !panelCard) {
+                          pickTool("select");
+                          return;
+                        }
+                        setPhonePitch(false);
+                        if (tool !== "panel") pickTool("panel");
+                        setPanelCard((v) => !v);
+                      }}
+                      aria-pressed={tool === "panel"}
+                      aria-label={tool === "panel" ? "Put Add a panel down" : "Add a panel"}
+                      title={tool === "panel" ? "Adding panels: press to stop" : "Add a panel"}
+                      className={clsx(
+                        "relative flex items-center justify-center rounded-full border shadow-lift",
+                        sideways ? "size-9" : "size-11",
+                        tool === "panel" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink",
+                      )}
+                    >
+                      <SquarePlus className="size-5" aria-hidden />
+                      {addLandscape !== null && (
+                        <span
+                          aria-hidden
+                          className={clsx(
+                            "absolute -bottom-0.5 -right-0.5 block rounded-[2px] border border-current bg-inherit",
+                            addLandscape ? "h-2 w-3" : "h-3 w-2",
+                          )}
+                        />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"
@@ -10277,6 +11335,45 @@ export function RoofDesigner(props: {
                   There&apos;s no roof data for this address to draw from. Trace the roof faces (top right) and they are drawn here.
                 </p>
               )}
+              {/* Sol's controller for what is picked (22 Nov 2026, Martin): upright a plate under the picture moulded round
+                  him, sideways the two thumbs in the picture's bottom corners and a slim pill round him. */}
+              {solHolds && picks.length > 0 && !solTray && (sideways || foot !== null) && (
+                <div
+                  className={clsx("absolute z-[54]", sideways ? "pointer-events-none inset-0" : "inset-x-0")}
+                  // A style of its own, so the phone's smaller drawing (designer-compact) leaves its thumbs full size.
+                  style={sideways ? { zIndex: 54 } : { top: foot ?? 0 }}
+                >
+                  <SolController
+                    layout={sideways ? "sideways" : "upright"}
+                    count={picks.length}
+                    panels={pickedPanels.length}
+                    tilt={pickedTilt}
+                    facing={pickedFacing === null ? null : compass(pickedFacing)}
+                    landscape={pickedPanels.every((p) => Boolean(p.across)) ? true : pickedPanels.every((p) => !p.across) ? false : null}
+                    canUndo={changedSincePicked}
+                    onUndo={undoKeepingPicks}
+                    onTurn={(degrees) => turn(degrees)}
+                    onLandscape={turnLandscape}
+                    onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
+                    onDelete={removePicked}
+                    onDone={() => setPicks([])}
+                    wholeArray={wholeArray?.length ?? null}
+                    onWholeArray={() => wholeArray && setPicks(wholeArray)}
+                    onTakeBack={(degrees) => {
+                      const mark = thumbMark.current;
+                      if (mark) history.current.takeBack = { len: mark.len };
+                      turn(-degrees);
+                    }}
+                    // Held, its turns are one step to undo (the history waits while sliding, as for the tilt slider).
+                    onHold={(holding) => {
+                      if (holding) thumbMark.current = { len: history.current.past.length };
+                      sliding.current = holding;
+                      if (!holding) setSettled((n) => n + 1);
+                    }}
+                    height={stage?.pb ?? 140}
+                  />
+                </div>
+              )}
               {/* The dock, centred on the foot of the picture, clear of the map's own mark and credit at the very bottom. The
                   comment bubble is its centre: a round larger than the rest, standing proud of the plate, with undo and
                   redo, the whole picture and the label to its left, and the two ways of looking to its right (the roof
@@ -10284,9 +11381,10 @@ export function RoofDesigner(props: {
               <div
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
-                  homeDay.on && "hidden",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
-                  props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
+                  (props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen)) || solHolds
+                    ? "z-[55]"
+                    : "z-10",
                 )}
               >
                 {/* Record a walkthrough, floating beside Ask Sol (14 Nov 2026, Martin: in sight, not in the bar): talk the
@@ -10319,6 +11417,8 @@ export function RoofDesigner(props: {
                       // Open: put away. Away (or never opened): the same panel back, his last answer in it, the box ready.
                       const shown = !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen);
                       if (shown) return putSolAway();
+                      // On a phone upright Sol holds the tools: his tray, with the way to ask him at its top.
+                      if (solHolds) return setSolTray((open) => !open);
                       tips.nudge("sol-pressed");
                       setAwayFrom(null);
                       setCommandOpen(true);
@@ -10326,18 +11426,52 @@ export function RoofDesigner(props: {
                     }}
                     aria-expanded={!solAway && commandOpen}
                     data-popup
+                    // Sideways with his plate at the foot, his middle on its top edge, as upright (the dock is drawn at 0.68).
+                    // His middle on the plate's top edge (the picture's foot upright), worked out from how far that edge
+                    // stands above where he sits (the dock is drawn at 0.68, his middle 43.5 px up).
+                    style={
+                      sideDeckUp
+                        ? { transform: `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)` }
+                        : deckUp && stage
+                          ? { transform: `translateY(${-Math.max(0, (stage.pb - 43.5) / 0.68)}px)` }
+                          : undefined
+                    }
                     title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
-                    className="pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110"
+                    className={clsx(
+                      "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
+                      // On a phone, with something picked, his card is this round grown open: no second pill under it.
+                      // Upright with his plate under the picture, he rises to sit on the picture's foot, in its notch.
+                      "transition-transform duration-300 motion-reduce:transition-none",
+                      // On a phone Sol is a round of his own, a tool and a + coming out of him: no words.
+                      solHolds && "!size-[4.5rem] !gap-0 !p-0 justify-center",
+                    )}
+                    aria-label={solHolds ? (solTray ? "Put Sol's tools away" : `Sol's tools: ${phoneSolWords}`) : undefined}
                   >
                     {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
-                    <span className="sol-orb relative flex size-11 items-center justify-center rounded-full">
+                    <span
+                      className={clsx(
+                        "sol-orb relative flex items-center justify-center rounded-full",
+                        solHolds ? "size-[3.75rem]" : "size-11",
+                      )}
+                    >
                       <span className="sol-heartbeat inline-flex">
-                        <SolMark className="size-[35px]" />
+                        <SolMark className={solHolds ? "size-12" : "size-[35px]"} />
                       </span>
-                      <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
+                      {solHolds ? (
+                        <SolEmerging
+                          tray={solTray}
+                          held={tool !== "select" && tool !== "panel" ? (TOOLS.find((x) => x.tool === tool)?.icon ?? null) : null}
+                        />
+                      ) : (
+                        <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
+                      )}
                     </span>
-                    <span className="whitespace-nowrap text-[15px] font-medium">Ask Sol</span>
-                    <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
+                    {!solHolds && (
+                      <>
+                        <span className="whitespace-nowrap text-[15px] font-medium">Ask Sol</span>
+                        <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
+                      </>
+                    )}
                   </button>
                 ) : (
                   <div

@@ -16,7 +16,7 @@ import { OPENING_WORDS, helloText, type OpeningPath } from "@/lib/domain/design/
 import { askAssistantToCall, textCustomer, useCallerInfo } from "@/lib/services/caller";
 import { leadPageFor } from "@/lib/services/hello";
 import { PATHS } from "./design-shell";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 import { CallerAvatar } from "./settings-caller";
 
 const W = OPENING_WORDS;

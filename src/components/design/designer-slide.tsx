@@ -7,7 +7,7 @@ import { Check } from "lucide-react";
 import { DESIGNER } from "@/lib/domain/design/sales-page";
 import { BrandEyebrow } from "./business-brand";
 import { LiveStyles, useMotionOk } from "./living-hero";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /**
  * The assisted designer (17 Nov 2026, Martin: the page was missing the designer, "asking for confirmations and whether

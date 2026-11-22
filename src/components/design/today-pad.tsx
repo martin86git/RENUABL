@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -40,7 +41,8 @@ import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-cha
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
-import { SolBadge, SolIcon, SolMark } from "./sol-icon";
+import { SolIcon } from "./sol-icon";
+import { SolBadge, SolMark } from "./sol-sun";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
@@ -253,7 +255,7 @@ export function TodayPad(props: {
         // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
         <div
           data-tour="today-switch"
-          className="relative z-[16] mt-1 flex justify-center print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
+          className="relative z-[16] mt-4 flex justify-center sm:mt-1 transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
         >
           <TodaySwitch
             first={firstViewLabel(insights)}
@@ -303,7 +305,16 @@ export function TodayPad(props: {
             className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
           >
             <div className="overflow-hidden">
-              <TodayChat name={props.name} views={insights} onAsk={ask} asking={asking} hidden={talking} />
+              <TodayChat
+                name={props.name}
+                views={insights}
+                onAsk={ask}
+                asking={asking}
+                hidden={talking}
+                jobs={props.jobs}
+                today={props.today}
+                items={items}
+              />
             </div>
           </div>
         </div>
@@ -517,9 +528,9 @@ export function SolBox({
             placeholder={placeholder}
             className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
+          {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
-            <AttachButton attach={attach} />
-            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
+            <AttachButton attach={attach} plus />
             <button
               type="submit"
               disabled={asking || !ready}
@@ -528,10 +539,12 @@ export function SolBox({
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
+            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
           </div>
         </>
       ) : (
         <div className="flex items-center gap-1.5">
+          <AttachButton attach={attach} plus />
           <SolBadge className="size-5 shrink-0" />
           <label className="sr-only" htmlFor={id}>
             Ask Sol
@@ -548,8 +561,6 @@ export function SolBox({
             placeholder={placeholder}
             className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
           />
-          <AttachButton attach={attach} />
-          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
           <button
             type="submit"
             disabled={asking || !ready}
@@ -558,6 +569,7 @@ export function SolBox({
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>
+          <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, 4000))} />
         </div>
       )}
     </form>
@@ -661,6 +673,8 @@ function Made({
 /** Before you call, read from the first customer's record: undefined while looking, null when there is none. */
 type CallFacts = { id: string; name: string; phone: string; email: string; facts: BeforeCall };
 function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null | undefined {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [got, setGot] = useState<{ for: string | null; facts: CallFacts | null } | null>(null);
   useEffect(() => {
     if (!jobId) return;
@@ -677,14 +691,14 @@ function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null |
           name: j.customer.name,
           phone: j.customer.phone,
           email: j.customer.email,
-          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today }),
+          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today, names: stageNames }),
         },
       });
     });
     return () => {
       gone = true;
     };
-  }, [jobId, today]);
+  }, [jobId, today, stageNames]);
   if (!jobId) return null;
   return got?.for === jobId ? got.facts : undefined;
 }
@@ -1123,6 +1137,8 @@ function MailBadge({ mark }: { mark: MailMark }) {
 
 /** The deals being sold as a board, or the numbers. */
 export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [numbers, setNumbers] = useState(false);
   // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
   const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);
@@ -1158,7 +1174,7 @@ export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: I
           <p className="animate-pulse text-center text-sm text-muted">Looking…</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {pipelineBoard(jobs).map((s) => (
+            {pipelineBoard(jobs, 6, stageNames).map((s) => (
               <div key={s.stage} className="rounded-2xl bg-canvas p-3">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">

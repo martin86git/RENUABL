@@ -425,8 +425,11 @@ export function coachPrompt(o: {
   /** Another assistant than the sales one (the post-sale assistant): what it does, and what no note can change. */
   job?: string;
   fixed?: readonly string[];
+  /** Where the business's phone line stands and how to get it going (add-ons.ts `phoneFacts`), a fact a line. */
+  phone?: readonly string[];
 }): string {
   const name = oneLine(o.assistant, 30) || "the assistant";
+  const phone = (o.phone ?? []).map((l) => `- ${oneLine(l, 400)}`).join("\n");
   const business = oneLine(o.business, 60) || "the business";
   const notes = o.notes.length ? o.notes.map((n) => `- [${n.id}]${n.locked ? " (locked rule)" : ""} ${n.text}`).join("\n") : "(none yet)";
   const history = o.history
@@ -466,7 +469,14 @@ ${
 `
     : ""
 }
-Your name and voice: when they ask you to go by another name, put it in rename (letters only: it's said out loud on calls). When they ask for another voice, put its id from this list in voice and say which you chose; when nothing on the list fits, say so and suggest the nearest. Otherwise leave both empty. Your picture is changed with the pencil on your photo at the top of this chat: point them there if they ask.
+${
+  phone
+    ? `Your phone line, the price and billing (facts from RENUABL; when they ask how to get a phone number, why you can't call, what calls cost or when they're billed, answer from these plainly and say exactly what to press; add nothing that isn't here, and don't send them elsewhere for something these lines answer):
+${phone}
+
+`
+    : ""
+}Your name and voice: when they ask you to go by another name, put it in rename (letters only: it's said out loud on calls). When they ask for another voice, put its id from this list in voice and say which you chose; when nothing on the list fits, say so and suggest the nearest. Otherwise leave both empty. Your picture is changed with the pencil on your photo at the top of this chat: point them there if they ask.
 Voices you can speak in (you speak in ${voiceNow} now):
 ${voiceList}
 

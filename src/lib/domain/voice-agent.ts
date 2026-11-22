@@ -792,6 +792,17 @@ export interface VapiEvent {
   endedReason: string;
   transcript: string;
   summary: string;
+  /** How long the call lasted, from the end-of-call report (0 when not said). */
+  durationSeconds: number;
+}
+
+/** A call's length from Vapi's end-of-call report: its seconds, else its milliseconds, else its start and end. */
+function durationOf(m: Record<string, unknown>, call: Record<string, unknown>): number {
+  if (typeof m.durationSeconds === "number" && Number.isFinite(m.durationSeconds)) return Math.max(0, m.durationSeconds);
+  if (typeof m.durationMs === "number" && Number.isFinite(m.durationMs)) return Math.max(0, m.durationMs / 1000);
+  const start = Date.parse(String(m.startedAt ?? call.startedAt ?? ""));
+  const end = Date.parse(String(m.endedAt ?? call.endedAt ?? ""));
+  return Number.isFinite(start) && Number.isFinite(end) && end > start ? (end - start) / 1000 : 0;
 }
 
 /** What we need from a Vapi server message, whatever else it carries. */
@@ -825,6 +836,7 @@ export function readVapiEvent(body: unknown): VapiEvent {
     endedReason: typeof m.endedReason === "string" ? m.endedReason : typeof call.endedReason === "string" ? call.endedReason : "",
     transcript: typeof artifact.transcript === "string" ? artifact.transcript.slice(0, 12000) : "",
     summary: typeof analysis.summary === "string" ? analysis.summary.slice(0, 1000) : "",
+    durationSeconds: durationOf(m, call),
   };
 }
 
@@ -875,3 +887,11 @@ export function readCallLine(text: string): { outcome: CallOutcome; headline: st
     rest: (slot ? old[2].slice(slot[0].length) : old[2]).trim(),
   };
 }
+
+/**
+ * The model the phone assistants run on unless `VAPI_MODEL` names another (22 Nov 2026, Martin: "Let's switch to
+ * haiku"): quicker to its first word than Sonnet, and a small share of a minute's cost. VERIFY on practice calls that
+ * the rules hold (no price, the two-turn opening, call screening, the tools), and set `VAPI_MODEL` to claude-sonnet-5
+ * to go back.
+ */
+export const VOICE_MODEL = "claude-haiku-5-5";

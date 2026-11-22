@@ -32,3 +32,36 @@ export function todayOpensOn(seen: TodaySeen | null, today: ISODate): TodayView 
   if (!seen || seen.day < today) return "chat";
   return seen.view;
 }
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st, 22nd. */
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const end = teen ? "th" : (({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th");
+  return `${n}${end}`;
+}
+
+/**
+ * Today's heading (22 Nov 2026, Martin: "the date (Sunday, 22nd November)" in place of "How's the business going").
+ * Read from the market's day as given, never the browser's clock.
+ */
+export function todayHeading(day: ISODate): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${DAY_NAMES[weekday]}, ${ordinal(d)} ${MONTH_NAMES[m - 1]}`;
+}

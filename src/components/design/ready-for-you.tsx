@@ -7,7 +7,7 @@ import clsx from "clsx";
 import { Check, ChevronDown, Pencil, Send } from "lucide-react";
 import { firstNameOf, type PreparedItem } from "@/lib/domain/design/prepared";
 import { PREPARED_CHANGED, dismissPrepared, loadPrepared, sendPrepared } from "@/lib/services/prepared";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 
 /** While something is still being written, the tray looks again this often, for at most this long. */
 const LOOK_EVERY_MS = 4_000;

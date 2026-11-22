@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -14,7 +15,7 @@ import {
   History,
   MessageSquarePlus,
   Minus,
-  Paperclip,
+  Plus,
   RefreshCw,
   X,
   Pin,
@@ -24,7 +25,7 @@ import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
 import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
 import {
@@ -71,7 +72,7 @@ import { SolSources } from "./sol-sources";
 import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
 import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
-import { SolMark } from "./sol-icon";
+import { SolMark } from "./sol-sun";
 import { SolThinking, SolWorking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
@@ -174,6 +175,8 @@ export function SolChat({
   onMinimise?: () => void;
   question?: { id: number; text: string; shown?: string } | null;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const router = useRouter();
   const { state, problem, run, runFor } = useSol();
   // Try another answer: the conversation from that question on is hidden while he answers it again.
@@ -772,14 +775,16 @@ export function SolChat({
                       {j.customerName} · {j.title}
                     </span>
                     <span className="block truncate text-xs text-muted">
-                      {[STAGE_LABELS[j.stage], j.address].filter(Boolean).join(" · ")}
+                      {[stageLabel(j.stage, stageNames), j.address].filter(Boolean).join(" · ")}
                     </span>
                   </button>
                 ))
               )}
             </div>
           )}
-          <div className="flex items-center gap-1.5 rounded-2xl px-1.5 ring-1 ring-line-strong focus-within:ring-sun-line">
+          {/* Laid out as Claude Code's box (21 Nov 2026, Martin): the words across the top, a + to add a file at the
+              left of the row under them, and send then the microphone at the far right. */}
+          <div className="rounded-2xl bg-surface px-1.5 pb-1.5 ring-1 ring-line focus-within:ring-sun-line">
             <input
               ref={picker}
               type="file"
@@ -788,17 +793,6 @@ export function SolChat({
               className="hidden"
               onChange={(e) => addFiles(e.target.files)}
             />
-            <button
-              type="button"
-              onClick={() => picker.current?.click()}
-              disabled={files.length >= MAX_FILES}
-              aria-label="Add a PDF or a picture"
-              title="Add a PDF (an electricity bill, a datasheet) or a picture"
-              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface hover:text-ink disabled:text-muted"
-            >
-              <Paperclip className="size-4" aria-hidden />
-            </button>
-            <DictateButton label="Speak to Sol" onHearing={setHeard} onWords={(w) => setText((t) => withSpoken(t, w).slice(0, MAX_SAID))} />
             <textarea
               ref={box}
               value={heard ? withSpoken(text, heard) : text}
@@ -835,28 +829,47 @@ export function SolChat({
               maxLength={MAX_SAID}
               placeholder="Message Sol… (# for a deal)"
               aria-label="Message Sol"
-              className="min-h-[2.75rem] flex-1 resize-none bg-transparent px-1.5 py-2.5 text-sm text-ink outline-none placeholder:text-muted"
+              className="min-h-[2.75rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
             />
-            <button
-              type="submit"
-              disabled={!text.trim() && !files.length}
-              aria-label="Send to Sol"
-              title={busy ? "Sends as soon as Sol has answered" : "Send to Sol"}
-              className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                className="size-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => picker.current?.click()}
+                disabled={files.length >= MAX_FILES}
+                aria-label="Add a file"
+                title="Add a PDF (an electricity bill, a datasheet) or a picture"
+                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface-2 hover:text-ink disabled:text-muted"
               >
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            </button>
+                <Plus className="size-[18px]" aria-hidden />
+              </button>
+              <div className="ml-auto flex items-center gap-1.5">
+                <button
+                  type="submit"
+                  disabled={!text.trim() && !files.length}
+                  aria-label="Send to Sol"
+                  title={busy ? "Sends as soon as Sol has answered" : "Send to Sol"}
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+                <DictateButton
+                  label="Speak to Sol"
+                  onHearing={setHeard}
+                  onWords={(w) => setText((t) => withSpoken(t, w).slice(0, MAX_SAID))}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </form>

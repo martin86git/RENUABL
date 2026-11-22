@@ -24,7 +24,7 @@ import {
   loadSol,
   setInductionStatus,
 } from "@/lib/services/sol";
-import { SolBadge } from "./sol-icon";
+import { SolBadge } from "./sol-sun";
 
 type Run = (go: Promise<{ ok: true; state: SolState } | { ok: false; message: string }>) => Promise<SolState | null>;
 

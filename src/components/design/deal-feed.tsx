@@ -1,5 +1,7 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
+import { useStageLabel } from "./stage-select";
 import { ContextLine } from "./context-line";
 import { dealContext } from "@/lib/domain/design/sol-on-deal";
 import { SolLive, SolTerminal, useTyped } from "./sol-on-deal";
@@ -79,11 +81,12 @@ import {
   type FeedMark,
   type LaterChoice,
 } from "@/lib/domain/design/deal-feed";
-import { OPEN_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { OPEN_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
 import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
+import { pipelinesByStage } from "@/lib/domain/design/pipeline-stages";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
 import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, type FeedAnswer } from "@/lib/services/deal-feed";
@@ -131,6 +134,8 @@ export function DealFeed(props: {
   day?: React.ReactNode;
   onDismissDay?: () => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const { me } = props;
   const [showAll, setShowAll] = useState(false);
   // The deal picked in the deals panel, shown as its card on the left.
@@ -204,12 +209,13 @@ export function DealFeed(props: {
   const [saved, setSaved] = useState<Pipeline[]>([]);
   useEffect(() => {
     let gone = false;
-    void listPipelines().then((r) => !gone && r.ok && setSaved(r.pipelines));
+    void listPipelines().then((r) => !gone && r.ok && setSaved(pipelinesByStage(r.pipelines, r.stages)));
     return () => {
       gone = true;
     };
   }, []);
-  const pipelines: readonly Pipeline[] = [...PIPELINES, ...saved];
+  // The set pipelines as the business renamed or changed them, then its own (pipeline-stages.ts).
+  const pipelines: readonly Pipeline[] = saved.length ? saved : PIPELINES;
   const pickedPipeline = pipelines.find((p) => p.id === feedPick.pipeline) ?? null;
   const now = new Date();
   const deals = useMemo(
@@ -655,7 +661,7 @@ export function DealFeed(props: {
           }}
           onNew={props.onNew}
           adding={props.adding}
-          tabs={panelTabsFor(pickedPipeline?.stages ?? null)}
+          tabs={panelTabsFor(pickedPipeline?.stages ?? null, stageNames)}
           picker={
             admin ? (
               <FeedPicker
@@ -887,7 +893,10 @@ function TodayStrip(props: {
   right: React.ReactNode;
 }) {
   return (
-    <div data-today-strip className="sticky top-2 z-20 -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)]">
+    <div
+      data-today-strip
+      className="sticky top-2 z-20 transition-[top] duration-300 ease-out motion-reduce:transition-none -mx-1 px-1 pb-1 pt-1 lg:top-[calc(var(--studio-head,4.5rem)+2.75rem)]"
+    >
       {/* One instrument (15 Nov 2026, Martin: the strip didn't look designed): equal tiles, each a label, a figure and a
           line under it, parted by hairlines; the part in view marked by a short orange line along its foot. */}
       <nav aria-label="Today at a glance" className={clsx(STRIP_BOX, "items-stretch")}>
@@ -1851,7 +1860,7 @@ function DealsPanel(props: {
   return (
     <aside
       aria-label="Deals"
-      className="mt-9 lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+3rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-11rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+      className="mt-9 transition-[top] duration-300 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+3rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-11rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
     >
       {/* Its own strip, level with Today's and the same height (15 Nov 2026, Martin). */}
       <div className={clsx(STRIP_BOX, "items-center justify-between gap-3 px-5")}>
@@ -2031,7 +2040,9 @@ const STAGE_TONES: Record<StageTone, string> = {
  * lead pill, blue with its icon, on the feed too, and the same for each stage).
  */
 function StagePill({ stage, className }: { stage: JobStage; className?: string }) {
-  const pill = stagePill(stage);
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
+  const pill = stagePill(stage, stageNames);
   const Icon = STAGE_ICONS[stage] ?? Stamp;
   return (
     <span
@@ -2107,6 +2118,8 @@ function sampleRoof(d: FeedDeal): AerialRoofSpec {
  * plain which deal the chat is about.
  */
 function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () => void; onChanged: () => void }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useStageLabel();
   const { deal: d, onClose } = props;
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -2128,7 +2141,7 @@ function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () =
             <p className="truncate text-[16px] font-semibold text-ink">{d.customer}</p>
             <p className="truncate text-[13px] text-ink-2">{d.address || d.suburb || "No address yet"}</p>
             <p className="truncate text-[12px] text-muted">
-              {d.title || "Solar"} · {STAGE_LABELS[d.stage]}
+              {d.title || "Solar"} · {stageWords(d.stage)}
             </p>
           </div>
           <Link

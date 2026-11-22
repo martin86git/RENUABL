@@ -1,7 +1,14 @@
 import { checkInverter, checkPanel, cleanSku, sheetBasis, type SheetKind } from "@/lib/domain/design/datasheets";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { businessDatasheets, confirmSheet, deleteSheet, listSheets, saveSheet } from "@/lib/server/design-datasheets-repo";
+import {
+  adoptSharedSheet,
+  businessDatasheets,
+  confirmSheet,
+  deleteSheet,
+  listSheets,
+  saveSheet,
+} from "@/lib/server/design-datasheets-repo";
 import { findDatasheet } from "@/lib/server/datasheet-finder";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -76,7 +83,11 @@ export async function POST(request: Request) {
     if (read.body.do === "confirm") {
       const who = await requireMember("prices");
       if ("refuse" in who) return who.refuse;
-      if (!(await confirmSheet(who.member.businessId, kind, sku, who.member.email)))
+      // The business's own found sheet, else one shared with it: confirming that makes it the business's own.
+      if (
+        !(await confirmSheet(who.member.businessId, kind, sku, who.member.email)) &&
+        !(await adoptSharedSheet(who.member.businessId, kind, sku, who.member.email))
+      )
         return Response.json({ ok: false, message: "There are no figures waiting to be checked for that product." }, { status: 404 });
       return Response.json({ ok: true, sheets: await listSheets(who.member.businessId) });
     }

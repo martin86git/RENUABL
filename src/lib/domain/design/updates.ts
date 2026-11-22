@@ -14,6 +14,194 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "A datasheet shared from another business is marked to check until someone in your business confirms it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Product datasheets are shared across RENUABL: one any business adds is there for every business to design with.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Your voice agents answer quicker on calls.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone: slimmer figures, more room for Sol in an outlined box, the eraser beside the hand, and a larger designs round.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, with one panel picked, All picks every panel in its array.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Double tap a 1° button on a phone to turn 5° a press, and again for 1°. Sideways, the controls sit where they do upright.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Turned sideways in a phone's browser, the designer says how to open RENUABL from your Home Screen for the full screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the pointer is on the map beside Add a panel, and holding a 1° button keeps turning the panels.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol is a little larger with one big + to open his tools.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, picked panels get a controller under the map: turn 1° with either thumb, and Undo appears after a change.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Add a panel sits on the map, and Sol is a round with a tool and a + in place of words.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol's card for picked panels is tidier: turns in one row, portrait or landscape, tilt and delete.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, sideways too, Sol holds the tools, and a hand button grabs the map to move it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Emails take a background and text colour of their own, and the editor is clearer with more room.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Marketing",
+    words: "The email editor is drag and drop: drag blocks onto the email or into a new order, type straight into it, and undo any change.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Deals",
+    words:
+      "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Team chat",
+    words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts beyond the free allowance is 50c a minute and 30c a text, and you're emailed at 80% of your spending cap.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, the figures run across the top of the screen and the panel, inverter and battery buttons are larger.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, Sol holds the tools: tap him for them, and pick panels to turn them from his card.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The designs menu lists each design's inverter, battery and EV charger, and on a phone it opens over the screen.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The Day button is gone from the designer.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright: a larger roof, smaller buttons, and a magnifier under the roof to pinch and zoom.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone turned sideways, the designer's buttons are smaller, so the roof is in view.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone, turn it sideways and the designer fills the screen, with the roof as large as it goes.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words:
+      "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts is $49 a month with 30 minutes and 30 texts free, then by use, with a spending cap you set.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Cancelling Calls & Texts or Growth gives 30 days' notice: it stays on until then, and you can change your mind.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
+    day: "2026-11-21",
+    area: "CRM",
+    words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Thirteen more Deepgram voices to pick from: British, Filipino and American, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Ten more voices to pick from: New Zealand, Indian, Irish, South African and British, each with a solar sample.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Sol",
+    words: "Set up with Sol takes you through the seven things to set up, and ticks each off as it's done.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Calls",
+    words:
+      "Calls & Texts now says when it's billed and what calls cost, asks for your number itself, and test calls work while it's set up.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Design tool",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Sol",
+    words: "Sol's chat is a soft mist blue with dark type, in place of the graphite.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Agents",
+    words: "Voices are picked from a list grouped by accent, with a play button to hear each first; the picture card plays the voice too.",
+  },
+  {
     day: "2026-11-21",
     area: "Today",
     words: "Today opens on how the month is going and what's worth changing. Salespeople see their own month.",
@@ -107,7 +295,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-20",
     area: "Floating bar",
     words:
-      "The bar on the right is slimmer and graphite, with team chat in its foot and Routines under it to match. Names show when you point at a round.",
+      "The bar on the right is slimmer and graphite, with team chat in its foot and Routines under it. Names show when you point at a round.",
   },
   {
     day: "2026-11-20",
@@ -381,8 +569,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-17",
     area: "Sol",
-    words:
-      "Ask Sol to set up a call and he puts up a card: it checks first if the customer agreed another time, books it on your press, gives you the Meet link to click and offers a reminder 1 hour, 30 or 10 minutes before.",
+    words: "Ask Sol to set up a call: a card checks the time the customer agreed, books it on your press, and offers a reminder before.",
   },
   {
     day: "2026-11-17",
@@ -499,8 +686,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-16",
     area: "Sol",
-    words:
-      "Ask Sol to set up a call and he books it in your Google Calendar with a Google Meet link, then gives you the link to send. Connect your calendar again from the date tile first.",
+    words: "Sol books calls in your Google Calendar with a Meet link to send. Connect your calendar again from the date tile first.",
   },
   {
     day: "2026-11-16",
@@ -814,8 +1000,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-13",
     area: "Calls",
-    words:
-      "Your chief of staff always speaks in a different voice from your phone assistant, and can't take its name, so nobody takes the two for the same person.",
+    words: "Your chief of staff never shares a voice or name with your phone assistant, so nobody mistakes one for the other.",
   },
   {
     day: "2026-11-13",
@@ -826,7 +1011,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-13",
     area: "Calls",
     words:
-      "Your team's own voice assistant, a chief of staff: call it from the app (or ring the team line with your PIN) and ask about your deals. Customers never reach it.",
+      "A chief of staff for your team: call it from the app or the team line with your PIN to ask about your deals. Customers never reach it.",
   },
   {
     day: "2026-11-13",
