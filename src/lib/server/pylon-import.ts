@@ -13,6 +13,8 @@ import {
   PYLON_WORDS,
   dealFromPylon,
   designUrl,
+  fillFromPylon,
+  pylonSaid,
   isPylonPage,
   pdfName,
   projectUrl,
@@ -21,6 +23,7 @@ import {
   soldProjectsUrl,
   type PylonCsvRow,
   type PylonDeal,
+  type PylonFillOutcome,
   type PylonListed,
   type PylonOutcome,
   type PylonStage,
@@ -29,7 +32,7 @@ import { cleanCustomerInput, cleanJobInput } from "@/lib/domain/design/crm";
 import { typedFields } from "@/lib/domain/design/deal-sections";
 import { query, transaction } from "./db";
 import { loadPrefs } from "./design-after-sale-repo";
-import { createCustomer, createJob, record } from "./design-crm-repo";
+import { createCustomer, createJob, record, updateJob } from "./design-crm-repo";
 import { addDealFiles } from "./design-pulse-repo";
 import { safeFetch } from "./safe-fetch";
 
@@ -48,7 +51,9 @@ function ensureTable(): Promise<void> {
        by_email text not null,
        at timestamptz not null default now(),
        primary key (business_id, source, ref)
-     )`,
+     );
+     alter table design_imports add column if not exists equipment_at timestamptz;
+     alter table design_imports add column if not exists pdf_at timestamptz`,
   ).then(
     () => undefined,
     (e) => {
@@ -80,7 +85,14 @@ async function pylonGet(url: string, key: string, retried = false): Promise<unkn
     return pylonGet(url, key, true);
   }
   if (res.status === 404) return null;
-  if (!res.ok) throw new PylonProblem(PYLON_WORDS.down);
+  if (!res.ok) {
+    // Pylon answers in RFC 7807 problem details: its own words say what it didn't like.
+    const said = await res.json().catch(() => null);
+    const title =
+      said && typeof said === "object" && typeof (said as { title?: unknown }).title === "string" ? (said as { title: string }).title : "";
+    console.error(`[pylon-import] Pylon answered ${res.status} for ${new URL(url).pathname}${title ? `: ${title}` : ""}`);
+    throw new PylonProblem(res.status >= 500 ? PYLON_WORDS.down : pylonSaid(res.status, title));
+  }
   return res.json().catch(() => {
     throw new PylonProblem(PYLON_WORDS.down);
   });
@@ -310,4 +322,139 @@ export async function bringInCsvRows(
     }
   }
   return out;
+}
+
+/** How many deals brought in from Pylon are still to be filled in (and, with `pdfs`, still to get their PDF). */
+export async function fillLeft(businessId: string, pdfs: boolean): Promise<number> {
+  await ensureTable();
+  const rows = await query<{ n: string }>(
+    `select count(*) as n from design_imports i
+       join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
+      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null))`,
+    [businessId, pdfs],
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** Marks one brought-in project as filled in (and its PDF looked for), so a run never asks Pylon for it again. */
+const markDone = (businessId: string, ref: string, what: "filled" | "pdf" | "both") =>
+  query(
+    `update design_imports set
+            equipment_at = case when $3 in ('filled', 'both') then coalesce(equipment_at, now()) else equipment_at end,
+            pdf_at = case when $3 in ('pdf', 'both') then coalesce(pdf_at, now()) else pdf_at end
+      where business_id = $1 and source = 'pylon' and ref = $2`,
+    [businessId, ref, what],
+  );
+
+/** Whether a deal already has a proposal PDF from Pylon on it. */
+async function hasPylonPdf(businessId: string, jobId: string): Promise<boolean> {
+  const rows = await query(
+    `select 1 from design_deal_files where business_id = $1 and job_id = $2 and type = 'application/pdf' and name like '%(Pylon%' limit 1`,
+    [businessId, jobId],
+  );
+  return rows.length > 0;
+}
+
+/** One deal read again from Pylon and filled in (fillFromPylon: never over what a person typed). */
+async function fillOne(
+  businessId: string,
+  key: string,
+  t: { ref: string; jobId: string; needFill: boolean },
+  wantPdf: boolean,
+  by: string,
+  fields: ReturnType<typeof typedFields>,
+): Promise<PylonFillOutcome> {
+  const project = await pylonGet(projectUrl(t.ref), key);
+  if (!project) {
+    await markDone(businessId, t.ref, "both");
+    return { id: t.ref, result: "gone" };
+  }
+  const designId = signedDesignId(project);
+  const design = designId ? await pylonGet(designUrl(designId), key) : null;
+  const deal = dealFromPylon(project, design, "won");
+  if (!deal) {
+    await markDone(businessId, t.ref, "both");
+    return { id: t.ref, result: "failed", why: "Pylon's answer for this project couldn't be read." };
+  }
+
+  let filled = 0;
+  if (t.needFill) {
+    const saved = await updateJob(
+      businessId,
+      t.jobId,
+      (current) => {
+        const fill = fillFromPylon(
+          { title: current.title, details: current.details ?? {}, address: current.address, lat: current.lat },
+          deal,
+        );
+        filled = fill.filled.length;
+        return cleanJobInput(
+          {
+            title: fill.title,
+            details: fill.details,
+            ...(fill.place ? { address: fill.place.address, lat: fill.place.lat, lng: fill.place.lng } : {}),
+            ...(current.kw == null && deal.job.kw !== null ? { kw: deal.job.kw } : {}),
+          },
+          current,
+          fields,
+        );
+      },
+      by,
+    );
+    if (!saved) {
+      await markDone(businessId, t.ref, "both");
+      return { id: t.ref, result: "gone" };
+    }
+    await markDone(businessId, t.ref, "filled");
+    if ("refused" in saved) return { id: t.ref, result: "failed", why: saved.refused };
+  }
+
+  let pdf = false;
+  if (wantPdf) {
+    if (!(await hasPylonPdf(businessId, t.jobId))) {
+      const signed = await fetchPdf(deal.signedPdf);
+      const bytes = signed ?? (await fetchPdf(deal.proposalPdf));
+      if (bytes) {
+        const file = new File([new Uint8Array(bytes)], pdfName(deal, Boolean(signed)), { type: "application/pdf" });
+        pdf = Boolean(await addDealFiles(businessId, t.jobId, [file], by).catch(() => null));
+      }
+    }
+    await markDone(businessId, t.ref, "pdf");
+  }
+  const battery = Boolean(deal.job.details.battery || deal.job.details.batteryStorage);
+  return { id: t.ref, result: "filled", filled, battery, pdf, design: Boolean(design) };
+}
+
+/**
+ * The next few deals brought in from Pylon read again with the business's key and filled in: their equipment, site
+ * details and place on the map, and with `pdfs` their signed PDF. Each is marked done, so a run can stop and carry on.
+ */
+export async function fillFromPylonRun(
+  businessId: string,
+  key: string,
+  pdfs: boolean,
+  by: string,
+): Promise<{ results: PylonFillOutcome[]; left: number }> {
+  await ensureTable();
+  const fields = typedFields((await loadPrefs(businessId)).dealFields);
+  const todo = await query<{ ref: string; job_id: string; need_fill: boolean }>(
+    `select i.ref, i.job_id, i.equipment_at is null as need_fill from design_imports i
+       join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
+      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null))
+      order by i.at, i.ref limit $3`,
+    [businessId, pdfs, PYLON_BATCH],
+  );
+  const results: PylonFillOutcome[] = [];
+  for (const row of todo) {
+    try {
+      results.push(await fillOne(businessId, key, { ref: row.ref, jobId: row.job_id, needFill: row.need_fill }, pdfs, by, fields));
+    } catch (e) {
+      if (e instanceof PylonProblem) throw e;
+      console.error("[pylon-import] a deal couldn't be filled in");
+      // Marked done so one deal that always fails doesn't hold every run up.
+      await markDone(businessId, row.ref, "both").catch(() => undefined);
+      results.push({ id: row.ref, result: "failed", why: "Something went wrong filling this one in." });
+    }
+  }
+  return { results, left: await fillLeft(businessId, pdfs) };
 }

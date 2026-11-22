@@ -15,6 +15,26 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the map is about a fifth bigger, and Sol's box runs edge to edge under it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: roomier figures at the top, each named, and Sol's box runs to the foot of the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Each voice agent can be set to answer quicker or more carefully, under How it speaks in its settings.",
+  },
+  {
+    day: "2026-11-22",
+    area: "CRM",
+    words: "Deals brought in from Pylon's export can be filled in from Pylon: the battery, panels, inverter and place on the map.",
+  },
+  {
+    day: "2026-11-22",
     area: "Today",
     words: "Pages answer taps sooner on phones: Sol's sun does less work in the background, and his cards type their lines more lightly.",
   },
@@ -22,6 +42,21 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-22",
     area: "Today",
     words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Video block, the video's picture with a play button that opens it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a clear place at the top of the email to drop or upload your business logo.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Countdown block, a timer to the end of an offer that is right each time the email is opened.",
   },
   {
     day: "2026-11-22",

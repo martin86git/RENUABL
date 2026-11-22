@@ -3,21 +3,8 @@
 import { SAMPLE_DEAL_HINT } from "@/lib/domain/design/deal-tour";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import {
-  ArrowRight,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  List,
-  PenTool,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Trash2,
-  X,
-} from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List, PenTool, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 import { JOB_STAGES, OPEN_STAGES, STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { DEFAULT_PIPELINE, cleanPipelineChoice, type PipelineChoice } from "@/lib/domain/design/deal";
@@ -59,6 +46,8 @@ import { NewDeal } from "./design-customers";
 import { useDesignAccount } from "./design-account";
 import { PATHS, PageHead, ui } from "./design-shell";
 import { PulseMarks } from "./deal-pulse";
+import { BatteryIcon, ChargerIcon, PanelIcon } from "./deal-banner";
+import { jobHas } from "@/lib/domain/design/customers";
 import { loadPulses } from "@/lib/services/deal-pulse";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 
@@ -74,6 +63,24 @@ const stageBar = (stage: JobStage) =>
 
 /** "$48k" for a column's total on a phone, where "$48,120" crowds the stage's name. */
 const shortDollars = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : dollars(n));
+
+/**
+ * What a deal is, as icons after its street: a panel, a battery, a charger, only those it has. A deal that is none of
+ * them keeps its name in words.
+ */
+function KitMarks({ job }: { job: JobLine }) {
+  const has = jobHas(job);
+  if (!has.solar && !has.battery && !has.ev) {
+    return job.title ? <span className="min-w-0 shrink truncate text-muted">{job.title}</span> : null;
+  }
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1 text-ink-2" title={job.title} aria-label={job.title} role="img">
+      {has.solar && <PanelIcon className="size-4" />}
+      {has.battery && <BatteryIcon className="size-4" />}
+      {has.ev && <ChargerIcon className="size-4" />}
+    </span>
+  );
+}
 
 /** How long since a deal last changed, short: "Today", "2d ago", "3w ago", else the date. */
 function agoWords(at: string): string {
@@ -165,6 +172,21 @@ export function PipelinesPage() {
   const all = pipelinesFor(kept, own);
   const named = all.find((p) => p.id === choice.pipeline) ?? all[0];
   const stages = order && order.pipeline === named.id ? order.stages : named.stages;
+  // New deals start as leads, so the lead column takes "+ Add new deal" in place of a button up top.
+  const leadAt = stages.findIndex((_, i) => baseAt(stages, i, own) === "lead");
+
+  // The board scrolls inside itself, down to the foot of the window, so each column's head stays in view.
+  const board = useRef<HTMLDivElement>(null);
+  const [boardTop, setBoardTop] = useState<number | null>(null);
+  const showingCards = choice.view === "cards";
+  useLayoutEffect(() => {
+    const el = board.current;
+    if (!el) return;
+    const measure = () => setBoardTop(Math.round(el.getBoundingClientRect().top + window.scrollY));
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [showingCards, problem]);
 
   const pick = (p: ShownPipeline) => {
     const fixed = p.stages.filter(isJobStage);
@@ -351,7 +373,7 @@ export function PipelinesPage() {
   ).map(([view, name, Icon]) => ({ view, name, Icon }));
 
   return (
-    <div className="px-1.5 py-2 sm:px-5 sm:py-8 lg:px-10">
+    <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10">
       {/* On a phone: one graphite card. The pipeline is the title (pressed to pick another), with how many deals and
           what they are worth under it and New deal beside it; under them whose deals, and cards or list as two icons. */}
       <div className="rounded-2xl bg-primary p-4 text-primary-ink sm:hidden">
@@ -369,13 +391,15 @@ export function PipelinesPage() {
               {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : "\u00a0"}
             </p>
           </div>
-          <button
-            onClick={() => setAdding(true)}
-            disabled={adding}
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/12 px-3.5 text-[14px] font-medium ring-1 ring-white/15 active:bg-white/20"
-          >
-            <Plus className="size-4" aria-hidden /> New deal
-          </button>
+          {leadAt < 0 && (
+            <button
+              onClick={() => setAdding(true)}
+              disabled={adding}
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/12 px-3.5 text-[14px] font-medium ring-1 ring-white/15 active:bg-white/20"
+            >
+              <Plus className="size-4" aria-hidden /> New deal
+            </button>
+          )}
         </div>
         <div className="mt-3 flex items-center justify-between gap-3">
           <label className="relative flex min-w-0 items-center">
@@ -413,12 +437,14 @@ export function PipelinesPage() {
 
       <div className="hidden sm:block">
         <PageHead eyebrow="CRM · Deals" title={named.name}>
-          <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
-            <Plus className="size-4" aria-hidden /> New deal
-          </button>
+          {leadAt < 0 && (
+            <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
+              <Plus className="size-4" aria-hidden /> New deal
+            </button>
+          )}
         </PageHead>
 
-        <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
+        <div className={clsx(ui.card, "mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2")}>
           <label className="inline-flex items-center gap-2">
             <span className="sr-only">Whose deals</span>
             <select
@@ -516,7 +542,11 @@ export function PipelinesPage() {
       )}
 
       {choice.view === "cards" ? (
-        <div className="no-scrollbar -mx-1.5 mt-3 flex snap-x snap-mandatory scroll-px-1.5 gap-2.5 overflow-x-auto px-1.5 pb-4 sm:mx-0 sm:mt-4 sm:snap-none sm:gap-3 sm:px-0">
+        <div
+          ref={board}
+          style={boardTop === null ? undefined : ({ "--board-top": `${boardTop}px` } as React.CSSProperties)}
+          className="no-scrollbar -mx-1.5 mt-3 flex max-h-[calc(100dvh-var(--board-top)-6rem)] snap-x snap-mandatory scroll-px-1.5 gap-2.5 overflow-auto px-1.5 pb-4 sm:mx-0 sm:max-h-[calc(100dvh-var(--board-top)-1rem)] sm:snap-none sm:gap-3 sm:px-0"
+        >
           {stages.map((stage, at) => {
             // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
             const column = shown
@@ -570,25 +600,36 @@ export function PipelinesPage() {
                   className={clsx("absolute inset-x-0 top-0 h-[3px] rounded-t-[inherit]", stageBar(baseAt(stages, at, own)))}
                   aria-hidden
                 />
-                <StageHead
-                  stage={stage}
-                  own={own}
-                  names={names}
-                  onGrab={() => setMovingCol(stage)}
-                  onLetGo={() => {
-                    setMovingCol(null);
-                    setColOver(null);
-                  }}
-                  onStep={(by) => void reorder(stage, at + by)}
-                  first={at === 0}
-                  last={at === stages.length - 1}
-                  count={jobs ? column.length : null}
-                  sum={sum}
-                  canRemove={stages.length > 1}
-                  onRename={renameAny}
-                  onRemove={() => void takeOff(stage)}
-                />
-                <ul className="mt-1 flex min-h-24 flex-col gap-2">
+                <div className="sticky top-0 z-10 -mx-2 -mt-2.5 rounded-t-[inherit] bg-surface-2 px-2 pt-2.5 pb-1">
+                  <StageHead
+                    stage={stage}
+                    own={own}
+                    names={names}
+                    onGrab={() => setMovingCol(stage)}
+                    onLetGo={() => {
+                      setMovingCol(null);
+                      setColOver(null);
+                    }}
+                    onStep={(by) => void reorder(stage, at + by)}
+                    first={at === 0}
+                    last={at === stages.length - 1}
+                    count={jobs ? column.length : null}
+                    sum={sum}
+                    canRemove={stages.length > 1}
+                    onRename={renameAny}
+                    onRemove={() => void takeOff(stage)}
+                  />
+                  {at === leadAt && (
+                    <button
+                      onClick={() => setAdding(true)}
+                      disabled={adding}
+                      className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-line-strong bg-surface/60 py-1.5 text-[13px] font-medium text-ink-2 hover:border-ink-2 hover:text-ink"
+                    >
+                      <Plus className="size-3.5" aria-hidden /> Add new deal
+                    </button>
+                  )}
+                </div>
+                <ul className="flex min-h-24 flex-col gap-2">
                   {!jobs && !problem && <li className="px-2 py-3 text-xs text-muted">Loading…</li>}
                   {jobs && column.length === 0 && <li className="px-2 py-3 text-xs text-muted">Nothing here.</li>}
                   {column.map((job) => (
@@ -605,7 +646,7 @@ export function PipelinesPage() {
                       }}
                       onClick={() => router.push(dealOf(job))}
                       className={clsx(
-                        "cursor-pointer rounded-md bg-surface p-3 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
+                        "cursor-pointer rounded-md bg-surface p-2.5 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
                         dragging === job.id && "opacity-60",
                       )}
                     >
@@ -621,40 +662,59 @@ export function PipelinesPage() {
                           {job.value ? dollars(job.value) : ""}
                         </span>
                       </div>
-                      <p className="mt-0.5 truncate text-[13px] text-ink-2 sm:text-xs">
-                        {job.address ? job.address.split(",")[0] : job.title}
-                        {job.address && job.title ? <span className="text-muted"> · {job.title}</span> : null}
+                      <p className="mt-0.5 flex items-center gap-2 text-[13px] text-ink-2 sm:text-xs">
+                        <span className="min-w-0 truncate">{job.address ? job.address.split(",")[0] : job.title}</span>
+                        {job.address ? <KitMarks job={job} /> : null}
                       </p>
-                      <PulseMarks pulse={pulses[job.id]} />
-                      <div className="mt-2.5 flex items-center justify-between gap-2">
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <Owner email={job.owner} />
-                          {job.sample ? (
-                            <span className="truncate rounded-full bg-sun px-2.5 py-1 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
-                              {SAMPLE_DEAL_HINT}
-                            </span>
-                          ) : (
-                            <span className="truncate text-[12px] text-muted" title={`Changed ${shortDate(job.updatedAt)}`}>
-                              {agoWords(job.updatedAt)}
-                            </span>
+                      <PulseMarks
+                        pulse={pulses[job.id]}
+                        end={
+                          <span className="flex items-center gap-1.5">
+                            {job.lat === null && (
+                              <span className="sm:hidden">
+                                <Owner email={job.owner} />
+                              </span>
+                            )}
+                            {!job.sample && (
+                              <span className="text-muted" title={`Changed ${shortDate(job.updatedAt)}`}>
+                                {agoWords(job.updatedAt)}
+                              </span>
+                            )}
+                          </span>
+                        }
+                      />
+                      {job.sample && (
+                        <p className="mt-1.5 truncate rounded-full bg-sun px-2.5 py-1 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
+                          {SAMPLE_DEAL_HINT}
+                        </p>
+                      )}
+                      {/* One row: who owns it, its stage (changed here on a computer) and the designer's round. */}
+                      <div className={clsx("mt-2 items-center gap-1.5", job.lat === null ? "hidden sm:flex" : "flex")}>
+                        <Owner email={job.owner} />
+                        <label className="hidden min-w-0 flex-1 sm:block" onClick={(e) => e.stopPropagation()}>
+                          <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
+                          {stagePicker(
+                            job,
+                            stageSelect
+                              .replace("h-8", "h-6")
+                              .replace("px-2", "px-1.5")
+                              .replace("text-xs", "text-[11px]")
+                              .replace("rounded-md", "rounded"),
                           )}
-                        </span>
+                        </label>
+                        <span className="flex-1 sm:hidden" />
                         {job.lat !== null && (
                           <Link
                             href={`${PATHS.designer}?job=${job.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="tap-area inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-sun-ink hover:text-ink sm:text-xs sm:text-ink-2"
+                            aria-label={job.projectId ? `Open ${job.customerName}'s design` : `Design ${job.customerName}'s roof`}
+                            title={job.projectId ? "Open design" : "Design it"}
+                            className="tap-area inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-sun-line/12 text-sun-line hover:bg-sun-line hover:text-white"
                           >
-                            <PenTool className="hidden size-3.5 sm:block" aria-hidden />
-                            {job.projectId ? "Open design" : "Design it"}
-                            <ArrowRight className="size-3.5 sm:hidden" aria-hidden />
+                            <PenTool className="size-3.5" aria-hidden />
                           </Link>
                         )}
                       </div>
-                      <label className="mt-2 hidden sm:block" onClick={(e) => e.stopPropagation()}>
-                        <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
-                        {stagePicker(job, stageSelect)}
-                      </label>
                     </li>
                   ))}
                 </ul>

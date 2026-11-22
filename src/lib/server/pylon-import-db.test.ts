@@ -55,7 +55,9 @@ function fakePylon(projects: Record<string, ReturnType<typeof project>>, status 
       return Response.json({ data: Object.values(projects).map((p) => p.data), links: { next: null } });
     const p = u.pathname.match(/^\/v1\/solar_projects\/(.+)$/);
     if (p) return projects[p[1]] ? Response.json(projects[p[1]]) : new Response("{}", { status: 404 });
-    if (u.pathname.startsWith("/v1/solar_designs/")) return Response.json(design);
+    // Pylon turns down a field its design object doesn't list (storage_types isn't one).
+    if (u.pathname.startsWith("/v1/solar_designs/"))
+      return /storage_types/.test(u.search) ? Response.json({ title: "Invalid field" }, { status: 400 }) : Response.json(design);
     return new Response("{}", { status: 404 });
   });
 }
@@ -157,6 +159,46 @@ describe.skipIf(!url)("bringing sold jobs in from Pylon (database)", () => {
     expect(await pylon.alreadyBroughtIn(a, ["csv00001", "csv00002", "csv00003"])).toEqual(["csv00001", "csv00002"]);
     const again = await pylon.bringInCsvRows(a, [row("csv00001", "2026-11-10", "pat@example.com")], "2026-11-20", 8, A);
     expect(again[0].result).toBe("already");
+  });
+
+  it("fills in the export's deals from Pylon: the battery and the map, never over what a person typed, and once", async () => {
+    const withBattery = {
+      data: {
+        ...design.data,
+        attributes: {
+          ...design.data.attributes,
+          summary: { dc_output_kw: 6.6, storage_kwh: 16 },
+        },
+      },
+    };
+    const [ref] = await db.query<{ job_id: string }>(`select job_id from design_imports where business_id = $1 and ref = 'csv00001'`, [a]);
+    const before = await crm.jobById(a, ref.job_id);
+    await crm.updateJob(a, ref.job_id, (cur) => ({ ok: true, value: { ...cur, details: { ...cur.details, nmi: "6305999999" } } }), A);
+    const fake = fakePylon({ csv00001: project("csv00001", "Pat Example", "pat@example.com") });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) =>
+        new URL(String(input)).pathname.startsWith("/v1/solar_designs/") && !/storage_types/.test(String(input))
+          ? Response.json(withBattery)
+          : fake(input, init),
+      ),
+    );
+    expect(await pylon.fillLeft(a, false)).toBeGreaterThan(0);
+    let left = 1;
+    const results = [];
+    for (let i = 0; i < 10 && left; i++) {
+      const run = await pylon.fillFromPylonRun(a, KEY, false, A);
+      results.push(...run.results);
+      left = run.left;
+    }
+    expect(left).toBe(0);
+    expect(results.find((r) => r.id === "csv00002")?.result).toBe("gone");
+    const after = await crm.jobById(a, ref.job_id);
+    expect(before?.job.lat).toBeNull();
+    expect(after?.job).toMatchObject({ title: "Solar and battery", lat: -37.86, lng: 145.06 });
+    expect(after?.job.details).toMatchObject({ systemType: "Solar and battery", batteryStorage: "16 kWh", nmi: "6305999999" });
+    const again = await pylon.fillFromPylonRun(a, KEY, false, A);
+    expect(again.results).toEqual([]);
   });
 
   it("stops with words for the business when Pylon refuses the key", async () => {

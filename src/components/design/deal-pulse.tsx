@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import { FileText, Paperclip, Trash2, X } from "lucide-react";
 import type { DealClock, DealHeat, DealPulse } from "@/lib/domain/design/deal-heat";
@@ -113,8 +113,8 @@ export function DealPulseBadges({ clock, heat }: { clock: DealClock | null; heat
 }
 
 /** On a board card: the temperature as a dot, the clock in words, and "Call first" for the top three. */
-export function PulseMarks({ pulse }: { pulse: DealPulse | undefined }) {
-  if (!pulse) return null;
+export function PulseMarks({ pulse, end }: { pulse: DealPulse | undefined; end?: ReactNode }) {
+  if (!pulse) return end ? <p className="mt-1.5 flex items-center justify-end text-[11px]">{end}</p> : null;
   const h = HEAT[pulse.heat.heat];
   return (
     <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -127,6 +127,7 @@ export function PulseMarks({ pulse }: { pulse: DealPulse | undefined }) {
         {h.label}
       </span>
       <span className={clsx("tabular-nums", BAND[pulse.clock.band].text)}>· {pulse.clock.words}</span>
+      {end && <span className="ml-auto">{end}</span>}
     </p>
   );
 }
