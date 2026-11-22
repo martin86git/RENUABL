@@ -606,7 +606,11 @@ export function DealPage({ id }: { id: string }) {
             customer={customer}
             pulse={pulse && hasPulse(job.stage) ? pulse : null}
             compact={tab !== "activities"}
-            figures={bannerFigures(details, job.kw)}
+            // The system as drawn when it has a design (22 Nov 2026, Martin: an imported 3.8 kW beside two 7 kW designs).
+            figures={bannerFigures(
+              details.map((d) => (d.designed ? { ...d, value: d.designed } : d)),
+              job.kw,
+            )}
             onDesign={job.lat !== null ? () => openTool("design") : null}
             onPlace={() => setAskPlace("place")}
             actions={
