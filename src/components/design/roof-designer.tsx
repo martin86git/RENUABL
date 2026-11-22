@@ -7219,7 +7219,10 @@ export function RoofDesigner(props: {
             <section
               ref={stripBox}
               className={clsx(
-                "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                "relative mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                // The bill box opens from here: while it is open the strip stands over the picture's controls, Sol's round and
+                // his cards (22 Nov 2026, Martin: on a phone they lay over the bill box).
+                menu === "bill" ? "z-[85]" : "z-30",
                 // On a phone it wraps, and keeps clear of the window's close round in the corner.
                 props.tight
                   ? phone
@@ -7566,7 +7569,12 @@ export function RoofDesigner(props: {
                   </button>
                 )}
                 {menu === "bill" && (
-                  <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw] overflow-y-auto text-ink shadow-lift rounded-lg border border-line bg-surface p-3">
+                  <div
+                    className={clsx(
+                      "absolute top-full z-40 overflow-y-auto overscroll-contain rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
+                      phone ? "inset-x-3 mt-1.5 max-h-[calc(100dvh-9rem)]" : "right-0 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw]",
+                    )}
+                  >
                     <p className={label}>The customer&apos;s electricity bill</p>
                     {props.jobId && (
                       <button
