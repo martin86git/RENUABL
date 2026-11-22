@@ -1860,7 +1860,7 @@ function DealsPanel(props: {
   return (
     <aside
       aria-label="Deals"
-      className="mt-9 transition-[top] max-sm:hidden duration-300 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+3rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-11rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
+      className="mt-9 transition-[top] max-lg:hidden duration-300 ease-out motion-reduce:transition-none lg:sticky lg:top-[calc(var(--studio-head,4.5rem)+3rem)] lg:mt-1 lg:flex lg:max-h-[calc(100dvh-var(--studio-head,4.5rem)-11rem)] lg:flex-col [&>*:not(ul)]:shrink-0"
     >
       {/* Its own strip, level with Today's and the same height (15 Nov 2026, Martin). */}
       <div className={clsx(STRIP_BOX, "items-center justify-between gap-3 px-5")}>
