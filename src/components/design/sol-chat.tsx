@@ -4,22 +4,7 @@ import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import {
-  ArrowUpRight,
-  Bell,
-  Copy,
-  CornerUpLeft,
-  Eye,
-  EyeOff,
-  FileText,
-  History,
-  MessageSquarePlus,
-  Minus,
-  Plus,
-  RefreshCw,
-  X,
-  Pin,
-} from "lucide-react";
+import { Bell, Copy, CornerUpLeft, Eye, EyeOff, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
@@ -94,6 +79,50 @@ const STARTERS = [
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
+
+const timeOnly = (iso: string) => new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+
+/** How far a pull to the left goes, in pixels: room for a time. */
+const PEEK_MOST = 64;
+
+/**
+ * A finger dragged left over the conversation slides every turn over to show its time; let go, it slides back.
+ * Sets `--sol-peek` on the element straight away, so a drag never re-renders the chat.
+ */
+function usePullForTimes() {
+  const start = useRef<{ x: number; y: number; on: boolean | null } | null>(null);
+  const settle = (el: HTMLElement, px: number, eased: boolean) => {
+    el.style.setProperty("--sol-peek-ease", eased ? "transform 0.25s ease, opacity 0.25s ease" : "none");
+    el.style.setProperty("--sol-peek", `${px}px`);
+    el.style.setProperty("--sol-peek-shown", String(px / PEEK_MOST));
+  };
+  return {
+    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
+      const t = e.touches[0];
+      start.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY, on: null } : null;
+    },
+    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
+      const s = start.current;
+      if (!s) return;
+      const t = e.touches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (s.on === null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        s.on = dx < 0 && Math.abs(dx) > Math.abs(dy);
+      }
+      if (s.on) settle(e.currentTarget, Math.min(PEEK_MOST, Math.max(0, -dx)), false);
+    },
+    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
+      if (start.current?.on) settle(e.currentTarget, 0, true);
+      start.current = null;
+    },
+    onTouchCancel: (e: React.TouchEvent<HTMLElement>) => {
+      settle(e.currentTarget, 0, true);
+      start.current = null;
+    },
+  };
+}
 
 function base64Of(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -197,6 +226,7 @@ export function SolChat({
     queuedRef.current = queued;
   }, [queued]);
   const picker = useRef<HTMLInputElement>(null);
+  const pullForTimes = usePullForTimes();
   const box = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   // "#" finds a deal: the business's deals are read the first time, then matched here as each letter goes in.
@@ -565,7 +595,15 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
+      {/* Pulled to the left with a finger, the turns slide over and each shows its time, as iMessage does (22 Nov 2026,
+          Martin: no time under every reply). On a computer the time shows on hover beside Copy and Pin. */}
+      <div
+        {...pullForTimes}
+        className={clsx(
+          "staff-scroll min-h-0 flex-1 touch-pan-y space-y-7 overflow-x-hidden overflow-y-auto px-6 py-6 text-sm",
+          history && "hidden",
+        )}
+      >
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
         {state && !inducting && (turns.length === 0 || resting) && !pending && (
           <div className="space-y-2 text-ink-2">
@@ -598,7 +636,12 @@ export function SolChat({
           </div>
         )}
         {(resting ? [] : redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
-          <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn scroll-mt-3 space-y-2">
+          <div key={`${t.at}-${i}`} id={turnId(t)} className="sol-peek-turn group/turn relative scroll-mt-3 space-y-2">
+            {t.at && (
+              <span className="sol-peek-time" aria-hidden>
+                {timeOnly(t.at)}
+              </span>
+            )}
             <Bubble
               you={t.role === "you"}
               text={t.shown || t.text}
@@ -628,16 +671,6 @@ export function SolChat({
                 }
               />
             ) : null}
-            {/* A page he opened: the chat went there as the answer came in; pressed, it goes again. */}
-            {t.role === "sol" && t.goTo && (
-              <button
-                type="button"
-                onClick={() => openSolPage(t.goTo!, router)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-sun px-3 py-1 text-xs font-medium text-sun-ink ring-1 ring-sun-line/30 transition hover:ring-sun-line"
-              >
-                Opened {t.goTo.label} <ArrowUpRight className="size-3.5" aria-hidden />
-              </button>
-            )}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}
@@ -1031,7 +1064,6 @@ function Bubble({
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
         {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
-        {at && <span className={clsx("block text-[10.5px] text-muted", you ? "mt-1" : "mt-3")}>{when(at)}</span>}
       </div>
       {at && (
         <div
@@ -1040,6 +1072,7 @@ function Bubble({
             pinned ? "opacity-100" : "opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100",
           )}
         >
+          <span className="max-sm:hidden">{when(at)}</span>
           <button
             type="button"
             onClick={() => {

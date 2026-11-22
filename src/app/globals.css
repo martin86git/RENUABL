@@ -1706,3 +1706,19 @@ html:has(.sales-snap) {
     font-size: 13px;
   }
 }
+
+/* Sol's chat: a finger pulled left slides the turns over to show each one's time (sol-chat.tsx, usePullForTimes). */
+.sol-peek-turn {
+  transform: translateX(calc(var(--sol-peek, 0px) * -1));
+  transition: var(--sol-peek-ease, none);
+}
+.sol-peek-time {
+  position: absolute;
+  top: 0.1rem;
+  left: calc(100% + 0.75rem);
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: var(--sol-peek-shown, 0);
+  transition: var(--sol-peek-ease, none);
+}
