@@ -65,7 +65,7 @@ Victoria first, then by state.
 
 **Sol types instead of static text** (22 Nov 2026, Martin): on the Sol pictures he sits in his state for two seconds, then types; and each follow-up has an **explainer card** (the feature's icon and headline) on which Sol, beside his sun, types the line that would otherwise sit in the email as words. The same words are the picture's alt text, so they still read with pictures off. The heading under each hero is the product's name (Voice agents. Meet Sol. The AI designer.), the card says what it does for you. _A trade-off to know:_ email apps and spam filters prefer some real words to all pictures; the heading, a price line and the alt text carry that, and the seed tests (section 8) will show where each lands.
 
-**Hooks, not just headlines** (22 Nov 2026, Martin): each email opens on a hook that names what the reader gets, and its subject says the same: Solar just got an AI sales force · An AI salesperson for less than $2 a day · Know who to call, and what to say · Quote it before you leave the driveway · Stop typing up your calls · Signed? It's already moving · Here's the deal.
+**Hooks, not just headlines** (22 Nov 2026, Martin): each email opens on a hook that names what the reader gets, and its subject says the same: Solar just got an AI sales force · An AI salesperson for less than $2 a day · Every new lead, answered in minutes · Know who to call, and what to say · Quote it before you leave the driveway · Signed? It's already moving · Here's the deal.
 
 **The saving is the voice hook.** Calls & Texts is $49 a month: $1.61 a day averaged over the year, $1.75 in February, so less than $2 a day in every month (tested). Nobody can be hired for that, phone included. Always said with "on top of your RENUABL plan" ($49 a user a month), since the voice agents need it.
 
@@ -104,7 +104,20 @@ Victoria first, then by state.
 - **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
-### 2 · three days on
+### 2 · two days on
+
+**Subject:** Answer every lead in minutes  
+**Preview:** Emailed, rung and in your CRM while you're still on the roof.
+
+- **Hook:** Every new lead, answered in minutes.
+- **Picture** `/design/launch/explain-lead.gif`: “A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.”
+- **Picture** `/design/launch/explain-crm.gif`: “I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.”
+- **Picture** `/design/launch/today.jpg`: “RENUABL's Today screen: calls, deals and what needs you (example data)”
+- **Button:** See it answer → https://www.renuabl.com.au/business/demo
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+
+### 3 · three days on
 
 **Subject:** Who should you call this morning?  
 **Preview:** Sol knows. And he's written what to say.
@@ -116,7 +129,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
-### 3 · three days on
+### 4 · three days on
 
 **Subject:** Quote it before you leave the driveway  
 **Preview:** One press. Three priced designs. Signed online.
@@ -125,18 +138,6 @@ Victoria first, then by state.
 - **Picture** `/design/launch/designer.jpg`: “Two homes designed in RENUABL's designer: panels laid, strung and priced”
 - **Picture** `/design/launch/explain-designer.gif`: “One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.”
 - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
-
-### 4 · three days on
-
-**Subject:** Stop typing up your calls  
-**Preview:** Calls written up. Follow-ups drafted. Emailed leads turned into deals.
-
-- **Hook:** Stop typing up your calls.
-- **Picture** `/design/launch/explain-crm.gif`: “I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.”
-- **Picture** `/design/launch/today.jpg`: “RENUABL's Today screen: calls, deals and what needs you (example data)”
-- **Button:** See Today → https://www.renuabl.com.au/business/demo
 - **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
@@ -192,3 +193,5 @@ Victoria first, then by state.
 3. Make a list of only your own addresses (Gmail and Outlook), express consent, and send the launch to it by typing SEND.
 4. Open it in each inbox; the series starts for an address that opened it once you **switch the sequence on**. With waits of a few working days, set the first wait to 0 for the test, then put it back.
 5. Click a button, unsubscribe from one copy, and check each report: sent, opened, clicked, unsubscribed.
+
+**The real logo, and speed to lead** (22 Nov 2026, Martin: "use the correct RENUABL logo as per the website"; "dont forget other hooks… such as speed to lead. instantly get back to a customer"): every picture carries the website's own wordmark file (`public/brand/renuabl-logo-white.png`), not RENUABL typed in another weight. The second email of the series is now speed to lead, in place of "Stop typing up your calls" (its card stays in it): Sol's hello within minutes and the voice agent ringing, in the business's hours (Sol's hello and calls both wait for them, so nothing says day or night). A series can hold only 12 steps (six emails and their waits), so a new email takes an old one's place.

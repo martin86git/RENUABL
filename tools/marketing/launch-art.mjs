@@ -15,7 +15,7 @@
  *   node tools/marketing/launch-art.mjs [only-this-one] [port]
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,6 +31,9 @@ const H = 675;
 const GIF_W = 800;
 mkdirSync(OUT, { recursive: true });
 const work = mkdtempSync(join(tmpdir(), "renuabl-art-"));
+/** RENUABL's logo as the website has it (public/brand/renuabl-logo-white.png, the wordmark at weight 400, wide spaced). */
+const LOGO_FILE = resolve("public/brand/renuabl-logo-white.png");
+const LOGO = pathToFileURL(LOGO_FILE).href;
 const shot = (f) => pathToFileURL(resolve("public/design/landing", f)).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -81,6 +84,11 @@ const NOTEBOOK = (size) => `<span class="graphite" style="width:${size}px;height
   <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
   <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></span>`;
 
+/** Speed to lead: a bolt on graphite. */
+const BOLT = (size) => `<span class="graphite" style="width:${size}px;height:${size}px">
+  <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#ff7a2e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>`;
+
 /** The install calendar's icon on graphite. */
 const CALENDAR = (size) => `<span class="graphite" style="width:${size}px;height:${size}px">
   <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -88,7 +96,7 @@ const CALENDAR = (size) => `<span class="graphite" style="width:${size}px;height
 
 const BASE = `*{margin:0;box-sizing:border-box}html,body{width:${W}px;height:${H}px;overflow:hidden;background:#05060a;color:#fff;
   font-family:Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-  .mark{position:absolute;right:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.42em;font-weight:500}
+  .mark{position:absolute;right:52px;bottom:40px;width:132px;height:auto;opacity:.75}
   .agent{position:relative;display:inline-grid;place-items:center;border-radius:50%;background:#202227;flex:none;
     box-shadow:0 18px 40px -18px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.08)}
   .agent-glow{position:absolute;inset:-14%;border-radius:50%;background:color-mix(in srgb,var(--tint) 30%,transparent);filter:blur(16px);opacity:.5}
@@ -134,6 +142,11 @@ const EXPLAINERS = {
     head: "Your customers, answered.",
     says: "Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.",
   },
+  "explain-lead.gif": {
+    icon: BOLT(88),
+    head: "Every lead, answered in minutes.",
+    says: "A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.",
+  },
   "explain-designer.gif": {
     icon: DESIGNER(88),
     head: "Your roofs, designed.",
@@ -154,7 +167,7 @@ const EXPLAINERS = {
 const explainer = ({ icon, head, says }) =>
   page(
     `<div class="sky"></div><div class="card"><div class="top">${icon}<h2>${head}</h2></div><hr>
-      <div class="sol">%%SOLBIG%%<p data-text="${says.replace(/"/g, "&quot;")}"></p></div></div><div class="mark">RENUABL</div>`,
+      <div class="sol">%%SOLBIG%%<p data-text="${says.replace(/"/g, "&quot;")}"></p></div></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
     `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 80% 110%,rgba(255,90,31,.3),transparent 55%)}
      .card{position:absolute;left:90px;top:128px;width:1020px;border-radius:36px;padding:52px 60px;
        background:linear-gradient(180deg,rgba(40,43,50,.97),rgba(22,24,29,.97));border:1px solid rgba(255,255,255,.1);
@@ -185,7 +198,7 @@ const product = (file, crop, tag) => {
   return page(
     `<div class="glow"></div><div class="frame" style="width:${fw}px;height:${fh}px;left:${(W - fw) / 2}px;top:${(H - fh) / 2 - 8}px">
       <div class="shot" style="background-image:url('${shot(file)}');background-size:${100 / crop.w}% ${100 / crop.h}%;background-position:${(crop.x / (1 - crop.w)) * 100}% ${(crop.y / (1 - crop.h)) * 100}%"></div></div>
-      <div class="tag">${tag}</div><div class="mark">RENUABL</div>`,
+      <div class="tag">${tag}</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
     `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
      .frame{position:absolute;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 40px 120px rgba(0,0,0,.85)}
      .shot{position:absolute;inset:0;background-repeat:no-repeat}
@@ -204,7 +217,7 @@ const ART = {
       `<div class="sky"></div>${CARDS.map(
         (c, i) => `<div class="card" style="left:${96 + i * 74}px;top:${34 + i * 99}px;z-index:${i}">
           ${c.icon}<div><b>${c.head}</b><em>${c.sub}</em></div></div>`,
-      ).join("")}<div class="mark">RENUABL</div>`,
+      ).join("")}<img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 78% 105%,rgba(255,90,31,.32),transparent 55%),radial-gradient(ellipse at 10% 0%,rgba(90,140,255,.08),transparent 50%)}
        .card{position:absolute;width:560px;height:92px;display:flex;align-items:center;gap:20px;padding:0 26px;border-radius:24px;
          background:linear-gradient(180deg,rgba(40,43,50,.96),rgba(24,26,31,.96));border:1px solid rgba(255,255,255,.1);
@@ -236,7 +249,7 @@ const ART = {
          <div class="b a"><s>Charlie</s><p data-text="With most of your power used after dark, it can be. Shall I book you a time with the team?"></p></div>
          <div class="b c"><s>Jo</s><p data-text="Thursday after four."></p></div>
          <div class="booked">✓ Booked · Thursday 4:30 pm</div>
-       </div><div class="mark">RENUABL</div>`,
+       </div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.sky{position:absolute;inset:0;background:radial-gradient(circle at 23% 46%,rgba(255,90,31,.28),transparent 34%)}
        .who{position:absolute;left:92px;top:118px;width:300px;display:flex;flex-direction:column;align-items:center;text-align:center}
        .who b{margin-top:28px;font-size:30px;font-weight:600;letter-spacing:-.02em}.who span{font-size:16px;color:rgba(255,255,255,.55);margin-top:4px}
@@ -276,7 +289,7 @@ const ART = {
   "designer.jpg": {
     html: page(
       `<div class="glow"></div><div class="frame f1"><img src="${shot("designer-site-1.webp")}"></div><div class="frame f2"><img src="${shot("designer-site-2.webp")}"></div>
-       <div class="tag">In RENUABL · The designer</div><div class="mark">RENUABL</div>`,
+       <div class="tag">In RENUABL · The designer</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
        .frame{position:absolute;width:540px;height:338px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 40px 100px rgba(0,0,0,.85)}
        .f1{left:48px;top:90px}.f2{left:612px;top:190px}
@@ -297,7 +310,7 @@ const ART = {
     html: page(
       `<div class="sky"></div><div class="who">${AGENT(150, "#ff5a1f", "big")}</div>
        <div class="say"><small>Your voice agent, with your own number</small><h1>Less than<br><b>$2 a day.</b></h1>
-       <p>$49 a month is $1.61 a day. Nobody can be hired for that.</p></div><div class="mark">RENUABL</div>`,
+       <p>$49 a month is $1.61 a day. Nobody can be hired for that.</p></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.sky{position:absolute;inset:0;background:radial-gradient(circle at 78% 50%,rgba(255,90,31,.3),transparent 36%)}
        .who{position:absolute;left:830px;top:262px}.big .agent-glow{inset:-30%;filter:blur(30px)}
        .say{position:absolute;left:84px;top:150px;width:640px}
@@ -342,7 +355,7 @@ const ART = {
   /** The CRM: the Today feed, the product's own screen on black. */
   "today.jpg": {
     html: page(
-      `<div class="glow"></div><div class="frame"><img src="${shot("today.webp")}"></div><div class="mark">RENUABL</div>`,
+      `<div class="glow"></div><div class="frame"><img src="${shot("today.webp")}"></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.glow{position:absolute;left:50%;top:60%;width:900px;height:420px;transform:translate(-50%,-50%);background:radial-gradient(ellipse,rgba(255,90,31,.35),transparent 65%);filter:blur(20px)}
        .frame{position:absolute;left:50%;top:56px;width:980px;height:540px;transform:translateX(-50%);border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);box-shadow:0 40px 120px rgba(0,0,0,.8)}
        .frame img{display:block;width:100%;margin-top:-20px}`,
@@ -352,7 +365,7 @@ const ART = {
   /** After the signature: the install calendar. */
   "runs.jpg": {
     html: page(
-      `<div class="glow"></div><div class="frame"><img src="${shot("calendar.webp")}"></div><div class="mark">RENUABL</div>`,
+      `<div class="glow"></div><div class="frame"><img src="${shot("calendar.webp")}"></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 110%,rgba(255,90,31,.32),transparent 60%)}
        .frame{position:absolute;left:50%;top:56px;width:1000px;height:540px;transform:translateX(-50%);border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.14);box-shadow:0 40px 120px rgba(0,0,0,.85)}
        .frame img{display:block;width:100%}`,
@@ -371,7 +384,7 @@ const ART = {
         <h1><span class="box"><i></i></span>Yes. I want my <b>AI sales force.</b></h1>
         <ul><li>Voice agents that ring every new lead</li><li>Sol, the brain of the business</li>
           <li>The AI designer: roofs priced as they're drawn</li><li>Every feature, for every user</li></ul>
-        <p class="fine">No contract · Cancel any time · Prices include GST</p></div><div class="mark">RENUABL</div>`,
+        <p class="fine">No contract · Cancel any time · Prices include GST</p></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 85% 0%,rgba(255,90,31,.25),transparent 50%)}
        .coupon{position:absolute;left:56px;top:56px;right:56px;bottom:72px;border:2px dashed rgba(255,122,46,.75);border-radius:26px;padding:48px 56px;
          background:linear-gradient(180deg,rgba(36,39,46,.96),rgba(20,22,27,.96))}
@@ -496,7 +509,7 @@ function solFrame(png, says, typed, i) {
           <text x="72" y="214" font-family="Inter,Segoe UI,sans-serif" font-size="92" font-weight="600" fill="#fff" letter-spacing="-3">Sol.</text>
           <text x="76" y="260" font-family="Inter,Segoe UI,sans-serif" font-size="22" fill="#ffffff" fill-opacity=".5">The brain of your business.</text>
           ${rows}
-          <text x="${W - 52}" y="${H - 40}" text-anchor="end" font-family="Inter,Segoe UI,sans-serif" font-size="13" letter-spacing="5" fill="#ffffff" fill-opacity=".5">RENUABL</text>
+          <image href="data:image/png;base64,${readFileSync(LOGO_FILE).toString("base64")}" x="${W - 52 - 132}" y="${H - 40 - 23}" width="132" height="23" opacity=".75"/>
         </svg>`),
       },
     ])

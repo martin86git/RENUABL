@@ -45,6 +45,9 @@ describe("the launch drafts", () => {
     for (const words of Object.values(SOL_TYPES)) expect(art).toContain(JSON.stringify(words).slice(1, -1));
     expect(art).toContain(PRICE_DAY_LINE);
     expect(art).not.toMatch(/henderson|shearer/i);
+    // The logo is the website's own file, never RENUABL typed in another weight or spacing.
+    expect(art).toContain("public/brand/renuabl-logo-white.png");
+    expect(art).not.toMatch(/>RENUABL<\/(div|text)>/);
   });
 
   it("open on the hook and end on the Marketplace band", () => {

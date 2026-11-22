@@ -62,6 +62,8 @@ export interface GtmPicture {
 export const SOL_TYPES: Record<string, string> = {
   xvoice:
     "Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.",
+  xlead:
+    "A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.",
   xdesigner: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
   xcrm: "I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.",
   xruns: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
@@ -88,6 +90,7 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
   sol: { file: "/design/launch/sol.gif", alt: SOL_TYPES.sol },
   psol: { file: "/design/launch/product-sol.jpg", alt: "In RENUABL: Sol on Today, saying who to call and what to say (example data)" },
   designer: { file: "/design/launch/designer.jpg", alt: "Two homes designed in RENUABL's designer: panels laid, strung and priced" },
+  xlead: { file: "/design/launch/explain-lead.gif", alt: SOL_TYPES.xlead },
   xdesigner: { file: "/design/launch/explain-designer.gif", alt: SOL_TYPES.xdesigner },
   today: { file: "/design/launch/today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
   xcrm: { file: "/design/launch/explain-crm.gif", alt: SOL_TYPES.xcrm },
@@ -176,6 +179,18 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     ),
   },
   {
+    wait: 2,
+    content: email(
+      "d",
+      ["xlead", "xcrm", "today"],
+      "Answer every lead in minutes",
+      "Emailed, rung and in your CRM while you're still on the roof.",
+      "Every new lead, answered in minutes.",
+      [],
+      ["See it answer", DEMO],
+    ),
+  },
+  {
     wait: 3,
     content: email(
       "b",
@@ -197,18 +212,6 @@ const SERIES: { wait: number; content: EdmContent }[] = [
       "Quote it before you leave the driveway.",
       [],
       ["Try the designer", DEMO],
-    ),
-  },
-  {
-    wait: 3,
-    content: email(
-      "d",
-      ["xcrm", "today"],
-      "Stop typing up your calls",
-      "Calls written up. Follow-ups drafted. Emailed leads turned into deals.",
-      "Stop typing up your calls.",
-      [],
-      ["See Today", DEMO],
     ),
   },
   {
