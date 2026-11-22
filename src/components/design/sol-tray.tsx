@@ -89,9 +89,11 @@ export function SolTray(props: {
   drawn: boolean;
   onDrawn: () => void;
   zooming: boolean;
-  onZoom: () => void;
+  /** Pinch zoom, on a touch screen only (the desktop has the wheel and its own zoom rounds). */
+  onZoom?: () => void;
   pitchShown: boolean;
-  onPitch: () => void;
+  /** The pitch marks, on a phone only (the desktop shows them on the picture). */
+  onPitch?: () => void;
   pitchWords: string;
   onDesignForMe?: () => void;
   onUndo: () => void;
@@ -101,9 +103,18 @@ export function SolTray(props: {
   sides?: ReactNode;
   /** Which picture is under the design (Google or Nearmap). */
   pictureMenu?: ReactNode;
-  /** Room left at the tray's foot for the designer's own row (save, ready, designs, record and the rest). */
+  /** Room left at the tray's foot for the designer's own row (save, ready, designs, record and the rest); 0 for none. */
   footRoom: number;
 }) {
+  const { open, onClose } = props;
+  useEffect(() => {
+    if (!open) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [open, onClose]);
   if (!props.open) return null;
   const pick = (tool: TrayTool) => {
     props.onTool(tool);
@@ -176,12 +187,14 @@ export function SolTray(props: {
                   on={props.shadeOn}
                   onClick={then(props.onShade)}
                 />
-                <Item
-                  icon={<TriangleRight className="size-[18px]" aria-hidden />}
-                  name={props.pitchWords}
-                  on={props.pitchShown}
-                  onClick={then(props.onPitch)}
-                />
+                {props.onPitch && (
+                  <Item
+                    icon={<TriangleRight className="size-[18px]" aria-hidden />}
+                    name={props.pitchWords}
+                    on={props.pitchShown}
+                    onClick={then(props.onPitch)}
+                  />
+                )}
                 <Item
                   icon={<WandSparkles className="size-[18px]" aria-hidden />}
                   name="Design it for me"
@@ -193,12 +206,14 @@ export function SolTray(props: {
             <section className="mt-2.5">
               <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">View</h4>
               <div className="grid grid-cols-4 justify-items-center gap-y-2">
-                <Item
-                  icon={<Search className="size-[18px]" aria-hidden />}
-                  name="Pinch zoom"
-                  on={props.zooming}
-                  onClick={then(props.onZoom)}
-                />
+                {props.onZoom && (
+                  <Item
+                    icon={<Search className="size-[18px]" aria-hidden />}
+                    name="Pinch zoom"
+                    on={props.zooming}
+                    onClick={then(props.onZoom)}
+                  />
+                )}
                 <Item
                   icon={<Hand className="size-[18px]" aria-hidden />}
                   name="Move map"
@@ -222,12 +237,14 @@ export function SolTray(props: {
           </div>
         </div>
         {/* The designer's own row (save, ready to install, strings, shade, record and the rest) stands in this strip. */}
-        <div
-          className="shrink-0 border-t border-white/10 px-3.5 pt-1.5"
-          style={{ height: `calc(${props.footRoom}px + env(safe-area-inset-bottom))` }}
-        >
-          <h4 className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">This design</h4>
-        </div>
+        {props.footRoom > 0 && (
+          <div
+            className="shrink-0 border-t border-white/10 px-3.5 pt-1.5"
+            style={{ height: `calc(${props.footRoom}px + env(safe-area-inset-bottom))` }}
+          >
+            <h4 className="text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">This design</h4>
+          </div>
+        )}
       </div>
     </>
   );
@@ -460,7 +477,7 @@ export function SolController(props: {
  * tools. With a tool in hand, that tool's mark rides on his upper left so it is plain what is in hand. With his tray up
  * the + turns to a cross.
  */
-export function SolEmerging({ tray, held }: { tray: boolean; held: LucideIcon | null }) {
+export function SolEmerging({ tray, held, small = false }: { tray: boolean; held: LucideIcon | null; small?: boolean }) {
   const Held = held;
   return (
     <span aria-hidden className="pointer-events-none absolute inset-0">
@@ -473,11 +490,13 @@ export function SolEmerging({ tray, held }: { tray: boolean; held: LucideIcon | 
       {/* Pressable as part of Sol's button (its own pointer events, so a press on it isn't passed to the map). */}
       <span
         className={clsx(
-          "sol-emerge pointer-events-auto absolute -right-[22px] -top-[22px] flex size-11 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 [--emerge-x:-22px] motion-reduce:transition-none",
+          "sol-emerge pointer-events-auto absolute flex items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 motion-reduce:transition-none",
+          // On a computer, drawn at full size, a smaller + (the phone's controls are drawn at 0.68).
+          small ? "-right-[12px] -top-[12px] size-8 [--emerge-x:-12px]" : "-right-[22px] -top-[22px] size-11 [--emerge-x:-22px]",
           tray && "rotate-45",
         )}
       >
-        <Plus className="size-7" strokeWidth={3} />
+        <Plus className={small ? "size-5" : "size-7"} strokeWidth={3} />
       </span>
     </span>
   );

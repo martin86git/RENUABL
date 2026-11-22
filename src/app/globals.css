@@ -1681,6 +1681,16 @@ html:has(.sales-snap) {
   padding-top: 1.9rem;
   margin-bottom: 0.5rem;
 }
+/* On a computer, Sol's step and suggestions form along the picture's foot round him as on a phone (22 Nov 2026, Martin:
+   "sols replies should form in the bottom half like on mobile"): a card up to the lower half of the picture, his notch
+   in its top edge, scrolling inside past that. */
+.sol-moulded.desk-deck > * {
+  width: min(46rem, 100% - 2rem);
+  margin-inline: auto;
+  max-height: calc(var(--pic-h, 40rem) * 0.48);
+  padding-top: 2.6rem;
+  margin-bottom: 0.75rem;
+}
 
 /* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
    the utilities and over the 16px touch rule above; on an iPhone the viewport's maximum-scale (DesignShell) stops Safari
