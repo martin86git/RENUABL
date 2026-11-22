@@ -48,6 +48,7 @@ import {
   resumeSolChat,
   rememberAnswer,
   retrySol,
+  type SolDraft,
 } from "@/lib/services/sol";
 import { askToStartAfresh, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
@@ -197,12 +198,15 @@ export function SolChat({
   onClose,
   onMinimise,
   question,
+  draft,
 }: {
   side?: boolean;
   onClose?: () => void;
   /** Tucks the panel away to a tab on the screen's edge, the conversation kept (19 Nov 2026, Martin). */
   onMinimise?: () => void;
   question?: { id: number; text: string; shown?: string } | null;
+  /** Words begun in a small Sol box elsewhere (a deal's card, the feed), to finish here: put in the box, not sent. */
+  draft?: (SolDraft & { id: number }) | null;
 }) {
   // The business's own names for the stages (pipeline-stages.ts).
   const stageNames = useStageNames();
@@ -210,7 +214,18 @@ export function SolChat({
   const { state, problem, run, runFor } = useSol();
   // Try another answer: the conversation from that question on is hidden while he answers it again.
   const [redoFrom, setRedoFrom] = useState<number | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => draft?.text ?? "");
+  // Which deal the carried words are about (22 Nov 2026): named over the box and put in front of what is sent.
+  const [onDealDraft, setOnDealDraft] = useState<{ about: string; label?: string } | null>(() =>
+    draft?.about ? { about: draft.about, label: draft.label } : null,
+  );
+  const [draftSeen, setDraftSeen] = useState(draft?.id ?? 0);
+  if (draft && draft.id !== draftSeen) {
+    // Taken in the same render, so the box holds them as soon as the panel is focused.
+    setDraftSeen(draft.id);
+    setText(draft.text);
+    setOnDealDraft(draft.about ? { about: draft.about, label: draft.label } : null);
+  }
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
@@ -335,8 +350,9 @@ export function SolChat({
   const send = async (over?: string, deep = false, shownAs?: string, followUp = false) => {
     const typed = (over ?? text).trim();
     const answering = !over && replyTo && typed ? replyTo : null;
-    const said = answering ? answerFor(answering, typed) : typed;
-    const shown = shownAs ?? (answering ? typed : undefined);
+    const onDeal = !over && !answering && onDealDraft && typed ? onDealDraft : null;
+    const said = answering ? answerFor(answering, typed) : onDeal ? `${onDeal.about}${typed}` : typed;
+    const shown = shownAs ?? (answering || onDeal ? typed : undefined);
     const sending = over ? [] : files;
     if (!said && !sending.length) return;
     if (busy) {
@@ -346,6 +362,7 @@ export function SolChat({
       setQueued((q) => [...q, { said, shown }]);
       setText("");
       setReplyTo(null);
+      setOnDealDraft(null);
       setDealAt(null);
       return;
     }
@@ -363,6 +380,7 @@ export function SolChat({
       setFiles([]);
       setFileProblem("");
       setReplyTo(null);
+      setOnDealDraft(null);
     }
     setDealAt(null);
     setBusy(true);
@@ -376,6 +394,7 @@ export function SolChat({
     } else if (!over) {
       setText(typed);
       if (answering) setReplyTo(answering);
+      if (onDeal) setOnDealDraft(onDeal);
       setFiles(sending);
     }
     sendQueued();
@@ -778,6 +797,16 @@ export function SolChat({
               </span>
             ))}
             {fileProblem && <span className="text-xs text-danger">{fileProblem}</span>}
+          </div>
+        )}
+        {onDealDraft && !replyTo && (
+          <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
+            <span className="min-w-0 flex-1 truncate">
+              About <span className="font-medium text-ink">{onDealDraft.label ? `${onDealDraft.label}'s deal` : "this deal"}</span>
+            </span>
+            <button type="button" onClick={() => setOnDealDraft(null)} aria-label="Not about this deal" className="shrink-0 hover:text-ink">
+              <X className="size-3.5" aria-hidden />
+            </button>
           </div>
         )}
         {replyTo && (

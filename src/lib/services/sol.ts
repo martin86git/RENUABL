@@ -89,6 +89,18 @@ export const askSolInPanel = (ask: SolAsk) => {
   }
   target.dispatchEvent(new (target as Window & typeof globalThis).CustomEvent<SolAsk>(SOL_ASK, { detail: ask }));
 };
+/**
+ * Words begun in one of Sol's small boxes (a deal's card, the feed), carried into his panel's box to finish there on a
+ * phone (22 Nov 2026, Martin: the small box is too small, so a single letter typed brings up the larger chat). `about`
+ * goes in front of what is sent (which deal it is about), `label` names it over the box. Nothing is sent by this.
+ */
+export const SOL_DRAFT = "renuabl:sol-draft";
+export type SolDraft = { text: string; about?: string; label?: string };
+export const draftInSolPanel = (d: SolDraft) => window.dispatchEvent(new CustomEvent<SolDraft>(SOL_DRAFT, { detail: d }));
+/** The phone's foot bar Sol round takes you to Today's first view (Business, or My month). */
+export const TODAY_FIRST = "renuabl:today-first";
+/** Whether this is a phone-sized screen, where the small Sol boxes hand their words to his panel. */
+export const handsToPanel = () => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
 /** Said back whenever the panel opens or shuts, so the rail can light its button. */
 export const SOL_STATE = "renuabl:sol-state";
 /** Said whenever Sol's conversation changes here, so the rail's count follows. */

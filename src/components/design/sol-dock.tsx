@@ -1,9 +1,23 @@
 "use client";
 
+import { flushSync } from "react-dom";
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import type { SolState } from "@/lib/domain/design/sol";
-import { SOL_ASK, SOL_CHANGED, SOL_INDUCTION, SOL_STATE, SOL_TOGGLE, loadSol, toggleSolHere, type SolAsk } from "@/lib/services/sol";
+import {
+  SOL_ASK,
+  SOL_CHANGED,
+  SOL_DRAFT,
+  SOL_INDUCTION,
+  SOL_STATE,
+  SOL_TOGGLE,
+  TODAY_FIRST,
+  loadSol,
+  toggleSolHere,
+  type SolAsk,
+  type SolDraft,
+} from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-sun";
@@ -28,6 +42,7 @@ export function SolDock() {
   const [tucked, setTucked] = useState(false);
   const shown = open && !tucked;
   const [question, setQuestion] = useState<{ id: number; text: string; shown?: string } | null>(null);
+  const [draft, setDraft] = useState<(SolDraft & { id: number }) | null>(null);
   useEffect(() => {
     const toggle = () => {
       setTucked(false);
@@ -47,11 +62,30 @@ export function SolDock() {
       setTucked(false);
       setOpen(true);
     };
+    // Words begun in a small box elsewhere: the panel opens with them in its box, focused at once (inside the same key
+    // press, so a phone keeps its keyboard up), to be finished and sent there.
+    const drafted = (e: Event) => {
+      const d = (e as CustomEvent<SolDraft>).detail;
+      if (!d) return;
+      flushSync(() => {
+        setDraft({ ...d, id: Date.now() });
+        setTucked(false);
+        setOpen(true);
+      });
+      const box = document.querySelector<HTMLTextAreaElement>(".sol-panel textarea");
+      if (box) {
+        box.focus({ preventScroll: true });
+        const end = box.value.length;
+        box.setSelectionRange(end, end);
+      }
+    };
     window.addEventListener(SOL_TOGGLE, toggle);
+    window.addEventListener(SOL_DRAFT, drafted);
     window.addEventListener(SOL_ASK, asked);
     window.addEventListener(SOL_INDUCTION, induct);
     return () => {
       window.removeEventListener(SOL_TOGGLE, toggle);
+      window.removeEventListener(SOL_DRAFT, drafted);
       window.removeEventListener(SOL_ASK, asked);
       window.removeEventListener(SOL_INDUCTION, induct);
     };
@@ -136,6 +170,7 @@ export function SolDock() {
           <SolChat
             side
             question={question}
+            draft={draft}
             onClose={() => {
               setTucked(false);
               setOpen(false);
@@ -262,12 +297,22 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
   const unread = useSolUnread();
   const open = useSolOpen();
   const waiting = unread > 0 && !open;
+  const router = useRouter();
+  const path = usePathname();
+  // On the phone's foot bar he takes you to Today's first view, Business or My month (22 Nov 2026, Martin: "tapping
+  // the centre sol icon in the dock should actually avail the today business page"); his chat opens from the small
+  // boxes on a deal and the feed as soon as something is typed in them.
+  const goToday = () => {
+    if (open) toggleSolHere(false);
+    if (path === "/design") window.dispatchEvent(new Event(TODAY_FIRST));
+    else router.push("/design?today=first");
+  };
   return (
     <button
       type="button"
-      onClick={() => toggleSolHere(phone)}
-      title="Sol, your assistant"
-      aria-label={unread ? `Sol: ${unread} unread` : "Sol, your assistant"}
+      onClick={() => (phone ? goToday() : toggleSolHere(false))}
+      title={phone ? "Today" : "Sol, your assistant"}
+      aria-label={phone ? (unread ? `Today. Sol: ${unread} unread` : "Today") : unread ? `Sol: ${unread} unread` : "Sol, your assistant"}
       aria-pressed={open}
       className={clsx(
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",

@@ -1261,7 +1261,8 @@ function useCentredRail() {
 /**
  * Sol's card for the deal. On a wide screen it sits in the page; on a phone (21 Nov 2026, Martin: "sols chat box should
  * be a pop up which can be collapsed or reintroduced via the centre sol icon at the footer") it is a sheet over the foot
- * bar, folded away by its handle and brought back by the foot bar's Sol round (`DEAL_SOL_TOGGLE`). One element either
+ * bar, folded away by its handle and brought back by a small Sol tab over the foot bar (since 22 Nov 2026 the foot
+ * bar's Sol round goes to Today; `DEAL_SOL_TOGGLE` still toggles it). One element either
  * way, so the card is never mounted twice (it drafts a reply when it opens). Folded or not is kept for the tab.
  */
 const SOL_TUCKED_KEY = "renuabl.design.deal-sol-tucked";
@@ -1346,7 +1347,7 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
           <button
             type="button"
             onClick={() => set(true)}
-            aria-label="Fold Sol away (the Sol button below brings him back)"
+            aria-label="Fold Sol away (the Sol tab brings him back)"
             title="Fold away"
             className="mt-1 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface-2"
           >
@@ -1355,6 +1356,18 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
         </div>
         {children}
       </div>
+      {/* Folded away on a phone: a small tab brings him back (22 Nov 2026: the foot bar's Sol round now goes to Today). */}
+      {tucked && (
+        <button
+          type="button"
+          onClick={() => set(false)}
+          aria-label={name ? `Sol on ${name}'s deal` : "Sol on this deal"}
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-30 flex items-center gap-1.5 rounded-full bg-surface py-1 pl-1 pr-3 text-[12px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.22)] ring-1 ring-line sm:hidden"
+        >
+          <SolMark className="size-7" />
+          Sol
+        </button>
+      )}
     </>
   );
 }

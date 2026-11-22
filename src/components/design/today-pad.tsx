@@ -38,6 +38,7 @@ import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { TODAY_FIRST } from "@/lib/services/sol";
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -157,7 +158,14 @@ export function TodayPad(props: {
     } catch {
       // Nothing kept.
     }
-    const opens = todayOpensOn(seen, props.today);
+    // Come from the phone's Sol round (`?today=first`): Business, or My month, whatever was last had.
+    const first = new URLSearchParams(window.location.search).get("today") === "first";
+    if (first) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("today");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    const opens = first ? "chat" : todayOpensOn(seen, props.today);
     const t = window.setTimeout(() => setView(opens), 0);
     return () => window.clearTimeout(t);
   }, [props.welcome, props.today, setView]);
@@ -168,6 +176,16 @@ export function TodayPad(props: {
     window.setTimeout(() => setTouring(true), 80);
   };
   const [turns, setTurns] = useState<Turn[]>([]);
+  // The phone's Sol round pressed while already on Today: back to the first view, out of any conversation.
+  useEffect(() => {
+    const first = () => {
+      setTurns([]);
+      setView("chat");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener(TODAY_FIRST, first);
+    return () => window.removeEventListener(TODAY_FIRST, first);
+  }, [setView]);
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
   const insights = useInsights();
