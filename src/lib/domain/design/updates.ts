@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-22",
+    area: "Quote",
+    words: "Including RCBOs in the quote now asks how many, with a stepper beside it.",
+  },
+  {
+    day: "2026-11-22",
     area: "Designer",
     words: "Designs list: the leading quote, what's on the proposal and which is recommended are said in words on each design.",
   },
