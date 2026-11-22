@@ -64,25 +64,48 @@ export interface Session {
 
 /** The signed-in account, if any. Partners must still be approved; staff must still be listed. */
 export async function currentSession(): Promise<Session | null> {
+  // Read outside the try: Next's signal that a page is dynamic must not be caught.
   const id = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!id || !/^[a-f0-9]{64}$/.test(id)) return null;
   try {
-    const s = (
-      await query<{ email: string; role: AccountRole }>(`select email, role from sessions where id_hash = $1 and expires_at > now()`, [
-        hash(id),
-      ])
-    )[0];
-    if (!s) return null;
-    if (s.role === "staff") return isStaff(s.email) ? { ...s, partner: null } : null;
-    if (s.role === "partner") {
-      const partner = await partnerByEmail(s.email);
-      return partner && partner.status === "approved" ? { ...s, partner } : null;
-    }
-    return { ...s, partner: null };
+    return await readSession(id);
   } catch (e) {
     console.error("session check failed", e instanceof Error ? e.message : e);
     return null;
   }
+}
+
+/** Thrown when the session couldn't be checked (the database didn't answer): not the same as signed out. */
+export class SessionUnknown extends Error {}
+
+/**
+ * The signed-in session, asked twice before giving up (22 Nov 2026, Martin: a database hiccup on the first load after
+ * signing in read as signed out, and Today said "Sign in to your business"). A failure throws `SessionUnknown`, so a
+ * route answers "couldn't reach your account" and the page tries again, instead of saying nobody is signed in.
+ */
+export async function readSession(sessionId?: string): Promise<Session | null> {
+  const id = sessionId ?? (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!id || !/^[a-f0-9]{64}$/.test(id)) return null;
+  let last: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const s = (
+        await query<{ email: string; role: AccountRole }>(`select email, role from sessions where id_hash = $1 and expires_at > now()`, [
+          hash(id),
+        ])
+      )[0];
+      if (!s) return null;
+      if (s.role === "staff") return isStaff(s.email) ? { ...s, partner: null } : null;
+      if (s.role === "partner") {
+        const partner = await partnerByEmail(s.email);
+        return partner && partner.status === "approved" ? { ...s, partner } : null;
+      }
+      return { ...s, partner: null };
+    } catch (e) {
+      last = e;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 300));
+    }
+  }
+  throw new SessionUnknown(last instanceof Error ? last.message : "session check failed");
 }
 
 /** Whose session an id is, while it lasts: for a session kept aside (staff looking through a sample business). */

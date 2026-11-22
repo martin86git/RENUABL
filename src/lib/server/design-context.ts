@@ -18,7 +18,7 @@ import {
   demoRefuses,
   isDemoEmail,
 } from "@/lib/domain/design/demo";
-import { currentSession } from "./accounts";
+import { currentSession, readSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
 
@@ -30,9 +30,13 @@ export type DesignAccess =
   | { state: "needs-terms"; email: string; member: Member }
   | { state: "ready"; email: string; member: Member };
 
-export async function designAccess(): Promise<DesignAccess> {
+/**
+ * `strict`: a session that couldn't be checked throws (`SessionUnknown`) instead of reading as signed out, so a route
+ * inside `answer` says "couldn't reach your account" and the page tries again. Pages keep the forgiving read.
+ */
+export async function designAccess(strict = false): Promise<DesignAccess> {
   if (!dbConfigured()) return { state: "signed-out" };
-  const session = await currentSession();
+  const session = strict ? await readSession() : await currentSession();
   if (session?.role !== "business") return { state: "signed-out" };
   const member = await memberByEmail(session.email);
   if (!member) return { state: "no-business", email: session.email };
@@ -55,7 +59,7 @@ const refused = (status: number, message: string) => Response.json({ ok: false, 
  * or the permissions the owner has given them don't allow it.
  */
 export async function requireMember(action: MemberAction): Promise<{ member: Member } | { refuse: Response }> {
-  const access = await designAccess();
+  const access = await designAccess(true);
   if (access.state !== "ready") return { refuse: refused(401, "Sign in to your business to do this.") };
   if (!can(access.member.role, action, access.member.permissions)) return { refuse: refused(403, refusal(action)) };
   // An installer's or inspector's login holds only part of the product: the proxy tells us the address asked for.
