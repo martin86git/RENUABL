@@ -867,8 +867,8 @@ export function DesignQuote(props: {
   if (split)
     return (
       <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder" {...pickWhole}>
-        <div className="flex items-baseline justify-between gap-2">
-          <p className={clsx(label, "flex items-center gap-1")}>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <p className={clsx(label, "flex shrink-0 items-center gap-1 whitespace-nowrap")}>
             Quote builder ·
             {props.onDesign && (
               <button
@@ -892,7 +892,7 @@ export function DesignQuote(props: {
               </button>
             )}
           </p>
-          <span className="flex items-baseline gap-3">
+          <span className="flex items-center gap-3 whitespace-nowrap">
             {props.onCompact && (
               <button
                 className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
@@ -994,8 +994,8 @@ export function DesignQuote(props: {
 
   return (
     <section className="rounded-lg border border-line bg-surface p-3" aria-label="Quote builder" {...pickWhole}>
-      <div className="flex items-baseline justify-between gap-2">
-        <p className={clsx(label, "flex items-center gap-1")}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className={clsx(label, "flex shrink-0 items-center gap-1 whitespace-nowrap")}>
           Quote builder ·
           {props.onDesign && (
             <button
@@ -1019,7 +1019,7 @@ export function DesignQuote(props: {
             </button>
           )}
         </p>
-        <span className="flex items-baseline gap-3">
+        <span className="flex items-center gap-3 whitespace-nowrap">
           {props.onCompact && (
             <button
               className="text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink"

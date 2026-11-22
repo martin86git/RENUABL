@@ -1848,6 +1848,8 @@ export function RoofDesigner(props: {
   const phone = Boolean(props.tight && stage);
   // Sol holds the tools on a phone, upright or turned sideways (22 Nov 2026, Martin): his tray and his card for what is picked.
   const solHolds = Boolean(props.tight && (phone || sideways));
+  // On a phone held upright the quote is a sheet over the whole screen, minimised back to the design (22 Nov 2026, Martin).
+  const quoteSheet = phone && shown === "quote";
   // The pop-up on a computer (22 Nov 2026, Martin: the phone's foot row on the desktop designer, with Sol's tray and his
   // replies at the foot): Select and Add a panel, Sol with his +, the hand and Erase along the picture's foot.
   const deskFoot = Boolean(props.tight && !solHolds);
@@ -12323,26 +12325,50 @@ export function RoofDesigner(props: {
             }, 450);
           }}
           className={clsx(
-            "absolute right-0 top-0 z-40 transition duration-200 ease-out motion-reduce:transition-none",
-            shown === "proposal"
-              ? "w-[min(calc(50%+10rem),100%)]"
-              : shown === "quote" && quoteShort
-                ? "w-[min(15rem,100%)]"
-                : shown === "quote"
-                  ? // The quote's lines down one side, what needs deciding on the other (8 Nov 2026, Martin).
-                    "w-[min(calc(100%-1.5rem),70rem)]"
-                  : "w-[min(26rem,100%)]",
+            "transition duration-200 ease-out motion-reduce:transition-none",
+            quoteSheet ? "quote-sheet fixed inset-0 z-[90] bg-canvas" : "absolute right-0 top-0 z-40",
+            quoteSheet
+              ? ""
+              : shown === "proposal"
+                ? "w-[min(calc(50%+10rem),100%)]"
+                : shown === "quote" && quoteShort
+                  ? "w-[min(15rem,100%)]"
+                  : shown === "quote"
+                    ? // The quote's lines down one side, what needs deciding on the other (8 Nov 2026, Martin).
+                      "w-[min(calc(100%-1.5rem),70rem)]"
+                    : "w-[min(26rem,100%)]",
             peek ? "translate-x-0 opacity-100" : "pointer-events-none invisible translate-x-6 opacity-0",
             !shown && "hidden",
           )}
         >
           <div
-            className="max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto overscroll-contain rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur"
+            className={
+              quoteSheet
+                ? "h-full space-y-3 overflow-y-auto overscroll-contain px-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                : "max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto overscroll-contain rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur"
+            }
             // No taller than the first fold, so it scrolls inside itself and never the page under it.
-            style={foldPx ? { maxHeight: foldPx } : undefined}
+            style={foldPx && !quoteSheet ? { maxHeight: foldPx } : undefined}
           >
+            {/* On a phone the quote is a sheet over the whole screen (22 Nov 2026, Martin: Finalise the quote opened it
+                cramped over the roof); Minimise folds it back to the design as it was, nothing reloaded. The window's own
+                white cross is top right, so the way back is on the left. */}
+            {quoteSheet && (
+              <div className="sticky top-0 z-20 -mx-3 flex items-center gap-2 border-b border-line bg-canvas/95 pb-2 pl-3 pr-16 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setPeek(false)}
+                  aria-label="Minimise the quote and go back to the design"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-semibold text-primary-ink"
+                >
+                  <ChevronDown className="size-4" aria-hidden />
+                  Back to the design
+                </button>
+                <p className="ml-auto text-sm font-semibold text-ink">{net !== null ? dollars(net) : "Quote"}</p>
+              </div>
+            )}
             {/* One view at a time, chosen at the top of the column (as Primero's); the cross folds it away. */}
-            <div className="flex items-center justify-end gap-1.5">
+            <div className={clsx("items-center justify-end gap-1.5", quoteSheet ? "hidden" : "flex")}>
               <div
                 role="tablist"
                 aria-label="Beside the picture"
@@ -12475,7 +12501,7 @@ export function RoofDesigner(props: {
                 onNet={onNet}
                 compact={quoteShort}
                 wide={shown === "quote" && !quoteShort}
-                onCompact={shortQuote}
+                onCompact={quoteSheet ? undefined : shortQuote}
                 homeless
                 onProceed={props.sitesOnly ? undefined : () => void toProposal()}
                 proceedSaid={proceedSaid}

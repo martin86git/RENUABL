@@ -1719,6 +1719,14 @@ html:has(.sales-snap) {
   }
 }
 
+/* The designer's quote as a sheet on a phone (22 Nov 2026, Martin): the 16px touch rule made its number boxes spill over
+   the item names. maximum-scale (DesignShell) stops Safari zooming into them. */
+@media (max-width: 639px) {
+  .quote-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+    font-size: 13px !important;
+  }
+}
+
 /* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
    the utilities and over the 16px touch rule above; on an iPhone the viewport's maximum-scale (DesignShell) stops Safari
    zooming into a field under 16px. */
