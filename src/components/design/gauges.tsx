@@ -1,9 +1,10 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { STAGE_LABELS, stageLabel } from "@/lib/domain/design/crm";
 import { dayShare, paceOf, tallyOrder, type PanelState } from "@/lib/domain/design/gauges";
 import type { MonthFigures, Ring, RingKey } from "@/lib/domain/design/sales-rings";
 import { dollars } from "@/lib/services/crm";
@@ -249,6 +250,8 @@ const STAGE_TINT = ["var(--line-strong)", "rgb(255 90 31 / 0.45)", "#ff5a1f"];
 
 /** The open pipeline as one fine line split by stage (by what each is worth, else how many), keyed under it. */
 export function PipelineBar({ stages }: { stages: { stage: keyof typeof STAGE_LABELS; deals: number; value: number }[] | null }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const drawn = useDrawn();
   const byValue = (stages ?? []).some((s) => s.value > 0);
   const total = (stages ?? []).reduce((n, s) => n + (byValue ? s.value : s.deals), 0);
@@ -267,7 +270,7 @@ export function PipelineBar({ stages }: { stages: { stage: keyof typeof STAGE_LA
         {(stages ?? []).map((s, i) => (
           <li key={s.stage} className="flex items-center gap-1.5 text-[11px] text-ink-2">
             <span className="size-1.5 rounded-full" style={{ background: STAGE_TINT[i] }} aria-hidden />
-            {STAGE_LABELS[s.stage]} <span className="tabular-nums text-muted">{s.deals}</span>
+            {stageLabel(s.stage, stageNames)} <span className="tabular-nums text-muted">{s.deals}</span>
           </li>
         ))}
       </ul>

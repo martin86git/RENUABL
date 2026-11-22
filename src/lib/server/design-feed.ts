@@ -6,7 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { usageOf } from "@/lib/domain/ai-costs";
 import type { DealViewer } from "@/lib/domain/design/account";
-import { OPEN_STAGES, PRE_INSTALL_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
+import { OPEN_STAGES, PRE_INSTALL_STAGES } from "@/lib/domain/design/crm";
 import { approvalsWaiting } from "@/lib/domain/design/journey";
 import { EXAMPLE_DEALS, EXAMPLE_SOURCE, exampleAddress, exampleEmail, mayHaveExamples } from "@/lib/domain/design/example-deals";
 import { SAMPLE_AUTHOR } from "@/lib/domain/design/crm";
@@ -31,7 +31,7 @@ import {
 } from "@/lib/domain/design/deal-feed";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { newId, query, transaction } from "./db";
-import { jobById, listJobs, record } from "./design-crm-repo";
+import { jobById, listJobs, record, stageWordsOf } from "./design-crm-repo";
 import { padsFor } from "./design-deal-team-repo";
 import { dealPulses } from "./design-pulse-repo";
 import { outbox } from "./design-sol-agents";
@@ -67,6 +67,8 @@ export async function dealFeed(
   );
   if (!jobs.length) return [];
   const ids = jobs.map((j) => j.id);
+  // Each deal's stage in the business's own words (pipeline-stages.ts), for its caption and pills.
+  const stageWord = await stageWordsOf(businessId);
   const [pulses, box, customers, activity, messages, proposals, pads, marks] = await Promise.all([
     dealPulses(businessId, viewer).catch(() => ({}) as Awaited<ReturnType<typeof dealPulses>>),
     outbox(member, viewer, true).catch(() => null),
@@ -138,6 +140,7 @@ export async function dealFeed(
       source: c?.source || "",
       title: j.title,
       stage: j.stage,
+      stageName: stageWord(j),
       value: j.value,
       kw: j.kw,
       batteryKwh: batteryOf(j.details),
@@ -223,7 +226,7 @@ export async function solWritesEmail(
     business: member.businessName,
     customerFirst: firstName,
     title: found.job.title,
-    stage: STAGE_LABELS[found.job.stage],
+    stage: (await stageWordsOf(member.businessId))(found.job),
     suburb: suburbOfAddress(found.job.address || found.customer.address),
     recent,
   };

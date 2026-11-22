@@ -1,5 +1,6 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -7,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ClipboardList,
   FileText,
@@ -22,7 +24,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { SolBadge } from "./sol-sun";
+import { SolBadge, SolMark } from "./sol-sun";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -31,8 +33,6 @@ import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import clsx from "clsx";
 import { DealTeamChat } from "./deal-team-chat";
 import {
-  JOB_STAGES,
-  STAGE_LABELS,
   type Activity,
   type Customer,
   type CustomerInput,
@@ -65,11 +65,13 @@ import { ACTIVITY_WORD } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
+import { StageSelect } from "./stage-select";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { SolOnDealCard } from "./sol-on-deal";
+import { DEAL_SOL_TOGGLE } from "@/lib/services/sol";
 import { Spotlight } from "./new-look";
 import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
 import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
@@ -234,6 +236,8 @@ function DetailField({ line, onSave }: { line: DealDetail; onSave: (text: string
  * searched and added to.
  */
 export function DealPage({ id }: { id: string }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -442,7 +446,7 @@ export function DealPage({ id }: { id: string }) {
     job && customer
       ? [
           `Deal: ${customer.name}, ${job.title} at ${job.address || "no address yet"}.`,
-          `Stage: ${STAGE_LABELS[job.stage]}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
+          `Stage: ${stageWords(job)}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
         ].join("\n")
       : null,
   );
@@ -534,11 +538,10 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:grid max-sm:grid-cols-[2.25rem_minmax(0,1fr)] max-sm:gap-2.5 max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:-mx-3 max-sm:w-auto max-sm:px-0 max-sm:pt-0 max-sm:pb-[var(--deal-sol-h,0px)] xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
       {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />
-      <DealMenu mini {...menu} onDelete={deleteDeal} />
       <div className="min-w-0 space-y-4 max-sm:space-y-3 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
           <DesignDrawer
@@ -606,8 +609,33 @@ export function DealPage({ id }: { id: string }) {
             figures={bannerFigures(details, job.kw)}
             onDesign={job.lat !== null ? () => openTool("design") : null}
             onPlace={() => setAskPlace("place")}
+            actions={
+              // On a phone, ringing and writing to the customer sit in the banner itself (21 Nov 2026, Martin).
+              <div data-tour="deal-reach" className="flex gap-1.5">
+                <CallMenu
+                  round="banner"
+                  jobId={job.id}
+                  phone={customer.phone}
+                  name={customer.firstName}
+                  onNotes={menu.onNotes}
+                  toBook={PRE_INSTALL_STAGES.includes(job.stage)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setTab("email")}
+                  aria-label={`Email ${customer.firstName || "the customer"}`}
+                  className={clsx(
+                    "flex size-9 items-center justify-center rounded-full ring-1 transition",
+                    tab === "email" ? "bg-white text-ink ring-white" : "bg-white/10 text-white ring-white/15",
+                  )}
+                >
+                  <Mail className="size-4" aria-hidden />
+                </button>
+              </div>
+            }
           />
         </div>
+        <DealPills {...menu} onDelete={deleteDeal} />
         {askPlace && (
           <AskPlace
             name={customer.firstName}
@@ -625,7 +653,7 @@ export function DealPage({ id }: { id: string }) {
         )}
 
         {/* Sol's line (16 Nov 2026, Martin): what happened, what he does next, what the deal needs from you. */}
-        <div data-tour="deal-sol" className="empty:hidden">
+        <DealSolSheet name={customer.firstName}>
           <SolOnDealCard
             jobId={job.id}
             phone={customer.phone || null}
@@ -647,7 +675,7 @@ export function DealPage({ id }: { id: string }) {
                           : goTab("team")
             }
           />
-        </div>
+        </DealSolSheet>
 
         <CallNotetaker
           handle={notetaker}
@@ -740,7 +768,7 @@ export function DealPage({ id }: { id: string }) {
               <div
                 role="tablist"
                 aria-label="Deal details"
-                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1 shadow-[0_0_0_8px_var(--canvas)]"
+                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1 shadow-[0_0_0_8px_var(--canvas)] max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
               >
                 {[{ id: "deal", label: "The deal" }, ...tabs].map((t) => {
                   const on = t.id === "deal" ? section === "deal" || !shownTab : section !== "deal" && shownTab?.id === t.id;
@@ -751,7 +779,7 @@ export function DealPage({ id }: { id: string }) {
                       aria-selected={on}
                       onClick={() => setSection(t.id)}
                       className={clsx(
-                        "h-8 flex-1 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium",
+                        "h-8 flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium max-sm:flex-none",
                         on ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
                       )}
                     >
@@ -760,10 +788,10 @@ export function DealPage({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <section data-tour="deal-fields" className={clsx(ui.card, "p-5")}>
+              <section data-tour="deal-fields" className={clsx(ui.card, "p-5 max-sm:px-3.5 max-sm:py-2")}>
                 {section === "deal" || !shownTab ? (
                   <>
-                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       <EditLine
                         key={`title:${job.title}`}
                         label="Deal name"
@@ -779,17 +807,7 @@ export function DealPage({ id }: { id: string }) {
                       />
                       <label className="block text-xs text-muted">
                         Deal stage
-                        <select
-                          className={clsx(ui.input, "mt-1 appearance-auto")}
-                          value={job.stage}
-                          onChange={(e) => void patch({ stage: e.target.value as JobStage })}
-                        >
-                          {JOB_STAGES.map((s) => (
-                            <option key={s} value={s}>
-                              {STAGE_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                        <StageSelect job={job} className={clsx(ui.input, "mt-1 appearance-auto")} onChange={(to) => void patch(to)} />
                       </label>
                       <label className="block text-xs text-muted">
                         Quoted price, inc. GST ($)
@@ -900,7 +918,7 @@ export function DealPage({ id }: { id: string }) {
                         {tabFilled} of {tabLines.length} filled
                       </span>
                     </div>
-                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       {tabLines.map((l) => {
                         const d = l.source === "design" ? details.find((x) => x.key === l.key) : null;
                         return (
@@ -1084,8 +1102,9 @@ function CallMenu({
   onNotes: () => void;
   /** Sold and not yet installed: the admin assistant can ring to book the installation. */
   toBook?: boolean;
-  /** A round of the deal's menu: down the left ("rail", its choices to its right) or in the row ("row", below). */
-  round?: "rail" | "row";
+  /** A round of the deal's menu: down the left ("rail", its choices to its right), in the row ("row", below), or on the
+   * phone's banner ("banner": a small light round on the graphite, its choices below). */
+  round?: "rail" | "row" | "banner";
   /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
   rail?: boolean;
   /** The phone's slim rail: a smaller round. */
@@ -1120,24 +1139,33 @@ function CallMenu({
           if (at) return setAt(null);
           const r = e.currentTarget.getBoundingClientRect();
           setAt(
-            round === "rail"
-              ? { top: r.top, left: Math.max(8, Math.min(r.right + 12, window.innerWidth - 296)) }
-              : rail
-                ? { top: r.top, left: Math.max(8, r.left - 296) }
-                : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
+            round === "banner"
+              ? { top: r.bottom + 8, left: Math.max(8, Math.min(r.right - 288, window.innerWidth - 296)) }
+              : round === "rail"
+                ? { top: r.top, left: Math.max(8, Math.min(r.right + 12, window.innerWidth - 296)) }
+                : rail
+                  ? { top: r.top, left: Math.max(8, r.left - 296) }
+                  : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
           );
         }}
         className={
-          round
-            ? "group flex flex-col items-center gap-1 disabled:opacity-100"
-            : clsx(
-                rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
-                at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                !phone && "text-muted hover:text-muted",
+          round === "banner"
+            ? clsx(
+                "flex size-9 items-center justify-center rounded-full ring-1 transition disabled:opacity-40",
+                at ? "bg-white text-ink ring-white" : "bg-white/10 text-white ring-white/15",
               )
+            : round
+              ? "group flex flex-col items-center gap-1 disabled:opacity-100"
+              : clsx(
+                  rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+                  at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                  !phone && "text-muted hover:text-muted",
+                )
         }
       >
-        {round ? (
+        {round === "banner" ? (
+          <Phone className="size-4" aria-hidden />
+        ) : round ? (
           <>
             <span
               className={clsx(
@@ -1221,6 +1249,193 @@ function useCentredRail() {
  * notes and chats; then, only once it matters, the Job card (sold) and Service (installed); then Sol. Down the left on
  * a wide screen, floating in the middle of the window; a row under the banner narrower.
  */
+/**
+ * The deal's tools on a phone (21 Nov 2026, Martin: the rail down the left took a fifth of the screen and cut the words
+ * short): one row of pills under the banner that scrolls sideways. Call and Email are in the banner; Sol is the foot
+ * bar's, so he isn't here twice.
+ */
+/**
+ * Sol's card for the deal. On a wide screen it sits in the page; on a phone (21 Nov 2026, Martin: "sols chat box should
+ * be a pop up which can be collapsed or reintroduced via the centre sol icon at the footer") it is a sheet over the foot
+ * bar, folded away by its handle and brought back by the foot bar's Sol round (`DEAL_SOL_TOGGLE`). One element either
+ * way, so the card is never mounted twice (it drafts a reply when it opens). Folded or not is kept for the tab.
+ */
+const SOL_TUCKED_KEY = "renuabl.design.deal-sol-tucked";
+function DealSolSheet({ children, name }: { children: React.ReactNode; name: string }) {
+  const [tucked, setTucked] = useState(() => {
+    try {
+      return typeof window !== "undefined" && sessionStorage.getItem(SOL_TUCKED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [height, setHeight] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const set = useCallback((next: boolean) => {
+    setTucked(next);
+    try {
+      sessionStorage.setItem(SOL_TUCKED_KEY, next ? "1" : "0");
+    } catch {}
+  }, []);
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 639px)");
+    const mark = () => {
+      if (phone.matches) document.documentElement.dataset.dealSol = "1";
+      else delete document.documentElement.dataset.dealSol;
+    };
+    mark();
+    phone.addEventListener("change", mark);
+    const toggle = () =>
+      setTucked((was) => {
+        try {
+          sessionStorage.setItem(SOL_TUCKED_KEY, was ? "0" : "1");
+        } catch {}
+        return !was;
+      });
+    window.addEventListener(DEAL_SOL_TOGGLE, toggle);
+    return () => {
+      phone.removeEventListener("change", mark);
+      window.removeEventListener(DEAL_SOL_TOGGLE, toggle);
+      delete document.documentElement.dataset.dealSol;
+    };
+  }, []);
+  // Room at the foot of the page so the sheet never hides its end.
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setHeight(el.offsetHeight));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--deal-sol-h", tucked || !height ? "0px" : `${height + 16}px`);
+    return () => {
+      root.removeProperty("--deal-sol-h");
+    };
+  }, [tucked, height]);
+  return (
+    <>
+      <div
+        ref={box}
+        data-tour="deal-sol"
+        className={clsx(
+          "[&:not(:has(section))]:hidden",
+          "max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(3.75rem+env(safe-area-inset-bottom))] max-sm:z-30",
+          "deal-sol-sheet max-sm:max-h-[58dvh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-2xl max-sm:bg-surface max-sm:ring-1 max-sm:ring-line",
+          "max-sm:shadow-[0_-6px_30px_rgba(11,11,12,0.22)]",
+          tucked && "max-sm:hidden",
+        )}
+      >
+        {/* On a phone it reads as a chat window (22 Nov 2026, Martin: "sols chat tab doesn't feel like a chat tab"): a
+            header with Sol and who it's about, his line as a bubble, quick replies under it, the box at the foot. */}
+        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-surface px-3 pb-2 pt-1.5 sm:hidden">
+          <span className="absolute left-1/2 top-1 h-1 w-9 -translate-x-1/2 rounded-full bg-ink/15" aria-hidden />
+          <SolMark className="mt-1 size-8 shrink-0" />
+          <span className="mt-1 min-w-0 flex-1 leading-tight">
+            <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
+              Sol
+              <span className="rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium text-muted ring-1 ring-line">AI</span>
+            </span>
+            <span className="block truncate text-[11.5px] text-muted">{name ? `On ${name}'s deal` : "On this deal"}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => set(true)}
+            aria-label="Fold Sol away (the Sol button below brings him back)"
+            title="Fold away"
+            className="mt-1 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface-2"
+          >
+            <ChevronDown className="size-4" aria-hidden />
+          </button>
+        </div>
+        {children}
+      </div>
+    </>
+  );
+}
+
+function DealPills(props: {
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  stage: JobStage;
+  designable: boolean;
+  onDesign: () => void;
+  onProposal: () => void;
+  onCard: () => void;
+  onDelete: () => void;
+}) {
+  const sold = WON_STAGES.includes(props.stage);
+  const installed = INSTALLED_STAGES.includes(props.stage);
+  const inDetails = NOTES_VIEWS.some(([key]) => key === props.tab);
+  return (
+    <nav
+      aria-label="This deal"
+      className="flex justify-between gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
+    >
+      <PillRound
+        label="Design"
+        icon={PenTool}
+        main
+        tour="deal-design"
+        title={props.designable ? "Design" : "Give the deal an address to design it"}
+        onClick={props.onDesign}
+      />
+      <PillRound label="Proposal" icon={FileText} tour="deal-proposal" onClick={props.onProposal} />
+      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("details")} />
+      <PillRound label="Files" icon={Paperclip} on={props.tab === "files"} onClick={() => props.onTab("files")} />
+      {sold && <PillRound label="Job card" icon={HardHat} onClick={props.onCard} />}
+      {installed && <PillRound label="Service" icon={Wrench} on={props.tab === "service"} onClick={() => props.onTab("service")} />}
+      <PillRound label="Delete" icon={Trash2} title="Delete this deal" onClick={props.onDelete} />
+    </nav>
+  );
+}
+
+// On a phone (21 Nov 2026, Martin): the deal's tools as icon rounds, a small name under each, in one row.
+function PillRound({
+  label,
+  icon: Icon,
+  on = false,
+  main = false,
+  tour,
+  title,
+  onClick,
+}: {
+  label: string;
+  icon: typeof PenTool;
+  on?: boolean;
+  main?: boolean;
+  tour?: string;
+  title?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-tour={tour}
+      onClick={onClick}
+      title={title ?? label}
+      aria-pressed={on || undefined}
+      className="flex w-14 shrink-0 flex-col items-center gap-1"
+    >
+      <span
+        className={clsx(
+          "flex size-10 items-center justify-center rounded-full ring-1 transition",
+          main
+            ? "bg-sun-line text-white ring-sun-line"
+            : on
+              ? "bg-primary text-primary-ink ring-primary"
+              : "bg-surface text-ink-2 ring-line",
+        )}
+        aria-hidden
+      >
+        <Icon className={clsx("size-[18px]", !main && !on && label === "Proposal" && "text-sun-line")} />
+      </span>
+      <span className={clsx("text-[10px] leading-none", on ? "font-semibold text-ink" : "text-muted")}>{label}</span>
+    </button>
+  );
+}
+
 function DealMenu({
   vertical = false,
   mini = false,

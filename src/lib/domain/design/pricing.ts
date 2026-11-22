@@ -201,21 +201,23 @@ export function withSupplierList(lists: readonly SupplierList[], added: Supplier
 
 /**
  * Parts the quote adds by rule. Each has a product code to look up on the uploaded lists, and may have a cost
- * typed in instead (which wins). The codes they start with are common wholesaler codes: change them to your own.
+ * typed in instead (which wins). A business starts with no codes (22 Nov 2026, Martin: "a new user may not use Antai
+ * … we should not assume it before any pricing or products are uploaded"); `example` is a common wholesaler code,
+ * offered to use only once it is found on the business's own lists.
  */
 export const COMPONENTS = [
-  { key: "rail", label: "Rail, 4.8 m length", sku: "ANTRAIL4800/B" },
-  { key: "splice", label: "Rail splice", sku: "ANTSPLICE" },
-  { key: "tileKit", label: "Tile roof kit (per 2 kW)", sku: "ANTTILE20" },
-  { key: "tinKit", label: "Tin roof kit (per 2 kW)", sku: "ANTTIN20" },
-  { key: "kliplok", label: "Kliplok interface (flat roofs)", sku: "CLNER-I-34" },
-  { key: "tiltLow", label: "Tilt kit, 10 to 15 degrees (per 2 kW)", sku: "ANTTILT10/15" },
-  { key: "tiltHigh", label: "Tilt kit, 15 to 30 degrees (per 2 kW)", sku: "ANTTILT15/30" },
-  { key: "meter1ph", label: "Smart meter, single phase", sku: "SGWS100" },
-  { key: "meter3ph", label: "Smart meter, three phase", sku: "SGWDTSU666-20" },
-  { key: "mc4", label: "MC4 connectors (pack)", sku: "MC4GENPR20" },
-  { key: "isolator1ph", label: "AC isolator, single phase", sku: "NHPNL140L" },
-  { key: "isolator3ph", label: "AC isolator, three phase", sku: "NHPNL340L" },
+  { key: "rail", label: "Rail, 4.8 m length", example: "ANTRAIL4800/B" },
+  { key: "splice", label: "Rail splice", example: "ANTSPLICE" },
+  { key: "tileKit", label: "Tile roof kit (per 2 kW)", example: "ANTTILE20" },
+  { key: "tinKit", label: "Tin roof kit (per 2 kW)", example: "ANTTIN20" },
+  { key: "kliplok", label: "Kliplok interface (flat roofs)", example: "CLNER-I-34" },
+  { key: "tiltLow", label: "Tilt kit, 10 to 15 degrees (per 2 kW)", example: "ANTTILT10/15" },
+  { key: "tiltHigh", label: "Tilt kit, 15 to 30 degrees (per 2 kW)", example: "ANTTILT15/30" },
+  { key: "meter1ph", label: "Smart meter, single phase", example: "SGWS100" },
+  { key: "meter3ph", label: "Smart meter, three phase", example: "SGWDTSU666-20" },
+  { key: "mc4", label: "MC4 connectors (pack)", example: "MC4GENPR20" },
+  { key: "isolator1ph", label: "AC isolator, single phase", example: "NHPNL140L" },
+  { key: "isolator3ph", label: "AC isolator, three phase", example: "NHPNL340L" },
 ] as const;
 export type ComponentKey = (typeof COMPONENTS)[number]["key"];
 
@@ -352,7 +354,7 @@ export interface Workspace {
 /** Somewhere to begin. The installation figures are placeholders: a business replaces them with its own. */
 export const DEFAULT_WORKSPACE: Workspace = {
   lists: [],
-  components: Object.fromEntries(COMPONENTS.map((c) => [c.key, { sku: c.sku, cost: null }])) as Record<ComponentKey, ComponentChoice>,
+  components: Object.fromEntries(COMPONENTS.map((c) => [c.key, { sku: "", cost: null }])) as Record<ComponentKey, ComponentChoice>,
   install: {
     pvPerWatt: 0.3,
     doubleStorey: 400,
@@ -459,7 +461,7 @@ export function cleanWorkspace(raw: unknown): Workspace {
   for (const c of COMPONENTS) {
     const given = bag(bag(r.components)[c.key]);
     const cost = numberIn(given.cost, 0, 100_000);
-    components[c.key] = { sku: typeof given.sku === "string" ? text(given.sku, 60) : c.sku, cost: given.cost === null ? null : cost };
+    components[c.key] = { sku: typeof given.sku === "string" ? text(given.sku, 60) : "", cost: given.cost === null ? null : cost };
   }
   const install = { ...DEFAULT_WORKSPACE.install };
   for (const rate of INSTALL_RATES) {

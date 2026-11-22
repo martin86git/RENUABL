@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -24,7 +25,7 @@ import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
 import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
 import {
@@ -174,6 +175,8 @@ export function SolChat({
   onMinimise?: () => void;
   question?: { id: number; text: string; shown?: string } | null;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const router = useRouter();
   const { state, problem, run, runFor } = useSol();
   // Try another answer: the conversation from that question on is hidden while he answers it again.
@@ -772,7 +775,7 @@ export function SolChat({
                       {j.customerName} · {j.title}
                     </span>
                     <span className="block truncate text-xs text-muted">
-                      {[STAGE_LABELS[j.stage], j.address].filter(Boolean).join(" · ")}
+                      {[stageLabel(j.stage, stageNames), j.address].filter(Boolean).join(" · ")}
                     </span>
                   </button>
                 ))

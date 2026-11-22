@@ -101,6 +101,11 @@ export interface Job {
   lat: number | null;
   lng: number | null;
   stage: JobStage;
+  /**
+   * A stage the business added (`OwnStage` in pipeline-stages.ts, its id) that the deal sits at on the board.
+   * It always counts as `stage`, which every rule reads; null at one of the twelve.
+   */
+  subStage?: string | null;
   /** The roof design this job is for, once there is one at its address. */
   projectId: string | null;
   /** The price including GST, in dollars. */
@@ -138,9 +143,21 @@ export const MAX_JOBS_PER_CUSTOMER = 50;
 export const CUSTOMERS_FULL = `A business can keep up to ${MAX_CUSTOMERS.toLocaleString("en-AU")} customers for now.`;
 export const JOBS_FULL = `A customer can have up to ${MAX_JOBS_PER_CUSTOMER} jobs for now.`;
 
-/** What a move between stages is recorded as: "Moved to Proposal sent". */
-export function stageMoveText(stage: JobStage): string {
-  return `Moved to ${STAGE_LABELS[stage]}`;
+/**
+ * The business's own names for the twelve stages (21 Nov 2026, Martin: rename the built-in stages, then "use the new
+ * stage names everywhere else too"). Only the words change: every rule reads the stage itself. A stage not here reads
+ * as ours. Kept per business (`design_stage_names`, pipeline-stages.ts).
+ */
+export type StageNames = Partial<Record<JobStage, string>>;
+
+/** One of the twelve in words: the business's name for it, else ours. */
+export function stageLabel(stage: JobStage, names: StageNames = {}): string {
+  return names[stage] || STAGE_LABELS[stage];
+}
+
+/** What a move between stages is recorded as: "Moved to Proposal sent" (or the business's name for it). */
+export function stageMoveText(stage: JobStage, names: StageNames = {}): string {
+  return `Moved to ${stageLabel(stage, names)}`;
 }
 
 /**
@@ -249,7 +266,7 @@ export function cleanCustomerInput(raw: unknown, current?: CustomerInput): Clean
   };
 }
 
-export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details"> & {
+export type JobInput = Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "subStage" | "value" | "installDate" | "details"> & {
   /** Sent by the designer with the price when a design is saved. */
   kw?: number | null;
 };
@@ -343,7 +360,13 @@ function realDate(raw: unknown): string | null {
  * A job as sent. A new job starts as a lead with no price or date; with
  * `current` (an edit), anything not sent stays as it is.
  */
-export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonly SectionField[]): Cleaned<JobInput> {
+export function cleanJobInput(
+  raw: unknown,
+  current?: JobInput,
+  fields?: readonly SectionField[],
+  /** The stages the business added: only needed to put a deal at one (`subStage`). */
+  ownStages: readonly { id: string; base: JobStage }[] = [],
+): Cleaned<JobInput> {
   const r = bag(raw);
   const sent = (key: string) => key in r;
   const start: JobInput = current ?? {
@@ -361,9 +384,22 @@ export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonl
   if (!at) return { ok: false, message: PLACE_WRONG };
 
   let stage = start.stage;
+  let subStage = start.subStage ?? null;
   if (sent("stage")) {
     if (!JOB_STAGES.includes(r.stage as JobStage)) return { ok: false, message: JOB_STAGE_WRONG };
     stage = r.stage as JobStage;
+    // Moved to another of the twelve: off any added stage (one sent with it below wins).
+    if (stage !== start.stage) subStage = null;
+  }
+  if (sent("subStage")) {
+    if (r.subStage === null || r.subStage === "") subStage = null;
+    else {
+      // An added stage always counts as its own base stage, whatever stage was sent beside it.
+      const own = ownStages.find((s) => s.id === r.subStage);
+      if (!own) return { ok: false, message: JOB_STAGE_WRONG };
+      subStage = own.id;
+      stage = own.base;
+    }
   }
 
   let value = start.value;
@@ -390,6 +426,8 @@ export function cleanJobInput(raw: unknown, current?: JobInput, fields?: readonl
       address: sent("address") ? line(r.address, 200) : start.address,
       ...at,
       stage,
+      // Left out for a deal that never had an added stage, so it reads as before.
+      ...(subStage !== null || start.subStage !== undefined ? { subStage } : {}),
       value,
       installDate,
       ...(sent("kw")

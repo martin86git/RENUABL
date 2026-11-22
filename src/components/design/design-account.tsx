@@ -21,6 +21,8 @@ import {
   savePassword,
   saveProfile,
   removeMember,
+  removeMyPhoto,
+  uploadMyPhoto,
   setMemberPermissions,
   setMemberRole,
   viewAs,
@@ -31,6 +33,7 @@ import {
 } from "@/lib/services/design-account";
 import { PlanCodeField, type AppliedCode } from "./plan-code-field";
 import { PLAN_CODE_WORDS } from "@/lib/domain/design/plan-codes";
+import { MemberAvatar } from "./member-avatar";
 import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from "@/lib/services/design-store";
 
 const SIGN_IN = "/design/sign-in";
@@ -656,6 +659,16 @@ export function DesignAccountPage() {
           </section>
         )}
 
+        <PhotoSection
+          email={account.email}
+          photo={members?.find((m) => m.email === account.email.toLowerCase())?.photo ?? null}
+          onChange={(photo) =>
+            setMembers(
+              (list) => list?.map((m) => (m.email === account.email.toLowerCase() ? { ...m, photo: photo ?? undefined } : m)) ?? list,
+            )
+          }
+        />
+
         <PasswordSection />
 
         <section className={card} aria-labelledby="people">
@@ -670,6 +683,7 @@ export function DesignAccountPage() {
           <ul className="mt-4 divide-y divide-line rounded-md border border-line">
             {(members ?? []).map((m) => (
               <li key={m.email} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
+                <MemberAvatar email={m.email} photo={m.photo ?? null} className="size-9 self-start text-[12px]" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-ink">{m.email}</p>
                   <p className="text-xs text-muted">
@@ -826,6 +840,71 @@ function PasswordSection() {
       {state && (
         <p className={state.ok ? "mt-2 text-sm text-positive" : "mt-2 text-sm text-danger"} role="status">
           {state.message}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Your photo (21 Nov 2026, Martin: "add a profile photo for each team member"): the signed-in person's own, shown to
+ * their team in team chat and on this page. Their initials stand in until one is chosen.
+ */
+function PhotoSection({ email, photo, onChange }: { email: string; photo: number | null; onChange: (photo: number | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState("");
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    setProblem("");
+    const res = await uploadMyPhoto(file);
+    setBusy(false);
+    if (res.problem) return setProblem(res.problem);
+    onChange(res.photo ?? null);
+  };
+  const remove = async () => {
+    setBusy(true);
+    setProblem("");
+    const res = await removeMyPhoto();
+    setBusy(false);
+    if (res.problem) return setProblem(res.problem);
+    onChange(null);
+  };
+  return (
+    <section className={card} aria-labelledby="your-photo">
+      <h2 id="your-photo" className="text-[19px] tracking-tight text-ink">
+        Your photo
+      </h2>
+      <p className="mt-1 text-sm text-ink-2">Your team sees it beside your name in team chat. A JPEG, PNG or WebP, cut square.</p>
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <MemberAvatar email={email} photo={photo} className="size-16 text-[20px]" />
+        <label className={`${primary} cursor-pointer ${busy ? "pointer-events-none opacity-60" : ""}`}>
+          {busy ? "Saving…" : photo ? "Change photo" : "Add a photo"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            disabled={busy}
+            onChange={(e) => {
+              void pick(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {photo && (
+          <button
+            type="button"
+            onClick={() => void remove()}
+            disabled={busy}
+            className="text-sm text-ink-2 underline underline-offset-4 hover:text-ink"
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      {problem && (
+        <p className="mt-2 text-sm text-danger" role="alert">
+          {problem}
         </p>
       )}
     </section>

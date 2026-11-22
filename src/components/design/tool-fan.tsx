@@ -139,7 +139,8 @@ export function KnifeMenu({
       <div
         className={clsx(
           sheet
-            ? "fixed inset-x-2 bottom-2 z-[70] flex max-h-[75dvh] origin-bottom flex-col gap-2 overflow-y-auto"
+            ? // Drawn back up to full size: on a phone the row it opens from is drawn smaller (roof-designer.tsx).
+              "fixed inset-x-2 bottom-2 z-[70] flex max-h-[75dvh] origin-bottom flex-col gap-2 overflow-y-auto [zoom:1.389]"
             : "absolute left-full top-0 z-40 ml-2 flex origin-top-left gap-1",
           "rounded-2xl bg-surface/95 p-2 shadow-[0_18px_50px_rgba(11,11,12,0.22)] ring-1 ring-line backdrop-blur-md transition duration-200 ease-out motion-reduce:transition-none",
           open ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0",

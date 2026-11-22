@@ -19,9 +19,105 @@ export const UPDATES: readonly Update[] = [
     words: "Your voice agents answer quicker on calls.",
   },
   {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone: slimmer figures, more room for Sol in an outlined box, the eraser beside the hand, and a larger designs round.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, with one panel picked, All picks every panel in its array.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Double tap a 1° button on a phone to turn 5° a press, and again for 1°. Sideways, the controls sit where they do upright.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Turned sideways in a phone's browser, the designer says how to open RENUABL from your Home Screen for the full screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the pointer is on the map beside Add a panel, and holding a 1° button keeps turning the panels.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol is a little larger with one big + to open his tools.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, picked panels get a controller under the map: turn 1° with either thumb, and Undo appears after a change.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Add a panel sits on the map, and Sol is a round with a tool and a + in place of words.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol's card for picked panels is tidier: turns in one row, portrait or landscape, tilt and delete.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, sideways too, Sol holds the tools, and a hand button grabs the map to move it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Emails take a background and text colour of their own, and the editor is clearer with more room.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Marketing",
+    words: "The email editor is drag and drop: drag blocks onto the email or into a new order, type straight into it, and undo any change.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Deals",
+    words:
+      "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Team chat",
+    words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",
+  },
+  {
     day: "2026-11-21",
     area: "Billing",
     words: "Calls & Texts beyond the free allowance is 50c a minute and 30c a text, and you're emailed at 80% of your spending cap.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, the figures run across the top of the screen and the panel, inverter and battery buttons are larger.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, Sol holds the tools: tap him for them, and pick panels to turn them from his card.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The designs menu lists each design's inverter, battery and EV charger, and on a phone it opens over the screen.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The Day button is gone from the designer.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright: a larger roof, smaller buttons, and a magnifier under the roof to pinch and zoom.",
   },
   {
     day: "2026-11-21",

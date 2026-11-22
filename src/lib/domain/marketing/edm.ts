@@ -52,7 +52,24 @@ export interface EdmContent {
   /** The line inboxes show after the subject. */
   preview: string;
   blocks: EdmBlock[];
+  /** The email's own colours; left out while they are ours. */
+  style?: EdmStyle;
 }
+
+/**
+ * The email's colours (21 Nov 2026, Martin: "add style settings for background and text colour"): the ground the email
+ * sits on and its words. `text` null keeps our two greys (near-black headings, softer words); a colour picked is used
+ * for headings, words and captions alike.
+ */
+export interface EdmStyle {
+  background: string;
+  text: string | null;
+}
+
+export const DEFAULT_STYLE: EdmStyle = { background: "#ffffff", text: null };
+/** Our colours for headings and for words, while the email has none of its own. */
+export const HEADING_INK = "#0b0b0c";
+export const WORDS_INK = "#3c3d41";
 
 /** The look and sender, set once for every email. */
 export interface EdmBrand {
@@ -176,7 +193,51 @@ export function cleanBlocks(raw: unknown): EdmBlock[] {
 
 export function cleanContent(raw: unknown): EdmContent {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  return { subject: line(r.subject, EDM_LIMITS.subject), preview: line(r.preview, EDM_LIMITS.preview), blocks: cleanBlocks(r.blocks) };
+  const style = cleanStyle(r.style);
+  return {
+    subject: line(r.subject, EDM_LIMITS.subject),
+    preview: line(r.preview, EDM_LIMITS.preview),
+    blocks: cleanBlocks(r.blocks),
+    ...(isDefaultStyle(style) ? {} : { style }),
+  };
+}
+
+export function cleanStyle(raw: unknown): EdmStyle {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return {
+    background: cleanColour(r.background, DEFAULT_STYLE.background),
+    text: r.text === null || r.text === undefined ? null : cleanColour(r.text, "") || null,
+  };
+}
+
+export const isDefaultStyle = (s: EdmStyle): boolean => s.background === DEFAULT_STYLE.background && s.text === null;
+
+/** The email's colours, ours where it has none. */
+export const styleOf = (c: Pick<EdmContent, "style">): EdmStyle => (c.style ? cleanStyle(c.style) : DEFAULT_STYLE);
+
+/** The colour a heading and the words are drawn in. */
+export const inksOf = (s: EdmStyle) => ({ heading: s.text ?? HEADING_INK, words: s.text ?? WORDS_INK });
+
+/** How far apart two colours are to read (WCAG's contrast ratio, 1 to 21). */
+export function contrastRatio(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+/** Words to show when the words would be hard to read on the ground; null when they read well. 4.5 is WCAG's floor for body text. */
+export function styleProblem(s: EdmStyle): string | null {
+  const { words } = inksOf(s);
+  return contrastRatio(words, s.background) < 4.5
+    ? "The words will be hard to read on this background. Pick a lighter or darker one."
+    : null;
 }
 
 export function cleanBrand(raw: unknown): EdmBrand {
@@ -321,6 +382,8 @@ export function footerLines(brand: EdmBrand, sender: EdmSender): string[] {
 /** One email for one contact. Merge fields are filled before escaping, so a name can't add markup. */
 export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSender, fields: MergeFields, links: RenderLinks): RenderedEdm {
   const colour = cleanColour(brand.colour);
+  const style = styleOf(content);
+  const ink = inksOf(style);
   const linkList = edmLinks(content.blocks);
   let linkAt = 0;
   const rows: string[] = [];
@@ -330,7 +393,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
     if (b.kind === "heading" && b.text) {
       const t = merge(b.text, fields);
       rows.push(
-        `<tr><td style="padding:8px 32px 4px;text-align:${align};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:24px;line-height:1.25;font-weight:600;color:#0b0b0c">${esc(t)}</td></tr>`,
+        `<tr><td style="padding:8px 32px 4px;text-align:${align};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:24px;line-height:1.25;font-weight:600;color:${ink.heading}">${esc(t)}</td></tr>`,
       );
       textParts.push(t.toUpperCase());
     } else if (b.kind === "text" && b.text) {
@@ -340,7 +403,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
         .map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`)
         .join("");
       rows.push(
-        `<tr><td style="padding:8px 32px;text-align:${align};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#3c3d41">${paras}</td></tr>`,
+        `<tr><td style="padding:8px 32px;text-align:${align};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:${ink.words}">${paras}</td></tr>`,
       );
       textParts.push(t);
     } else if (b.kind === "image" && b.imageId) {
@@ -368,7 +431,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
           linkAt++;
         }
         if (caption) {
-          inner += `<div style="padding:8px 2px 0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.4;color:#3c3d41;text-align:${align}">${esc(caption)}</div>`;
+          inner += `<div style="padding:8px 2px 0;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.4;color:${ink.words};text-align:${align}">${esc(caption)}</div>`;
           textParts.push(`[${caption}]`);
         }
         return inner;
@@ -409,7 +472,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
   const preview = content.preview ? merge(content.preview, fields) : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(merge(content.subject, fields))}</title></head><body style="margin:0;padding:0;background:#f4f4f5">${
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
-  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#0b0b0c">${esc(sender.name)}</td></tr>${rows.join(
+  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${esc(sender.name)}</td></tr>${rows.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
     links.pixel ? `<img src="${esc(links.pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""

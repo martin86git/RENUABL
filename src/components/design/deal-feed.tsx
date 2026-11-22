@@ -1,5 +1,7 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
+import { useStageLabel } from "./stage-select";
 import { ContextLine } from "./context-line";
 import { dealContext } from "@/lib/domain/design/sol-on-deal";
 import { SolLive, SolTerminal, useTyped } from "./sol-on-deal";
@@ -79,11 +81,12 @@ import {
   type FeedMark,
   type LaterChoice,
 } from "@/lib/domain/design/deal-feed";
-import { OPEN_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { OPEN_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
 import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
 import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
+import { pipelinesByStage } from "@/lib/domain/design/pipeline-stages";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
 import { exampleDeals, loadFeed, markFeedDeal, saveLeadRule, type FeedAnswer } from "@/lib/services/deal-feed";
@@ -131,6 +134,8 @@ export function DealFeed(props: {
   day?: React.ReactNode;
   onDismissDay?: () => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const { me } = props;
   const [showAll, setShowAll] = useState(false);
   // The deal picked in the deals panel, shown as its card on the left.
@@ -204,12 +209,13 @@ export function DealFeed(props: {
   const [saved, setSaved] = useState<Pipeline[]>([]);
   useEffect(() => {
     let gone = false;
-    void listPipelines().then((r) => !gone && r.ok && setSaved(r.pipelines));
+    void listPipelines().then((r) => !gone && r.ok && setSaved(pipelinesByStage(r.pipelines, r.stages)));
     return () => {
       gone = true;
     };
   }, []);
-  const pipelines: readonly Pipeline[] = [...PIPELINES, ...saved];
+  // The set pipelines as the business renamed or changed them, then its own (pipeline-stages.ts).
+  const pipelines: readonly Pipeline[] = saved.length ? saved : PIPELINES;
   const pickedPipeline = pipelines.find((p) => p.id === feedPick.pipeline) ?? null;
   const now = new Date();
   const deals = useMemo(
@@ -655,7 +661,7 @@ export function DealFeed(props: {
           }}
           onNew={props.onNew}
           adding={props.adding}
-          tabs={panelTabsFor(pickedPipeline?.stages ?? null)}
+          tabs={panelTabsFor(pickedPipeline?.stages ?? null, stageNames)}
           picker={
             admin ? (
               <FeedPicker
@@ -2034,7 +2040,9 @@ const STAGE_TONES: Record<StageTone, string> = {
  * lead pill, blue with its icon, on the feed too, and the same for each stage).
  */
 function StagePill({ stage, className }: { stage: JobStage; className?: string }) {
-  const pill = stagePill(stage);
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
+  const pill = stagePill(stage, stageNames);
   const Icon = STAGE_ICONS[stage] ?? Stamp;
   return (
     <span
@@ -2110,6 +2118,8 @@ function sampleRoof(d: FeedDeal): AerialRoofSpec {
  * plain which deal the chat is about.
  */
 function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () => void; onChanged: () => void }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useStageLabel();
   const { deal: d, onClose } = props;
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -2131,7 +2141,7 @@ function DealChatSheet(props: { deal: FeedDeal; startText: string; onClose: () =
             <p className="truncate text-[16px] font-semibold text-ink">{d.customer}</p>
             <p className="truncate text-[13px] text-ink-2">{d.address || d.suburb || "No address yet"}</p>
             <p className="truncate text-[12px] text-muted">
-              {d.title || "Solar"} · {STAGE_LABELS[d.stage]}
+              {d.title || "Solar"} · {stageWords(d.stage)}
             </p>
           </div>
           <Link

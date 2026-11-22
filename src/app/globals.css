@@ -885,6 +885,36 @@ button.team-flash:not([aria-pressed="true"]) {
 }
 /* Sol's sun beats like a heart (3 Nov 2026, Martin: no rays; the sun itself pulses, a subtle signal to engage): two
    quick beats, then a rest, the glow brightening with each. */
+/* On a phone upright, Sol's step and suggestions sit under the picture in a plate moulded round him (his notch cut by
+   the wrapper's mask), so they never cover the map. */
+.sol-moulded > [data-popup] {
+  /* An outlined box with room round it (22 Nov 2026, Martin: "within an outlined text box - with the outline also
+     integrating in the sol icon"): the notch cuts the outline at the top, where a ring of the same line round Sol meets it. */
+  width: calc(100% - 1rem);
+  margin-inline: 0.5rem;
+  /* Within the band under the picture (PHONE_BANDS.below, 156 px): it scrolls inside past that. */
+  max-height: 9.25rem;
+  overflow-y: auto;
+  padding-top: 2rem;
+  border-radius: 22px;
+  outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
+  outline-offset: -1.5px;
+}
+/* Sol's spanner and + on a phone come out of him once as he appears. */
+.sol-emerge {
+  animation: sol-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes sol-emerge {
+  from {
+    transform: translate(var(--emerge-x, 0), 13px) scale(0.2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-emerge {
+    animation: none;
+  }
+}
 @keyframes sol-heartbeat {
   0%,
   40%,
@@ -1352,6 +1382,15 @@ html:has(.sales-snap) {
    smaller (zoom, so its touch area shrinks with it), and so is the rail beside it. The map itself is the picture's first
    child and keeps its size; anything placed at a point on the map carries an inline style and is left alone, since zoom
    would move it off its point. Sol's card is shrunk less, so it stays readable. */
+/* The kit (panel, inverter, battery) on a phone upright is drawn larger than the other controls (21 Nov 2026, Martin). */
+.designer-compact > .designer-kit {
+  zoom: 0.8 !important;
+}
+@media (max-width: 380px) {
+  .designer-compact > .designer-kit {
+    zoom: 0.72 !important;
+  }
+}
 .designer-compact > :not(:first-child):not([style]):not(.sideways-sol) {
   zoom: 0.68;
 }
@@ -1488,4 +1527,151 @@ html:has(.sales-snap) {
     inset 0 1px 0 rgb(255 255 255 / 0.9),
     inset 0 0 0 1px rgb(255 122 61 / 0.5),
     0 16px 36px -20px rgb(255 90 31 / 0.5);
+}
+
+/* On a phone, while something is being typed, the foot bar steps aside so the keyboard doesn't push it up over the box
+   being typed in (21 Nov 2026, Martin, Safari on iPhone). */
+@media (max-width: 1023px) and (pointer: coarse) {
+  body:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
+    .phone-tabbar {
+    display: none;
+  }
+}
+
+/* A deal's details on a phone (22 Nov 2026, Martin: the boxes were too big and ran past the screen's edge): one column of
+   compact rows, the label on the left and its value beside it, a box only while it is being typed in. */
+@media (max-width: 639px) {
+  .deal-fields {
+    row-gap: 0;
+  }
+  .deal-fields > label,
+  .deal-fields > div > label,
+  .deal-fields > div > div > label {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .deal-fields > div:last-child,
+  .deal-fields > :last-child label {
+    border-bottom: 0;
+  }
+  .deal-fields > div:not(:has(label)) {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .deal-fields :is(input, select, textarea) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0 0.5rem;
+    border-color: transparent;
+    border-radius: 0.5rem;
+    background: transparent;
+    box-shadow: none;
+  }
+  .deal-fields textarea {
+    height: auto;
+    min-height: 4rem;
+    padding: 0.375rem 0.5rem;
+  }
+  .deal-fields :is(input, select, textarea):focus {
+    border-color: var(--line);
+    background: var(--surface);
+  }
+  .deal-fields input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+}
+
+/* Sol's sheet on a deal, on a phone, as a chat (22 Nov 2026, Martin): his line a bubble from him, the choices as quick
+   replies under it, the box a rounded composer kept at the foot of the sheet. */
+@media (max-width: 639px) {
+  .deal-sol-sheet .sol-say {
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    background: var(--canvas);
+  }
+  .deal-sol-sheet .sol-line {
+    display: inline-block;
+    max-width: 92%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 1rem 1rem 1rem 0.3rem;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 1px 2px rgba(11, 11, 12, 0.06);
+    font-size: 13.5px;
+    font-weight: 450;
+    line-height: 1.45;
+  }
+  .deal-sol-sheet .sol-line-mark {
+    display: none;
+  }
+  .deal-sol-sheet .sol-replies {
+    flex-wrap: wrap;
+  }
+  /* A thick message box (22 Nov 2026, Martin: "I want it to be thicker"): the words along its top, the microphone and
+     the send round in its lower right corner. */
+  .deal-sol-sheet .sol-compose {
+    position: sticky;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: end;
+    column-gap: 0.25rem;
+    min-height: 6rem;
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.5rem 0.5rem 0.875rem;
+    border-radius: 1.25rem;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 -6px 12px var(--canvas);
+  }
+  .deal-sol-sheet .sol-compose > input {
+    grid-column: 1 / -1;
+    align-self: start;
+    padding: 0;
+  }
+  .deal-sol-sheet .sol-compose > :not(input):not(.sol-send):not(.sol-prompt) {
+    grid-column: 2;
+  }
+  .deal-sol-sheet .sol-compose > .sol-send {
+    grid-column: 3;
+  }
+  .deal-sol-sheet .sol-prompt {
+    display: none;
+  }
+  .deal-sol-sheet .sol-send {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    background: var(--sun-line);
+    color: #fff;
+  }
+  .deal-sol-sheet .sol-send:disabled {
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .deal-sol-sheet .sol-lead-page {
+    font-size: 11.5px;
+    background: var(--surface);
+  }
+}
+
+/* Sideways on a phone, Sol's step and suggestions are a plate along the foot moulded round him (22 Nov 2026, Martin: as
+   upright), short so the roof stays in view; it scrolls inside past that. */
+.sol-moulded.sideways-deck > [data-popup] {
+  max-height: 6.5rem;
+  padding-top: 1.9rem;
+  margin-bottom: 0.5rem;
 }
