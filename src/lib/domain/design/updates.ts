@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Marketing",
+    words: "Email builder: a Video block, the video's picture with a play button that opens it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
     words: "Email builder: a clear place at the top of the email to drop or upload your business logo.",
   },
   {

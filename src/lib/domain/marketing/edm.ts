@@ -5,6 +5,7 @@
  * text of one email for one contact.
  */
 
+import { VIDEO_LINE, videoStillKey } from "./edm-video";
 import { COUNTDOWN_HEIGHT, COUNTDOWN_UNITS, COUNTDOWN_WIDTH, cleanEndsAt, endsAtMs, endsWords } from "./countdown";
 
 /** How tall the logo stands at the top of an email. */
@@ -24,6 +25,7 @@ export const EDM_BLOCK_KINDS = [
   "social",
   "products",
   "countdown",
+  "video",
 ] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
@@ -38,6 +40,7 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   social: "Social links",
   products: "Products",
   countdown: "Countdown",
+  video: "Video",
 };
 
 export type EdmAlign = "left" | "center";
@@ -314,6 +317,12 @@ export const filledProducts = (b: EdmBlock): EdmProduct[] => (b.kind === "produc
 /** A tiles block's tiles that have a picture: the ones an email shows. */
 export const filledTiles = (b: EdmBlock): EdmTile[] => (b.kind === "tiles" ? (b.tiles ?? []).filter((t) => t.imageId) : []);
 
+/** A link to a web page (https), never a mailto: what a video block points to. */
+const webLink = (raw: unknown) => {
+  const l = cleanLink(raw);
+  return l && l.startsWith("https://") ? l : null;
+};
+
 export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -326,7 +335,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
         ? EDM_LIMITS.label
         : kind === "image"
           ? EDM_LIMITS.alt
-          : kind === "countdown"
+          : kind === "countdown" || kind === "video"
             ? EDM_LIMITS.caption
             : EDM_LIMITS.text;
   return {
@@ -338,8 +347,8 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
         : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products"
           ? ""
           : line(r.text, max),
-    url: kind === "button" || kind === "image" ? cleanLink(r.url) : null,
-    imageId: kind === "image" ? imageIdOf(r.imageId) : null,
+    url: kind === "button" || kind === "image" ? cleanLink(r.url) : kind === "video" ? webLink(r.url) : null,
+    imageId: kind === "image" || kind === "video" ? imageIdOf(r.imageId) : null,
     align: r.align === "center" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
     ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
@@ -433,6 +442,11 @@ export function contentProblem(c: EdmContent): string | null {
   if (button) return "Every button needs a label and a link (https).";
   const picture = c.blocks.find((b) => b.kind === "image" && !b.imageId);
   if (picture) return "A picture block has no picture. Add one or take the block out.";
+  const video = c.blocks.find((b) => b.kind === "video" && (!b.url || !videoStillKey(b.imageId, b.url)));
+  if (video)
+    return video.url
+      ? "A video block needs a picture to show, unless it's a YouTube link."
+      : "A video block needs a link to the video (https).";
   if (c.blocks.some((b) => b.kind === "countdown" && !b.endsAt)) return "A countdown has no end. Give it a day and time, or take it out.";
   return null;
 }
@@ -446,7 +460,7 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
         ? filledSocials(b).map((s) => s.url!)
         : b.kind === "products"
           ? filledProducts(b).flatMap((p) => (p.url ? [p.url] : []))
-          : (b.kind === "button" || b.kind === "image") && b.url
+          : (b.kind === "button" || b.kind === "image" || b.kind === "video") && b.url
             ? [b.url]
             : [],
   );
@@ -477,7 +491,7 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     text,
     url: null,
     imageId: null,
-    align: kind === "button" || kind === "countdown" ? "center" : "left",
+    align: kind === "button" || kind === "countdown" || kind === "video" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
     ...(kind === "spacer" ? { space: "medium" as const } : {}),
     ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
@@ -535,6 +549,8 @@ export interface RenderLinks {
   image: (id: string) => string;
   /** Where a social network's icon in a colour (six hex digits, no #) is served; without it, names only. */
   social?: (network: SocialNetwork, colour: string) => string;
+  /** Where a video's still with its play button is drawn, by its key (edm-video.ts) and colour; without it, the picture alone. */
+  video?: (key: string, colour: string) => string;
   /** Where a countdown to an end (seconds since 1970) in a colour (six hex digits) is drawn; without it, the end in words only. */
   countdown?: (endSeconds: number, colour: string) => string;
 }
@@ -709,6 +725,21 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
         `<tr><td style="padding:12px 32px"><div style="height:1px;background:#e4e4e7;line-height:1px;font-size:1px">&nbsp;</div></td></tr>`,
       );
       textParts.push("—");
+    } else if (b.kind === "video") {
+      // A mail app doesn't play video: a still with a play button, linked to where it plays, and a line under it.
+      if (!b.url) continue;
+      const key = videoStillKey(b.imageId, b.url);
+      const href = links.click(linkAt, linkList[linkAt]);
+      linkAt++;
+      const line = merge(b.text, fields) || VIDEO_LINE;
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      const src = key && links.video ? links.video(key, colour.replace("#", "")) : b.imageId ? links.image(b.imageId) : null;
+      let inner = src
+        ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none"><img src="${esc(src)}" alt="${esc(`Play: ${line}`)}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:8px"></a>`
+        : "";
+      inner += `<div style="padding:${src ? 10 : 0}px 0 0;text-align:${align}"><a href="${esc(href)}" target="_blank" style="${font};font-size:14px;font-weight:600;color:${colour};text-decoration:none">&#9654;&nbsp;${esc(line)}</a></div>`;
+      rows.push(`<tr><td style="padding:12px 32px">${inner}</td></tr>`);
+      textParts.push(`${line}: ${href}`);
     } else if (b.kind === "countdown") {
       // The timer is a picture drawn at each open; the line over it, the units and the end in words are text.
       if (!b.endsAt) continue;

@@ -53,6 +53,7 @@ export function linksFor(site: string, sendToken: string, unsubToken: string): R
     image: (id) => `${site}/api/m/i/${id}`,
     social: (network, colour) => `${site}/api/m/s/${network}.png?c=${colour}`,
     countdown: (end, colour) => `${site}/api/m/t/${end}.gif?c=${colour}`,
+    video: (key, colour) => `${site}/api/m/v/${key}.jpg?c=${colour}`,
   };
 }
 
@@ -396,6 +397,7 @@ export async function sendTest(businessId: string, content: EdmContent, to: stri
       image: (id) => `${site}/api/m/i/${id}`,
       social: (network, colour) => `${site}/api/m/s/${network}.png?c=${colour}`,
       countdown: (end, colour) => `${site}/api/m/t/${end}.gif?c=${colour}`,
+      video: (key, colour) => `${site}/api/m/v/${key}.jpg?c=${colour}`,
     },
   );
   return sendEmail({

@@ -25,6 +25,7 @@ import {
   X,
   ShoppingBag,
   Timer,
+  CirclePlay,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
@@ -72,6 +73,7 @@ import {
   type EdmTile,
   type EdmProduct,
 } from "@/lib/domain/marketing/edm";
+import { VIDEO_LINE, videoStillKey, youTubeId } from "@/lib/domain/marketing/edm-video";
 import { COUNTDOWN_UNITS, cleanEndsAt, endsAtMs, endsWords } from "@/lib/domain/marketing/countdown";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
 import { saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
@@ -91,13 +93,14 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   social: Share2,
   products: ShoppingBag,
   countdown: Timer,
+  video: CirclePlay,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
 const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
-  { name: "Basics", kinds: ["heading", "text", "button", "image", "products", "countdown"] },
+  { name: "Basics", kinds: ["heading", "text", "button", "image", "video", "products", "countdown"] },
   { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
 ];
 
@@ -134,6 +137,7 @@ export function EdmPreview({
           image: (id) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/i/${id}`,
           social: (network, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/s/${network}.png?c=${colour}`,
           countdown: (end, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/t/${end}.gif?c=${colour}`,
+          video: (key, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/v/${key}.jpg?c=${colour}`,
         },
       ).html,
     [content, brand, sender],
@@ -1008,6 +1012,8 @@ function CanvasBlock({
       )}
       {b.kind === "social" && <SocialPills socials={b.socials ?? []} look={cleanSocialLook(b.socialLook)} colour={colour} align={align} />}
       {b.kind === "social" && picked && <SocialFields block={b} onChange={onChange} />}
+      {b.kind === "video" && <VideoView block={b} colour={colour} align={align} />}
+      {b.kind === "video" && picked && <VideoFields block={b} onChange={onChange} />}
       {b.kind === "countdown" && (
         <>
           <AutoText
@@ -2000,6 +2006,94 @@ function LogoField({
         </button>
       )}
       {problem && <p className="mt-1.5 px-1 text-[12px] text-warning">{problem}</p>}
+    </div>
+  );
+}
+
+/** A video block as it will look: its still with the play button and the line under it; until it has one, a hint. */
+function VideoView({ block: b, colour, align }: { block: EdmBlock; colour: string; align: "left" | "center" }) {
+  const key = videoStillKey(b.imageId, b.url);
+  return (
+    <div className="mt-1">
+      {key ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/m/v/${key}.jpg?c=${colour.replace("#", "")}`} alt="" className="block w-full rounded-lg" />
+      ) : (
+        <div className="grid aspect-video place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+          <span className="flex items-center gap-1.5">
+            <CirclePlay className="size-4" /> Press to add the video&apos;s link
+          </span>
+        </div>
+      )}
+      <p className="pt-2.5 text-[14px] font-semibold" style={{ textAlign: align, color: colour }}>
+        &#9654;&nbsp;{b.text || VIDEO_LINE}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A video block's settings: the link where it plays, the line under it, and the still (a YouTube link brings its own;
+ * any other needs a picture). Mail apps don't play video, so the still and the line open the link.
+ */
+function VideoFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const yt = youTubeId(b.url);
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setProblem(null);
+    const r = await uploadMarketingImage(file);
+    setBusy(false);
+    if (!r.ok) return setProblem(r.message);
+    onChange({ imageId: r.id });
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <LinkInput
+        value={b.url}
+        onChange={(url) => onChange({ url: url && url.startsWith("https://") ? url : null })}
+        placeholder="The video's link: YouTube, Vimeo, your website…"
+      />
+      <input
+        value={b.text}
+        maxLength={EDM_LIMITS.caption}
+        onChange={(e) => onChange({ text: e.target.value })}
+        placeholder={`The line under it (blank: ${VIDEO_LINE})`}
+        className={field}
+      />
+      <div
+        className="flex flex-wrap items-center gap-2"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          pick(e.dataTransfer.files?.[0]);
+        }}
+      >
+        <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line-strong px-3 text-[13px] hover:border-ink/40">
+          {busy && <Loader2 className="size-4 animate-spin" />}
+          {b.imageId ? "Change the picture" : yt ? "Use my own picture" : "Choose a picture"}
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+        </label>
+        {b.imageId && (
+          <button
+            type="button"
+            onClick={() => onChange({ imageId: null })}
+            className="h-9 rounded-full px-3 text-[13px] text-muted hover:text-ink"
+          >
+            {yt ? "Use YouTube's picture" : "Remove the picture"}
+          </button>
+        )}
+      </div>
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] leading-snug text-muted">
+        {yt && !b.imageId
+          ? "The video's own picture from YouTube is used, with a play button on it."
+          : b.url && !b.imageId
+            ? "Add a picture to show for the video: only YouTube links bring their own."
+            : "Mail apps don't play video, so the picture and the line under it open the video's link."}
+      </p>
     </div>
   );
 }
