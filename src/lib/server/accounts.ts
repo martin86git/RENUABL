@@ -4,7 +4,14 @@
  */
 import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
-import { LOGIN_LINK_MINUTES, SESSION_COOKIE, SESSION_DAYS, staffEmails, type AccountRole } from "@/lib/domain/accounts";
+import {
+  LOGIN_LINK_MINUTES,
+  SESSION_COOKIE,
+  SESSION_DAYS,
+  sessionNeedsRenewing,
+  staffEmails,
+  type AccountRole,
+} from "@/lib/domain/accounts";
 import { query, randomToken } from "./db";
 import { partnerByEmail, type PartnerRow } from "./partners-repo";
 
@@ -89,17 +96,25 @@ export async function readSession(sessionId?: string): Promise<Session | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const s = (
-        await query<{ email: string; role: AccountRole }>(`select email, role from sessions where id_hash = $1 and expires_at > now()`, [
-          hash(id),
-        ])
+        await query<{ email: string; role: AccountRole; expires_at: Date }>(
+          `select email, role, expires_at from sessions where id_hash = $1 and expires_at > now()`,
+          [hash(id)],
+        )
       )[0];
       if (!s) return null;
-      if (s.role === "staff") return isStaff(s.email) ? { ...s, partner: null } : null;
+      // Rolling: a session in use is pushed out again (never fails the check if the write doesn't go through).
+      if (sessionNeedsRenewing(new Date(s.expires_at)))
+        await query(`update sessions set expires_at = now() + ($2 || ' days')::interval where id_hash = $1`, [
+          hash(id),
+          String(SESSION_DAYS),
+        ]).catch(() => undefined);
+      const who = { email: s.email, role: s.role };
+      if (s.role === "staff") return isStaff(s.email) ? { ...who, partner: null } : null;
       if (s.role === "partner") {
         const partner = await partnerByEmail(s.email);
-        return partner && partner.status === "approved" ? { ...s, partner } : null;
+        return partner && partner.status === "approved" ? { ...who, partner } : null;
       }
-      return { ...s, partner: null };
+      return { ...who, partner: null };
     } catch (e) {
       last = e;
       if (attempt === 0) await new Promise((r) => setTimeout(r, 300));
@@ -117,6 +132,17 @@ export async function sessionEmail(id: string | undefined): Promise<string | nul
 
 export async function endSession(id: string | undefined) {
   if (id && /^[a-f0-9]{64}$/.test(id)) await query(`delete from sessions where id_hash = $1`, [hash(id)]);
+}
+
+/** Sends the session cookie again with its full life, so the browser keeps it as long as the server does. Route handlers only. */
+export async function renewSessionCookie() {
+  try {
+    const jar = await cookies();
+    const id = jar.get(SESSION_COOKIE)?.value;
+    if (id && /^[a-f0-9]{64}$/.test(id)) jar.set(SESSION_COOKIE, id, SESSION_COOKIE_OPTIONS);
+  } catch {
+    // Not somewhere a cookie can be set (a page): the next route call renews it.
+  }
 }
 
 export const SESSION_COOKIE_OPTIONS = {

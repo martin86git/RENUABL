@@ -9,8 +9,19 @@ export type AccountRole = "customer" | "partner" | "staff" | "business";
 
 /** A sign-in link works once, for this long. */
 export const LOGIN_LINK_MINUTES = 30;
-/** How long someone stays signed in. */
-export const SESSION_DAYS = 30;
+/**
+ * How long someone stays signed in without using RENUABL (23 Nov 2026, Martin: signed out far too quickly). The
+ * session rolls: each visit pushes its end out again (`sessionNeedsRenewing`), so someone who uses it signs in once.
+ */
+export const SESSION_DAYS = 90;
+/** A session is pushed out again once this many days of it have gone, so it isn't written on every request. */
+export const SESSION_RENEW_AFTER_DAYS = 1;
+
+/** Whether a session ending at `expiresAt` should be pushed out to SESSION_DAYS from `now`. */
+export function sessionNeedsRenewing(expiresAt: Date, now: Date = new Date()): boolean {
+  const left = expiresAt.getTime() - now.getTime();
+  return left < (SESSION_DAYS - SESSION_RENEW_AFTER_DAYS) * 86_400_000;
+}
 export const SESSION_COOKIE = "renuabl_session";
 /** Preview only: browsing the sample portal without an account. */
 export const DEMO_COOKIE = "renuabl_demo";
