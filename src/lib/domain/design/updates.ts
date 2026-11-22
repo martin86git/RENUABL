@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-23",
+    area: "Everywhere",
+    words: "When Safari won't take dictation, the microphone says why and the next tap opens your keyboard to use its own.",
+  },
+  {
     day: "2026-11-22",
     area: "Designer",
     words: "Designs list: the leading quote, what's on the proposal and which is recommended are said in words on each design.",
