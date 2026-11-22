@@ -55,6 +55,7 @@ import { TeamChatButton } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
+import { BackToTop } from "./back-to-top";
 
 export { MarketplaceMark };
 
@@ -728,6 +729,8 @@ function Shell({
           </div>
         </div>
       )}
+
+      {!tool && <BackToTop />}
 
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
