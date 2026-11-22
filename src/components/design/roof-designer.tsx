@@ -6686,6 +6686,24 @@ export function RoofDesigner(props: {
   // (22 Nov 2026, Martin: the same places as upright), with Sol and the rounds beside him on its top edge.
   const sideDeck = solHolds && sideways && !solTray && picks.length === 0 && (guideShown || nudgeShown);
   const sideDeckUp = sideDeck && sideDeckH > 0;
+  // On a phone, the whole array(s) of what is picked, when that is more than is picked: Sol's controller offers them all
+  // (22 Nov 2026, Martin: "when I select a single panel… select the whole array").
+  const wholeArray = (() => {
+    if (!solHolds || solTray || !picks.length || picks.length > 400) return null;
+    const keys = new Set<string>();
+    const all: Pick[] = [];
+    for (const pick of picks) {
+      if (keys.has(keyOf(pick))) continue;
+      const found = arrayOf(pick);
+      for (const one of found?.picks ?? [pick]) {
+        const key = keyOf(one);
+        if (keys.has(key)) continue;
+        keys.add(key);
+        all.push(one);
+      }
+    }
+    return all.length > picks.length ? all : null;
+  })();
   return (
     <div data-design-popup className={clsx(props.tight && "relative p-2")}>
       {solHolds && (
@@ -11291,6 +11309,8 @@ export function RoofDesigner(props: {
                     onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
                     onDelete={removePicked}
                     onDone={() => setPicks([])}
+                    wholeArray={wholeArray?.length ?? null}
+                    onWholeArray={() => wholeArray && setPicks(wholeArray)}
                     onTakeBack={(degrees) => {
                       const mark = thumbMark.current;
                       if (mark) history.current.takeBack = { len: mark.len };

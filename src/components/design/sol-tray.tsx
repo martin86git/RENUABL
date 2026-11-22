@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Eraser,
   Hand,
+  LayoutGrid,
   House,
   Maximize,
   Minus,
@@ -261,6 +262,9 @@ export function SolController(props: {
   onTilt: (by: number) => void;
   onDelete: () => void;
   onDone: () => void;
+  /** How many panels are in the array(s) of what is picked, when more than are picked: the button picks them all. */
+  wholeArray?: number | null;
+  onWholeArray?: () => void;
   /** A double tap's first tap turned the panels this far: turn them back, leaving nothing to undo. */
   onTakeBack: (degrees: number) => void;
   /** A press and hold on a 1° button begins (true) and ends (false): its turns are one step to undo. */
@@ -349,6 +353,19 @@ export function SolController(props: {
       <Trash2 className="size-4" aria-hidden />
     </button>
   );
+  // One panel picked, the rest of its array a press away (22 Nov 2026, Martin: "a select all button").
+  const whole = Boolean(props.wholeArray && props.onWholeArray) && (
+    <button
+      type="button"
+      onClick={props.onWholeArray}
+      aria-label={`Pick the whole array: ${props.wholeArray} panels`}
+      title="Pick every panel in this array"
+      className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-xl bg-white/[0.08] px-2.5 text-[12px] font-semibold text-white hover:bg-white/15"
+    >
+      <LayoutGrid className="size-4 text-sun-line" aria-hidden />
+      All {props.wholeArray}
+    </button>
+  );
   const undo = props.canUndo && (
     <button
       type="button"
@@ -397,6 +414,7 @@ export function SolController(props: {
           <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
             <div className="flex items-center gap-1.5">
               {orient}
+              {whole}
               {remove}
             </div>
             {tilt}
@@ -425,6 +443,7 @@ export function SolController(props: {
         </div>
         <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
+          {whole}
           {remove}
           {undo}
           <span className="flex-1" />
