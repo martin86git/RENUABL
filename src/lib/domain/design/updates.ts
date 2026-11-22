@@ -17,7 +17,7 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-22",
     area: "Designer",
     words:
-      "Designer on a phone: drag the handle in the corner of Sol's box to slide it up and read more, or down to fold it to a strip with Sol and the tools still in view; tap the strip to open it again.",
+      "Designer on a phone: drag Sol's box up to read more, or down to fold it to a strip; tap the strip to open it again.",
   },
   {
     day: "2026-11-22",
