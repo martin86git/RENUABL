@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Designer",
+    words: "Double tap a 1° button on a phone to turn 5° a press, and again for 1°. Sideways, the controls sit where they do upright.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
     words: "Turned sideways in a phone's browser, the designer says how to open RENUABL from your Home Screen for the full screen.",
   },
   {

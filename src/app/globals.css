@@ -1531,3 +1531,10 @@ html:has(.sales-snap) {
     display: none;
   }
 }
+
+/* Sideways on a phone, Sol's step and suggestions are a plate along the foot moulded round him (22 Nov 2026, Martin: as
+   upright), short so the roof stays in view; it scrolls inside past that. */
+.sol-moulded.sideways-deck > [data-popup] {
+  max-height: 6.5rem;
+  padding-top: 1.9rem;
+}

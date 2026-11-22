@@ -32,7 +32,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SolMark } from "./sol-sun";
 
 type TrayTool = "select" | "panel" | "erase" | "trace" | "string" | "rule" | "label" | "comment" | "pan";
@@ -261,6 +261,8 @@ export function SolController(props: {
   onTilt: (by: number) => void;
   onDelete: () => void;
   onDone: () => void;
+  /** A double tap's first tap turned the panels this far: turn them back, leaving nothing to undo. */
+  onTakeBack: (degrees: number) => void;
   /** A press and hold on a 1° button begins (true) and ends (false): its turns are one step to undo. */
   onHold?: (holding: boolean) => void;
   /** Upright: how tall the plate is. */
@@ -273,20 +275,30 @@ export function SolController(props: {
     .join(" · ");
   const seg = "flex items-center rounded-xl bg-white/[0.08] p-[3px]";
   const small = "flex items-center justify-center rounded-[9px] text-white/85 hover:bg-white/10";
+  // A double tap on either thumb turns both to 5° a press, and another back to 1° (22 Nov 2026, Martin). Kept for the visit.
+  const [stepBy, setStepBy] = useState(turnStep);
   const thumb = (by: -1 | 1) => {
     const Turn = by < 0 ? RotateCcw : RotateCw;
     return (
       <HoldButton
-        onStep={(times) => props.onTurn(by * times)}
+        onStep={(times) => props.onTurn(by * stepBy * times)}
         onHold={props.onHold}
-        aria-label={`Turn 1 degree ${by < 0 ? "anticlockwise" : "clockwise"}`}
+        onDoubleTap={() => {
+          // The first tap of the two turned the panels: take it back, so a double tap only changes the step.
+          props.onTakeBack(by * stepBy);
+          turnStep = turnStep === 1 ? 5 : 1;
+          setStepBy(turnStep);
+        }}
+        aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"} (double tap for ${stepBy === 1 ? 5 : 1}°)`}
         className={clsx(
           "pointer-events-auto flex flex-col items-center justify-center rounded-full bg-[#3a3d43] text-white shadow-[0_6px_18px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/10 active:scale-95 active:bg-[#4a4e55] motion-reduce:active:scale-100",
           upright ? "size-[4.25rem]" : "size-[3.4rem]",
         )}
       >
         <Turn className={upright ? "size-6" : "size-5"} aria-hidden />
-        <span className="mt-0.5 text-[11px] font-semibold tabular-nums text-white/80">1°</span>
+        <span className={clsx("mt-0.5 text-[11px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
+          {stepBy}°
+        </span>
       </HoldButton>
     );
   };
@@ -454,6 +466,10 @@ export function SolEmerging({ tray, held }: { tray: boolean; held: LucideIcon | 
 }
 
 /** How long a press is held before it repeats, and how often it repeats then. */
+/** The degrees a thumb turns a press: 1, or 5 after a double tap; kept for the visit, so a new pick keeps it. */
+let turnStep: 1 | 5 = 1;
+/** A second tap this soon after a short first one is a double tap. */
+const DOUBLE_TAP_MS = 320;
 const HOLD_START_MS = 380;
 const HOLD_EVERY_MS = 90;
 /** A slow redraw never jumps more than this in one go. */
@@ -466,6 +482,7 @@ const HOLD_MOST_AT_ONCE = 5;
 function HoldButton({
   onStep,
   onHold,
+  onDoubleTap,
   className,
   children,
   "aria-label": label,
@@ -473,6 +490,8 @@ function HoldButton({
   /** How many steps are due: one on the press, then as many as the time held since the last asks for. */
   onStep: (times: number) => void;
   onHold?: (holding: boolean) => void;
+  /** A second short tap straight after a first: nothing steps on it. */
+  onDoubleTap?: () => void;
   className?: string;
   children: ReactNode;
   "aria-label": string;
@@ -482,6 +501,9 @@ function HoldButton({
   const timer = useRef<number | null>(null);
   const due = useRef(0);
   const last = useRef(0);
+  // When the press began, and when the last short tap ended (0 after a double tap, so a third tap starts afresh).
+  const pressedAt = useRef(0);
+  const tapEnded = useRef(0);
   const owed = () => {
     const now = Date.now();
     const times = Math.min(HOLD_MOST_AT_ONCE, Math.max(1, Math.round((now - last.current) / HOLD_EVERY_MS)));
@@ -519,13 +541,28 @@ function HoldButton({
         if (e.button !== 0) return;
         e.preventDefault();
         stop();
+        // Timed by when the finger touched (the event's own time), not when this runs: a redraw of the first tap's turn
+        // can hold this up, and a quick double tap would read as two single ones.
+        const now = e.timeStamp;
+        if (onDoubleTap && tapEnded.current && now - tapEnded.current < DOUBLE_TAP_MS) {
+          tapEnded.current = 0;
+          pressedAt.current = 0;
+          onDoubleTap();
+          return;
+        }
+        pressedAt.current = now;
         held.current = true;
         due.current = Date.now() + HOLD_START_MS;
         last.current = due.current - HOLD_EVERY_MS;
         onHold?.(true);
         step.current(1);
       }}
-      onPointerUp={stop}
+      onPointerUp={(e) => {
+        // A short press is a tap that a second may make a double tap; a hold isn't.
+        tapEnded.current = pressedAt.current && e.timeStamp - pressedAt.current < HOLD_START_MS ? e.timeStamp : 0;
+        pressedAt.current = 0;
+        stop();
+      }}
       onPointerLeave={stop}
       onPointerCancel={stop}
       onContextMenu={(e) => e.preventDefault()}
