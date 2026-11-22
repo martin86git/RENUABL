@@ -117,9 +117,13 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
   ],
 };
 
-const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
+// The designer beside Sol (22 Nov 2026, Martin: "we need the designer icon in the bottom menu bar… rapid lookup of
+// existing deal or new address to design on the spot"): it opens the design tool's home, with its one search for a
+// deal or an address, over the page.
+const PHONE_TABS: PhoneTab[] = [
   { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
+  { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
   { label: "Messages", href: PATHS.messages, icon: MessageCircle, match: (p) => p.startsWith(PATHS.messages) },
 ];
 
@@ -688,7 +692,10 @@ function Shell({
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
         aria-label="Sections, on a phone"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
+        className={clsx(
+          "fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
+          retail || kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
+        )}
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
           const lit = !more && t.match(path);
@@ -714,7 +721,15 @@ function Shell({
                 lit ? "text-ink" : "text-muted",
               )}
             >
-              <span className={clsx("relative flex h-7 w-12 items-center justify-center rounded-full", lit && "bg-sun")}>
+              <span
+                className={clsx(
+                  "relative flex items-center justify-center rounded-full",
+                  // The designer is the orange round it is in the top menu.
+                  t.href === PATHS.designer
+                    ? clsx("size-7 bg-sun-line text-white shadow-sm", lit && "ring-2 ring-sun-line/30 ring-offset-1")
+                    : clsx("h-7 w-12", lit && "bg-sun"),
+                )}
+              >
                 <t.icon className="size-[18px]" aria-hidden />
                 {n > 0 && (
                   <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
