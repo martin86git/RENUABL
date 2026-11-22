@@ -145,7 +145,7 @@ import {
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
 import { SolIcon, SolStars } from "./sol-icon";
 import { SolMark } from "./sol-sun";
-import { SolEmerging, SolPicksCard, SolTray } from "./sol-tray";
+import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
@@ -1935,6 +1935,13 @@ export function RoofDesigner(props: {
     [faces, loose, strings, labels, panel, fitted, rules, battery, charger],
   );
   const history = useRef({ past: [] as (typeof drawing)[], future: [] as (typeof drawing)[], last: drawing, restoring: false });
+  // How many steps can be undone, and how many there were when the panels now picked were picked: once a change is made
+  // with them picked, Undo comes into sight on Sol's controller (22 Nov 2026, Martin: "it's easy to make a mistake").
+  const [pastLen, setPastLen] = useState(0);
+  const [pickBase, setPickBase] = useState<number | null>(null);
+  if (picks.length && (pickBase === null || pastLen < pickBase)) setPickBase(pastLen);
+  if (!picks.length && pickBase !== null) setPickBase(null);
+  const changedSincePicked = pickBase !== null && pastLen > pickBase;
   // Bumped when a drag ends, so the drawing is looked at again once the pointer has let go.
   const [settled, setSettled] = useState(0);
   // A slider being dragged changes the drawing at every notch: it is one step too.
@@ -1967,6 +1974,7 @@ export function RoofDesigner(props: {
     if (h.past.length > 100) h.past.shift();
     h.future = [];
     h.last = drawing;
+    setPastLen(h.past.length);
   }, [drawing, settled]);
 
   const restore = (to: typeof drawing) => {
@@ -1990,13 +1998,27 @@ export function RoofDesigner(props: {
     const back = h.past.pop();
     if (!back) return;
     h.future.push(h.last);
+    setPastLen(h.past.length);
     restore(back);
+  };
+  // Undo from Sol's controller keeps what is still there picked, so the next try is one tap away.
+  const undoKeepingPicks = () => {
+    const was = picks;
+    const back = history.current.past.at(-1);
+    undo();
+    if (!back) return;
+    setPicks(
+      was.filter((k) =>
+        k.kind === "loose" ? back.loose.some((l) => l.id === k.id) : k.kind === "label" ? back.labels.some((l) => l.id === k.id) : false,
+      ),
+    );
   };
   const redo = () => {
     const h = history.current;
     const forward = h.future.pop();
     if (!forward) return;
     h.past.push(h.last);
+    setPastLen(h.past.length);
     restore(forward);
   };
 
@@ -6578,6 +6600,25 @@ export function RoofDesigner(props: {
     </div>
   );
 
+  // Sol's step and suggestions, when shown.
+  const guideShown =
+    guideActive && !menu && !(solHolds && (picks.length > 0 || solTray)) && !(props.tight && !solAway && (commandReply || commandBusy));
+  const nudgeShown =
+    !guideActive &&
+    !solQuiet &&
+    !(solHolds && (picks.length > 0 || solTray)) &&
+    nudges.length > 0 &&
+    !menu &&
+    !opening &&
+    !calcOpen &&
+    !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
+    !(!props.tight && commandOpen);
+  // On a phone upright, what Sol says and his controller for what is picked are moulded round him under the picture, not
+  // over it (22 Nov 2026, Martin: "the objective is not to overlay the map"): he rises to sit on the picture's foot,
+  // in a notch of the plate under it.
+  const foot = stage ? stage.pt + stage.photoH : null;
+  const underUp = solHolds && !sideways && foot !== null && !solTray;
+  const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown);
   return (
     <div data-design-popup className={clsx(props.tight && "relative p-2")}>
       {solHolds && (
@@ -10832,7 +10873,7 @@ export function RoofDesigner(props: {
                   </ToolFan>
                 </div>
               )}
-              {tips.corner}
+              {!(solHolds && picks.length > 0) && tips.corner}
               {phone && stage && turnHint && !zooming && (
                 <div
                   className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
@@ -10853,128 +10894,122 @@ export function RoofDesigner(props: {
                 </div>
               )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
-              {guideActive &&
-                !menu &&
-                !(solHolds && (picks.length > 0 || solTray)) &&
-                !(props.tight && !solAway && (commandReply || commandBusy)) && (
-                  <div
-                    className={clsx(
-                      "pointer-events-none absolute inset-x-0 flex justify-center",
-                      // Above Sol's box while it is open (16 Nov 2026, Martin: the box hid the step at hand).
-                      props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
-                      // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
-                      sideways
-                        ? "sideways-sol bottom-[5.5rem]"
-                        : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
-                    )}
-                    // On a phone it starts just under the picture, so the roof it asks about stays in view.
-                    style={phone && stage ? { top: "auto", bottom: 66 + 72 } : undefined}
-                  >
-                    <SolGuide
-                      step={guideNow}
-                      house={
-                        lot
-                          ? {
-                              address: lot.registered ? titleCase(lot.registered) : props.address.split(",")[0],
-                              found: lot.outlines.length > 0,
-                              doubt: lotDoubt(lot),
-                              nearby: props.onPickAddress ? lot.nearby : [],
-                            }
-                          : {
-                              address: props.address.split(",")[0],
-                              found: true,
-                              doubt: lotMissing
-                                ? "I couldn't check it against the land register just now: check it's the house in the middle of the picture."
-                                : null,
-                              nearby: [],
-                            }
-                      }
-                      canSearch={Boolean(props.onSearchAddress)}
-                      placing={
-                        guideAnswered.includes("place") && !guideAnswered.includes("reached")
-                          ? {
-                              panels: summary.panels,
-                              of: guideTarget ? panelsFor(guideTarget.kw, panelOf(design).watts) : null,
-                              kw: summary.kw,
-                            }
-                          : null
-                      }
-                      first={firstName ?? null}
-                      home={{ phase: quoteNow.form.phase, storeys: quoteNow.form.storeys, roof: quoteNow.form.roof }}
-                      suggested={guideSuggested}
-                      target={guideTarget}
-                      canFind={Boolean(props.jobId)}
-                      finding={Boolean(usageRead?.busy)}
-                      panelName={guidePanel?.name ?? "standard panel"}
-                      inverterName={
-                        guideInverter ? `${guideInverter.count > 1 ? `${guideInverter.count} × ` : ""}${guideInverter.inverter.name}` : null
-                      }
-                      batteryName={batteryNameOf(guideBattery)}
-                      freeBatteryName={batteryNameOf(guideFreeBattery)}
-                      batteryKit={
-                        guideBattery ? { qty: guideBattery.qty, name: guideBattery.battery.name, kwh: guideBattery.battery.kwh } : null
-                      }
-                      freeBatteryKit={
-                        guideFreeBattery
-                          ? { qty: guideFreeBattery.qty, name: guideFreeBattery.battery.name, kwh: guideFreeBattery.battery.kwh }
-                          : null
-                      }
-                      unstrung={guideFacts.leftWhy ? { left: guideFacts.unstrung, why: guideFacts.leftWhy } : null}
-                      bill={{ amount: bill.amount, interval: bill.interval }}
-                      onBill={(change) => setBill(billWith(bill, change))}
-                      dailyKwh={dailyFromBillFields(bill)}
-                      onUpload={(file) => void readBillPhoto(file)}
-                      reading={usageRead?.photo ? { busy: usageRead.busy, ...(usageRead.error ? { error: usageRead.error } : {}) } : null}
-                      kw={summary.kw}
-                      onBack={guideAnswered.length ? guideBack : null}
-                      {...guideHandlers}
-                    />
-                  </div>
-                )}
+              {guideShown && (
+                <div
+                  className={clsx(
+                    "pointer-events-none absolute inset-x-0 flex justify-center",
+                    // Above Sol's box while it is open (16 Nov 2026, Martin: the box hid the step at hand).
+                    props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
+                    // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
+                    underUp && "sol-moulded",
+                    sideways
+                      ? "sideways-sol bottom-[5.5rem]"
+                      : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
+                  )}
+                  // On a phone it starts just under the picture, so the roof it asks about stays in view.
+                  style={underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 24) } : undefined}
+                >
+                  <SolGuide
+                    step={guideNow}
+                    house={
+                      lot
+                        ? {
+                            address: lot.registered ? titleCase(lot.registered) : props.address.split(",")[0],
+                            found: lot.outlines.length > 0,
+                            doubt: lotDoubt(lot),
+                            nearby: props.onPickAddress ? lot.nearby : [],
+                          }
+                        : {
+                            address: props.address.split(",")[0],
+                            found: true,
+                            doubt: lotMissing
+                              ? "I couldn't check it against the land register just now: check it's the house in the middle of the picture."
+                              : null,
+                            nearby: [],
+                          }
+                    }
+                    canSearch={Boolean(props.onSearchAddress)}
+                    placing={
+                      guideAnswered.includes("place") && !guideAnswered.includes("reached")
+                        ? {
+                            panels: summary.panels,
+                            of: guideTarget ? panelsFor(guideTarget.kw, panelOf(design).watts) : null,
+                            kw: summary.kw,
+                          }
+                        : null
+                    }
+                    first={firstName ?? null}
+                    home={{ phase: quoteNow.form.phase, storeys: quoteNow.form.storeys, roof: quoteNow.form.roof }}
+                    suggested={guideSuggested}
+                    target={guideTarget}
+                    canFind={Boolean(props.jobId)}
+                    finding={Boolean(usageRead?.busy)}
+                    panelName={guidePanel?.name ?? "standard panel"}
+                    inverterName={
+                      guideInverter ? `${guideInverter.count > 1 ? `${guideInverter.count} × ` : ""}${guideInverter.inverter.name}` : null
+                    }
+                    batteryName={batteryNameOf(guideBattery)}
+                    freeBatteryName={batteryNameOf(guideFreeBattery)}
+                    batteryKit={
+                      guideBattery ? { qty: guideBattery.qty, name: guideBattery.battery.name, kwh: guideBattery.battery.kwh } : null
+                    }
+                    freeBatteryKit={
+                      guideFreeBattery
+                        ? { qty: guideFreeBattery.qty, name: guideFreeBattery.battery.name, kwh: guideFreeBattery.battery.kwh }
+                        : null
+                    }
+                    unstrung={guideFacts.leftWhy ? { left: guideFacts.unstrung, why: guideFacts.leftWhy } : null}
+                    bill={{ amount: bill.amount, interval: bill.interval }}
+                    onBill={(change) => setBill(billWith(bill, change))}
+                    dailyKwh={dailyFromBillFields(bill)}
+                    onUpload={(file) => void readBillPhoto(file)}
+                    reading={usageRead?.photo ? { busy: usageRead.busy, ...(usageRead.error ? { error: usageRead.error } : {}) } : null}
+                    kw={summary.kw}
+                    onBack={guideAnswered.length ? guideBack : null}
+                    {...guideHandlers}
+                  />
+                </div>
+              )}
               {/* Sol beside the design: one suggestion or question at a time, over Ask Sol, never while his panel is out. */}
-              {!guideActive &&
-                !solQuiet &&
-                !(solHolds && (picks.length > 0 || solTray)) &&
-                nudges.length > 0 &&
-                !menu &&
-                !opening &&
-                !calcOpen &&
-                !(props.tight && !solAway && (commandOpen || commandReply || commandBusy)) &&
-                !(!props.tight && commandOpen) && (
-                  <div
-                    className={clsx(
-                      "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
-                      // Sideways it stands above Sol's round, which holds the tools there too.
-                      sideways ? "sideways-sol bottom-[5.5rem]" : !phone && "bottom-[6.25rem]",
-                    )}
-                    style={phone && stage ? { top: "auto", bottom: 66 + 72 } : undefined}
-                  >
-                    <SolNudges
-                      nudges={nudges}
-                      onAct={actOnNudge}
-                      onDismiss={(id) => {
-                        setResumeSaid(true);
-                        setNudgesAside((a) => [...a, id]);
-                      }}
-                      resume={resumeLine}
-                      focus={nudgeFocus}
-                      onBack={nudgeDone.length ? nudgeBack : guideOn && guideAnswered.length ? guideBack : null}
-                    />
-                  </div>
-                )}
+              {nudgeShown && (
+                <div
+                  className={clsx(
+                    "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
+                    // Sideways it stands above Sol's round, which holds the tools there too.
+                    underUp && "sol-moulded",
+                    sideways ? "sideways-sol bottom-[5.5rem]" : !phone && "bottom-[6.25rem]",
+                  )}
+                  style={underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 24) } : undefined}
+                >
+                  <SolNudges
+                    nudges={nudges}
+                    onAct={actOnNudge}
+                    onDismiss={(id) => {
+                      setResumeSaid(true);
+                      setNudgesAside((a) => [...a, id]);
+                    }}
+                    resume={resumeLine}
+                    focus={nudgeFocus}
+                    onBack={nudgeDone.length ? nudgeBack : guideOn && guideAnswered.length ? guideBack : null}
+                  />
+                </div>
+              )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
               {/* The hand to grab the map, in reach on a phone (22 Nov 2026, Martin: "an easy way of selecting the grab
                   tool… grab the map and reposition and recenter the rooftop"): one round, lit while in hand; again puts it down. */}
-              {solHolds && (
+              {solHolds && !(picks.length > 0 && !solTray) && (
                 <button
                   type="button"
                   onClick={() => pickTool(tool === "pan" ? "select" : "pan")}
                   aria-pressed={tool === "pan"}
                   aria-label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
                   title={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                  // With Sol's plate up under the picture, it sits on the picture's foot to his right (the panel round to his left).
+                  style={deckUp ? { left: "calc(50% + 3.75rem)", top: foot ?? 0, transform: "translate(-50%, -50%)" } : undefined}
                   className={clsx(
-                    "pointer-events-auto absolute bottom-7 left-4 z-[55] flex size-[3.25rem] items-center justify-center rounded-full border shadow-lift",
+                    "pointer-events-auto absolute z-[55] flex items-center justify-center rounded-full border shadow-lift",
+                    deckUp ? "size-11" : "bottom-7 left-4 size-[3.25rem]",
                     tool === "pan" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
                   )}
                 >
@@ -10989,7 +11024,9 @@ export function RoofDesigner(props: {
                   style={
                     sideways
                       ? { left: "calc(50% - 3.4rem)", bottom: 20, transform: "translateX(-50%)" }
-                      : { left: "50%", top: (stage ? stage.pt + stage.photoH : 300) - 12, transform: "translate(-50%, -100%)" }
+                      : deckUp
+                        ? { left: "calc(50% - 3.75rem)", top: (foot ?? 300) + 22, transform: "translate(-50%, -100%)" }
+                        : { left: "50%", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
                   }
                 >
                   {panelCard && tool === "panel" && (
@@ -11102,28 +11139,29 @@ export function RoofDesigner(props: {
                   There&apos;s no roof data for this address to draw from. Trace the roof faces (top right) and they are drawn here.
                 </p>
               )}
-              {/* On a phone upright, Sol's card for what is picked, over his round, in place of the dial and the turn bar. */}
-              {solHolds && picks.length > 0 && !solTray && (
+              {/* Sol's controller for what is picked (22 Nov 2026, Martin): upright a plate under the picture moulded round
+                  him, sideways the two thumbs in the picture's bottom corners and a slim pill round him. */}
+              {solHolds && picks.length > 0 && !solTray && (sideways || foot !== null) && (
                 <div
-                  className="pointer-events-auto absolute z-[56]"
-                  // Sideways, a smaller card at the picture's right edge, clear of the panels being worked on in the middle.
-                  style={
-                    sideways
-                      ? { right: 10 / 0.72, width: "min(26rem, 62%)", bottom: 12 / 0.72, zoom: 0.72 }
-                      : { left: 10, right: 10, bottom: 12 }
-                  }
+                  className={clsx("absolute z-[54]", sideways ? "pointer-events-none inset-0" : "inset-x-0")}
+                  // A style of its own, so the phone's smaller drawing (designer-compact) leaves its thumbs full size.
+                  style={sideways ? { zIndex: 54 } : { top: foot ?? 0 }}
                 >
-                  <SolPicksCard
+                  <SolController
+                    layout={sideways ? "sideways" : "upright"}
                     count={picks.length}
                     panels={pickedPanels.length}
                     tilt={pickedTilt}
                     facing={pickedFacing === null ? null : compass(pickedFacing)}
                     landscape={pickedPanels.every((p) => Boolean(p.across)) ? true : pickedPanels.every((p) => !p.across) ? false : null}
+                    canUndo={changedSincePicked}
+                    onUndo={undoKeepingPicks}
                     onTurn={(degrees) => turn(degrees)}
                     onLandscape={turnLandscape}
                     onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
                     onDelete={removePicked}
                     onDone={() => setPicks([])}
+                    height={140}
                   />
                 </div>
               )}
@@ -11135,7 +11173,9 @@ export function RoofDesigner(props: {
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
-                  props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) ? "z-[55]" : "z-10",
+                  (props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen)) || solHolds
+                    ? "z-[55]"
+                    : "z-10",
                 )}
               >
                 {/* Record a walkthrough, floating beside Ask Sol (14 Nov 2026, Martin: in sight, not in the bar): talk the
@@ -11181,7 +11221,9 @@ export function RoofDesigner(props: {
                     className={clsx(
                       "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
                       // On a phone, with something picked, his card is this round grown open: no second pill under it.
-                      solHolds && picks.length > 0 && !solTray && "hidden",
+                      // Upright with his plate under the picture, he rises to sit on the picture's foot, in its notch.
+                      deckUp && "-translate-y-[56px]",
+                      "transition-transform duration-300 motion-reduce:transition-none",
                       // On a phone Sol is a round of his own, a tool and a + coming out of him: no words.
                       solHolds && "!size-14 !gap-0 !p-0 justify-center",
                     )}

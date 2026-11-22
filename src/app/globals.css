@@ -885,6 +885,15 @@ button.team-flash:not([aria-pressed="true"]) {
 }
 /* Sol's sun beats like a heart (3 Nov 2026, Martin: no rays; the sun itself pulses, a subtle signal to engage): two
    quick beats, then a rest, the glow brightening with each. */
+/* On a phone upright, Sol's step and suggestions sit under the picture in a plate moulded round him (his notch cut by
+   the wrapper's mask), so they never cover the map. */
+.sol-moulded > [data-popup] {
+  width: 100%;
+  max-height: 10rem;
+  overflow-y: auto;
+  padding-top: 2rem;
+  border-radius: 26px 26px 0 0;
+}
 /* Sol's spanner and + on a phone come out of him once as he appears. */
 .sol-emerge {
   animation: sol-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
