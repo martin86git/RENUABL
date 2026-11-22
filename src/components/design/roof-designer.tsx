@@ -451,6 +451,8 @@ function FootRound(props: { label: string; on: boolean; onClick: () => void; chi
 // Above: none (22 Nov 2026, Martin: the empty band between the figures and the map was "wasted space"): the map
 // starts right under the figures and the kit and designs round stand on it.
 const PHONE_BANDS = { above: 0, below: 104, rail: 0, bar: 0 };
+// The band under the picture while Sol's box is folded to its strip (3rem) at the foot of the screen.
+const PHONE_FOLDED_BAND = 56;
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
@@ -1789,7 +1791,12 @@ export function RoofDesigner(props: {
     bleed: number;
     /** From the picture's foot to the foot of the screen: Sol's box fills it (22 Nov 2026, Martin). */
     rest: number;
+    // How much taller the picture stands while Sol's box is folded (the room the box gave up), 0 while it is open.
+    drop: number;
   } | null>(null);
+  // Sol's box folded on a phone: the picture grows down into its room (22 Nov 2026, Martin: "minimize down so that there
+  // is more of the map"), read by the measure below.
+  const solFoldedNow = useRef(false);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1818,19 +1825,24 @@ export function RoofDesigner(props: {
         const photoH = Math.round(
           Math.min(across * PHONE_TALLEST, Math.max(shortest, room - PHONE_BANDS.above - PHONE_BANDS.below - PHONE_BANDS.rail)),
         );
-        const pb = PHONE_BANDS.below;
         const stripH = Math.round(box.height);
-        const rest = Math.max(pb, Math.round(window.innerHeight - box.top - box.height - PHONE_BANDS.above - photoH));
+        const restOpen = Math.max(PHONE_BANDS.below, Math.round(window.innerHeight - box.top - box.height - PHONE_BANDS.above - photoH));
+        // Folded, the strip sits at the foot of the screen and the picture takes the rest of the box's room.
+        const drop = solFoldedNow.current ? Math.max(0, restOpen - PHONE_FOLDED_BAND) : 0;
+        const pb = drop ? PHONE_FOLDED_BAND : PHONE_BANDS.below;
+        const rest = restOpen - drop;
+        const tall = photoH + drop;
         setStage((was) =>
           was &&
-          was.photoH === photoH &&
+          was.photoH === tall &&
           was.pb === pb &&
           was.top === stripH &&
           was.across === across &&
           was.bleed === bleed &&
-          was.rest === rest
+          was.rest === rest &&
+          was.drop === drop
             ? was
-            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across, bleed, rest },
+            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH: tall, across, bleed, rest, drop },
         );
       } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
@@ -6820,6 +6832,13 @@ export function RoofDesigner(props: {
     if (solSaying) setSolFolded(false);
   }
   const foldable = underUp && (guideShown || nudgeShown);
+  // Folded, the picture grows down into the box's room: measured again whenever that changes.
+  const growDown = foldable && solFolded;
+  useEffect(() => {
+    if (solFoldedNow.current === growDown) return;
+    solFoldedNow.current = growDown;
+    window.dispatchEvent(new Event("resize"));
+  }, [growDown]);
   // The box's top edge: the picture's foot, or higher once slid up. Sol and the foot row stand on it.
   const liftMost = stage ? Math.round(stage.photoH * 0.6) : 0;
   const lift = foldable && !solFolded ? Math.min(solLift, liftMost) : 0;
@@ -6832,7 +6851,7 @@ export function RoofDesigner(props: {
       type="button"
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
-        const from = solFolded ? -((stage?.rest ?? 156) - 8 - restFolded) : lift;
+        const from = solFolded ? -(stage?.drop ?? (stage?.rest ?? 156) - 8 - restFolded) : lift;
         solDrag.current = { y: e.clientY, from, moved: false };
       }}
       onPointerMove={(e) => {
