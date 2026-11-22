@@ -1577,7 +1577,7 @@ html:has(.sales-snap) {
    being typed in (21 Nov 2026, Martin, Safari on iPhone). */
 @media (max-width: 1023px) and (pointer: coarse) {
   body:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
-    .phone-tabbar {
+    :is(.phone-tabbar, .back-to-top) {
     display: none;
   }
 }
