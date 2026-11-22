@@ -13,6 +13,7 @@ import {
   cleanVoice,
   NO_SAMPLE,
   VOICE_BAD,
+  OFFERED_PROVIDERS,
   VOICE_PROVIDERS,
   voiceKey,
   voiceLabel,
@@ -483,7 +484,7 @@ export function VoicePicker({
       {own && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <div role="radiogroup" aria-label="Who makes the voice" className="flex flex-wrap gap-1 rounded-full bg-canvas p-1">
-            {VOICE_PROVIDERS.map((p) => (
+            {(provider === "azure" ? VOICE_PROVIDERS : OFFERED_PROVIDERS).map((p) => (
               <button
                 key={p.id}
                 type="button"

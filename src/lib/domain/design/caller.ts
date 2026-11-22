@@ -74,10 +74,47 @@ export interface VoiceChoice extends CallerVoice {
  * and Microsoft publishes no clip we can play, so each must be heard on a test call first. If Vapi turns a call away
  * with one of these, the call goes once more in the usual voice (withoutSpeedSettings in voice-agent.ts).
  */
-export const CALLER_VOICES: readonly VoiceChoice[] = [
+const LISTED_VOICES: readonly VoiceChoice[] = [
   { provider: "11labs", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie", words: "Australian, relaxed and natural", sex: "male" },
   { provider: "deepgram", voiceId: "hyperion", label: "Hyperion", words: "Australian, caring and warm", sex: "male" },
   { provider: "deepgram", voiceId: "theia", label: "Theia", words: "Australian, polite and sincere", sex: "female" },
+  { provider: "11labs", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George", words: "British, warm", sex: "male" },
+  { provider: "11labs", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", words: "British, steady", sex: "male" },
+  { provider: "11labs", voiceId: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice", words: "British, clear", sex: "female" },
+  { provider: "11labs", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily", words: "British, soft", sex: "female" },
+  // More of Deepgram's Aura-2 voices (21 Nov 2026, Martin: "i do like some of the deepgram voices"). Names from
+  // memory, not read from Deepgram's list here: VERIFY each by its play button (the sample is Deepgram speaking it).
+  { provider: "deepgram", voiceId: "draco", label: "Draco", words: "British · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "pandora", label: "Pandora", words: "British · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "amalthea", label: "Amalthea", words: "Filipino · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "thalia", label: "Thalia", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "andromeda", label: "Andromeda", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "helena", label: "Helena", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "luna", label: "Luna", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "asteria", label: "Asteria", words: "American · Deepgram", sex: "female" },
+  { provider: "deepgram", voiceId: "apollo", label: "Apollo", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "arcas", label: "Arcas", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "aries", label: "Aries", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "orion", label: "Orion", words: "American · Deepgram", sex: "male" },
+  { provider: "deepgram", voiceId: "zeus", label: "Zeus", words: "American · Deepgram", sex: "male" },
+  { provider: "vapi", voiceId: "Elliot", label: "Elliot", words: "Canadian, young and calm (Vapi's default)", sex: "male" },
+  { provider: "vapi", voiceId: "Dan", label: "Dan", words: "British", sex: "male" },
+  { provider: "vapi", voiceId: "Kai", label: "Kai", words: "American, adult", sex: "male" },
+  { provider: "vapi", voiceId: "Neil", label: "Neil", words: "American, young", sex: "male" },
+  { provider: "vapi", voiceId: "Clara", label: "Clara", words: "American, adult", sex: "female" },
+  { provider: "vapi", voiceId: "Emma", label: "Emma", words: "American, young", sex: "female" },
+  { provider: "vapi", voiceId: "Savannah", label: "Savannah", words: "American, young", sex: "female" },
+  { provider: "vapi", voiceId: "Layla", label: "Layla", words: "American, young", sex: "female" },
+  { provider: "vapi", voiceId: "Tara", label: "Tara", words: "American", sex: "female" },
+];
+/**
+ * Microsoft's voices (18 and 21 Nov 2026), taken off the list on 22 Nov 2026 (Martin: "perhaps lets just remove
+ * microsoft voices for now"): their previews need an Azure Speech key the site doesn't have (Microsoft refused the one
+ * set), and Vapi taking Microsoft's full voice names on a call was never confirmed. Kept here so an agent already
+ * speaking in one is still named and heard; set `MICROSOFT_VOICES_SHOWN` to put them back on the list.
+ */
+export const MICROSOFT_VOICES_SHOWN = false;
+export const MICROSOFT_VOICES: readonly VoiceChoice[] = [
   {
     provider: "azure",
     voiceId: "en-AU-NatashaNeural",
@@ -128,7 +165,6 @@ export const CALLER_VOICES: readonly VoiceChoice[] = [
     sex: "male",
   },
   { provider: "azure", voiceId: "en-AU-KenNeural", label: "Ken", words: "Australian · Microsoft", sex: "male" },
-  // More accents from Microsoft (21 Nov 2026, Martin: New Zealand, Indian and European voices, each with a preview).
   { provider: "azure", voiceId: "en-NZ-MollyNeural", label: "Molly", words: "New Zealand · Microsoft", sex: "female" },
   { provider: "azure", voiceId: "en-NZ-MitchellNeural", label: "Mitchell", words: "New Zealand · Microsoft", sex: "male" },
   { provider: "azure", voiceId: "en-IN-NeerjaNeural", label: "Neerja", words: "Indian English · Microsoft", sex: "female" },
@@ -139,35 +175,15 @@ export const CALLER_VOICES: readonly VoiceChoice[] = [
   { provider: "azure", voiceId: "en-ZA-LukeNeural", label: "Luke", words: "South African · Microsoft", sex: "male" },
   { provider: "azure", voiceId: "en-GB-SoniaNeural", label: "Sonia", words: "British · Microsoft", sex: "female" },
   { provider: "azure", voiceId: "en-GB-RyanNeural", label: "Ryan", words: "British · Microsoft", sex: "male" },
-  { provider: "11labs", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George", words: "British, warm", sex: "male" },
-  { provider: "11labs", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel", words: "British, steady", sex: "male" },
-  { provider: "11labs", voiceId: "Xb7hH8MSUJpSbSDYk0k2", label: "Alice", words: "British, clear", sex: "female" },
-  { provider: "11labs", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily", words: "British, soft", sex: "female" },
-  // More of Deepgram's Aura-2 voices (21 Nov 2026, Martin: "i do like some of the deepgram voices"). Names from
-  // memory, not read from Deepgram's list here: VERIFY each by its play button (the sample is Deepgram speaking it).
-  { provider: "deepgram", voiceId: "draco", label: "Draco", words: "British · Deepgram", sex: "male" },
-  { provider: "deepgram", voiceId: "pandora", label: "Pandora", words: "British · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "amalthea", label: "Amalthea", words: "Filipino · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "thalia", label: "Thalia", words: "American · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "andromeda", label: "Andromeda", words: "American · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "helena", label: "Helena", words: "American · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "luna", label: "Luna", words: "American · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "asteria", label: "Asteria", words: "American · Deepgram", sex: "female" },
-  { provider: "deepgram", voiceId: "apollo", label: "Apollo", words: "American · Deepgram", sex: "male" },
-  { provider: "deepgram", voiceId: "arcas", label: "Arcas", words: "American · Deepgram", sex: "male" },
-  { provider: "deepgram", voiceId: "aries", label: "Aries", words: "American · Deepgram", sex: "male" },
-  { provider: "deepgram", voiceId: "orion", label: "Orion", words: "American · Deepgram", sex: "male" },
-  { provider: "deepgram", voiceId: "zeus", label: "Zeus", words: "American · Deepgram", sex: "male" },
-  { provider: "vapi", voiceId: "Elliot", label: "Elliot", words: "Canadian, young and calm (Vapi's default)", sex: "male" },
-  { provider: "vapi", voiceId: "Dan", label: "Dan", words: "British", sex: "male" },
-  { provider: "vapi", voiceId: "Kai", label: "Kai", words: "American, adult", sex: "male" },
-  { provider: "vapi", voiceId: "Neil", label: "Neil", words: "American, young", sex: "male" },
-  { provider: "vapi", voiceId: "Clara", label: "Clara", words: "American, adult", sex: "female" },
-  { provider: "vapi", voiceId: "Emma", label: "Emma", words: "American, young", sex: "female" },
-  { provider: "vapi", voiceId: "Savannah", label: "Savannah", words: "American, young", sex: "female" },
-  { provider: "vapi", voiceId: "Layla", label: "Layla", words: "American, young", sex: "female" },
-  { provider: "vapi", voiceId: "Tara", label: "Tara", words: "American", sex: "female" },
 ];
+
+/** The voices offered in every picker. */
+export const CALLER_VOICES: readonly VoiceChoice[] = MICROSOFT_VOICES_SHOWN
+  ? [...LISTED_VOICES.slice(0, 3), ...MICROSOFT_VOICES, ...LISTED_VOICES.slice(3)]
+  : LISTED_VOICES;
+
+/** Every voice we know by name, offered or not: for naming a voice an agent already speaks in. */
+export const KNOWN_VOICES: readonly VoiceChoice[] = [...LISTED_VOICES, ...MICROSOFT_VOICES];
 
 /**
  * Voices a business has taken off its list (18 Nov 2026, Martin: "i need to be able to remove the voices i dont
@@ -209,6 +225,9 @@ export const VOICE_PROVIDERS: { id: CallerVoice["provider"]; label: string }[] =
   { id: "azure", label: "Microsoft" },
 ];
 
+/** The makers a voice may be typed in for ("Another voice"): Microsoft only while its voices are offered. */
+export const OFFERED_PROVIDERS = VOICE_PROVIDERS.filter((p) => p.id !== "azure" || MICROSOFT_VOICES_SHOWN);
+
 /** A voice sent from the browser, checked: a known provider and an ID of letters and digits. Null is "the default". */
 export function cleanVoice(raw: unknown): CallerVoice | null | "bad" {
   if (raw === null || raw === undefined || raw === "") return null;
@@ -236,7 +255,7 @@ export const canSpeak = (p: CallerVoice["provider"]): p is SpeakingProvider => (
 
 /** The name a voice gives in its sample: its name on our list, else a plain one. */
 export const sampleName = (v: CallerVoice) =>
-  CALLER_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId)?.label ?? "your assistant";
+  KNOWN_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId)?.label ?? "your assistant";
 
 /**
  * Where a voice's maker keeps its own sample clip, the fallback when the site can't have it speak our line: Deepgram
@@ -282,7 +301,7 @@ export const VOICE_BAD = "That isn't a voice ID we can use: letters and numbers 
 /** The voice's name for the page: one of ours by its name, else "ElevenLabs voice 21m00…". */
 export function voiceLabel(v: CallerVoice | null): string {
   if (!v) return "Vapi's default voice";
-  const ours = CALLER_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId);
+  const ours = KNOWN_VOICES.find((c) => c.provider === v.provider && c.voiceId === v.voiceId);
   if (ours) return ours.label;
   return `${VOICE_PROVIDERS.find((p) => p.id === v.provider)?.label ?? "Vapi"} voice ${v.voiceId.length > 12 ? `${v.voiceId.slice(0, 8)}…` : v.voiceId}`;
 }
