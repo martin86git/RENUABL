@@ -885,6 +885,21 @@ button.team-flash:not([aria-pressed="true"]) {
 }
 /* Sol's sun beats like a heart (3 Nov 2026, Martin: no rays; the sun itself pulses, a subtle signal to engage): two
    quick beats, then a rest, the glow brightening with each. */
+/* Sol's spanner and + on a phone come out of him once as he appears. */
+.sol-emerge {
+  animation: sol-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes sol-emerge {
+  from {
+    transform: translate(var(--emerge-x, 0), 13px) scale(0.2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-emerge {
+    animation: none;
+  }
+}
 @keyframes sol-heartbeat {
   0%,
   40%,

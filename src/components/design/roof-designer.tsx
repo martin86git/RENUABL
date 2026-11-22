@@ -145,7 +145,7 @@ import {
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
 import { SolIcon, SolStars } from "./sol-icon";
 import { SolMark } from "./sol-sun";
-import { SolPicksCard, SolTray } from "./sol-tray";
+import { SolEmerging, SolPicksCard, SolTray } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
@@ -1812,6 +1812,8 @@ export function RoofDesigner(props: {
   const [zooming, setZooming] = useState(false);
   // Sol holds the tools on a phone upright (sol-tray.tsx): his tray, and the roof pitch marks shown only when asked for.
   const [solTray, setSolTray] = useState(false);
+  // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
+  const [panelCard, setPanelCard] = useState(false);
   const [phonePitch, setPhonePitch] = useState(false);
   const pinch = useRef<{
     at: Map<number, { x: number; y: number }>;
@@ -1887,7 +1889,7 @@ export function RoofDesigner(props: {
       ? `Sol · ${picks.length} picked`
       : phonePitch
         ? "Sol · Pitch"
-        : tool !== "select"
+        : tool !== "select" && tool !== "panel"
           ? `Sol · ${TOOLS.find((x) => x.tool === tool)?.name ?? "tools"}`
           : "Sol · tools";
   // The dial for what is picked, on a phone upright: about three fifths of the picture's height, its middle the picture's.
@@ -10834,7 +10836,7 @@ export function RoofDesigner(props: {
               {phone && stage && turnHint && !zooming && (
                 <div
                   className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
-                  style={{ top: stage.pt + stage.photoH - 34 }}
+                  style={{ top: stage.pt + stage.photoH - (solHolds ? 34 + 64 : 34) }}
                 >
                   <p className="flex items-center gap-1.5 rounded-full bg-primary/90 py-0.5 pl-2.5 pr-0.5 text-[11px] text-white shadow-lift backdrop-blur-md">
                     <Smartphone className="size-3 rotate-90 text-sun-line" aria-hidden />
@@ -10862,11 +10864,11 @@ export function RoofDesigner(props: {
                       props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
                       // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
                       sideways
-                        ? "sideways-sol bottom-[4rem]"
+                        ? "sideways-sol bottom-[5.5rem]"
                         : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                     )}
                     // On a phone it starts just under the picture, so the roof it asks about stays in view.
-                    style={phone && stage ? { top: "auto", bottom: 66 } : undefined}
+                    style={phone && stage ? { top: "auto", bottom: 66 + 72 } : undefined}
                   >
                     <SolGuide
                       step={guideNow}
@@ -10943,9 +10945,9 @@ export function RoofDesigner(props: {
                     className={clsx(
                       "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
                       // Sideways it stands above Sol's round, which holds the tools there too.
-                      sideways ? "sideways-sol bottom-[4rem]" : !phone && "bottom-[6.25rem]",
+                      sideways ? "sideways-sol bottom-[5.5rem]" : !phone && "bottom-[6.25rem]",
                     )}
-                    style={phone && stage ? { top: "auto", bottom: 66 } : undefined}
+                    style={phone && stage ? { top: "auto", bottom: 66 + 72 } : undefined}
                   >
                     <SolNudges
                       nudges={nudges}
@@ -10978,6 +10980,94 @@ export function RoofDesigner(props: {
                 >
                   <Hand className="size-6" aria-hidden />
                 </button>
+              )}
+              {/* The panel round, on the map's bottom centre on a phone (22 Nov 2026, Martin: out of Sol's tool kit, on the map):
+                  a press takes up Add a panel and asks which way they go down; a press with it in hand puts it down. */}
+              {solHolds && !solTray && picks.length === 0 && (
+                <div
+                  className="pointer-events-auto absolute z-[55] flex flex-col items-center"
+                  style={
+                    sideways
+                      ? { left: "calc(50% - 3.4rem)", bottom: 20, transform: "translateX(-50%)" }
+                      : { left: "50%", top: (stage ? stage.pt + stage.photoH : 300) - 12, transform: "translate(-50%, -100%)" }
+                  }
+                >
+                  {panelCard && tool === "panel" && (
+                    <div
+                      className="mb-2 w-56 rounded-2xl bg-surface p-1.5 text-ink shadow-lift ring-1 ring-line"
+                      role="radiogroup"
+                      aria-label="New panels"
+                    >
+                      <span className="grid grid-cols-2 gap-1.5">
+                        {([false, true] as const).map((land) => (
+                          <button
+                            key={String(land)}
+                            type="button"
+                            role="radio"
+                            aria-checked={addLandscape === land}
+                            onClick={() => {
+                              setAddLandscape(land);
+                              setPanelCard(false);
+                            }}
+                            className={clsx(
+                              "flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-semibold",
+                              addLandscape === land ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-2",
+                            )}
+                          >
+                            <PanelDrawing landscape={land} size={24} />
+                            {land ? "Landscape" : "Portrait"}
+                          </button>
+                        ))}
+                      </span>
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={addLandscape === null}
+                        onClick={() => {
+                          setAddLandscape(null);
+                          setPanelCard(false);
+                        }}
+                        className={clsx(
+                          "mt-1.5 w-full rounded-xl px-2 py-1.5 text-[11px] font-medium",
+                          addLandscape === null ? "bg-sun text-sun-ink" : "text-muted",
+                        )}
+                      >
+                        Follow the roof face
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (tool === "panel" && !panelCard) {
+                        pickTool("select");
+                        return;
+                      }
+                      setPhonePitch(false);
+                      if (tool !== "panel") pickTool("panel");
+                      setPanelCard((v) => !v);
+                    }}
+                    aria-pressed={tool === "panel"}
+                    aria-label={tool === "panel" ? "Put Add a panel down" : "Add a panel"}
+                    title={tool === "panel" ? "Adding panels: press to stop" : "Add a panel"}
+                    className={clsx(
+                      "relative flex items-center justify-center rounded-full border shadow-lift",
+                      sideways ? "size-9" : "size-11",
+                      tool === "panel" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink",
+                    )}
+                  >
+                    <SquarePlus className="size-5" aria-hidden />
+                    {addLandscape !== null && (
+                      <span
+                        aria-hidden
+                        className={clsx(
+                          "absolute -bottom-0.5 -right-0.5 block rounded-[2px] border border-current bg-inherit",
+                          addLandscape ? "h-2 w-3" : "h-3 w-2",
+                        )}
+                      />
+                    )}
+                  </button>
+                </div>
               )}
               <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
                 <ToolFan
@@ -11092,17 +11182,31 @@ export function RoofDesigner(props: {
                       "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
                       // On a phone, with something picked, his card is this round grown open: no second pill under it.
                       solHolds && picks.length > 0 && !solTray && "hidden",
+                      // On a phone Sol is a round of his own, a tool and a + coming out of him: no words.
+                      solHolds && "!size-14 !gap-0 !p-0 justify-center",
                     )}
+                    aria-label={solHolds ? (solTray ? "Put Sol's tools away" : `Sol's tools: ${phoneSolWords}`) : undefined}
                   >
                     {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
                     <span className="sol-orb relative flex size-11 items-center justify-center rounded-full">
                       <span className="sol-heartbeat inline-flex">
                         <SolMark className="size-[35px]" />
                       </span>
-                      <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
+                      {solHolds ? (
+                        <SolEmerging
+                          tray={solTray}
+                          held={tool !== "select" && tool !== "panel" ? (TOOLS.find((x) => x.tool === tool)?.icon ?? null) : null}
+                        />
+                      ) : (
+                        <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
+                      )}
                     </span>
-                    <span className="whitespace-nowrap text-[15px] font-medium">{solHolds ? phoneSolWords : "Ask Sol"}</span>
-                    <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
+                    {!solHolds && (
+                      <>
+                        <span className="whitespace-nowrap text-[15px] font-medium">Ask Sol</span>
+                        <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
+                      </>
+                    )}
                   </button>
                 ) : (
                   <div

@@ -22,13 +22,14 @@ import {
   RotateCw,
   Ruler,
   Search,
-  SquarePlus,
   SunMedium,
   Tag,
   Trash2,
   TriangleRight,
+  Plus,
   Undo2,
   WandSparkles,
+  Wrench,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -42,7 +43,6 @@ const GROUPS: { title: string; items: { tool: TrayTool; icon: LucideIcon; name: 
     title: "Draw",
     items: [
       { tool: "select", icon: MousePointer2, name: "Select" },
-      { tool: "panel", icon: SquarePlus, name: "Add panel" },
       { tool: "erase", icon: Eraser, name: "Erase" },
       { tool: "trace", icon: PenTool, name: "Trace roof" },
     ],
@@ -352,5 +352,37 @@ export function SolPicksCard(props: {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Sol on a phone (22 Nov 2026, Martin: "a tool and + icon somehow emerging out of him", in place of tools in words):
+ * his sun with a spanner coming out of its upper left and a + out of its upper right, each on a short stem of light
+ * from him, so it reads as Sol holding the tools and adding things. With a tool in hand, that tool's mark takes the
+ * spanner's place, lit orange. With his tray up the + turns to a cross. Drawn over his orb.
+ */
+export function SolEmerging({ tray, held }: { tray: boolean; held: LucideIcon | null }) {
+  const Tool = held ?? Wrench;
+  const badge =
+    "sol-emerge absolute flex size-6 items-center justify-center rounded-full ring-2 ring-[#26282c] shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition-transform duration-300 motion-reduce:transition-none";
+  return (
+    <span aria-hidden className="pointer-events-none absolute inset-0">
+      <span className="absolute -left-[7px] -top-[5px] h-[3px] w-4 origin-right rotate-[35deg] rounded-full bg-gradient-to-l from-[#ffb347]/0 to-[#ffb347]/70" />
+      <span className="absolute -right-[7px] -top-[5px] h-[3px] w-4 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70" />
+      <span
+        className={clsx(badge, "-left-[14px] -top-[14px] [--emerge-x:14px]", held ? "bg-sun-line text-white" : "bg-white text-[#1d1f23]")}
+      >
+        <Tool className="size-3.5" strokeWidth={2.4} />
+      </span>
+      <span
+        className={clsx(
+          badge,
+          "-right-[14px] -top-[14px] bg-sun-line text-white [--emerge-x:-14px] [animation-delay:90ms]",
+          tray && "rotate-45",
+        )}
+      >
+        <Plus className="size-4" strokeWidth={2.8} />
+      </span>
+    </span>
   );
 }
