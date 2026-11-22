@@ -6,7 +6,7 @@
 
 import type { StrayText, TextLine } from "@/lib/domain/design/texts";
 import { useEffect, useState } from "react";
-import { DEFAULT_CALLER, type CallerVoice } from "@/lib/domain/design/caller";
+import { DEFAULT_CALLER, type CallerBrain, type CallerVoice } from "@/lib/domain/design/caller";
 import type { CallerKey } from "@/lib/domain/install-call";
 import type { AskDraft } from "@/lib/domain/design/call-consent";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
@@ -22,6 +22,8 @@ export interface CallerState {
   named: boolean;
   /** The colour chosen for its stand-in picture, or null to leave it to its name. */
   tint?: number | null;
+  /** The model it thinks with on calls, or null for RENUABL's default. */
+  brain?: CallerBrain | null;
 }
 
 type Answer<T> = ({ ok: true } & T) | { ok: false; message: string };
@@ -80,6 +82,17 @@ export async function saveCallerVoice(voice: CallerVoice | null, role: CallerKey
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ voice, role }),
+  });
+  if (res.ok) window.dispatchEvent(new CustomEvent(CHANGED, { detail: res.caller }));
+  return res;
+}
+
+/** The model it thinks with on calls: quicker or more careful; null goes back to RENUABL's default. */
+export async function saveCallerBrain(brain: CallerBrain | null, role: CallerKey = "sales") {
+  const res = await ask<{ caller: CallerState }>("/api/design/caller", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ brain, role }),
   });
   if (res.ok) window.dispatchEvent(new CustomEvent(CHANGED, { detail: res.caller }));
   return res;

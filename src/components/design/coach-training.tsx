@@ -6,7 +6,8 @@ import { Check, ChevronDown, ChevronRight, GraduationCap, Loader2, Lock, PhoneCa
 import type { CoachNote } from "@/lib/domain/design/coaching";
 import { DEFAULT_DELIVERY, DELIVERY_COPY, NATURAL_DELIVERY, sameDelivery, type Delivery } from "@/lib/domain/design/delivery";
 import { TRAINING_COPY, openProposals, type TrainingProposal, type TrainingView } from "@/lib/domain/design/training-call";
-import { TRAINING_PLACED, ringMeToHear, ringMeToTrain, type CallerState } from "@/lib/services/caller";
+import { TRAINING_PLACED, ringMeToHear, ringMeToTrain, saveCallerBrain, type CallerState } from "@/lib/services/caller";
+import { BRAIN_WORDS, CALLER_BRAINS, type CallerBrain } from "@/lib/domain/design/caller";
 import { answerProposal, loadTraining, retryTraining, saveDelivery } from "@/lib/services/coaching";
 
 const SEEN_KEY = "renuabl.design.training-seen";
@@ -592,5 +593,62 @@ export function DeliverySettings(props: { delivery: Delivery | null; editable: b
       <p className="text-[11px] leading-snug text-muted">{DELIVERY_COPY.note}</p>
       {!props.editable && <p className="text-xs text-muted">Only an admin can change how it speaks.</p>}
     </div>
+  );
+}
+
+/**
+ * The model the agent thinks with on calls (22 Nov 2026, Martin: "build the per-agent model setting"): RENUABL's
+ * default, quicker (Claude Haiku) or more careful (Claude Sonnet), each agent its own. Saved as it is pressed and used
+ * from the next call, test and training calls too.
+ */
+export function BrainSettings(props: { caller: CallerState; editable: boolean }) {
+  // What was pressed here, until the agent read back from the server says the same (undefined: as the server has it).
+  const [picked, setBrain] = useState<CallerBrain | null | undefined>(undefined);
+  const brain = picked === undefined ? (props.caller.brain ?? null) : picked;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const save = async (next: CallerBrain | null) => {
+    const was = brain;
+    setBrain(next);
+    setBusy(true);
+    setSaid(null);
+    const res = await saveCallerBrain(next, props.caller.role ?? "sales");
+    setBusy(false);
+    if (!res.ok) {
+      setBrain(was);
+      return setSaid({ ok: false, text: res.message });
+    }
+    setSaid({ ok: true, text: "Saved. Used from the next call." });
+  };
+  const options: (CallerBrain | null)[] = [null, ...CALLER_BRAINS];
+  return (
+    <fieldset disabled={!props.editable || busy} className="border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <legend className="float-left text-[13px] font-medium text-ink">How it thinks</legend>
+        <div className="inline-flex rounded-full bg-surface-2 p-0.5">
+          {options.map((value) => {
+            const on = brain === value;
+            const [label, what] = BRAIN_WORDS[value ?? "default"];
+            return (
+              <button
+                key={value ?? "default"}
+                type="button"
+                aria-pressed={on}
+                title={what}
+                onClick={() => !on && void save(value)}
+                className={clsx(
+                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                  on ? "bg-surface text-ink shadow-soft" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <p className="clear-both mt-1 text-xs text-muted">{BRAIN_WORDS[brain ?? "default"][1]}</p>
+      {said && <p className={clsx("mt-1 text-xs", said.ok ? "text-positive" : "text-danger")}>{said.text}</p>}
+    </fieldset>
   );
 }

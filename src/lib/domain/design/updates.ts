@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Each voice agent can be set to answer quicker or more carefully, under How it speaks in its settings.",
+  },
+  {
+    day: "2026-11-22",
     area: "Today",
     words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
   },
