@@ -16,7 +16,6 @@ import {
   Sparkles,
   Stamp,
   TrendingUp,
-  Rows3,
   type LucideIcon,
 } from "lucide-react";
 import type { ISODate } from "@/lib/domain/types";
