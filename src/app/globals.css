@@ -1498,3 +1498,115 @@ html:has(.sales-snap) {
     display: none;
   }
 }
+
+/* A deal's details on a phone (22 Nov 2026, Martin: the boxes were too big and ran past the screen's edge): one column of
+   compact rows, the label on the left and its value beside it, a box only while it is being typed in. */
+@media (max-width: 639px) {
+  .deal-fields {
+    row-gap: 0;
+  }
+  .deal-fields > label,
+  .deal-fields > div > label,
+  .deal-fields > div > div > label {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .deal-fields > div:last-child,
+  .deal-fields > :last-child label {
+    border-bottom: 0;
+  }
+  .deal-fields > div:not(:has(label)) {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .deal-fields :is(input, select, textarea) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0 0.5rem;
+    border-color: transparent;
+    border-radius: 0.5rem;
+    background: transparent;
+    box-shadow: none;
+  }
+  .deal-fields textarea {
+    height: auto;
+    min-height: 4rem;
+    padding: 0.375rem 0.5rem;
+  }
+  .deal-fields :is(input, select, textarea):focus {
+    border-color: var(--line);
+    background: var(--surface);
+  }
+  .deal-fields input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+}
+
+/* Sol's sheet on a deal, on a phone, as a chat (22 Nov 2026, Martin): his line a bubble from him, the choices as quick
+   replies under it, the box a rounded composer kept at the foot of the sheet. */
+@media (max-width: 639px) {
+  .deal-sol-sheet .sol-say {
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    background: var(--canvas);
+  }
+  .deal-sol-sheet .sol-line {
+    display: inline-block;
+    max-width: 92%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 1rem 1rem 1rem 0.3rem;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 1px 2px rgba(11, 11, 12, 0.06);
+    font-size: 13.5px;
+    font-weight: 450;
+    line-height: 1.45;
+  }
+  .deal-sol-sheet .sol-line-mark {
+    display: none;
+  }
+  .deal-sol-sheet .sol-replies {
+    flex-wrap: wrap;
+  }
+  .deal-sol-sheet .sol-compose {
+    position: sticky;
+    bottom: 0;
+    margin-top: 0.75rem;
+    padding: 0.25rem 0.25rem 0.25rem 0.875rem;
+    border-radius: 9999px;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 -6px 12px var(--canvas);
+  }
+  .deal-sol-sheet .sol-prompt {
+    display: none;
+  }
+  .deal-sol-sheet .sol-send {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    background: var(--sun-line);
+    color: #fff;
+  }
+  .deal-sol-sheet .sol-send:disabled {
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .deal-sol-sheet .sol-lead-page {
+    font-size: 11.5px;
+    background: var(--surface);
+  }
+}

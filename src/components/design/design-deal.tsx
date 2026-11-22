@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ClipboardList,
   FileText,
@@ -22,7 +23,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { SolBadge } from "./sol-sun";
+import { SolBadge, SolMark } from "./sol-sun";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -650,7 +651,7 @@ export function DealPage({ id }: { id: string }) {
         )}
 
         {/* Sol's line (16 Nov 2026, Martin): what happened, what he does next, what the deal needs from you. */}
-        <DealSolSheet>
+        <DealSolSheet name={customer.firstName}>
           <SolOnDealCard
             jobId={job.id}
             phone={customer.phone || null}
@@ -765,7 +766,7 @@ export function DealPage({ id }: { id: string }) {
               <div
                 role="tablist"
                 aria-label="Deal details"
-                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1 shadow-[0_0_0_8px_var(--canvas)]"
+                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1 shadow-[0_0_0_8px_var(--canvas)] max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
               >
                 {[{ id: "deal", label: "The deal" }, ...tabs].map((t) => {
                   const on = t.id === "deal" ? section === "deal" || !shownTab : section !== "deal" && shownTab?.id === t.id;
@@ -776,7 +777,7 @@ export function DealPage({ id }: { id: string }) {
                       aria-selected={on}
                       onClick={() => setSection(t.id)}
                       className={clsx(
-                        "h-8 flex-1 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium",
+                        "h-8 flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium max-sm:flex-none",
                         on ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
                       )}
                     >
@@ -785,10 +786,10 @@ export function DealPage({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <section data-tour="deal-fields" className={clsx(ui.card, "p-5")}>
+              <section data-tour="deal-fields" className={clsx(ui.card, "p-5 max-sm:px-3.5 max-sm:py-2")}>
                 {section === "deal" || !shownTab ? (
                   <>
-                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       <EditLine
                         key={`title:${job.title}`}
                         label="Deal name"
@@ -925,7 +926,7 @@ export function DealPage({ id }: { id: string }) {
                         {tabFilled} of {tabLines.length} filled
                       </span>
                     </div>
-                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       {tabLines.map((l) => {
                         const d = l.source === "design" ? details.find((x) => x.key === l.key) : null;
                         return (
@@ -1268,7 +1269,7 @@ function useCentredRail() {
  * way, so the card is never mounted twice (it drafts a reply when it opens). Folded or not is kept for the tab.
  */
 const SOL_TUCKED_KEY = "renuabl.design.deal-sol-tucked";
-function DealSolSheet({ children }: { children: React.ReactNode }) {
+function DealSolSheet({ children, name }: { children: React.ReactNode; name: string }) {
   const [tucked, setTucked] = useState(() => {
     try {
       return typeof window !== "undefined" && sessionStorage.getItem(SOL_TUCKED_KEY) === "1";
@@ -1329,20 +1330,30 @@ function DealSolSheet({ children }: { children: React.ReactNode }) {
         className={clsx(
           "[&:not(:has(section))]:hidden",
           "max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(3.75rem+env(safe-area-inset-bottom))] max-sm:z-30",
-          "max-sm:max-h-[58dvh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-2xl",
+          "deal-sol-sheet max-sm:max-h-[58dvh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-2xl max-sm:bg-surface max-sm:ring-1 max-sm:ring-line",
           "max-sm:shadow-[0_-6px_30px_rgba(11,11,12,0.22)]",
           tucked && "max-sm:hidden",
         )}
       >
-        <button
-          type="button"
-          onClick={() => set(true)}
-          aria-label="Fold Sol away (the Sol button below brings him back)"
-          title="Fold away"
-          className="sticky top-0 z-10 -mb-5 flex h-5 w-full items-start justify-center pt-1.5 sm:hidden"
-        >
-          <span className="h-1 w-10 rounded-full bg-ink/25" aria-hidden />
-        </button>
+        {/* On a phone it reads as a chat window (22 Nov 2026, Martin: "sols chat tab doesn't feel like a chat tab"): a
+            header with Sol and who it's about, his line as a bubble, quick replies under it, the box at the foot. */}
+        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-surface px-3 pb-2 pt-1.5 sm:hidden">
+          <span className="absolute left-1/2 top-1 h-1 w-9 -translate-x-1/2 rounded-full bg-ink/15" aria-hidden />
+          <SolMark className="mt-1 size-8 shrink-0" />
+          <span className="mt-1 min-w-0 flex-1 leading-tight">
+            <span className="block text-[14px] font-semibold text-ink">Sol</span>
+            <span className="block truncate text-[11.5px] text-muted">{name ? `On ${name}'s deal` : "On this deal"}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => set(true)}
+            aria-label="Fold Sol away (the Sol button below brings him back)"
+            title="Fold away"
+            className="mt-1 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface-2"
+          >
+            <ChevronDown className="size-4" aria-hidden />
+          </button>
+        </div>
         {children}
       </div>
     </>
