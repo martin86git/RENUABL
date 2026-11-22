@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { readXlsxRows } from "@/lib/server/xlsx";
 import { VERIFIED_RATES } from "../rebates";
 import { defaultBrand, type BrandImage, type BrandKit } from "./brand";
-import { DEFAULT_WORKSPACE, readSupplierList, type Workspace } from "./pricing";
+import { COMPONENTS, DEFAULT_WORKSPACE, readSupplierList, type Workspace } from "./pricing";
 import type { ProposalInputs } from "./proposal";
 import { cleanExtras, costSystem, defaultBill, editedLines, lineKey, type LineEdit } from "./quote";
 import { cleanDesignSet, type DesignSet, type Face } from "./roof-design";
@@ -47,7 +47,14 @@ export function sampleSet(withBattery = false): DesignSet {
 
 export function pricedWorkspace(): Workspace {
   const rows = readXlsxRows(readFileSync("src/lib/domain/__fixtures__/awm-price-list.xlsx"));
-  return { ...DEFAULT_WORKSPACE, lists: [readSupplierList("awm.xlsx", rows, "2026-10-10")] };
+  return { ...withExampleCodes(DEFAULT_WORKSPACE), lists: [readSupplierList("awm.xlsx", rows, "2026-10-10")] };
+}
+
+/** A business that has typed the common wholesaler codes in for the parts every job needs (none start with them). */
+export function withExampleCodes(ws: Workspace): Workspace {
+  const components = { ...ws.components };
+  for (const c of COMPONENTS) components[c.key] = { ...components[c.key], sku: c.example };
+  return { ...ws, components };
 }
 
 export const sampleBrand = (): BrandKit => ({

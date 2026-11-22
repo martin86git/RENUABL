@@ -887,3 +887,11 @@ export function readCallLine(text: string): { outcome: CallOutcome; headline: st
     rest: (slot ? old[2].slice(slot[0].length) : old[2]).trim(),
   };
 }
+
+/**
+ * The model the phone assistants run on unless `VAPI_MODEL` names another (22 Nov 2026, Martin: "Let's switch to
+ * haiku"): quicker to its first word than Sonnet, and a small share of a minute's cost. VERIFY on practice calls that
+ * the rules hold (no price, the two-turn opening, call screening, the tools), and set `VAPI_MODEL` to claude-sonnet-5
+ * to go back.
+ */
+export const VOICE_MODEL = "claude-haiku-5-5";
