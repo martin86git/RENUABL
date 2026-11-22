@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import type { SolState } from "@/lib/domain/design/sol";
-import { SOL_ASK, SOL_CHANGED, SOL_INDUCTION, SOL_STATE, SOL_TOGGLE, loadSol, type SolAsk } from "@/lib/services/sol";
+import { SOL_ASK, SOL_CHANGED, SOL_INDUCTION, SOL_STATE, SOL_TOGGLE, loadSol, toggleSolHere, type SolAsk } from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-sun";
@@ -265,7 +265,7 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
   return (
     <button
       type="button"
-      onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
+      onClick={() => toggleSolHere(phone)}
       title="Sol, your assistant"
       aria-label={unread ? `Sol: ${unread} unread` : "Sol, your assistant"}
       aria-pressed={open}

@@ -70,6 +70,7 @@ import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { SolOnDealCard } from "./sol-on-deal";
+import { DEAL_SOL_TOGGLE } from "@/lib/services/sol";
 import { Spotlight } from "./new-look";
 import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
 import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
@@ -536,7 +537,7 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:-mx-3 max-sm:w-auto max-sm:px-0 max-sm:py-0 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:-mx-3 max-sm:w-auto max-sm:px-0 max-sm:pt-0 max-sm:pb-[var(--deal-sol-h,0px)] xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
       {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />
@@ -651,7 +652,7 @@ export function DealPage({ id }: { id: string }) {
         )}
 
         {/* Sol's line (16 Nov 2026, Martin): what happened, what he does next, what the deal needs from you. */}
-        <div data-tour="deal-sol" className="empty:hidden">
+        <DealSolSheet>
           <SolOnDealCard
             jobId={job.id}
             phone={customer.phone || null}
@@ -673,7 +674,7 @@ export function DealPage({ id }: { id: string }) {
                           : goTab("team")
             }
           />
-        </div>
+        </DealSolSheet>
 
         <CallNotetaker
           handle={notetaker}
@@ -1252,6 +1253,94 @@ function useCentredRail() {
  * short): one row of pills under the banner that scrolls sideways. Call and Email are in the banner; Sol is the foot
  * bar's, so he isn't here twice.
  */
+/**
+ * Sol's card for the deal. On a wide screen it sits in the page; on a phone (21 Nov 2026, Martin: "sols chat box should
+ * be a pop up which can be collapsed or reintroduced via the centre sol icon at the footer") it is a sheet over the foot
+ * bar, folded away by its handle and brought back by the foot bar's Sol round (`DEAL_SOL_TOGGLE`). One element either
+ * way, so the card is never mounted twice (it drafts a reply when it opens). Folded or not is kept for the tab.
+ */
+const SOL_TUCKED_KEY = "renuabl.design.deal-sol-tucked";
+function DealSolSheet({ children }: { children: React.ReactNode }) {
+  const [tucked, setTucked] = useState(() => {
+    try {
+      return typeof window !== "undefined" && sessionStorage.getItem(SOL_TUCKED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [height, setHeight] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const set = useCallback((next: boolean) => {
+    setTucked(next);
+    try {
+      sessionStorage.setItem(SOL_TUCKED_KEY, next ? "1" : "0");
+    } catch {}
+  }, []);
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 639px)");
+    const mark = () => {
+      if (phone.matches) document.documentElement.dataset.dealSol = "1";
+      else delete document.documentElement.dataset.dealSol;
+    };
+    mark();
+    phone.addEventListener("change", mark);
+    const toggle = () =>
+      setTucked((was) => {
+        try {
+          sessionStorage.setItem(SOL_TUCKED_KEY, was ? "0" : "1");
+        } catch {}
+        return !was;
+      });
+    window.addEventListener(DEAL_SOL_TOGGLE, toggle);
+    return () => {
+      phone.removeEventListener("change", mark);
+      window.removeEventListener(DEAL_SOL_TOGGLE, toggle);
+      delete document.documentElement.dataset.dealSol;
+    };
+  }, []);
+  // Room at the foot of the page so the sheet never hides its end.
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setHeight(el.offsetHeight));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--deal-sol-h", tucked || !height ? "0px" : `${height + 16}px`);
+    return () => {
+      root.removeProperty("--deal-sol-h");
+    };
+  }, [tucked, height]);
+  return (
+    <>
+      <div
+        ref={box}
+        data-tour="deal-sol"
+        className={clsx(
+          "[&:not(:has(section))]:hidden",
+          "max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(3.75rem+env(safe-area-inset-bottom))] max-sm:z-30",
+          "max-sm:max-h-[58dvh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-2xl",
+          "max-sm:shadow-[0_-6px_30px_rgba(11,11,12,0.22)]",
+          tucked && "max-sm:hidden",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => set(true)}
+          aria-label="Fold Sol away (the Sol button below brings him back)"
+          title="Fold away"
+          className="sticky top-0 z-10 -mb-5 flex h-5 w-full items-start justify-center pt-1.5 sm:hidden"
+        >
+          <span className="h-1 w-10 rounded-full bg-ink/25" aria-hidden />
+        </button>
+        {children}
+      </div>
+    </>
+  );
+}
+
 function DealPills(props: {
   tab: Tab;
   onTab: (tab: Tab) => void;
@@ -1265,60 +1354,71 @@ function DealPills(props: {
   const sold = WON_STAGES.includes(props.stage);
   const installed = INSTALLED_STAGES.includes(props.stage);
   const inDetails = NOTES_VIEWS.some(([key]) => key === props.tab);
-  const pill = (on: boolean) =>
-    clsx(
-      "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium ring-1 transition",
-      on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line",
-    );
   return (
     <nav
       aria-label="This deal"
-      className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
+      className="flex justify-between gap-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
     >
-      <button
-        type="button"
-        data-tour="deal-design"
-        onClick={props.onDesign}
+      <PillRound
+        label="Design"
+        icon={PenTool}
+        main
+        tour="deal-design"
         title={props.designable ? "Design" : "Give the deal an address to design it"}
-        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[13px] font-semibold text-white"
-      >
-        <PenTool className="size-3.5" aria-hidden />
-        Design
-      </button>
-      <button type="button" data-tour="deal-proposal" onClick={props.onProposal} className={pill(false)}>
-        <FileText className="size-3.5 text-sun-line" aria-hidden />
-        Proposal
-      </button>
-      <button type="button" data-tour="deal-details" onClick={() => props.onTab("details")} className={pill(inDetails)}>
-        <LayoutList className="size-3.5" aria-hidden />
-        Details
-      </button>
-      <button type="button" onClick={() => props.onTab("files")} className={pill(props.tab === "files")}>
-        <Paperclip className="size-3.5" aria-hidden />
-        Files
-      </button>
-      {sold && (
-        <button type="button" onClick={props.onCard} className={pill(false)}>
-          <HardHat className="size-3.5" aria-hidden />
-          Job card
-        </button>
-      )}
-      {installed && (
-        <button type="button" onClick={() => props.onTab("service")} className={pill(props.tab === "service")}>
-          <Wrench className="size-3.5" aria-hidden />
-          Service
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={props.onDelete}
-        title="Delete this deal"
-        aria-label="Delete this deal"
-        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted hover:text-danger"
-      >
-        <Trash2 className="size-3.5" aria-hidden />
-      </button>
+        onClick={props.onDesign}
+      />
+      <PillRound label="Proposal" icon={FileText} tour="deal-proposal" onClick={props.onProposal} />
+      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("details")} />
+      <PillRound label="Files" icon={Paperclip} on={props.tab === "files"} onClick={() => props.onTab("files")} />
+      {sold && <PillRound label="Job card" icon={HardHat} onClick={props.onCard} />}
+      {installed && <PillRound label="Service" icon={Wrench} on={props.tab === "service"} onClick={() => props.onTab("service")} />}
+      <PillRound label="Delete" icon={Trash2} title="Delete this deal" onClick={props.onDelete} />
     </nav>
+  );
+}
+
+// On a phone (21 Nov 2026, Martin): the deal's tools as icon rounds, a small name under each, in one row.
+function PillRound({
+  label,
+  icon: Icon,
+  on = false,
+  main = false,
+  tour,
+  title,
+  onClick,
+}: {
+  label: string;
+  icon: typeof PenTool;
+  on?: boolean;
+  main?: boolean;
+  tour?: string;
+  title?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-tour={tour}
+      onClick={onClick}
+      title={title ?? label}
+      aria-pressed={on || undefined}
+      className="flex w-14 shrink-0 flex-col items-center gap-1"
+    >
+      <span
+        className={clsx(
+          "flex size-10 items-center justify-center rounded-full ring-1 transition",
+          main
+            ? "bg-sun-line text-white ring-sun-line"
+            : on
+              ? "bg-primary text-primary-ink ring-primary"
+              : "bg-surface text-ink-2 ring-line",
+        )}
+        aria-hidden
+      >
+        <Icon className={clsx("size-[18px]", !main && !on && label === "Proposal" && "text-sun-line")} />
+      </span>
+      <span className={clsx("text-[10px] leading-none", on ? "font-semibold text-ink" : "text-muted")}>{label}</span>
+    </button>
   );
 }
 
