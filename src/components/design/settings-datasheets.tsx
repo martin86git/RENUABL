@@ -332,6 +332,12 @@ export function DatasheetSettings() {
       <section className="mt-6">
         <h2 className="text-[15px] font-medium text-ink">Your datasheets</h2>
         {sheets && sheets.length === 0 && <p className="mt-2 text-sm text-ink-2">None yet.</p>}
+        {sheets?.some((s) => s.shared) && (
+          <p className="mt-1 text-xs text-muted">
+            Datasheets are shared across RENUABL: one any business has added is here for you to design with, marked Shared. Yours always
+            come first.
+          </p>
+        )}
         <ul className="mt-2 space-y-2">
           {(sheets ?? []).map((s) => (
             <li key={`${s.kind}:${s.sku}`} className={clsx(ui.card, "flex flex-wrap items-start gap-3 px-4 py-3")}>
@@ -347,8 +353,10 @@ export function DatasheetSettings() {
                   // Found online by itself (3 Nov 2026): in use, every string on it marked to check, until someone confirms it.
                   <div className="mt-1.5 rounded-md bg-sun px-2.5 py-2 text-xs text-sun-ink">
                     <p>
-                      <strong className="font-semibold">Found online · to check.</strong> In use now, and every string on it is marked to
-                      check. Open the sheet, check these figures against it, then confirm.
+                      <strong className="font-semibold">
+                        {s.shared ? "Shared · found online · to check." : "Found online · to check."}
+                      </strong>{" "}
+                      In use now, and every string on it is marked to check. Open the sheet, check these figures against it, then confirm.
                     </p>
                     {s.foundUrl && (
                       <a
@@ -376,7 +384,8 @@ export function DatasheetSettings() {
                   </div>
                 ) : (
                   <p className="mt-0.5 text-xs text-muted">
-                    Checked by {s.checkedBy.split("@")[0]} on {shortDate(s.checkedAt)}
+                    {s.shared && <span className="mr-1.5 rounded-full bg-surface-2 px-1.5 py-0.5 font-medium text-ink-2">Shared</span>}
+                    Checked by {s.shared ? s.checkedBy : s.checkedBy.split("@")[0]} on {shortDate(s.checkedAt)}
                     {s.fileName && ` · from ${s.fileName}`}
                   </p>
                 )}
@@ -392,6 +401,8 @@ export function DatasheetSettings() {
                 </a>
               )}
               <button
+                // A shared sheet isn't this business's to remove: saving its own for the product takes its place.
+                hidden={Boolean(s.shared)}
                 className="inline-flex size-8 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-danger"
                 aria-label={`Remove ${s.sku}'s figures`}
                 onClick={async () => {
