@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
   ArrowRight,
@@ -34,6 +34,7 @@ import { SolStars } from "./sol-icon";
 import { SolMark } from "./sol-sun";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
+import { loadPerfRows } from "@/lib/services/performance";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -112,13 +113,17 @@ export function TodayChat(props: {
     if (r.ok) setFeed(r.deals);
   }, []);
   useEffect(() => {
+    // Performance's own small rows first, so a press on it finds them ready (22 Nov 2026, Martin).
+    void loadPerfRows();
     const t = window.setTimeout(() => void readFeed(), 0);
     return () => window.clearTimeout(t);
   }, [readFeed]);
+  // Worked out once a feed, not on every press of a tab (it reads every deal's next move).
+  const needsCount = useMemo(() => (feed ? dealsNeedingYou(feed).length : undefined), [feed]);
   // 21 Nov 2026, Martin: the tray holds what Sol or a voice agent can act on, with Performance first.
   const tabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
-    { key: "needs", label: "Needs you", icon: CircleAlert, count: feed ? dealsNeedingYou(feed).length : undefined },
+    { key: "needs", label: "Needs you", icon: CircleAlert, count: needsCount },
     { key: "proposals", label: "Proposals", icon: FileText },
     { key: "calls", label: "Calls", icon: Phone },
     { key: "sol", label: "Sol's work", icon: Sparkles },
