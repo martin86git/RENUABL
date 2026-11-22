@@ -14,6 +14,9 @@ import { query } from "./db";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
+/** Where a shared sheet with no address of its own sends someone to check it. */
+const SHARED_CHECK_PAGE = "/design/settings/datasheets";
+
 /** Not a made-up business: a demo's or a sample's figures are never shared. */
 const REAL_BUSINESS = `not exists (select 1 from business_members m
    where m.business_id = d.business_id and m.role = 'owner' and m.email like '%.example')`;
@@ -33,6 +36,10 @@ async function sharedSheets(businessId: string, own: readonly SavedSheet[]): Pro
   return sharedFor(own, others).map((s) => ({
     ...s,
     shared: true,
+    // To check for every business it is shared with, until someone there confirms it (22 Nov 2026, Martin), whoever
+    // checked it where it came from.
+    checkedElsewhere: !s.unchecked,
+    unchecked: true,
     checkedBy: SHARED_BY,
     figures: { ...s.figures, basis: sharedBasis(s.model, s.fileName, dayWords(s.checkedAt), Boolean(s.unchecked)) },
   }));
@@ -59,7 +66,7 @@ export async function businessDatasheets(businessId: string): Promise<Datasheets
   const sheets: Datasheets = { panels: {}, inverters: {} };
   for (const s of await listSheets(businessId)) {
     // Figures found online and not yet checked carry where they came from, so the string check says so.
-    const figures = s.unchecked ? { ...s.figures, unchecked: s.foundUrl ?? "found online" } : s.figures;
+    const figures = s.unchecked ? { ...s.figures, unchecked: s.foundUrl ?? (s.shared ? SHARED_CHECK_PAGE : "found online") } : s.figures;
     if (s.kind === "panel") sheets.panels[s.sku] = figures as PanelElectrical;
     else sheets.inverters[s.sku] = figures as InverterElectrical;
   }

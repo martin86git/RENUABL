@@ -354,7 +354,11 @@ export function DatasheetSettings() {
                   <div className="mt-1.5 rounded-md bg-sun px-2.5 py-2 text-xs text-sun-ink">
                     <p>
                       <strong className="font-semibold">
-                        {s.shared ? "Shared · found online · to check." : "Found online · to check."}
+                        {s.checkedElsewhere
+                          ? `Shared · checked by ${s.checkedBy} on ${shortDate(s.checkedAt)} · to check.`
+                          : s.shared
+                            ? "Shared · found online · to check."
+                            : "Found online · to check."}
                       </strong>{" "}
                       In use now, and every string on it is marked to check. Open the sheet, check these figures against it, then confirm.
                     </p>
