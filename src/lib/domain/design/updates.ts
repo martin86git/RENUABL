@@ -20,6 +20,12 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-22",
+    area: "Today",
+    words:
+      "The Business and Feed switch is a smoother segmented control with icons, and Sol's brain etch is a lighter grey, on phones too.",
+  },
+  {
+    day: "2026-11-22",
     area: "Quote",
     words: "Including RCBOs in the quote now asks how many, with a stepper beside it.",
   },
