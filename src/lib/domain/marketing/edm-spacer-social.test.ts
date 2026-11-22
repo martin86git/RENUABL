@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { cleanBlock, cleanBrand, cleanSocials, edmLinks, networkOf, newBlock, renderEdm, type EdmContent, type EdmSender } from "./edm";
+import {
+  DEFAULT_BRAND,
+  SOCIAL_NETWORKS,
+  cleanBlock,
+  cleanBrand,
+  cleanSocials,
+  edmLinks,
+  networkOf,
+  newBlock,
+  renderEdm,
+  type EdmContent,
+  type EdmSender,
+} from "./edm";
+import { iconColour, socialIconSvg } from "./social-glyphs";
 
 const sender: EdmSender = { name: "Sunrise Solar", abn: null, email: "hi@sunrise.example", phone: null, address: null };
 const links = {
@@ -73,5 +86,47 @@ describe("spacer and social blocks", () => {
     const r = renderEdm(content, cleanBrand({}), sender, { firstName: "Sam", company: null }, links);
     expect(r.html).not.toContain(">X</a>");
     expect(edmLinks(content.blocks)).toEqual([]);
+  });
+});
+
+describe("social icons", () => {
+  const block = (look?: string) =>
+    cleanBlock({ id: "b1", kind: "social", socialLook: look, socials: [{ network: "facebook", url: "https://facebook.com/sunrise" }] }, 0)!;
+  const links = {
+    click: (_i: number, url: string) => url,
+    pixel: null,
+    unsubscribe: "#",
+    image: (id: string) => id,
+    social: (n: string, c: string) => `https://site/api/m/s/${n}.png?c=${c}`,
+  };
+  const sender = { name: "Sunrise Solar", abn: null, email: "hi@sunrise.example", phone: null, address: null };
+  const html = (look?: string, l: typeof links | Omit<typeof links, "social"> = links) =>
+    renderEdm({ subject: "s", preview: "", blocks: [block(look)] }, DEFAULT_BRAND, sender, { firstName: null, company: null }, l).html;
+
+  it("cleans the look, icons by default", () => {
+    expect(block().socialLook).toBe("icons");
+    expect(block("both").socialLook).toBe("both");
+    expect(block("odd").socialLook).toBe("icons");
+  });
+
+  it("draws icons with the network's name as alt text, in the brand colour", () => {
+    const hex = DEFAULT_BRAND.colour.replace("#", "").toLowerCase();
+    expect(html()).toContain(`src="https://site/api/m/s/facebook.png?c=${hex}"`);
+    expect(html()).toContain('alt="Facebook"');
+    expect(html("words")).not.toContain("/api/m/s/");
+    expect(html("both")).toContain(">Facebook</a>");
+  });
+
+  it("falls back to names when no icon address is given", () => {
+    const noIcons = { ...links, social: undefined };
+    expect(html("icons", noIcons)).not.toContain('<img src="https://site');
+    expect(html("icons", noIcons)).toContain(">Facebook</a>");
+  });
+
+  it("makes an icon for every network, refusing a bad colour", () => {
+    for (const n of SOCIAL_NETWORKS) expect(socialIconSvg(n, "ff5a1f")).toContain('fill="#ff5a1f"');
+    expect(iconColour("FF5A1F")).toBe("ff5a1f");
+    expect(iconColour("red")).toBeNull();
+    expect(iconColour('ff5a1f"/>')).toBeNull();
   });
 });

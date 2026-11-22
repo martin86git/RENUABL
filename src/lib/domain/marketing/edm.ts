@@ -50,6 +50,17 @@ export const SOCIAL_WORDS: Record<SocialNetwork, string> = {
   website: "Website",
 };
 
+/**
+ * How a social links block draws its links (22 Nov 2026, Martin: "add icons for the social networks"): each
+ * network's icon, its icon and name in a pill, or its name alone. An icon is a picture, so where an inbox blocks
+ * pictures it shows the network's name in its place (alt text); the email's text version always lists them in words.
+ */
+export const SOCIAL_LOOKS = ["icons", "both", "words"] as const;
+export type SocialLook = (typeof SOCIAL_LOOKS)[number];
+export const SOCIAL_LOOK_WORDS: Record<SocialLook, string> = { icons: "Icons", both: "Icons and names", words: "Names" };
+export const cleanSocialLook = (raw: unknown): SocialLook =>
+  (SOCIAL_LOOKS as readonly string[]).includes(raw as string) ? (raw as SocialLook) : "icons";
+
 /** One link in a social links block. */
 export interface EdmSocial {
   network: SocialNetwork;
@@ -79,6 +90,8 @@ export interface EdmBlock {
   space?: SpacerSize;
   /** A social links block's links, one a network. */
   socials?: EdmSocial[];
+  /** How a social links block draws them. */
+  socialLook?: SocialLook;
 }
 
 export interface EdmContent {
@@ -253,7 +266,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     align: r.align === "center" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
     ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
-    ...(kind === "social" ? { socials: cleanSocials(r.socials) } : {}),
+    ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
   };
 }
 
@@ -374,7 +387,7 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     align: kind === "button" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
     ...(kind === "spacer" ? { space: "medium" as const } : {}),
-    ...(kind === "social" ? { socials: [] } : {}),
+    ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
   };
 }
 
@@ -425,6 +438,8 @@ export interface RenderLinks {
   unsubscribe: string;
   /** Where an uploaded picture is served. */
   image: (id: string) => string;
+  /** Where a social network's icon in a colour (six hex digits, no #) is served; without it, names only. */
+  social?: (network: SocialNetwork, colour: string) => string;
 }
 
 export interface RenderedEdm {
@@ -553,14 +568,22 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       const h = SPACER_SIZES[cleanSpace(b.space)];
       rows.push(`<tr><td style="height:${h}px;line-height:${h}px;font-size:1px">&nbsp;</td></tr>`);
     } else if (b.kind === "social") {
-      // Words, not icons: pictures are often blocked until a reader allows them, and words always show.
       const socials = filledSocials(b);
       if (!socials.length) continue;
+      const look = links.social ? cleanSocialLook(b.socialLook) : "words";
+      const hex = colour.replace("#", "");
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600";
       const pills = socials.map((s) => {
         const href = links.click(linkAt, linkList[linkAt]);
         linkAt++;
-        textParts.push(`${SOCIAL_WORDS[s.network]}: ${s.url}`);
-        return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 4px 8px;padding:7px 14px;border:1px solid ${colour};border-radius:999px;color:${colour};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;text-decoration:none">${esc(SOCIAL_WORDS[s.network])}</a>`;
+        const name = SOCIAL_WORDS[s.network];
+        textParts.push(`${name}: ${s.url}`);
+        if (look === "words")
+          return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 4px 8px;padding:7px 14px;border:1px solid ${colour};border-radius:999px;color:${colour};${font};text-decoration:none">${esc(name)}</a>`;
+        const icon = esc(links.social!(s.network, hex));
+        if (look === "icons")
+          return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 5px 8px;text-decoration:none;color:${colour};${font}"><img src="${icon}" width="32" height="32" alt="${esc(name)}" style="display:block;width:32px;height:32px;border:0"></a>`;
+        return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 4px 8px;padding:5px 14px 5px 6px;border:1px solid ${colour};border-radius:999px;color:${colour};${font};text-decoration:none"><img src="${icon}" width="20" height="20" alt="" style="display:inline-block;width:20px;height:20px;border:0;vertical-align:middle;margin-right:6px">${esc(name)}</a>`;
       });
       rows.push(`<tr><td style="padding:12px 28px 4px;text-align:${align}">${pills.join("")}</td></tr>`);
     }

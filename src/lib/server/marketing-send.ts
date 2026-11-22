@@ -51,6 +51,7 @@ export function linksFor(site: string, sendToken: string, unsubToken: string): R
     unsubscribe: `${site}/m/u/${unsubToken}?s=${sendToken}`,
     oneClick: `${site}/api/m/u/${unsubToken}?s=${sendToken}`,
     image: (id) => `${site}/api/m/i/${id}`,
+    social: (network, colour) => `${site}/api/m/s/${network}.png?c=${colour}`,
   };
 }
 
@@ -392,6 +393,7 @@ export async function sendTest(businessId: string, content: EdmContent, to: stri
       pixel: null,
       unsubscribe: `${site}/m/u/test`,
       image: (id) => `${site}/api/m/i/${id}`,
+      social: (network, colour) => `${site}/api/m/s/${network}.png?c=${colour}`,
     },
   );
   return sendEmail({

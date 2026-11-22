@@ -36,6 +36,9 @@ import {
   SOCIAL_WORDS,
   SPACER_SIZES,
   SPACER_WORDS,
+  SOCIAL_LOOKS,
+  SOCIAL_LOOK_WORDS,
+  cleanSocialLook,
   TILE_COLUMNS,
   cleanSpace,
   networkOf,
@@ -60,6 +63,7 @@ import {
   type EdmSocial,
   type SocialNetwork,
   type SpacerSize,
+  type SocialLook,
   type EdmStyle,
   type EdmTile,
 } from "@/lib/domain/marketing/edm";
@@ -120,6 +124,7 @@ export function EdmPreview({
           unsubscribe: "#",
           // The whole address: a sandboxed frame doesn't take its page's address, so "/api/…" alone loads nothing.
           image: (id) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/i/${id}`,
+          social: (network, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/s/${network}.png?c=${colour}`,
         },
       ).html,
     [content, brand, sender],
@@ -991,14 +996,24 @@ function CanvasBlock({
           ))}
         </div>
       )}
-      {b.kind === "social" && <SocialPills socials={b.socials ?? []} colour={colour} align={align} />}
+      {b.kind === "social" && <SocialPills socials={b.socials ?? []} look={cleanSocialLook(b.socialLook)} colour={colour} align={align} />}
       {b.kind === "social" && picked && <SocialFields block={b} onChange={onChange} />}
     </div>
   );
 }
 
-/** A social links block as it will look: a pill a network, in the button colour; until a link is in, a hint. */
-function SocialPills({ socials, colour, align }: { socials: EdmSocial[]; colour: string; align: "left" | "center" }) {
+/** A social links block as it will look: each network's icon, icon and name, or name, in the button colour; until a link is in, a hint. */
+function SocialPills({
+  socials,
+  look,
+  colour,
+  align,
+}: {
+  socials: EdmSocial[];
+  look: SocialLook;
+  colour: string;
+  align: "left" | "center";
+}) {
   const shown = socials.filter((s) => s.url);
   if (!shown.length)
     return (
@@ -1008,17 +1023,33 @@ function SocialPills({ socials, colour, align }: { socials: EdmSocial[]; colour:
         </span>
       </div>
     );
+  const icon = (n: SocialNetwork) => `/api/m/s/${n}.png?c=${colour.replace("#", "")}`;
   return (
-    <div className="flex flex-wrap gap-2 py-1" style={{ justifyContent: align === "center" ? "center" : "flex-start" }}>
-      {shown.map((s) => (
-        <span
-          key={s.network}
-          className="rounded-full border px-3.5 py-1.5 text-[13px] font-semibold"
-          style={{ borderColor: colour, color: colour }}
-        >
-          {SOCIAL_WORDS[s.network]}
-        </span>
-      ))}
+    <div
+      className={cn("flex flex-wrap py-1", look === "icons" ? "gap-2.5" : "gap-2")}
+      style={{ justifyContent: align === "center" ? "center" : "flex-start" }}
+    >
+      {shown.map((s) =>
+        look === "icons" ? (
+          // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+          <img key={s.network} src={icon(s.network)} alt={SOCIAL_WORDS[s.network]} width={32} height={32} className="size-8" />
+        ) : (
+          <span
+            key={s.network}
+            className={cn(
+              "inline-flex items-center rounded-full border text-[13px] font-semibold",
+              look === "both" ? "gap-1.5 py-1 pr-3.5 pl-1.5" : "px-3.5 py-1.5",
+            )}
+            style={{ borderColor: colour, color: colour }}
+          >
+            {look === "both" && (
+              // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+              <img src={icon(s.network)} alt="" width={20} height={20} className="size-5" />
+            )}
+            {SOCIAL_WORDS[s.network]}
+          </span>
+        ),
+      )}
     </div>
   );
 }
@@ -1043,6 +1074,14 @@ function SocialFields({ block: b, onChange }: { block: EdmBlock; onChange: (patc
   const pastedNetwork = pasted && !pasted.startsWith("mailto:") ? networkOf(pasted) : null;
   return (
     <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
+        <span className="text-muted">Show as</span>
+        {SOCIAL_LOOKS.map((k) => (
+          <Toggle key={k} on={cleanSocialLook(b.socialLook) === k} onClick={() => onChange({ socialLook: k })} label={SOCIAL_LOOK_WORDS[k]}>
+            <span className="px-1 text-[12px]">{SOCIAL_LOOK_WORDS[k]}</span>
+          </Toggle>
+        ))}
+      </div>
       {socials.map((s) => (
         <div key={s.network} className="flex items-center gap-2">
           <span className="w-20 shrink-0 text-[13px] font-medium text-ink">{SOCIAL_WORDS[s.network]}</span>
@@ -1101,7 +1140,7 @@ function SocialFields({ block: b, onChange }: { block: EdmBlock; onChange: (patc
           </div>
         </>
       )}
-      <p className="text-[12px] text-muted">Shown as words, not icons, so they show even where pictures are blocked.</p>
+      <p className="text-[12px] text-muted">Where an inbox blocks pictures, each icon shows its network&apos;s name instead.</p>
     </div>
   );
 }
