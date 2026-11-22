@@ -696,7 +696,7 @@ function Shell({
           </Link>
         ) : (
           <Link href={PATHS.home} aria-label="RENUABL, today">
-            <Wordmark className="text-[16px]" />
+            <Wordmark className="phone-wordmark text-[16px] transition-[font-size]" />
           </Link>
         )}
         {retail && (

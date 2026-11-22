@@ -303,6 +303,17 @@ function CoachWindowFor() {
   }, []);
   // Folded to its header bar (13 Nov 2026, Martin: minimise it, so what is behind it can be reached).
   const [small, setSmall] = useState(false);
+  // Open full, it tells the phone's header to make its wordmark smaller, and the window stops below that header
+  // (22 Nov 2026, Martin: the half-covered RENUABL looked like a mistake; `.coach-window` in globals.css).
+  const shown = !!state && !small;
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    root.dataset.phoneWindow = "";
+    return () => {
+      delete root.dataset.phoneWindow;
+    };
+  }, [shown]);
   // Searching a contact to call or text: the contacts take the chat's place (13 Nov 2026, Martin).
   const [reaching, setReaching] = useState(false);
   // The assistant's call window sits bottom right too: while one is open, this window stands beside it, not on it.
@@ -517,7 +528,7 @@ function CoachWindowFor() {
               } as React.CSSProperties)
         }
         className={clsx(
-          "fixed bottom-20 right-4 z-[86] flex max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-lift lg:bottom-6 print:hidden",
+          "coach-window fixed bottom-20 right-4 z-[86] flex max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-lift lg:bottom-6 print:hidden",
           // A call on its own window bottom right (folded, or a narrow screen): this one stands beside it.
           watching && !dockCall ? "lg:right-[25.5rem]" : "lg:right-20",
           small ? "w-[min(19rem,calc(100vw-2rem))]" : "lg:bottom-auto lg:top-[var(--coach-top)]",

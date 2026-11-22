@@ -1814,3 +1814,14 @@ html:has(.sales-snap) {
   opacity: var(--sol-peek-shown, 0);
   transition: var(--sol-peek-ease, none);
 }
+
+/* A window open full over the page on a phone (the voice agent's chat) stops below the phone's header, whose wordmark
+   steps down a size while it is open, so RENUABL is never half under it (22 Nov 2026, Martin). */
+@media (max-width: 1023px) {
+  .coach-window {
+    max-height: calc(100dvh - 5rem - 3.5rem - env(safe-area-inset-bottom));
+  }
+  html[data-phone-window] .phone-wordmark {
+    font-size: 13px;
+  }
+}
