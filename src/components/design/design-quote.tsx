@@ -436,8 +436,12 @@ export function DesignQuote(props: {
   const priced = editedLines(all, edits);
   // Item, how many, the cost of one, and the line's total: how many times the cost each (21 Nov 2026, Martin).
   const cols = "grid grid-cols-[minmax(0,1fr)_3.25rem_5.25rem_5rem_1.25rem] items-center gap-x-2";
+  // Narrow (a phone's quote sheet, 23 Nov 2026, Martin: names cut to "Rails (…" and the code running into Qty), the
+  // item takes a line of its own and its figures sit on the line under it.
+  const itemCell = "@max-md:col-span-full @max-md:flex-wrap @max-md:gap-x-2";
+  const qtyCell = "@max-md:col-start-2";
   const tableBlock = (
-    <>
+    <div className="@container">
       <div
         className={clsx(cols, "sticky top-0 z-10 bg-surface px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted")}
         aria-hidden
@@ -507,7 +511,7 @@ export function DesignQuote(props: {
                         )}
                       >
                         <div className={cols}>
-                          <div className="flex min-w-0 items-baseline gap-2 text-[13px]">
+                          <div className={clsx("flex min-w-0 items-baseline gap-2 text-[13px]", itemCell)}>
                             {l.watts ? (
                               // Priced by the watt (18 Nov 2026, Martin): the cents a watt is a box to type over.
                               <span className="inline-flex min-w-0 items-center gap-1">
@@ -533,13 +537,17 @@ export function DesignQuote(props: {
                                 </span>
                               </span>
                             ) : (
-                              <span className="truncate" title={name}>
+                              <span className="truncate @max-md:whitespace-normal @max-md:break-words" title={name}>
                                 {name}
                               </span>
                             )}
-                            {l.sku && <span className="shrink-0 truncate text-[11px] text-muted">{l.sku}</span>}
+                            {l.sku && (
+                              <span className="min-w-0 shrink truncate text-[11px] text-muted @max-md:shrink-0 @max-md:basis-full">
+                                {l.sku}
+                              </span>
+                            )}
                           </div>
-                          <div className="text-right text-[13px] tabular-nums text-ink-2">
+                          <div className={clsx("text-right text-[13px] tabular-nums text-ink-2", qtyCell)}>
                             {l.qty !== undefined && (
                               <input
                                 type="number"
@@ -756,7 +764,7 @@ export function DesignQuote(props: {
           + Add a line
         </button>
       )}
-    </>
+    </div>
   );
   const changedBox = changed > 0 && (
     <p className="mt-3 rounded-md bg-sun p-2.5 text-xs text-sun-ink">
