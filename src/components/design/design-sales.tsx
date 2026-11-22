@@ -693,7 +693,14 @@ export function PipelinesPage() {
                         <Owner email={job.owner} />
                         <label className="hidden min-w-0 flex-1 sm:block" onClick={(e) => e.stopPropagation()}>
                           <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
-                          {stagePicker(job, stageSelect.replace("h-8", "h-7"))}
+                          {stagePicker(
+                            job,
+                            stageSelect
+                              .replace("h-8", "h-6")
+                              .replace("px-2", "px-1.5")
+                              .replace("text-xs", "text-[11px]")
+                              .replace("rounded-md", "rounded"),
+                          )}
                         </label>
                         <span className="flex-1 sm:hidden" />
                         {job.lat !== null && (
