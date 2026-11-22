@@ -888,11 +888,17 @@ button.team-flash:not([aria-pressed="true"]) {
 /* On a phone upright, Sol's step and suggestions sit under the picture in a plate moulded round him (his notch cut by
    the wrapper's mask), so they never cover the map. */
 .sol-moulded > [data-popup] {
-  width: 100%;
-  max-height: 10rem;
+  /* An outlined box with room round it (22 Nov 2026, Martin: "within an outlined text box - with the outline also
+     integrating in the sol icon"): the notch cuts the outline at the top, where a ring of the same line round Sol meets it. */
+  width: calc(100% - 1rem);
+  margin-inline: 0.5rem;
+  /* Within the band under the picture (PHONE_BANDS.below, 156 px): it scrolls inside past that. */
+  max-height: 9.25rem;
   overflow-y: auto;
   padding-top: 2rem;
-  border-radius: 26px 26px 0 0;
+  border-radius: 22px;
+  outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
+  outline-offset: -1.5px;
 }
 /* Sol's spanner and + on a phone come out of him once as he appears. */
 .sol-emerge {
@@ -1660,4 +1666,12 @@ html:has(.sales-snap) {
     font-size: 11.5px;
     background: var(--surface);
   }
+}
+
+/* Sideways on a phone, Sol's step and suggestions are a plate along the foot moulded round him (22 Nov 2026, Martin: as
+   upright), short so the roof stays in view; it scrolls inside past that. */
+.sol-moulded.sideways-deck > [data-popup] {
+  max-height: 6.5rem;
+  padding-top: 1.9rem;
+  margin-bottom: 0.5rem;
 }
