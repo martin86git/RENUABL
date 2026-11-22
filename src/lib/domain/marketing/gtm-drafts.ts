@@ -72,6 +72,10 @@ export const SOL_TYPES: Record<string, string> = {
 };
 
 export const GTM_PICTURES: Record<string, GtmPicture> = {
+  dband: {
+    file: "/design/launch/designer-band.jpg",
+    alt: "Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn",
+  },
   solintro: { file: "/design/launch/sol-intro.gif", alt: SOL_TYPES.solintro },
   cards: {
     file: "/design/launch/cards.gif",
@@ -111,7 +115,8 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
 export const pictureKeyOf = (b: EdmBlock): string | null => (b.kind === "image" ? (b.id.match(/pic([a-z]+)$/)?.[1] ?? null) : null);
 
 /**
- * One email: the hook as its heading, its pictures (the product moving, Sol's card, the product itself), a line only
+ * One email: the hook as its heading, then the designer (22 Nov 2026, Martin: every email shows the designer, so it
+ * reads at a glance as solar software and not a stray promotion; the designer's own email already leads with it), its pictures (the product moving, Sol's card, the product itself), a line only
  * where something must be said in words, one button, then the slim $2-a-day strip and the Marketplace band.
  */
 function email(
@@ -130,6 +135,7 @@ function email(
     preview,
     blocks: [
       block("h", { kind: "heading", text: hook, url: null, align: "left" }),
+      ...(pictures.includes("designer") ? [] : [picture("dband", DEMO)]),
       ...pictures.map((k) => picture(k)),
       ...(words.length ? [block("t", { kind: "text", text: words.join("\n\n"), url: null, align: "left" })] : []),
       block("b", { kind: "button", text: button[0], url: button[1], align: "left" }),

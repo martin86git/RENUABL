@@ -50,9 +50,10 @@ describe("the launch drafts", () => {
     expect(art).not.toMatch(/>RENUABL<\/(div|text)>/);
   });
 
-  it("open on the hook and end on the Marketplace band", () => {
+  it("open on the hook with the designer in view, and end on the Marketplace band", () => {
     for (const c of GTM_EMAILS) {
       expect(c.blocks[0].kind).toBe("heading");
+      expect(["dband", "designer"]).toContain(pictureKeyOf(c.blocks[1]));
       expect(pictureKeyOf(c.blocks.at(-2)!)).toBe("footv");
       expect(pictureKeyOf(c.blocks.at(-1)!)).toBe("footer");
       expect(c.blocks.at(-1)!.url).toBe("https://www.renuabl.com.au/design/marketplace");

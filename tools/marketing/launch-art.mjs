@@ -291,10 +291,27 @@ const ART = {
       `<div class="glow"></div><div class="frame f1"><img src="${shot("designer-site-1.webp")}"></div><div class="frame f2"><img src="${shot("designer-site-2.webp")}"></div>
        <div class="tag">In RENUABL · The designer</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
-       .frame{position:absolute;width:540px;height:338px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 40px 100px rgba(0,0,0,.85)}
-       .f1{left:48px;top:90px}.f2{left:612px;top:190px}
+       .frame{position:absolute;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 40px 100px rgba(0,0,0,.85)}
+       .f1{left:48px;top:56px;width:780px;height:482px}.f2{left:600px;top:350px;width:552px;height:225px}
        .frame img{width:100%;height:100%;object-fit:cover}
        .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+    ),
+  },
+
+  /**
+   * The designer in every email (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it…
+   * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a slim band under the
+   * hook, the new designer pop-up on a real roof (the website's site, under a made-up label; no address shown).
+   */
+  "designer-band.jpg": {
+    clipH: 480,
+    html: page(
+      `<div class="glow"></div><div class="frame"><img src="${shot("designer-site-1.webp")}"></div>
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:438px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:480px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:388px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 2%}
+       .tag{position:absolute;left:52px;top:442px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
     ),
   },
 
