@@ -6388,7 +6388,6 @@ export function RoofDesigner(props: {
                       {lineup.recommended === i ? "Recommended" : "Recommend"}
                     </button>
                   )}
-                  {!lineup.on.includes(i) && i !== primary && <span className="text-[11px] text-muted">Not on the proposal</span>}
                 </div>
               )}
               {/* The open design names itself inside its own card (10 Nov 2026, Martin: the label box outside it read as apart). */}
