@@ -15,8 +15,33 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Each voice agent can be set to answer quicker or more carefully, under How it speaks in its settings.",
+  },
+  {
+    day: "2026-11-22",
+    area: "CRM",
+    words: "Deals brought in from Pylon's export can be filled in from Pylon: the battery, panels, inverter and place on the map.",
+  },
+  {
+    day: "2026-11-22",
     area: "Today",
-    words: "Performance opens straight away, even the moment Today has opened.",
+    words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Video block, the video's picture with a play button that opens it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a clear place at the top of the email to drop or upload your business logo.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Countdown block, a timer to the end of an offer that is right each time the email is opened.",
   },
   {
     day: "2026-11-22",

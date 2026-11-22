@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   csvStage,
+  fillFromPylon,
   dealFromCsv,
   readCsv,
   readPylonExport,
@@ -231,5 +232,46 @@ describe("Pylon's CSV export", () => {
       firstName: "Pylon customer",
       lastName: "J 113-4444-333",
     });
+  });
+});
+
+describe("filling in a deal from Pylon", () => {
+  const deal = {
+    job: {
+      title: "Solar and battery",
+      address: "1 Sample Street, Testville VIC 3000",
+      lat: -37.9,
+      lng: 145.1,
+      stage: "installed" as const,
+      value: null,
+      installDate: null,
+      details: {
+        systemType: "Solar and battery",
+        systemSize: "6.6 kW",
+        battery: "Sigenergy SigenStor",
+        batteryStorage: "16 kWh",
+        nmi: "6305123456",
+      },
+      kw: 6.6,
+    },
+  };
+
+  it("adds the battery and replaces what the export set, never what a person typed", () => {
+    const got = fillFromPylon(
+      { title: "Solar", details: { systemType: "Solar", systemSize: "6.6 kW", nmi: "6305999999" }, address: "", lat: null },
+      deal,
+    );
+    expect(got.details.systemType).toBe("Solar and battery");
+    expect(got.details.battery).toBe("Sigenergy SigenStor");
+    expect(got.details.nmi).toBe("6305999999");
+    expect(got.title).toBe("Solar and battery");
+    expect(got.place).toEqual({ address: deal.job.address, lat: -37.9, lng: 145.1 });
+    expect(got.filled).toEqual(["systemType", "battery", "batteryStorage", "place"]);
+  });
+
+  it("leaves a deal already on the map, and a title a person changed, alone", () => {
+    const got = fillFromPylon({ title: "Battery upgrade", details: {}, address: "x", lat: -37 }, deal);
+    expect(got.title).toBe("Battery upgrade");
+    expect(got.place).toBeNull();
   });
 });

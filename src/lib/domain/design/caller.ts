@@ -375,3 +375,29 @@ export function azureRegionFrom(raw: string | undefined | null): string | null {
   const region = typed.replace(/[^a-z0-9]/g, "");
   return /^[a-z0-9]{3,30}$/.test(region) ? region : null;
 }
+
+// ---------------------------------------------------------------------------
+// The model each voice agent thinks with (22 Nov 2026, Martin: "build the per-agent model setting")
+// ---------------------------------------------------------------------------
+
+/** The choices: quicker replies, or more care. Null leaves it to RENUABL's default (`VOICE_MODEL`, or `VAPI_MODEL`). */
+export const CALLER_BRAINS = ["quick", "careful"] as const;
+export type CallerBrain = (typeof CALLER_BRAINS)[number];
+
+/** The model each choice runs on, as Vapi names Anthropic's models. */
+export const BRAIN_MODELS: Record<CallerBrain, string> = { quick: "claude-haiku-5-5", careful: "claude-sonnet-5" };
+
+/** How each choice is said in the agent's settings: its name, then what it means for a call. */
+export const BRAIN_WORDS: Record<CallerBrain | "default", readonly [string, string]> = {
+  default: ["Default", "RENUABL's choice for every agent, quicker replies for now."],
+  quick: ["Quicker", "Answers soonest and costs least a minute. Try a test call to check it keeps your rules."],
+  careful: ["More careful", "A beat slower to answer, and keeps a long script and its rules more closely."],
+};
+
+/** A choice from the browser: one of the two, or null for the default. */
+export function cleanBrain(raw: unknown): CallerBrain | null {
+  return typeof raw === "string" && (CALLER_BRAINS as readonly string[]).includes(raw) ? (raw as CallerBrain) : null;
+}
+
+/** The model a call runs on: the agent's own choice, else the site's. */
+export const modelOfBrain = (brain: CallerBrain | null | undefined, siteModel: string): string => (brain ? BRAIN_MODELS[brain] : siteModel);

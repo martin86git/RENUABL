@@ -41,7 +41,7 @@ import {
   wholeDollars,
   type FollowUpDue,
 } from "@/lib/domain/design/proposal-lists";
-import { listProposals, markFollowUp, type ProposalLine } from "@/lib/services/after-sale";
+import { keptProposals, listProposals, markFollowUp, type ProposalLine } from "@/lib/services/after-sale";
 import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { PATHS, PageHead, ui } from "./design-shell";
 import { usePrepared } from "./ready-for-you";
@@ -54,9 +54,10 @@ import { SolIcon } from "./sol-icon";
  * when it went out. Signed: by month and week with their totals, each with its signed PDF.
  */
 export function ProposalsPage({ signed, bare = false }: { signed: boolean; bare?: boolean }) {
-  const [rows, setRows] = useState<ProposalLine[] | null>(null);
+  // Starts on the list Today read as it opened, then reads it again behind it.
+  const [rows, setRows] = useState<ProposalLine[] | null>(() => keptProposals()?.proposals ?? null);
   // The business's own follow-up days (its Routines).
-  const [days, setDays] = useState<number[] | undefined>(undefined);
+  const [days, setDays] = useState<number[] | undefined>(() => keptProposals()?.followUpDays);
   const [problem, setProblem] = useState<string | null>(null);
   // Read once on the client, so "today" and "3 days ago" are the viewer's now.
   const [now] = useState(() => new Date());

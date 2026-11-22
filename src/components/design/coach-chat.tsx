@@ -51,7 +51,7 @@ import { CallSetupSettings } from "./coach-call-setup";
 import type { ScriptLine } from "@/lib/domain/design/call-scripts";
 import { ScriptPicker } from "./coach-scripts";
 import { roleOfKey } from "@/lib/domain/install-call";
-import { DeliverySettings, RingMe, TrainingReview, TrainingStrip, useTraining, type Training } from "./coach-training";
+import { BrainSettings, DeliverySettings, RingMe, TrainingReview, TrainingStrip, useTraining, type Training } from "./coach-training";
 import { TINT_NAMES, tintOf, voiceLabel } from "@/lib/domain/design/caller";
 import {
   clearCoachCall,
@@ -959,6 +959,9 @@ function CoachSettings(props: {
           {speakOpen && (
             <div className="border-t border-line px-3.5 py-3">
               <DeliverySettings delivery={props.delivery} editable={props.mayCoach} onSaved={props.onDelivery} />
+              <div className="mt-3">
+                <BrainSettings caller={caller} editable={props.mayCoach} />
+              </div>
             </div>
           )}
         </section>

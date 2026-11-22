@@ -1574,6 +1574,12 @@ html:has(.sales-snap) {
     border-radius: 0.5rem;
     background: transparent;
     box-shadow: none;
+    /* 22 Nov 2026, Martin: the values read too large beside the 12px labels. !important beats the 16px touch-screen
+       floor above; an iPhone doesn't zoom into them (maximum-scale=1, design-shell.tsx) and Android never does. */
+    font-size: 13px !important;
+  }
+  .deal-fields :is(input, select, textarea)::placeholder {
+    font-size: 13px;
   }
   .deal-fields textarea {
     height: auto;
@@ -1674,6 +1680,16 @@ html:has(.sales-snap) {
   max-height: 6.5rem;
   padding-top: 1.9rem;
   margin-bottom: 0.5rem;
+}
+/* On a computer, Sol's step and suggestions form along the picture's foot round him as on a phone (22 Nov 2026, Martin:
+   "sols replies should form in the bottom half like on mobile"): a card up to the lower half of the picture, his notch
+   in its top edge, scrolling inside past that. */
+.sol-moulded.desk-deck > * {
+  width: min(46rem, 100% - 2rem);
+  margin-inline: auto;
+  max-height: calc(var(--pic-h, 40rem) * 0.48);
+  padding-top: 2.6rem;
+  margin-bottom: 0.75rem;
 }
 
 /* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
