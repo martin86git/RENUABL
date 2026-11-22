@@ -1759,6 +1759,8 @@ export function RoofDesigner(props: {
     };
   }, []);
   const phone = Boolean(props.tight && stage);
+  // Sol holds the tools on a phone, upright or turned sideways (22 Nov 2026, Martin): his tray and his card for what is picked.
+  const solHolds = Boolean(props.tight && (phone || sideways));
   // In the pop-up the picture takes the window's whole width, its height the first fold's (21 Nov 2026, Martin: widening
   // the window should widen the map, not the grey round it); `across` is then its width to height.
   const fills = Boolean(props.tight && !phone && fitPx);
@@ -6576,7 +6578,7 @@ export function RoofDesigner(props: {
 
   return (
     <div data-design-popup className={clsx(props.tight && "relative p-2")}>
-      {phone && (
+      {solHolds && (
         <SolTray
           open={solTray}
           onClose={() => setSolTray(false)}
@@ -6618,21 +6620,30 @@ export function RoofDesigner(props: {
           // a rail of rounds down the left, beside the picture, each saying what it is on hover.
           // On a phone the rail lies across the foot, under Ask Sol: a toolbar in reach of a thumb.
           props.tight
-            ? phone
+            ? solHolds
               ? clsx("absolute inset-x-3 flex h-12 flex-row items-center", !solTray && "hidden")
               : clsx("absolute inset-y-2 left-2 flex w-11 flex-col items-center justify-center", sideways && "designer-compact-rail")
             : "relative rounded-lg bg-surface px-4 shadow-[var(--shadow-soft)] ring-1 ring-line",
         )}
         // On a phone upright the row is drawn smaller (21 Nov 2026, Martin: every button smaller); its top in its own zoomed units.
         style={
-          phone && stage
+          solHolds
             ? // On a phone the designer's own row sits at the foot of Sol's tray, shown only while the tray is up.
-              { position: "fixed", top: "auto", bottom: 14 / PHONE_RAIL_ZOOM, zIndex: 96, zoom: PHONE_RAIL_ZOOM }
+              {
+                position: "fixed",
+                top: "auto",
+                bottom: 14 / PHONE_RAIL_ZOOM,
+                zIndex: 96,
+                zoom: PHONE_RAIL_ZOOM,
+                // Within the tray's width when the phone is sideways (the tray is 52rem at most, centred).
+                maxWidth: `calc((52rem - 1.5rem) / ${PHONE_RAIL_ZOOM})`,
+                marginInline: "auto",
+              }
             : undefined
         }
       >
         <BarRow
-          row={phone}
+          row={solHolds}
           quick={
             props.tight ? (
               <>
@@ -6940,7 +6951,7 @@ export function RoofDesigner(props: {
 
       {/* Room for the window's close round on the right: sideways it shares a row with the figures only, so the figures
           keep clear of it and the picture runs to the edge. */}
-      <div className={clsx("relative", props.tight ? (phone ? "" : sideways ? "pl-12" : "pl-[4.25rem] pr-11") : "mt-5")}>
+      <div className={clsx("relative", props.tight ? (solHolds ? "" : "pl-[4.25rem] pr-11") : "mt-5")}>
         <div className="min-w-0">
           <div>
             {/* The figures, in a strip across the top of the picture, read left to right as one chain: what is on the roof, what it makes, what stores and runs it, and what
@@ -8930,7 +8941,7 @@ export function RoofDesigner(props: {
                   // On a phone it stands over Ask Sol, not beside it.
                   props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
                   // Sideways the dial for what is picked takes the foot; on a phone upright these are in the toolbar under the picture.
-                  ((sideways && picks.length > 0) || phone) && "hidden",
+                  solHolds && "hidden",
                 )}
               >
                 <div className="flex items-center gap-2">
@@ -8984,7 +8995,7 @@ export function RoofDesigner(props: {
 
               {/* The roof's pitch (1 Nov 2026, Martin, as Primero's): until a person has set it for this home, a card asks for it
                   (so a flat roof isn't left at the 22 degree start); then it is a small roof-angle mark on the left edge that opens to change it. */}
-              {quoteNow.form.pitchSet && (!phone || phonePitch) && (
+              {quoteNow.form.pitchSet && (!solHolds || phonePitch) && (
                 <RoofPitches
                   {...(phone && stage ? { top: `${Math.round((stage.pt + stage.photoH / 2) / 0.68)}px` } : {})}
                   roofs={roofPitches}
@@ -9305,7 +9316,7 @@ export function RoofDesigner(props: {
                   them, or over them when they are low on the picture. */}
               {tool === "select" &&
                 pickedPanels.length > 0 &&
-                !phone &&
+                !solHolds &&
                 (() => {
                   const corners = pickedPanels.flatMap((p) => looseCorners(p, size));
                   const xs = corners.map((c) => ((ROOF_IMAGE.width / 2 + c.x / scale - view.x) / view.w) * 100);
@@ -9761,7 +9772,7 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               ) : picks.length > 0 ? (
-                phone ? null : (
+                solHolds ? null : (
                   <Dial
                     label="What is picked"
                     dark
@@ -10496,7 +10507,7 @@ export function RoofDesigner(props: {
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
               <div
-                className={clsx("absolute z-20 size-[6.25rem]", phone ? "hidden" : "left-4 top-4")}
+                className={clsx("absolute z-20 size-[6.25rem]", solHolds ? "hidden" : "left-4 top-4")}
                 role="toolbar"
                 aria-label="Select, add a panel, landscape, erase"
               >
@@ -10842,7 +10853,7 @@ export function RoofDesigner(props: {
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideActive &&
                 !menu &&
-                !(phone && (picks.length > 0 || solTray)) &&
+                !(solHolds && (picks.length > 0 || solTray)) &&
                 !(props.tight && !solAway && (commandReply || commandBusy)) && (
                   <div
                     className={clsx(
@@ -10851,7 +10862,7 @@ export function RoofDesigner(props: {
                       props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
                       // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
                       sideways
-                        ? "sideways-sol bottom-2"
+                        ? "sideways-sol bottom-[4rem]"
                         : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                     )}
                     // On a phone it starts just under the picture, so the roof it asks about stays in view.
@@ -10921,7 +10932,7 @@ export function RoofDesigner(props: {
               {/* Sol beside the design: one suggestion or question at a time, over Ask Sol, never while his panel is out. */}
               {!guideActive &&
                 !solQuiet &&
-                !(phone && (picks.length > 0 || solTray)) &&
+                !(solHolds && (picks.length > 0 || solTray)) &&
                 nudges.length > 0 &&
                 !menu &&
                 !opening &&
@@ -10931,7 +10942,8 @@ export function RoofDesigner(props: {
                   <div
                     className={clsx(
                       "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
-                      sideways ? "sideways-sol bottom-2" : !phone && "bottom-[6.25rem]",
+                      // Sideways it stands above Sol's round, which holds the tools there too.
+                      sideways ? "sideways-sol bottom-[4rem]" : !phone && "bottom-[6.25rem]",
                     )}
                     style={phone && stage ? { top: "auto", bottom: 66 } : undefined}
                   >
@@ -10950,7 +10962,24 @@ export function RoofDesigner(props: {
                 )}
               {/* The third pad, in the bottom left corner (above the map's own mark): the hand that moves the picture in its
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
-              <div className={clsx("absolute bottom-8 left-4 z-10", phone && "hidden")}>
+              {/* The hand to grab the map, in reach on a phone (22 Nov 2026, Martin: "an easy way of selecting the grab
+                  tool… grab the map and reposition and recenter the rooftop"): one round, lit while in hand; again puts it down. */}
+              {solHolds && (
+                <button
+                  type="button"
+                  onClick={() => pickTool(tool === "pan" ? "select" : "pan")}
+                  aria-pressed={tool === "pan"}
+                  aria-label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                  title={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it"}
+                  className={clsx(
+                    "pointer-events-auto absolute bottom-7 left-4 z-[55] flex size-[3.25rem] items-center justify-center rounded-full border shadow-lift",
+                    tool === "pan" ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
+                  )}
+                >
+                  <Hand className="size-6" aria-hidden />
+                </button>
+              )}
+              <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"
@@ -10984,8 +11013,16 @@ export function RoofDesigner(props: {
                 </p>
               )}
               {/* On a phone upright, Sol's card for what is picked, over his round, in place of the dial and the turn bar. */}
-              {phone && picks.length > 0 && !solTray && (
-                <div className="pointer-events-auto absolute z-[56]" style={{ left: 10, right: 10, bottom: 66 }}>
+              {solHolds && picks.length > 0 && !solTray && (
+                <div
+                  className="pointer-events-auto absolute z-[56]"
+                  // Sideways, a smaller card at the picture's right edge, clear of the panels being worked on in the middle.
+                  style={
+                    sideways
+                      ? { right: 10 / 0.72, width: "min(26rem, 62%)", bottom: 12 / 0.72, zoom: 0.72 }
+                      : { left: 10, right: 10, bottom: 66 }
+                  }
+                >
                   <SolPicksCard
                     count={picks.length}
                     panels={pickedPanels.length}
@@ -11042,7 +11079,7 @@ export function RoofDesigner(props: {
                       const shown = !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen);
                       if (shown) return putSolAway();
                       // On a phone upright Sol holds the tools: his tray, with the way to ask him at its top.
-                      if (phone) return setSolTray((open) => !open);
+                      if (solHolds) return setSolTray((open) => !open);
                       tips.nudge("sol-pressed");
                       setAwayFrom(null);
                       setCommandOpen(true);
@@ -11060,7 +11097,7 @@ export function RoofDesigner(props: {
                       </span>
                       <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
                     </span>
-                    <span className="whitespace-nowrap text-[15px] font-medium">{phone ? phoneSolWords : "Ask Sol"}</span>
+                    <span className="whitespace-nowrap text-[15px] font-medium">{solHolds ? phoneSolWords : "Ask Sol"}</span>
                     <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
                   </button>
                 ) : (
