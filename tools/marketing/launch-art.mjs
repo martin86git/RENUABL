@@ -267,38 +267,21 @@ const ART = {
     ),
   },
 
-  /** The AI designer: one press, and the panels lay themselves on the roof row by row. */
-  "designer.gif": {
-    frames: 30,
-    delay: 90,
-    hold: 3200,
+  /**
+   * The AI designer, as the website shows it (22 Nov 2026, Martin: "the designer needs to use [the website's site]… and
+   * then use a second address… never disclose the addresses"): two real roofs designed in RENUABL's designer, taken in
+   * the portal on the local example business under made-up labels, staggered side by side (a GIF of them weighed nearly 2 MB, so it is a still). Their files are named by
+   * number, never by street, and nothing in the pictures names either.
+   */
+  "designer.jpg": {
     html: page(
-      `<img class="roof" src="${shot("aerial-demo.webp")}"><svg id="panels" width="${W}" height="${H}" style="position:absolute;inset:0"></svg>
-       <div class="shade"></div>
-       <div class="pill">${DESIGNER(44)}<span>Design it for me</span></div>
-       <div class="price"><small>Designed in one press</small><b id="kw">0.0 kW</b><span id="n">0 panels</span></div>
-       <div class="mark">RENUABL</div>`,
-      `.roof{position:absolute;inset:0;width:${W}px;height:${H}px;object-fit:cover;filter:saturate(.7) brightness(.72)}
-       .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,6,10,0) 50%,rgba(5,6,10,.85));pointer-events:none}
-       .pill{position:absolute;left:48px;top:40px;display:flex;align-items:center;gap:12px;padding:6px 20px 6px 6px;border-radius:999px;
-         background:rgba(20,22,27,.82);border:1px solid rgba(255,255,255,.14);font-size:17px;font-weight:600;backdrop-filter:blur(10px)}
-       .price{position:absolute;left:48px;bottom:40px}.price small{display:block;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#ff8f4a}
-       .price b{display:block;font-size:44px;font-weight:600;letter-spacing:-.03em;font-family:"JetBrains Mono",Consolas,monospace}
-       .price span{font-size:16px;color:rgba(255,255,255,.6)}`,
-      `const P = [];
-       const row = (y, x0, n) => { for (let i = 0; i < n; i++) P.push([x0 + i * 37, y]); };
-       row(93, 289, 14); row(147, 345, 11);
-       const svg = document.getElementById("panels");
-       const panel = ([x, y]) => '<g><rect x="' + x + '" y="' + y + '" width="34" height="50" rx="1.5" fill="#101826" stroke="#d6dde8" stroke-width="1.2"/>'
-         + [1,2,3,4,5].map((k) => '<line x1="' + x + '" x2="' + (x + 34) + '" y1="' + (y + k * 8.3) + '" y2="' + (y + k * 8.3) + '" stroke="#2a3a52" stroke-width=".7"/>').join("")
-         + '<line x1="' + (x + 17) + '" x2="' + (x + 17) + '" y1="' + y + '" y2="' + (y + 50) + '" stroke="#2a3a52" stroke-width=".7"/></g>';
-       window.at = (t) => {
-         const n = Math.round(P.length * span(t, 0.08, 0.86));
-         svg.innerHTML = P.slice(0, n).map(panel).join("");
-         document.getElementById("kw").textContent = (n * 0.475).toFixed(1) + " kW";
-         document.getElementById("n").textContent = n + " panels, priced as they land";
-         document.querySelector(".pill").style.boxShadow = t < 0.08 ? "0 0 0 3px rgba(255,90,31,.6)" : "none";
-       };`,
+      `<div class="glow"></div><div class="frame f1"><img src="${shot("designer-site-1.webp")}"></div><div class="frame f2"><img src="${shot("designer-site-2.webp")}"></div>
+       <div class="tag">In RENUABL · The designer</div><div class="mark">RENUABL</div>`,
+      `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
+       .frame{position:absolute;width:540px;height:338px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 40px 100px rgba(0,0,0,.85)}
+       .f1{left:48px;top:90px}.f2{left:612px;top:190px}
+       .frame img{width:100%;height:100%;object-fit:cover}
+       .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
     ),
   },
 
@@ -341,6 +324,18 @@ const ART = {
        small{display:block;font-size:16px;letter-spacing:.22em;text-transform:uppercase;color:#7fa2ff}
        b{display:block;margin-top:10px;font-size:46px;font-weight:600;letter-spacing:-.03em}
        em{display:block;margin-top:8px;font-style:normal;font-size:20px;color:rgba(255,255,255,.55)}`,
+    ),
+  },
+
+  /** A slim strip above the Marketplace band in every email (22 Nov 2026, Martin): the saving, as a reminder. */
+  "footer-voice.jpg": {
+    clipH: 120,
+    html: page(
+      `<div class="strip">${AGENT(64, "#ff5a1f")}<b>Your AI salesperson: <i>less than $2 a day.</i></b><em>Calls &amp; Texts · $49 a month</em></div>`,
+      `.strip{position:absolute;left:0;top:0;width:1200px;height:120px;display:flex;align-items:center;gap:26px;padding:0 64px;
+         background:linear-gradient(90deg,rgba(255,90,31,.18),transparent 60%),#0b0c10;border-top:1px solid rgba(255,255,255,.08)}
+       .strip b{font-size:34px;font-weight:600;letter-spacing:-.02em}.strip i{font-style:normal;color:#ff7a2e}
+       .strip em{margin-left:auto;font-style:normal;font-size:18px;color:rgba(255,255,255,.5)}`,
     ),
   },
 
@@ -586,7 +581,8 @@ for (const [name, art] of Object.entries(ART)) {
     await writeGif(
       name,
       frames,
-      frames.map((_, i) => (i === frames.length - 1 ? art.hold : art.delay)),
+      frames.map((_, i) => (i === frames.length - 1 ? art.hold : i === 0 && art.first ? art.first : art.delay)),
+      art.colours ?? 160,
     );
   }
   console.log("made", name);

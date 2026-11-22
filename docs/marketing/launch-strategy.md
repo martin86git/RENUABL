@@ -71,9 +71,9 @@ Victoria first, then by state.
 
 **"First" isn't said.** Martin asked for "the FIRST truly AI empowered sales force". Under the Australian Consumer Law a claim to be first needs proof, so the launch says "Solar just got an AI sales force." instead.
 
-**The real product beside each claim**: Sol's real answer on Today (who to call first and what to say), Charlie's window on a call, the Today feed and the install calendar, taken in the portal on the local example business (made-up customers).
+**The designer shows two real roofs**, the site the website uses and a home in Rowville, designed in the portal under made-up labels; no address appears in any picture, alt text or file name. **The real product beside each claim**: Sol's real answer on Today (who to call first and what to say), Charlie's window on a call, the Today feed and the install calendar, taken in the portal on the local example business (made-up customers).
 
-**A band at the foot of every email**: RENUABL Marketplace, coming soon. Find crews. Win installs. Trade stock. It links to the Marketplace page.
+**The foot of every email**: a slim strip, "Your AI salesperson: less than $2 a day." (Calls & Texts, $49 a month), then the band for RENUABL Marketplace, coming soon. Find crews. Win installs. Trade stock. It links to the Marketplace page.
 
 **It ends the 1990s mail-order way**: a coupon in RENUABL's own look (the cream-paper first try was off brand): a dashed orange cut line, a ticked Yes box, ticks, a "First month free" badge in the designer's orange, and a P.S.
 
@@ -86,6 +86,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/sol-intro.gif`: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.”
 - **Picture** `/design/launch/cards.gif`: “Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.”
 - **Button:** See it work → https://www.renuabl.com.au/
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 1 · two working days after opening
@@ -100,6 +101,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/price-voice.jpg`: “Your voice agent, with your own number: less than $2 a day. $49 a month is $1.61 a day.”
 - **Words:** Calls & Texts is $49 a month with your own business number, on top of your RENUABL plan. Calls go out in calling hours.
 - **Button:** Hear it call → https://www.renuabl.com.au/
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 2 · three days on
@@ -111,6 +113,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/sol.gif`: “I know every deal. I write your emails in your voice, and tell you who to ring next.”
 - **Picture** `/design/launch/product-sol.jpg`: “In RENUABL: Sol on Today, saying who to call and what to say (example data)”
 - **Button:** Meet Sol → https://www.renuabl.com.au/
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 3 · three days on
@@ -119,9 +122,10 @@ Victoria first, then by state.
 **Preview:** One press. Three priced designs. Signed online.
 
 - **Hook:** Quote it before you leave the driveway.
-- **Picture** `/design/launch/designer.gif`: “RENUABL's AI designer laying panels on a roof in one press (example home)”
+- **Picture** `/design/launch/designer.jpg`: “Two homes designed in RENUABL's designer: panels laid, strung and priced”
 - **Picture** `/design/launch/explain-designer.gif`: “One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.”
 - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 4 · three days on
@@ -133,6 +137,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/explain-crm.gif`: “I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.”
 - **Picture** `/design/launch/today.jpg`: “RENUABL's Today screen: calls, deals and what needs you (example data)”
 - **Button:** See Today → https://www.renuabl.com.au/business/demo
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 5 · three days on
@@ -144,6 +149,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/explain-runs.gif`: “The moment they sign, the order opens, approvals line up and your installer's job card is ready.”
 - **Picture** `/design/launch/runs.jpg`: “RENUABL's install calendar after the sale (example data)”
 - **Button:** See after the sale → https://www.renuabl.com.au/
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 6 · four days on
@@ -155,6 +161,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/coupon.jpg`: “Yes. I want my AI sales force. First month free. No contract, cancel any time.”
 - **Words:** Your first month is free. Then it's $49 a user a month. No contract. Cancel any time. P.S. Leads go to whoever answers soonest. Let yours answer this week.
 - **Button:** Yes, start now → https://www.renuabl.com.au/#pricing
+- **Picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ## 6. Must be true before anything is sent

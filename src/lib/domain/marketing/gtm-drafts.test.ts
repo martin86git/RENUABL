@@ -44,11 +44,13 @@ describe("the launch drafts", () => {
     const art = readFileSync(join(process.cwd(), "tools/marketing/launch-art.mjs"), "utf8");
     for (const words of Object.values(SOL_TYPES)) expect(art).toContain(JSON.stringify(words).slice(1, -1));
     expect(art).toContain(PRICE_DAY_LINE);
+    expect(art).not.toMatch(/henderson|shearer/i);
   });
 
   it("open on the hook and end on the Marketplace band", () => {
     for (const c of GTM_EMAILS) {
       expect(c.blocks[0].kind).toBe("heading");
+      expect(pictureKeyOf(c.blocks.at(-2)!)).toBe("footv");
       expect(pictureKeyOf(c.blocks.at(-1)!)).toBe("footer");
       expect(c.blocks.at(-1)!.url).toBe("https://www.renuabl.com.au/design/marketplace");
     }

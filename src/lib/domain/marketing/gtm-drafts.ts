@@ -87,13 +87,17 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
   },
   sol: { file: "/design/launch/sol.gif", alt: SOL_TYPES.sol },
   psol: { file: "/design/launch/product-sol.jpg", alt: "In RENUABL: Sol on Today, saying who to call and what to say (example data)" },
-  designer: { file: "/design/launch/designer.gif", alt: "RENUABL's AI designer laying panels on a roof in one press (example home)" },
+  designer: { file: "/design/launch/designer.jpg", alt: "Two homes designed in RENUABL's designer: panels laid, strung and priced" },
   xdesigner: { file: "/design/launch/explain-designer.gif", alt: SOL_TYPES.xdesigner },
   today: { file: "/design/launch/today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
   xcrm: { file: "/design/launch/explain-crm.gif", alt: SOL_TYPES.xcrm },
   runs: { file: "/design/launch/runs.jpg", alt: "RENUABL's install calendar after the sale (example data)" },
   xruns: { file: "/design/launch/explain-runs.gif", alt: SOL_TYPES.xruns },
   coupon: { file: "/design/launch/coupon.jpg", alt: "Yes. I want my AI sales force. First month free. No contract, cancel any time." },
+  footv: {
+    file: "/design/launch/footer-voice.jpg",
+    alt: `Your AI salesperson: ${VOICE_DAY_WORDS}. Calls & Texts, ${VOICE}.`,
+  },
   footer: {
     file: "/design/launch/footer-marketplace.jpg",
     alt: "RENUABL Marketplace, coming soon: find crews, win installs, trade stock.",
@@ -105,7 +109,7 @@ export const pictureKeyOf = (b: EdmBlock): string | null => (b.kind === "image" 
 
 /**
  * One email: the hook as its heading, its pictures (the product moving, Sol's card, the product itself), a line only
- * where something must be said in words, one button, then the Marketplace band.
+ * where something must be said in words, one button, then the slim $2-a-day strip and the Marketplace band.
  */
 function email(
   key: string,
@@ -126,6 +130,7 @@ function email(
       ...pictures.map((k) => picture(k)),
       ...(words.length ? [block("t", { kind: "text", text: words.join("\n\n"), url: null, align: "left" })] : []),
       block("b", { kind: "button", text: button[0], url: button[1], align: "left" }),
+      picture("footv", SITE),
       picture("footer", MARKETPLACE),
     ],
   };
