@@ -443,9 +443,9 @@ function FootRound(props: { label: string; on: boolean; onClick: () => void; chi
  * picture only room for the top half of the kit, which sits on the picture's top edge; below it the toolbar hugging the
  * picture's foot (`bar`: zoom, Roof, Sides, the picture's switch), then Ask Sol, then the rail as a toolbar at the foot.
  */
-// Below: room for Sol's card under the picture (22 Nov 2026, Martin: "very squashed in"; the slimmer figures gave the map
-// the room to move up).
-const PHONE_BANDS = { above: 34, below: 156, rail: 0, bar: 0 };
+// Below: the least room kept for Sol's card under the picture; his card then runs on to the foot of the screen (`rest`).
+// 104 (22 Nov 2026, Martin: "the map should be at least 20% bigger", Sol "can also lower slightly"; it was 156).
+const PHONE_BANDS = { above: 34, below: 104, rail: 0, bar: 0 };
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
@@ -9820,7 +9820,7 @@ export function RoofDesigner(props: {
                   )}
                   style={
                     solHolds && !sideways && stage
-                      ? { top: foot ?? 0, maxHeight: stage.pb, ...solNotch(0, 30) }
+                      ? { top: foot ?? 0, maxHeight: stage.rest, ...solNotch(0, 30) }
                       : solHolds
                         ? { zIndex: 30, maxHeight: `calc(100% - ${(sideDeckUp ? sideDeckH : 0) + 64}px)` }
                         : undefined
@@ -11563,7 +11563,7 @@ export function RoofDesigner(props: {
                       sliding.current = holding;
                       if (!holding) setSettled((n) => n + 1);
                     }}
-                    height={stage?.pb ?? 140}
+                    height={stage?.rest ?? 140}
                   />
                 </div>
               )}

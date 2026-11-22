@@ -890,15 +890,16 @@ button.team-flash:not([aria-pressed="true"]) {
 .sol-moulded > [data-popup] {
   /* An outlined box with room round it (22 Nov 2026, Martin: "within an outlined text box - with the outline also
      integrating in the sol icon"): the notch cuts the outline at the top, where a ring of the same line round Sol meets it. */
-  width: calc(100% - 1rem);
-  margin-inline: 0.5rem;
+  /* Edge to edge under the full-bleed picture (22 Nov 2026, Martin: "should bleed edge to edge"). */
+  width: 100%;
+  margin-inline: 0;
   /* From the picture's foot to the foot of the screen (22 Nov 2026, Martin: "extend down to the bottom of the page"),
      set as --sol-rest by the designer; it scrolls inside past that. */
   height: var(--sol-rest, 9.25rem);
   max-height: var(--sol-rest, 9.25rem);
   overflow-y: auto;
   padding-top: 2rem;
-  border-radius: 22px;
+  border-radius: 22px 22px 0 0;
   outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
   outline-offset: -1.5px;
 }
@@ -1679,6 +1680,9 @@ html:has(.sales-snap) {
 /* Sideways on a phone, Sol's step and suggestions are a plate along the foot moulded round him (22 Nov 2026, Martin: as
    upright), short so the roof stays in view; it scrolls inside past that. */
 .sol-moulded.sideways-deck > [data-popup] {
+  width: calc(100% - 1rem);
+  margin-inline: 0.5rem;
+  border-radius: 22px;
   height: auto;
   max-height: 6.5rem;
   padding-top: 1.9rem;
@@ -1688,6 +1692,8 @@ html:has(.sales-snap) {
    "sols replies should form in the bottom half like on mobile"): a card up to the lower half of the picture, his notch
    in its top edge, scrolling inside past that. */
 .sol-moulded.desk-deck > * {
+  height: auto;
+  border-radius: 22px;
   width: min(46rem, 100% - 2rem);
   margin-inline: auto;
   max-height: calc(var(--pic-h, 40rem) * 0.48);
