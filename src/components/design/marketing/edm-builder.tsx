@@ -24,6 +24,7 @@ import {
   Undo2,
   X,
   ShoppingBag,
+  Timer,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
@@ -71,8 +72,9 @@ import {
   type EdmTile,
   type EdmProduct,
 } from "@/lib/domain/marketing/edm";
+import { COUNTDOWN_UNITS, cleanEndsAt, endsAtMs, endsWords } from "@/lib/domain/marketing/countdown";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
-import { uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
+import { saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
 import { emptyHistory, record, redo as redoHistory, undo as undoHistory } from "@/lib/domain/marketing/edm-history";
 import { SolAsk, type SolAskResult } from "./edm-sol-ask";
 import { SolIcon } from "../sol-icon";
@@ -88,13 +90,14 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   spacer: MoveVertical,
   social: Share2,
   products: ShoppingBag,
+  countdown: Timer,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
 const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
-  { name: "Basics", kinds: ["heading", "text", "button", "image", "products"] },
+  { name: "Basics", kinds: ["heading", "text", "button", "image", "products", "countdown"] },
   { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
 ];
 
@@ -130,6 +133,7 @@ export function EdmPreview({
           // The whole address: a sandboxed frame doesn't take its page's address, so "/api/…" alone loads nothing.
           image: (id) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/i/${id}`,
           social: (network, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/s/${network}.png?c=${colour}`,
+          countdown: (end, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/t/${end}.gif?c=${colour}`,
         },
       ).html,
     [content, brand, sender],
@@ -156,12 +160,15 @@ export function EdmPreview({
 export function EdmBuilder({
   content,
   brand,
+  onBrand,
   sender,
   onChange,
   readOnly = false,
 }: {
   content: EdmContent;
   brand: EdmBrand;
+  /** The settings as saved after the logo changes (it is set once for every email). */
+  onBrand?: (b: EdmBrand) => void;
   sender: EdmSender;
   onChange: (c: EdmContent) => void;
   readOnly?: boolean;
@@ -238,7 +245,7 @@ export function EdmBuilder({
     const now = latest.current;
     // Typing (words, a label, a link, a caption) is one step per field while it carries on.
     const part = typeof patch === "function" ? "" : Object.keys(patch).join();
-    const typed = ["text", "url", "tiles", "socials", "products"].includes(part);
+    const typed = ["text", "url", "tiles", "socials", "products", "endsAt"].includes(part);
     change(
       {
         ...now,
@@ -496,9 +503,7 @@ export function EdmBuilder({
                 drop(e, dropAt ?? content.blocks.length);
               }}
             >
-              <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
-                {sender.name}
-              </p>
+              <LogoField brand={brand} sender={sender} ink={ink} readOnly={readOnly} onBrand={onBrand} />
               {content.blocks.length === 0 && (
                 <p
                   className={cn(
@@ -1003,6 +1008,21 @@ function CanvasBlock({
       )}
       {b.kind === "social" && <SocialPills socials={b.socials ?? []} look={cleanSocialLook(b.socialLook)} colour={colour} align={align} />}
       {b.kind === "social" && picked && <SocialFields block={b} onChange={onChange} />}
+      {b.kind === "countdown" && (
+        <>
+          <AutoText
+            value={b.text}
+            max={EDM_LIMITS.caption}
+            align={align}
+            onChange={(text) => onChange({ text })}
+            placeholder="A line over the timer (optional)"
+            className="text-[17px] leading-snug font-semibold"
+            colour={ink.heading}
+          />
+          <CountdownView endsAt={b.endsAt ?? null} colour={colour} ink={ink} align={align} />
+          {picked && <CountdownFields block={b} onChange={onChange} />}
+        </>
+      )}
       {b.kind === "products" &&
         (picked ? (
           <ProductsFields block={b} onChange={onChange} />
@@ -1783,6 +1803,202 @@ function ColourField({
         />
       </div>
       {note && <p className="mt-1 text-[11px] text-muted">{note}</p>}
+    </div>
+  );
+}
+
+/** A countdown as it will look: the timer as it stands now, the units and the end in words; until it has an end, a hint. */
+function CountdownView({
+  endsAt,
+  colour,
+  ink,
+  align,
+}: {
+  endsAt: string | null;
+  colour: string;
+  ink: { heading: string; words: string };
+  align: "left" | "center";
+}) {
+  if (!endsAt)
+    return (
+      <div className="mt-2 grid h-20 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <Timer className="size-4" /> Press to set when it ends
+        </span>
+      </div>
+    );
+  const src = `/api/m/t/${Math.round(endsAtMs(endsAt) / 1000)}.gif?c=${colour.replace("#", "")}`;
+  return (
+    <div className="mt-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={endsWords(endsAt)} className="block w-full" />
+      <div className="grid grid-cols-4 pt-1.5">
+        {COUNTDOWN_UNITS.map((u) => (
+          <span key={u} className="text-center text-[11px] tracking-[0.08em] uppercase" style={{ color: ink.words }}>
+            {u}
+          </span>
+        ))}
+      </div>
+      <p className="pt-2 text-[13px]" style={{ textAlign: align, color: ink.words }}>
+        {endsWords(endsAt)}
+      </p>
+    </div>
+  );
+}
+
+/** A countdown's settings: the day and time it ends, in the market's time, and how the timer behaves. */
+function CountdownFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const passed = b.endsAt ? endsAtMs(b.endsAt) <= Date.now() : false;
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <label className="block text-[12px] text-muted">
+        Ends (Melbourne time)
+        <input
+          type="datetime-local"
+          value={b.endsAt ?? ""}
+          onChange={(e) => onChange({ endsAt: cleanEndsAt(e.target.value) })}
+          className={cn(field, "mt-1")}
+        />
+      </label>
+      {passed && <p className="text-[12px] font-medium text-warning">That time has passed: the timer will show zeros.</p>}
+      <p className="text-[12px] leading-snug text-muted">
+        Each time someone opens the email, the timer shows the time left then and counts down for a minute. Where an inbox blocks pictures,
+        the end in words still shows. Only set an end you&apos;ll keep to.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The business's logo at the top of the email (22 Nov 2026, Martin: "we need a clear upload business logo drop field"):
+ * with none, a plain drop field that says what it is for; with one, the logo with Change and Remove. It is saved as the
+ * business's marketing setting at once, so it heads every email, not only this one.
+ */
+function LogoField({
+  brand,
+  sender,
+  ink,
+  readOnly,
+  onBrand,
+}: {
+  brand: EdmBrand;
+  sender: EdmSender;
+  ink: { heading: string; words: string };
+  readOnly: boolean;
+  onBrand?: (b: EdmBrand) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const files = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+  const keep = async (id: string | null) => {
+    const r = await saveMarketingLogo(id);
+    if (!r.ok) return setProblem(r.message);
+    onBrand?.(r.settings.brand);
+  };
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setProblem(null);
+    setBusy(true);
+    const r = await uploadMarketingImage(file, "logo");
+    if (r.ok) await keep(r.id);
+    else setProblem(r.message);
+    setBusy(false);
+  };
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOver(true);
+    },
+    onDragLeave: () => setOver(false),
+    onDrop: (e: React.DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOver(false);
+      void upload(e.dataTransfer.files[0]);
+    },
+  };
+  const picker = (
+    <input
+      ref={input}
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      className="hidden"
+      onChange={(e) => {
+        void upload(e.target.files?.[0]);
+        e.target.value = "";
+      }}
+    />
+  );
+  if (readOnly || !onBrand)
+    return brand.logoId ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="mx-8 mb-2 block h-11 w-auto max-w-[240px]" />
+    ) : (
+      <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
+        {sender.name}
+      </p>
+    );
+  return (
+    <div className="px-5 pb-2" onClick={(e) => e.stopPropagation()}>
+      {picker}
+      {brand.logoId ? (
+        <div
+          {...dropProps}
+          className={cn(
+            "group/logo relative flex items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-transparent hover:ring-line",
+            over && "bg-sun/30 ring-sun-line",
+          )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="block h-11 w-auto max-w-[240px]" />
+          <div className="ml-auto flex gap-1.5 opacity-0 transition-opacity group-focus-within/logo:opacity-100 group-hover/logo:opacity-100">
+            <button
+              type="button"
+              onClick={() => input.current?.click()}
+              disabled={busy}
+              className="h-8 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink/40"
+            >
+              {busy ? "Uploading…" : "Change logo"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void keep(null)}
+              disabled={busy}
+              className="h-8 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink/40"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          {...dropProps}
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-colors",
+            over ? "border-sun-line bg-sun/30" : "border-line-strong hover:border-ink/40 hover:bg-canvas",
+          )}
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-canvas text-muted">
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] font-semibold text-ink">{busy ? "Uploading your logo…" : "Add your business logo"}</span>
+            <span className="block text-[12px] text-muted">
+              Drop it here, or press to choose. A PNG with a clear background works best. It heads every email; until then,{" "}
+              {sender.name || "your business name"} shows in words.
+            </span>
+          </span>
+        </button>
+      )}
+      {problem && <p className="mt-1.5 px-1 text-[12px] text-warning">{problem}</p>}
     </div>
   );
 }

@@ -5,7 +5,26 @@
  * text of one email for one contact.
  */
 
-export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider", "spacer", "social", "products"] as const;
+import { COUNTDOWN_HEIGHT, COUNTDOWN_UNITS, COUNTDOWN_WIDTH, cleanEndsAt, endsAtMs, endsWords } from "./countdown";
+
+/** How tall the logo stands at the top of an email. */
+export const LOGO_HEIGHT = 44;
+
+/** What a new countdown says over the timer. */
+export const COUNTDOWN_LINE = "Offer ends in";
+
+export const EDM_BLOCK_KINDS = [
+  "heading",
+  "text",
+  "image",
+  "tiles",
+  "button",
+  "divider",
+  "spacer",
+  "social",
+  "products",
+  "countdown",
+] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
 export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
@@ -18,6 +37,7 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   spacer: "Spacer",
   social: "Social links",
   products: "Products",
+  countdown: "Countdown",
 };
 
 export type EdmAlign = "left" | "center";
@@ -112,6 +132,8 @@ export interface EdmBlock {
   socialLook?: SocialLook;
   /** A products block's products, laid out `columns` across. */
   products?: EdmProduct[];
+  /** A countdown's end, a wall-clock time in the market ("YYYY-MM-DDTHH:mm", countdown.ts); null until set. */
+  endsAt?: string | null;
 }
 
 export interface EdmContent {
@@ -150,6 +172,8 @@ export interface EdmBrand {
   reason: string;
   /** A postal address for the footer, in place of the business's own; blank uses its own. */
   address: string | null;
+  /** The business's logo at the top of every email (a marketing picture's id); without it, its name in words. */
+  logoId: string | null;
 }
 
 export const DEFAULT_BRAND: EdmBrand = {
@@ -158,6 +182,7 @@ export const DEFAULT_BRAND: EdmBrand = {
   colour: "#ff5a1f",
   reason: "You're receiving this because you're one of our customers or contacts.",
   address: null,
+  logoId: null,
 };
 
 export const EDM_LIMITS = {
@@ -295,7 +320,15 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
   const kind = (EDM_BLOCK_KINDS as readonly string[]).includes(r.kind as string) ? (r.kind as EdmBlockKind) : null;
   if (!kind) return null;
   const max =
-    kind === "heading" ? EDM_LIMITS.heading : kind === "button" ? EDM_LIMITS.label : kind === "image" ? EDM_LIMITS.alt : EDM_LIMITS.text;
+    kind === "heading"
+      ? EDM_LIMITS.heading
+      : kind === "button"
+        ? EDM_LIMITS.label
+        : kind === "image"
+          ? EDM_LIMITS.alt
+          : kind === "countdown"
+            ? EDM_LIMITS.caption
+            : EDM_LIMITS.text;
   return {
     id: blockId(r.id, i),
     kind,
@@ -312,6 +345,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
     ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
     ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
+    ...(kind === "countdown" ? { endsAt: cleanEndsAt(r.endsAt) } : {}),
   };
 }
 
@@ -387,6 +421,7 @@ export function cleanBrand(raw: unknown): EdmBrand {
     colour: cleanColour(r.colour),
     reason: line(r.reason, 240) || DEFAULT_BRAND.reason,
     address: line(r.address, 200) || null,
+    logoId: imageIdOf(r.logoId),
   };
 }
 
@@ -398,6 +433,7 @@ export function contentProblem(c: EdmContent): string | null {
   if (button) return "Every button needs a label and a link (https).";
   const picture = c.blocks.find((b) => b.kind === "image" && !b.imageId);
   if (picture) return "A picture block has no picture. Add one or take the block out.";
+  if (c.blocks.some((b) => b.kind === "countdown" && !b.endsAt)) return "A countdown has no end. Give it a day and time, or take it out.";
   return null;
 }
 
@@ -425,18 +461,28 @@ export const EMPTY_TILE: EdmTile = { imageId: null, text: "", url: null };
 export const EMPTY_PRODUCT: EdmProduct = { imageId: null, name: "", price: "", text: "", label: "", url: null };
 
 export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
-  const text = kind === "heading" ? "A heading" : kind === "text" ? "Hi {firstName}," : kind === "button" ? "Find out more" : "";
+  const text =
+    kind === "heading"
+      ? "A heading"
+      : kind === "text"
+        ? "Hi {firstName},"
+        : kind === "button"
+          ? "Find out more"
+          : kind === "countdown"
+            ? COUNTDOWN_LINE
+            : "";
   return {
     id: newBlockId(rand),
     kind,
     text,
     url: null,
     imageId: null,
-    align: kind === "button" ? "center" : "left",
+    align: kind === "button" || kind === "countdown" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
     ...(kind === "spacer" ? { space: "medium" as const } : {}),
     ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
     ...(kind === "products" ? { products: [EMPTY_PRODUCT, EMPTY_PRODUCT], columns: 2 as const } : {}),
+    ...(kind === "countdown" ? { endsAt: null } : {}),
   };
 }
 
@@ -489,6 +535,8 @@ export interface RenderLinks {
   image: (id: string) => string;
   /** Where a social network's icon in a colour (six hex digits, no #) is served; without it, names only. */
   social?: (network: SocialNetwork, colour: string) => string;
+  /** Where a countdown to an end (seconds since 1970) in a colour (six hex digits) is drawn; without it, the end in words only. */
+  countdown?: (endSeconds: number, colour: string) => string;
 }
 
 export interface RenderedEdm {
@@ -661,6 +709,26 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
         `<tr><td style="padding:12px 32px"><div style="height:1px;background:#e4e4e7;line-height:1px;font-size:1px">&nbsp;</div></td></tr>`,
       );
       textParts.push("—");
+    } else if (b.kind === "countdown") {
+      // The timer is a picture drawn at each open; the line over it, the units and the end in words are text.
+      if (!b.endsAt) continue;
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      const label = merge(b.text, fields);
+      const when = endsWords(b.endsAt);
+      let inner = "";
+      if (label)
+        inner += `<div style="padding:0 0 10px;${font};font-size:17px;line-height:1.35;font-weight:600;color:${ink.heading};text-align:${align}">${esc(label)}</div>`;
+      if (links.countdown) {
+        const src = links.countdown(Math.round(endsAtMs(b.endsAt) / 1000), colour.replace("#", ""));
+        inner += `<img src="${esc(src)}" alt="${esc(when)}" width="${COUNTDOWN_WIDTH}" height="${COUNTDOWN_HEIGHT}" style="display:block;width:100%;max-width:${COUNTDOWN_WIDTH}px;height:auto;border:0">`;
+        inner += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${COUNTDOWN_UNITS.map(
+          (u) =>
+            `<td width="25%" style="padding:6px 0 0;${font};font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:${ink.words};text-align:center">${u}</td>`,
+        ).join("")}</tr></table>`;
+      }
+      inner += `<div style="padding:${links.countdown ? 10 : 0}px 0 0;${font};font-size:${links.countdown ? 13 : 16}px;line-height:1.4;${links.countdown ? "" : "font-weight:600;"}color:${links.countdown ? ink.words : ink.heading};text-align:${align}">${esc(when)}</div>`;
+      rows.push(`<tr><td style="padding:12px 32px">${inner}</td></tr>`);
+      textParts.push([label, when].filter(Boolean).join("\n"));
     } else if (b.kind === "spacer") {
       const h = SPACER_SIZES[cleanSpace(b.space)];
       rows.push(`<tr><td style="height:${h}px;line-height:${h}px;font-size:1px">&nbsp;</td></tr>`);
@@ -690,7 +758,11 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
   const preview = content.preview ? merge(content.preview, fields) : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(merge(content.subject, fields))}</title></head><body style="margin:0;padding:0;background:#f4f4f5">${
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
-  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${esc(sender.name)}</td></tr>${rows.join(
+  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${
+    brand.logoId
+      ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
+      : esc(sender.name)
+  }</td></tr>${rows.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
     links.pixel ? `<img src="${esc(links.pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""
