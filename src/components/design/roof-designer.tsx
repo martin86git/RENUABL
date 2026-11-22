@@ -1885,7 +1885,38 @@ export function RoofDesigner(props: {
     </div>
   );
   const kitSearchFoot = (placeholder: string) =>
-    searchDown && <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">{searchBox(placeholder)}</div>;
+    searchDown && (
+      <div
+        className={clsx(
+          "sticky mt-2 border-t border-line p-2",
+          kitSheet ? "bg-[#2b2e33] -mx-3 bottom-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]" : "-bottom-2 -mx-2 -mb-2 bg-surface",
+        )}
+      >
+        {searchBox(placeholder)}
+      </div>
+    );
+  // On a phone held upright (22 Nov 2026, Martin: the inverter list was covered by the rounds along the picture's foot;
+  // "allow it to take over the page as much as possible"), each kit list is a sheet over the whole screen, headed by a
+  // way back to the roof, like the designs menu. The white cross in the top right is the window's, so the back is left.
+  const kitSheet = props.tight && phone;
+  const kitMenuClass = (usual: string) =>
+    kitSheet ? "fixed inset-0 z-[90] space-y-1 overflow-y-auto bg-[#2b2e33] px-3 pb-[env(safe-area-inset-bottom)] text-ink" : usual;
+  const kitMenuStyle: React.CSSProperties | undefined = kitSheet ? { zoom: 1.15 } : undefined;
+  const kitSheetHead = (title: string) =>
+    kitSheet && (
+      <div className="sticky top-0 z-10 -mx-3 mb-1 flex items-center gap-2 border-b border-line bg-[#2b2e33] pb-2 pl-2 pr-16 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={() => openMenu(false)}
+          aria-label="Back to the roof"
+          title="Back to the roof"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink hover:bg-white/15"
+        >
+          <ChevronLeft className="size-5" aria-hidden />
+        </button>
+        <p className="text-base font-semibold">{title}</p>
+      </div>
+    );
   const seeks = (text: string) =>
     seek
       .toLowerCase()
@@ -10236,9 +10267,12 @@ export function RoofDesigner(props: {
                   the customer's bill in the figures above the picture.) */}
               <div
                 className={clsx(
-                  "absolute z-20 flex -translate-x-1/2 flex-col items-center",
-                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner.
-                  phone ? "designer-kit left-[calc(50%-1.1rem)] top-[0.78rem]" : "left-1/2 top-4",
+                  "absolute flex flex-col items-center",
+                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner;
+                  // centred without a transform there, so a kit list can be a sheet over the whole screen (a transform
+                  // would hold a fixed sheet inside the kit). Above everything on the picture while its sheet is open.
+                  phone ? "designer-kit left-0 right-[2.75rem] top-[0.78rem] mx-auto w-max" : "left-1/2 top-4 -translate-x-1/2",
+                  kitSheet && menu && menu !== "designs" && menu !== "bill" ? "z-[95]" : "z-20",
                 )}
                 role="group"
                 aria-label="System"
@@ -10281,8 +10315,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Panels")}
                         <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                         {kitSearchHere("Search panels")}
                         {[
@@ -10361,8 +10399,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift",
+                        )}
                       >
+                        {kitSheetHead("EV chargers")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {charger ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -10462,8 +10504,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Inverters")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -10684,8 +10730,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Batteries")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {battery ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
