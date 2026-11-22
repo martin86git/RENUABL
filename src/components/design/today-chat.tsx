@@ -34,6 +34,9 @@ import { SolEtch } from "./sol-icon";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
 import { loadPerfRows } from "@/lib/services/performance";
+import { listProposals } from "@/lib/services/after-sale";
+import { loadCallLog } from "@/lib/services/call-log";
+import { loadPrepared } from "@/lib/services/prepared";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -114,7 +117,13 @@ export function TodayChat(props: {
   useEffect(() => {
     // Performance's own small rows first, so a press on it finds them ready (22 Nov 2026, Martin).
     void loadPerfRows();
-    const t = window.setTimeout(() => void readFeed(), 0);
+    // Then every other tab's answer, kept for the page, so each opens on it at once.
+    const t = window.setTimeout(() => {
+      void readFeed();
+      void listProposals();
+      void loadCallLog();
+      void loadPrepared();
+    }, 0);
     return () => window.clearTimeout(t);
   }, [readFeed]);
   // Worked out once a feed, not on every press of a tab (it reads every deal's next move).

@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Today",
-    words: "Performance opens straight away, even the moment Today has opened.",
+    words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
   },
   {
     day: "2026-11-22",
