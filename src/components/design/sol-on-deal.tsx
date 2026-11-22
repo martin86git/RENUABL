@@ -356,7 +356,7 @@ export function SolTerminal(props: {
         >
           <div>
             <div>
-              <p className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink max-sm:text-[13px]" aria-live="polite">
+              <p className="sol-line min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink max-sm:text-[13px]" aria-live="polite">
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>
@@ -366,7 +366,7 @@ export function SolTerminal(props: {
               {hasDraft && <div className="@3xl:hidden">{drafts}</div>}
 
               {!leftIt && typed.done && waiting && (answer || unwritten) && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:flex-nowrap max-sm:gap-1.5">
+                <div className="sol-replies mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:flex-nowrap max-sm:gap-1.5">
                   {answer && (
                     <button
                       type="button"
@@ -393,7 +393,7 @@ export function SolTerminal(props: {
               )}
 
               {!leftIt && typed.done && !waiting && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:gap-1.5">
+                <div className="sol-replies mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:gap-1.5">
                   {p.yes && !(p.yes.kind === "call" && !props.phone) && (
                     <button
                       type="button"
@@ -466,9 +466,9 @@ export function SolTerminal(props: {
                   tellSol();
                 }}
                 // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
-                className="mt-3.5 flex items-center gap-1 rounded-lg bg-canvas max-sm:mt-2.5 py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+                className="sol-compose mt-3.5 flex items-center gap-1 rounded-lg bg-canvas max-sm:mt-2.5 py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
               >
-                <span className="font-mono text-[12px] text-sun-line" aria-hidden>
+                <span className="sol-prompt font-mono text-[12px] text-sun-line" aria-hidden>
                   {">"}
                 </span>
                 <input
@@ -497,7 +497,7 @@ export function SolTerminal(props: {
                   type="submit"
                   disabled={!ask.trim()}
                   aria-label="Send to Sol"
-                  className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+                  className="sol-send grid size-7 shrink-0 place-items-center rounded-md bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
                 >
                   <ArrowUp className="size-3.5" aria-hidden />
                 </button>
@@ -570,7 +570,7 @@ function LeadPage({ jobId, name }: { jobId: string; name: string }) {
   };
   const link = "font-medium text-ink underline decoration-line underline-offset-2 hover:decoration-ink disabled:text-muted";
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-canvas/60 px-4 py-2 text-[12.5px] sm:px-5">
+    <div className="sol-lead-page flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-canvas/60 px-4 py-2 text-[12.5px] sm:px-5">
       <span className="text-muted">{name}&apos;s page: their home, the design and a chat with Sol</span>
       <span className="ml-auto flex gap-3">
         <button
