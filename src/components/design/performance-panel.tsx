@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import {
@@ -168,6 +168,20 @@ function Menu(props: {
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  // Kept on the screen (22 Nov 2026, Martin: on a phone the range menu opened past the left edge, half cut off): it opens
+  // from the button's left edge, and is moved back in by however much it would run past either side.
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    if (!props.open || !list.current) return;
+    const box = list.current.getBoundingClientRect();
+    const room = document.documentElement.clientWidth;
+    const gutter = 12;
+    const past = box.right - shift - (room - gutter);
+    const before = box.left - shift - gutter;
+    const next = past > 0 ? -Math.min(past, Math.max(0, before)) : 0;
+    if (next !== shift) setShift(next);
+  }, [props.open, shift]);
   useEffect(() => {
     if (!props.open) return;
     const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && props.onOpen(false);
@@ -197,7 +211,12 @@ function Menu(props: {
         {!props.iconOnly && <ChevronDown className={clsx("size-4 text-muted transition", props.open && "rotate-180")} aria-hidden />}
       </button>
       {props.open && (
-        <div role="menu" className="absolute right-0 top-11 z-30 w-56 rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line">
+        <div
+          ref={list}
+          role="menu"
+          style={{ transform: shift ? `translateX(${shift}px)` : undefined }}
+          className="absolute left-0 top-11 z-30 w-56 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
+        >
           {props.children}
         </div>
       )}
