@@ -67,16 +67,26 @@ function hint(set?: boolean): boolean {
 
 let asked: Promise<DesignAccount> | null = null;
 
+/** Waits between asking again when the server doesn't answer on a device someone has signed in on. */
+const RETRY_MS = [800, 2_000, 4_000];
+
 async function ask(): Promise<DesignAccount> {
-  try {
-    const res = await fetch("/api/design/me", { cache: "no-store" });
-    if (!res.ok) throw new Error(String(res.status));
-    const account = (await res.json()) as DesignAccount;
-    hint(account.signedIn);
-    return account;
-  } catch {
-    // The server didn't answer. Say so only for a device someone has signed in on.
-    return { signedIn: false, unreachable: hint() };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch("/api/design/me", { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const account = (await res.json()) as DesignAccount;
+      hint(account.signedIn);
+      return account;
+    } catch {
+      // The server didn't answer (a database waking up). On a device someone has signed in on, ask again a few
+      // times before saying so, rather than showing the sign-in page to someone who is signed in.
+      if (hint() && attempt < RETRY_MS.length) {
+        await new Promise((r) => setTimeout(r, RETRY_MS[attempt]));
+        continue;
+      }
+      return { signedIn: false, unreachable: hint() };
+    }
   }
 }
 
