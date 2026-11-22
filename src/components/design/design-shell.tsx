@@ -173,7 +173,7 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
 }
 
 /** The pad every page sits on (Primero's `PAGE_PAD`): a soft grey ground with rounded corners, white cards on it. */
-const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 sm:p-6 lg:pt-10";
+const PAD = "studio-pad min-h-[calc(100dvh-10rem)] max-sm:min-h-[calc(100dvh-15rem)] rounded-[28px] bg-canvas p-4 sm:p-6 lg:pt-10";
 
 /**
  * How far the sections menu drops below the top bar on a wide screen, so it sits half over the pad's top edge (14 Nov
@@ -704,7 +704,7 @@ function Shell({
           {children}
         </div>
       ) : (
-        <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
+        <div className="px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
             {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad
                 disappeared): its own grey with its rounded corners, drawn on a wide screen only (globals.css .pad-cap). */}

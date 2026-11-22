@@ -545,7 +545,9 @@ export function PipelinesPage() {
         <div
           ref={board}
           style={boardTop === null ? undefined : ({ "--board-top": `${boardTop}px` } as React.CSSProperties)}
-          className="no-scrollbar -mx-1.5 mt-3 flex max-h-[calc(100dvh-var(--board-top)-6rem)] snap-x snap-mandatory scroll-px-1.5 gap-2.5 overflow-auto px-1.5 pb-4 sm:mx-0 sm:max-h-[calc(100dvh-var(--board-top)-1rem)] sm:snap-none sm:gap-3 sm:px-0"
+          // On a phone (22 Nov 2026, Martin: cards could be dragged around the page): the board only slides sideways, with
+          // the phone's own momentum and a soft settle on a column, and each column scrolls its cards under a fixed head.
+          className="no-scrollbar -mx-1.5 mt-3 flex snap-x snap-proximity scroll-px-1.5 gap-2.5 px-1.5 pb-4 max-sm:h-[calc(100dvh-var(--board-top)-8.5rem)] max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:overscroll-x-contain sm:mx-0 sm:max-h-[calc(100dvh-var(--board-top)-1rem)] sm:snap-none sm:gap-3 sm:overflow-auto sm:px-0"
         >
           {stages.map((stage, at) => {
             // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
@@ -581,7 +583,7 @@ export function PipelinesPage() {
                   setColOver(null);
                 }}
                 className={clsx(
-                  "relative flex w-[86%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 sm:w-auto sm:min-w-72 sm:flex-1 sm:shrink sm:basis-72 sm:rounded-lg",
+                  "relative flex w-[86%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 max-sm:min-h-0 max-sm:pb-0 sm:w-auto sm:min-w-72 sm:flex-1 sm:shrink sm:basis-72 sm:rounded-lg",
                   over === stage ? "border-sun-line" : "border-transparent",
                   movingCol === stage && "opacity-50",
                 )}
@@ -629,7 +631,7 @@ export function PipelinesPage() {
                     </button>
                   )}
                 </div>
-                <ul className="flex min-h-24 flex-col gap-2">
+                <ul className="no-scrollbar flex min-h-24 flex-col gap-2 max-sm:min-h-0 max-sm:flex-1 max-sm:overflow-y-auto max-sm:overscroll-y-contain max-sm:pb-2">
                   {!jobs && !problem && <li className="px-2 py-3 text-xs text-muted">Loading…</li>}
                   {jobs && column.length === 0 && <li className="px-2 py-3 text-xs text-muted">Nothing here.</li>}
                   {column.map((job) => (
