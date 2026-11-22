@@ -23,6 +23,7 @@ import {
   Type,
   Undo2,
   X,
+  ShoppingBag,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
@@ -31,6 +32,8 @@ import {
   EDM_BLOCK_WORDS,
   EDM_LIMITS,
   EMPTY_TILE,
+  EMPTY_PRODUCT,
+  PRODUCT_BUTTON,
   MERGE_FIELDS,
   SOCIAL_NETWORKS,
   SOCIAL_WORDS,
@@ -66,6 +69,7 @@ import {
   type SocialLook,
   type EdmStyle,
   type EdmTile,
+  type EdmProduct,
 } from "@/lib/domain/marketing/edm";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
 import { uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
@@ -83,13 +87,14 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   divider: Minus,
   spacer: MoveVertical,
   social: Share2,
+  products: ShoppingBag,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
 const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
-  { name: "Basics", kinds: ["heading", "text", "button", "image"] },
+  { name: "Basics", kinds: ["heading", "text", "button", "image", "products"] },
   { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
 ];
 
@@ -233,7 +238,7 @@ export function EdmBuilder({
     const now = latest.current;
     // Typing (words, a label, a link, a caption) is one step per field while it carries on.
     const part = typeof patch === "function" ? "" : Object.keys(patch).join();
-    const typed = ["text", "url", "tiles", "socials"].includes(part);
+    const typed = ["text", "url", "tiles", "socials", "products"].includes(part);
     change(
       {
         ...now,
@@ -998,6 +1003,12 @@ function CanvasBlock({
       )}
       {b.kind === "social" && <SocialPills socials={b.socials ?? []} look={cleanSocialLook(b.socialLook)} colour={colour} align={align} />}
       {b.kind === "social" && picked && <SocialFields block={b} onChange={onChange} />}
+      {b.kind === "products" &&
+        (picked ? (
+          <ProductsFields block={b} onChange={onChange} />
+        ) : (
+          <ProductCards products={b.products ?? []} columns={cols} align={align} colour={colour} ink={ink} />
+        ))}
     </div>
   );
 }
@@ -1412,6 +1423,240 @@ function TilesFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch
       </div>
       {problem && <p className="text-[12px] text-danger">{problem}</p>}
       <p className="text-[12px] text-muted">A spot with no picture is left out of the email.</p>
+    </div>
+  );
+}
+
+/** A products block as it will look: each named product's picture, name, price, words and button; until one is named, a hint. */
+function ProductCards({
+  products,
+  columns,
+  align,
+  colour,
+  ink,
+}: {
+  products: EdmProduct[];
+  columns: number;
+  align: "left" | "center";
+  colour: string;
+  ink: { heading: string; words: string };
+}) {
+  const shown = products.filter((p) => p.name);
+  if (!shown.length)
+    return (
+      <div className="grid h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <ShoppingBag className="size-4" /> Press to add your products
+        </span>
+      </div>
+    );
+  const cols = Math.min(columns, shown.length);
+  return (
+    <div className={cn("grid gap-4", cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3")} style={{ textAlign: align }}>
+      {shown.map((p, i) => (
+        <div key={i}>
+          {p.imageId && (
+            // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+            <img src={`/api/m/i/${p.imageId}`} alt={p.name} className="mb-2.5 block w-full rounded-lg" />
+          )}
+          <p className="text-[16px] leading-snug font-semibold" style={{ color: ink.heading }}>
+            {p.name}
+          </p>
+          {p.price && (
+            <p className="pt-0.5 text-[15px] font-semibold" style={{ color: colour }}>
+              {p.price}
+            </p>
+          )}
+          {p.text && (
+            <p className="pt-1.5 text-[13px] leading-normal" style={{ color: ink.words }}>
+              {p.text}
+            </p>
+          )}
+          {p.url && (
+            <span
+              className="mt-3 inline-block rounded-full px-[18px] py-[9px] text-[13px] font-semibold text-white"
+              style={{ background: colour }}
+            >
+              {p.label || PRODUCT_BUTTON}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A products block's settings: one, two or three across, and a card a product with its picture, name, price, words,
+ * button words and link. A product with no name is left out of the email; one with no link has no button.
+ */
+function ProductsFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const products = b.products ?? [];
+  const columns = cleanColumns(b.columns);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const full = products.length >= EDM_LIMITS.products;
+  // Typing is an object patch, so it is one undo step while it carries on (setBlock's typing key).
+  const setProduct = (i: number, patch: Partial<EdmProduct>) =>
+    onChange({ products: products.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
+
+  async function picture(file: File | undefined, i: number) {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setProblem("Pictures are JPEG, PNG or WebP.");
+      return;
+    }
+    setProblem(null);
+    setBusy(i);
+    const r = await uploadMarketingImage(file);
+    setBusy(null);
+    if (!r.ok) {
+      setProblem(r.message);
+      return;
+    }
+    // Placed in the block as it stands once the upload is in.
+    onChange((now) => ({ products: (now.products ?? []).map((p, j) => (j === i ? { ...p, imageId: r.id } : p)) }));
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+        <span>Across</span>
+        <span className="inline-flex rounded-full bg-canvas p-0.5">
+          {TILE_COLUMNS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={columns === c}
+              onClick={() => onChange({ columns: c })}
+              className={cn(
+                "h-7 min-w-8 rounded-full px-2 text-[12px] font-medium",
+                columns === c ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-muted hover:text-ink",
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </span>
+        <span className="ml-auto">
+          {products.filter((p) => p.name).length} of {EDM_LIMITS.products} products
+        </span>
+      </div>
+      <div className={cn("grid gap-3", columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+        {products.map((p, i) => (
+          <div key={i} className="space-y-1.5 rounded-lg border border-line p-2">
+            <div className="relative">
+              <label
+                className={cn(
+                  "grid aspect-[4/3] cursor-pointer place-items-center overflow-hidden rounded-md bg-canvas text-muted hover:text-ink",
+                  !p.imageId && "border border-dashed border-line-strong",
+                )}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void picture(e.dataTransfer.files[0], i);
+                }}
+              >
+                {p.imageId ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/m/i/${p.imageId}`} alt="" className="size-full object-cover" />
+                ) : busy === i ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <span className="flex flex-col items-center gap-1 text-[12px]">
+                    <ImagePlus className="size-5" /> Drop or choose a picture
+                  </span>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    void picture(e.target.files?.[0], i);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {p.imageId && (
+                <button
+                  type="button"
+                  aria-label="Remove the picture"
+                  title="Remove the picture"
+                  onClick={() => setProduct(i, { imageId: null })}
+                  className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] hover:text-ink"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+            <input
+              value={p.name}
+              maxLength={EDM_LIMITS.productName}
+              onChange={(e) => setProduct(i, { name: e.target.value })}
+              placeholder="Product name"
+              aria-label="Product name"
+              className={field}
+            />
+            <input
+              value={p.price}
+              maxLength={EDM_LIMITS.price}
+              onChange={(e) => setProduct(i, { price: e.target.value })}
+              placeholder="Price, e.g. From $9,990 installed (optional)"
+              aria-label="Price"
+              className={field}
+            />
+            <textarea
+              value={p.text}
+              maxLength={EDM_LIMITS.productText}
+              onChange={(e) => setProduct(i, { text: e.target.value })}
+              placeholder="A line or two about it (optional)"
+              aria-label="About the product"
+              rows={2}
+              className={cn(field, "h-auto py-2")}
+            />
+            <div className="space-y-1.5">
+              <input
+                value={p.label}
+                maxLength={EDM_LIMITS.label}
+                onChange={(e) => setProduct(i, { label: e.target.value })}
+                placeholder={PRODUCT_BUTTON}
+                aria-label="Button words"
+                className={field}
+              />
+              <div>
+                <LinkInput
+                  value={p.url}
+                  onChange={(url) => setProduct(i, { url })}
+                  placeholder="Link (the button shows once there is one)"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange({ products: products.filter((_, j) => j !== i) })}
+              className="text-[12px] text-muted hover:text-danger"
+            >
+              Remove this product
+            </button>
+          </div>
+        ))}
+        {!full && (
+          <button
+            type="button"
+            onClick={() => onChange({ products: [...products, EMPTY_PRODUCT] })}
+            className="grid min-h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted hover:border-ink/40 hover:text-ink"
+          >
+            <span className="flex items-center gap-1.5">
+              <Plus className="size-4" /> Add a product
+            </span>
+          </button>
+        )}
+      </div>
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] text-muted">
+        A product with no name is left out of the email. Prices are as you type them: check they are ones you can honour.
+      </p>
     </div>
   );
 }

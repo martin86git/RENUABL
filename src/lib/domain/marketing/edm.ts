@@ -5,7 +5,7 @@
  * text of one email for one contact.
  */
 
-export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider", "spacer", "social"] as const;
+export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider", "spacer", "social", "products"] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
 export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
@@ -17,6 +17,7 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   divider: "Divider",
   spacer: "Spacer",
   social: "Social links",
+  products: "Products",
 };
 
 export type EdmAlign = "left" | "center";
@@ -36,6 +37,23 @@ export interface EdmTile {
 export const SPACER_SIZES = { small: 16, medium: 32, large: 56 } as const;
 export type SpacerSize = keyof typeof SPACER_SIZES;
 export const SPACER_WORDS: Record<SpacerSize, string> = { small: "Small", medium: "Medium", large: "Large" };
+
+/**
+ * A product in a products block (22 Nov 2026, Martin: "add product blocks to the email builder"): its picture, name, a
+ * price line as the business writes it ("$9,990 installed", "From $49 a month"), a few words, and a button to its page.
+ * Nothing is read from the price lists: what the business types is what goes, as with every other block.
+ */
+export interface EdmProduct {
+  imageId: string | null;
+  name: string;
+  price: string;
+  text: string;
+  /** The button's words; blank is "Find out more". */
+  label: string;
+  url: string | null;
+}
+
+export const PRODUCT_BUTTON = "Find out more";
 
 /** The places a social links block can point to, in the order they are offered. */
 export const SOCIAL_NETWORKS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "website"] as const;
@@ -92,6 +110,8 @@ export interface EdmBlock {
   socials?: EdmSocial[];
   /** How a social links block draws them. */
   socialLook?: SocialLook;
+  /** A products block's products, laid out `columns` across. */
+  products?: EdmProduct[];
 }
 
 export interface EdmContent {
@@ -150,6 +170,10 @@ export const EDM_LIMITS = {
   alt: 160,
   tiles: 6,
   caption: 80,
+  products: 6,
+  productName: 80,
+  price: 40,
+  productText: 240,
 } as const;
 
 const line = (v: unknown, max: number) =>
@@ -242,6 +266,26 @@ export const filledSocials = (b: EdmBlock): EdmSocial[] => (b.kind === "social" 
 
 export const cleanColumns = (raw: unknown): TileColumns => (raw === 1 || raw === 3 ? raw : 2);
 
+/** A products block's products: up to the limit, each cleaned as its own fields are. */
+export function cleanProducts(raw: unknown): EdmProduct[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, EDM_LIMITS.products).map((p) => {
+    const r = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
+    const url = cleanLink(r.url);
+    return {
+      imageId: imageIdOf(r.imageId),
+      name: line(r.name, EDM_LIMITS.productName),
+      price: line(r.price, EDM_LIMITS.price),
+      text: line(r.text, EDM_LIMITS.productText),
+      label: line(r.label, EDM_LIMITS.label),
+      url: url && !url.startsWith("mailto:") ? url : null,
+    };
+  });
+}
+
+/** A products block's products that have a name: the ones an email shows. */
+export const filledProducts = (b: EdmBlock): EdmProduct[] => (b.kind === "products" ? (b.products ?? []).filter((p) => p.name) : []);
+
 /** A tiles block's tiles that have a picture: the ones an email shows. */
 export const filledTiles = (b: EdmBlock): EdmTile[] => (b.kind === "tiles" ? (b.tiles ?? []).filter((t) => t.imageId) : []);
 
@@ -258,7 +302,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     text:
       kind === "text"
         ? words(r.text, max)
-        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social"
+        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products"
           ? ""
           : line(r.text, max),
     url: kind === "button" || kind === "image" ? cleanLink(r.url) : null,
@@ -267,6 +311,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
     ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
     ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
+    ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
   };
 }
 
@@ -363,9 +408,11 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
       ? filledTiles(b).flatMap((t) => (t.url ? [t.url] : []))
       : b.kind === "social"
         ? filledSocials(b).map((s) => s.url!)
-        : (b.kind === "button" || b.kind === "image") && b.url
-          ? [b.url]
-          : [],
+        : b.kind === "products"
+          ? filledProducts(b).flatMap((p) => (p.url ? [p.url] : []))
+          : (b.kind === "button" || b.kind === "image") && b.url
+            ? [b.url]
+            : [],
   );
 }
 
@@ -375,6 +422,7 @@ export function newBlockId(rand: () => number = Math.random): string {
 }
 
 export const EMPTY_TILE: EdmTile = { imageId: null, text: "", url: null };
+export const EMPTY_PRODUCT: EdmProduct = { imageId: null, name: "", price: "", text: "", label: "", url: null };
 
 export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
   const text = kind === "heading" ? "A heading" : kind === "text" ? "Hi {firstName}," : kind === "button" ? "Find out more" : "";
@@ -388,6 +436,7 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
     ...(kind === "spacer" ? { space: "medium" as const } : {}),
     ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
+    ...(kind === "products" ? { products: [EMPTY_PRODUCT, EMPTY_PRODUCT], columns: 2 as const } : {}),
   };
 }
 
@@ -544,6 +593,54 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
             .map(
               (c, i) =>
                 `<td width="${Math.round(100 / cols)}%" valign="top" style="padding:0 ${i < cols - 1 ? gap / 2 : 0}px ${gap}px ${i > 0 ? gap / 2 : 0}px">${c}</td>`,
+            )
+            .join("")}</tr>`,
+        );
+      }
+      rows.push(
+        `<tr><td style="padding:12px 32px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
+      );
+    } else if (b.kind === "products") {
+      // A product is sent once it has a name; its picture and button only when given.
+      const products = filledProducts(b);
+      if (!products.length) continue;
+      const cols = Math.min(cleanColumns(b.columns), products.length) as TileColumns;
+      const gap = 16;
+      const width = Math.floor((536 - gap * (cols - 1)) / cols);
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      const cells = products.map((p) => {
+        const name = merge(p.name, fields);
+        const href = p.url ? links.click(linkAt, linkList[linkAt]) : null;
+        if (p.url) linkAt++;
+        let inner = "";
+        if (p.imageId) {
+          const img = `<img src="${esc(links.image(p.imageId))}" alt="${esc(name)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border:0;border-radius:8px">`;
+          inner += href ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none">${img}</a>` : img;
+        }
+        inner += `<div style="padding:${p.imageId ? 10 : 0}px 2px 0;${font};font-size:16px;line-height:1.35;font-weight:600;color:${ink.heading};text-align:${align}">${esc(name)}</div>`;
+        if (p.price)
+          inner += `<div style="padding:2px 2px 0;${font};font-size:15px;line-height:1.4;font-weight:600;color:${colour};text-align:${align}">${esc(merge(p.price, fields))}</div>`;
+        if (p.text)
+          inner += `<div style="padding:6px 2px 0;${font};font-size:13px;line-height:1.5;color:${ink.words};text-align:${align}">${esc(merge(p.text, fields))}</div>`;
+        const label = merge(p.label, fields) || PRODUCT_BUTTON;
+        if (href)
+          inner += `<div style="padding:12px 2px 0;text-align:${align}"><a href="${esc(href)}" target="_blank" style="display:inline-block;background:${colour};color:#ffffff;${font};font-size:13px;font-weight:600;text-decoration:none;padding:9px 18px;border-radius:999px">${esc(label)}</a></div>`;
+        textParts.push(
+          [p.price ? `${name}: ${merge(p.price, fields)}` : name, p.text ? merge(p.text, fields) : "", href ? `${label}: ${href}` : ""]
+            .filter(Boolean)
+            .join("\n"),
+        );
+        return inner;
+      });
+      const trs: string[] = [];
+      for (let at = 0; at < cells.length; at += cols) {
+        const row = cells.slice(at, at + cols);
+        while (row.length < cols) row.push("");
+        trs.push(
+          `<tr>${row
+            .map(
+              (c, i) =>
+                `<td width="${Math.round(100 / cols)}%" valign="top" style="padding:0 ${i < cols - 1 ? gap / 2 : 0}px ${gap + 4}px ${i > 0 ? gap / 2 : 0}px">${c}</td>`,
             )
             .join("")}</tr>`,
         );
