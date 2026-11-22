@@ -23,7 +23,14 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/job/[token]/
     if (!card) return gone();
     const input = cleanAsBuilt(read.body.asBuilt);
     const differences = card.designed ? asBuiltDifferences(input, card.designed) : [];
-    const saved = await saveAsBuilt(link.businessId, link.jobId, input, installerBy(link.installer.name, read.body.person), differences);
+    const saved = await saveAsBuilt(
+      link.businessId,
+      link.jobId,
+      input,
+      installerBy(link.installer.name, read.body.person),
+      differences,
+      card.designed,
+    );
     return saved ? Response.json({ ok: true, asBuilt: saved }) : gone();
   });
 }
