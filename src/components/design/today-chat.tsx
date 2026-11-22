@@ -12,6 +12,7 @@ import {
   Lightbulb,
   Phone,
   PhoneCall,
+  Rows3,
   Sparkles,
   Stamp,
   TrendingUp,
@@ -369,18 +370,21 @@ function InsightRow({ insight }: { insight: Insight }) {
 
 /** Business (or My month) | Feed, at the top of Today. */
 export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
+  // Two buttons that each look like one (22 Nov 2026, Martin: "make the Feed pill a little different in shape. I don't
+  // notice it's there sometimes"): squarer, each with its icon, and the one not on show in a well of its own rather
+  // than plain words on the pill.
   return (
     <div
       role="tablist"
       aria-label="Today"
-      className="inline-flex rounded-full bg-surface p-1 shadow-[0_2px_10px_rgb(20_22_26_/_0.06)] ring-1 ring-line"
+      className="inline-flex gap-1 rounded-2xl bg-surface p-1 shadow-[0_2px_10px_rgb(20_22_26_/_0.06)] ring-1 ring-line"
     >
       {(
         [
-          ["chat", first],
-          ["feed", "Feed"],
+          ["chat", first, TrendingUp],
+          ["feed", "Feed", Rows3],
         ] as const
-      ).map(([v, label]) => (
+      ).map(([v, label, Icon]) => (
         <button
           key={v}
           type="button"
@@ -388,10 +392,11 @@ export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: 
           aria-selected={view === v}
           onClick={() => onView(v)}
           className={clsx(
-            "h-8 rounded-full px-4 text-[13px] font-medium transition",
-            view === v ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+            "inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-medium transition",
+            view === v ? "bg-primary text-primary-ink shadow-sm" : "bg-canvas text-ink ring-1 ring-inset ring-line hover:ring-ink/30",
           )}
         >
+          <Icon className={clsx("size-4", view === v ? "text-sun-line" : "text-muted")} aria-hidden />
           {label}
         </button>
       ))}
