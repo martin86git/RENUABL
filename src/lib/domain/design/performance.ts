@@ -118,7 +118,9 @@ export function perfPeriod(range: PerfRange, today: ISODate, custom?: { from: IS
   }
 }
 
-type PerfJob = Pick<Job, "stage" | "value" | "kw" | "wonAt" | "installedAt" | "createdAt" | "title" | "details"> & { sample?: boolean };
+export type PerfJob = Pick<Job, "stage" | "value" | "kw" | "wonAt" | "installedAt" | "createdAt" | "title" | "details"> & {
+  sample?: boolean;
+};
 
 export interface PerfFigure {
   metric: PerfMetric;
@@ -136,7 +138,7 @@ export interface PerfFigure {
  * Turning a time into the market's day goes through Intl, slow enough that doing it for every deal in every bar of the
  * period made Performance wait seconds on a phone with a few thousand deals (22 Nov 2026, Martin).
  */
-interface DayedJob {
+export interface PerfRow {
   won: ISODate | null;
   created: ISODate | null;
   installed: ISODate | null;
@@ -147,9 +149,59 @@ interface DayedJob {
   battery: boolean;
 }
 
-const dayedCache = new WeakMap<readonly PerfJob[], DayedJob[]>();
+/**
+ * What Performance counts from: the deals themselves, or rows already worked out (the small download Today asks for as
+ * it opens, so Performance needn't wait for the whole deals list: 22 Nov 2026, Martin, it took a second to open).
+ */
+export type PerfSource = readonly PerfJob[] | { rows: readonly PerfRow[] };
 
-function dayed(jobs: readonly PerfJob[]): DayedJob[] {
+function rowsOf(source: PerfSource): readonly PerfRow[] {
+  return "rows" in source ? source.rows : perfRows(source);
+}
+
+/** A row as it travels: [won, created, installed] ("" for none), flags (1 sold, 2 installed, 4 battery), value, kW. */
+export type PackedPerfRow = [string, string, string, number, number, number];
+
+export function packPerfRows(rows: readonly PerfRow[]): PackedPerfRow[] {
+  return rows.map((r) => [
+    r.won ?? "",
+    r.created ?? "",
+    r.installed ?? "",
+    (r.sold ? 1 : 0) | (r.isInstalled ? 2 : 0) | (r.battery ? 4 : 0),
+    Math.round(r.value * 100) / 100,
+    Math.round(r.kw * 1000) / 1000,
+  ]);
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const dayOrNull = (x: unknown): ISODate | null => (typeof x === "string" && DAY_RE.test(x) ? x : null);
+const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+
+/** Rows read back from the download; anything not shaped as a row is left out, and anything not a list is null. */
+export function unpackPerfRows(raw: unknown): PerfRow[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: PerfRow[] = [];
+  for (const r of raw) {
+    if (!Array.isArray(r) || r.length < 6) continue;
+    const flags = num(r[3]);
+    out.push({
+      won: dayOrNull(r[0]),
+      created: dayOrNull(r[1]),
+      installed: dayOrNull(r[2]),
+      sold: (flags & 1) !== 0,
+      isInstalled: (flags & 2) !== 0,
+      battery: (flags & 4) !== 0,
+      value: num(r[4]),
+      kw: num(r[5]),
+    });
+  }
+  return out;
+}
+
+const dayedCache = new WeakMap<readonly PerfJob[], PerfRow[]>();
+
+/** Every deal but the samples as the rows Performance counts. */
+export function perfRows(jobs: readonly PerfJob[]): PerfRow[] {
   const kept = dayedCache.get(jobs);
   if (kept) return kept;
   const days = new Map<string, ISODate>();
@@ -181,7 +233,7 @@ function dayed(jobs: readonly PerfJob[]): DayedJob[] {
   return out;
 }
 
-function figuresIn(jobs: readonly DayedJob[], from: ISODate, to: ISODate): Record<PerfMetric, number | null> {
+function figuresIn(jobs: readonly PerfRow[], from: ISODate, to: ISODate): Record<PerfMetric, number | null> {
   const inside = (d: ISODate | null) => d !== null && d >= from && d <= to;
   let sold = 0;
   let sales = 0;
@@ -212,8 +264,8 @@ function figuresIn(jobs: readonly DayedJob[], from: ISODate, to: ISODate): Recor
 }
 
 /** Each metric asked for, in the order asked, for the period and the one before it. Sample deals are left out. */
-export function performance(jobs: readonly PerfJob[], period: PerfPeriod, metrics: readonly PerfMetric[]): PerfFigure[] {
-  const real = dayed(jobs);
+export function performance(jobs: PerfSource, period: PerfPeriod, metrics: readonly PerfMetric[]): PerfFigure[] {
+  const real = rowsOf(jobs);
   const now = figuresIn(real, period.from, period.to);
   const before = figuresIn(real, period.prevFrom, period.prevTo);
   return metrics.map((metric) => {
@@ -258,8 +310,8 @@ export interface PerfBucket {
  * The period cut into stretches for the small bars under each figure: days up to a month, weeks up to about four
  * months, else calendar months (the first and last cut to the period).
  */
-export function perfSeries(jobs: readonly PerfJob[], period: { from: ISODate; to: ISODate }): PerfBucket[] {
-  const real = dayed(jobs);
+export function perfSeries(jobs: PerfSource, period: { from: ISODate; to: ISODate }): PerfBucket[] {
+  const real = rowsOf(jobs);
   const days = Math.round((at(period.to) - at(period.from)) / DAY) + 1;
   const spans: [ISODate, ISODate][] = [];
   if (days <= 31) {

@@ -19,6 +19,7 @@ import {
 } from "@/lib/domain/design/performance";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, type JobLine } from "@/lib/services/crm";
+import { usePerfRows } from "@/lib/services/performance";
 
 /** Kept on the device: the range, a custom range's days and the figures chosen. */
 const PERF_KEY = "renuabl.design.perf";
@@ -43,35 +44,27 @@ function kept(): { range: PerfRange; custom: { from: ISODate; to: ISODate } | nu
  * and small bars across the period. `extra` (the month's goal and the sun, your own month) is drawn under it.
  */
 export function PerformancePanel({ jobs, today, extra }: { jobs: JobLine[] | null; today: ISODate; extra?: React.ReactNode }) {
-  const [range, setRange] = useState<PerfRange>("month");
-  const [custom, setCustom] = useState<{ from: ISODate; to: ISODate } | null>(null);
-  const [metrics, setMetrics] = useState<PerfMetric[]>(() => cleanMetrics(null));
+  // Only ever drawn after a tab is pressed (never on the server), so the saved choices are read at once: reading them
+  // a moment later drew the panel twice and worked every figure out twice (22 Nov 2026, Martin: it was slow to open).
+  const [first] = useState(kept);
+  const [range, setRange] = useState<PerfRange>(first.range);
+  const [custom, setCustom] = useState<{ from: ISODate; to: ISODate } | null>(first.custom);
+  const [metrics, setMetrics] = useState<PerfMetric[]>(first.metrics);
   const [open, setOpen] = useState<"range" | "figures" | null>(null);
-  const [ready, setReady] = useState(false);
-
-  // Read after the page is up, so the server's page and the browser's agree.
   useEffect(() => {
-    const k = kept();
-    const t = window.setTimeout(() => {
-      setRange(k.range);
-      setCustom(k.custom);
-      setMetrics(k.metrics);
-      setReady(true);
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (!ready) return;
     try {
       localStorage.setItem(PERF_KEY, JSON.stringify({ range, custom, metrics }));
     } catch {
       // Not kept: the defaults next time.
     }
-  }, [ready, range, custom, metrics]);
+  }, [range, custom, metrics]);
 
   const period = useMemo(() => perfPeriod(range, today, custom), [range, today, custom]);
-  const figures = useMemo(() => (jobs ? performance(jobs, period, metrics) : null), [jobs, period, metrics]);
-  const series = useMemo(() => (jobs ? perfSeries(jobs, period) : []), [jobs, period]);
+  // The small rows Today asked for as it opened, else the deals list once it is here.
+  const rows = usePerfRows();
+  const source = useMemo(() => (rows ? { rows } : jobs), [rows, jobs]);
+  const figures = useMemo(() => (source ? performance(source, period, metrics) : null), [source, period, metrics]);
+  const series = useMemo(() => (source ? perfSeries(source, period) : []), [source, period]);
   const year = today.slice(0, 4);
   const toggle = (m: PerfMetric) =>
     setMetrics((all) =>

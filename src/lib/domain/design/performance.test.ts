@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { cleanMetrics, cleanRange, DEFAULT_METRICS, perfPeriod, performance, periodWords } from "./performance";
+import {
+  cleanMetrics,
+  cleanRange,
+  DEFAULT_METRICS,
+  packPerfRows,
+  perfPeriod,
+  perfRows,
+  perfSeries,
+  performance,
+  periodWords,
+  unpackPerfRows,
+  type PerfJob,
+} from "./performance";
 
-const job = (o: Partial<Parameters<typeof performance>[0][number]>) => ({
+const job = (o: Partial<PerfJob>): PerfJob => ({
   stage: "lead" as const,
   value: null,
   kw: null,
@@ -121,5 +133,33 @@ describe("perfSeries", () => {
     const months = perfSeries(jobs, { from: "2026-07-01", to: "2026-11-21" });
     expect(months.map((b) => b.from)).toEqual(["2026-07-01", "2026-08-01", "2026-09-01", "2026-10-01", "2026-11-01"]);
     expect(months[4]).toMatchObject({ to: "2026-11-21", values: { sales: 25000, sold: 2 } });
+  });
+});
+
+describe("the small rows Today asks for", () => {
+  const jobs: PerfJob[] = [
+    job({ stage: "won", value: 18_400.5, kw: 6.6, wonAt: "2026-11-03T02:00:00Z", title: "Solar and battery" }),
+    job({ stage: "installed", value: 9_000, kw: 5.2, wonAt: "2026-10-30T23:30:00Z", installedAt: "2026-11-10T03:00:00Z" }),
+    job({ stage: "lead", createdAt: "2026-11-15T13:30:00Z" }),
+    { ...job({ stage: "won", value: 50_000, wonAt: "2026-11-04T01:00:00Z" }), sample: true },
+  ];
+  const period = perfPeriod("month", "2026-11-21");
+  const all = ["sales", "sold", "average", "kw", "batteries", "leads", "conversion", "installs"] as const;
+
+  it("travel and come back unchanged, samples left out", () => {
+    const rows = perfRows(jobs);
+    expect(rows).toHaveLength(3);
+    expect(unpackPerfRows(JSON.parse(JSON.stringify(packPerfRows(rows))))).toEqual(rows);
+  });
+  it("give the same figures and bars as the deals themselves", () => {
+    const rows = { rows: unpackPerfRows(packPerfRows(perfRows(jobs)))! };
+    expect(performance(rows, period, all)).toEqual(performance(jobs, period, all));
+    expect(perfSeries(rows, period)).toEqual(perfSeries(jobs, period));
+  });
+  it("take nothing that isn't a row", () => {
+    expect(unpackPerfRows("nope")).toBeNull();
+    expect(unpackPerfRows([["2026-11-01", "bad-day", "", 1, "x", 2], "junk"])).toEqual([
+      { won: "2026-11-01", created: null, installed: null, sold: true, isInstalled: false, battery: false, value: 0, kw: 2 },
+    ]);
   });
 });

@@ -24,6 +24,15 @@ let renderer: Renderer | null | undefined;
 const viewers = new Set<Viewer>();
 let frame = 0;
 let last = 0;
+/** One plain copy of each frame, so the WebGL canvas is read back once a frame however many Sols are on screen. */
+let copy: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
+/**
+ * Until when the sun holds still (22 Nov 2026, Martin: Performance took a second to open on a phone). Each frame
+ * copied to every Sol on screen took about half the main thread's time on a slow phone, so for a moment after a tap or
+ * a key the sun keeps its last frame and the page has the time to answer.
+ */
+let quietUntil = 0;
+const QUIET_MS = 900;
 const begun = typeof performance === "undefined" ? 0 : performance.now();
 
 function still(): boolean {
@@ -95,26 +104,54 @@ function paint(v: Viewer, from: HTMLCanvasElement) {
   v.ctx.restore();
 }
 
+function framed(r: Renderer): HTMLCanvasElement {
+  if (!copy) {
+    const canvas = document.createElement("canvas");
+    canvas.width = SHARED_PX;
+    canvas.height = SHARED_PX;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return r.canvas;
+    copy = { canvas, ctx };
+  }
+  copy.ctx.clearRect(0, 0, SHARED_PX, SHARED_PX);
+  copy.ctx.drawImage(r.canvas, 0, 0);
+  return copy.canvas;
+}
+
 function drawAll(now: number) {
   const r = sharedRenderer();
   if (!r) return;
   r.draw(still() ? 12 : (now - begun) / 1000 + 12);
-  for (const v of viewers) if (v.visible || still()) paint(v, r.canvas);
+  const shown = [...viewers].filter((v) => v.visible || still());
+  if (!shown.length) return;
+  const from = shown.length > 1 ? framed(r) : r.canvas;
+  for (const v of shown) paint(v, from);
+}
+
+function hush() {
+  quietUntil = performance.now() + QUIET_MS;
 }
 
 function loop(now: number) {
   frame = 0;
   if (viewers.size === 0) return;
   const anyVisible = [...viewers].some((v) => v.visible);
-  if (anyVisible && !document.hidden && now - last >= FRAME_MS) {
+  if (anyVisible && !document.hidden && now >= quietUntil && now - last >= FRAME_MS) {
     last = now;
     drawAll(now);
   }
   frame = requestAnimationFrame(loop);
 }
 
+let listening = false;
+
 function join(v: Viewer): () => void {
   viewers.add(v);
+  if (!listening && typeof window !== "undefined") {
+    listening = true;
+    window.addEventListener("pointerdown", hush, { capture: true, passive: true });
+    window.addEventListener("keydown", hush, { capture: true, passive: true });
+  }
   if (still()) drawAll(performance.now());
   else if (!frame) frame = requestAnimationFrame(loop);
   return () => {
