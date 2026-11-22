@@ -6774,6 +6774,10 @@ export function RoofDesigner(props: {
   // replies should form in the bottom half like on mobile").
   const sideDeck = ((solHolds && sideways && picks.length === 0) || deskFoot) && !solTray && (guideShown || nudgeShown);
   const sideDeckUp = sideDeck && sideDeckH > 0;
+  // How far the tray's top row has risen while Sol's card fills the tray: the foot row, Sol, and the tray's own ends
+  // (zoom and the tips' bulb on the left, Roof, Sides and the picture's switch on the right) rise together.
+  const trayRise = deskFoot && sideDeckUp ? Math.max(0, sideDeckH - DESK_SOL_MIDDLE) : 0;
+  const trayRow: React.CSSProperties | undefined = trayRise ? { transform: `translateY(${-trayRise}px)` } : undefined;
   // On a phone, the whole array(s) of what is picked, when that is more than is picked: Sol's controller offers them all
   // (22 Nov 2026, Martin: "when I select a single panel… select the whole array").
   const wholeArray = (() => {
@@ -9238,11 +9242,17 @@ export function RoofDesigner(props: {
                 </div>
               )}
               <div
-                data-lift
+                {...(deskFoot ? {} : { "data-lift": true })}
+                style={deskFoot ? trayRow : undefined}
                 className={clsx(
-                  "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
+                  "pointer-events-auto absolute right-4 flex gap-2",
+                  // On a computer's pop-up they stand in the graphite tray's right end, level with the foot row (22 Nov 2026,
+                  // Martin: the dock should take in the other tools, not leave them floating over the roof).
+                  deskFoot
+                    ? "bottom-[14px] z-[56] flex-row-reverse items-center transition-transform duration-300 motion-reduce:transition-none"
+                    : "z-20 flex-col items-end",
                   // On a phone it stands over Ask Sol, not beside it.
-                  props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
+                  deskFoot ? "" : props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
                   // Sideways the dial for what is picked takes the foot; on a phone upright these are in the toolbar under the picture.
                   solHolds && "hidden",
                 )}
@@ -11253,7 +11263,13 @@ export function RoofDesigner(props: {
                   </ToolFan>
                 </div>
               )}
-              {!(solHolds && picks.length > 0) && tips.corner}
+              {!(solHolds && picks.length > 0) &&
+                (deskFoot
+                  ? tips.cornerAt({
+                      className: "bottom-[18px] left-[10.75rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
+                      style: trayRow,
+                    })
+                  : tips.corner)}
               {phone && stage && turnHint && !zooming && (
                 <div
                   className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
@@ -11578,7 +11594,26 @@ export function RoofDesigner(props: {
                   </div>
                 </div>
               )}
-              <div data-lift className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
+              {/* In a computer's pop-up the tray's left end: zoom out, zoom in and the whole picture as rounds of the tray. */}
+              {deskFoot && (
+                <div
+                  className="pointer-events-auto absolute bottom-[14px] left-4 z-[56] flex items-center gap-2 transition-transform duration-300 motion-reduce:transition-none"
+                  style={trayRow}
+                  role="group"
+                  aria-label="Getting about"
+                >
+                  <FootRound label="Zoom out" on={false} onClick={() => zoom(1.4)}>
+                    <ZoomOut className="size-5" aria-hidden />
+                  </FootRound>
+                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / 1.4)}>
+                    <ZoomIn className="size-5" aria-hidden />
+                  </FootRound>
+                  <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
+                    <Maximize className="size-5" aria-hidden />
+                  </FootRound>
+                </div>
+              )}
+              <div data-lift className={clsx("absolute bottom-8 left-4 z-10", (solHolds || deskFoot) && "hidden")}>
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"
