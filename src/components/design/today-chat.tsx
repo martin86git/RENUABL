@@ -30,8 +30,7 @@ import { GoalLine, SunArc } from "./gauges";
 import { loadFeed } from "@/lib/services/deal-feed";
 import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
-import { SolStars } from "./sol-icon";
-import { SolMark } from "./sol-sun";
+import { SolEtch } from "./sol-icon";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
 import { loadPerfRows } from "@/lib/services/performance";
@@ -72,10 +71,10 @@ function TodayDate({ today }: { today: ISODate }) {
     };
   }, []);
   return (
-    <h1 className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-3 text-center text-[22px] sm:text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+    <h1 className="mt-4 flex flex-col items-center justify-center gap-2 text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
       <span>{todayHeading(today)}</span>
       {weather && (weather.sky || weather.degrees !== null) && (
-        <span className="inline-flex translate-y-0.5 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[14px] tracking-normal text-white">
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[13px] tracking-normal text-white">
           {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
           {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
         </span>
@@ -143,11 +142,10 @@ export function TodayChat(props: {
     >
       {/* 22 Nov 2026, Martin: no Sol round in the middle on a phone (he is in the foot bar), and the day with its weather
           in place of "How's the business going". */}
-      <span className="relative hidden sm:inline-flex">
-        <span className="sol-orb sol-breathe inline-flex size-14 items-center justify-center rounded-full">
-          <SolMark className="size-11" />
-        </span>
-        <SolStars className="absolute -right-3 -top-2 size-5" />
+      {/* 22 Nov 2026, Martin: here Sol is only the etched brain in the text colour (`SolEtch`), no colour or glow, and
+          sits a little higher, clear of the date. */}
+      <span className="relative -mt-6 mb-5 hidden text-ink/70 sm:inline-flex">
+        <SolEtch className="size-14" />
       </span>
       <TodayDate today={props.today} />
 

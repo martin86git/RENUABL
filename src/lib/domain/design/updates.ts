@@ -46,6 +46,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Designer",
+    words: "On a phone, the strings sit under the map, one line each, so the roof stays clear to tap; Auto and New in their header.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
     words: "On a phone: slimmer figures, more room for Sol in an outlined box, the eraser beside the hand, and a larger designs round.",
   },
   {
