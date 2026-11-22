@@ -28,7 +28,7 @@ import {
   solarVicBar,
   solarVicFor,
   solarVicNote,
-  stcValue,
+  stcSplit,
   type CostLine,
   type LineEdit,
   type QuoteFields,
@@ -174,7 +174,8 @@ export function DesignQuote(props: {
     });
   const empty = spec.panels === 0;
   const costing = costSystem(spec, form, workspace);
-  const stc = stcValue(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
+  const stcs = stcSplit(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
+  const stc = stcs.total;
 
   const all = costing.lines;
   // Every hand change: lines typed over or taken out, lines of the business's own, the margin typed over.
@@ -813,15 +814,27 @@ export function DesignQuote(props: {
           </button>
         </p>
       )}
-      {[
-        ["Price inc. GST", money(totals.priceIncGst)],
-        [`After STCs (${money(stc)})`, money(totals.priceIncGst - stc)],
-      ].map(([k, v]) => (
-        <div key={k} className="flex justify-between font-semibold">
-          <dt>{k}</dt>
-          <dd className="tabular-nums">{v}</dd>
+      <div className="flex justify-between font-semibold">
+        <dt>Price inc. GST</dt>
+        <dd className="tabular-nums">{money(totals.priceIncGst)}</dd>
+      </div>
+      {/* The STCs split into the panels' and the battery's (22 Nov 2026, Martin: "StC breakdown needs to show (StC / BSTC)"). */}
+      {stcs.solar.certificates > 0 && (
+        <div className="flex justify-between text-positive">
+          <dt>STC Solar Incentive ({stcs.solar.certificates} STCs)</dt>
+          <dd className="tabular-nums">-{money(stcs.solar.value)}</dd>
         </div>
-      ))}
+      )}
+      {stcs.battery.certificates > 0 && (
+        <div className="flex justify-between text-positive">
+          <dt>BSTC Battery Incentive ({stcs.battery.certificates} STCs)</dt>
+          <dd className="tabular-nums">-{money(stcs.battery.value)}</dd>
+        </div>
+      )}
+      <div className="flex justify-between font-semibold">
+        <dt>After STCs ({money(stc)})</dt>
+        <dd className="tabular-nums">{money(totals.priceIncGst - stc)}</dd>
+      </div>
     </dl>
   );
   const priceCheckBox = advice.length > 0 && <PriceCheck advice={advice} typed={Object.keys(typedFlags).length} />;
