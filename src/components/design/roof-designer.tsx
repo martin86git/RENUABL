@@ -1752,7 +1752,16 @@ export function RoofDesigner(props: {
   const [foldPx, setFoldPx] = useState<number | null>(null);
   // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
   // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
-  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number; across: number; bleed: number } | null>(null);
+  const [stage, setStage] = useState<{
+    top: number;
+    pt: number;
+    pb: number;
+    photoH: number;
+    across: number;
+    bleed: number;
+    /** From the picture's foot to the foot of the screen: Sol's box fills it (22 Nov 2026, Martin). */
+    rest: number;
+  } | null>(null);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1783,10 +1792,17 @@ export function RoofDesigner(props: {
         );
         const pb = PHONE_BANDS.below;
         const stripH = Math.round(box.height);
+        const rest = Math.max(pb, Math.round(window.innerHeight - box.top - box.height - PHONE_BANDS.above - photoH));
         setStage((was) =>
-          was && was.photoH === photoH && was.pb === pb && was.top === stripH && was.across === across && was.bleed === bleed
+          was &&
+          was.photoH === photoH &&
+          was.pb === pb &&
+          was.top === stripH &&
+          was.across === across &&
+          was.bleed === bleed &&
+          was.rest === rest
             ? was
-            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across, bleed },
+            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across, bleed, rest },
         );
       } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
@@ -7118,31 +7134,49 @@ export function RoofDesigner(props: {
               {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
               {phone ? (
-                // On a phone, three figures across, each with its unit under it; clear of the window's close round on the right.
-                // One slim line (22 Nov 2026, Martin: the two bars took room the map and Sol needed).
+                // On a phone, three figures across, each named over it with its detail under it; clear of the window's close
+                // round on the right. Roomier (22 Nov 2026, Martin: "they do not need to be so skinny").
                 <div
                   className={clsx(
-                    "flex items-baseline gap-x-3 whitespace-nowrap py-1 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
+                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-2 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
                     growing ? "bg-sun-line" : "",
                   )}
-                  style={{ paddingTop: "max(0.25rem, env(safe-area-inset-top))" }}
+                  style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
                 >
-                  <p className="min-w-0 truncate" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
-                    <span className={clsx("text-[15px] font-semibold", growing ? "text-white" : "text-sun-bright")}>
-                      {liveKw.toFixed(2)}
-                    </span>
-                    <span className="ml-0.5 text-[10.5px] text-white/60">
-                      kW · {livePanels}×{panelOf(design).watts}W
-                    </span>
-                  </p>
-                  <p className={clsx("shrink-0", oversize?.over && "text-sun-bright")}>
-                    <span className="text-[15px] font-semibold text-white">{summary.kwhPerDay}</span>
-                    <span className="ml-0.5 text-[10.5px] text-white/60">kWh/day</span>
-                  </p>
-                  <p className="shrink-0" title={battery ? `${battery.qty} modules` : "No battery"}>
-                    <span className="text-[15px] font-semibold text-white">{battery ? batteryKwh : "–"}</span>
-                    <span className="ml-0.5 text-[10.5px] text-white/60">{battery ? "kWh batt" : "no batt"}</span>
-                  </p>
+                  <div className="min-w-0" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
+                    <p className={clsx("text-[9px] font-medium uppercase tracking-[0.16em]", growing ? "text-white" : "text-sun-bright")}>
+                      Solar
+                    </p>
+                    <p className="whitespace-nowrap">
+                      <span className={clsx("text-[20px] font-semibold tracking-[-0.02em]", growing ? "text-white" : "text-sun-bright")}>
+                        {liveKw.toFixed(2)}
+                      </span>
+                      <span className="ml-0.5 text-[11px] text-white/60">kW</span>
+                    </p>
+                    <p className="truncate text-[10.5px] text-white/60">
+                      {livePanels} × {panelOf(design).watts} W
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">Daily yield</p>
+                    <p className="whitespace-nowrap">
+                      <span className="text-[20px] font-semibold tracking-[-0.02em] text-white">{summary.kwhPerDay}</span>
+                      <span className="ml-0.5 text-[11px] text-white/60">kWh</span>
+                    </p>
+                    <p className={clsx("truncate text-[10.5px]", oversize?.over ? "font-medium text-sun-bright" : "text-white/60")}>
+                      {fitted.length ? `${fittedKw} kW${oversize ? ` · ${oversize.percent}%` : " inverter"}` : "no inverter"}
+                    </p>
+                  </div>
+                  <div className="min-w-0" title={battery ? `${battery.qty} modules` : "No battery"}>
+                    <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">Battery</p>
+                    <p className="whitespace-nowrap">
+                      <span className="text-[20px] font-semibold tracking-[-0.02em] text-white">{battery ? batteryKwh : "–"}</span>
+                      {battery && <span className="ml-0.5 text-[11px] text-white/60">kWh</span>}
+                    </p>
+                    <p className="truncate text-[10.5px] text-white/60">
+                      {battery ? `${battery.qty} ${battery.qty === 1 ? "module" : "modules"}` : "none"}
+                    </p>
+                  </div>
                 </div>
               ) : props.tight ? (
                 <div
@@ -7261,7 +7295,7 @@ export function RoofDesigner(props: {
                     // Clipped, so a figure that runs long never paints under the shade widget beside it.
                     "min-w-0 flex-1 cursor-pointer overflow-hidden",
                     (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
-                    phone ? "flex items-center py-1 pl-4 pr-[4.5rem]" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    phone ? "flex items-center px-4 py-2" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -7279,30 +7313,30 @@ export function RoofDesigner(props: {
                   {finance && phone ? (
                     // On a phone, the bill, the saving and the payback as three figures across, each named over it.
                     <dl
-                      className="flex w-full items-baseline gap-x-3 whitespace-nowrap tabular-nums"
+                      className="grid w-full grid-cols-[1.25fr_1fr_1fr] gap-x-3 tabular-nums leading-tight"
                       title="What it does for this home: open the bill"
                     >
                       {(
                         [
-                          // On a narrow phone the bill after alone, so the line fits beside the window's close round.
                           [
-                            "Bill",
                             <>
-                              <span className="max-[409px]:hidden">{dollars(finance.billNow)}→</span>
+                              Bill <span className="max-[409px]:hidden">now → </span>after
+                            </>,
+                            <>
+                              <span className="max-[409px]:hidden">{dollars(finance.billNow)} → </span>
                               {dollars(finance.billAfter)}
                             </>,
                             false,
                           ],
-                          ["Saves", `${dollars(finance.saving)}/yr`, true],
+                          ["Saves a year", dollars(finance.saving), true],
                           ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
                         ] as const
-                      ).map(([name, value, gold]) => (
-                        <div key={name} className={clsx("flex items-baseline gap-1", name === "Bill" ? "min-w-0" : "shrink-0")}>
-                          <dt className="text-[8px] font-medium uppercase tracking-[0.08em] text-muted">
-                            {name}
-                            {name === "Bill" && <span className="min-[410px]:hidden"> after</span>}
-                          </dt>
-                          <dd className={clsx("truncate text-[12px] font-semibold leading-tight", gold && "text-positive")}>{value}</dd>
+                      ).map(([name, value, gold], i) => (
+                        <div key={i} className="min-w-0">
+                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.12em] text-muted">{name}</dt>
+                          <dd className={clsx("truncate text-[16px] font-semibold tracking-[-0.01em]", gold && "text-positive")}>
+                            {value}
+                          </dd>
                         </div>
                       ))}
                     </dl>
@@ -11133,7 +11167,16 @@ export function RoofDesigner(props: {
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
                   style={
-                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                    sideDeck
+                      ? solNotch(0, 40)
+                      : underUp && foot !== null
+                        ? ({
+                            top: foot,
+                            bottom: "auto",
+                            ...solNotch(0, 30),
+                            "--sol-rest": `${(stage?.rest ?? 156) - 8}px`,
+                          } as React.CSSProperties)
+                        : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
                 >
@@ -11212,7 +11255,16 @@ export function RoofDesigner(props: {
                       : !phone && "bottom-[6.25rem]",
                   )}
                   style={
-                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                    sideDeck
+                      ? solNotch(0, 40)
+                      : underUp && foot !== null
+                        ? ({
+                            top: foot,
+                            bottom: "auto",
+                            ...solNotch(0, 30),
+                            "--sol-rest": `${(stage?.rest ?? 156) - 8}px`,
+                          } as React.CSSProperties)
+                        : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
                 >
