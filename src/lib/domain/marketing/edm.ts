@@ -5,7 +5,7 @@
  * text of one email for one contact.
  */
 
-export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider"] as const;
+export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider", "spacer", "social"] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
 export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
@@ -15,6 +15,8 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   tiles: "Picture tiles",
   button: "Button",
   divider: "Divider",
+  spacer: "Spacer",
+  social: "Social links",
 };
 
 export type EdmAlign = "left" | "center";
@@ -24,6 +26,34 @@ export interface EdmTile {
   imageId: string | null;
   /** The line under the picture, also what it shows for a screen reader. */
   text: string;
+  url: string | null;
+}
+
+/**
+ * A spacer's height (22 Nov 2026, Martin: "add spacer and social blocks to the email builder"): room between blocks
+ * with nothing in it.
+ */
+export const SPACER_SIZES = { small: 16, medium: 32, large: 56 } as const;
+export type SpacerSize = keyof typeof SPACER_SIZES;
+export const SPACER_WORDS: Record<SpacerSize, string> = { small: "Small", medium: "Medium", large: "Large" };
+
+/** The places a social links block can point to, in the order they are offered. */
+export const SOCIAL_NETWORKS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "website"] as const;
+export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number];
+export const SOCIAL_WORDS: Record<SocialNetwork, string> = {
+  facebook: "Facebook",
+  instagram: "Instagram",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  x: "X",
+  website: "Website",
+};
+
+/** One link in a social links block. */
+export interface EdmSocial {
+  network: SocialNetwork;
+  /** https only; null while it isn't a link yet. */
   url: string | null;
 }
 
@@ -45,6 +75,10 @@ export interface EdmBlock {
   tiles?: EdmTile[];
   /** How many of its tiles sit across a row. */
   columns?: TileColumns;
+  /** A spacer's height. */
+  space?: SpacerSize;
+  /** A social links block's links, one a network. */
+  socials?: EdmSocial[];
 }
 
 export interface EdmContent {
@@ -154,6 +188,45 @@ export function cleanTiles(raw: unknown): EdmTile[] {
   });
 }
 
+/** The network a link belongs to, from its address; anything else is a website. */
+export function networkOf(url: string): SocialNetwork {
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "website";
+  }
+  const on = (d: string) => host === d || host.endsWith(`.${d}`);
+  if (on("facebook.com") || on("fb.com")) return "facebook";
+  if (on("instagram.com")) return "instagram";
+  if (on("linkedin.com")) return "linkedin";
+  if (on("youtube.com") || on("youtu.be")) return "youtube";
+  if (on("tiktok.com")) return "tiktok";
+  if (on("x.com") || on("twitter.com")) return "x";
+  return "website";
+}
+
+export const cleanSpace = (raw: unknown): SpacerSize => (raw === "small" || raw === "large" ? raw : "medium");
+
+/** A social block's links: known networks only, one each, in the order given. */
+export function cleanSocials(raw: unknown): EdmSocial[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<SocialNetwork>();
+  const out: EdmSocial[] = [];
+  for (const s of raw) {
+    const r = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
+    const network = (SOCIAL_NETWORKS as readonly string[]).includes(r.network as string) ? (r.network as SocialNetwork) : null;
+    if (!network || seen.has(network)) continue;
+    seen.add(network);
+    const url = cleanLink(r.url);
+    out.push({ network, url: url && !url.startsWith("mailto:") ? url : null });
+  }
+  return out;
+}
+
+/** A social block's links that go somewhere: the ones an email shows. */
+export const filledSocials = (b: EdmBlock): EdmSocial[] => (b.kind === "social" ? (b.socials ?? []).filter((s) => s.url) : []);
+
 export const cleanColumns = (raw: unknown): TileColumns => (raw === 1 || raw === 3 ? raw : 2);
 
 /** A tiles block's tiles that have a picture: the ones an email shows. */
@@ -169,11 +242,18 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
   return {
     id: blockId(r.id, i),
     kind,
-    text: kind === "text" ? words(r.text, max) : kind === "divider" || kind === "tiles" ? "" : line(r.text, max),
+    text:
+      kind === "text"
+        ? words(r.text, max)
+        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social"
+          ? ""
+          : line(r.text, max),
     url: kind === "button" || kind === "image" ? cleanLink(r.url) : null,
     imageId: kind === "image" ? imageIdOf(r.imageId) : null,
     align: r.align === "center" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
+    ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
+    ...(kind === "social" ? { socials: cleanSocials(r.socials) } : {}),
   };
 }
 
@@ -268,9 +348,11 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
   return blocks.flatMap((b) =>
     b.kind === "tiles"
       ? filledTiles(b).flatMap((t) => (t.url ? [t.url] : []))
-      : (b.kind === "button" || b.kind === "image") && b.url
-        ? [b.url]
-        : [],
+      : b.kind === "social"
+        ? filledSocials(b).map((s) => s.url!)
+        : (b.kind === "button" || b.kind === "image") && b.url
+          ? [b.url]
+          : [],
   );
 }
 
@@ -291,6 +373,8 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     imageId: null,
     align: kind === "button" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
+    ...(kind === "spacer" ? { space: "medium" as const } : {}),
+    ...(kind === "social" ? { socials: [] } : {}),
   };
 }
 
@@ -465,6 +549,20 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
         `<tr><td style="padding:12px 32px"><div style="height:1px;background:#e4e4e7;line-height:1px;font-size:1px">&nbsp;</div></td></tr>`,
       );
       textParts.push("—");
+    } else if (b.kind === "spacer") {
+      const h = SPACER_SIZES[cleanSpace(b.space)];
+      rows.push(`<tr><td style="height:${h}px;line-height:${h}px;font-size:1px">&nbsp;</td></tr>`);
+    } else if (b.kind === "social") {
+      // Words, not icons: pictures are often blocked until a reader allows them, and words always show.
+      const socials = filledSocials(b);
+      if (!socials.length) continue;
+      const pills = socials.map((s) => {
+        const href = links.click(linkAt, linkList[linkAt]);
+        linkAt++;
+        textParts.push(`${SOCIAL_WORDS[s.network]}: ${s.url}`);
+        return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 4px 8px;padding:7px 14px;border:1px solid ${colour};border-radius:999px;color:${colour};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;text-decoration:none">${esc(SOCIAL_WORDS[s.network])}</a>`;
+      });
+      rows.push(`<tr><td style="padding:12px 28px 4px;text-align:${align}">${pills.join("")}</td></tr>`);
     }
   }
   const foot = footerLines(brand, sender);

@@ -12,10 +12,12 @@ import {
   Loader2,
   Minus,
   Monitor,
+  MoveVertical,
   MousePointerClick,
   Pencil,
   Plus,
   Redo2,
+  Share2,
   Smartphone,
   Trash2,
   Type,
@@ -30,7 +32,13 @@ import {
   EDM_LIMITS,
   EMPTY_TILE,
   MERGE_FIELDS,
+  SOCIAL_NETWORKS,
+  SOCIAL_WORDS,
+  SPACER_SIZES,
+  SPACER_WORDS,
   TILE_COLUMNS,
+  cleanSpace,
+  networkOf,
   cleanColumns,
   cleanLink,
   footerLines,
@@ -49,6 +57,9 @@ import {
   type EdmBrand,
   type EdmContent,
   type EdmSender,
+  type EdmSocial,
+  type SocialNetwork,
+  type SpacerSize,
   type EdmStyle,
   type EdmTile,
 } from "@/lib/domain/marketing/edm";
@@ -66,6 +77,8 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   tiles: LayoutGrid,
   button: MousePointerClick,
   divider: Minus,
+  spacer: MoveVertical,
+  social: Share2,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
@@ -73,7 +86,7 @@ const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
   { name: "Basics", kinds: ["heading", "text", "button", "image"] },
-  { name: "Layout", kinds: ["tiles", "divider"] },
+  { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
 ];
 
 /** When a change was made, for grouping typing into one undo step. */
@@ -215,7 +228,7 @@ export function EdmBuilder({
     const now = latest.current;
     // Typing (words, a label, a link, a caption) is one step per field while it carries on.
     const part = typeof patch === "function" ? "" : Object.keys(patch).join();
-    const typed = ["text", "url", "tiles"].includes(part);
+    const typed = ["text", "url", "tiles", "socials"].includes(part);
     change(
       {
         ...now,
@@ -860,7 +873,7 @@ function CanvasBlock({
           <GripVertical className="size-3.5" /> {EDM_BLOCK_WORDS[b.kind]}
         </span>
         {sol}
-        {b.kind !== "divider" && b.kind !== "image" && (
+        {b.kind !== "divider" && b.kind !== "image" && b.kind !== "spacer" && (
           <Toggle on={b.align === "center"} onClick={() => onChange({ align: b.align === "center" ? "left" : "center" })} label="Centre it">
             <AlignCenter className="size-3.5" />
           </Toggle>
@@ -957,6 +970,138 @@ function CanvasBlock({
           </div>
         ))}
       {b.kind === "divider" && <div className="my-2 h-px bg-[#e4e4e7]" />}
+      {b.kind === "spacer" && (
+        <div
+          className="grid place-items-center rounded-md bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(127,127,127,0.12)_6px_7px)] text-[11px]"
+          style={{ height: SPACER_SIZES[cleanSpace(b.space)], color: `color-mix(in srgb, ${ink.words} 55%, transparent)` }}
+        >
+          {picked ? null : `Space · ${SPACER_WORDS[cleanSpace(b.space)]}`}
+        </div>
+      )}
+      {b.kind === "spacer" && picked && (
+        <div
+          className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] ring-1 ring-line"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-muted">Height</span>
+          {(Object.keys(SPACER_SIZES) as SpacerSize[]).map((k) => (
+            <Toggle key={k} on={cleanSpace(b.space) === k} onClick={() => onChange({ space: k })} label={`${SPACER_WORDS[k]} space`}>
+              <span className="px-1 text-[12px]">{SPACER_WORDS[k]}</span>
+            </Toggle>
+          ))}
+        </div>
+      )}
+      {b.kind === "social" && <SocialPills socials={b.socials ?? []} colour={colour} align={align} />}
+      {b.kind === "social" && picked && <SocialFields block={b} onChange={onChange} />}
+    </div>
+  );
+}
+
+/** A social links block as it will look: a pill a network, in the button colour; until a link is in, a hint. */
+function SocialPills({ socials, colour, align }: { socials: EdmSocial[]; colour: string; align: "left" | "center" }) {
+  const shown = socials.filter((s) => s.url);
+  if (!shown.length)
+    return (
+      <div className="grid h-12 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <Share2 className="size-4" /> Press to add your social links
+        </span>
+      </div>
+    );
+  return (
+    <div className="flex flex-wrap gap-2 py-1" style={{ justifyContent: align === "center" ? "center" : "flex-start" }}>
+      {shown.map((s) => (
+        <span
+          key={s.network}
+          className="rounded-full border px-3.5 py-1.5 text-[13px] font-semibold"
+          style={{ borderColor: colour, color: colour }}
+        >
+          {SOCIAL_WORDS[s.network]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A social links block's settings: a row a network with its link, and the networks not yet in it to add. A link
+ * pasted into the first box finds its own network.
+ */
+function SocialFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const socials = b.socials ?? [];
+  const [paste, setPaste] = useState("");
+  const missing = SOCIAL_NETWORKS.filter((n) => !socials.some((s) => s.network === n));
+  // Typing a link is an object patch, so it is one undo step while it carries on (setBlock's typing key).
+  const set = (network: SocialNetwork, url: string | null) =>
+    onChange({ socials: socials.map((s) => (s.network === network ? { ...s, url } : s)) });
+  const add = (network: SocialNetwork, url: string | null = null) =>
+    onChange((now) =>
+      (now.socials ?? []).some((s) => s.network === network) ? {} : { socials: [...(now.socials ?? []), { network, url }] },
+    );
+  const remove = (network: SocialNetwork) => onChange((now) => ({ socials: (now.socials ?? []).filter((s) => s.network !== network) }));
+  const pasted = cleanLink(paste);
+  const pastedNetwork = pasted && !pasted.startsWith("mailto:") ? networkOf(pasted) : null;
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      {socials.map((s) => (
+        <div key={s.network} className="flex items-center gap-2">
+          <span className="w-20 shrink-0 text-[13px] font-medium text-ink">{SOCIAL_WORDS[s.network]}</span>
+          <div className="min-w-0 flex-1">
+            <LinkInput value={s.url} onChange={(url) => set(s.network, url)} placeholder={`Your ${SOCIAL_WORDS[s.network]} link`} />
+          </div>
+          <IconButton label={`Take ${SOCIAL_WORDS[s.network]} out`} onClick={() => remove(s.network)}>
+            <X className="size-3.5" />
+          </IconButton>
+        </div>
+      ))}
+      {missing.length > 0 && (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              value={paste}
+              onChange={(e) => setPaste(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && pastedNetwork && missing.includes(pastedNetwork)) {
+                  e.preventDefault();
+                  add(pastedNetwork, pasted);
+                  setPaste("");
+                }
+              }}
+              placeholder="Paste a link to add it"
+              className={field}
+            />
+            <button
+              type="button"
+              disabled={!pastedNetwork || !missing.includes(pastedNetwork)}
+              onClick={() => {
+                if (!pastedNetwork) return;
+                add(pastedNetwork, pasted);
+                setPaste("");
+              }}
+              className="h-10 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas disabled:bg-line disabled:text-muted"
+            >
+              {pastedNetwork ? `Add ${SOCIAL_WORDS[pastedNetwork]}` : "Add"}
+            </button>
+          </div>
+          {pastedNetwork && !missing.includes(pastedNetwork) && (
+            <p className="text-[12px] text-muted">{SOCIAL_WORDS[pastedNetwork]} is already in. Change its link above.</p>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] text-muted">Or add</span>
+            {missing.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => add(n)}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-line px-2.5 text-[12px] hover:border-ink/40"
+              >
+                <Plus className="size-3" /> {SOCIAL_WORDS[n]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <p className="text-[12px] text-muted">Shown as words, not icons, so they show even where pictures are blocked.</p>
     </div>
   );
 }

@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Spacer block for room between blocks, and Social links for your Facebook, Instagram and more.",
+  },
+  {
+    day: "2026-11-22",
     area: "Designer",
     words: "On a phone, the pointer is on the map beside Add a panel, and holding a 1° button keeps turning the panels.",
   },
