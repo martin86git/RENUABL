@@ -386,11 +386,14 @@ export const MAX_PROPOSAL_OPTIONS = 5;
 export function offeredDesigns(
   set: Pick<DesignSet, "designs" | "primary">,
 ): { goal: OptionKey; at: number; name: string; promise: string }[] {
-  if (set.designs.some((d, i) => d.offer && i !== set.primary)) {
+  // Chosen by hand: any design marked offered, the leading (primary) one too, which marks "this one alone" (22 Nov 2026,
+  // Martin: with five designs he might offer one, so taking the last option off mustn't bring the goal designs back).
+  if (set.designs.some((d) => d.offer)) {
     const picked = [set.primary, ...set.designs.flatMap((d, i) => (d.offer && i !== set.primary ? [i] : []))].slice(
       0,
       MAX_PROPOSAL_OPTIONS,
     );
+    if (picked.length < 2) return [];
     return picked.map((at, n) => {
       const goal = set.designs[at].goal;
       return {
