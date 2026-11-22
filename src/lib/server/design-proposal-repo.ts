@@ -51,7 +51,7 @@ import { cleanExtras, defaultBill, postcodeIn, type DesignExtras } from "@/lib/d
 import { cleanDesignSet, type DesignSet } from "@/lib/domain/design/roof-design";
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
-import { jobById, record, stageNamesIn, type Q } from "./design-crm-repo";
+import { jobById, joinNearbyDesign, record, stageNamesIn, type Q } from "./design-crm-repo";
 import { connectOf, paymentsOn } from "./design-connect-repo";
 import {
   nextDue,
@@ -179,8 +179,12 @@ export const NO_DESIGN = "This deal has no roof design yet. Open it in the desig
  * design to price.
  */
 export async function savedFor(businessId: string, businessName: string, jobId: string): Promise<Saved | typeof NO_DESIGN | null> {
-  const found = await jobById(businessId, jobId);
+  let found = await jobById(businessId, jobId);
   if (!found) return null;
+  if (!found.job.projectId && found.job.lat !== null) {
+    await joinNearbyDesign(businessId, jobId, "sol");
+    found = (await jobById(businessId, jobId)) ?? found;
+  }
   const row = found.job.projectId ? await projectById(businessId, found.job.projectId) : null;
   const set = row ? cleanDesignSet(row.design) : null;
   if (!row || !set) return NO_DESIGN;
