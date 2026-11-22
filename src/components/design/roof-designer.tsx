@@ -183,6 +183,7 @@ import {
 import { DictateButton } from "./dictate";
 import { usePageAbout } from "@/lib/services/page-context";
 import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
+import { lineupWords, proposalLineup, withLeading, withOnProposal, withRecommended } from "@/lib/domain/design/proposal-lineup";
 import {
   DESIGN_GOALS,
   FACINGS,
@@ -2227,25 +2228,29 @@ export function RoofDesigner(props: {
    * Offered to the customer beside the primary, or not; and the one recommended among those offered (one at most).
    * As Primero's (1 Nov 2026): the next proposal published carries them as options, up to five with the primary.
    */
-  const flagDesign = (index: number, flag: "offer" | "recommended") => {
-    const list = everyDesign();
-    const on = !list[index][flag];
-    const offered = list.filter((d, i) => d.offer && i !== primary).length;
-    if (flag === "offer" && on && offered >= MAX_PROPOSAL_OPTIONS - 1) return;
-    setDesigns(
-      list.map((d, i) => {
-        const next = { ...d };
-        if (i === index) {
-          if (on) next[flag] = true;
-          else delete next[flag];
-        } else if (flag === "recommended" && on) delete next.recommended; // one recommended at most
-        return next;
-      }),
-    );
+  const [lineupFull, setLineupFull] = useState(false);
+  const setOnProposal = (index: number, on: boolean) => {
+    const next = withOnProposal({ designs: everyDesign(), primary }, index, on);
+    setLineupFull(next === null);
+    if (!next) return;
+    setDesigns(next);
     setSaved("changed");
+  };
+  const recommend = (index: number) => {
+    setDesigns(withRecommended({ designs: everyDesign(), primary }, index));
+    setSaved("changed");
+  };
+  /** Another design leads, keeping what is on the proposal. */
+  const makeLeading = (index: number) => {
+    setLineupFull(false);
+    setDesigns(withLeading({ designs: everyDesign(), primary }, index));
+    setPrimary(index);
+    changed();
   };
   /** Every design, with the one being worked on as it stands now. */
   const everyDesign = () => designs.map((d, i) => (i === active ? working() : d));
+  // Which designs go on the next proposal, and which is recommended (22 Nov 2026).
+  const lineup = proposalLineup({ designs: everyDesign(), primary });
   /** Puts a list of designs in place and opens one of them. Undo starts afresh: it doesn't reach across designs. */
   const show = (list: RoofDesign[], index: number) => {
     const next = list[index];
@@ -6276,11 +6281,24 @@ export function RoofDesigner(props: {
           )}
         </div>
       )}
+      {designs.length > 1 && (
+        <p className="rounded-md bg-sun-line/10 px-3 py-2 text-xs font-medium text-ink" role="status">
+          {lineupWords(lineup)}
+        </p>
+      )}
+      {lineupFull && <p className="text-xs text-warning">A proposal holds {MAX_PROPOSAL_OPTIONS} designs at most.</p>}
       <ul className="space-y-1.5">
         {everyDesign().map((d, i) => {
           const sum = designSummary(d);
           return (
-            <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
+            <li
+              key={i}
+              className={clsx(
+                "rounded-md border",
+                i === active ? "border-forest" : "border-line",
+                lineup.on.includes(i) && designs.length > 1 && "border-l-4 !border-l-sun-line",
+              )}
+            >
               <div className="flex items-center gap-1 p-1">
                 <button
                   onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
@@ -6305,45 +6323,14 @@ export function RoofDesigner(props: {
                   </span>
                 </button>
                 <button
-                  onClick={() => {
-                    setPrimary(i);
-                    changed();
-                  }}
+                  onClick={() => makeLeading(i)}
                   disabled={i === primary}
-                  title={i === primary ? "The primary design" : "Make this the primary design"}
-                  aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
+                  title={i === primary ? "The leading design: the quote this roof opens on" : "Make this the leading design"}
+                  aria-label={i === primary ? `Design ${i + 1} is the leading design` : `Make design ${i + 1} the leading design`}
                   className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
                 >
                   <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
                 </button>
-                {designs.length > 1 && i !== primary && (
-                  <button
-                    onClick={() => flagDesign(i, "offer")}
-                    title={
-                      d.offer
-                        ? "Offered to the customer as an option: press to stop"
-                        : "Offer it to the customer as an option, beside the primary"
-                    }
-                    aria-pressed={Boolean(d.offer)}
-                    className={clsx(
-                      "h-8 rounded-full px-2.5 text-[11px] font-semibold",
-                      d.offer ? "bg-primary text-primary-ink" : "text-muted ring-1 ring-line hover:text-ink",
-                    )}
-                  >
-                    {d.offer ? "Offered" : "Offer"}
-                  </button>
-                )}
-                {designs.length > 1 && (d.offer || i === primary) && everyDesign().some((x, j) => x.offer && j !== primary) && (
-                  <button
-                    onClick={() => flagDesign(i, "recommended")}
-                    title={d.recommended ? "Recommended to the customer: press to stop" : "Recommend this one to the customer"}
-                    aria-label={d.recommended ? `Design ${i + 1} is recommended` : `Recommend design ${i + 1}`}
-                    aria-pressed={Boolean(d.recommended)}
-                    className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
-                  >
-                    <ThumbsUp className={clsx("size-4", d.recommended ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
-                  </button>
-                )}
                 {designs.length > 1 && (
                   <button
                     onClick={() => setDoomed(doomed === i ? null : i)}
@@ -6355,6 +6342,55 @@ export function RoofDesigner(props: {
                   </button>
                 )}
               </div>
+              {/* Where it stands on the proposal, in words (22 Nov 2026, Martin: which is the leading quote, which are on the
+                  proposal, which is recommended). */}
+              {designs.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-2 py-1.5">
+                  {i === primary ? (
+                    <span className="inline-flex h-7 items-center gap-1 rounded-full bg-sun-line/15 px-2.5 text-[11px] font-semibold text-sun-line">
+                      <Star className="size-3 fill-current" aria-hidden /> Leading quote · always on the proposal
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setOnProposal(i, !lineup.on.includes(i))}
+                      aria-pressed={lineup.on.includes(i)}
+                      title={lineup.on.includes(i) ? "Take it off the proposal" : "Offer it on the proposal as an option"}
+                      className={clsx(
+                        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold",
+                        lineup.on.includes(i) ? "bg-sun-line text-white" : "text-muted ring-1 ring-line hover:text-ink",
+                      )}
+                    >
+                      {lineup.on.includes(i) ? (
+                        <>
+                          <Check className="size-3" aria-hidden /> On the proposal
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="size-3" aria-hidden /> Add to the proposal
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {lineup.on.length > 1 && lineup.on.includes(i) && (
+                    <button
+                      type="button"
+                      onClick={() => recommend(i)}
+                      disabled={lineup.recommended === i}
+                      aria-pressed={lineup.recommended === i}
+                      title={lineup.recommended === i ? "Recommended to the customer" : "Recommend this one to the customer"}
+                      className={clsx(
+                        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold",
+                        lineup.recommended === i ? "bg-ink text-canvas" : "text-muted ring-1 ring-line hover:text-ink",
+                      )}
+                    >
+                      <ThumbsUp className={clsx("size-3", lineup.recommended === i && "fill-current")} aria-hidden />
+                      {lineup.recommended === i ? "Recommended" : "Recommend"}
+                    </button>
+                  )}
+                  {!lineup.on.includes(i) && i !== primary && <span className="text-[11px] text-muted">Not on the proposal</span>}
+                </div>
+              )}
               {/* The open design names itself inside its own card (10 Nov 2026, Martin: the label box outside it read as apart). */}
               {i === active && (
                 <label className="flex items-center gap-2 border-t border-line px-3 py-1.5">
@@ -6400,8 +6436,8 @@ export function RoofDesigner(props: {
         </span>
       </div>
       <p className={clsx("text-xs text-muted", compactMenu && !sheetMenu && "hidden")}>
-        The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
-        options on the next proposal published, and mark the one you recommend.
+        The starred design is the leading quote: the one this roof opens on, always on the proposal. Add up to {MAX_PROPOSAL_OPTIONS - 1}{" "}
+        more as options, and one of them is recommended to the customer.
       </p>
     </div>
   );
@@ -7170,16 +7206,13 @@ export function RoofDesigner(props: {
           {designs.length > 1 && (
             <button
               type="button"
-              onClick={() => {
-                setPrimary(active);
-                changed();
-              }}
+              onClick={() => makeLeading(active)}
               disabled={active === primary}
-              data-leg={active === primary ? "The primary design" : "Make it the primary"}
+              data-leg={active === primary ? "The leading design" : "Make it the leading design"}
               title={
                 active === primary
-                  ? "This is the primary design"
-                  : "Make the open design the primary: the one priced on the deal and sent first"
+                  ? "This is the leading design: the quote this roof opens on"
+                  : "Make the open design the leading one: the quote priced on the deal and shown first"
               }
               className={clsx(
                 "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-1",
