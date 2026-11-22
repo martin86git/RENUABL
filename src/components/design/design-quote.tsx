@@ -568,7 +568,7 @@ export function DesignQuote(props: {
                                 value={boxValue}
                                 onChange={(e) => {
                                   const v = Math.max(0, Number(e.target.value) || 0);
-                                  edit(l, counted ? { each: v, amount: undefined } : { amount: v });
+                                  edit(l, counted ? { each: v, amount: undefined, whole: undefined } : { amount: v, whole: true });
                                 }}
                                 aria-label={counted ? `Cost each of ${l.label}` : `Cost of ${l.label}`}
                                 style={{ width: `${String(boxValue).length + 1.6}ch` }}
