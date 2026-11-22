@@ -1490,10 +1490,30 @@ export function ProposalPage({
           {b.address && <p>{b.address}</p>}
           <p>{[b.abn && `ABN ${shownAbn(b.abn)}`, ...b.licences].filter(Boolean).join(" · ")}</p>
           <p>{contact.join(" · ")}</p>
+          <p className="pt-3 text-[11px] tracking-[0.02em] text-muted/80">
+            Powered by <span className="tracking-[0.22em]">RENUABL</span>
+          </p>
         </div>
       </footer>
       {/* Last, so it stays at the foot of the screen all the way down the page, footer included. */}
       {chat}
+    </div>
+  );
+}
+
+/**
+ * RENUABL's mark on the customer's own proposal (23 Nov 2026, Martin: yes to the logo on proposals, "but it cannot be
+ * competing with the company's logo"): a small, quiet "Powered by RENUABL" fixed in the bottom left corner, so a
+ * screenshot anywhere down the page carries it, while the business's logo heads the page. Muted, 10px, no colour; the
+ * chat and Call me keep the right.
+ */
+export function PoweredByRenuabl() {
+  return (
+    <div
+      aria-label="Powered by RENUABL"
+      className="pointer-events-none fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 z-30 rounded-full bg-canvas/80 px-2.5 py-1 text-[10px] leading-none text-muted ring-1 ring-line/60 backdrop-blur print:hidden sm:bottom-5 sm:left-5"
+    >
+      Powered by <span className="tracking-[0.22em] text-ink/70">RENUABL</span>
     </div>
   );
 }
