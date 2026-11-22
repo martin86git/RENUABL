@@ -37,6 +37,7 @@ import { casesToResolve } from "./design-service-repo";
 import { hasAddOn } from "./design-addons";
 import { renuablCrm } from "./renuabl-crm";
 import { voiceSettings } from "./voice-calls";
+import { VOICE_MODEL } from "@/lib/domain/voice-agent";
 
 const VAPI = "https://api.vapi.ai";
 const hashOf = (ref: string) => createHash("sha256").update(ref).digest("hex");
@@ -219,7 +220,7 @@ export async function startWebCall(
  */
 export async function answerTeamLine(e: VapiEvent): Promise<{ assistant: unknown }> {
   const s = voiceSettings();
-  const model = s?.model ?? "claude-sonnet-5";
+  const model = s?.model ?? VOICE_MODEL;
   const closed = { assistant: teamLineClosed(model) };
   const line = process.env.VAPI_TEAM_PHONE_NUMBER_ID?.trim();
   if (!s || !line || e.phoneNumberId !== line || !dbConfigured()) return closed;

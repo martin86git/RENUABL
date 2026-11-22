@@ -236,6 +236,15 @@ function Shell({
     watchHead.current = new ResizeObserver(set);
     watchHead.current.observe(el);
   };
+  // iPhone and iPad only (22 Nov 2026, Martin: compact email fields on the deal): Safari zooms into any field under 16px
+  // when it is tapped and stays zoomed. maximum-scale=1 stops that, and iOS still lets people pinch to zoom. Not set
+  // elsewhere, since Android's Chrome would stop pinch zoom with it.
+  useEffect(() => {
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (!ios || !meta || meta.content.includes("maximum-scale")) return;
+    meta.content = `${meta.content}, maximum-scale=1`;
+  }, []);
   // The approval gates' counts (Procurement), refreshed when a job is moved on from one.
   const [gates, setGates] = useState<Record<string, number>>({});
   useEffect(() => {

@@ -16,6 +16,16 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Designer",
+    words: "Product datasheets are shared across RENUABL: one any business adds is there for every business to design with.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Your voice agents answer quicker on calls.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
     words: "On a phone: slimmer figures, more room for Sol in an outlined box, the eraser beside the hand, and a larger designs round.",
   },
   {

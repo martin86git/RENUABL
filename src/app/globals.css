@@ -1675,3 +1675,34 @@ html:has(.sales-snap) {
   padding-top: 1.9rem;
   margin-bottom: 0.5rem;
 }
+
+/* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
+   the utilities and over the 16px touch rule above; on an iPhone the viewport's maximum-scale (DesignShell) stops Safari
+   zooming into a field under 16px. */
+@media (max-width: 639px) {
+  .deal-email label {
+    font-size: 11px;
+    gap: 0.375rem;
+  }
+  .deal-email input:not([type="file"]),
+  .deal-email select {
+    height: 2rem;
+    min-height: 2rem;
+    font-size: 13px !important; /* over the 16px touch rule, whose selector is stronger */
+    padding-inline: 0.625rem;
+  }
+  .deal-email textarea {
+    font-size: 13px !important;
+    min-height: 8rem;
+    padding: 0.5rem 0.625rem;
+  }
+  .deal-email .mt-2 {
+    margin-top: 0.375rem;
+  }
+  .deal-email p {
+    font-size: 11px;
+  }
+  .deal-email button {
+    font-size: 13px;
+  }
+}

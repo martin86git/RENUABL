@@ -32,6 +32,37 @@ export interface SavedSheet {
   foundUrl?: string | null;
   /** Found online and not yet checked by a person. */
   unchecked?: boolean;
+  /**
+   * Another business's sheet, shared with every business on RENUABL (22 Nov 2026, Martin: "any datasheet downloaded by
+   * any user then becomes available to all users"). Never says whose: `checkedBy` is `SHARED_BY`.
+   */
+  shared?: boolean;
+}
+
+/** Who a shared sheet's figures are said to be checked by: never the other business's name or a person's email. */
+export const SHARED_BY = "another business on RENUABL";
+
+/** Where a shared sheet's figures came from, as the string check names it: the product and the day, never who. */
+export const sharedBasis = (model: string, fileName: string, on: string, unchecked: boolean) =>
+  `${model || "Datasheet"} (${fileName || "datasheet"}), ${unchecked ? "found online for" : "read and checked by"} ${SHARED_BY} on ${on}`;
+
+/**
+ * The sheets shared with a business: other businesses' sheets for the products it has none of its own for, one a
+ * product (`codeKey`), the first given winning (the repo gives checked ones first, then the newest).
+ */
+export function sharedFor<T extends { kind: SheetKind; sku: string }>(
+  own: readonly { kind: SheetKind; sku: string }[],
+  others: readonly T[],
+): T[] {
+  const taken = new Set(own.map((s) => `${s.kind}:${codeKey(s.sku)}`));
+  const out: T[] = [];
+  for (const s of others) {
+    const key = `${s.kind}:${codeKey(s.sku)}`;
+    if (taken.has(key)) continue;
+    taken.add(key);
+    out.push(s);
+  }
+  return out;
 }
 
 /** A sheet is kept with its figures when it fits in one request to the host (under Vercel's 4.5 MB limit). */
@@ -233,7 +264,7 @@ export function datasheetFigures(
     .filter((s) => hit(`${s.sku} ${s.model}`))
     .map(
       (s) =>
-        `${s.sku}${s.model ? ` (${s.model})` : ""} · ${s.kind}: ${figuresLine(s.kind, s.figures)} · from the business's datasheet, checked by ${s.checkedBy.split("@")[0]} ${s.checkedAt.slice(0, 10)}`,
+        `${s.sku}${s.model ? ` (${s.model})` : ""} · ${s.kind}: ${figuresLine(s.kind, s.figures)} · from ${s.checkedBy === SHARED_BY ? "a datasheet shared on RENUABL" : "the business's datasheet"}, checked by ${s.checkedBy.split("@")[0]} ${s.checkedAt.slice(0, 10)}`,
     );
   const have = new Set(sheets.map((s) => `${s.kind}:${s.sku}`));
   const renuabl = [
