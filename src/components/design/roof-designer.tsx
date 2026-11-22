@@ -11020,7 +11020,7 @@ export function RoofDesigner(props: {
                   style={
                     sideways
                       ? { right: 10 / 0.72, width: "min(26rem, 62%)", bottom: 12 / 0.72, zoom: 0.72 }
-                      : { left: 10, right: 10, bottom: 66 }
+                      : { left: 10, right: 10, bottom: 12 }
                   }
                 >
                   <SolPicksCard
@@ -11088,7 +11088,11 @@ export function RoofDesigner(props: {
                     aria-expanded={!solAway && commandOpen}
                     data-popup
                     title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
-                    className="pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110"
+                    className={clsx(
+                      "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
+                      // On a phone, with something picked, his card is this round grown open: no second pill under it.
+                      solHolds && picks.length > 0 && !solTray && "hidden",
+                    )}
                   >
                     {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
                     <span className="sol-orb relative flex size-11 items-center justify-center rounded-full">

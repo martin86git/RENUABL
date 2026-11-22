@@ -18,6 +18,8 @@ import {
   MousePointer2,
   PenTool,
   Redo2,
+  RotateCcw,
+  RotateCw,
   Ruler,
   Search,
   SquarePlus,
@@ -233,7 +235,12 @@ export function SolTray(props: {
   );
 }
 
-/** Sol's card for what is picked, in place of the dial: turns, portrait or landscape, tilt, delete. */
+/**
+ * Sol's card for what is picked, in place of the dial (22 Nov 2026, Martin, from a mockup: "build it"): his round grown
+ * open, so no second pill under it. One line of what is picked; the turns as one quiet control (no orange: the only
+ * orange is what's picked on the roof); then portrait or landscape as two small panel drawings, the tilt with its value
+ * in place, and delete as an icon at the end.
+ */
 export function SolPicksCard(props: {
   count: number;
   panels: number;
@@ -246,18 +253,21 @@ export function SolPicksCard(props: {
   onDelete: () => void;
   onDone: () => void;
 }) {
-  const chip = "flex h-8 flex-1 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums";
+  const seg = "flex items-center rounded-xl bg-white/[0.08] p-[3px]";
+  const step = "flex h-8 items-center justify-center rounded-[9px] text-[12px] tabular-nums text-white/85 hover:bg-white/10";
+  const what = props.panels ? `${props.panels} panel${props.panels === 1 ? "" : "s"}` : `${props.count} picked`;
   return (
     <div
       role="group"
       aria-label="What is picked"
-      className="rounded-[18px] bg-[#26282c] p-2.5 text-white shadow-[0_10px_26px_rgba(0,0,0,0.35)]"
+      className="rounded-[22px] bg-[#26282c] px-2 pb-2 pt-1.5 text-white shadow-[0_10px_26px_rgba(0,0,0,0.35)]"
     >
-      <div className="mb-2 flex items-center gap-2 text-[12px]">
-        <p className="min-w-0 flex-1 truncate text-white/75">
-          <b className="font-semibold text-white">
-            {props.panels ? `${props.panels} panel${props.panels === 1 ? "" : "s"} picked` : `${props.count} picked`}
-          </b>
+      <div className="flex items-center gap-2 px-1 pb-1.5 text-[12px] text-white/60">
+        <span className="sol-orb flex size-6 shrink-0 items-center justify-center rounded-full">
+          <SolMark className="size-5" />
+        </span>
+        <p className="min-w-0 flex-1 truncate">
+          <b className="font-semibold text-white">{what}</b>
           {props.panels > 0 && props.tilt !== null && ` · tilt ${props.tilt}°`}
           {props.panels > 0 && props.facing && ` · facing ${props.facing}`}
         </p>
@@ -265,65 +275,81 @@ export function SolPicksCard(props: {
           type="button"
           onClick={props.onDone}
           aria-label="Pick none"
-          className="flex size-7 items-center justify-center rounded-full bg-white/10"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/15"
         >
           <X className="size-3.5" aria-hidden />
         </button>
       </div>
       {props.panels > 0 && (
-        <>
-          <div className="flex gap-1.5">
-            {[-5, -1, 90, 1, 5].map((step) => (
+        <div className={clsx(seg, "justify-between")} role="toolbar" aria-label="Turn">
+          {[-5, -1, 1, 5].map((by) => {
+            const Turn = by < 0 ? RotateCcw : RotateCw;
+            return (
               <button
-                key={step}
+                key={by}
                 type="button"
-                onClick={() => props.onTurn(step)}
-                aria-label={`Turn ${Math.abs(step)} degree${Math.abs(step) === 1 ? "" : "s"} ${step < 0 ? "anticlockwise" : "clockwise"}`}
-                className={clsx(chip, step === 90 ? "bg-sun-line" : "bg-white/10")}
+                onClick={() => props.onTurn(by)}
+                aria-label={`Turn ${Math.abs(by)} degree${Math.abs(by) === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"}`}
+                className={clsx(step, "flex-1 gap-1")}
               >
-                {step === 90 ? "90°" : `${step > 0 ? "+" : "−"}${Math.abs(step)}°`}
+                <Turn className="size-3.5 opacity-70" aria-hidden />
+                {Math.abs(by)}°
               </button>
-            ))}
-          </div>
-          <div className="mt-1.5 flex gap-1.5">
-            {([false, true] as const).map((land) => (
-              <button
-                key={String(land)}
-                type="button"
-                onClick={() => props.onLandscape(land)}
-                aria-pressed={props.landscape === land}
-                className={clsx(chip, "font-medium", props.landscape === land ? "bg-white text-[#26282c]" : "bg-white/10")}
-              >
-                {land ? "Landscape" : "Portrait"}
-              </button>
-            ))}
-            <span className="flex flex-1 items-center justify-between rounded-full bg-white/10 px-1 text-[12px]">
-              <button
-                type="button"
-                onClick={() => props.onTilt(-1)}
-                aria-label="Tilt down a degree"
-                className="flex size-6 items-center justify-center"
-              >
-                −
-              </button>
-              Tilt
-              <button
-                type="button"
-                onClick={() => props.onTilt(1)}
-                aria-label="Tilt up a degree"
-                className="flex size-6 items-center justify-center"
-              >
-                +
-              </button>
-            </span>
-          </div>
-        </>
+            );
+          })}
+          <button type="button" onClick={() => props.onTurn(90)} aria-label="Turn a quarter turn" className={clsx(step, "flex-1")}>
+            90°
+          </button>
+        </div>
       )}
       <div className="mt-1.5 flex items-center gap-1.5">
-        <button type="button" onClick={props.onDelete} className={clsx(chip, "max-w-[8rem] gap-1 bg-white/10 font-medium text-[#ff6b5e]")}>
-          <Trash2 className="size-3.5" aria-hidden /> Delete
+        {props.panels > 0 && (
+          <>
+            <div className={seg} role="radiogroup" aria-label="Portrait or landscape">
+              {([false, true] as const).map((land) => (
+                <button
+                  key={String(land)}
+                  type="button"
+                  role="radio"
+                  aria-checked={props.landscape === land}
+                  aria-label={land ? "Landscape" : "Portrait"}
+                  title={land ? "Landscape" : "Portrait"}
+                  onClick={() => props.onLandscape(land)}
+                  className={clsx(
+                    "flex h-8 w-10 items-center justify-center rounded-[9px]",
+                    props.landscape === land ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
+                  )}
+                >
+                  <span
+                    className={clsx("rounded-[2px] border-[1.5px] border-current", land ? "h-[9px] w-[15px]" : "h-[15px] w-[9px]")}
+                    aria-hidden
+                  />
+                </button>
+              ))}
+            </div>
+            <div className={seg} role="group" aria-label="Tilt">
+              <button type="button" onClick={() => props.onTilt(-1)} aria-label="Tilt down a degree" className={clsx(step, "w-8")}>
+                −
+              </button>
+              <span className="min-w-[4.5rem] text-center text-[12px] tabular-nums">
+                <span className="text-white/55">tilt </span>
+                <b className="font-semibold">{props.tilt === null ? "mixed" : `${props.tilt}°`}</b>
+              </span>
+              <button type="button" onClick={() => props.onTilt(1)} aria-label="Tilt up a degree" className={clsx(step, "w-8")}>
+                +
+              </button>
+            </div>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={props.onDelete}
+          aria-label="Delete what is picked"
+          title="Delete"
+          className="ml-auto flex size-[38px] items-center justify-center rounded-xl bg-white/[0.08] text-[#ff6b5e] hover:bg-white/15"
+        >
+          <Trash2 className="size-4" aria-hidden />
         </button>
-        {props.panels > 0 && <p className="flex-1 text-right text-[10.5px] text-white/50">or tell Sol: “turn them 3° left”</p>}
       </div>
     </div>
   );

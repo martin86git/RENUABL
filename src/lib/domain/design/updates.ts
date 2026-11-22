@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Designer",
+    words: "On a phone, Sol's card for picked panels is tidier: turns in one row, portrait or landscape, tilt and delete.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
     words: "On a phone, sideways too, Sol holds the tools, and a hand button grabs the map to move it.",
   },
   {
