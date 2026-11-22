@@ -5,7 +5,7 @@ import { ADD_ON_MONTHLY_CENTS } from "@/lib/domain/design/add-ons";
 import { SEAT_MONTHLY_CENTS, dollars } from "@/lib/domain/design/plans";
 import { cleanContent, contentProblem } from "./edm";
 import { claimsToCheck } from "./edm-sol";
-import { GTM_EMAILS, GTM_PICTURES, gtmSequence, pictureKeyOf, withPictures } from "./gtm-drafts";
+import { GTM_EMAILS, GTM_PICTURES, MAX_WORDS, gtmSequence, pictureKeyOf, withPictures } from "./gtm-drafts";
 import { cleanSequence, sequenceProblem } from "./sequences";
 
 const allText = (c: (typeof GTM_EMAILS)[number]) => [c.subject, c.preview, ...c.blocks.map((b) => b.text)].join(" ");
@@ -26,6 +26,18 @@ describe("the launch drafts", () => {
       const key = pictureKeyOf(c.blocks[0]);
       expect(key && GTM_PICTURES[key]).toBeTruthy();
       expect(existsSync(join(process.cwd(), "public", GTM_PICTURES[key!].file))).toBe(true);
+    }
+  });
+
+  it("are short: a glance, not a read", () => {
+    for (const c of GTM_EMAILS) {
+      const words = c.blocks
+        .filter((b) => b.kind === "text")
+        .map((b) => b.text)
+        .join(" ")
+        .split(/\s+/)
+        .filter(Boolean);
+      expect(words.length).toBeLessThanOrEqual(MAX_WORDS);
     }
   });
 

@@ -7,7 +7,7 @@ import {
   withPictures,
 } from "@/lib/domain/marketing/gtm-drafts";
 import { answer } from "@/lib/server/design-context";
-import { safeImage } from "@/lib/server/design-images";
+import { marketingImage } from "@/lib/server/design-images";
 import { isRenuablBusiness } from "@/lib/server/marketing-access";
 import { createCampaign, createSequence, listCampaigns, listSequences, saveImage } from "@/lib/server/marketing-campaigns-repo";
 import { marketingMember, refuse } from "@/lib/server/marketing-guard";
@@ -34,7 +34,7 @@ async function pictures(origin: string, businessId: string, by: string): Promise
   for (const [key, p] of Object.entries(GTM_PICTURES)) {
     const res = await fetch(new URL(p.file, origin)).catch(() => null);
     if (!res?.ok) continue;
-    const img = await safeImage(new Uint8Array(await res.arrayBuffer()), "photo");
+    const img = await marketingImage(new Uint8Array(await res.arrayBuffer()));
     if ("problem" in img) continue;
     ids[key] = await saveImage(businessId, img, by);
   }

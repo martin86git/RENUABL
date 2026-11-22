@@ -2,7 +2,7 @@
 
 _22 Nov 2026. A strategy and a draft email series for Martin's review. Nothing here has been sent._
 
-The emails live in code as drafts (`src/lib/domain/marketing/gtm-drafts.ts`), their pictures in `public/design/launch/` (drawn by `tools/marketing/launch-art.mjs`). In RENUABL's own business, **Marketing → Campaigns → Add the drafts** puts them into Marketing as a draft campaign and a switched-off sequence, pictures included. Keep this copy and the code in step.
+The emails live in code as drafts (`src/lib/domain/marketing/gtm-drafts.ts`), their pictures and GIFs in `public/design/launch/` (drawn by `tools/marketing/launch-art.mjs`; run it with the dev server on, since Sol is filmed off the homepage). In RENUABL's own business, **Marketing → Campaigns → Add the drafts** puts them into Marketing as a draft campaign and a switched-off sequence, pictures included. Keep this copy and the code in step.
 
 ---
 
@@ -57,123 +57,87 @@ Victoria first, then by state.
 
 ## 5. The series
 
-Each email is one picture, one headline, a few short paragraphs and one button. The pictures are drawn for us: dark, cinematic, the product's own screens and made-up customers, no stock photos and nobody else's marks.
+**A glance, not a read.** Nobody reads about something before they know it pays them. Each email is one product, sold the way Apple sells a product: a moving or still picture, a headline of four words or so, one or two lines (45 words at most, tested), one button. No greeting, no paragraphs.
+
+**The products are the heroes:** Sol (filmed off the homepage, so he is the same sun with the brain in it), the voice agent (its sound wave on graphite, as on the homepage and in the app) and the AI designer (its orange round). The launch shows them all at once as **a staggered stack of cards** dealt in one by one: Your customers, answered · Your emails, written · Your calls, written up · Your super-intelligent advisor · Your roofs, designed · Your installs, lined up.
+
+**Moving pictures are GIFs**, the only animation email apps play: the cards dealt in, **a voice agent on a call** (its wave beating, the clock running, the words typed as they are said, then Booked), Sol breathing, the designer laying panels row by row with the kW counting up. **Outlook on Windows shows only a GIF's first frame**, so each starts on its finished picture and then plays. Sizes: 0.2 to 0.8 MB each.
+
+**It ends the 1990s mail-order way**: a coupon with a dashed border and scissors, a starburst, a YES! box, ticks, and a P.S.
 
 ### Launch · day 0: One giant leap for solar.
 
 **Subject:** One giant leap for solar  
-**Preview:** RENUABL Business is live: an AI sales force for your solar business.  
-**Picture:** `/design/launch/leap.jpg` (The sun rising over the curve of the earth)
+**Preview:** Your AI sales force is here.  
+**Picture:** `/design/launch/cards.gif` (RENUABL's AI sales force: your customers answered, your emails written, your calls written up, your roofs designed)
 
-Hi {firstName},
+{firstName}, your AI sales force is here. It answers your leads, writes your emails and designs your roofs.
 
-For years, a solar business has run on the same things: a spreadsheet of leads, a CRM you type into, a design tool, a proposal tool, and somebody on the phone chasing.
+**Button:** See it work → https://www.renuabl.com.au/
 
-RENUABL Business puts it in one place and puts AI to work in every part of it.
+### 1 · two working days after opening: Your customers, answered.
 
-Voice agents ring your new leads, answer their questions and book them a call with your team. Sol, the brain of the business, knows every deal, tells you who needs you and drafts the follow-up in your voice. The designer prices the roof as you draw it. And once a customer signs, the order, the install and the paperwork carry on in the same place.
-
-The businesses that move now will be answering leads in minutes while everyone else is still returning calls.
-
-**Button:** See RENUABL Business → https://www.renuabl.com.au/
-
-### 1 · two working days after opening: Meet your AI sales force.
-
-**Subject:** Your new sales team doesn't sleep in  
+**Subject:** It's on the phone with your new lead  
 **Preview:** Voice agents that ring every lead and book them in.  
-**Picture:** `/design/launch/voice.jpg` (A RENUABL voice agent on a call, its words as they are said (example))
+**Picture:** `/design/launch/call.gif` (A RENUABL voice agent on a call with a new lead, booking them in (example))
 
-Hi {firstName},
+Your voice agent rings each new lead within minutes, answers their questions and books them in. You choose its name and its voice.
 
-Solar leads go to whoever talks to them soonest. Most businesses ring back the next day. Yours won't need to.
+It always says it's your automated assistant. Calls go out in calling hours. Calls & Texts, $29 a month.
 
-A RENUABL voice agent rings each new lead in calling hours, says it's {company}'s automated assistant, answers their questions, meets the usual worries (price, other quotes, is a battery worth it) and books them a call with your team.
+**Button:** Hear it call → https://www.renuabl.com.au/
 
-You name each agent, choose its voice and give it its script. Watch any call live, type it a note mid-call, or hang up. Every call is written on the deal.
+### 2 · three days on: Meet Sol.
 
-Voice agents come with Calls & Texts, $29 a month, with your own business number.
+**Subject:** Meet Sol  
+**Preview:** The brain of your business.  
+**Picture:** `/design/launch/sol.gif` (Sol, the brain of your business)
 
-**Button:** Meet your voice agents → https://www.renuabl.com.au/
-
-### 2 · three days on: Sol thinks. You decide.
-
-**Subject:** The brain of your business  
-**Preview:** Sol knows every deal, and tells you what matters next.  
-**Picture:** `/design/launch/sol.jpg` (Sol on RENUABL's Today screen, putting the day in order (example data))
-
-Hi {firstName},
-
-Sol is the AI built into RENUABL Business. He reads every deal, every email and every call, and each morning he puts the day in order: who wrote in, who's gone quiet, and who to ring next.
-
-Ask him anything: which proposals have gone cold, what to say to a customer worried about their roof, where a battery can go on a garage wall. He answers from your own deals, and from the standards and makers' sheets with his sources.
-
-He drafts. You send. Nothing goes to a customer until you say so, or until you switch on the agents you trust.
+He knows every deal, writes your emails in your voice and tells you who to ring next. Ask him anything about solar.
 
 **Button:** Meet Sol → https://www.renuabl.com.au/
 
-### 3 · three days on: It prices as you draw.
+### 3 · three days on: Your roofs, designed.
 
-**Subject:** Roof to signed, in one sitting  
-**Preview:** Three priced designs in one press. A proposal they sign online.  
-**Picture:** `/design/launch/roof.jpg` (A roof designed from above in RENUABL's designer (example home))
+**Subject:** Your roofs, designed  
+**Preview:** One press. Three priced designs.  
+**Picture:** `/design/launch/designer.gif` (RENUABL's AI designer laying panels on a roof in one press (example home))
 
-Hi {firstName},
-
-Type an address and the roof is there from above, to scale. Press once and the designer lays out three designs, one for the quickest payback, one for the biggest return over time and one for the most independence, each priced, with the strings checked against the inverter.
-
-Send a proposal in your own name, logo and colours. Your customer chooses their system, asks questions in the chat and signs online.
-
-Record a short walkthrough of the design as you talk, with subtitles written as you speak, and it sits at the top of their proposal.
+One press lays out three designs, each priced as it lands. Your customer signs online.
 
 **Button:** Try the designer → https://www.renuabl.com.au/business/demo
 
-### 4 · three days on: Software that works while you're on the roof.
+### 4 · three days on: Your calls, written up.
 
-**Subject:** A CRM that does the typing  
-**Preview:** Calls written up. Follow-ups drafted. Leads emailed in, added for you.  
+**Subject:** The CRM that does the typing  
+**Preview:** Calls written up. Follow-ups drafted.  
 **Picture:** `/design/launch/today.jpg` (RENUABL's Today screen: calls, deals and what needs you (example data))
 
-Hi {firstName},
-
-A normal CRM waits for you to type. This one does the typing. The note-taker writes your calls up into the deal. Leads emailed to your inbox arrive as deals. Every deal says how warm it is and what it needs next.
-
-Today is one feed of what's happening: what Sol has lined up and when it goes, what only a person can do, and one button for each.
-
-Your team talks on each deal. Your customers never see it.
+Calls written up. Follow-ups drafted. Emailed leads turned into deals. You do the selling.
 
 **Button:** See Today → https://www.renuabl.com.au/business/demo
 
 ### 5 · three days on: Signed. Then it runs itself.
 
 **Subject:** Signed. Then it runs itself.  
-**Preview:** Ordering, approvals, installs, job cards and service, in the same place.  
+**Preview:** Ordering, approvals, installs and job cards in one place.  
 **Picture:** `/design/launch/runs.jpg` (RENUABL's install calendar after the sale (example data))
 
-Hi {firstName},
-
-The moment a customer accepts, the order opens with the exact lines sold, approvals line up in order, and the install goes on the calendar against your weekly capacity.
-
-Your installer gets a job card with the layout, strings and photos. Your post-sale voice agent can ring the customer to pencil in their install day.
-
-Invoices, STCs and the grid connection are tracked to the end, and service cases after that.
+The moment they sign, the order opens, approvals line up and your installer's job card is ready.
 
 **Button:** See after the sale → https://www.renuabl.com.au/
 
-### 6 · four days on: One price. Everything in it.
+### 6 · four days on: Here's the deal.
 
-**Subject:** The leap, for {company}  
-**Preview:** $49 a user a month, your first month free. Cancel any time.  
-**Picture:** `/design/launch/close.jpg` (The sun on the horizon)
+**Subject:** YES! Your first month is free  
+**Preview:** No contract. Cancel any time. Every feature, every user.  
+**Picture:** `/design/launch/coupon.jpg` (YES! I want my AI sales force. First month free. No contract, cancel any time.)
 
-Hi {firstName},
+Your first month is free. Then it's $49 a user a month. No contract. Cancel any time.
 
-Every user gets everything: the designer, the CRM, proposals, after the sale, service and Sol.
+P.S. Leads go to whoever answers soonest. Let yours answer this week.
 
-It's $49 a user a month, your first month free, or $39 a user a month on the 12-month plan. Voice agents and your business number come with Calls & Texts, $29 a month. Prices include GST. Cancel any time.
-
-This is where selling solar is going. The businesses that start now get the head start.
-
-**Button:** Start now → https://www.renuabl.com.au/#pricing
+**Button:** YES! Start now → https://www.renuabl.com.au/#pricing
 
 ## 6. Must be true before anything is sent
 
