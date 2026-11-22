@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import { Lightbulb, LightbulbOff, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   NO_TIP_PREFS,
   TIP_RULES,
@@ -96,8 +96,13 @@ export function useDesignTips({ onAct, busy }: { onAct: (act: TipAct) => void; b
     setFlash(off ? "Tips off" : "Tips on");
   };
 
-  const corner: ReactNode = (
-    <div data-lift className="pointer-events-none absolute bottom-[5.5rem] left-3 z-20 flex items-end gap-2">
+  // Where the bulb stands: bottom left of the picture, or (on a computer's pop-up) in the graphite tray at its foot.
+  const cornerAt = (place?: { className: string; style?: CSSProperties }): ReactNode => (
+    <div
+      {...(place ? {} : { "data-lift": true })}
+      className={clsx("pointer-events-none absolute z-20 flex items-end gap-2", place?.className ?? "bottom-[5.5rem] left-3")}
+      style={place?.style}
+    >
       <button
         type="button"
         onClick={toggle}
@@ -147,5 +152,6 @@ export function useDesignTips({ onAct, busy }: { onAct: (act: TipAct) => void; b
       )}
     </div>
   );
-  return { nudge, corner };
+  const corner = cornerAt();
+  return { nudge, corner, cornerAt };
 }

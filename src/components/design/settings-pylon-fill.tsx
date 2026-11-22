@@ -29,6 +29,7 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
   const [left, setLeft] = useState<{ left: number; any: number } | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [whys, setWhys] = useState<string[]>([]);
   const stop = useRef(false);
 
   const count = useCallback(async (withPdfs: boolean) => {
@@ -46,6 +47,7 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
   const go = async () => {
     stop.current = false;
     setProblem(null);
+    setWhys([]);
     let state: Run = { done: 0, total: left.left, batteries: 0, pdfs: 0, failed: 0, gone: 0, noDesign: 0, running: true, stopped: false };
     setRun(state);
     for (;;) {
@@ -60,8 +62,11 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
         break;
       }
       for (const r of res.results) {
-        if (r.result === "failed") state = { ...state, failed: state.failed + 1 };
-        else state = { ...state, done: state.done + 1 };
+        if (r.result === "failed") {
+          state = { ...state, failed: state.failed + 1 };
+          const why = r.why;
+          setWhys((w) => (w.includes(why) ? w : [...w, why].slice(-4)));
+        } else state = { ...state, done: state.done + 1 };
         if (r.result === "gone") state = { ...state, gone: state.gone + 1 };
         if (r.result === "filled" && !r.design) state = { ...state, noDesign: state.noDesign + 1 };
         if (r.result === "filled")
@@ -138,6 +143,13 @@ export function PylonFill({ pylonKey }: { pylonKey: string }) {
             {run.gone > 0 && ` · ${n(run.gone)} no longer in Pylon`}
             {run.failed > 0 && ` · ${n(run.failed)} couldn't be read`}
           </p>
+          {whys.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs text-muted">
+              {whys.map((w) => (
+                <li key={w}>{w}</li>
+              ))}
+            </ul>
+          )}
           {!run.running && !run.stopped && (
             <p className="mt-2 text-sm">
               <Link href={PATHS.customers} className={ui.link}>

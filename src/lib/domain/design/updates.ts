@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
+    area: "Today",
+    words: "A brief hiccup reaching your account no longer says you need to sign in; the page tries again by itself.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Today on a phone: the page scrolls down through Needs you and Performance, and their cards fit the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the panel, inverter, battery and charger lists open over the whole screen, easy to browse.",
+  },
+  {
+    day: "2026-11-22",
     area: "Designer",
     words: "Designer on a phone: the map is about a fifth bigger, and Sol's box runs edge to edge under it.",
   },

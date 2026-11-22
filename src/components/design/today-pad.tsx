@@ -302,9 +302,15 @@ export function TodayPad(props: {
           aria-hidden={talking}
         >
           <div
-            className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
+            className={clsx(
+              "grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows] duration-500 ease-out",
+              talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+            )}
           >
-            <div className="overflow-hidden">
+            {/* Clipped only while it folds away (22 Nov 2026, Martin, on an iPhone: "I can't scroll down"): left on, Safari
+                can size the grid's row to the screen and cut Needs you and Performance off under it, so the page has
+                nothing more to scroll to. */}
+            <div className={clsx("min-w-0", talking && "min-h-0 overflow-hidden")}>
               <TodayChat
                 name={props.name}
                 views={insights}
