@@ -446,7 +446,9 @@ function FootRound(props: { label: string; on: boolean; onClick: () => void; chi
  */
 // Below: the least room kept for Sol's card under the picture; his card then runs on to the foot of the screen (`rest`).
 // 104 (22 Nov 2026, Martin: "the map should be at least 20% bigger", Sol "can also lower slightly"; it was 156).
-const PHONE_BANDS = { above: 34, below: 104, rail: 0, bar: 0 };
+// Above: none (22 Nov 2026, Martin: the empty band between the figures and the map was "wasted space"): the map
+// starts right under the figures and the kit and designs round stand on it.
+const PHONE_BANDS = { above: 0, below: 104, rail: 0, bar: 0 };
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
@@ -7191,7 +7193,7 @@ export function RoofDesigner(props: {
                 props.tight
                   ? phone
                     ? // Full bleed across the top of the screen (21 Nov 2026, Martin), the figures in a grid of their own.
-                      "mb-1.5 flex-col !rounded-none"
+                      "flex-col !rounded-none"
                     : sideways
                       ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
                       : "mb-1.5 flex-nowrap"
