@@ -1825,3 +1825,22 @@ html:has(.sales-snap) {
     font-size: 13px;
   }
 }
+
+/* The voice agent's chat stands off the page on a phone (22 Nov 2026, Martin: "the bot card should have a contrast"):
+   the page behind it dims a little (the foot bar stays as it is) and the window carries a graphite edge and a deeper
+   shadow, so the white window no longer runs into the white page. Nothing is blocked: the dim takes no presses. */
+@media (max-width: 1023px) {
+  html[data-phone-window] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(11, 11, 12, 0.28);
+    pointer-events: none;
+  }
+  .coach-window {
+    box-shadow:
+      0 0 0 1.5px #3a3d43,
+      0 22px 60px rgba(11, 11, 12, 0.38);
+  }
+}
