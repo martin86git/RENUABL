@@ -1688,8 +1688,26 @@ html:has(.sales-snap) {
   width: min(46rem, 100% - 2rem);
   margin-inline: auto;
   max-height: calc(var(--pic-h, 40rem) * 0.48);
-  padding-top: 2.6rem;
-  margin-bottom: 0.75rem;
+  /* Room under the foot row and Sol's peak, which stand on its top edge. */
+  padding-top: 3.75rem;
+  margin-bottom: 0.5rem;
+  /* Inside the graphite tray: the tray is its ground, so no box of its own. */
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  outline: 0;
+  backdrop-filter: none;
+}
+/* On a computer what stands at the picture's foot (the zoom round, the tip bulb, Roof and the picture's switch, the
+   Drawn view's wall) rises above the graphite tray, as tall as it is at the time. */
+.desk-tray [data-lift] {
+  translate: 0 calc(-1 * var(--tray-h, 72px) + 1.25rem);
+  transition: translate 0.3s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk-tray [data-lift] {
+    transition: none;
+  }
 }
 
 /* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
