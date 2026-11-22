@@ -18,6 +18,7 @@ import {
   demoRefuses,
   isDemoEmail,
 } from "@/lib/domain/design/demo";
+import { LOCKED_MESSAGE, LOCKED_STATUS, isLocked, lockDeviceOf } from "@/lib/domain/design/screen-lock";
 import { currentSession, readSession } from "./accounts";
 import { dbConfigured } from "./db";
 import { memberByEmail, type Member } from "./design-repo";
@@ -28,7 +29,8 @@ export type DesignAccess =
   | { state: "no-business"; email: string }
   /** Added to a business by its owner (or the terms have changed): they accept the terms to carry on. */
   | { state: "needs-terms"; email: string; member: Member }
-  | { state: "ready"; email: string; member: Member };
+  /** `locked`: the screen lock (screen-lock.ts) is on for this session; requireMember refuses until it is unlocked. */
+  | { state: "ready"; email: string; member: Member; locked?: boolean };
 
 /**
  * `strict`: a session that couldn't be checked throws (`SessionUnknown`) instead of reading as signed out, so a route
@@ -40,18 +42,22 @@ export async function designAccess(strict = false): Promise<DesignAccess> {
   if (session?.role !== "business") return { state: "signed-out" };
   const member = await memberByEmail(session.email);
   if (!member) return { state: "no-business", email: session.email };
+  const locked = !isDemoEmail(session.email) && isLocked(session.activeAt, lockDeviceOf((await headers()).get("user-agent")));
   if (member.termsVersion !== BUSINESS_TERMS_VERSION) return { state: "needs-terms", email: session.email, member };
   // The owner viewing as another member of their business (read only: the proxy refuses changes while it is set).
   const viewing = (await cookies()).get(VIEW_AS_COOKIE)?.value;
   if (viewing && member.role === "owner") {
     const other = await memberByEmail(viewing);
     if (other && mayViewAs(member, other) && other.termsVersion === BUSINESS_TERMS_VERSION)
-      return { state: "ready", email: other.email, member: { ...other, viewedBy: member.email } };
+      return { state: "ready", email: other.email, member: { ...other, viewedBy: member.email }, locked };
   }
-  return { state: "ready", email: session.email, member };
+  return { state: "ready", email: session.email, member, locked };
 }
 
 const refused = (status: number, message: string) => Response.json({ ok: false, message }, { status });
+
+/** The answer while the screen lock is on: the product reads 423 and shows the lock. */
+export const lockedAnswer = () => Response.json({ ok: false, locked: true, message: LOCKED_MESSAGE }, { status: LOCKED_STATUS });
 
 /**
  * The member a request is from, allowed to do this. Otherwise the answer to
@@ -61,6 +67,7 @@ const refused = (status: number, message: string) => Response.json({ ok: false, 
 export async function requireMember(action: MemberAction): Promise<{ member: Member } | { refuse: Response }> {
   const access = await designAccess(true);
   if (access.state !== "ready") return { refuse: refused(401, "Sign in to your business to do this.") };
+  if (access.locked) return { refuse: lockedAnswer() };
   if (!can(access.member.role, action, access.member.permissions)) return { refuse: refused(403, refusal(action)) };
   // An installer's or inspector's login holds only part of the product: the proxy tells us the address asked for.
   const sent = await headers();

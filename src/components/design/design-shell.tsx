@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
+import { ScreenLock } from "./screen-lock";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
 import { withMarketing } from "@/lib/domain/marketing/access";
 import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
@@ -417,6 +418,8 @@ function Shell({
     ) : null;
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
+      {/* The screen lock: covers the page after a while unused, until Face ID, the PIN or signing in again. */}
+      <ScreenLock />
       {/* The design tool slides over whatever page this is, never a page of its own. */}
       <ShellDesignDrawer />
       {/* A call made from the computer: who, how long, Mute and Hang up, over every page while it lasts. */}

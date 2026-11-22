@@ -6,7 +6,7 @@ import {
   readTermsTick,
 } from "@/lib/domain/design/account";
 import { cleanKind } from "@/lib/domain/design/business-kind";
-import { answer, designAccess, readBody, requireMember } from "@/lib/server/design-context";
+import { answer, designAccess, lockedAnswer, readBody, requireMember } from "@/lib/server/design-context";
 import { acceptTerms, createBusiness, renameBusiness } from "@/lib/server/design-repo";
 
 /**
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
   return answer(async () => {
     const access = await designAccess();
     if (access.state === "signed-out") return Response.json({ ok: false, message: "Sign in first." }, { status: 401 });
+    if (access.state === "ready" && access.locked) return lockedAnswer();
     const read = await readBody(request, 2_000);
     if ("refuse" in read) return read.refuse;
     if (!readTermsTick(read.body.terms)) return Response.json({ ok: false, message: BUSINESS_TERMS_MISSING }, { status: 422 });
