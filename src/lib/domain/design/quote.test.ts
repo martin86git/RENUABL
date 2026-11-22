@@ -36,11 +36,12 @@ import {
   undecidedLines,
   variationsOf,
 } from "./quote";
+import { withExampleCodes } from "./proposal-fixture";
 
 // A wholesaler's real price list (AWM Clayton), as a business would upload it.
 const rows = readXlsxRows(readFileSync("src/lib/domain/__fixtures__/awm-price-list.xlsx"));
 const list = readSupplierList("awm.xlsx", rows, "2026-10-10");
-const withList: Workspace = { ...DEFAULT_WORKSPACE, lists: [list] };
+const withList: Workspace = { ...withExampleCodes(DEFAULT_WORKSPACE), lists: [list] };
 const form = defaultQuote("3150").form;
 const system: SystemSpec = {
   panels: 14,
@@ -77,7 +78,7 @@ describe("a business's supplier price lists", () => {
       ],
       "2026-11-08",
     );
-    const ws: Workspace = { ...DEFAULT_WORKSPACE, lists: [newer] };
+    const ws: Workspace = { ...withExampleCodes(DEFAULT_WORKSPACE), lists: [newer] };
     expect(componentCost(ws, "tileKit")).toBe(99.8);
     expect(componentCost(ws, "tinKit")).toBe(49);
     expect(listed(ws, "anttile-2.0")?.sku).toBe("ANTTILE2.0");
@@ -390,5 +391,13 @@ describe("costs decided on each job", () => {
     expect(undecidedLines(c.lines, {}).length).toBe(2);
     expect(variationsOf(c.lines, edits)).toEqual(["RCBO switches"]);
     expect(repriced(c, editedLines(c.lines, edits)).cost).toBe(c.cost + board.amount);
+  });
+});
+
+describe("the parts every job needs, for a new business", () => {
+  it("start with no product codes: no brand is assumed before a list is uploaded", () => {
+    expect(Object.values(DEFAULT_WORKSPACE.components).every((c) => c.sku === "" && c.cost === null)).toBe(true);
+    expect(cleanWorkspace({ components: {} }).components.rail.sku).toBe("");
+    expect(componentCost(DEFAULT_WORKSPACE, "rail")).toBeNull();
   });
 });

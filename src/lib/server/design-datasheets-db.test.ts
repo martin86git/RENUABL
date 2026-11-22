@@ -2,7 +2,8 @@
  * Runs against a real Postgres when TEST_DATABASE_URL is set (skipped
  * otherwise; `npm run test:db` sets it): a business's checked datasheets. That
  * figures are kept by product code, replaced when saved again, read back as
- * the designer uses them, taken away, and never seen by another business.
+ * the designer uses them, taken away, and shared with every other business
+ * without saying whose they are.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BUSINESS_TERMS_VERSION } from "@/lib/domain/design/account";
@@ -63,9 +64,66 @@ describe.skipIf(!url)("product datasheets (database)", () => {
     expect(Object.keys((await sheets.businessDatasheets(a)).inverters)).toEqual([]);
   });
 
-  it("never shows one business's figures to another, nor lets it take them away", async () => {
-    expect(await sheets.businessDatasheets(b)).toEqual({ panels: {}, inverters: {} });
+  it("shares a sheet with every business, never saying whose, and never lets another take it away", async () => {
+    const theirs = await sheets.listSheets(b);
+    expect(theirs.map((s) => [s.sku, s.shared, s.checkedBy])).toEqual([["NEW-475", true, "another business on RENUABL"]]);
+    expect(JSON.stringify(theirs)).not.toContain("alpha");
+    expect(JSON.stringify(theirs)).not.toContain("owner");
+    expect((await sheets.businessDatasheets(b)).panels["NEW-475"].voc).toBe(36.4);
     expect(await sheets.deleteSheet(b, "panel", "NEW-475")).toBe(false);
     expect(Object.keys((await sheets.businessDatasheets(a)).panels)).toEqual(["NEW-475"]);
+    // The business that added it sees its own, not a shared copy.
+    expect((await sheets.listSheets(a)).some((s) => s.shared)).toBe(false);
+  });
+
+  it("puts a business's own sheet ahead of a shared one, however the code is written", async () => {
+    const panel = checkPanel(
+      { voc: "40", vmp: "33", isc: "14", imp: "13.5", vocPercent: "-0.25", iscPercent: "0.05", pmaxPercent: "-0.29" },
+      "beta's own",
+    );
+    if (!panel.ok) throw new Error("unexpected");
+    await sheets.saveSheet(b, { kind: "panel", sku: "new 475", model: "", fileName: "", figures: panel.value }, B);
+    const mine = await sheets.listSheets(b);
+    expect(mine.map((s) => [s.sku, Boolean(s.shared)])).toEqual([["new 475", false]]);
+    expect(await sheets.deleteSheet(b, "panel", "new 475")).toBe(true);
+  });
+
+  it("makes a shared sheet the business's own once someone there has checked it", async () => {
+    expect(await sheets.adoptSharedSheet(b, "panel", "NEW-475", "Sam@beta-sheets.test")).toBe(true);
+    const own = (await sheets.listSheets(b))[0]!;
+    expect(own.shared).toBeUndefined();
+    expect(own.checkedBy).toBe("sam@beta-sheets.test");
+    expect(own.figures.basis).toMatch(/read and checked by sam on /);
+    expect(await sheets.adoptSharedSheet(b, "panel", "NEW-475", B)).toBe(false);
+    expect(await sheets.adoptSharedSheet(b, "inverter", "NOT-THERE", B)).toBe(false);
+    expect(await sheets.deleteSheet(b, "panel", "NEW-475")).toBe(true);
+  });
+
+  it("shares nothing from a made-up business, and marks a found sheet to check for everyone", async () => {
+    const repo = await import("./design-repo");
+    const demo = (await repo.createBusiness("demo-x@demo.renuabl.example", "A demo", BUSINESS_TERMS_VERSION)).businessId;
+    const panel = checkPanel(
+      { voc: "50", vmp: "42", isc: "13", imp: "12.5", vocPercent: "-0.25", iscPercent: "0.05", pmaxPercent: "-0.29" },
+      "demo",
+    );
+    if (!panel.ok) throw new Error("unexpected");
+    await sheets.saveSheet(
+      demo,
+      { kind: "panel", sku: "DEMO-500", model: "", fileName: "", figures: panel.value },
+      "demo-x@demo.renuabl.example",
+    );
+    expect((await sheets.listSheets(b)).map((s) => s.sku)).toEqual(["NEW-475"]);
+    await db.query(`delete from businesses where id = $1`, [demo]);
+    expect(
+      await sheets.saveFoundSheet(
+        a,
+        { kind: "panel", sku: "FOUND-440", model: "Found 440", fileName: "f.pdf", figures: panel.value, url: "https://example.com/f.pdf" },
+        null,
+      ),
+    ).toBe(true);
+    const found = (await sheets.listSheets(b)).find((s) => s.sku === "FOUND-440")!;
+    expect(found.shared && found.unchecked).toBe(true);
+    expect((await sheets.businessDatasheets(b)).panels["FOUND-440"].unchecked).toBe("https://example.com/f.pdf");
+    expect(found.figures.basis).toMatch(/found online for another business on RENUABL/);
   });
 });
