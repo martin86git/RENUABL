@@ -1341,7 +1341,10 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
           <span className="absolute left-1/2 top-1 h-1 w-9 -translate-x-1/2 rounded-full bg-ink/15" aria-hidden />
           <SolMark className="mt-1 size-8 shrink-0" />
           <span className="mt-1 min-w-0 flex-1 leading-tight">
-            <span className="block text-[14px] font-semibold text-ink">Sol</span>
+            <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
+              Sol
+              <span className="rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium text-muted ring-1 ring-line">AI</span>
+            </span>
             <span className="block truncate text-[11.5px] text-muted">{name ? `On ${name}'s deal` : "On this deal"}</span>
           </span>
           <button

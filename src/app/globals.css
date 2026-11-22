@@ -1580,23 +1580,41 @@ html:has(.sales-snap) {
   .deal-sol-sheet .sol-replies {
     flex-wrap: wrap;
   }
+  /* A thick message box (22 Nov 2026, Martin: "I want it to be thicker"): the words along its top, the microphone and
+     the send round in its lower right corner. */
   .deal-sol-sheet .sol-compose {
     position: sticky;
     bottom: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: end;
+    column-gap: 0.25rem;
+    min-height: 6rem;
     margin-top: 0.75rem;
-    padding: 0.25rem 0.25rem 0.25rem 0.875rem;
-    border-radius: 9999px;
+    padding: 0.625rem 0.5rem 0.5rem 0.875rem;
+    border-radius: 1.25rem;
     background: var(--surface);
     box-shadow:
       0 0 0 1px var(--line),
       0 -6px 12px var(--canvas);
   }
+  .deal-sol-sheet .sol-compose > input {
+    grid-column: 1 / -1;
+    align-self: start;
+    padding: 0;
+  }
+  .deal-sol-sheet .sol-compose > :not(input):not(.sol-send):not(.sol-prompt) {
+    grid-column: 2;
+  }
+  .deal-sol-sheet .sol-compose > .sol-send {
+    grid-column: 3;
+  }
   .deal-sol-sheet .sol-prompt {
     display: none;
   }
   .deal-sol-sheet .sol-send {
-    width: 2rem;
-    height: 2rem;
+    width: 2.25rem;
+    height: 2.25rem;
     border-radius: 9999px;
     background: var(--sun-line);
     color: #fff;
