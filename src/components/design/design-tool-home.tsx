@@ -5,7 +5,7 @@ import { ArrowRight, Check, Flame, MapPin, PenTool, Plus, Search, Sun, X } from 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { goUnderneath, inDrawer, openDesigner } from "./design-drawer";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AddressEntry } from "@/components/consumer/address-entry";
 import { inLaunchMarket, outsideMarketMessage, type AddressSuggestion } from "@/lib/domain/address";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
@@ -37,6 +37,14 @@ const roofPicture = (s: { lat: number; lng: number }) =>
 const designHref = (jobId: string) => `/design/roof?job=${encodeURIComponent(jobId)}`;
 const lineOf = (a: Address) => [a.line, a.suburb, a.state, a.postcode].filter(Boolean).join(", ");
 const newSession = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()));
+
+const NARROW = "(max-width: 639px)";
+const narrowWatch = (on: () => void) => {
+  const m = window.matchMedia(NARROW);
+  m.addEventListener("change", on);
+  return () => m.removeEventListener("change", on);
+};
+const narrowNow = () => window.matchMedia(NARROW).matches;
 
 /** Waiting deals, the one most worth designing first: the hottest and nearest the end of its clock, then the longest waiting. */
 function rankQueue(list: readonly Waiting[], pulses: Record<string, DealPulse>): Waiting[] {
@@ -241,12 +249,15 @@ function FindBar({
     else router.push(deal);
   };
   const open = asked.length >= 2;
+  // On a phone the box is too narrow for the whole sentence (22 Nov 2026, Martin: the placeholder was cut off), so
+  // it reads shorter there, a size down; what is typed stays 16px so Safari doesn't zoom.
+  const narrow = useSyncExternalStore(narrowWatch, narrowNow, () => false);
   return (
     <div className="relative">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 max-sm:gap-2">
         <div
           className={clsx(
-            "flex min-w-0 flex-1 items-center gap-3 rounded-full bg-surface px-5 shadow-[var(--shadow-soft)] ring-1 transition",
+            "flex min-w-0 flex-1 items-center gap-3 rounded-full bg-surface px-5 shadow-[var(--shadow-soft)] ring-1 transition max-sm:gap-2 max-sm:px-4",
             newSite ? "ring-2 ring-sun-line" : "ring-line focus-within:ring-ink/40",
           )}
         >
@@ -275,11 +286,15 @@ function FindBar({
               newSite
                 ? "The new site's street address"
                 : hasDeals
-                  ? "Find a deal, or type an address to design"
-                  : "Type an address to design"
+                  ? narrow
+                    ? "Find a deal or type an address"
+                    : "Find a deal, or type an address to design"
+                  : narrow
+                    ? "Type an address"
+                    : "Type an address to design"
             }
             aria-label={newSite ? "The new site's street address" : hasDeals ? "Find a deal or an address" : "An address to design"}
-            className="h-14 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted"
+            className="h-14 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-muted max-sm:placeholder:text-[13.5px]"
           />
           {newSite ? (
             <button
@@ -303,7 +318,7 @@ function FindBar({
           }}
           title="Start a new design from an address"
           aria-label="New design"
-          className="flex size-14 shrink-0 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_8px_24px_rgba(255,90,31,0.35)] transition hover:scale-105 hover:brightness-105 motion-reduce:transition-none"
+          className="flex size-14 shrink-0 items-center justify-center rounded-full bg-sun-line max-sm:size-12 text-white shadow-[0_8px_24px_rgba(255,90,31,0.35)] transition hover:scale-105 hover:brightness-105 motion-reduce:transition-none"
         >
           <Plus className="size-7" strokeWidth={2.25} aria-hidden />
         </button>
