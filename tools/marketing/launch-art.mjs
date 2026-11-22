@@ -301,17 +301,17 @@ const ART = {
   /**
    * The designer in every email (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it…
    * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a slim band under the
-   * hook, the new designer pop-up on a real roof (the website's site, under a made-up label; no address shown).
+   * last part of every email but the designer's, the updated designer on a real roof, its dock and Sol in view (the website's site, under a made-up label; no address shown).
    */
   "designer-band.jpg": {
-    clipH: 480,
+    clipH: 560,
     html: page(
       `<div class="glow"></div><div class="frame"><img src="${shot("designer-site-1.webp")}"></div>
-       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:438px;bottom:auto">`,
-      `.glow{position:absolute;left:0;right:0;top:0;height:480px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
-       .frame{position:absolute;left:48px;top:28px;width:1104px;height:388px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
-       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 2%}
-       .tag{position:absolute;left:52px;top:442px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:518px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:560px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:470px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 77%}
+       .tag{position:absolute;left:52px;top:522px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
     ),
   },
 
@@ -400,7 +400,7 @@ const ART = {
         <div class="badge"><b>First month</b><span>free</span></div>
         <h1><span class="box"><i></i></span>Yes. I want my <b>AI sales force.</b></h1>
         <ul><li>Voice agents that ring every new lead</li><li>Sol, the brain of the business</li>
-          <li>The AI designer: roofs priced as they're drawn</li><li>Every feature, for every user</li></ul>
+          <li>The AI designer: roofs priced as they're drawn</li><li>From $39 a user, then pay as you go</li></ul>
         <p class="fine">No contract · Cancel any time · Prices include GST</p></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 85% 0%,rgba(255,90,31,.25),transparent 50%)}
        .coupon{position:absolute;left:56px;top:56px;right:56px;bottom:72px;border:2px dashed rgba(255,122,46,.75);border-radius:26px;padding:48px 56px;

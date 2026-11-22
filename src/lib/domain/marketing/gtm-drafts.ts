@@ -23,7 +23,7 @@
  * picture's id in its block (`withPictures`). Never sent or switched on by adding them.
  */
 import { ADD_ON_MONTHLY_CENTS } from "@/lib/domain/design/add-ons";
-import { SEAT_MONTHLY_CENTS, dollars, firstMonthWords } from "@/lib/domain/design/plans";
+import { COMMIT_SEAT_CENTS, SEAT_MONTHLY_CENTS, dollars, firstMonthWords } from "@/lib/domain/design/plans";
 import type { EdmBlock, EdmContent } from "./edm";
 import type { SequenceDraft, SequenceStep } from "./sequences";
 
@@ -33,6 +33,7 @@ const PRICING = `${SITE}#pricing`;
 const MARKETPLACE = `${SITE}design/marketplace`;
 
 const PLAN_AFTER = `${dollars(SEAT_MONTHLY_CENTS)} a user a month`;
+const COMMIT = `${dollars(COMMIT_SEAT_CENTS)} a user a month`;
 const VOICE_CENTS = ADD_ON_MONTHLY_CENTS.voice ?? 0;
 const VOICE = `${dollars(VOICE_CENTS)} a month`;
 
@@ -114,37 +115,46 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
 /** The picture key a draft's block stands for, read from its id (`gtm<email>pic<key>`). */
 export const pictureKeyOf = (b: EdmBlock): string | null => (b.kind === "image" ? (b.id.match(/pic([a-z]+)$/)?.[1] ?? null) : null);
 
+/** A part of an email: a hook, the picture or pictures it is about, a line only where words must be said, a button. */
+interface Section {
+  hook: string;
+  pictures: (keyof typeof GTM_PICTURES)[];
+  words?: string[];
+  cta: [string, string];
+}
+
+/** The designer's own part, near the end of every email but the designer's (it isn't the first thing anyone sees). */
+const DESIGNER_PART: Section = {
+  hook: "Made for solar. Design and price a roof while you're on the phone.",
+  pictures: ["dband"],
+  cta: ["Try the designer", DEMO],
+};
+
 /**
- * One email: the hook as its heading, then the designer (22 Nov 2026, Martin: every email shows the designer, so it
- * reads at a glance as solar software and not a stray promotion; the designer's own email already leads with it), its pictures (the product moving, Sol's card, the product itself), a line only
- * where something must be said in words, one button, then the slim $2-a-day strip and the Marketplace band.
+ * One email (22 Nov 2026, Martin: "dont just dump images without a hook call to action"; "dont make the designer the first
+ * slide"; every email shows the designer, so it reads at a glance as solar software): a run of parts, each a hook over its
+ * picture and a button under it, then the designer's part (unless the email is about the designer), then the slim
+ * $2-a-day strip and the Marketplace band.
  */
-function email(
-  key: string,
-  pictures: [keyof typeof GTM_PICTURES, ...(keyof typeof GTM_PICTURES)[]],
-  subject: string,
-  preview: string,
-  hook: string,
-  words: string[],
-  button: [string, string],
-): EdmContent {
+function email(key: string, subject: string, preview: string, parts: [Section, ...Section[]]): EdmContent {
   const block = (id: string, b: Omit<EdmBlock, "id" | "imageId">): EdmBlock => ({ id: `gtm${key}${id}`, imageId: null, ...b });
-  const picture = (k: string, url = button[1]) => block(`pic${k}`, { kind: "image", text: GTM_PICTURES[k].alt, url, align: "center" });
+  const picture = (k: string, url: string) => block(`pic${k}`, { kind: "image", text: GTM_PICTURES[k].alt, url, align: "center" });
+  const all = parts.some((p) => p.pictures.includes("designer")) ? parts : [...parts, DESIGNER_PART];
   return {
     subject,
     preview,
     blocks: [
-      block("h", { kind: "heading", text: hook, url: null, align: "left" }),
-      ...(pictures.includes("designer") ? [] : [picture("dband", DEMO)]),
-      ...pictures.map((k) => picture(k)),
-      ...(words.length ? [block("t", { kind: "text", text: words.join("\n\n"), url: null, align: "left" })] : []),
-      block("b", { kind: "button", text: button[0], url: button[1], align: "left" }),
+      ...all.flatMap((p, i) => [
+        block(`h${i}`, { kind: "heading", text: p.hook, url: null, align: "left" }),
+        ...p.pictures.map((k) => picture(k, p.cta[1])),
+        ...(p.words?.length ? [block(`t${i}`, { kind: "text", text: p.words.join("\n\n"), url: null, align: "left" })] : []),
+        block(`b${i}`, { kind: "button", text: p.cta[0], url: p.cta[1], align: "left" }),
+      ]),
       picture("footv", SITE),
       picture("footer", MARKETPLACE),
     ],
   };
 }
-
 /** Every picture in an email filled in from the ids the route made for each file (key → mimg id). */
 export function withPictures(c: EdmContent, ids: Record<string, string>): EdmContent {
   return {
@@ -159,93 +169,75 @@ export function withPictures(c: EdmContent, ids: Record<string, string>): EdmCon
 export const GTM_CAMPAIGN_NAME = "One giant leap · launch";
 export const GTM_SEQUENCE_NAME = "One giant leap · the series";
 
-/** The launch: the hook, Sol introducing himself, the products as a stack of cards. */
+/** The launch: Sol introducing himself, then what he does as a stack of cards. */
 export const GTM_LAUNCH: EdmContent = email(
   "l",
-  ["solintro", "cards"],
   "Solar just got an AI sales force",
   "Your leads answered in minutes. Your emails written. Your systems designed with you.",
-  "Solar just got an AI sales force.",
-  [],
-  ["See it work", SITE],
+  [
+    { hook: "Solar just got an AI sales force.", pictures: ["solintro"], cta: ["Meet Sol", SITE] },
+    { hook: "Answered, written, designed, booked. While you're on the roof.", pictures: ["cards"], cta: ["See it work", DEMO] },
+  ],
 );
 
-/** The series: a hook an email, the product moving, Sol's card, the product itself; then the deal. */
+/** The series: one product an email, each picture with its own hook and button. */
 const SERIES: { wait: number; content: EdmContent }[] = [
   {
     wait: 2,
-    content: email(
-      "a",
-      ["call", "xvoice", "pvoice", "pricev"],
-      `An AI salesperson for ${VOICE_DAY_WORDS}`,
-      "It rings every new lead in minutes and books them in. Nobody can be hired for that.",
-      `An AI salesperson for ${VOICE_DAY_WORDS}.`,
-      [`Calls & Texts is ${VOICE} with your own business number, on top of your RENUABL plan. Calls go out in calling hours.`],
-      ["Hear it call", SITE],
-    ),
+    content: email("a", `An AI salesperson for ${VOICE_DAY_WORDS}`, "It rings every new lead in minutes and books them in. Nobody can be hired for that.", [
+      {
+        hook: `An AI salesperson for ${VOICE_DAY_WORDS}.`,
+        pictures: ["call"],
+        words: [`Calls & Texts is ${VOICE} with your own business number, on top of your RENUABL plan. Calls go out in calling hours.`],
+        cta: ["Hear it call", SITE],
+      },
+      { hook: "It rings every new lead, and books them in.", pictures: ["xvoice"], cta: ["See how it books", DEMO] },
+      { hook: "Watch any call live. Step in whenever you like.", pictures: ["pvoice"], cta: ["Try the demo", DEMO] },
+      { hook: `${PRICE_DAY_LINE.replace(" is ", ". That's ")} Your own number included.`, pictures: ["pricev"], cta: ["See the pricing", PRICING] },
+    ]),
   },
   {
     wait: 2,
-    content: email(
-      "d",
-      ["xlead", "xcrm", "today"],
-      "Answer every lead in minutes",
-      "Emailed, rung and in your CRM while you're still on the roof.",
-      "Every new lead, answered in minutes.",
-      [],
-      ["See it answer", DEMO],
-    ),
+    content: email("d", "Answer every lead in minutes", "Emailed, rung and in your CRM while you're still on the roof.", [
+      { hook: "Every new lead, answered in minutes.", pictures: ["xlead"], cta: ["See it answer", DEMO] },
+      { hook: "Your calls written up. Your follow-ups drafted.", pictures: ["xcrm"], cta: ["See Sol at work", DEMO] },
+      { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Open the demo", DEMO] },
+    ]),
   },
   {
     wait: 3,
-    content: email(
-      "b",
-      ["sol", "psol"],
-      "Who should you call this morning?",
-      "Sol knows. And he's written what to say.",
-      "Know who to call, and what to say. Every morning.",
-      [],
-      ["Meet Sol", SITE],
-    ),
+    content: email("b", "Who should you call this morning?", "Sol knows. And he's written what to say.", [
+      { hook: "Know who to call, and what to say. Every morning.", pictures: ["sol"], cta: ["Meet Sol", SITE] },
+      { hook: "Ask Sol about any deal. He knows them all.", pictures: ["psol"], cta: ["Ask Sol in the demo", DEMO] },
+    ]),
   },
   {
     wait: 3,
-    content: email(
-      "c",
-      ["designer", "xdesigner"],
-      "Quote it before you leave the driveway",
-      "One press. Three priced designs. Signed online.",
-      "Quote it before you leave the driveway.",
-      [],
-      ["Try the designer", DEMO],
-    ),
+    content: email("c", "Quote it before you leave the driveway", "One press. Three priced designs. Signed online.", [
+      { hook: "Quote it before you leave the driveway.", pictures: ["xdesigner"], cta: ["See it design", DEMO] },
+      { hook: "Real roofs, laid out and priced as you draw.", pictures: ["designer"], cta: ["Try the designer", DEMO] },
+    ]),
   },
   {
     wait: 3,
-    content: email(
-      "e",
-      ["xruns", "runs"],
-      "Signed? It's already moving.",
-      "The order, approvals and the job card, from the moment they sign.",
-      "Signed? It's already moving.",
-      [],
-      ["See after the sale", SITE],
-    ),
+    content: email("e", "Signed? It's already moving.", "The order, approvals and the job card, from the moment they sign.", [
+      { hook: "Signed? It's already moving.", pictures: ["xruns"], cta: ["See after the sale", DEMO] },
+      { hook: "Every install on one calendar, ready for your crew.", pictures: ["runs"], cta: ["Open the calendar", DEMO] },
+    ]),
   },
   {
     wait: 4,
-    content: email(
-      "f",
-      ["coupon"],
-      `Yes: your first month is ${firstMonthWords}`,
-      "No contract. Cancel any time. Every feature, every user.",
-      "Here's the deal.",
-      [
-        `Your first month is ${firstMonthWords}. Then it's ${PLAN_AFTER}. No contract. Cancel any time.`,
-        "P.S. Leads go to whoever answers soonest. Let yours answer this week.",
-      ],
-      ["Yes, start now", PRICING],
-    ),
+    content: email("f", `Yes: your first month is ${firstMonthWords}`, "No contract. Cancel any time.", [
+      {
+        hook: "Here's the deal.",
+        pictures: ["coupon"],
+        words: [
+          `Your first month is ${firstMonthWords}. Then it's ${PLAN_AFTER}, or ${COMMIT} on the 12-month plan. No contract. Cancel any time.`,
+          "P.S. Leads go to whoever answers soonest. Let yours answer this week.",
+        ],
+        cta: ["Yes, start now", PRICING],
+      },
+    ]),
   },
 ];
 
