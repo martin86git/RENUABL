@@ -147,3 +147,17 @@ export function skyOf(type: unknown, daytime: unknown = true): Sky | null {
   if (t === "CLEAR" || t === "MOSTLY_CLEAR") return day ? "clear" : "clear-night";
   return null;
 }
+
+/** The weather as one emoji beside Today's date (22 Nov 2026, Martin: "a weather emoji widget"). */
+export const SKY_EMOJI: Record<Sky, string> = {
+  clear: "☀️",
+  "clear-night": "🌙",
+  partly: "⛅",
+  "partly-night": "☁️",
+  cloudy: "☁️",
+  rain: "🌧️",
+  storm: "⛈️",
+  snow: "❄️",
+  fog: "🌫️",
+  wind: "💨",
+};
