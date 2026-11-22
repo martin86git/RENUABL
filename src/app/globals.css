@@ -916,6 +916,12 @@ button.team-flash:not([aria-pressed="true"]) {
   max-height: 3rem;
   overflow: hidden;
 }
+.sol-moulded.sol-folded > [data-popup] {
+  cursor: pointer;
+}
+.sol-moulded.sol-dragging > [data-popup] {
+  transition: none;
+}
 .sol-moulded.sol-folded > [data-popup] > * {
   visibility: hidden;
 }

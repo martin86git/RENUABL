@@ -93,6 +93,7 @@ import {
   Trash2,
   X,
   ChevronDown,
+  GripHorizontal,
   Ellipsis,
   Move,
   Settings2,
@@ -1936,6 +1937,10 @@ export function RoofDesigner(props: {
   // Sol's box under the picture on a phone, folded to a strip (22 Nov 2026, Martin: "minimize down to a height where I
   // can still see the sol icon, pointer, eraser etc"); a new step or suggestion opens it again.
   const [solFolded, setSolFolded] = useState(false);
+  // How far the box has been slid up over the picture to show more words (22 Nov 2026, Martin: "slide it up higher").
+  const [solLift, setSolLift] = useState(0);
+  const [solDragging, setSolDragging] = useState(false);
+  const solDrag = useRef<{ y: number; from: number; moved: boolean } | null>(null);
   // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
   const [panelCard, setPanelCard] = useState(false);
   const [phonePitch, setPhonePitch] = useState(false);
@@ -6778,16 +6783,54 @@ export function RoofDesigner(props: {
     if (solSaying) setSolFolded(false);
   }
   const foldable = underUp && (guideShown || nudgeShown);
+  // The box's top edge: the picture's foot, or higher once slid up. Sol and the foot row stand on it.
+  const liftMost = stage ? Math.round(stage.photoH * 0.6) : 0;
+  const lift = foldable && !solFolded ? Math.min(solLift, liftMost) : 0;
+  const deckTop = foot === null ? null : foot - lift;
+  const restFolded = 48;
+  // One handle in the box's top left: pressed, it folds or opens the box; dragged, it slides the box up or down (down
+  // past its usual height folds it, up from folded opens it).
   const foldButton = foldable ? (
     <button
       type="button"
-      onClick={() => setSolFolded((f) => !f)}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const from = solFolded ? -((stage?.rest ?? 156) - 8 - restFolded) : lift;
+        solDrag.current = { y: e.clientY, from, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const d = solDrag.current;
+        if (!d) return;
+        const dy = d.y - e.clientY;
+        if (!d.moved && Math.abs(dy) < 6) return;
+        if (!d.moved) setSolDragging(true);
+        d.moved = true;
+        const v = d.from + dy;
+        if (v < -40) {
+          setSolFolded(true);
+          setSolLift(0);
+        } else {
+          setSolFolded(false);
+          setSolLift(Math.max(0, Math.min(liftMost, Math.round(v))));
+        }
+      }}
+      onPointerUp={() => {
+        const d = solDrag.current;
+        solDrag.current = null;
+        setSolDragging(false);
+        if (d && !d.moved) setSolFolded((f) => !f);
+      }}
+      onPointerCancel={() => {
+        solDrag.current = null;
+        setSolDragging(false);
+      }}
       aria-expanded={!solFolded}
       aria-label={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
-      title={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
-      className="pointer-events-auto absolute left-2.5 top-2 z-10 flex size-8 items-center justify-center rounded-full text-white/70 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+      title={solFolded ? "Open Sol's box, or drag it up" : "Fold Sol's box away, or drag it up to read more"}
+      className="pointer-events-auto absolute left-2.5 top-1.5 z-10 flex h-8 w-12 touch-none flex-col items-center justify-center rounded-full text-white/70 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
     >
-      <ChevronDown className={clsx("size-4 transition-transform", solFolded && "rotate-180")} aria-hidden />
+      <GripHorizontal className="-mb-1 size-4" aria-hidden />
+      <ChevronDown className={clsx("size-3.5 transition-transform", solFolded && "rotate-180")} aria-hidden />
     </button>
   ) : null;
   // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
@@ -11328,6 +11371,7 @@ export function RoofDesigner(props: {
                     // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
                     (underUp || sideDeck) && "sol-moulded",
                     underUp && solFolded && "sol-folded",
+                    underUp && solDragging && "sol-dragging",
                     deskFoot
                       ? sideDeck && "desk-deck bottom-0"
                       : sideways
@@ -11344,14 +11388,22 @@ export function RoofDesigner(props: {
                         : solNotch(0, 40)
                       : underUp && foot !== null
                         ? ({
-                            top: foot,
+                            top: deckTop ?? foot,
                             bottom: "auto",
                             ...solNotch(0, 30),
-                            "--sol-rest": `${(stage?.rest ?? 156) - 8}px`,
+                            "--sol-rest": `${(stage?.rest ?? 156) - 8 + lift}px`,
                           } as React.CSSProperties)
                         : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
+                  onClickCapture={(e) => {
+                    // Folded, a press anywhere on the strip opens it again.
+                    if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSolFolded(false);
+                    }
+                  }}
                 >
                   {foldButton}
                   <SolGuide
@@ -11423,6 +11475,7 @@ export function RoofDesigner(props: {
                     // Sideways it stands above Sol's round, which holds the tools there too.
                     (underUp || sideDeck) && "sol-moulded",
                     underUp && solFolded && "sol-folded",
+                    underUp && solDragging && "sol-dragging",
                     deskFoot
                       ? sideDeck && "desk-deck bottom-0"
                       : sideways
@@ -11438,14 +11491,22 @@ export function RoofDesigner(props: {
                         : solNotch(0, 40)
                       : underUp && foot !== null
                         ? ({
-                            top: foot,
+                            top: deckTop ?? foot,
                             bottom: "auto",
                             ...solNotch(0, 30),
-                            "--sol-rest": `${(stage?.rest ?? 156) - 8}px`,
+                            "--sol-rest": `${(stage?.rest ?? 156) - 8 + lift}px`,
                           } as React.CSSProperties)
                         : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
+                  onClickCapture={(e) => {
+                    // Folded, a press anywhere on the strip opens it again.
+                    if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSolFolded(false);
+                    }
+                  }}
                 >
                   {foldButton}
                   <SolNudges
@@ -11471,7 +11532,7 @@ export function RoofDesigner(props: {
                   // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
                   style={
                     deckUp
-                      ? { left: "calc(50% + 3.75rem)", top: foot ?? 0, transform: "translate(-50%, -50%)" }
+                      ? { left: "calc(50% + 3.75rem)", top: deckTop ?? 0, transform: "translate(-50%, -50%)" }
                       : sideways
                         ? { left: "calc(50% + 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
                         : { left: "calc(50% + 3.75rem)", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
@@ -11523,7 +11584,7 @@ export function RoofDesigner(props: {
                           height: deskFoot ? 84 : 60,
                           transform: "translate(-50%, 50%)",
                         }
-                      : { left: "50%", top: foot ?? 0, width: 60, height: 60, transform: "translate(-50%, -50%)" }
+                      : { left: "50%", top: deckTop ?? 0, width: 60, height: 60, transform: "translate(-50%, -50%)" }
                   }
                 />
               )}
@@ -11536,7 +11597,7 @@ export function RoofDesigner(props: {
                     sideways
                       ? { left: "calc(50% - 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
                       : deckUp
-                        ? { left: "calc(50% - 3.75rem)", top: (foot ?? 300) + 22, transform: "translate(-50%, -100%)" }
+                        ? { left: "calc(50% - 3.75rem)", top: (deckTop ?? 300) + 22, transform: "translate(-50%, -100%)" }
                         : { left: "50%", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
                   }
                 >
@@ -11805,7 +11866,7 @@ export function RoofDesigner(props: {
                               : `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)`,
                           }
                         : deckUp && stage
-                          ? { transform: `translateY(${-Math.max(0, (stage.pb - 43.5) / 0.68)}px)` }
+                          ? { transform: `translateY(${-Math.max(0, (stage.pb + lift - 43.5) / 0.68)}px)` }
                           : undefined
                     }
                     title={
