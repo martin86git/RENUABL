@@ -51,6 +51,10 @@ export function askSales(o: { name: string; business: string; email: string; mob
   return post("/api/design/sales-enquiry", o);
 }
 
+export function requestDemo(o: { name: string; business: string; email: string; mobile: string; note: string }) {
+  return post("/api/design/demo-request", o);
+}
+
 export interface BillingState {
   /** RENUABL doesn't bill this business: no plan to choose, nothing charged. */
   notBilled?: boolean;

@@ -4,9 +4,22 @@ import { SAMPLE_DEAL_HINT } from "@/lib/domain/design/deal-tour";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, LayoutGrid, List, PenTool, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  List,
+  PenTool,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react";
 import clsx from "clsx";
-import { JOB_STAGES, STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { JOB_STAGES, OPEN_STAGES, STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { DEFAULT_PIPELINE, cleanPipelineChoice, type PipelineChoice } from "@/lib/domain/design/deal";
 import {
   STAGE_NAME_MAX,
@@ -54,6 +67,22 @@ const CHOICE = "renuabl.design.pipeline";
 
 /** The pipeline menu's last option: starts a new pipeline. */
 const NEW_PIPELINE = "__new";
+
+/** The fine bar over each column: being sold in the signal orange, won in green, lost in red. */
+const stageBar = (stage: JobStage) =>
+  OPEN_STAGES.includes(stage) ? "bg-sun-line" : WON_STAGES.includes(stage) ? "bg-positive" : "bg-danger";
+
+/** "$48k" for a column's total on a phone, where "$48,120" crowds the stage's name. */
+const shortDollars = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : dollars(n));
+
+/** How long since a deal last changed, short: "Today", "2d ago", "3w ago", else the date. */
+function agoWords(at: string): string {
+  const days = Math.floor((Date.now() - new Date(at).getTime()) / 86_400_000);
+  if (!Number.isFinite(days) || days < 1) return "Today";
+  if (days < 14) return `${days}d ago`;
+  if (days < 60) return `${Math.floor(days / 7)}w ago`;
+  return shortDate(at);
+}
 
 const stageSelect =
   "block h-8 w-full appearance-auto rounded-md border border-line bg-surface px-2 text-xs text-ink-2 outline-none focus:border-forest";
@@ -283,136 +312,202 @@ export function PipelinesPage() {
     </select>
   );
 
-  return (
-    <div className="px-5 py-8 lg:px-10">
-      <PageHead eyebrow="CRM · Deals" title={named.name}>
-        <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
-          <Plus className="size-4" aria-hidden /> New deal
-        </button>
-      </PageHead>
-      {adding && <NewDeal onClose={() => setAdding(false)} />}
+  const pipelineSelect = (className: string, withNew: boolean) => (
+    <select
+      className={className}
+      value={named.id}
+      onChange={(e) => {
+        if (e.target.value === NEW_PIPELINE) return setNaming({ mode: "new", name: "" });
+        const p = all.find((x) => x.id === e.target.value);
+        if (p) pick(p);
+      }}
+    >
+      {all
+        .filter((p) => p.set)
+        .map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      {all.some((p) => !p.set) && (
+        <optgroup label="Your own">
+          {all
+            .filter((p) => !p.set)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+        </optgroup>
+      )}
+      {withNew && <option value={NEW_PIPELINE}>+ New pipeline…</option>}
+    </select>
+  );
+  const views = (
+    [
+      ["cards", "Cards", LayoutGrid],
+      ["list", "List", List],
+    ] as const
+  ).map(([view, name, Icon]) => ({ view, name, Icon }));
 
-      <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
-        <label className="inline-flex items-center gap-2">
-          <span className="sr-only">Whose deals</span>
-          <select
-            className={clsx(ui.input, "h-9 min-h-9 w-40 appearance-auto")}
-            value={whose}
-            onChange={(e) => setWhose(e.target.value as typeof whose)}
+  return (
+    <div className="px-1.5 py-2 sm:px-5 sm:py-8 lg:px-10">
+      {/* On a phone: one graphite card. The pipeline is the title (pressed to pick another), with how many deals and
+          what they are worth under it and New deal beside it; under them whose deals, and cards or list as two icons. */}
+      <div className="rounded-2xl bg-primary p-4 text-primary-ink sm:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <label className="relative flex min-w-0 items-center">
+              <span className="sr-only">Pipeline</span>
+              {pipelineSelect(
+                "min-w-0 max-w-full appearance-none truncate bg-transparent pr-6 text-[21px] font-semibold tracking-[-0.02em] text-primary-ink outline-none [field-sizing:content] [&_option]:text-ink",
+                false,
+              )}
+              <ChevronDown className="pointer-events-none absolute right-0 size-4 opacity-80" aria-hidden />
+            </label>
+            <p className="mt-0.5 text-[12px] tabular-nums opacity-70">
+              {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : "\u00a0"}
+            </p>
+          </div>
+          <button
+            onClick={() => setAdding(true)}
+            disabled={adding}
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/12 px-3.5 text-[14px] font-medium ring-1 ring-white/15 active:bg-white/20"
           >
-            <option value="all">Everyone&apos;s deals</option>
-            <option value="mine">My deals</option>
-            <option value="none">No owner yet</option>
-          </select>
-        </label>
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
-          <label className="inline-flex items-center gap-2">
-            <span className="sr-only">Pipeline</span>
-            <select
-              className={clsx(ui.input, "h-9 min-h-9 w-64 appearance-auto font-medium")}
-              value={named.id}
-              onChange={(e) => {
-                if (e.target.value === NEW_PIPELINE) return setNaming({ mode: "new", name: "" });
-                const p = all.find((x) => x.id === e.target.value);
-                if (p) pick(p);
-              }}
-            >
-              {all
-                .filter((p) => p.set)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              {all.some((p) => !p.set) && (
-                <optgroup label="Your own">
-                  {all
-                    .filter((p) => !p.set)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                </optgroup>
-              )}
-              <option value={NEW_PIPELINE}>+ New pipeline…</option>
-            </select>
-          </label>
-          {naming ? (
-            <span className="ml-1 inline-flex flex-wrap items-center gap-1.5">
-              <input
-                autoFocus
-                aria-label={naming.mode === "new" ? "New pipeline's name" : "Pipeline name"}
-                className={clsx(ui.input, "h-9 min-h-9 w-48")}
-                value={naming.name}
-                maxLength={40}
-                placeholder={naming.mode === "new" ? "New pipeline's name" : "Pipeline name"}
-                onChange={(e) => setNaming({ ...naming, name: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void keep();
-                  if (e.key === "Escape") setNaming(null);
-                }}
-              />
-              <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={keep} disabled={!naming.name.trim()}>
-                {naming.mode === "new" ? "Create" : "Save"}
-              </button>
-              <button className={clsx(ui.quiet, "h-9 px-3 text-[13px]")} onClick={() => setNaming(null)}>
-                Cancel
-              </button>
-              {naming.mode === "new" && (
-                <span className="text-xs text-muted">Starts with the stages of {named.name}; add or take off stages after.</span>
-              )}
-            </span>
-          ) : (
-            <span className="ml-1 inline-flex items-center gap-3 text-[13px] font-medium">
-              <button
-                className={clsx(ui.link, "inline-flex items-center gap-1")}
-                onClick={() => setNaming({ mode: "rename", name: named.name })}
-              >
-                <Pencil className="size-3.5" aria-hidden /> Rename
-              </button>
-              {named.rowId && (
-                <button className="inline-flex items-center gap-1 text-muted hover:text-danger" onClick={() => void remove(named)}>
-                  {named.set ? (
-                    <>
-                      <RotateCcw className="size-3.5" aria-hidden /> Put back as it came
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="size-3.5" aria-hidden /> Delete
-                    </>
-                  )}
-                </button>
-              )}
-            </span>
-          )}
+            <Plus className="size-4" aria-hidden /> New deal
+          </button>
         </div>
-        <div className="ml-auto flex items-center gap-3">
-          <p className="text-xs tabular-nums text-muted">
-            {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : ""}
-          </p>
-          <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="View">
-            {(
-              [
-                ["cards", "Cards", LayoutGrid],
-                ["list", "List", List],
-              ] as const
-            ).map(([view, name, Icon]) => (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <label className="relative flex min-w-0 items-center">
+            <span className="sr-only">Whose deals</span>
+            <select
+              className="h-9 min-w-0 appearance-none truncate rounded-lg bg-transparent pl-3 pr-8 text-[14px] text-primary-ink outline-none ring-1 ring-white/25 [&_option]:text-ink"
+              value={whose}
+              onChange={(e) => setWhose(e.target.value as typeof whose)}
+            >
+              <option value="all">Everyone&apos;s deals</option>
+              <option value="mine">My deals</option>
+              <option value="none">No owner yet</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2.5 size-4 opacity-80" aria-hidden />
+          </label>
+          <div className="flex shrink-0 items-center rounded-lg bg-white/8 p-0.5 ring-1 ring-white/15" role="group" aria-label="View">
+            {views.map(({ view, name, Icon }) => (
               <button
                 key={view}
                 aria-pressed={choice.view === view}
+                aria-label={name}
+                title={name}
                 onClick={() => choose({ ...choice, view })}
                 className={clsx(
-                  "inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-[13px] font-medium",
-                  choice.view === view ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
+                  "inline-flex size-9 items-center justify-center rounded-md",
+                  choice.view === view ? "bg-white/18" : "opacity-70",
                 )}
               >
-                <Icon className="size-4" aria-hidden /> {name}
+                <Icon className="size-4" aria-hidden />
               </button>
             ))}
           </div>
         </div>
       </div>
+
+      <div className="hidden sm:block">
+        <PageHead eyebrow="CRM · Deals" title={named.name}>
+          <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
+            <Plus className="size-4" aria-hidden /> New deal
+          </button>
+        </PageHead>
+
+        <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
+          <label className="inline-flex items-center gap-2">
+            <span className="sr-only">Whose deals</span>
+            <select
+              className={clsx(ui.input, "h-9 min-h-9 w-40 appearance-auto")}
+              value={whose}
+              onChange={(e) => setWhose(e.target.value as typeof whose)}
+            >
+              <option value="all">Everyone&apos;s deals</option>
+              <option value="mine">My deals</option>
+              <option value="none">No owner yet</option>
+            </select>
+          </label>
+          <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
+            <label className="inline-flex items-center gap-2">
+              <span className="sr-only">Pipeline</span>
+              {pipelineSelect(clsx(ui.input, "h-9 min-h-9 w-64 appearance-auto font-medium"), true)}
+            </label>
+            {naming ? (
+              <span className="ml-1 inline-flex flex-wrap items-center gap-1.5">
+                <input
+                  autoFocus
+                  aria-label={naming.mode === "new" ? "New pipeline's name" : "Pipeline name"}
+                  className={clsx(ui.input, "h-9 min-h-9 w-48")}
+                  value={naming.name}
+                  maxLength={40}
+                  placeholder={naming.mode === "new" ? "New pipeline's name" : "Pipeline name"}
+                  onChange={(e) => setNaming({ ...naming, name: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void keep();
+                    if (e.key === "Escape") setNaming(null);
+                  }}
+                />
+                <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={keep} disabled={!naming.name.trim()}>
+                  {naming.mode === "new" ? "Create" : "Save"}
+                </button>
+                <button className={clsx(ui.quiet, "h-9 px-3 text-[13px]")} onClick={() => setNaming(null)}>
+                  Cancel
+                </button>
+                {naming.mode === "new" && (
+                  <span className="text-xs text-muted">Starts with the stages of {named.name}; add or take off stages after.</span>
+                )}
+              </span>
+            ) : (
+              <span className="ml-1 inline-flex items-center gap-3 text-[13px] font-medium">
+                <button
+                  className={clsx(ui.link, "inline-flex items-center gap-1")}
+                  onClick={() => setNaming({ mode: "rename", name: named.name })}
+                >
+                  <Pencil className="size-3.5" aria-hidden /> Rename
+                </button>
+                {named.rowId && (
+                  <button className="inline-flex items-center gap-1 text-muted hover:text-danger" onClick={() => void remove(named)}>
+                    {named.set ? (
+                      <>
+                        <RotateCcw className="size-3.5" aria-hidden /> Put back as it came
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="size-3.5" aria-hidden /> Delete
+                      </>
+                    )}
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <p className="text-xs tabular-nums text-muted">
+              {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : ""}
+            </p>
+            <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="View">
+              {views.map(({ view, name, Icon }) => (
+                <button
+                  key={view}
+                  aria-pressed={choice.view === view}
+                  onClick={() => choose({ ...choice, view })}
+                  className={clsx(
+                    "inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-[13px] font-medium",
+                    choice.view === view ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden /> {name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      {adding && <NewDeal onClose={() => setAdding(false)} />}
 
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
@@ -421,7 +516,7 @@ export function PipelinesPage() {
       )}
 
       {choice.view === "cards" ? (
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-4">
+        <div className="no-scrollbar -mx-1.5 mt-3 flex snap-x snap-mandatory scroll-px-1.5 gap-2.5 overflow-x-auto px-1.5 pb-4 sm:mx-0 sm:mt-4 sm:snap-none sm:gap-3 sm:px-0">
           {stages.map((stage, at) => {
             // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
             const column = shown
@@ -456,7 +551,7 @@ export function PipelinesPage() {
                   setColOver(null);
                 }}
                 className={clsx(
-                  "relative flex min-w-72 flex-1 basis-72 snap-start flex-col rounded-lg border bg-surface-2 p-2",
+                  "relative flex w-[86%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 sm:w-auto sm:min-w-72 sm:flex-1 sm:shrink sm:basis-72 sm:rounded-lg",
                   over === stage ? "border-sun-line" : "border-transparent",
                   movingCol === stage && "opacity-50",
                 )}
@@ -471,6 +566,10 @@ export function PipelinesPage() {
                     )}
                   />
                 )}
+                <span
+                  className={clsx("absolute inset-x-0 top-0 h-[3px] rounded-t-[inherit]", stageBar(baseAt(stages, at, own)))}
+                  aria-hidden
+                />
                 <StageHead
                   stage={stage}
                   own={own}
@@ -510,39 +609,49 @@ export function PipelinesPage() {
                         dragging === job.id && "opacity-60",
                       )}
                     >
-                      <Link
-                        href={dealOf(job)}
-                        className="block text-sm font-medium text-ink hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {job.customerName}
-                      </Link>
-                      <p className="mt-0.5 truncate text-xs text-ink-2">
-                        {job.title}
-                        {job.address ? ` · ${job.address.split(",")[0]}` : ""}
+                      <div className="flex items-baseline justify-between gap-3">
+                        <Link
+                          href={dealOf(job)}
+                          className="min-w-0 truncate text-[15px] font-medium text-ink hover:underline sm:text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {job.customerName}
+                        </Link>
+                        <span className="shrink-0 text-[15px] font-semibold tabular-nums text-ink sm:text-sm">
+                          {job.value ? dollars(job.value) : ""}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-[13px] text-ink-2 sm:text-xs">
+                        {job.address ? job.address.split(",")[0] : job.title}
+                        {job.address && job.title ? <span className="text-muted"> · {job.title}</span> : null}
                       </p>
-                      {job.sample && (
-                        <p className="mt-1.5 inline-flex h-6 items-center rounded-full bg-sun px-2.5 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
-                          {SAMPLE_DEAL_HINT}
-                        </p>
-                      )}
                       <PulseMarks pulse={pulses[job.id]} />
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 text-sm tabular-nums text-ink">
+                      <div className="mt-2.5 flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1.5">
                           <Owner email={job.owner} />
-                          {dollars(job.value)}
+                          {job.sample ? (
+                            <span className="truncate rounded-full bg-sun px-2.5 py-1 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
+                              {SAMPLE_DEAL_HINT}
+                            </span>
+                          ) : (
+                            <span className="truncate text-[12px] text-muted" title={`Changed ${shortDate(job.updatedAt)}`}>
+                              {agoWords(job.updatedAt)}
+                            </span>
+                          )}
                         </span>
                         {job.lat !== null && (
                           <Link
                             href={`${PATHS.designer}?job=${job.id}`}
                             onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
+                            className="tap-area inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-sun-ink hover:text-ink sm:text-xs sm:text-ink-2"
                           >
-                            <PenTool className="size-3.5" aria-hidden /> {job.projectId ? "Design" : "Design it"}
+                            <PenTool className="hidden size-3.5 sm:block" aria-hidden />
+                            {job.projectId ? "Open design" : "Design it"}
+                            <ArrowRight className="size-3.5 sm:hidden" aria-hidden />
                           </Link>
                         )}
                       </div>
-                      <label className="mt-2 block" onClick={(e) => e.stopPropagation()}>
+                      <label className="mt-2 hidden sm:block" onClick={(e) => e.stopPropagation()}>
                         <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
                         {stagePicker(job, stageSelect)}
                       </label>
@@ -692,11 +801,15 @@ function StageHead({
           />
         ) : (
           <h2 className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink">
-            {shownName} <span className="tabular-nums text-muted">{count ?? ""}</span>
+            {shownName}{" "}
+            <span className="tabular-nums text-muted">
+              {count ?? ""}
+              {sum ? <span className="normal-case sm:hidden"> · {shortDollars(sum)}</span> : null}
+            </span>
           </h2>
         )}
         <span className="flex shrink-0 items-center gap-1">
-          <span className="text-xs tabular-nums text-muted">{sum ? dollars(sum) : ""}</span>
+          <span className="hidden text-xs tabular-nums text-muted sm:inline">{sum ? dollars(sum) : ""}</span>
           {name === null && (
             <button
               title="Rename this stage"

@@ -1517,6 +1517,17 @@ create table if not exists design_leads (
   note text,
   at timestamptz not null default now()
 );
+alter table design_leads add column if not exists stage text;
+alter table design_leads add column if not exists stage_at timestamptz;
+alter table design_leads add column if not exists moved_by text;
+alter table design_leads add column if not exists staff_note text;
+-- A booked demo and its reminders (business-leads.ts, 21 Nov 2026).
+alter table design_leads add column if not exists demo_at timestamptz;
+alter table design_leads add column if not exists demo_link text;
+alter table design_leads add column if not exists demo_remind_lead boolean not null default false;
+alter table design_leads add column if not exists demo_by text;
+alter table design_leads add column if not exists demo_staff_reminded_at timestamptz;
+alter table design_leads add column if not exists demo_lead_reminded_at timestamptz;
 create table if not exists design_sol_credits (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
