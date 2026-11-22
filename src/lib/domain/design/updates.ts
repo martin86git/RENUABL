@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Designer",
+    words: "Designer on a phone: zoom in and out with the + and − on the map's right; the magnifier beside them turns on pinch zoom.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
     words: "Designer on a phone: drag Sol's box up to read more, or down to fold it to a strip; tap the strip to open it again.",
   },
   {

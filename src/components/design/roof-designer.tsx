@@ -6929,7 +6929,7 @@ export function RoofDesigner(props: {
           drawn={illustrated}
           onDrawn={toggleIllustrated}
           zooming={zooming}
-          {...(solHolds ? { onZoom: () => setZooming((z) => !z), onPitch: () => setPhonePitch((v) => !v) } : {})}
+          {...(solHolds ? { onPitch: () => setPhonePitch((v) => !v) } : {})}
           pitchShown={phonePitch}
           pitchWords={quoteNow.form.roof === "flat" ? "Pitch: flat" : `Pitch ${quoteNow.form.pitch ?? TILT.roof}°`}
           {...(costsHidden ? {} : { onDesignForMe: () => setMineIntro(true) })}
@@ -9277,11 +9277,41 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
-              {/* Zoom mode on a phone: what it does, and the way out, at the picture's foot. */}
-              {phone && stage && zooming && (
+              {/* Zoom on a phone (22 Nov 2026, Martin: the pinch pill was hidden behind Sol, and "the zoom + and - … out of the
+                  tool bar and on the right hand side … with a small magnifying glass next to it"): + and − on the map's right
+                  edge, the magnifier beside them turning pinch zoom on, its pill at the picture's top where nothing covers it. */}
+              {solHolds && !solTray && (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
-                  style={{ top: stage.pt + stage.photoH - 44 }}
+                  className="pointer-events-auto absolute right-2 z-30 flex -translate-y-1/2 items-center gap-1.5"
+                  style={{ top: stage ? stage.pt + stage.photoH / 2 : "50%" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setZooming((z) => !z)}
+                    aria-pressed={zooming}
+                    aria-label={zooming ? "Stop pinch zoom" : "Pinch to zoom"}
+                    className={clsx(
+                      "grid size-7 place-items-center rounded-full shadow-lift",
+                      zooming ? "bg-sun-line text-white" : "bg-primary/85 text-primary-ink",
+                    )}
+                  >
+                    <Search className="size-3.5" aria-hidden />
+                  </button>
+                  <div className="flex flex-col overflow-hidden rounded-full bg-primary/90 text-primary-ink shadow-lift">
+                    <button type="button" aria-label="Zoom in" onClick={() => zoom(1 / 1.4)} className="grid size-10 place-items-center">
+                      <Plus className="size-5" aria-hidden />
+                    </button>
+                    <span className="mx-2.5 h-px bg-primary-ink/25" aria-hidden />
+                    <button type="button" aria-label="Zoom out" onClick={() => zoom(1.4)} className="grid size-10 place-items-center">
+                      <Minus className="size-5" aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {solHolds && zooming && (
+                <div
+                  className="pointer-events-auto absolute inset-x-0 z-40 flex justify-center"
+                  style={{ top: (stage ? stage.pt : 0) + 64 }}
                 >
                   <button
                     type="button"
