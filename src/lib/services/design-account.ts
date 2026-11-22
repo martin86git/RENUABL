@@ -252,3 +252,14 @@ export async function removeMyPhoto(): Promise<{ problem?: string }> {
   const res = await send<Answer>("/api/design/profile/photo", "DELETE");
   return res.ok ? {} : { problem: res.message ?? UNREACHABLE };
 }
+
+/** The business's own sign-in address (sign-in-page.ts), made the first time it is asked for. */
+export async function loadSignInPage(): Promise<string | null> {
+  return (await send<{ ok: boolean; path?: string }>("/api/design/sign-in-page", "GET")).path ?? null;
+}
+
+/** The owner's new sign-in address; the old one stops working. */
+export async function renewSignInPage(): Promise<{ path?: string; problem?: string }> {
+  const res = await send<{ ok: boolean; path?: string; message?: string }>("/api/design/sign-in-page", "POST");
+  return res.ok && res.path ? { path: res.path } : { problem: res.message ?? UNREACHABLE };
+}
