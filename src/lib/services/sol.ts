@@ -66,6 +66,8 @@ export const SOL_TOGGLE = "renuabl:sol-toggle";
  * on screen it sets `data-deal-sol` on <html>, and the foot bar's Sol round toggles that sheet instead of his panel.
  */
 export const DEAL_SOL_TOGGLE = "renuabl:deal-sol-toggle";
+/** Said when the deal's Sol sheet folds into the foot bar's round or comes out of it (`data-deal-sol-tucked`). */
+export const DEAL_SOL_STATE = "renuabl:deal-sol-state";
 export function toggleSolHere(phone: boolean) {
   const deal = phone && typeof document !== "undefined" && document.documentElement.dataset.dealSol === "1";
   window.dispatchEvent(new Event(deal ? DEAL_SOL_TOGGLE : SOL_TOGGLE));

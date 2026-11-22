@@ -1844,3 +1844,64 @@ html:has(.sales-snap) {
       0 22px 60px rgba(11, 11, 12, 0.38);
   }
 }
+
+/* A deal's Sol sheet folds into the foot bar's Sol round on a phone, and comes back out of it (22 Nov 2026, Martin:
+   "he should minimise visually onto the centre sol icon so the user can see that's where they can re-engage Sol on
+   the deal"). The sheet shrinks towards the round (its origin is the round's middle, below the sheet's foot), and the
+   round then carries an orange ring with a small dot: Sol is in there, a press brings him out. */
+@media (max-width: 639px) {
+  .deal-sol-sheet {
+    transform-origin: 50% calc(100% + 2.25rem);
+    transition:
+      transform 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s ease,
+      visibility 0s linear 0s;
+  }
+  .deal-sol-sheet.deal-sol-tucked {
+    transform: scale(0.05);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s ease 0.08s,
+      visibility 0s linear 0.38s;
+  }
+  .phone-tabbar .sol-orb[data-holding] {
+    box-shadow:
+      0 0 0 2px var(--surface),
+      0 0 0 4px var(--sun-line);
+    animation: sol-lands 0.5s ease-out 0.3s both;
+  }
+  .phone-tabbar .sol-orb[data-holding]::after {
+    content: "";
+    position: absolute;
+    right: 1px;
+    top: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--sun-line);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+}
+@keyframes sol-lands {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal-sol-sheet,
+  .deal-sol-sheet.deal-sol-tucked {
+    transition: none;
+  }
+  .phone-tabbar .sol-orb[data-holding] {
+    animation: none;
+  }
+}
