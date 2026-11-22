@@ -483,11 +483,15 @@ export function SolChat({
                   : "Sol can't see the page beside this chat. Press to let him."
               }
               className={clsx(
-                "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-canvas",
+                "inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full transition-colors hover:bg-canvas",
                 seePage ? "text-sun-line" : "text-muted hover:text-ink",
               )}
             >
-              {seePage ? <Eye className="size-3.5" aria-hidden /> : <EyeOff className="size-3.5" aria-hidden />}
+              {seePage ? (
+                <Eye className="size-3.5 max-lg:size-[18px]" aria-hidden />
+              ) : (
+                <EyeOff className="size-3.5 max-lg:size-[18px]" aria-hidden />
+              )}
             </button>
           )}
           {/* A new chat: a speech bubble with a plus (8 Nov 2026; 18 Nov 2026, Martin). The current one is filed away. */}
@@ -497,9 +501,9 @@ export function SolChat({
             disabled={busy || turns.length === 0}
             aria-label="New chat"
             title="New chat"
-            className="inline-flex size-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
+            className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
           >
-            <MessageSquarePlus className="size-3.5" aria-hidden />
+            <MessageSquarePlus className="size-3.5 max-lg:size-[18px]" aria-hidden />
           </button>
           {/* Chat history (1 Nov 2026, Martin): the clock wound back. */}
           <button
@@ -509,11 +513,11 @@ export function SolChat({
             aria-label="Chat history"
             title="Chat history"
             className={clsx(
-              "inline-flex size-7 items-center justify-center rounded-full transition-colors",
+              "inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full transition-colors",
               history ? "bg-ink text-sun-line" : "text-muted hover:bg-canvas hover:text-ink",
             )}
           >
-            <History className="size-3.5" aria-hidden />
+            <History className="size-3.5 max-lg:size-[18px]" aria-hidden />
           </button>
           {onMinimise && (
             <button
@@ -521,9 +525,9 @@ export function SolChat({
               onClick={onMinimise}
               aria-label="Minimise Sol"
               title="Minimise Sol: a tab on the edge brings him back"
-              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
             >
-              <Minus className="size-3.5" aria-hidden />
+              <Minus className="size-3.5 max-lg:size-[18px]" aria-hidden />
             </button>
           )}
           {onClose && (
@@ -532,9 +536,9 @@ export function SolChat({
               onClick={onClose}
               aria-label="Close Sol"
               title="Close Sol (Esc)"
-              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
             >
-              <X className="size-3.5" aria-hidden />
+              <X className="size-3.5 max-lg:size-[18px]" aria-hidden />
             </button>
           )}
         </div>

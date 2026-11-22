@@ -103,7 +103,7 @@ export function SolDock() {
         aria-label="Sol"
         aria-hidden={!shown}
         className={clsx(
-          "fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
+          "sol-panel fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
           shown
             ? "translate-x-0 shadow-2xl min-[1440px]:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]"
             : "pointer-events-none invisible translate-x-full",

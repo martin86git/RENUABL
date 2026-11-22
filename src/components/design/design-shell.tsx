@@ -38,7 +38,8 @@ import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
-import { SolDock, SolNavButton, SolRail } from "./sol-dock";
+import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
+import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
 import { AssistantCallWindow } from "./assistant-call";
@@ -207,6 +208,12 @@ function Shell({
   const [account] = useDesignAccount();
   // Inside the design drawer's frame every page is bare, wherever the designer goes within it.
   const bare = useInDrawer() || bareAsked;
+  // On a phone Sol's panel covers the page with the foot bar under it (22 Nov 2026, Martin): a tab pressed there puts
+  // the panel away so the page it opens is seen.
+  const solOpen = useSolOpen();
+  const leaveSol = () => {
+    if (solOpen && !window.matchMedia("(min-width: 1024px)").matches) toggleSolHere(false);
+  };
   const on = Boolean(account?.signedIn && account.business);
   // What kind of business this login is (business-kind.ts): an installer or inspector has part of the product, and
   // nothing of the CRM is asked for.
@@ -747,7 +754,10 @@ function Shell({
             <Link
               key={t.label}
               href={t.href}
-              onClick={() => setMore(false)}
+              onClick={() => {
+                setMore(false);
+                leaveSol();
+              }}
               aria-current={lit ? "page" : undefined}
               className={clsx(
                 "flex flex-col items-center justify-center gap-1 font-medium",
@@ -777,7 +787,10 @@ function Shell({
         })}
         <button
           type="button"
-          onClick={() => setMore(!more)}
+          onClick={() => {
+            if (!more) leaveSol();
+            setMore(!more);
+          }}
           aria-expanded={more}
           className={clsx(
             "flex flex-col items-center justify-center gap-1 font-medium",

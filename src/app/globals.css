@@ -1554,6 +1554,25 @@ html:has(.sales-snap) {
     0 16px 36px -20px rgb(255 90 31 / 0.5);
 }
 
+/* Sol's panel on a phone keeps the foot bar under it (22 Nov 2026, Martin: "maintain the bottom nav bar even when in a
+   chat with sol as it isn't easy to navigate away"): the panel stops above the bar, and the bar stands over the panel so
+   Sol's raised round in its middle isn't cut off. While something is typed the bar steps aside and the panel runs to the
+   foot again (the rule below). */
+@media (max-width: 1023px) {
+  .sol-panel {
+    bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  body:has(.sol-panel[aria-hidden="false"]) .phone-tabbar {
+    z-index: 55;
+  }
+}
+@media (max-width: 1023px) and (pointer: coarse) {
+  body:has(.sol-panel :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
+    .sol-panel {
+    bottom: 0;
+  }
+}
+
 /* On a phone, while something is being typed, the foot bar steps aside so the keyboard doesn't push it up over the box
    being typed in (21 Nov 2026, Martin, Safari on iPhone). */
 @media (max-width: 1023px) and (pointer: coarse) {
