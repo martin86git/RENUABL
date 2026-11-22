@@ -44,7 +44,7 @@ export function PhoneTop({
           </Link>
         ) : (
           <Link href={home} aria-label="RENUABL, today">
-            <Wordmark className="text-[16px]" />
+            <Wordmark className="phone-wordmark text-[16px] transition-[font-size]" />
           </Link>
         )}
         {onSearch && (
