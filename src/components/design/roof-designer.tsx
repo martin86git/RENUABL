@@ -6667,11 +6667,18 @@ export function RoofDesigner(props: {
   );
 
   // Sol's step and suggestions, when shown.
+  // On a phone held upright the strings take Sol's place under the picture while stringing (22 Nov 2026).
+  const stringsUnder = solHolds && !sideways && tool === "string";
   const guideShown =
-    guideActive && !menu && !(solHolds && (picks.length > 0 || solTray)) && !(props.tight && !solAway && (commandReply || commandBusy));
+    guideActive &&
+    !menu &&
+    !stringsUnder &&
+    !(solHolds && (picks.length > 0 || solTray)) &&
+    !(props.tight && !solAway && (commandReply || commandBusy));
   const nudgeShown =
     !guideActive &&
     !solQuiet &&
+    !stringsUnder &&
     !(solHolds && (picks.length > 0 || solTray)) &&
     nudges.length > 0 &&
     !menu &&
@@ -6684,7 +6691,7 @@ export function RoofDesigner(props: {
   // in a notch of the plate under it.
   const foot = stage ? stage.pt + stage.photoH : null;
   const underUp = solHolds && !sideways && foot !== null && !solTray;
-  const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown);
+  const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown || stringsUnder);
   // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
   // (22 Nov 2026, Martin: the same places as upright), with Sol and the rounds beside him on its top edge.
   const sideDeck = solHolds && sideways && !solTray && picks.length === 0 && (guideShown || nudgeShown);
@@ -9692,18 +9699,64 @@ export function RoofDesigner(props: {
               {/* On the picture, half way down its right edge: the controls for whatever is picked, in a half-round. With nothing picked, the turn buttons for the rows of the face being worked on. */}
               {tool === "string" ? (
                 <div
-                  className="absolute right-3 top-[6.75rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
+                  className={clsx(
+                    "absolute overflow-y-auto rounded-lg border border-line bg-surface shadow-lift",
+                    // On a phone (22 Nov 2026, Martin: "optimise the string designer… wider, text smaller"): drawn at full
+                    // size (its own style keeps it out of the phone's smaller drawing) across the picture, smaller type,
+                    // a string a line.
+                    solHolds
+                      ? clsx(
+                          "z-30 space-y-1.5 p-2 text-[12px]",
+                          // Upright, a plate under the picture notched round Sol, so the roof stays clear to tap.
+                          sideways ? "right-2 top-2 w-[24rem] max-w-[calc(100%-1rem)]" : "inset-x-0 rounded-b-none rounded-t-[26px] !pt-8",
+                        )
+                      : "right-3 top-[6.75rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 p-3",
+                  )}
+                  style={
+                    solHolds && !sideways && stage
+                      ? { top: foot ?? 0, maxHeight: stage.pb, ...solNotch(0, 30) }
+                      : solHolds
+                        ? { zIndex: 30, maxHeight: `calc(100% - ${(sideDeckUp ? sideDeckH : 0) + 64}px)` }
+                        : undefined
+                  }
                   role="group"
                   aria-label="Strings"
                   data-popup
                 >
                   <div className="flex items-start gap-2">
-                    <p className={clsx(label, "flex-1")}>
+                    <p className={clsx(label, "flex-1", solHolds && "!text-[10px] leading-snug")}>
                       Strings
-                      {fitted.length
-                        ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
-                        : " · no inverter chosen"}
+                      {solHolds
+                        ? fitted.length
+                          ? ` · ${fittedKw} kW inverter · ${summary.kw.toFixed(2)} kW panels`
+                          : " · no inverter"
+                        : fitted.length
+                          ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
+                          : " · no inverter chosen"}
                     </p>
+                    {/* On a phone the two ways to start strings sit in the header, so the strings below stay in view. */}
+                    {solHolds && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={stringForMe}
+                          disabled={summary.panels === 0}
+                          title="String the panels by rule, checked against the inverter's inputs"
+                          className="-mt-1 flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-semibold text-ink ring-1 ring-sun-line disabled:opacity-50"
+                        >
+                          <Sparkles className="size-3.5 text-sun-ink" aria-hidden /> Auto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWiring(newId("s"))}
+                          disabled={startedString}
+                          aria-label="New string"
+                          className="-mt-1 flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-semibold text-ink ring-1 ring-line disabled:opacity-50"
+                        >
+                          <Plus className="size-3.5" aria-hidden /> New
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => pickTool("select")}
                       title="Done stringing (Esc)"
@@ -9713,12 +9766,20 @@ export function RoofDesigner(props: {
                       <X className="size-4" aria-hidden />
                     </button>
                   </div>
-                  {strings.length === 0 && <p className="text-sm text-muted">Click panels on the roof in the order they&apos;re wired.</p>}
-                  <ul className="space-y-1">
+                  {strings.length === 0 && (
+                    <p className={clsx("text-muted", solHolds ? "text-[12px]" : "text-sm")}>
+                      Click panels on the roof in the order they&apos;re wired.
+                    </p>
+                  )}
+                  <ul className={solHolds ? "space-y-0.5" : "space-y-1"}>
                     {strings.map((x, i) => (
                       <li
                         key={x.id}
-                        className={clsx("flex items-center gap-1 rounded-md border p-1", x.id === wiring ? "border-forest" : "border-line")}
+                        className={clsx(
+                          "flex items-center gap-1 rounded-md border",
+                          solHolds ? "px-1 py-0.5" : "p-1",
+                          x.id === wiring ? "border-forest" : "border-line",
+                        )}
                         onMouseEnter={() => setHover(x.id)}
                         onMouseLeave={() => setHover(null)}
                       >
@@ -9731,13 +9792,24 @@ export function RoofDesigner(props: {
                             style={{ background: STRING_COLOURS[i % STRING_COLOURS.length] }}
                             aria-hidden
                           />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">String {letter(i)}</span>
-                            <span className="block truncate text-xs tabular-nums text-muted">
-                              {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
-                              {checks[i].coldVoc ? ` · Voc ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                          {solHolds ? (
+                            // On a phone, one line: the letter, then its panels, kW and voltage.
+                            <span className="flex min-w-0 items-baseline gap-1.5">
+                              <span className="text-[13px] font-semibold">{letter(i)}</span>
+                              <span className="truncate text-[11px] tabular-nums text-muted">
+                                {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
+                                {checks[i].coldVoc ? ` · ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                              </span>
                             </span>
-                          </span>
+                          ) : (
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold">String {letter(i)}</span>
+                              <span className="block truncate text-xs tabular-nums text-muted">
+                                {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
+                                {checks[i].coldVoc ? ` · Voc ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                              </span>
+                            </span>
+                          )}
                         </button>
                         <select
                           value={`${x.inverter ?? 0}:${x.mppt ?? 0}`}
@@ -9752,12 +9824,15 @@ export function RoofDesigner(props: {
                           }}
                           aria-label={`The inverter input string ${letter(i)} is on`}
                           title="The inverter and the input (MPPT) this string is on"
-                          className="h-8 max-w-[6.5rem] rounded-lg border border-line bg-surface px-1 text-xs font-medium"
+                          className={clsx(
+                            "rounded-lg border border-line bg-surface px-1 font-medium",
+                            solHolds ? "h-7 max-w-[5.5rem] text-[11px]" : "h-8 max-w-[6.5rem] text-xs",
+                          )}
                         >
                           {Array.from({ length: Math.max(1, fitted.length, (x.inverter ?? 0) + 1) }, (_, n) =>
                             Array.from({ length: Math.max(inputsOf(n), n === (x.inverter ?? 0) ? (x.mppt ?? 0) + 1 : 0) }, (_, input) => (
                               <option key={`${n}:${input}`} value={`${n}:${input}`}>
-                                {fitted.length > 1 ? `Inv ${n + 1} · in ${input + 1}` : `Input ${input + 1}`}
+                                {fitted.length > 1 ? `Inv ${n + 1} · in ${input + 1}` : solHolds ? `In ${input + 1}` : `Input ${input + 1}`}
                               </option>
                             )),
                           )}
@@ -9791,7 +9866,10 @@ export function RoofDesigner(props: {
                   </ul>
                   {startedString && (
                     <p
-                      className="flex items-center gap-2 rounded-md border border-sun-line bg-sun px-2.5 py-2 text-sm text-sun-ink"
+                      className={clsx(
+                        "flex items-center gap-2 rounded-md border border-sun-line bg-sun px-2.5 text-sun-ink",
+                        solHolds ? "py-1.5 text-[11.5px]" : "py-2 text-sm",
+                      )}
                       role="status"
                     >
                       <span
@@ -9805,18 +9883,36 @@ export function RoofDesigner(props: {
                       </span>
                     </p>
                   )}
-                  <button
-                    className={clsx(button, "!min-h-9 w-full justify-center !border-sun-line")}
-                    onClick={stringForMe}
-                    disabled={summary.panels === 0}
-                    title="String the panels by rule, checked against the inverter's inputs"
-                  >
-                    <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> String automatically
-                  </button>
+                  {/* On a phone, String automatically and New string side by side. */}
+                  <div className={solHolds ? "hidden" : "contents"}>
+                    <button
+                      className={clsx(
+                        button,
+                        "w-full justify-center !border-sun-line",
+                        solHolds ? "!min-h-8 !px-2 !py-1 !text-[12px]" : "!min-h-9",
+                      )}
+                      onClick={stringForMe}
+                      disabled={summary.panels === 0}
+                      title="String the panels by rule, checked against the inverter's inputs"
+                    >
+                      <Sparkles className={clsx("shrink-0 text-sun-ink", solHolds ? "mr-1 size-3.5" : "mr-1.5 size-4")} aria-hidden />{" "}
+                      String automatically
+                    </button>
+                    {solHolds && (
+                      <button
+                        className={clsx(button, "!min-h-8 w-full justify-center !px-2 !py-1 !text-[12px]")}
+                        onClick={() => setWiring(newId("s"))}
+                        disabled={startedString}
+                      >
+                        <Plus className="mr-1 size-3.5 shrink-0" aria-hidden /> New string
+                      </button>
+                    )}
+                  </div>
                   {autoNote && (
                     <p
                       className={clsx(
-                        "rounded-md px-2.5 py-2 text-xs",
+                        "rounded-md px-2.5",
+                        solHolds ? "py-1.5 text-[11px] leading-snug" : "py-2 text-xs",
                         autoNote.ok ? "bg-positive-soft text-positive" : "bg-sun text-sun-ink",
                       )}
                       role="status"
@@ -9863,7 +9959,7 @@ export function RoofDesigner(props: {
                     ].filter((s, n, all) => all.findIndex((x) => x.kind === s.kind && x.sku === s.sku) === n);
                     if (!sheets.length) return null;
                     return (
-                      <div className="rounded-md bg-surface-2 px-2.5 py-2 text-xs">
+                      <div className={clsx("rounded-md bg-surface-2 px-2.5", solHolds ? "py-1.5 text-[11px]" : "py-2 text-xs")}>
                         <p className="font-semibold text-ink">The figures behind these strings</p>
                         <ul className="mt-1.5 space-y-1.5">
                           {sheets.map((s) => (
@@ -9904,16 +10000,19 @@ export function RoofDesigner(props: {
                       </div>
                     );
                   })()}
-                  <button
-                    className={clsx(button, "!min-h-9 w-full justify-center")}
-                    onClick={() => setWiring(newId("s"))}
-                    disabled={startedString}
-                  >
-                    <Plus className="mr-1.5 size-4" aria-hidden /> New string
-                  </button>
-                  <p className="text-xs text-muted">
+                  {!solHolds && (
+                    <button
+                      className={clsx(button, "!min-h-9 w-full justify-center")}
+                      onClick={() => setWiring(newId("s"))}
+                      disabled={startedString}
+                    >
+                      <Plus className="mr-1.5 size-4" aria-hidden /> New string
+                    </button>
+                  )}
+                  <p className={clsx("text-muted", solHolds ? "text-[11px]" : "text-xs")}>
                     {summary.panels - strings.reduce((n, x) => n + x.panels.length, 0)} of {summary.panels} panels aren&apos;t on a string.
-                    Tap the tick or cross beside a string for its check. String last: re-laying a face&apos;s rows renumbers its panels.
+                    {!solHolds &&
+                      " Tap the tick or cross beside a string for its check. String last: re-laying a face's rows renumbers its panels."}
                   </p>
                 </div>
               ) : picks.length > 0 ? (
