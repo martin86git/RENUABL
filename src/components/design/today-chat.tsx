@@ -153,8 +153,8 @@ export function TodayChat(props: {
           in place of "How's the business going". */}
       {/* 22 Nov 2026, Martin: here Sol is only the etched brain in the text colour (`SolEtch`), no colour or glow, and
           sits a little higher, clear of the date. */}
-      <span className="relative -mt-6 mb-5 hidden text-ink/70 sm:inline-flex">
-        <SolEtch className="size-14" />
+      <span className="relative -mt-6 mb-5 hidden text-ink/45 sm:inline-flex">
+        <SolEtch className="size-16" />
       </span>
       <TodayDate today={props.today} />
 
