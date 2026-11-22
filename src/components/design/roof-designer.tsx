@@ -1933,6 +1933,9 @@ export function RoofDesigner(props: {
   const [zooming, setZooming] = useState(false);
   // Sol holds the tools on a phone upright (sol-tray.tsx): his tray, and the roof pitch marks shown only when asked for.
   const [solTray, setSolTray] = useState(false);
+  // Sol's box under the picture on a phone, folded to a strip (22 Nov 2026, Martin: "minimize down to a height where I
+  // can still see the sol icon, pointer, eraser etc"); a new step or suggestion opens it again.
+  const [solFolded, setSolFolded] = useState(false);
   // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
   const [panelCard, setPanelCard] = useState(false);
   const [phonePitch, setPhonePitch] = useState(false);
@@ -6768,6 +6771,25 @@ export function RoofDesigner(props: {
   const foot = stage ? stage.pt + stage.photoH : null;
   const underUp = solHolds && !sideways && foot !== null && !solTray;
   const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown || stringsUnder);
+  const solSaying = guideShown ? `g:${guideNow}` : nudgeShown ? `n:${nudges[0]?.id ?? ""}` : "";
+  const [solSaid, setSolSaid] = useState(solSaying);
+  if (solSaid !== solSaying) {
+    setSolSaid(solSaying);
+    if (solSaying) setSolFolded(false);
+  }
+  const foldable = underUp && (guideShown || nudgeShown);
+  const foldButton = foldable ? (
+    <button
+      type="button"
+      onClick={() => setSolFolded((f) => !f)}
+      aria-expanded={!solFolded}
+      aria-label={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
+      title={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
+      className="pointer-events-auto absolute left-2.5 top-2 z-10 flex size-8 items-center justify-center rounded-full text-white/70 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+    >
+      <ChevronDown className={clsx("size-4 transition-transform", solFolded && "rotate-180")} aria-hidden />
+    </button>
+  ) : null;
   // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
   // (22 Nov 2026, Martin: the same places as upright), with Sol and the rounds beside him on its top edge.
   // On the desktop pop-up too: Sol's step and suggestions form along the foot round him (22 Nov 2026, Martin: "sols
@@ -11305,6 +11327,7 @@ export function RoofDesigner(props: {
                     props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
                     // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
                     (underUp || sideDeck) && "sol-moulded",
+                    underUp && solFolded && "sol-folded",
                     deskFoot
                       ? sideDeck && "desk-deck bottom-0"
                       : sideways
@@ -11330,6 +11353,7 @@ export function RoofDesigner(props: {
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
                 >
+                  {foldButton}
                   <SolGuide
                     step={guideNow}
                     house={
@@ -11398,6 +11422,7 @@ export function RoofDesigner(props: {
                     "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
                     // Sideways it stands above Sol's round, which holds the tools there too.
                     (underUp || sideDeck) && "sol-moulded",
+                    underUp && solFolded && "sol-folded",
                     deskFoot
                       ? sideDeck && "desk-deck bottom-0"
                       : sideways
@@ -11422,6 +11447,7 @@ export function RoofDesigner(props: {
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
                 >
+                  {foldButton}
                   <SolNudges
                     nudges={nudges}
                     onAct={actOnNudge}

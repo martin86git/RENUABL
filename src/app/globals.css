@@ -903,6 +903,22 @@ button.team-flash:not([aria-pressed="true"]) {
   outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
   outline-offset: -1.5px;
 }
+/* Folded to a strip (22 Nov 2026, Martin): only the plate's top edge, where Sol and the foot row stand, stays. */
+.sol-moulded > [data-popup] {
+  transition:
+    height 0.25s ease-out,
+    max-height 0.25s ease-out,
+    opacity 0.2s ease-out,
+    translate 0.2s ease-out;
+}
+.sol-moulded.sol-folded > [data-popup] {
+  height: 3rem;
+  max-height: 3rem;
+  overflow: hidden;
+}
+.sol-moulded.sol-folded > [data-popup] > * {
+  visibility: hidden;
+}
 /* Sol's spanner and + on a phone come out of him once as he appears. */
 .sol-emerge {
   animation: sol-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
