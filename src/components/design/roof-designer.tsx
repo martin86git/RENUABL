@@ -70,6 +70,7 @@ import {
   Redo2,
   RotateCcw,
   Ruler,
+  Share,
   Smartphone,
   SquarePlus,
   Save,
@@ -367,6 +368,7 @@ const SHORTCUTS: [keys: string, does: string][] = [
 import { KnifeMenu, ToolFan } from "./tool-fan";
 import { lotDoubt, registerWarning, titleCase, type NearbyHome, type PropertyLot } from "@/lib/domain/design/property-lot";
 import type { Address } from "@/lib/domain/types";
+import { HOME_SCREEN_LEAD, HOME_SCREEN_STEPS, phoneBrowserOf, type PhoneBrowser } from "@/lib/domain/design/home-screen";
 
 const GLASS = "rounded-2xl border border-line bg-surface/75 shadow-lift backdrop-blur-md backdrop-saturate-150";
 /**
@@ -411,6 +413,7 @@ const PHONE_BELOW = 640;
  */
 const SIDEWAYS_BELOW = 500;
 const TURN_HINT_KEY = "renuabl.design.turn-hint";
+const HOME_HINT_KEY = "renuabl.design.home-hint";
 const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
 /**
  * The bands on a phone held upright (21 Nov 2026, Martin: the picture higher and longer, the tools on it). Above the
@@ -1385,6 +1388,31 @@ export function RoofDesigner(props: {
     setTurnHint(false);
     try {
       window.localStorage.setItem(TURN_HINT_KEY, "1");
+    } catch {
+      // Storage is off: it stays away for the visit.
+    }
+  };
+  // Sideways in a phone's browser, how to open RENUABL from the Home Screen for the full screen (22 Nov 2026, Martin: Safari's
+  // bars took the room, and a page can't hide them). Never once opened from the Home Screen; until put away on this device.
+  const [homeHint, setHomeHint] = useState<PhoneBrowser | null>(null);
+  useEffect(() => {
+    try {
+      const top = window.top ?? window;
+      const standalone =
+        (top.navigator as Navigator & { standalone?: boolean }).standalone === true ||
+        top.matchMedia("(display-mode: standalone)").matches ||
+        top.matchMedia("(display-mode: fullscreen)").matches;
+      if (standalone || window.localStorage.getItem(HOME_HINT_KEY) === "1") return;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setHomeHint(phoneBrowserOf(navigator.userAgent, navigator.maxTouchPoints));
+    } catch {
+      // Storage or the top window can't be read: no hint.
+    }
+  }, []);
+  const putHomeHintAway = () => {
+    setHomeHint(null);
+    try {
+      window.localStorage.setItem(HOME_HINT_KEY, "1");
     } catch {
       // Storage is off: it stays away for the visit.
     }
@@ -10887,6 +10915,28 @@ export function RoofDesigner(props: {
                       onClick={putTurnHintAway}
                       aria-label="Put this away"
                       className="flex size-6 items-center justify-center rounded-full text-white/60 hover:text-white"
+                    >
+                      <X className="size-3.5" aria-hidden />
+                    </button>
+                  </p>
+                </div>
+              )}
+              {sideways && solHolds && homeHint && !zooming && (
+                <div className="pointer-events-auto absolute left-2 top-2 z-20 max-w-[17rem]">
+                  <p className="flex items-start gap-1.5 rounded-2xl bg-primary/90 py-1.5 pl-2.5 pr-0.5 text-[11px] leading-snug text-white shadow-lift backdrop-blur-md">
+                    {homeHint === "ios" ? (
+                      <Share className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    ) : (
+                      <Maximize className="mt-0.5 size-3.5 shrink-0 text-sun-line" aria-hidden />
+                    )}
+                    <span>
+                      {HOME_SCREEN_LEAD} <span className="font-semibold">{HOME_SCREEN_STEPS[homeHint]}</span>.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={putHomeHintAway}
+                      aria-label="Put this away"
+                      className="-my-1 flex size-7 shrink-0 items-center justify-center rounded-full text-white/60 hover:text-white"
                     >
                       <X className="size-3.5" aria-hidden />
                     </button>
