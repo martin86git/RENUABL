@@ -152,10 +152,10 @@ export function TodayChat(props: {
     >
       {/* 22 Nov 2026, Martin: no Sol round in the middle on a phone (he is in the foot bar), and the day with its weather
           in place of "How's the business going". */}
-      {/* 22 Nov 2026, Martin: here Sol is only the etched brain in the text colour (`SolEtch`), no colour or glow, and
-          sits a little higher, clear of the date. */}
-      <span className="relative -mt-6 mb-5 hidden text-ink/45 sm:inline-flex">
-        <SolEtch className="size-16" />
+      {/* 22 Nov 2026, Martin: here Sol is only the etched brain (`SolEtch`), no colour or glow, a little higher, clear of
+          the date; then "more like a white / grey… less dark", on phones too. */}
+      <span className="relative -mt-2 mb-3 inline-flex text-[#c9ccd3] sm:-mt-6 sm:mb-5">
+        <SolEtch className="size-12 sm:size-16" />
       </span>
       <TodayDate today={props.today} />
 
@@ -370,21 +370,25 @@ function InsightRow({ insight }: { insight: Insight }) {
 
 /** Business (or My month) | Feed, at the top of Today. */
 export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
-  // Two buttons that each look like one (22 Nov 2026, Martin: "make the Feed pill a little different in shape. I don't
-  // notice it's there sometimes"): squarer, each with its icon, and the one not on show in a well of its own rather
-  // than plain words on the pill.
+  // 22 Nov 2026, Martin: "I don't notice [Feed] sometimes", then "we can do better on the pill shapes". A segmented control: a soft recessed track, two halves of
+  // one width, and a white thumb that slides to the one open, each with its icon.
+  const tabs = [
+    ["chat", first, TrendingUp],
+    ["feed", "Feed", Rows3],
+  ] as const;
+  const at = view === "feed" ? 1 : 0;
   return (
     <div
       role="tablist"
       aria-label="Today"
-      className="inline-flex gap-1 rounded-2xl bg-surface p-1 shadow-[0_2px_10px_rgb(20_22_26_/_0.06)] ring-1 ring-line"
+      className="relative grid h-10 w-[15rem] grid-cols-2 rounded-full bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgb(20_22_26_/_0.08)] ring-1 ring-inset ring-ink/[0.04] backdrop-blur"
     >
-      {(
-        [
-          ["chat", first, TrendingUp],
-          ["feed", "Feed", Rows3],
-        ] as const
-      ).map(([v, label, Icon]) => (
+      <span
+        aria-hidden
+        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-surface shadow-[0_1px_2px_rgb(20_22_26_/_0.12),0_4px_12px_-4px_rgb(20_22_26_/_0.18)] ring-1 ring-ink/[0.05] transition-transform duration-300 ease-out motion-reduce:transition-none"
+        style={{ transform: `translateX(${at * 100}%)` }}
+      />
+      {tabs.map(([v, label, Icon]) => (
         <button
           key={v}
           type="button"
@@ -392,11 +396,11 @@ export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: 
           aria-selected={view === v}
           onClick={() => onView(v)}
           className={clsx(
-            "inline-flex h-9 items-center gap-1.5 rounded-xl px-3.5 text-[13px] font-medium transition",
-            view === v ? "bg-primary text-primary-ink shadow-sm" : "bg-canvas text-ink ring-1 ring-inset ring-line hover:ring-ink/30",
+            "relative z-[1] flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium transition-colors",
+            view === v ? "text-ink" : "text-ink/80 hover:text-ink",
           )}
         >
-          <Icon className={clsx("size-4", view === v ? "text-sun-line" : "text-muted")} aria-hidden />
+          <Icon className={clsx("size-[15px]", view === v ? "text-sun-line" : "opacity-70")} aria-hidden />
           {label}
         </button>
       ))}
