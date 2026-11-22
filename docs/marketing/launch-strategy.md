@@ -63,81 +63,79 @@ Victoria first, then by state.
 
 **Moving pictures are GIFs**, the only animation email apps play: the cards dealt in, **a voice agent on a call** (its wave beating, the clock running, the words typed as they are said, then Booked), Sol breathing, the designer laying panels row by row with the kW counting up. **Outlook on Windows shows only a GIF's first frame**, so each starts on its finished picture and then plays. Sizes: 0.2 to 0.8 MB each.
 
+**Sol types instead of static text** (22 Nov 2026, Martin): on the Sol pictures he sits in his state for two seconds, then types; and each follow-up has an **explainer card** (the feature's icon and headline) on which Sol, beside his sun, types the line that would otherwise sit in the email as words. The same words are the picture's alt text, so they still read with pictures off. The heading under each hero is the product's name (Voice agents. Meet Sol. The AI designer.), the card says what it does for you. _A trade-off to know:_ email apps and spam filters prefer some real words to all pictures; the heading, a price line and the alt text carry that, and the seed tests (section 8) will show where each lands.
+
 **It ends the 1990s mail-order way**: a coupon with a dashed border and scissors, a starburst, a YES! box, ticks, and a P.S.
 
-### Launch · day 0: One giant leap for solar.
+### Launch · day 0
 
 **Subject:** One giant leap for solar  
-**Preview:** Your AI sales force is here.  
-**Picture:** `/design/launch/cards.gif` (RENUABL's AI sales force: your customers answered, your emails written, your calls written up, your roofs designed)
+**Preview:** Your AI sales force is here.
 
-{firstName}, your AI sales force is here. It answers your leads, writes your emails and designs your roofs.
+- **Picture** `/design/launch/sol-intro.gif`: Sol types: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and design your roofs.”
+- **Heading:** One giant leap for solar.
+- **Picture** `/design/launch/cards.gif`: “Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.”
+- **Button:** See it work → https://www.renuabl.com.au/
 
-**Button:** See it work → https://www.renuabl.com.au/
-
-### 1 · two working days after opening: Your customers, answered.
+### 1 · two working days after opening
 
 **Subject:** It's on the phone with your new lead  
-**Preview:** Voice agents that ring every lead and book them in.  
-**Picture:** `/design/launch/call.gif` (A RENUABL voice agent on a call with a new lead, booking them in (example))
+**Preview:** Voice agents that ring every lead and book them in.
 
-Your voice agent rings each new lead within minutes, answers their questions and books them in. You choose its name and its voice.
+- **Picture** `/design/launch/call.gif`: “A RENUABL voice agent on a call with a new lead, booking them in (example)”
+- **Heading:** Voice agents.
+- **Picture** `/design/launch/explain-voice.gif`: Sol types: “Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.”
+- **Words:** Calls go out in calling hours. Calls & Texts, $29 a month.
+- **Button:** Hear it call → https://www.renuabl.com.au/
 
-It always says it's your automated assistant. Calls go out in calling hours. Calls & Texts, $29 a month.
-
-**Button:** Hear it call → https://www.renuabl.com.au/
-
-### 2 · three days on: Meet Sol.
+### 2 · three days on
 
 **Subject:** Meet Sol  
-**Preview:** The brain of your business.  
-**Picture:** `/design/launch/sol.gif` (Sol, the brain of your business)
+**Preview:** The brain of your business.
 
-He knows every deal, writes your emails in your voice and tells you who to ring next. Ask him anything about solar.
+- **Picture** `/design/launch/sol.gif`: Sol types: “I know every deal. I write your emails in your voice, and tell you who to ring next.”
+- **Heading:** Meet Sol.
+- **Button:** Meet Sol → https://www.renuabl.com.au/
 
-**Button:** Meet Sol → https://www.renuabl.com.au/
-
-### 3 · three days on: Your roofs, designed.
+### 3 · three days on
 
 **Subject:** Your roofs, designed  
-**Preview:** One press. Three priced designs.  
-**Picture:** `/design/launch/designer.gif` (RENUABL's AI designer laying panels on a roof in one press (example home))
+**Preview:** One press. Three priced designs.
 
-One press lays out three designs, each priced as it lands. Your customer signs online.
+- **Picture** `/design/launch/designer.gif`: “RENUABL's AI designer laying panels on a roof in one press (example home)”
+- **Heading:** The AI designer.
+- **Picture** `/design/launch/explain-designer.gif`: Sol types: “One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.”
+- **Button:** Try the designer → https://www.renuabl.com.au/business/demo
 
-**Button:** Try the designer → https://www.renuabl.com.au/business/demo
-
-### 4 · three days on: Your calls, written up.
+### 4 · three days on
 
 **Subject:** The CRM that does the typing  
-**Preview:** Calls written up. Follow-ups drafted.  
-**Picture:** `/design/launch/today.jpg` (RENUABL's Today screen: calls, deals and what needs you (example data))
+**Preview:** Calls written up. Follow-ups drafted.
 
-Calls written up. Follow-ups drafted. Emailed leads turned into deals. You do the selling.
+- **Picture** `/design/launch/today.jpg`: “RENUABL's Today screen: calls, deals and what needs you (example data)”
+- **Heading:** A CRM that types.
+- **Picture** `/design/launch/explain-crm.gif`: Sol types: “I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.”
+- **Button:** See Today → https://www.renuabl.com.au/business/demo
 
-**Button:** See Today → https://www.renuabl.com.au/business/demo
-
-### 5 · three days on: Signed. Then it runs itself.
+### 5 · three days on
 
 **Subject:** Signed. Then it runs itself.  
-**Preview:** Ordering, approvals, installs and job cards in one place.  
-**Picture:** `/design/launch/runs.jpg` (RENUABL's install calendar after the sale (example data))
+**Preview:** Ordering, approvals, installs and job cards in one place.
 
-The moment they sign, the order opens, approvals line up and your installer's job card is ready.
+- **Picture** `/design/launch/runs.jpg`: “RENUABL's install calendar after the sale (example data)”
+- **Heading:** After the sale.
+- **Picture** `/design/launch/explain-runs.gif`: Sol types: “The moment they sign, the order opens, approvals line up and your installer's job card is ready.”
+- **Button:** See after the sale → https://www.renuabl.com.au/
 
-**Button:** See after the sale → https://www.renuabl.com.au/
-
-### 6 · four days on: Here's the deal.
+### 6 · four days on
 
 **Subject:** YES! Your first month is free  
-**Preview:** No contract. Cancel any time. Every feature, every user.  
-**Picture:** `/design/launch/coupon.jpg` (YES! I want my AI sales force. First month free. No contract, cancel any time.)
+**Preview:** No contract. Cancel any time. Every feature, every user.
 
-Your first month is free. Then it's $49 a user a month. No contract. Cancel any time.
-
-P.S. Leads go to whoever answers soonest. Let yours answer this week.
-
-**Button:** YES! Start now → https://www.renuabl.com.au/#pricing
+- **Picture** `/design/launch/coupon.jpg`: “YES! I want my AI sales force. First month free. No contract, cancel any time.”
+- **Heading:** Here's the deal.
+- **Words:** Your first month is free. Then it's $49 a user a month. No contract. Cancel any time. P.S. Leads go to whoever answers soonest. Let yours answer this week.
+- **Button:** YES! Start now → https://www.renuabl.com.au/#pricing
 
 ## 6. Must be true before anything is sent
 

@@ -81,6 +81,11 @@ const NOTEBOOK = (size) => `<span class="graphite" style="width:${size}px;height
   <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
   <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg></span>`;
 
+/** The install calendar's icon on graphite. */
+const CALENDAR = (size) => `<span class="graphite" style="width:${size}px;height:${size}px">
+  <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/></svg></span>`;
+
 const BASE = `*{margin:0;box-sizing:border-box}html,body{width:${W}px;height:${H}px;overflow:hidden;background:#05060a;color:#fff;
   font-family:Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   .mark{position:absolute;right:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.42em;font-weight:500}
@@ -117,6 +122,57 @@ const CARDS = [
   { icon: DESIGNER(56), head: "Your roofs, designed.", sub: "Three priced designs in one press" },
   { icon: AGENT(56, "#2bb5a0"), head: "Your installs, lined up.", sub: "The post-sale agent pencils in the day" },
 ];
+
+/**
+ * A feature explained on one card (22 Nov 2026, Martin: follow-up emails with card explainers, the text "typed up by
+ * Sol" rather than static): the card comes in with the feature's own icon and headline, then Sol, beside his sun, types
+ * the line under it. The same words are the picture's alt text.
+ */
+const EXPLAINERS = {
+  "explain-voice.gif": {
+    icon: AGENT(88, "#ff5a1f"),
+    head: "Your customers, answered.",
+    says: "Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.",
+  },
+  "explain-designer.gif": {
+    icon: DESIGNER(88),
+    head: "Your roofs, designed.",
+    says: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
+  },
+  "explain-crm.gif": {
+    icon: NOTEBOOK(88),
+    head: "Your calls, written up.",
+    says: "I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.",
+  },
+  "explain-runs.gif": {
+    icon: CALENDAR(88),
+    head: "Signed. Then it runs itself.",
+    says: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
+  },
+};
+
+const explainer = ({ icon, head, says }) =>
+  page(
+    `<div class="sky"></div><div class="card"><div class="top">${icon}<h2>${head}</h2></div><hr>
+      <div class="sol">%%SOLBIG%%<p data-text="${says.replace(/"/g, "&quot;")}"></p></div></div><div class="mark">RENUABL</div>`,
+    `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 80% 110%,rgba(255,90,31,.3),transparent 55%)}
+     .card{position:absolute;left:90px;top:128px;width:1020px;border-radius:36px;padding:52px 60px;
+       background:linear-gradient(180deg,rgba(40,43,50,.97),rgba(22,24,29,.97));border:1px solid rgba(255,255,255,.1);
+       box-shadow:0 40px 100px -30px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.08)}
+     .top{display:flex;align-items:center;gap:30px}.top h2{font-size:54px;font-weight:600;letter-spacing:-.03em}
+     hr{border:0;border-top:1px solid rgba(255,255,255,.1);margin:40px 0 34px}
+     .sol{display:flex;gap:26px;align-items:flex-start}.sol p{font-size:31px;line-height:1.45;color:rgba(255,255,255,.9);min-height:3em}
+     .sol p b{display:inline-block;width:3px;height:1em;margin-left:3px;background:#ff7a2e;vertical-align:-.12em}`,
+    `const p = document.querySelector(".sol p"); const text = p.dataset.text; const card = document.querySelector(".card");
+     window.at = (t) => {
+       const k = span(t, 0, 0.12);
+       card.style.opacity = k; card.style.transform = "translateY(" + (1 - k) * 30 + "px)";
+       const n = Math.round(text.length * span(t, 0.18, 0.9));
+       const on = n < text.length ? Math.round(t * 60) % 2 === 0 : false;
+       p.innerHTML = text.slice(0, n).replace(/&/g, "&amp;").replace(/</g, "&lt;") + (on || n === 0 ? "<b></b>" : "");
+       beat(t);
+     };`,
+  );
 
 /** Each picture: a page, and for a moving one how many frames, how long each shows and how long the last holds. */
 const ART = {
@@ -227,6 +283,8 @@ const ART = {
     ),
   },
 
+  ...Object.fromEntries(Object.entries(EXPLAINERS).map(([name, e]) => [name, { frames: 40, delay: 80, hold: 3800, html: explainer(e) }])),
+
   /** The CRM: the Today feed, the product's own screen on black. */
   "today.jpg": {
     html: page(
@@ -321,11 +379,11 @@ const grab = async (clip) =>
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: false });
 
-async function writeGif(name, frames, delays, colours = 160) {
+async function writeGif(name, frames, delays, colours = 160, width = GIF_W) {
   // Outlook on Windows shows only a GIF's first frame: the finished picture goes first, then it plays from the start.
   frames = [frames.at(-1), ...frames];
   delays = [1600, ...delays];
-  const small = await Promise.all(frames.map((f) => sharp(f).resize(GIF_W).png().toBuffer()));
+  const small = await Promise.all(frames.map((f) => sharp(f).resize(width).png().toBuffer()));
   await sharp(small, { join: { animated: true } })
     .gif({ delay: delays, loop: 0, effort: 10, colours, dither: 0.5 })
     .toFile(join(OUT, name));
@@ -335,6 +393,60 @@ async function writeGif(name, frames, delays, colours = 160) {
  * Sol, from the homepage itself: his live sun (the canvas corona) and the brain in it, on black, as he breathes.
  * Taken by hiding everything else on the page and filming the sun where it stands.
  */
+/** What Sol types on each of his GIFs, in his own voice, after sitting still for two seconds. */
+const SOL_SAYS = {
+  "sol-intro.gif": "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and design your roofs.",
+  "sol.gif": "I know every deal. I write your emails in your voice, and tell you who to ring next.",
+};
+const SOL_IDLE = 8;
+const SOL_TYPING = 22;
+const xml = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+/** Words broken into lines of about `max` letters. */
+function wrap(text, max) {
+  const lines = [];
+  let line = "";
+  for (const w of text.split(" ")) {
+    if ((line + " " + w).trim().length > max && line) {
+      lines.push(line);
+      line = w;
+    } else line = (line + " " + w).trim();
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+/** A frame of Sol's GIF: the filmed sun on the right, "Sol." and what he has typed so far on the left, with his caret. */
+function solFrame(png, says, typed, i) {
+  const lines = wrap(says, 30);
+  let left = typed;
+  const shown = lines.map((l) => {
+    const n = Math.max(0, Math.min(l.length, left));
+    left -= l.length + 1;
+    return l.slice(0, n);
+  });
+  const last = shown.reduce((k, l, j) => (l ? j : k), 0);
+  const caret = typed > 0 && typed < says.length ? i % 2 === 0 : typed === 0 ? i % 4 < 2 : false;
+  const rows = shown
+    .map(
+      (l, j) =>
+        `<text x="76" y="${330 + j * 46}" font-family="Inter,Segoe UI,sans-serif" font-size="32" fill="#ffffff" fill-opacity=".92">${xml(l)}${j === last && caret ? '<tspan fill="#ff7a2e" font-weight="700"> |</tspan>' : ""}</text>`,
+    )
+    .join("");
+  return sharp(png)
+    .resize(W, H)
+    .composite([
+      {
+        input: Buffer.from(`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+          <text x="72" y="214" font-family="Inter,Segoe UI,sans-serif" font-size="92" font-weight="600" fill="#fff" letter-spacing="-3">Sol.</text>
+          <text x="76" y="260" font-family="Inter,Segoe UI,sans-serif" font-size="22" fill="#ffffff" fill-opacity=".5">The brain of your business.</text>
+          ${rows}
+          <text x="${W - 52}" y="${H - 40}" text-anchor="end" font-family="Inter,Segoe UI,sans-serif" font-size="13" letter-spacing="5" fill="#ffffff" fill-opacity=".5">RENUABL</text>
+        </svg>`),
+      },
+    ])
+    .png()
+    .toBuffer();
+}
+
 let solStill = null;
 {
   await send("Page.navigate", { url: `${SITE}/` });
@@ -360,35 +472,27 @@ let solStill = null;
     const pad = box.w * 0.12;
     solStill = join(process.env.SOL_STILL_DIR ?? work, "sol-still.png");
     writeFileSync(solStill, await grab({ x: box.x - pad, y: box.y - pad, width: box.w + pad * 2, height: box.h + pad * 2 }));
-    if (!ONLY || ONLY === "sol.gif") {
+    for (const [name, says] of Object.entries(SOL_SAYS)) {
+      if (ONLY && ONLY !== name) continue;
+      // He sits in his state for two seconds, then types (22 Nov 2026, Martin).
       const frames = [];
-      for (let i = 0; i < 16; i++) {
-        frames.push(await grab(clip));
-        await sleep(140);
+      const delays = [];
+      for (let i = 0; i < SOL_IDLE; i++) {
+        frames.push({ png: await grab(clip), typed: 0 });
+        delays.push(250);
+        await sleep(250);
       }
-      // The sun on the right of the picture, "Sol" and his line to its left.
-      const label = (f) =>
-        sharp(f)
-          .resize(W, H)
-          .composite([
-            {
-              input: Buffer.from(`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-              <text x="72" y="300" font-family="Inter,Segoe UI,sans-serif" font-size="92" font-weight="600" fill="#fff" letter-spacing="-3">Sol.</text>
-              <text x="76" y="352" font-family="Inter,Segoe UI,sans-serif" font-size="26" fill="#ffffff" fill-opacity=".6">The brain of your business.</text>
-              <text x="${W - 52}" y="${H - 40}" text-anchor="end" font-family="Inter,Segoe UI,sans-serif" font-size="13" letter-spacing="5" fill="#ffffff" fill-opacity=".5">RENUABL</text>
-            </svg>`),
-            },
-          ])
-          .png()
-          .toBuffer();
-      const done = await Promise.all(frames.map(label));
-      await writeGif(
-        "sol.gif",
-        done,
-        done.map(() => 140),
-        96,
-      );
-      console.log("made sol.gif");
+      for (let i = 1; i <= SOL_TYPING; i++) {
+        // The sun is filmed every third frame while he types: it moves slowly, and every new sun frame weighs the GIF down.
+        const png = i % 3 === 1 ? await grab(clip) : frames.at(-1).png;
+        frames.push({ png, typed: Math.round((says.length * i) / SOL_TYPING) });
+        delays.push(90);
+        await sleep(90);
+      }
+      delays[delays.length - 1] = 3600;
+      const done = await Promise.all(frames.map((f, i) => solFrame(f.png, says, f.typed, i)));
+      await writeGif(name, done, delays, 80, 680);
+      console.log("made", name);
     }
   }
 }
@@ -399,7 +503,10 @@ for (const [name, art] of Object.entries(ART)) {
   const sun = solStill
     ? `<img src="${pathToFileURL(solStill).href}" width="96" height="96" style="flex:none;margin:-18px -12px -18px -20px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
     : SOL(64);
-  writeFileSync(file, art.html.replaceAll("%%SOL%%", sun));
+  const big = solStill
+    ? `<img src="${pathToFileURL(solStill).href}" width="84" height="84" style="flex:none;margin:-14px -6px 0 -14px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
+    : SOL(64);
+  writeFileSync(file, art.html.replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
   await send("Page.navigate", { url: pathToFileURL(file).href });
   await sleep(1200);
   if (!art.frames) {

@@ -38,25 +38,48 @@ export interface GtmPicture {
   alt: string;
 }
 
+/**
+ * What Sol types on each feature's explainer card (tools/marketing/launch-art.mjs, `EXPLAINERS`): the same words, kept
+ * here as the picture's alt text so they read with pictures off and to a screen reader. A test keeps the two in step.
+ */
+export const SOL_TYPES: Record<string, string> = {
+  xvoice:
+    "Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.",
+  xdesigner: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
+  xcrm: "I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.",
+  xruns: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
+  solintro: "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and design your roofs.",
+  sol: "I know every deal. I write your emails in your voice, and tell you who to ring next.",
+};
+
 export const GTM_PICTURES: Record<string, GtmPicture> = {
+  solintro: { file: "/design/launch/sol-intro.gif", alt: SOL_TYPES.solintro },
   cards: {
     file: "/design/launch/cards.gif",
-    alt: "RENUABL's AI sales force: your customers answered, your emails written, your calls written up, your roofs designed",
+    alt: "Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.",
   },
   call: { file: "/design/launch/call.gif", alt: "A RENUABL voice agent on a call with a new lead, booking them in (example)" },
-  sol: { file: "/design/launch/sol.gif", alt: "Sol, the brain of your business" },
+  xvoice: { file: "/design/launch/explain-voice.gif", alt: SOL_TYPES.xvoice },
+  sol: { file: "/design/launch/sol.gif", alt: SOL_TYPES.sol },
   designer: { file: "/design/launch/designer.gif", alt: "RENUABL's AI designer laying panels on a roof in one press (example home)" },
+  xdesigner: { file: "/design/launch/explain-designer.gif", alt: SOL_TYPES.xdesigner },
   today: { file: "/design/launch/today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
+  xcrm: { file: "/design/launch/explain-crm.gif", alt: SOL_TYPES.xcrm },
   runs: { file: "/design/launch/runs.jpg", alt: "RENUABL's install calendar after the sale (example data)" },
+  xruns: { file: "/design/launch/explain-runs.gif", alt: SOL_TYPES.xruns },
   coupon: { file: "/design/launch/coupon.jpg", alt: "YES! I want my AI sales force. First month free. No contract, cancel any time." },
 };
 
 /** The picture key a draft's block stands for, read from its id (`gtm<email>pic<key>`). */
 export const pictureKeyOf = (b: EdmBlock): string | null => (b.kind === "image" ? (b.id.match(/pic([a-z]+)$/)?.[1] ?? null) : null);
 
+/**
+ * One email: the product's picture, its name as the heading, then the explainer card Sol types (or a second picture),
+ * a line only where something must be said in words (a price, the P.S.), and one button.
+ */
 function email(
   key: string,
-  picture: keyof typeof GTM_PICTURES,
+  pictures: [keyof typeof GTM_PICTURES, ...(keyof typeof GTM_PICTURES)[]],
   subject: string,
   preview: string,
   heading: string,
@@ -64,13 +87,16 @@ function email(
   button: [string, string],
 ): EdmContent {
   const block = (id: string, b: Omit<EdmBlock, "id" | "imageId">): EdmBlock => ({ id: `gtm${key}${id}`, imageId: null, ...b });
+  const picture = (k: string) => block(`pic${k}`, { kind: "image", text: GTM_PICTURES[k].alt, url: button[1], align: "center" });
+  const [hero, ...rest] = pictures;
   return {
     subject,
     preview,
     blocks: [
-      block(`pic${picture}`, { kind: "image", text: GTM_PICTURES[picture].alt, url: button[1], align: "center" }),
+      picture(hero),
       block("h", { kind: "heading", text: heading, url: null, align: "left" }),
-      block("t", { kind: "text", text: words.join("\n\n"), url: null, align: "left" }),
+      ...rest.map(picture),
+      ...(words.length ? [block("t", { kind: "text", text: words.join("\n\n"), url: null, align: "left" })] : []),
       block("b", { kind: "button", text: button[0], url: button[1], align: "left" }),
     ],
   };
@@ -90,55 +116,44 @@ export function withPictures(c: EdmContent, ids: Record<string, string>): EdmCon
 export const GTM_CAMPAIGN_NAME = "One giant leap · launch";
 export const GTM_SEQUENCE_NAME = "One giant leap · the series";
 
-/** The launch: the idea in one line, the products as a stack of cards. */
+/** The launch: Sol sits still, then types who he is; under him the products as a stack of cards. */
 export const GTM_LAUNCH: EdmContent = email(
   "l",
-  "cards",
+  ["solintro", "cards"],
   "One giant leap for solar",
   "Your AI sales force is here.",
   "One giant leap for solar.",
-  ["{firstName}, your AI sales force is here. It answers your leads, writes your emails and designs your roofs."],
+  [],
   ["See it work", SITE],
 );
 
-/** The series: one product an email, Apple style, then the deal, 1990s mail-order style. */
+/** The series: one product an email, Apple style, its card typed by Sol, then the deal, 1990s mail-order style. */
 const SERIES: { wait: number; content: EdmContent }[] = [
   {
     wait: 2,
     content: email(
       "a",
-      "call",
+      ["call", "xvoice"],
       "It's on the phone with your new lead",
       "Voice agents that ring every lead and book them in.",
-      "Your customers, answered.",
-      [
-        "Your voice agent rings each new lead within minutes, answers their questions and books them in. You choose its name and its voice.",
-        `It always says it's your automated assistant. Calls go out in calling hours. Calls & Texts, ${VOICE}.`,
-      ],
+      "Voice agents.",
+      [`Calls go out in calling hours. Calls & Texts, ${VOICE}.`],
       ["Hear it call", SITE],
     ),
   },
   {
     wait: 3,
-    content: email(
-      "b",
-      "sol",
-      "Meet Sol",
-      "The brain of your business.",
-      "Meet Sol.",
-      ["He knows every deal, writes your emails in your voice and tells you who to ring next. Ask him anything about solar."],
-      ["Meet Sol", SITE],
-    ),
+    content: email("b", ["sol"], "Meet Sol", "The brain of your business.", "Meet Sol.", [], ["Meet Sol", SITE]),
   },
   {
     wait: 3,
     content: email(
       "c",
-      "designer",
+      ["designer", "xdesigner"],
       "Your roofs, designed",
       "One press. Three priced designs.",
-      "Your roofs, designed.",
-      ["One press lays out three designs, each priced as it lands. Your customer signs online."],
+      "The AI designer.",
+      [],
       ["Try the designer", DEMO],
     ),
   },
@@ -146,11 +161,11 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     wait: 3,
     content: email(
       "d",
-      "today",
+      ["today", "xcrm"],
       "The CRM that does the typing",
       "Calls written up. Follow-ups drafted.",
-      "Your calls, written up.",
-      ["Calls written up. Follow-ups drafted. Emailed leads turned into deals. You do the selling."],
+      "A CRM that types.",
+      [],
       ["See Today", DEMO],
     ),
   },
@@ -158,11 +173,11 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     wait: 3,
     content: email(
       "e",
-      "runs",
+      ["runs", "xruns"],
       "Signed. Then it runs itself.",
       "Ordering, approvals, installs and job cards in one place.",
-      "Signed. Then it runs itself.",
-      ["The moment they sign, the order opens, approvals line up and your installer's job card is ready."],
+      "After the sale.",
+      [],
       ["See after the sale", SITE],
     ),
   },
@@ -170,7 +185,7 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     wait: 4,
     content: email(
       "f",
-      "coupon",
+      ["coupon"],
       `YES! Your first month is ${firstMonthWords}`,
       "No contract. Cancel any time. Every feature, every user.",
       "Here's the deal.",

@@ -1,11 +1,11 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ADD_ON_MONTHLY_CENTS } from "@/lib/domain/design/add-ons";
 import { SEAT_MONTHLY_CENTS, dollars } from "@/lib/domain/design/plans";
 import { cleanContent, contentProblem } from "./edm";
 import { claimsToCheck } from "./edm-sol";
-import { GTM_EMAILS, GTM_PICTURES, MAX_WORDS, gtmSequence, pictureKeyOf, withPictures } from "./gtm-drafts";
+import { GTM_EMAILS, GTM_PICTURES, MAX_WORDS, SOL_TYPES, gtmSequence, pictureKeyOf, withPictures } from "./gtm-drafts";
 import { cleanSequence, sequenceProblem } from "./sequences";
 
 const allText = (c: (typeof GTM_EMAILS)[number]) => [c.subject, c.preview, ...c.blocks.map((b) => b.text)].join(" ");
@@ -27,6 +27,11 @@ describe("the launch drafts", () => {
       expect(key && GTM_PICTURES[key]).toBeTruthy();
       expect(existsSync(join(process.cwd(), "public", GTM_PICTURES[key!].file))).toBe(true);
     }
+  });
+
+  it("say in words what Sol types in the pictures, kept in step with the picture tool", () => {
+    const art = readFileSync(join(process.cwd(), "tools/marketing/launch-art.mjs"), "utf8");
+    for (const words of Object.values(SOL_TYPES)) expect(art).toContain(JSON.stringify(words).slice(1, -1));
   });
 
   it("are short: a glance, not a read", () => {
