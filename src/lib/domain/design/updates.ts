@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Proposals",
+    words: "Customer proposals carry a small, quiet Powered by RENUABL in the bottom corner and the footer.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On a phone, once RENUABL scrolls away a slim bar keeps it small at the top, so screenshots still show it.",
+  },
+  {
+    day: "2026-11-23",
+    area: "On a phone",
+    words: "Scrolled well down a page, a small arrow in the bottom right takes you back to the top in one press.",
+  },
+  {
+    day: "2026-11-23",
     area: "Your account",
     words: "Your team's own sign-in page, with your logo and a private code in its address. Copy it from Your account.",
   },

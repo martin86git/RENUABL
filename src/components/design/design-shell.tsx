@@ -24,7 +24,6 @@ import {
   Wrench,
   type LucideIcon,
   Mail,
-  ArrowLeft,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
@@ -40,6 +39,7 @@ import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
 import { PhoneVoiceTab } from "./phone-voice";
+import { PhoneTop } from "./phone-top";
 import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
@@ -52,10 +52,11 @@ import { RoutinesRound } from "./routines-round";
 import { AgentsWindow } from "./agents-window";
 import { SetupWizard } from "./setup-wizard";
 import { openSetup } from "@/lib/services/setup";
-import { TeamChatButton } from "./team-chat";
+import { TeamChatButton, useTeamUnread } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
+import { BackToTop } from "./back-to-top";
 
 export { MarketplaceMark };
 
@@ -131,6 +132,9 @@ const PHONE_TABS: PhoneTab[] = [
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
   { label: VOICE_TAB, href: PATHS.home, icon: PenTool, match: () => false },
+  // Team chat in the foot bar (22 Nov 2026, Martin: "we need to introduce the team chat into the bottom nav"): its own
+  // page on a phone, with this member's unread team lines on it.
+  { label: "Team", href: PATHS.team, icon: MessagesSquare, match: (p) => p.startsWith(PATHS.team) },
 ];
 
 /**
@@ -228,6 +232,8 @@ function Shell({
   const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.business));
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
   const unread = useUnreadMessages(retail);
+  // This member's unread team chat lines, for the Team tab on a phone's foot bar.
+  const teamUnread = useTeamUnread();
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -686,30 +692,12 @@ function Shell({
         {tool && sectionPages}
       </header>
 
-      {/* On a phone: the wordmark, Search and the day across the top. */}
-      <div className="flex items-center gap-3 px-4 pb-1 pt-3 print:hidden lg:hidden">
-        {/^\/design\/deals\/[^/]+$/.test(path) ? (
-          // On a deal, the way back to Deals takes the wordmark's place (21 Nov 2026, Martin).
-          <Link href={PATHS.pipelines} className="-ml-1 inline-flex h-9 items-center gap-1.5 pr-2 text-[15px] font-medium text-ink">
-            <ArrowLeft className="size-[18px]" aria-hidden />
-            Deals
-          </Link>
-        ) : (
-          <Link href={PATHS.home} aria-label="RENUABL, today">
-            <Wordmark className="phone-wordmark text-[16px] transition-[font-size]" />
-          </Link>
-        )}
-        {retail && (
-          <button
-            type="button"
-            onClick={() => setSearching(true)}
-            aria-label="Search, or ask Sol"
-            className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
-          >
-            <Search className="size-4" aria-hidden />
-          </button>
-        )}
-      </div>
+      {/* On a phone: the wordmark, Search and the day across the top; once scrolled away, the wordmark small at the top. */}
+      <PhoneTop
+        home={PATHS.home}
+        back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
+        onSearch={retail ? () => setSearching(true) : undefined}
+      />
 
       {tool ? (
         <div data-sol-page className="relative min-w-0 lg:pt-5">
@@ -734,12 +722,14 @@ function Shell({
         </div>
       )}
 
+      {!tool && <BackToTop />}
+
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
         aria-label="Sections, on a phone"
         className={clsx(
           "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
-          kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
+          kind === "installer" ? "grid-cols-5" : "grid-cols-6",
         )}
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
@@ -753,7 +743,7 @@ function Shell({
                 Sol
               </div>
             ) : null;
-          const n = t.href === PATHS.messages ? unread : 0;
+          const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
           if (retail && t.label === VOICE_TAB)
             return [
               sol,
