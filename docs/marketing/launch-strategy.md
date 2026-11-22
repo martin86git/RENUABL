@@ -72,7 +72,7 @@ Victoria first, then by state.
 **Subject:** One giant leap for solar  
 **Preview:** Your AI sales force is here.
 
-- **Picture** `/design/launch/sol-intro.gif`: Sol types: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and design your roofs.”
+- **Picture** `/design/launch/sol-intro.gif`: Sol types: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.”
 - **Heading:** One giant leap for solar.
 - **Picture** `/design/launch/cards.gif`: “Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.”
 - **Button:** See it work → https://www.renuabl.com.au/
@@ -85,7 +85,7 @@ Victoria first, then by state.
 - **Picture** `/design/launch/call.gif`: “A RENUABL voice agent on a call with a new lead, booking them in (example)”
 - **Heading:** Voice agents.
 - **Picture** `/design/launch/explain-voice.gif`: Sol types: “Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.”
-- **Words:** Calls go out in calling hours. Calls & Texts, $29 a month.
+- **Words:** Calls go out in calling hours. Calls & Texts, $49 a month.
 - **Button:** Hear it call → https://www.renuabl.com.au/
 
 ### 2 · three days on

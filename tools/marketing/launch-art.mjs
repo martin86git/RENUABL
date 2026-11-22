@@ -395,7 +395,7 @@ async function writeGif(name, frames, delays, colours = 160, width = GIF_W) {
  */
 /** What Sol types on each of his GIFs, in his own voice, after sitting still for two seconds. */
 const SOL_SAYS = {
-  "sol-intro.gif": "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and design your roofs.",
+  "sol-intro.gif": "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.",
   "sol.gif": "I know every deal. I write your emails in your voice, and tell you who to ring next.",
 };
 const SOL_IDLE = 8;

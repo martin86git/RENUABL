@@ -48,7 +48,7 @@ export const SOL_TYPES: Record<string, string> = {
   xdesigner: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
   xcrm: "I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.",
   xruns: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
-  solintro: "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and design your roofs.",
+  solintro: "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.",
   sol: "I know every deal. I write your emails in your voice, and tell you who to ring next.",
 };
 

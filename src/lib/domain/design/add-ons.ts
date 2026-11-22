@@ -4,7 +4,7 @@
  * the business (`design_addons`), charged as an item of its own on the plan's Stripe subscription, shown in Settings →
  * Billing and wherever the feature lives as "Add to your plan". Pure, tested.
  *
- * Prices (16 Nov 2026, Martin): **Calls & Texts** (key `voice`) $29 a month, with the business number, 250 texts and 60
+ * Prices (16 Nov 2026, Martin; Calls & Texts raised to $49 on 22 Nov 2026, Martin: "its $49"): **Calls & Texts** (key `voice`) $49 a month, with the business number, 250 texts and 60
  * voice-agent minutes, Sol credits beyond (`VOICE_INCLUDES`); **Growth** (key `marketing`) $19 a month: custom proposals
  * and marketing email, 2,000 emails a month, then $10 per 5,000 more (`GROWTH_EMAILS`). Custom proposals are no longer
  * sold apart: they come with Growth (`CUSTOM_PROPOSALS` is its key). Prices are Martin's to set; one set to null is
@@ -26,7 +26,7 @@ export const cleanAddOnKey = (raw: unknown): AddOnKey | null => (ADD_ON_KEYS.inc
  * Martin how usage is charged before setting it).
  */
 export const ADD_ON_MONTHLY_CENTS: Record<AddOnKey, number | null> = {
-  voice: 2900,
+  voice: 4900,
   marketing: 1900,
 };
 
