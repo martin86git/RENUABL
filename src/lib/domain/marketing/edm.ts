@@ -5,7 +5,7 @@
  * text of one email for one contact.
  */
 
-export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider"] as const;
+export const EDM_BLOCK_KINDS = ["heading", "text", "image", "tiles", "button", "divider", "spacer", "social", "products"] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
 export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
@@ -15,6 +15,9 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   tiles: "Picture tiles",
   button: "Button",
   divider: "Divider",
+  spacer: "Spacer",
+  social: "Social links",
+  products: "Products",
 };
 
 export type EdmAlign = "left" | "center";
@@ -24,6 +27,62 @@ export interface EdmTile {
   imageId: string | null;
   /** The line under the picture, also what it shows for a screen reader. */
   text: string;
+  url: string | null;
+}
+
+/**
+ * A spacer's height (22 Nov 2026, Martin: "add spacer and social blocks to the email builder"): room between blocks
+ * with nothing in it.
+ */
+export const SPACER_SIZES = { small: 16, medium: 32, large: 56 } as const;
+export type SpacerSize = keyof typeof SPACER_SIZES;
+export const SPACER_WORDS: Record<SpacerSize, string> = { small: "Small", medium: "Medium", large: "Large" };
+
+/**
+ * A product in a products block (22 Nov 2026, Martin: "add product blocks to the email builder"): its picture, name, a
+ * price line as the business writes it ("$9,990 installed", "From $49 a month"), a few words, and a button to its page.
+ * Nothing is read from the price lists: what the business types is what goes, as with every other block.
+ */
+export interface EdmProduct {
+  imageId: string | null;
+  name: string;
+  price: string;
+  text: string;
+  /** The button's words; blank is "Find out more". */
+  label: string;
+  url: string | null;
+}
+
+export const PRODUCT_BUTTON = "Find out more";
+
+/** The places a social links block can point to, in the order they are offered. */
+export const SOCIAL_NETWORKS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "website"] as const;
+export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number];
+export const SOCIAL_WORDS: Record<SocialNetwork, string> = {
+  facebook: "Facebook",
+  instagram: "Instagram",
+  linkedin: "LinkedIn",
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  x: "X",
+  website: "Website",
+};
+
+/**
+ * How a social links block draws its links (22 Nov 2026, Martin: "add icons for the social networks"): each
+ * network's icon, its icon and name in a pill, or its name alone. An icon is a picture, so where an inbox blocks
+ * pictures it shows the network's name in its place (alt text); the email's text version always lists them in words.
+ */
+export const SOCIAL_LOOKS = ["icons", "both", "words"] as const;
+export type SocialLook = (typeof SOCIAL_LOOKS)[number];
+export const SOCIAL_LOOK_WORDS: Record<SocialLook, string> = { icons: "Icons", both: "Icons and names", words: "Names" };
+export const cleanSocialLook = (raw: unknown): SocialLook =>
+  (SOCIAL_LOOKS as readonly string[]).includes(raw as string) ? (raw as SocialLook) : "icons";
+
+/** One link in a social links block. */
+export interface EdmSocial {
+  network: SocialNetwork;
+  /** https only; null while it isn't a link yet. */
   url: string | null;
 }
 
@@ -45,6 +104,14 @@ export interface EdmBlock {
   tiles?: EdmTile[];
   /** How many of its tiles sit across a row. */
   columns?: TileColumns;
+  /** A spacer's height. */
+  space?: SpacerSize;
+  /** A social links block's links, one a network. */
+  socials?: EdmSocial[];
+  /** How a social links block draws them. */
+  socialLook?: SocialLook;
+  /** A products block's products, laid out `columns` across. */
+  products?: EdmProduct[];
 }
 
 export interface EdmContent {
@@ -103,6 +170,10 @@ export const EDM_LIMITS = {
   alt: 160,
   tiles: 6,
   caption: 80,
+  products: 6,
+  productName: 80,
+  price: 40,
+  productText: 240,
 } as const;
 
 const line = (v: unknown, max: number) =>
@@ -154,7 +225,66 @@ export function cleanTiles(raw: unknown): EdmTile[] {
   });
 }
 
+/** The network a link belongs to, from its address; anything else is a website. */
+export function networkOf(url: string): SocialNetwork {
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "website";
+  }
+  const on = (d: string) => host === d || host.endsWith(`.${d}`);
+  if (on("facebook.com") || on("fb.com")) return "facebook";
+  if (on("instagram.com")) return "instagram";
+  if (on("linkedin.com")) return "linkedin";
+  if (on("youtube.com") || on("youtu.be")) return "youtube";
+  if (on("tiktok.com")) return "tiktok";
+  if (on("x.com") || on("twitter.com")) return "x";
+  return "website";
+}
+
+export const cleanSpace = (raw: unknown): SpacerSize => (raw === "small" || raw === "large" ? raw : "medium");
+
+/** A social block's links: known networks only, one each, in the order given. */
+export function cleanSocials(raw: unknown): EdmSocial[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<SocialNetwork>();
+  const out: EdmSocial[] = [];
+  for (const s of raw) {
+    const r = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
+    const network = (SOCIAL_NETWORKS as readonly string[]).includes(r.network as string) ? (r.network as SocialNetwork) : null;
+    if (!network || seen.has(network)) continue;
+    seen.add(network);
+    const url = cleanLink(r.url);
+    out.push({ network, url: url && !url.startsWith("mailto:") ? url : null });
+  }
+  return out;
+}
+
+/** A social block's links that go somewhere: the ones an email shows. */
+export const filledSocials = (b: EdmBlock): EdmSocial[] => (b.kind === "social" ? (b.socials ?? []).filter((s) => s.url) : []);
+
 export const cleanColumns = (raw: unknown): TileColumns => (raw === 1 || raw === 3 ? raw : 2);
+
+/** A products block's products: up to the limit, each cleaned as its own fields are. */
+export function cleanProducts(raw: unknown): EdmProduct[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, EDM_LIMITS.products).map((p) => {
+    const r = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
+    const url = cleanLink(r.url);
+    return {
+      imageId: imageIdOf(r.imageId),
+      name: line(r.name, EDM_LIMITS.productName),
+      price: line(r.price, EDM_LIMITS.price),
+      text: line(r.text, EDM_LIMITS.productText),
+      label: line(r.label, EDM_LIMITS.label),
+      url: url && !url.startsWith("mailto:") ? url : null,
+    };
+  });
+}
+
+/** A products block's products that have a name: the ones an email shows. */
+export const filledProducts = (b: EdmBlock): EdmProduct[] => (b.kind === "products" ? (b.products ?? []).filter((p) => p.name) : []);
 
 /** A tiles block's tiles that have a picture: the ones an email shows. */
 export const filledTiles = (b: EdmBlock): EdmTile[] => (b.kind === "tiles" ? (b.tiles ?? []).filter((t) => t.imageId) : []);
@@ -169,11 +299,19 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
   return {
     id: blockId(r.id, i),
     kind,
-    text: kind === "text" ? words(r.text, max) : kind === "divider" || kind === "tiles" ? "" : line(r.text, max),
+    text:
+      kind === "text"
+        ? words(r.text, max)
+        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products"
+          ? ""
+          : line(r.text, max),
     url: kind === "button" || kind === "image" ? cleanLink(r.url) : null,
     imageId: kind === "image" ? imageIdOf(r.imageId) : null,
     align: r.align === "center" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
+    ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
+    ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
+    ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
   };
 }
 
@@ -268,9 +406,13 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
   return blocks.flatMap((b) =>
     b.kind === "tiles"
       ? filledTiles(b).flatMap((t) => (t.url ? [t.url] : []))
-      : (b.kind === "button" || b.kind === "image") && b.url
-        ? [b.url]
-        : [],
+      : b.kind === "social"
+        ? filledSocials(b).map((s) => s.url!)
+        : b.kind === "products"
+          ? filledProducts(b).flatMap((p) => (p.url ? [p.url] : []))
+          : (b.kind === "button" || b.kind === "image") && b.url
+            ? [b.url]
+            : [],
   );
 }
 
@@ -280,6 +422,7 @@ export function newBlockId(rand: () => number = Math.random): string {
 }
 
 export const EMPTY_TILE: EdmTile = { imageId: null, text: "", url: null };
+export const EMPTY_PRODUCT: EdmProduct = { imageId: null, name: "", price: "", text: "", label: "", url: null };
 
 export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
   const text = kind === "heading" ? "A heading" : kind === "text" ? "Hi {firstName}," : kind === "button" ? "Find out more" : "";
@@ -291,6 +434,9 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     imageId: null,
     align: kind === "button" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: [EMPTY_TILE], columns: 2 as const } : {}),
+    ...(kind === "spacer" ? { space: "medium" as const } : {}),
+    ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
+    ...(kind === "products" ? { products: [EMPTY_PRODUCT, EMPTY_PRODUCT], columns: 2 as const } : {}),
   };
 }
 
@@ -341,6 +487,8 @@ export interface RenderLinks {
   unsubscribe: string;
   /** Where an uploaded picture is served. */
   image: (id: string) => string;
+  /** Where a social network's icon in a colour (six hex digits, no #) is served; without it, names only. */
+  social?: (network: SocialNetwork, colour: string) => string;
 }
 
 export interface RenderedEdm {
@@ -452,6 +600,54 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       rows.push(
         `<tr><td style="padding:12px 32px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
       );
+    } else if (b.kind === "products") {
+      // A product is sent once it has a name; its picture and button only when given.
+      const products = filledProducts(b);
+      if (!products.length) continue;
+      const cols = Math.min(cleanColumns(b.columns), products.length) as TileColumns;
+      const gap = 16;
+      const width = Math.floor((536 - gap * (cols - 1)) / cols);
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      const cells = products.map((p) => {
+        const name = merge(p.name, fields);
+        const href = p.url ? links.click(linkAt, linkList[linkAt]) : null;
+        if (p.url) linkAt++;
+        let inner = "";
+        if (p.imageId) {
+          const img = `<img src="${esc(links.image(p.imageId))}" alt="${esc(name)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border:0;border-radius:8px">`;
+          inner += href ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none">${img}</a>` : img;
+        }
+        inner += `<div style="padding:${p.imageId ? 10 : 0}px 2px 0;${font};font-size:16px;line-height:1.35;font-weight:600;color:${ink.heading};text-align:${align}">${esc(name)}</div>`;
+        if (p.price)
+          inner += `<div style="padding:2px 2px 0;${font};font-size:15px;line-height:1.4;font-weight:600;color:${colour};text-align:${align}">${esc(merge(p.price, fields))}</div>`;
+        if (p.text)
+          inner += `<div style="padding:6px 2px 0;${font};font-size:13px;line-height:1.5;color:${ink.words};text-align:${align}">${esc(merge(p.text, fields))}</div>`;
+        const label = merge(p.label, fields) || PRODUCT_BUTTON;
+        if (href)
+          inner += `<div style="padding:12px 2px 0;text-align:${align}"><a href="${esc(href)}" target="_blank" style="display:inline-block;background:${colour};color:#ffffff;${font};font-size:13px;font-weight:600;text-decoration:none;padding:9px 18px;border-radius:999px">${esc(label)}</a></div>`;
+        textParts.push(
+          [p.price ? `${name}: ${merge(p.price, fields)}` : name, p.text ? merge(p.text, fields) : "", href ? `${label}: ${href}` : ""]
+            .filter(Boolean)
+            .join("\n"),
+        );
+        return inner;
+      });
+      const trs: string[] = [];
+      for (let at = 0; at < cells.length; at += cols) {
+        const row = cells.slice(at, at + cols);
+        while (row.length < cols) row.push("");
+        trs.push(
+          `<tr>${row
+            .map(
+              (c, i) =>
+                `<td width="${Math.round(100 / cols)}%" valign="top" style="padding:0 ${i < cols - 1 ? gap / 2 : 0}px ${gap + 4}px ${i > 0 ? gap / 2 : 0}px">${c}</td>`,
+            )
+            .join("")}</tr>`,
+        );
+      }
+      rows.push(
+        `<tr><td style="padding:12px 32px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
+      );
     } else if (b.kind === "button" && b.text && b.url) {
       const href = links.click(linkAt, linkList[linkAt]);
       linkAt++;
@@ -465,6 +661,28 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
         `<tr><td style="padding:12px 32px"><div style="height:1px;background:#e4e4e7;line-height:1px;font-size:1px">&nbsp;</div></td></tr>`,
       );
       textParts.push("—");
+    } else if (b.kind === "spacer") {
+      const h = SPACER_SIZES[cleanSpace(b.space)];
+      rows.push(`<tr><td style="height:${h}px;line-height:${h}px;font-size:1px">&nbsp;</td></tr>`);
+    } else if (b.kind === "social") {
+      const socials = filledSocials(b);
+      if (!socials.length) continue;
+      const look = links.social ? cleanSocialLook(b.socialLook) : "words";
+      const hex = colour.replace("#", "");
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600";
+      const pills = socials.map((s) => {
+        const href = links.click(linkAt, linkList[linkAt]);
+        linkAt++;
+        const name = SOCIAL_WORDS[s.network];
+        textParts.push(`${name}: ${s.url}`);
+        if (look === "words")
+          return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 4px 8px;padding:7px 14px;border:1px solid ${colour};border-radius:999px;color:${colour};${font};text-decoration:none">${esc(name)}</a>`;
+        const icon = esc(links.social!(s.network, hex));
+        if (look === "icons")
+          return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 5px 8px;text-decoration:none;color:${colour};${font}"><img src="${icon}" width="32" height="32" alt="${esc(name)}" style="display:block;width:32px;height:32px;border:0"></a>`;
+        return `<a href="${esc(href)}" target="_blank" style="display:inline-block;margin:0 4px 8px;padding:5px 14px 5px 6px;border:1px solid ${colour};border-radius:999px;color:${colour};${font};text-decoration:none"><img src="${icon}" width="20" height="20" alt="" style="display:inline-block;width:20px;height:20px;border:0;vertical-align:middle;margin-right:6px">${esc(name)}</a>`;
+      });
+      rows.push(`<tr><td style="padding:12px 28px 4px;text-align:${align}">${pills.join("")}</td></tr>`);
     }
   }
   const foot = footerLines(brand, sender);
