@@ -10907,7 +10907,7 @@ export function RoofDesigner(props: {
                       : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
-                  style={underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 24) } : undefined}
+                  style={underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined}
                 >
                   <SolGuide
                     step={guideNow}
@@ -10979,7 +10979,7 @@ export function RoofDesigner(props: {
                     underUp && "sol-moulded",
                     sideways ? "sideways-sol bottom-[5.5rem]" : !phone && "bottom-[6.25rem]",
                   )}
-                  style={underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 24) } : undefined}
+                  style={underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined}
                 >
                   <SolNudges
                     nudges={nudges}
@@ -11222,17 +11222,22 @@ export function RoofDesigner(props: {
                       "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
                       // On a phone, with something picked, his card is this round grown open: no second pill under it.
                       // Upright with his plate under the picture, he rises to sit on the picture's foot, in its notch.
-                      deckUp && "-translate-y-[56px]",
+                      deckUp && "-translate-y-[48px]",
                       "transition-transform duration-300 motion-reduce:transition-none",
                       // On a phone Sol is a round of his own, a tool and a + coming out of him: no words.
-                      solHolds && "!size-14 !gap-0 !p-0 justify-center",
+                      solHolds && "!size-[4.5rem] !gap-0 !p-0 justify-center",
                     )}
                     aria-label={solHolds ? (solTray ? "Put Sol's tools away" : `Sol's tools: ${phoneSolWords}`) : undefined}
                   >
                     {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
-                    <span className="sol-orb relative flex size-11 items-center justify-center rounded-full">
+                    <span
+                      className={clsx(
+                        "sol-orb relative flex items-center justify-center rounded-full",
+                        solHolds ? "size-[3.75rem]" : "size-11",
+                      )}
+                    >
                       <span className="sol-heartbeat inline-flex">
-                        <SolMark className="size-[35px]" />
+                        <SolMark className={solHolds ? "size-12" : "size-[35px]"} />
                       </span>
                       {solHolds ? (
                         <SolEmerging

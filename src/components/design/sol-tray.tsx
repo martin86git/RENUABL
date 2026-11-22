@@ -30,7 +30,6 @@ import {
   Plus,
   Undo2,
   WandSparkles,
-  Wrench,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -366,7 +365,7 @@ export function SolController(props: {
         role="group"
         aria-label="What is picked"
         className="pointer-events-auto relative rounded-t-[26px] bg-[#26282c] text-white shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
-        style={{ height: props.height ?? 140, ...solNotch(0, 24) }}
+        style={{ height: props.height ?? 140, ...solNotch(0, 30) }}
       >
         {/* Beside Sol's notch: what is picked on the left; undo and pick none on the right. */}
         <div className="absolute inset-x-3 top-2 flex items-center">
@@ -374,7 +373,7 @@ export function SolController(props: {
             <b className="font-semibold text-white">{what}</b>
             {detail && ` · ${detail}`}
           </p>
-          <span className="w-[3.75rem] shrink-0" aria-hidden />
+          <span className="w-[4.5rem] shrink-0" aria-hidden />
           <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
             {undo}
             {done}
@@ -401,7 +400,7 @@ export function SolController(props: {
       {props.panels > 0 && <div className="absolute bottom-3 right-3">{thumb(1)}</div>}
       <div
         className="pointer-events-auto absolute bottom-2.5 left-1/2 flex h-[2.9rem] -translate-x-1/2 items-center gap-1.5 rounded-full bg-[#26282c] px-1.5 text-white shadow-[0_6px_18px_rgba(0,0,0,0.35)]"
-        style={solNotch(18, 25)}
+        style={solNotch(13, 30)}
       >
         {/* Two sides of one width, so Sol's notch is dead centre whatever stands beside it. */}
         <div className="flex w-[17.5rem] items-center justify-end gap-1.5">
@@ -412,7 +411,7 @@ export function SolController(props: {
           {orient}
           {tilt}
         </div>
-        <span className="w-[3.4rem] shrink-0" aria-hidden />
+        <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
           {remove}
           {undo}
@@ -425,32 +424,30 @@ export function SolController(props: {
 }
 
 /**
- * Sol on a phone (22 Nov 2026, Martin: "a tool and + icon somehow emerging out of him", in place of tools in words):
- * his sun with a spanner coming out of its upper left and a + out of its upper right, each on a short stem of light
- * from him, so it reads as Sol holding the tools and adding things. With a tool in hand, that tool's mark takes the
- * spanner's place, lit orange. With his tray up the + turns to a cross. Drawn over his orb.
+ * Sol on a phone (22 Nov 2026, Martin: a + "emerging out of him" in place of tools in words; then "the + icon and the
+ * spanner are for the same thing… just leave the + icon… big enough that it's not hard to press"): his sun with a
+ * large orange + coming out of its upper right on a short stem of light, part of his button, so a press on it opens his
+ * tools. With a tool in hand, that tool's mark rides on his upper left so it is plain what is in hand. With his tray up
+ * the + turns to a cross.
  */
 export function SolEmerging({ tray, held }: { tray: boolean; held: LucideIcon | null }) {
-  const Tool = held ?? Wrench;
-  const badge =
-    "sol-emerge absolute flex size-6 items-center justify-center rounded-full ring-2 ring-[#26282c] shadow-[0_2px_8px_rgba(0,0,0,0.35)] transition-transform duration-300 motion-reduce:transition-none";
+  const Held = held;
   return (
     <span aria-hidden className="pointer-events-none absolute inset-0">
-      <span className="absolute -left-[7px] -top-[5px] h-[3px] w-4 origin-right rotate-[35deg] rounded-full bg-gradient-to-l from-[#ffb347]/0 to-[#ffb347]/70" />
-      <span className="absolute -right-[7px] -top-[5px] h-[3px] w-4 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70" />
-      <span
-        className={clsx(badge, "-left-[14px] -top-[14px] [--emerge-x:14px]", held ? "bg-sun-line text-white" : "bg-white text-[#1d1f23]")}
-      >
-        <Tool className="size-3.5" strokeWidth={2.4} />
-      </span>
+      <span className="absolute -right-[9px] -top-[7px] h-[3px] w-5 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70" />
+      {Held && (
+        <span className="sol-emerge absolute -left-[12px] -top-[12px] flex size-7 items-center justify-center rounded-full bg-sun-line text-white ring-2 ring-[#26282c] [--emerge-x:12px]">
+          <Held className="size-4" strokeWidth={2.4} />
+        </span>
+      )}
+      {/* Pressable as part of Sol's button (its own pointer events, so a press on it isn't passed to the map). */}
       <span
         className={clsx(
-          badge,
-          "-right-[14px] -top-[14px] bg-sun-line text-white [--emerge-x:-14px] [animation-delay:90ms]",
+          "sol-emerge pointer-events-auto absolute -right-[22px] -top-[22px] flex size-11 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 [--emerge-x:-22px] motion-reduce:transition-none",
           tray && "rotate-45",
         )}
       >
-        <Plus className="size-4" strokeWidth={2.8} />
+        <Plus className="size-7" strokeWidth={3} />
       </span>
     </span>
   );
