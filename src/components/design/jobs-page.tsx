@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
@@ -42,6 +43,8 @@ const pill = (on: boolean) =>
  * the install calendar or the map.
  */
 export function JobsPage({ initialPhase }: { initialPhase?: JobPhase }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [phase, setPhase] = useState<JobPhase>(initialPhase ?? "selling");
@@ -77,7 +80,7 @@ export function JobsPage({ initialPhase }: { initialPhase?: JobPhase }) {
 
   const today = todayInMarket();
   const counts = useMemo(() => (jobs ? phaseCounts(jobs, today) : null), [jobs, today]);
-  const filters = filtersFor(phase);
+  const filters = filtersFor(phase, stageNames);
   const atPhase = useMemo(() => (jobs ? jobsAt(jobs, phase, null, today) : []), [jobs, phase, today]);
   const shown = filter ? atPhase.filter((j) => filterOf(j, phase, today) === filter) : atPhase;
   const choosePhase = (p: JobPhase) => {
@@ -233,6 +236,8 @@ function NextChip({ job, phase, today }: { job: JobLine; phase: JobPhase; today:
 }
 
 function JobList({ jobs, phase, today }: { jobs: JobLine[]; phase: JobPhase; today: string }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   if (jobs.length === 0)
     return <p className="mt-6 rounded-2xl bg-surface px-5 py-8 text-center text-[14px] text-ink-2 ring-1 ring-line">No jobs here.</p>;
   return (
@@ -248,7 +253,7 @@ function JobList({ jobs, phase, today }: { jobs: JobLine[]; phase: JobPhase; tod
               <span className="block truncate text-[12.5px] text-muted">{suburbOfAddress(j.address) || j.address || "No address yet"}</span>
             </span>
             <span className="truncate text-[13px] text-ink-2">
-              {[j.kw ? `${j.kw.toFixed(1)} kW` : j.title, money(j.value), stageWords(j.stage)].filter(Boolean).join(" · ")}
+              {[j.kw ? `${j.kw.toFixed(1)} kW` : j.title, money(j.value), stageWords(j.stage, stageNames)].filter(Boolean).join(" · ")}
             </span>
             <span>
               <NextChip job={j} phase={phase} today={today} />
@@ -263,7 +268,9 @@ function JobList({ jobs, phase, today }: { jobs: JobLine[]; phase: JobPhase; tod
 
 /** The stage's jobs as columns by its quick filters (one column where it has none). */
 function Board({ jobs, phase, today }: { jobs: JobLine[]; phase: JobPhase; today: string }) {
-  const cols = filtersFor(phase);
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
+  const cols = filtersFor(phase, stageNames);
   const columns = cols.length
     ? cols.map((c) => ({ ...c, jobs: jobs.filter((j) => filterOf(j, phase, today) === c.id) }))
     : [{ id: "all", label: "All", jobs }];

@@ -60,6 +60,12 @@ export async function saveImage(
   return id;
 }
 
+/** Whether a picture is one this business uploaded. */
+export async function ownsImage(businessId: string, id: string): Promise<boolean> {
+  const rows = await query(`select 1 from design_marketing_images where id = $1 and business_id = $2`, [id, businessId]);
+  return rows.length > 0;
+}
+
 /** A picture in an email, by its id alone: mail apps load it, so it is public (the id is long and random). */
 export async function imageById(id: string): Promise<{ bytes: Buffer; contentType: string } | null> {
   const rows = await query<{ bytes: Buffer; content_type: string }>(

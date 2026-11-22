@@ -348,6 +348,30 @@ create table if not exists design_pipelines (
   unique (business_id, id)
 );
 create index if not exists design_pipelines_business on design_pipelines(business_id, created_at);
+-- A business's own pipelines and stages (domain/design/pipeline-stages.ts). A pipeline's stages are keys in its order:
+-- one of the twelve or an added stage's id. base_id: the set pipeline ("sales", ...) a row stands in for once renamed
+-- or changed; one a set pipeline. An added stage counts as one of the twelve (base); a deal at it keeps that stage in
+-- design_jobs.stage, which every rule reads, and the added stage's id in sub_stage.
+alter table design_pipelines add column if not exists base_id text;
+create unique index if not exists design_pipelines_base on design_pipelines(business_id, base_id) where base_id is not null;
+create table if not exists design_stages (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
+  base text not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  unique (business_id, id)
+);
+create index if not exists design_stages_business on design_stages(business_id, created_at);
+alter table design_jobs add column if not exists sub_stage text;
+-- The business's own names for the twelve stages (domain/design/pipeline-stages.ts StageNames): only the words change.
+create table if not exists design_stage_names (
+  business_id text not null references businesses(id) on delete cascade,
+  stage text not null,
+  name text not null,
+  primary key (business_id, stage)
+);
 -- Proposals (server/design-proposal-repo.ts): a business's branding, the pictures it has put up, and what it has sent.
 -- design_brand: one row a business. design_files: its logo, cover and photos, made safe and small before they are kept;
 -- a picture taken out of the brand kit is only marked removed, so a proposal already sent keeps its pictures.
@@ -482,6 +506,8 @@ alter table design_addons add column if not exists status text not null default 
 alter table design_addons add column if not exists stripe_item text;
 alter table design_addons add column if not exists by_email text;
 alter table design_addons add column if not exists requested_at timestamptz;
+-- Notice given to cancel (Calls & Texts, 30 days): still on and billed until then, then ended by the daily cron.
+alter table design_addons add column if not exists ends_at timestamptz;
 -- Each business's own phone number for its voice agents and texts (server/business-numbers.ts): bought on Twilio,
 -- imported into Vapi; one live number a business, released when the voice add-on ends.
 create table if not exists design_phone_numbers (
@@ -1491,6 +1517,17 @@ create table if not exists design_leads (
   note text,
   at timestamptz not null default now()
 );
+alter table design_leads add column if not exists stage text;
+alter table design_leads add column if not exists stage_at timestamptz;
+alter table design_leads add column if not exists moved_by text;
+alter table design_leads add column if not exists staff_note text;
+-- A booked demo and its reminders (business-leads.ts, 21 Nov 2026).
+alter table design_leads add column if not exists demo_at timestamptz;
+alter table design_leads add column if not exists demo_link text;
+alter table design_leads add column if not exists demo_remind_lead boolean not null default false;
+alter table design_leads add column if not exists demo_by text;
+alter table design_leads add column if not exists demo_staff_reminded_at timestamptz;
+alter table design_leads add column if not exists demo_lead_reminded_at timestamptz;
 create table if not exists design_sol_credits (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
@@ -1716,6 +1753,8 @@ alter table design_caller add column if not exists delivery jsonb;
 alter table design_caller add column if not exists call_setup jsonb;
 -- The colour chosen for its stand-in picture (domain/design/caller.ts): null leaves it to its name.
 alter table design_caller add column if not exists tint smallint;
+-- The model it thinks with on calls (domain/design/caller.ts CALLER_BRAINS): null leaves it to RENUABL's default.
+alter table design_caller add column if not exists brain text;
 -- Its scripts (domain/design/call-scripts.ts): the name of the one in use (coach_notes and call_setup hold it), and the others filed away.
 alter table design_caller add column if not exists script_name text;
 alter table design_caller add column if not exists scripts jsonb;

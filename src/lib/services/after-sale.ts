@@ -10,13 +10,17 @@ import type { OrderState } from "@/lib/domain/design/orders";
 import type { BusinessPrefs } from "@/lib/domain/design/prefs";
 import type { BookedJob, InvoicesView, JobOrder, OrderRow, ProposalLine } from "@/lib/server/design-after-sale-repo";
 import { ask, type Answer } from "./crm";
+import { warm, warmed } from "./warm";
 
 export type { BookedJob, InvoicesView, JobOrder, OrderRow, ProposalLine };
 
 export const loadPrefs = () => ask<{ prefs: BusinessPrefs }>("/api/design/prefs");
 export const savePrefs = (prefs: BusinessPrefs) => ask<{ prefs: BusinessPrefs }>("/api/design/prefs", { method: "PUT", body: { prefs } });
 
-export const listProposals = () => ask<{ proposals: ProposalLine[]; followUpDays?: number[] }>("/api/design/proposals");
+type Proposals = { proposals: ProposalLine[]; followUpDays?: number[] };
+export const listProposals = () => warm("proposals", () => ask<Proposals>("/api/design/proposals"));
+/** The last proposals list read this visit, so Today's Proposals tab opens on it. */
+export const keptProposals = () => warmed<{ ok: true } & Proposals>("proposals");
 /** A proposal's follow-up done: the follow-up day it fell due on, called or emailed. */
 export const markFollowUp = (jobId: string, day: number, how: "call" | "email") =>
   ask<object>(`/api/design/jobs/${encodeURIComponent(jobId)}/follow-up`, { method: "POST", body: { day, how } });

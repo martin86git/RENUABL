@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import {
   ArrowRight,
@@ -22,16 +22,21 @@ import type { NextItem } from "@/lib/domain/design/next-up";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
 import type { TodayView } from "@/lib/domain/design/today-view";
-import { dollars, type JobLine } from "@/lib/services/crm";
+import { dollars, loadWeather, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
+import { todayHeading } from "@/lib/domain/design/today-view";
+import { SKY_EMOJI, type Sky } from "@/lib/domain/weather";
 import { GoalLine, SunArc } from "./gauges";
 import { loadFeed } from "@/lib/services/deal-feed";
 import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
-import { SolStars } from "./sol-icon";
-import { SolMark } from "./sol-sun";
+import { SolEtch } from "./sol-icon";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
+import { loadPerfRows } from "@/lib/services/performance";
+import { listProposals } from "@/lib/services/after-sale";
+import { loadCallLog } from "@/lib/services/call-log";
+import { loadPrepared } from "@/lib/services/prepared";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -58,6 +63,29 @@ export function useInsights(): InsightsView[] | null | "failed" {
   return views;
 }
 
+/** Today's date, and the weather now beside it as an emoji and a small temperature (left out when it can't be had). */
+function TodayDate({ today }: { today: ISODate }) {
+  const [weather, setWeather] = useState<{ degrees: number | null; sky: Sky | null } | null>(null);
+  useEffect(() => {
+    let on = true;
+    void loadWeather().then((r) => on && r.ok && setWeather({ degrees: r.degrees, sky: r.sky ?? null }));
+    return () => {
+      on = false;
+    };
+  }, []);
+  return (
+    <h1 className="mt-4 flex flex-col items-center justify-center gap-2 text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+      <span>{todayHeading(today)}</span>
+      {weather && (weather.sky || weather.degrees !== null) && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[13px] tracking-normal text-white">
+          {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
+          {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
+        </span>
+      )}
+    </h1>
+  );
+}
+
 /** The first view's name on the switch: Business for the owner and admins, My month for everyone else. */
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
@@ -79,7 +107,6 @@ export function TodayChat(props: {
   const first = views?.[0];
   const own = views?.[1];
   const mine = first?.scope === "me";
-  const you = props.name ? `, ${props.name}` : "";
   const [tab, setTab] = useState<TrayTab | null>(null);
   // The deals Sol has a suggestion on, for Needs you (the feed's own answer, read again as Sol's cards change).
   const [feed, setFeed] = useState<FeedDeal[] | null>(null);
@@ -88,13 +115,23 @@ export function TodayChat(props: {
     if (r.ok) setFeed(r.deals);
   }, []);
   useEffect(() => {
-    const t = window.setTimeout(() => void readFeed(), 0);
+    // Performance's own small rows first, so a press on it finds them ready (22 Nov 2026, Martin).
+    void loadPerfRows();
+    // Then every other tab's answer, kept for the page, so each opens on it at once.
+    const t = window.setTimeout(() => {
+      void readFeed();
+      void listProposals();
+      void loadCallLog();
+      void loadPrepared();
+    }, 0);
     return () => window.clearTimeout(t);
   }, [readFeed]);
+  // Worked out once a feed, not on every press of a tab (it reads every deal's next move).
+  const needsCount = useMemo(() => (feed ? dealsNeedingYou(feed).length : undefined), [feed]);
   // 21 Nov 2026, Martin: the tray holds what Sol or a voice agent can act on, with Performance first.
   const tabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
-    { key: "needs", label: "Needs you", icon: CircleAlert, count: feed ? dealsNeedingYou(feed).length : undefined },
+    { key: "needs", label: "Needs you", icon: CircleAlert, count: needsCount },
     { key: "proposals", label: "Proposals", icon: FileText },
     { key: "calls", label: "Calls", icon: Phone },
     { key: "sol", label: "Sol's work", icon: Sparkles },
@@ -112,15 +149,14 @@ export function TodayChat(props: {
       )}
       inert={props.hidden}
     >
-      <span className="relative">
-        <span className="sol-orb sol-breathe inline-flex size-14 items-center justify-center rounded-full">
-          <SolMark className="size-11" />
-        </span>
-        <SolStars className="absolute -right-3 -top-2 size-5" />
+      {/* 22 Nov 2026, Martin: no Sol round in the middle on a phone (he is in the foot bar), and the day with its weather
+          in place of "How's the business going". */}
+      {/* 22 Nov 2026, Martin: here Sol is only the etched brain in the text colour (`SolEtch`), no colour or glow, and
+          sits a little higher, clear of the date. */}
+      <span className="relative -mt-6 mb-5 hidden text-ink/45 sm:inline-flex">
+        <SolEtch className="size-16" />
       </span>
-      <h1 className="mt-4 text-center text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
-        {mine ? `How's your month going${you}?` : `How's the business going${you}?`}
-      </h1>
+      <TodayDate today={props.today} />
 
       <div data-tour="today-sol" className="relative z-10 mt-6 w-full">
         <SolBox

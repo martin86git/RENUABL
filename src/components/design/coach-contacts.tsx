@@ -1,11 +1,12 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { ArrowUp, MessageSquare, Phone, Search, X } from "lucide-react";
 import { TEXT_MAX, TEXT_WORDS, reachContacts, textParts, type ReachContact } from "@/lib/domain/design/contact-reach";
-import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { type JobStage, stageLabel } from "@/lib/domain/design/crm";
 import { PHONE_FROM, digitsOf, looksLikePhone } from "@/lib/domain/design/find";
 import { TEXTS_COPY, signedText, type StrayText, type TextLine } from "@/lib/domain/design/texts";
 import { loadDealTexts, loadStrayTexts, textCustomer, useCallerInfo } from "@/lib/services/caller";
@@ -187,11 +188,13 @@ function ContactRow(props: {
   onDo: (what: "call" | "text" | null) => void;
   onSent: (message: string) => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const c = props.contact;
   const who = c.firstName || "them";
   const dial = c.phone.replace(/\s/g, "");
   const noText = !c.job ? `${who} has no deal to keep a text on` : !c.mobile ? TEXT_WORDS.noMobile : null;
-  const line = [c.phone || "No phone number", c.job && `${c.job.title} · ${STAGE_LABELS[c.job.stage as JobStage] ?? c.job.stage}`]
+  const line = [c.phone || "No phone number", c.job && `${c.job.title} · ${stageLabel(c.job.stage as JobStage, stageNames)}`]
     .filter(Boolean)
     .join(" · ");
 

@@ -231,6 +231,7 @@
     display: block;
     position: sticky;
     top: calc(var(--studio-head, 8rem) - 20px);
+    transition: top 0.3s ease-out;
     z-index: 15;
     height: var(--pad-cap, 20px);
     margin: -2.5rem -1.5rem calc(2.5rem - var(--pad-cap, 20px));
@@ -884,6 +885,39 @@ button.team-flash:not([aria-pressed="true"]) {
 }
 /* Sol's sun beats like a heart (3 Nov 2026, Martin: no rays; the sun itself pulses, a subtle signal to engage): two
    quick beats, then a rest, the glow brightening with each. */
+/* On a phone upright, Sol's step and suggestions sit under the picture in a plate moulded round him (his notch cut by
+   the wrapper's mask), so they never cover the map. */
+.sol-moulded > [data-popup] {
+  /* An outlined box with room round it (22 Nov 2026, Martin: "within an outlined text box - with the outline also
+     integrating in the sol icon"): the notch cuts the outline at the top, where a ring of the same line round Sol meets it. */
+  /* Edge to edge under the full-bleed picture (22 Nov 2026, Martin: "should bleed edge to edge"). */
+  width: 100%;
+  margin-inline: 0;
+  /* From the picture's foot to the foot of the screen (22 Nov 2026, Martin: "extend down to the bottom of the page"),
+     set as --sol-rest by the designer; it scrolls inside past that. */
+  height: var(--sol-rest, 9.25rem);
+  max-height: var(--sol-rest, 9.25rem);
+  overflow-y: auto;
+  padding-top: 2rem;
+  border-radius: 22px 22px 0 0;
+  outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
+  outline-offset: -1.5px;
+}
+/* Sol's spanner and + on a phone come out of him once as he appears. */
+.sol-emerge {
+  animation: sol-emerge 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes sol-emerge {
+  from {
+    transform: translate(var(--emerge-x, 0), 13px) scale(0.2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-emerge {
+    animation: none;
+  }
+}
 @keyframes sol-heartbeat {
   0%,
   40%,
@@ -1296,6 +1330,96 @@ html:has(.sales-snap) {
   }
 }
 
+/* The pop-up's tool rounds stand in the grey just left of the window, wherever the window is (21 Nov 2026, Martin: with
+   Sol's panel open the window moved over beside it and the rounds stayed put, on top of the window). `--pop-w` is the
+   window's width as set on it; beside Sol's panel the window keeps a gutter either side for the rounds. */
+.popup-tools {
+  left: calc((100vw - var(--pop-w)) / 2 - 4rem);
+}
+@media (min-width: 1280px) {
+  html.sol-docked section[data-design-popup] {
+    max-width: calc(100vw - var(--sol-w) - 10rem);
+  }
+  html.sol-docked .popup-tools {
+    left: calc((100vw - var(--sol-w) - min(var(--pop-w), 100vw - var(--sol-w) - 10rem)) / 2 - 4rem);
+  }
+}
+
+/* A phone turned sideways (21 Nov 2026, Martin: "it should allow for tilting the phone sideways and the designer fills
+   the screen"): the pop-up is the whole screen, with no window, gutter or shadow round it. The designer inside lays the
+   picture over all the height under its figures (`sideways` in roof-designer.tsx, the same test). */
+@media (orientation: landscape) and (max-height: 500px) {
+  section[data-design-popup][role="dialog"] {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* Sideways, Sol's step and his suggestions sit at the foot of the picture as a short card: what he asks, the choices
+   and the buttons run on in rows rather than stacking, and a long step scrolls inside the card. */
+.sideways-sol > * {
+  max-height: calc(var(--pic-h, 20rem) - 5.5rem);
+  overflow-y: auto;
+  padding-block: 0.4rem;
+}
+.sideways-sol .min-w-0.flex-1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+}
+.sideways-sol .min-w-0.flex-1 > * {
+  margin-top: 0;
+}
+.sideways-sol .min-w-0.flex-1 .grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.75rem;
+}
+
+/* Sideways on a phone the picture is only about 250 px tall, so the desktop-sized controls on it covered the roof (21 Nov
+   2026, Martin: "all the buttons / controls are too big for mobile"). Every control group on the picture is drawn
+   smaller (zoom, so its touch area shrinks with it), and so is the rail beside it. The map itself is the picture's first
+   child and keeps its size; anything placed at a point on the map carries an inline style and is left alone, since zoom
+   would move it off its point. Sol's card is shrunk less, so it stays readable. */
+/* The kit (panel, inverter, battery) on a phone upright is drawn larger than the other controls (21 Nov 2026, Martin). */
+.designer-compact > .designer-kit {
+  zoom: 0.8 !important;
+}
+@media (max-width: 380px) {
+  .designer-compact > .designer-kit {
+    zoom: 0.72 !important;
+  }
+}
+.designer-compact > :not(:first-child):not([style]):not(.sideways-sol) {
+  zoom: 0.68;
+}
+.designer-compact > .sideways-sol {
+  zoom: 0.76;
+}
+/* The figures over the picture, a size smaller too. */
+.designer-compact-strip {
+  zoom: 0.82;
+}
+.designer-compact-rail {
+  zoom: 0.72;
+}
+/* Lists and cards opened from a shrunk control come back to full size, to be read and pressed. */
+.designer-compact [class*="var(--pic-h"],
+.designer-compact [data-opened],
+.designer-compact [role="dialog"],
+.designer-compact [role="menu"],
+.designer-compact [role="listbox"] {
+  zoom: 1.4;
+}
+.designer-compact .sideways-sol [role="dialog"],
+.designer-compact .sideways-sol [role="menu"] {
+  zoom: 1;
+}
+
 /* Sol's guide: the shade analysis loading bar, filling once (19 Nov 2026). */
 @keyframes sol-shade-fill {
   from {
@@ -1406,4 +1530,238 @@ html:has(.sales-snap) {
     inset 0 1px 0 rgb(255 255 255 / 0.9),
     inset 0 0 0 1px rgb(255 122 61 / 0.5),
     0 16px 36px -20px rgb(255 90 31 / 0.5);
+}
+
+/* On a phone, while something is being typed, the foot bar steps aside so the keyboard doesn't push it up over the box
+   being typed in (21 Nov 2026, Martin, Safari on iPhone). */
+@media (max-width: 1023px) and (pointer: coarse) {
+  body:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
+    .phone-tabbar {
+    display: none;
+  }
+}
+
+/* A deal's details on a phone (22 Nov 2026, Martin: the boxes were too big and ran past the screen's edge): one column of
+   compact rows, the label on the left and its value beside it, a box only while it is being typed in. */
+@media (max-width: 639px) {
+  .deal-fields {
+    row-gap: 0;
+  }
+  .deal-fields > label,
+  .deal-fields > div > label,
+  .deal-fields > div > div > label {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+  }
+  .deal-fields > div:last-child,
+  .deal-fields > :last-child label {
+    border-bottom: 0;
+  }
+  .deal-fields > div:not(:has(label)) {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .deal-fields :is(input, select, textarea) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0 0.5rem;
+    border-color: transparent;
+    border-radius: 0.5rem;
+    background: transparent;
+    box-shadow: none;
+    /* 22 Nov 2026, Martin: the values read too large beside the 12px labels. !important beats the 16px touch-screen
+       floor above; an iPhone doesn't zoom into them (maximum-scale=1, design-shell.tsx) and Android never does. */
+    font-size: 13px !important;
+  }
+  .deal-fields :is(input, select, textarea)::placeholder {
+    font-size: 13px;
+  }
+  .deal-fields textarea {
+    height: auto;
+    min-height: 4rem;
+    padding: 0.375rem 0.5rem;
+  }
+  .deal-fields :is(input, select, textarea):focus {
+    border-color: var(--line);
+    background: var(--surface);
+  }
+  .deal-fields input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+}
+
+/* Sol's sheet on a deal, on a phone, as a chat (22 Nov 2026, Martin): his line a bubble from him, the choices as quick
+   replies under it, the box a rounded composer kept at the foot of the sheet. */
+@media (max-width: 639px) {
+  .deal-sol-sheet .sol-say {
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+    background: var(--canvas);
+  }
+  .deal-sol-sheet .sol-line {
+    display: inline-block;
+    max-width: 92%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 1rem 1rem 1rem 0.3rem;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 1px 2px rgba(11, 11, 12, 0.06);
+    font-size: 13.5px;
+    font-weight: 450;
+    line-height: 1.45;
+  }
+  .deal-sol-sheet .sol-line-mark {
+    display: none;
+  }
+  .deal-sol-sheet .sol-replies {
+    flex-wrap: wrap;
+  }
+  /* A thick message box (22 Nov 2026, Martin: "I want it to be thicker"): the words along its top, the microphone and
+     the send round in its lower right corner. */
+  .deal-sol-sheet .sol-compose {
+    position: sticky;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: end;
+    column-gap: 0.25rem;
+    min-height: 6rem;
+    margin-top: 0.75rem;
+    padding: 0.625rem 0.5rem 0.5rem 0.875rem;
+    border-radius: 1.25rem;
+    background: var(--surface);
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 -6px 12px var(--canvas);
+  }
+  .deal-sol-sheet .sol-compose > input {
+    grid-column: 1 / -1;
+    align-self: start;
+    padding: 0;
+  }
+  .deal-sol-sheet .sol-compose > :not(input):not(.sol-send):not(.sol-prompt) {
+    grid-column: 2;
+  }
+  .deal-sol-sheet .sol-compose > .sol-send {
+    grid-column: 3;
+  }
+  .deal-sol-sheet .sol-prompt {
+    display: none;
+  }
+  .deal-sol-sheet .sol-send {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    background: var(--sun-line);
+    color: #fff;
+  }
+  .deal-sol-sheet .sol-send:disabled {
+    background: var(--surface-2);
+    color: var(--muted);
+  }
+  .deal-sol-sheet .sol-lead-page {
+    font-size: 11.5px;
+    background: var(--surface);
+  }
+}
+
+/* Sideways on a phone, Sol's step and suggestions are a plate along the foot moulded round him (22 Nov 2026, Martin: as
+   upright), short so the roof stays in view; it scrolls inside past that. */
+.sol-moulded.sideways-deck > [data-popup] {
+  width: calc(100% - 1rem);
+  margin-inline: 0.5rem;
+  border-radius: 22px;
+  height: auto;
+  max-height: 6.5rem;
+  padding-top: 1.9rem;
+  margin-bottom: 0.5rem;
+}
+/* On a computer, Sol's step and suggestions form along the picture's foot round him as on a phone (22 Nov 2026, Martin:
+   "sols replies should form in the bottom half like on mobile"): a card up to the lower half of the picture, his notch
+   in its top edge, scrolling inside past that. */
+.sol-moulded.desk-deck > * {
+  height: auto;
+  border-radius: 22px;
+  width: min(46rem, 100% - 2rem);
+  margin-inline: auto;
+  max-height: calc(var(--pic-h, 40rem) * 0.48);
+  /* Room under the foot row and Sol's peak, which stand on its top edge. */
+  padding-top: 3.75rem;
+  margin-bottom: 0.5rem;
+  /* Inside the graphite tray: the tray is its ground, so no box of its own. */
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  outline: 0;
+  backdrop-filter: none;
+}
+/* On a computer what stands at the picture's foot (the zoom round, the tip bulb, Roof and the picture's switch, the
+   Drawn view's wall) rises above the graphite tray, as tall as it is at the time. */
+.desk-tray [data-lift] {
+  translate: 0 calc(-1 * var(--tray-h, 72px) + 1.25rem);
+  transition: translate 0.3s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk-tray [data-lift] {
+    transition: none;
+  }
+}
+
+/* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
+   the utilities and over the 16px touch rule above; on an iPhone the viewport's maximum-scale (DesignShell) stops Safari
+   zooming into a field under 16px. */
+@media (max-width: 639px) {
+  .deal-email label {
+    font-size: 11px;
+    gap: 0.375rem;
+  }
+  .deal-email input:not([type="file"]),
+  .deal-email select {
+    height: 2rem;
+    min-height: 2rem;
+    font-size: 13px !important; /* over the 16px touch rule, whose selector is stronger */
+    padding-inline: 0.625rem;
+  }
+  .deal-email textarea {
+    font-size: 13px !important;
+    min-height: 8rem;
+    padding: 0.5rem 0.625rem;
+  }
+  .deal-email .mt-2 {
+    margin-top: 0.375rem;
+  }
+  .deal-email p {
+    font-size: 11px;
+  }
+  .deal-email button {
+    font-size: 13px;
+  }
+}
+
+/* Sol's chat: a finger pulled left slides the turns over to show each one's time (sol-chat.tsx, usePullForTimes). */
+.sol-peek-turn {
+  transform: translateX(calc(var(--sol-peek, 0px) * -1));
+  transition: var(--sol-peek-ease, none);
+}
+.sol-peek-time {
+  position: absolute;
+  top: 0.1rem;
+  left: calc(100% + 0.75rem);
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: var(--sol-peek-shown, 0);
+  transition: var(--sol-peek-ease, none);
 }

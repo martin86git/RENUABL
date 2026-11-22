@@ -1,9 +1,9 @@
 "use client";
 
+import { useStageLabel } from "./stage-select";
 import { clsx } from "clsx";
 import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import {
   CHECK_TESTS,
   CHECK_WORDS,
@@ -61,6 +61,8 @@ export function RoutineBuilder({
   onGone: () => Promise<void>;
   onCancelNew: () => void;
 }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useStageLabel();
   const kept: Draft = routine
     ? { name: routine.name, agent: routine.agent, on: routine.on, trigger: routine.trigger, steps: routine.steps }
     : blankRoutine();
@@ -172,7 +174,7 @@ export function RoutineBuilder({
                       <option value="new-lead">A new lead comes in</option>
                       {TRIGGER_STAGES.map((s) => (
                         <option key={s} value={s}>
-                          A deal reaches {STAGE_LABELS[s]}
+                          A deal reaches {stageWords(s)}
                         </option>
                       ))}
                     </select>

@@ -15,7 +15,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { sharedViewer } from "./design-sol";
 import { loadPrefs } from "./design-after-sale-repo";
-import { listJobs } from "./design-crm-repo";
+import { listJobs, stageNamesOf } from "./design-crm-repo";
 import { query } from "./db";
 import type { Member } from "./design-repo";
 import { casesToResolve } from "./design-service-repo";
@@ -78,7 +78,7 @@ export async function solStepsIn(member: Member, room: string, lineId: string, t
     member: member.email,
     // The channel is read by everyone: no costs, whoever asked.
     costs: false,
-    facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
+    facts: canvasFacts(jobs, serviceOpen, todayInMarket(), await stageNamesOf(businessId)),
     prefs: [],
     now: new Date(),
   });

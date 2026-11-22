@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { KindToday } from "./kind-home";
 import { MyJobsPage } from "./my-jobs";
@@ -8,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, ChevronLeft } from "lucide-react";
 import clsx from "clsx";
-import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
+import { WON_STAGES, type JobStage, stageLabel } from "@/lib/domain/design/crm";
 import { OVERVIEW_VIEWS, PIPELINES, VIEW_PIPELINE, dashboard, inTheWorks, power, type OverviewView } from "@/lib/domain/design/deal";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { journey, type JourneyStop } from "@/lib/domain/design/journey";
@@ -39,6 +40,8 @@ import { TodayPad } from "./today-pad";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
 export function StageTag({ stage, small }: { stage: JobStage; small?: boolean }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   return (
     <span
       className={clsx(
@@ -53,7 +56,7 @@ export function StageTag({ stage, small }: { stage: JobStage; small?: boolean })
               : "bg-surface-2 text-ink-2",
       )}
     >
-      {STAGE_LABELS[stage]}
+      {stageLabel(stage, stageNames)}
     </span>
   );
 }
@@ -523,6 +526,8 @@ type ViewProps = { jobs: JobLine[] | null; data: Overview | null; today: ISODate
 
 /** The stages of one pipeline with how many deals are at each. */
 function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const p = PIPELINES.find((x) => x.id === id) ?? PIPELINES[0];
   return (
     <section className="mt-8" aria-labelledby={`pipe-${p.id}`}>
@@ -539,7 +544,7 @@ function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
           <li key={stage} className="flex min-w-[7.5rem] flex-1 items-center gap-2">
             <div className="min-w-0 flex-1 rounded-md bg-surface-2 px-3 py-2.5">
               <p className="text-[17px] font-medium leading-none tabular-nums text-ink">{data ? (data.counts[stage] ?? 0) : "–"}</p>
-              <p className="mt-1.5 truncate text-xs text-ink-2">{STAGE_LABELS[stage]}</p>
+              <p className="mt-1.5 truncate text-xs text-ink-2">{stageLabel(stage, stageNames)}</p>
             </div>
             {i < p.stages.length - 1 && <ArrowRight className="size-3.5 shrink-0 text-muted" aria-hidden />}
           </li>

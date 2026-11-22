@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -254,7 +255,7 @@ export function TodayPad(props: {
         // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
         <div
           data-tour="today-switch"
-          className="relative z-[16] mt-1 flex justify-center print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
+          className="relative z-[16] mt-4 flex justify-center sm:mt-1 transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
         >
           <TodaySwitch
             first={firstViewLabel(insights)}
@@ -301,9 +302,15 @@ export function TodayPad(props: {
           aria-hidden={talking}
         >
           <div
-            className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
+            className={clsx(
+              "grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows] duration-500 ease-out",
+              talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+            )}
           >
-            <div className="overflow-hidden">
+            {/* Clipped only while it folds away (22 Nov 2026, Martin, on an iPhone: "I can't scroll down"): left on, Safari
+                can size the grid's row to the screen and cut Needs you and Performance off under it, so the page has
+                nothing more to scroll to. */}
+            <div className={clsx("min-w-0", talking && "min-h-0 overflow-hidden")}>
               <TodayChat
                 name={props.name}
                 views={insights}
@@ -672,6 +679,8 @@ function Made({
 /** Before you call, read from the first customer's record: undefined while looking, null when there is none. */
 type CallFacts = { id: string; name: string; phone: string; email: string; facts: BeforeCall };
 function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null | undefined {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [got, setGot] = useState<{ for: string | null; facts: CallFacts | null } | null>(null);
   useEffect(() => {
     if (!jobId) return;
@@ -688,14 +697,14 @@ function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null |
           name: j.customer.name,
           phone: j.customer.phone,
           email: j.customer.email,
-          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today }),
+          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today, names: stageNames }),
         },
       });
     });
     return () => {
       gone = true;
     };
-  }, [jobId, today]);
+  }, [jobId, today, stageNames]);
   if (!jobId) return null;
   return got?.for === jobId ? got.facts : undefined;
 }
@@ -1134,6 +1143,8 @@ function MailBadge({ mark }: { mark: MailMark }) {
 
 /** The deals being sold as a board, or the numbers. */
 export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [numbers, setNumbers] = useState(false);
   // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
   const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);
@@ -1169,7 +1180,7 @@ export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: I
           <p className="animate-pulse text-center text-sm text-muted">Looking…</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {pipelineBoard(jobs).map((s) => (
+            {pipelineBoard(jobs, 6, stageNames).map((s) => (
               <div key={s.stage} className="rounded-2xl bg-canvas p-3">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">

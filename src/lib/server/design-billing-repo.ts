@@ -297,7 +297,7 @@ export async function spendToken(
   });
 }
 
-export type LeadKind = "marketplace" | "enterprise" | "demo";
+export type LeadKind = "marketplace" | "enterprise" | "demo" | "demo-request";
 
 /** Someone who asked about the marketplace, or an Enterprise plan, on the sign-up page, or opened the demo (demo.ts). */
 export async function recordLead(

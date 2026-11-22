@@ -15,7 +15,6 @@ import {
   FileText,
   LayoutDashboard,
   Menu,
-  MessageCircle,
   MessagesSquare,
   PenTool,
   Search,
@@ -25,6 +24,7 @@ import {
   Wrench,
   type LucideIcon,
   Mail,
+  ArrowLeft,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
@@ -117,10 +117,14 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
   ],
 };
 
-const PHONE_TABS: [PhoneTab, PhoneTab, PhoneTab] = [
+// The designer beside Sol (22 Nov 2026, Martin: "we need the designer icon in the bottom menu bar… rapid lookup of
+// existing deal or new address to design on the spot"): it opens the design tool's home, with its one search for a
+// deal or an address, over the page. Messages left the bar (22 Nov 2026, Martin: "remove the chat icon from the tool
+// bar in mobile view. this will allow all icons to be a little larger"); it is under More.
+const PHONE_TABS: PhoneTab[] = [
   { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
-  { label: "Messages", href: PATHS.messages, icon: MessageCircle, match: (p) => p.startsWith(PATHS.messages) },
+  { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
 ];
 
 /**
@@ -177,6 +181,16 @@ const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 
  * bar (`lg:pt-9`): the menu's middle lands on the pad's edge.
  */
 const MENU_DROP_PX = 56;
+/**
+ * Scrolled down, the menu rises into the bar's own row, level with the wordmark and the cards at the sides, and what
+ * sticks moves up with it (21 Nov 2026, Martin: Today's Business | Feed switch ran into the lowered menu; "when
+ * scrolling the top banner menu compresses allowing more space on the page"). What sticks then sits this far under the
+ * bar, room for the pad's rounded top edge (.pad-cap), which sticks 20px above --studio-head.
+ */
+const RAISED_GAP_PX = 20;
+/** How far down the page the menu rises, and how near the top it drops again (apart, so it never flickers between). */
+const RAISE_AT_PX = 24;
+const DROP_AT_PX = 4;
 
 function Shell({
   children,
@@ -219,11 +233,21 @@ function Shell({
       return;
     }
     // The sections menu hangs below the bar on a page with a pad: what sticks clears it too.
-    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight + (tool ? 0 : MENU_DROP_PX)}px`);
+    // Raised, it clears the bar and leaves room for the pad's top edge. (A fresh ref each render, so this reads `raised`.)
+    const set = () => root.style.setProperty("--studio-head", `${el.offsetHeight + (tool ? 0 : raised ? RAISED_GAP_PX : MENU_DROP_PX)}px`);
     set();
     watchHead.current = new ResizeObserver(set);
     watchHead.current.observe(el);
   };
+  // iPhone and iPad only (22 Nov 2026, Martin: compact email fields on the deal): Safari zooms into any field under 16px
+  // when it is tapped and stays zoomed. maximum-scale=1 stops that, and iOS still lets people pinch to zoom. Not set
+  // elsewhere, since Android's Chrome would stop pinch zoom with it.
+  useEffect(() => {
+    const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    if (!ios || !meta || meta.content.includes("maximum-scale")) return;
+    meta.content = `${meta.content}, maximum-scale=1`;
+  }, []);
   // The approval gates' counts (Procurement), refreshed when a job is moved on from one.
   const [gates, setGates] = useState<Record<string, number>>({});
   useEffect(() => {
@@ -288,8 +312,13 @@ function Shell({
   // Once the pad's top has scrolled under the top bar, the gap behind the lowered menu is filled with the pad's own
   // ground, so the page never shows through around it (14 Nov 2026, Martin).
   const [underBar, setUnderBar] = useState(false);
+  // Scrolled down, the lowered menu rises into the bar (RAISED_GAP_PX); back near the top it drops again.
+  const [raised, setRaised] = useState(false);
   useEffect(() => {
-    const look = () => setUnderBar(window.scrollY > 0);
+    const look = () => {
+      setUnderBar(window.scrollY > 0);
+      setRaised((r) => (r ? window.scrollY > DROP_AT_PX : window.scrollY > RAISE_AT_PX));
+    };
     look();
     window.addEventListener("scroll", look, { passive: true });
     return () => window.removeEventListener("scroll", look);
@@ -471,8 +500,8 @@ function Shell({
             )}
           </div>
           <div
-            className="mt-4 flex min-w-0 items-center justify-center"
-            style={tool ? undefined : { transform: `translateY(${MENU_DROP_PX}px)` }}
+            className="mt-4 flex min-w-0 items-center justify-center transition-transform duration-300 ease-out motion-reduce:transition-none"
+            style={tool ? undefined : { transform: `translateY(${raised ? 0 : MENU_DROP_PX}px)` }}
           >
             {/* One pill in liquid glass (19 Nov 2026, Martin: .glass-bar in globals.css; it was flat white). Every
                 round sits inside it at the same height, nothing standing out of it, and the section you're in is lit as the
@@ -637,7 +666,7 @@ function Shell({
         {!tool && (
           <div
             aria-hidden
-            className={clsx("pad-under pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas", !underBar && "hidden")}
+            className={clsx("pad-under pointer-events-none absolute inset-x-0 top-full -z-10 bg-canvas", (!underBar || raised) && "hidden")}
             style={{ height: MENU_DROP_PX + 48 }}
           />
         )}
@@ -647,9 +676,17 @@ function Shell({
 
       {/* On a phone: the wordmark, Search and the day across the top. */}
       <div className="flex items-center gap-3 px-4 pb-1 pt-3 print:hidden lg:hidden">
-        <Link href={PATHS.home} aria-label="RENUABL, today">
-          <Wordmark className="text-[16px]" />
-        </Link>
+        {/^\/design\/deals\/[^/]+$/.test(path) ? (
+          // On a deal, the way back to Deals takes the wordmark's place (21 Nov 2026, Martin).
+          <Link href={PATHS.pipelines} className="-ml-1 inline-flex h-9 items-center gap-1.5 pr-2 text-[15px] font-medium text-ink">
+            <ArrowLeft className="size-[18px]" aria-hidden />
+            Deals
+          </Link>
+        ) : (
+          <Link href={PATHS.home} aria-label="RENUABL, today">
+            <Wordmark className="text-[16px]" />
+          </Link>
+        )}
         {retail && (
           <button
             type="button"
@@ -688,13 +725,16 @@ function Shell({
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
         aria-label="Sections, on a phone"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden"
+        className={clsx(
+          "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
+          kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
+        )}
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
           const lit = !more && t.match(path);
           const sol =
             retail && i === 2 ? (
-              <div key="sol" className="flex min-h-14 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-medium text-ink">
+              <div key="sol" className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink">
                 <span className="-mt-5">
                   <SolNavButton phone />
                 </span>
@@ -710,12 +750,21 @@ function Shell({
               onClick={() => setMore(false)}
               aria-current={lit ? "page" : undefined}
               className={clsx(
-                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+                "flex flex-col items-center justify-center gap-1 font-medium",
+                retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
                 lit ? "text-ink" : "text-muted",
               )}
             >
-              <span className={clsx("relative flex h-7 w-12 items-center justify-center rounded-full", lit && "bg-sun")}>
-                <t.icon className="size-[18px]" aria-hidden />
+              <span
+                className={clsx(
+                  "relative flex items-center justify-center rounded-full",
+                  // The designer is the orange round it is in the top menu.
+                  t.href === PATHS.designer
+                    ? clsx(retail ? "size-9" : "size-7", "bg-sun-line text-white shadow-sm", lit && "ring-2 ring-sun-line/30 ring-offset-1")
+                    : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && "bg-sun"),
+                )}
+              >
+                <t.icon className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
                 {n > 0 && (
                   <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
                     {n}
@@ -731,12 +780,20 @@ function Shell({
           onClick={() => setMore(!more)}
           aria-expanded={more}
           className={clsx(
-            "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
+            "flex flex-col items-center justify-center gap-1 font-medium",
+            retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
             more ? "text-ink" : "text-muted",
           )}
         >
-          <span className={clsx("flex h-7 w-12 items-center justify-center rounded-full", more && "bg-sun")}>
-            <Menu className="size-[18px]" aria-hidden />
+          <span
+            className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
+          >
+            <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+            {retail && unread > 0 && (
+              <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                {unread}
+              </span>
+            )}
           </span>
           More
         </button>
@@ -794,6 +851,7 @@ function Shell({
                 { label: "Team chat", href: PATHS.team, n: 0 },
                 ...(retail
                   ? [
+                      { label: "Messages", href: PATHS.messages, n: unread },
                       { label: "Notifications", href: PATHS.notifications, n: mentions },
                       { label: "Email", href: PATHS.inbox, n: mail },
                     ]

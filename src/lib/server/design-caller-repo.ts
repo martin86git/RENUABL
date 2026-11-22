@@ -5,7 +5,15 @@
  */
 import { agentPrefs } from "./design-sol-repo";
 import { callVoice } from "@/lib/domain/design/sol-induction";
-import { cleanHiddenVoices, cleanTint, DEFAULT_CALLER, voiceProvider, type CallerVoice } from "@/lib/domain/design/caller";
+import {
+  cleanBrain,
+  cleanHiddenVoices,
+  cleanTint,
+  DEFAULT_CALLER,
+  voiceProvider,
+  type CallerBrain,
+  type CallerVoice,
+} from "@/lib/domain/design/caller";
 import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call";
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
@@ -26,18 +34,24 @@ export interface Caller {
   named: boolean;
   /** The colour chosen for its stand-in picture (caller.ts), or null to leave it to its name. */
   tint: number | null;
+  /** The model it thinks with on calls (caller.ts CALLER_BRAINS), or null for RENUABL's default. */
+  brain: CallerBrain | null;
 }
 
 /** The business's phone assistant: its name (Sol until named) and whether it has a picture. */
 export async function callerOf(businessId: string, role: CallerKey = "sales"): Promise<Caller> {
-  if (!dbConfigured()) return { role, name: DEFAULT_CALLER, photoAt: null, voice: null, named: false, tint: null };
+  if (!dbConfigured()) return { role, name: DEFAULT_CALLER, photoAt: null, voice: null, named: false, tint: null, brain: null };
   const rows = await query<{
     name: string;
     photo_at: Date | null;
     voice_provider: string | null;
     voice_id: string | null;
     tint: number | null;
-  }>(`select name, photo_at, voice_provider, voice_id, tint from design_caller where business_id = $1 and role = $2`, [businessId, role]);
+    brain: string | null;
+  }>(`select name, photo_at, voice_provider, voice_id, tint, brain from design_caller where business_id = $1 and role = $2`, [
+    businessId,
+    role,
+  ]);
   const row = rows[0];
   const provider = voiceProvider(row?.voice_provider);
   return {
@@ -47,7 +61,23 @@ export async function callerOf(businessId: string, role: CallerKey = "sales"): P
     voice: provider && row?.voice_id ? { provider, voiceId: row.voice_id } : null,
     named: Boolean(row),
     tint: cleanTint(row?.tint),
+    brain: cleanBrain(row?.brain),
   };
+}
+
+/** The model it thinks with on calls, already cleaned (cleanBrain); null leaves it to RENUABL's default. */
+export async function setCallerBrain(
+  businessId: string,
+  brain: CallerBrain | null,
+  by: string,
+  role: CallerKey = "sales",
+): Promise<Caller> {
+  await query(
+    `insert into design_caller (business_id, name, brain, updated_by, role) values ($1, $2, $3, $4, $5)
+     on conflict (business_id, role) do update set brain = excluded.brain, updated_by = excluded.updated_by, updated_at = now()`,
+    [businessId, DEFAULT_CALLER, brain, by, role],
+  );
+  return callerOf(businessId, role);
 }
 
 /** The colour of its stand-in picture, already cleaned (cleanTint); null leaves it to its name. */

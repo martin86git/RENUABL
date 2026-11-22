@@ -13,9 +13,9 @@ describe("what a business is told before adding Calls & Texts", () => {
 
   it("says what a call costs and that the number comes with it", () => {
     const all = voiceTerms().join(" ");
-    expect(all).toContain("no charge per call");
-    expect(all).toContain("60 voice-agent minutes and 250 texts");
-    expect(all).toContain("a minute takes 3 Sol credits and a text 1");
+    expect(all).toContain("30 voice-agent minutes and 30 texts free");
+    expect(all).toContain("30 voice-agent minutes and 30 texts");
+    expect(all).toMatch(/\d+c a minute and \d+c a text/);
     expect(all).toContain("business number comes with it");
   });
 });

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
 import { Check, ChevronDown, Pencil, Send } from "lucide-react";
 import { firstNameOf, type PreparedItem } from "@/lib/domain/design/prepared";
-import { PREPARED_CHANGED, dismissPrepared, loadPrepared, sendPrepared } from "@/lib/services/prepared";
+import { PREPARED_CHANGED, dismissPrepared, keptPrepared, loadPrepared, sendPrepared } from "@/lib/services/prepared";
 import { SolMark } from "./sol-sun";
 
 /** While something is still being written, the tray looks again this often, for at most this long. */
@@ -15,24 +15,31 @@ const LOOK_FOR_MS = 60_000;
 
 /** The work Sol prepared on the member's deals, kept fresh: read on opening, again while drafts are being written. */
 export function usePrepared(jobId?: string) {
-  const [items, setItems] = useState<PreparedItem[] | null>(null);
-  const read = useCallback(async () => {
-    const r = await loadPrepared();
-    if (r.ok) setItems(jobId ? r.items.filter((i) => i.jobId === jobId) : r.items);
-    return r.ok ? r.items : [];
-  }, [jobId]);
+  // Starts on the tray already read this visit (Today asks for it as it opens), then reads it again behind it.
+  const [items, setItems] = useState<PreparedItem[] | null>(() => {
+    const k = keptPrepared();
+    return k ? (jobId ? k.items.filter((i) => i.jobId === jobId) : k.items) : null;
+  });
+  const read = useCallback(
+    async (again = false) => {
+      const r = await loadPrepared(again);
+      if (r.ok) setItems(jobId ? r.items.filter((i) => i.jobId === jobId) : r.items);
+      return r.ok ? r.items : [];
+    },
+    [jobId],
+  );
   useEffect(() => {
     let gone = false;
     const started = Date.now();
     let timer = 0;
-    const look = async () => {
-      const got = await read();
+    const look = async (again = false) => {
+      const got = await read(again);
       if (gone) return;
       if (got.some((i) => i.status === "preparing") && Date.now() - started < LOOK_FOR_MS)
-        timer = window.setTimeout(() => void look(), LOOK_EVERY_MS);
+        timer = window.setTimeout(() => void look(true), LOOK_EVERY_MS);
     };
     void look();
-    const again = () => void look();
+    const again = () => void look(true);
     window.addEventListener(PREPARED_CHANGED, again);
     return () => {
       gone = true;

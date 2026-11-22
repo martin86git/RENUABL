@@ -317,7 +317,13 @@ export function SequenceEditor({ id }: { id: string }) {
               </div>
               {s.kind === "email" && open === s.id && (
                 <div className="border-t border-line p-5">
-                  <EdmBuilder content={s.content} brand={brand} sender={sender} onChange={(content) => setStep(i, { ...s, content })} />
+                  <EdmBuilder
+                    content={s.content}
+                    brand={brand}
+                    onBrand={setBrand}
+                    sender={sender}
+                    onChange={(content) => setStep(i, { ...s, content })}
+                  />
                 </div>
               )}
             </div>

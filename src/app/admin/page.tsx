@@ -35,6 +35,9 @@ import { NotBilledSwitch } from "@/components/admin/not-billed";
 import { MakePlanCode, StopPlanCode } from "@/components/admin/plan-codes";
 import { stripeClient } from "@/lib/server/stripe";
 import { listPlanCodes } from "@/lib/server/stripe-plan-codes";
+import { BusinessLeadsBoard } from "@/components/admin/business-leads";
+import { openLeads } from "@/lib/domain/design/business-leads";
+import { listBusinessLeads } from "@/lib/server/business-leads-repo";
 
 export const metadata = { title: "Partners and jobs" };
 
@@ -60,7 +63,7 @@ export default async function AdminPage() {
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
   const stripe = stripeClient();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn, planCodes] =
+  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn, planCodes, salesLeads] =
     await Promise.all([
       listPartners(),
       listAllJobs(),
@@ -74,6 +77,7 @@ export default async function AdminPage() {
       addOnsAskedFor().catch(() => []),
       addOnsOnForStaff().catch(() => []),
       stripe ? listPlanCodes(stripe).catch(() => null) : null,
+      listBusinessLeads().catch(() => []),
     ]);
   const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
@@ -91,7 +95,10 @@ export default async function AdminPage() {
         </a>{" "}
         saves a note on RENUABL&apos;s own test contact and shows HubSpot&apos;s reply.
       </p>
-      <Panel title="Send a brief">
+      <Panel title={`RENUABL Business sales · ${openLeads(salesLeads)} open`}>
+        <BusinessLeadsBoard leads={salesLeads} />
+      </Panel>
+      <Panel className="mt-6" title="Send a brief">
         <BriefSender />
       </Panel>
       {briefs.length > 0 && (

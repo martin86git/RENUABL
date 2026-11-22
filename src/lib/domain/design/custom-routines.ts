@@ -10,7 +10,7 @@
  * count down inside the business's hours, his texts go only inside them, and a voice agent's calls keep calling hours
  * and every rule a call keeps. Nothing is sent from here. Pure: no I/O.
  */
-import { STAGE_LABELS, type JobStage } from "./crm";
+import { stageLabel, type JobStage, type StageNames } from "./crm";
 import type { Routine, RoutineNode, RoutineStep, StepLive } from "./routines";
 
 export const TRIGGER_STAGES = ["designed", "proposal", "won", "scheduled", "installed"] as const satisfies readonly JobStage[];
@@ -67,8 +67,8 @@ export const CHECK_WORDS: Record<CheckTest, { title: string; otherwise: string }
   "same-stage": { title: "Still at the stage it started?", otherwise: "Stops: the deal has moved on" },
 };
 
-export const triggerWords = (t: CustomTrigger) =>
-  t.kind === "new-lead" ? "A new lead comes in" : `A deal reaches ${STAGE_LABELS[t.stage]}`;
+export const triggerWords = (t: CustomTrigger, names: StageNames = {}) =>
+  t.kind === "new-lead" ? "A new lead comes in" : `A deal reaches ${stageLabel(t.stage, names)}`;
 
 const plain = (raw: unknown, max: number) =>
   typeof raw === "string"
@@ -308,6 +308,8 @@ export function routineWritePrompt(o: {
   title: string;
   stage: JobStage;
   voice?: string[];
+  /** The business's own names for the stages. */
+  names?: StageNames;
 }): string {
   return [
     `You write one ${o.kind === "email" ? "short email" : "short text message"} to a customer of ${o.business}, a solar business in Australia, as "we".`,
@@ -317,7 +319,7 @@ export function routineWritePrompt(o: {
       ? "Under 110 words. One easy next step. No sign-off: one is added. Give a subject of under 60 characters."
       : "Under 300 characters, one or two sentences. No sign-off: one is added. Subject: leave it as a single dash.",
     o.voice?.length ? `How the business writes to customers:\n- ${o.voice.join("\n- ")}` : "",
-    `<deal>Customer's first name: ${o.customer.split(/\s+/)[0]}\nWhat they're looking at: ${o.title}\nWhere the deal is: ${STAGE_LABELS[o.stage]}</deal>`,
+    `<deal>Customer's first name: ${o.customer.split(/\s+/)[0]}\nWhat they're looking at: ${o.title}\nWhere the deal is: ${stageLabel(o.stage, o.names)}</deal>`,
     `<about>${o.about}</about>`,
   ]
     .filter(Boolean)

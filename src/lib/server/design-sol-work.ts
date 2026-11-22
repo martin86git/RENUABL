@@ -5,7 +5,7 @@
  * they may see and do.
  */
 import { can } from "@/lib/domain/design/account";
-import { cleanJobInput, STAGE_LABELS } from "@/lib/domain/design/crm";
+import { cleanJobInput, stageLabel } from "@/lib/domain/design/crm";
 import { typedFields } from "@/lib/domain/design/deal-sections";
 import { fromLocal, withReminder } from "@/lib/domain/design/sol";
 import {
@@ -31,7 +31,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { readWithClaude } from "./claude-reader";
 import { viewerOf } from "./design-context";
 import { jobOrder, loadPrefs, saveOrder } from "./design-after-sale-repo";
-import { addActivity, jobById, listJobs, updateJob } from "./design-crm-repo";
+import { addActivity, jobById, listJobs, stageNamesOf, updateJob } from "./design-crm-repo";
 import { loadLists, type Member } from "./design-repo";
 import { newSolId, withSol } from "./design-sol-repo";
 import {
@@ -83,9 +83,10 @@ export async function solOffersWork(
   const { businessId } = member;
   if (!asked && !(await loadPrefs(businessId)).solJoinsIn) return false;
   const jobs = (await listJobs(businessId, viewerOf(member))).filter((j) => j.stage !== "lost").slice(0, 80);
+  const stageNames = await stageNamesOf(businessId);
   const names = new Map(jobs.map((j) => [j.id, `${j.customerName} · ${j.title}`]));
   const deals = jobs
-    .map((j) => `${j.id}: ${j.customerName} · ${j.title} · ${STAGE_LABELS[j.stage]} · ${j.installDate ?? "no install day"}`)
+    .map((j) => `${j.id}: ${j.customerName} · ${j.title} · ${stageLabel(j.stage, stageNames)} · ${j.installDate ?? "no install day"}`)
     .join("\n");
   const context = (await channelContext(businessId, room, 6))
     .filter((l) => l.text !== text)
@@ -96,7 +97,15 @@ export async function solOffersWork(
     readWithClaude<Record<string, unknown>>(
       [],
       WORK_SCHEMA,
-      workPrompt({ asker: nameOf(member.email), line: text.replace(/(^|\s)@sol\b/gi, "$1"), today, deals, context, asked }),
+      workPrompt({
+        asker: nameOf(member.email),
+        line: text.replace(/(^|\s)@sol\b/gi, "$1"),
+        today,
+        deals,
+        context,
+        asked,
+        names: stageNames,
+      }),
       apiKey,
       ai,
     ),
@@ -155,7 +164,7 @@ export async function pressAction(member: Member, lineId: string, how: "do" | "d
         dueAt: action.dueAt,
       }),
     }));
-    return { ok: true, words: actionDoneWords(action) };
+    return { ok: true, words: actionDoneWords(action, await stageNamesOf(businessId)) };
   }
   // A deal's work only for someone who may see that deal.
   const found = await jobById(businessId, action.jobId!, viewerOf(member));
@@ -176,7 +185,7 @@ export async function pressAction(member: Member, lineId: string, how: "do" | "d
     const saved = await saveOrder(businessId, jobId, next, email);
     if (typeof saved === "string") return { ok: false, message: "That order couldn't be changed." };
     await onRecord(`Added ${action.qty} × ${action.item} to the order, from the team chat.`);
-    return { ok: true, words: actionDoneWords(action) };
+    return { ok: true, words: actionDoneWords(action, await stageNamesOf(businessId)) };
   }
 
   if (!(await settleAction(businessId, lineId, "done", email))) return { ok: false, message: "Someone got there first." };
@@ -189,13 +198,13 @@ export async function pressAction(member: Member, lineId: string, how: "do" | "d
     await onRecord(
       action.kind === "install-date"
         ? `Install day set to ${action.date} from the team chat.`
-        : `Marked ${STAGE_LABELS[action.stage!]} from the team chat.`,
+        : `Marked ${stageLabel(action.stage!, await stageNamesOf(businessId))} from the team chat.`,
     );
-    return { ok: true, words: actionDoneWords(action) };
+    return { ok: true, words: actionDoneWords(action, await stageNamesOf(businessId)) };
   }
   const note = await onRecord(action.text!);
   if (typeof note === "string") return { ok: false, message: "The note couldn't be added to that deal." };
-  return { ok: true, words: actionDoneWords(action) };
+  return { ok: true, words: actionDoneWords(action, await stageNamesOf(businessId)) };
 }
 
 /** Catches a member up on a channel: the `unread` lines from others since they were last there, in three short parts. */

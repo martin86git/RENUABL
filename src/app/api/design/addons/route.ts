@@ -7,16 +7,27 @@ import {
   addOnRequestNote,
   addRefusal,
   cleanAddOnKey,
+  hasNotice,
 } from "@/lib/domain/design/add-ons";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { buyNumber, numberBuyingOn, numberOf } from "@/lib/server/business-numbers";
-import { addOnsOf, addToSubscription, removeFromSubscription, requestAddOn, standingOf } from "@/lib/server/design-addons";
+import {
+  addOnsOf,
+  addToSubscription,
+  giveNotice,
+  removeFromSubscription,
+  requestAddOn,
+  standingOf,
+  withdrawNotice,
+} from "@/lib/server/design-addons";
 import { subscriptionOf } from "@/lib/server/design-billing-repo";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { tellStaff } from "@/lib/server/design-staff-note";
 import { allow } from "@/lib/server/rate-limit";
 import { stripeClient } from "@/lib/server/stripe";
 import { voiceStandingFor } from "@/lib/server/voice-calls";
+import { cleanCap } from "@/lib/domain/design/voice-usage";
+import { capOf, setCap, usageOf } from "@/lib/server/design-voice-usage";
 
 const PRIVATE = { "cache-control": "private, no-store" };
 
@@ -30,11 +41,13 @@ export async function GET() {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     const { businessId, role, permissions } = who.member;
-    const [addOns, number, voice, plan] = await Promise.all([
+    const [addOns, number, voice, plan, usage, cap] = await Promise.all([
       addOnsOf(businessId),
       numberOf(businessId).catch(() => null),
       voiceStandingFor(businessId).catch(() => "not-set-up" as const),
       subscriptionOf(businessId).catch(() => null),
+      usageOf(businessId).catch(() => ({ minutes: 0, texts: 0 })),
+      capOf(businessId).catch(() => null),
     ]);
     return Response.json(
       {
@@ -46,6 +59,9 @@ export async function GET() {
         // The plan's next bill day, so an offer can say when an add-on is first billed.
         nextBill: plan && plan.interval !== "year" && !["canceled", "incomplete_expired"].includes(plan.status) ? plan.periodEnd : null,
         mayAdd: can(role, "members", permissions) && cleanKind(who.member.businessKind) === "retailer",
+        // This month's minutes and texts, and the spending cap in cents (voice-usage.ts).
+        usage,
+        capCents: cap,
       },
       { headers: PRIVATE },
     );
@@ -76,7 +92,9 @@ async function getNumber(businessId: string, email: string, businessName: string
 
 /**
  * POST { do: "add", key } → a priced add-on put on the plan's Stripe subscription now, an unpriced one asked for (kept,
- * RENUABL's staff told); { do: "remove", key } → taken off the plan (voice also releases the number); { do: "number" } →
+ * RENUABL's staff told); { do: "remove", key } → cancelled: Calls & Texts with 30 days' notice (on and billed until then,
+ * then off the plan and the number released by the daily cron), anything else at once; { do: "keep", key } → a cancel
+ * withdrawn while its notice runs; { do: "number" } →
  * the business's own phone number bought (voice add-on on, buying switched on). The owner only.
  */
 export async function POST(request: Request) {
@@ -89,6 +107,14 @@ export async function POST(request: Request) {
       return Response.json({ ok: false, message: "Too many tries. Wait a little." }, { status: 429 });
     const { businessId, email, businessName } = who.member;
     const retailer = cleanKind(who.member.businessKind) === "retailer";
+
+    // The spending cap on minutes and texts beyond the free allowance, in whole dollars.
+    if (read.body.do === "cap") {
+      const cents = cleanCap(read.body.dollars);
+      if (cents === null) return Response.json({ ok: false, message: "Type a cap in whole dollars, up to $5,000." }, { status: 422 });
+      await setCap(businessId, cents);
+      return Response.json({ ok: true, capCents: cents });
+    }
 
     if (read.body.do === "number") {
       if ((await standingOf(businessId, "voice")) !== "on")
@@ -105,9 +131,23 @@ export async function POST(request: Request) {
 
     if (read.body.do === "remove") {
       const standing = await standingOf(businessId, key);
+      if (standing === "ending") return Response.json({ ok: true, already: true });
       if (standing !== "on" && standing !== "requested")
         return Response.json({ ok: false, message: "It isn't on your plan." }, { status: 409 });
+      // Calls & Texts carries 30 days' notice: it stays on, and billed, until then (add-ons.ts CANCEL_NOTICE_DAYS).
+      if (standing === "on" && hasNotice(key)) {
+        const endsAt = await giveNotice(businessId, key, email);
+        return Response.json({ ok: true, endsAt });
+      }
       await removeFromSubscription(stripeClient(), businessId, key);
+      return Response.json({ ok: true });
+    }
+
+    // Changed their mind while the notice runs.
+    if (read.body.do === "keep") {
+      if ((await standingOf(businessId, key)) !== "ending")
+        return Response.json({ ok: false, message: "It isn't cancelled." }, { status: 409 });
+      await withdrawNotice(businessId, key);
       return Response.json({ ok: true });
     }
 

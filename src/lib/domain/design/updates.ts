@@ -14,6 +14,223 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Today on a phone: the page scrolls down through Needs you and Performance, and their cards fit the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the panel, inverter, battery and charger lists open over the whole screen, easy to browse.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the map is about a fifth bigger, and Sol's box runs edge to edge under it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: roomier figures at the top, each named, and Sol's box runs to the foot of the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Each voice agent can be set to answer quicker or more carefully, under How it speaks in its settings.",
+  },
+  {
+    day: "2026-11-22",
+    area: "CRM",
+    words: "Deals brought in from Pylon's export can be filled in from Pylon: the battery, panels, inverter and place on the map.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Pages answer taps sooner on phones: Sol's sun does less work in the background, and his cards type their lines more lightly.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Video block, the video's picture with a play button that opens it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a clear place at the top of the email to drop or upload your business logo.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Countdown block, a timer to the end of an offer that is right each time the email is opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Products block, each product with its picture, price, a few words and a button.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Spacer block, and Social links for Facebook, Instagram and more, shown as icons or names.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "A datasheet shared from another business is marked to check until someone in your business confirms it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Product datasheets are shared across RENUABL: one any business adds is there for every business to design with.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Your voice agents answer quicker on calls.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the strings sit under the map, one line each, so the roof stays clear to tap; Auto and New in their header.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone: slimmer figures, more room for Sol in an outlined box, the eraser beside the hand, and a larger designs round.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, with one panel picked, All picks every panel in its array.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Double tap a 1° button on a phone to turn 5° a press, and again for 1°. Sideways, the controls sit where they do upright.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Turned sideways in a phone's browser, the designer says how to open RENUABL from your Home Screen for the full screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the pointer is on the map beside Add a panel, and holding a 1° button keeps turning the panels.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol is a little larger with one big + to open his tools.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, picked panels get a controller under the map: turn 1° with either thumb, and Undo appears after a change.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Add a panel sits on the map, and Sol is a round with a tool and a + in place of words.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol's card for picked panels is tidier: turns in one row, portrait or landscape, tilt and delete.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, sideways too, Sol holds the tools, and a hand button grabs the map to move it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Emails take a background and text colour of their own, and the editor is clearer with more room.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Marketing",
+    words: "The email editor is drag and drop: drag blocks onto the email or into a new order, type straight into it, and undo any change.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Deals",
+    words:
+      "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Team chat",
+    words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts beyond the free allowance is 50c a minute and 30c a text, and you're emailed at 80% of your spending cap.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, the figures run across the top of the screen and the panel, inverter and battery buttons are larger.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, Sol holds the tools: tap him for them, and pick panels to turn them from his card.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The designs menu lists each design's inverter, battery and EV charger, and on a phone it opens over the screen.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The Day button is gone from the designer.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright: a larger roof, smaller buttons, and a magnifier under the roof to pinch and zoom.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone turned sideways, the designer's buttons are smaller, so the roof is in view.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone, turn it sideways and the designer fills the screen, with the roof as large as it goes.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words:
+      "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts is $49 a month with 30 minutes and 30 texts free, then by use, with a spending cap you set.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Cancelling Calls & Texts or Growth gives 30 days' notice: it stays on until then, and you can change your mind.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
     day: "2026-11-21",
     area: "CRM",
     words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
@@ -42,7 +259,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Design tool",
-    words: "Dragging out panels on open roof turns the row to follow your pointer, and panels square to an edge before you let go.",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
   },
   {
     day: "2026-11-21",

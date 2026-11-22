@@ -1,10 +1,12 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { MapPin } from "lucide-react";
+import { ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
+import type { ReactNode } from "react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
-import { STAGE_LABELS, type Customer, type Job } from "@/lib/domain/design/crm";
+import type { Customer, Job } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 import type { BannerFigure } from "@/lib/domain/design/system-summary";
@@ -66,6 +68,7 @@ export function DealBanner({
   onDesign,
   onPlace,
   compact = false,
+  actions,
 }: {
   job: Job;
   customer: Customer;
@@ -78,7 +81,13 @@ export function DealBanner({
   onPlace: () => void;
   /** Slimmer, without the figures (8 Nov 2026, Martin: on any tab but the deal's own the tab's work belongs in the first fold). */
   compact?: boolean;
+  /** On a phone, the ways of reaching the customer (Call, Email), in the banner's top right corner. */
+  actions?: ReactNode;
 }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
+  // On a phone the roof is a strip; a tap opens it tall to look at the layout, and the design from there (21 Nov 2026).
+  const [roofOpen, setRoofOpen] = useState(false);
   const placed = job.lat !== null && job.lng !== null;
   const [drawing, setDrawing] = useState<JobDrawing | null>(null);
   useEffect(() => {
@@ -98,38 +107,57 @@ export function DealBanner({
   const where = job.address || customer.address;
 
   return (
-    <section className="overflow-hidden rounded-[24px] bg-primary text-white shadow-[0_8px_30px_rgba(11,11,12,0.10)]">
+    <section className="overflow-hidden rounded-[24px] bg-primary max-sm:rounded-[20px] text-white shadow-[0_8px_30px_rgba(11,11,12,0.10)]">
       <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,34%)]">
         <div
           className={clsx(
-            "flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-4",
-            compact ? "px-5 py-4 sm:px-6" : "p-5 sm:p-6",
+            "min-w-0",
+            // On a phone (21 Nov 2026, Martin): smaller, the kit stacked down the right beside who it's for.
+            "max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2 max-sm:px-3.5 max-sm:py-3",
+            "sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-4",
+            compact ? "sm:px-6 sm:py-4" : "sm:p-6",
           )}
         >
           <div className="min-w-0">
-            <h1 className={clsx("truncate leading-tight tracking-tight", compact ? "text-[21px]" : "text-[26px] sm:text-[28px]")}>
+            <h1
+              className={clsx(
+                "truncate leading-tight tracking-tight max-sm:text-[18px]",
+                compact ? "text-[21px]" : "text-[26px] sm:text-[28px]",
+              )}
+            >
               {customer.name}
             </h1>
-            <p className="mt-0.5 truncate text-sm text-white/75">
+            <p className="mt-0.5 truncate text-sm text-white/75 max-sm:text-[11.5px]">
               {where || "No address yet"}
               {job.title ? ` · ${job.title}` : ""}
             </p>
-            <div className={clsx("flex flex-wrap items-center gap-2", compact ? "mt-2" : "mt-3")}>
-              <Chip>{STAGE_LABELS[job.stage]}</Chip>
+            <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-1.5 max-sm:gap-1", compact ? "mt-2" : "mt-3")}>
+              <Chip>{stageWords(job)}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
               {pulse && (
-                <span className="[&>*]:mt-0">
+                <span className="[&>*]:mt-0 max-sm:basis-full">
                   <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
                 </span>
               )}
             </div>
           </div>
-          <Kit figures={figures} compact={compact} />
+          {/* On a phone (21 Nov 2026, Martin): Call and Email, then the kit down the right edge, its words left of each icon. */}
+          <div className="max-sm:flex max-sm:flex-col max-sm:items-end max-sm:gap-2.5">
+            {actions && <div className="sm:hidden">{actions}</div>}
+            <Kit figures={figures} compact={compact} />
+          </div>
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}
-        <div className={clsx("relative bg-black/20", compact ? "min-h-[6.5rem]" : "min-h-[8.5rem]")}>
+        <div
+          className={clsx(
+            "relative bg-black/20",
+            compact ? "min-h-[6.5rem]" : "min-h-[8.5rem]",
+            roofOpen ? "max-sm:min-h-[17rem]" : "max-sm:min-h-[4.5rem]",
+            "transition-[min-height] duration-300",
+          )}
+        >
           {picture ? (
             <svg
               viewBox={bannerView(drawing?.viewBox ?? null, 1.5, 1.25)}
@@ -157,11 +185,45 @@ export function DealBanner({
           {picture && onDesign && (
             <button
               type="button"
-              onClick={onDesign}
+              onClick={() => {
+                // On a phone the first tap opens the strip tall; the design is a tap on its own button from there.
+                if (!roofOpen && window.matchMedia("(max-width: 639px)").matches) setRoofOpen(true);
+                else onDesign();
+              }}
               title={job.projectId ? "Open the design" : "Design this roof"}
               className="absolute inset-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sun-line"
-              aria-label={job.projectId ? "Open the design" : "Design this roof"}
+              aria-label={roofOpen ? (job.projectId ? "Open the design" : "Design this roof") : "Show the roof larger"}
             />
+          )}
+          {picture && !roofOpen && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-2 right-2 flex size-7 items-center justify-center rounded-full bg-black/45 text-white sm:hidden"
+            >
+              <Maximize2 className="size-3.5" />
+            </span>
+          )}
+          {picture && roofOpen && (
+            <div className="absolute inset-x-2 bottom-2 flex items-center justify-between sm:hidden">
+              <button
+                type="button"
+                onClick={() => setRoofOpen(false)}
+                className="inline-flex h-8 items-center gap-1 rounded-full bg-black/55 px-3 text-[12px] font-medium text-white"
+              >
+                <ChevronUp className="size-3.5" aria-hidden />
+                Smaller
+              </button>
+              {onDesign && (
+                <button
+                  type="button"
+                  onClick={onDesign}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3 text-[12px] font-semibold text-white"
+                >
+                  <PenTool className="size-3.5" aria-hidden />
+                  {job.projectId ? "Open the design" : "Design it"}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -174,28 +236,34 @@ export function DealBanner({
  * do): each part the deal knows, as its icon in the signal orange with its size and a few words under it.
  */
 function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }) {
-  if (!figures.length) return <p className="text-[13px] text-white/60">No system designed yet</p>;
+  if (!figures.length)
+    return <p className="text-[13px] text-white/60 max-sm:max-w-[6rem] max-sm:text-right max-sm:text-[12px]">No system designed yet</p>;
   return (
-    <dl className={clsx("flex flex-wrap", compact ? "gap-x-5 gap-y-2" : "gap-x-6 gap-y-3")}>
+    <dl
+      className={clsx(
+        "flex max-sm:flex-col max-sm:items-end max-sm:gap-y-1.5 sm:flex-wrap",
+        compact ? "sm:gap-x-5 sm:gap-y-2" : "sm:gap-x-6 sm:gap-y-3",
+      )}
+    >
       {figures.map((f) => {
         const Icon = KIT_ICONS[f.label] ?? PanelIcon;
         return (
-          <div key={f.label} className="flex min-w-0 items-center gap-2.5">
+          <div key={f.label} className="flex min-w-0 items-center gap-2.5 max-sm:flex-row-reverse max-sm:gap-2">
             <span
               className={clsx(
-                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15",
+                "flex shrink-0 items-center justify-center rounded-full bg-white/10 text-sun-line ring-1 ring-white/15 max-sm:size-8",
                 compact ? "size-8" : "size-10",
               )}
               aria-hidden
             >
-              <Icon className={compact ? "size-[18px]" : "size-[22px]"} />
+              <Icon className={clsx("max-sm:size-[17px]", compact ? "size-[18px]" : "size-[22px]")} />
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 max-sm:text-right">
               <dt className="sr-only">{f.label}</dt>
-              <dd className={clsx("tabular-nums leading-tight text-white", compact ? "text-[14px]" : "text-[16px]")}>
+              <dd className={clsx("tabular-nums leading-tight text-white max-sm:text-[13px]", compact ? "text-[14px]" : "text-[16px]")}>
                 {f.label === "EV charger" ? "EV charger" : f.value}
               </dd>
-              {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60">{f.note}</dd>}
+              {f.note && !compact && <dd className="max-w-[10rem] truncate text-[12px] text-white/60 max-sm:hidden">{f.note}</dd>}
             </div>
           </div>
         );
@@ -203,6 +271,8 @@ function Kit({ figures, compact }: { figures: BannerFigure[]; compact: boolean }
     </dl>
   );
 }
+
+/** The kit on a phone: one row of small badges, an icon and its size each (21 Nov 2026, Martin). */
 
 type IconProps = { className?: string };
 const LINE = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -252,7 +322,7 @@ const KIT_ICONS: Record<string, (p: IconProps) => React.ReactNode> = {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/15">
+    <span className="inline-flex h-7 items-center rounded-full bg-white/10 px-3 text-[13px] tabular-nums text-white ring-1 ring-white/15 max-sm:h-[22px] max-sm:px-2 max-sm:text-[11px]">
       {children}
     </span>
   );
