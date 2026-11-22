@@ -10318,6 +10318,15 @@ export function RoofDesigner(props: {
                               )}
                             </div>
                           ))}
+                        {props.catalogue.length <= 1 && (
+                          <p className="px-2 pt-1 pb-1.5 text-xs text-muted">
+                            Only one panel to offer: none of your price lists has panels on it.{" "}
+                            <Link href="/design/settings/price-lists" className="font-medium text-ink underline underline-offset-2">
+                              Upload a price list
+                            </Link>{" "}
+                            to choose from your wholesaler&apos;s panels.
+                          </p>
+                        )}
                         {kitSearchFoot("Search panels")}
                       </div>
                     )}
