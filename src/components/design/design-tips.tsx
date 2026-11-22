@@ -97,7 +97,7 @@ export function useDesignTips({ onAct, busy }: { onAct: (act: TipAct) => void; b
   };
 
   const corner: ReactNode = (
-    <div className="pointer-events-none absolute bottom-[5.5rem] left-3 z-20 flex items-end gap-2">
+    <div data-lift className="pointer-events-none absolute bottom-[5.5rem] left-3 z-20 flex items-end gap-2">
       <button
         type="button"
         onClick={toggle}
