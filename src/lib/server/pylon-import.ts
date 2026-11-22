@@ -37,7 +37,18 @@ import { addDealFiles } from "./design-pulse-repo";
 import { safeFetch } from "./safe-fetch";
 
 /** Why Pylon couldn't be read, in words for the business. */
-export class PylonProblem extends Error {}
+export class PylonProblem extends Error {
+  /** Pylon was slow, failing or gave an answer that couldn't be read: worth trying that one again later. */
+  constructor(
+    message: string,
+    readonly passing = false,
+  ) {
+    super(message);
+  }
+}
+
+/** Which of Pylon's addresses was asked, for a message: "a project", "a design". */
+const askedFor = (url: string) => (new URL(url).pathname.includes("solar_designs") ? "a design" : "a project");
 
 let ready: Promise<void> | null = null;
 function ensureTable(): Promise<void> {
@@ -53,7 +64,8 @@ function ensureTable(): Promise<void> {
        primary key (business_id, source, ref)
      );
      alter table design_imports add column if not exists equipment_at timestamptz;
-     alter table design_imports add column if not exists pdf_at timestamptz`,
+     alter table design_imports add column if not exists pdf_at timestamptz;
+     alter table design_imports add column if not exists fill_tries integer not null default 0`,
   ).then(
     () => undefined,
     (e) => {
@@ -73,8 +85,12 @@ async function pylonGet(url: string, key: string, retried = false): Promise<unkn
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
     });
-  } catch {
-    throw new PylonProblem(PYLON_WORDS.down);
+  } catch (e) {
+    const slow = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    console.error(
+      `[pylon-import] no answer from Pylon for ${new URL(url).pathname}: ${slow ? "timed out" : e instanceof Error ? e.message : "failed"}`,
+    );
+    throw new PylonProblem(`Pylon didn't answer for ${askedFor(url)}${slow ? " in time" : ""}.`, true);
   }
   if (res.status === 401) throw new PylonProblem(PYLON_WORDS.refused);
   if (res.status === 403) throw new PylonProblem(PYLON_WORDS.noRead);
@@ -91,10 +107,12 @@ async function pylonGet(url: string, key: string, retried = false): Promise<unkn
     const title =
       said && typeof said === "object" && typeof (said as { title?: unknown }).title === "string" ? (said as { title: string }).title : "";
     console.error(`[pylon-import] Pylon answered ${res.status} for ${new URL(url).pathname}${title ? `: ${title}` : ""}`);
-    throw new PylonProblem(res.status >= 500 ? PYLON_WORDS.down : pylonSaid(res.status, title));
+    if (res.status >= 500) throw new PylonProblem(`Pylon answered ${res.status} for ${askedFor(url)}${title ? `: ${title}` : ""}.`, true);
+    throw new PylonProblem(pylonSaid(res.status, title));
   }
   return res.json().catch(() => {
-    throw new PylonProblem(PYLON_WORDS.down);
+    console.error(`[pylon-import] Pylon's answer for ${new URL(url).pathname} wasn't JSON`);
+    throw new PylonProblem(`Pylon's answer for ${askedFor(url)} couldn't be read.`, true);
   });
 }
 
@@ -324,13 +342,16 @@ export async function bringInCsvRows(
   return out;
 }
 
+/** How many times a project Pylon chokes on is asked again before it is passed over. */
+const FILL_TRIES = 3;
+
 /** How many deals brought in from Pylon are still to be filled in (and, with `pdfs`, still to get their PDF). */
 export async function fillLeft(businessId: string, pdfs: boolean): Promise<number> {
   await ensureTable();
   const rows = await query<{ n: string }>(
     `select count(*) as n from design_imports i
        join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
-      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null))`,
+      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null)) and i.fill_tries < ${FILL_TRIES}`,
     [businessId, pdfs],
   );
   return Number(rows[0]?.n ?? 0);
@@ -440,15 +461,27 @@ export async function fillFromPylonRun(
   const todo = await query<{ ref: string; job_id: string; need_fill: boolean }>(
     `select i.ref, i.job_id, i.equipment_at is null as need_fill from design_imports i
        join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
-      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null))
-      order by i.at, i.ref limit $3`,
+      where i.business_id = $1 and i.source = 'pylon' and (i.equipment_at is null or ($2::boolean and i.pdf_at is null)) and i.fill_tries < ${FILL_TRIES}
+      order by i.fill_tries, i.at, i.ref limit $3`,
     [businessId, pdfs, PYLON_BATCH],
   );
   const results: PylonFillOutcome[] = [];
+  let passing: PylonProblem | null = null;
   for (const row of todo) {
     try {
       results.push(await fillOne(businessId, key, { ref: row.ref, jobId: row.job_id, needFill: row.need_fill }, pdfs, by, fields));
     } catch (e) {
+      // One project Pylon chokes on is tried again later (up to FILL_TRIES) and the run goes on;
+      // a refused key, or every project in the batch failing, stops it.
+      if (e instanceof PylonProblem && e.passing) {
+        passing = e;
+        await query(`update design_imports set fill_tries = fill_tries + 1 where business_id = $1 and source = 'pylon' and ref = $2`, [
+          businessId,
+          row.ref,
+        ]).catch(() => undefined);
+        results.push({ id: row.ref, result: "failed", why: e.message });
+        continue;
+      }
       if (e instanceof PylonProblem) throw e;
       console.error("[pylon-import] a deal couldn't be filled in");
       // Marked done so one deal that always fails doesn't hold every run up.
@@ -456,5 +489,6 @@ export async function fillFromPylonRun(
       results.push({ id: row.ref, result: "failed", why: "Something went wrong filling this one in." });
     }
   }
+  if (passing && todo.length && results.every((r) => r.result === "failed")) throw passing;
   return { results, left: await fillLeft(businessId, pdfs) };
 }

@@ -201,6 +201,18 @@ describe.skipIf(!url)("bringing sold jobs in from Pylon (database)", () => {
     expect(again.results).toEqual([]);
   });
 
+  it("says what Pylon answered when it fails, and tries a failing project no more than three times", async () => {
+    await db.query(`update design_imports set equipment_at = null, fill_tries = 0 where business_id = $1 and ref = 'csv00001'`, [a]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ title: "Internal error" }, { status: 502 })),
+    );
+    await expect(pylon.fillFromPylonRun(a, KEY, false, A)).rejects.toThrow("Pylon answered 502 for a project: Internal error.");
+    await pylon.fillFromPylonRun(a, KEY, false, A).catch(() => undefined);
+    await pylon.fillFromPylonRun(a, KEY, false, A).catch(() => undefined);
+    expect(await pylon.fillLeft(a, false)).toBe(0);
+  });
+
   it("stops with words for the business when Pylon refuses the key", async () => {
     vi.stubGlobal("fetch", fakePylon({}, 401));
     await expect(pylon.listSoldProjects(a, KEY)).rejects.toThrow("Pylon didn't accept that key");

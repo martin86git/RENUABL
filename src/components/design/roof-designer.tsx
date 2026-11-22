@@ -417,7 +417,8 @@ const HOME_HINT_KEY = "renuabl.design.home-hint";
 const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
 /** On a computer, Sol's round in the pop-up's foot: his middle above the picture's foot, and the notch his plate leaves. */
 const DESK_SOL_MIDDLE = 64;
-const DESK_NOTCH = 44;
+/** The graphite tray along the pop-up's foot on a computer (22 Nov 2026, Martin: "graphite tray end to end"), px tall. */
+const DESK_TRAY = 72;
 
 /** A round in the desktop pop-up's foot row (Select, Add a panel, the hand, Erase), lit while its tool is in hand. */
 function FootRound(props: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -445,7 +446,9 @@ function FootRound(props: { label: string; on: boolean; onClick: () => void; chi
  */
 // Below: the least room kept for Sol's card under the picture; his card then runs on to the foot of the screen (`rest`).
 // 104 (22 Nov 2026, Martin: "the map should be at least 20% bigger", Sol "can also lower slightly"; it was 156).
-const PHONE_BANDS = { above: 34, below: 104, rail: 0, bar: 0 };
+// Above: none (22 Nov 2026, Martin: the empty band between the figures and the map was "wasted space"): the map
+// starts right under the figures and the kit and designs round stand on it.
+const PHONE_BANDS = { above: 0, below: 104, rail: 0, bar: 0 };
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
@@ -1882,7 +1885,38 @@ export function RoofDesigner(props: {
     </div>
   );
   const kitSearchFoot = (placeholder: string) =>
-    searchDown && <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">{searchBox(placeholder)}</div>;
+    searchDown && (
+      <div
+        className={clsx(
+          "sticky mt-2 border-t border-line p-2",
+          kitSheet ? "bg-[#2b2e33] -mx-3 bottom-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]" : "-bottom-2 -mx-2 -mb-2 bg-surface",
+        )}
+      >
+        {searchBox(placeholder)}
+      </div>
+    );
+  // On a phone held upright (22 Nov 2026, Martin: the inverter list was covered by the rounds along the picture's foot;
+  // "allow it to take over the page as much as possible"), each kit list is a sheet over the whole screen, headed by a
+  // way back to the roof, like the designs menu. The white cross in the top right is the window's, so the back is left.
+  const kitSheet = props.tight && phone;
+  const kitMenuClass = (usual: string) =>
+    kitSheet ? "fixed inset-0 z-[90] space-y-1 overflow-y-auto bg-[#2b2e33] px-3 pb-[env(safe-area-inset-bottom)] text-ink" : usual;
+  const kitMenuStyle: React.CSSProperties | undefined = kitSheet ? { zoom: 1.15 } : undefined;
+  const kitSheetHead = (title: string) =>
+    kitSheet && (
+      <div className="sticky top-0 z-10 -mx-3 mb-1 flex items-center gap-2 border-b border-line bg-[#2b2e33] pb-2 pl-2 pr-16 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={() => openMenu(false)}
+          aria-label="Back to the roof"
+          title="Back to the roof"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink hover:bg-white/15"
+        >
+          <ChevronLeft className="size-5" aria-hidden />
+        </button>
+        <p className="text-base font-semibold">{title}</p>
+      </div>
+    );
   const seeks = (text: string) =>
     seek
       .toLowerCase()
@@ -6740,6 +6774,10 @@ export function RoofDesigner(props: {
   // replies should form in the bottom half like on mobile").
   const sideDeck = ((solHolds && sideways && picks.length === 0) || deskFoot) && !solTray && (guideShown || nudgeShown);
   const sideDeckUp = sideDeck && sideDeckH > 0;
+  // How far the tray's top row has risen while Sol's card fills the tray: the foot row, Sol, and the tray's own ends
+  // (zoom and the tips' bulb on the left, Roof, Sides and the picture's switch on the right) rise together.
+  const trayRise = deskFoot && sideDeckUp ? Math.max(0, sideDeckH - DESK_SOL_MIDDLE) : 0;
+  const trayRow: React.CSSProperties | undefined = trayRise ? { transform: `translateY(${-trayRise}px)` } : undefined;
   // On a phone, the whole array(s) of what is picked, when that is more than is picked: Sol's controller offers them all
   // (22 Nov 2026, Martin: "when I select a single panel… select the whole array").
   const wholeArray = (() => {
@@ -7185,12 +7223,15 @@ export function RoofDesigner(props: {
             <section
               ref={stripBox}
               className={clsx(
-                "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                "relative mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                // The bill box opens from here: while it is open the strip stands over the picture's controls, Sol's round and
+                // his cards (22 Nov 2026, Martin: on a phone they lay over the bill box).
+                menu === "bill" ? "z-[85]" : "z-30",
                 // On a phone it wraps, and keeps clear of the window's close round in the corner.
                 props.tight
                   ? phone
                     ? // Full bleed across the top of the screen (21 Nov 2026, Martin), the figures in a grid of their own.
-                      "mb-1.5 flex-col !rounded-none"
+                      "flex-col !rounded-none"
                     : sideways
                       ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
                       : "mb-1.5 flex-nowrap"
@@ -7532,7 +7573,12 @@ export function RoofDesigner(props: {
                   </button>
                 )}
                 {menu === "bill" && (
-                  <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw] overflow-y-auto text-ink shadow-lift rounded-lg border border-line bg-surface p-3">
+                  <div
+                    className={clsx(
+                      "absolute top-full z-40 overflow-y-auto overscroll-contain rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
+                      phone ? "inset-x-3 mt-1.5 max-h-[calc(100dvh-9rem)]" : "right-0 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw]",
+                    )}
+                  >
                     <p className={label}>The customer&apos;s electricity bill</p>
                     {props.jobId && (
                       <button
@@ -7699,10 +7745,12 @@ export function RoofDesigner(props: {
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
               ref={picBox}
-              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact")}
+              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact", deskFoot && "desk-tray")}
               style={
                 {
                   maxWidth: fit,
+                  // What stands at the picture's foot rises above the tray, however tall Sol's card makes it.
+                  ...(deskFoot ? { "--tray-h": `${sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY}px` } : {}),
                   ...(fitPx ? { "--pic-h": `${Math.round((fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width)}px` } : {}),
                   // A phone: a band above the picture and one below, where the controls stand.
                   ...(phone && stage
@@ -9154,7 +9202,7 @@ export function RoofDesigner(props: {
                     />
                   )}
                   {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - 30 * u})`}>
+                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : 30) * u})`}>
                     <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
                     <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
                       5 m
@@ -9194,10 +9242,17 @@ export function RoofDesigner(props: {
                 </div>
               )}
               <div
+                {...(deskFoot ? {} : { "data-lift": true })}
+                style={deskFoot ? trayRow : undefined}
                 className={clsx(
-                  "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
+                  "pointer-events-auto absolute right-4 flex gap-2",
+                  // On a computer's pop-up they stand in the graphite tray's right end, level with the foot row (22 Nov 2026,
+                  // Martin: the dock should take in the other tools, not leave them floating over the roof).
+                  deskFoot
+                    ? "bottom-[14px] z-[56] flex-row-reverse items-center transition-transform duration-300 motion-reduce:transition-none"
+                    : "z-20 flex-col items-end",
                   // On a phone it stands over Ask Sol, not beside it.
-                  props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
+                  deskFoot ? "" : props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
                   // Sideways the dial for what is picked takes the foot; on a phone upright these are in the toolbar under the picture.
                   solHolds && "hidden",
                 )}
@@ -9246,7 +9301,7 @@ export function RoofDesigner(props: {
               )}
               {/* The Drawn view's wall: the inverter, battery, switchboard and EV charger standing where they go. */}
               {art && (
-                <div className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
+                <div data-lift className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
                   <WallStrip kit={wallKit} panels={summary.panels} />
                 </div>
               )}
@@ -10230,9 +10285,12 @@ export function RoofDesigner(props: {
                   the customer's bill in the figures above the picture.) */}
               <div
                 className={clsx(
-                  "absolute z-20 flex -translate-x-1/2 flex-col items-center",
-                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner.
-                  phone ? "designer-kit left-[calc(50%-1.1rem)] top-[0.78rem]" : "left-1/2 top-4",
+                  "absolute flex flex-col items-center",
+                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner;
+                  // centred without a transform there, so a kit list can be a sheet over the whole screen (a transform
+                  // would hold a fixed sheet inside the kit). Above everything on the picture while its sheet is open.
+                  phone ? "designer-kit left-0 right-[2.75rem] top-[0.78rem] mx-auto w-max" : "left-1/2 top-4 -translate-x-1/2",
+                  kitSheet && menu && menu !== "designs" && menu !== "bill" ? "z-[95]" : "z-20",
                 )}
                 role="group"
                 aria-label="System"
@@ -10275,8 +10333,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Panels")}
                         <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                         {kitSearchHere("Search panels")}
                         {[
@@ -10318,6 +10380,15 @@ export function RoofDesigner(props: {
                               )}
                             </div>
                           ))}
+                        {props.catalogue.length <= 1 && (
+                          <p className="px-2 pt-1 pb-1.5 text-xs text-muted">
+                            Only one panel to offer: none of your price lists has panels on it.{" "}
+                            <Link href="/design/settings/price-lists" className="font-medium text-ink underline underline-offset-2">
+                              Upload a price list
+                            </Link>{" "}
+                            to choose from your wholesaler&apos;s panels.
+                          </p>
+                        )}
                         {kitSearchFoot("Search panels")}
                       </div>
                     )}
@@ -10346,8 +10417,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift",
+                        )}
                       >
+                        {kitSheetHead("EV chargers")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {charger ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -10447,8 +10522,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Inverters")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -10669,8 +10748,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Batteries")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {battery ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -11180,7 +11263,13 @@ export function RoofDesigner(props: {
                   </ToolFan>
                 </div>
               )}
-              {!(solHolds && picks.length > 0) && tips.corner}
+              {!(solHolds && picks.length > 0) &&
+                (deskFoot
+                  ? tips.cornerAt({
+                      className: "bottom-[18px] left-[10.75rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
+                      style: trayRow,
+                    })
+                  : tips.corner)}
               {phone && stage && turnHint && !zooming && (
                 <div
                   className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
@@ -11222,6 +11311,15 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               )}
+              {/* The graphite tray end to end along the picture's foot on a computer (22 Nov 2026, Martin): the foot row
+                  stands in it, and Sol's step or suggestion forms inside it, the tray growing to hold the card. */}
+              {deskFoot && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-[29] rounded-t-[22px] bg-[#26282c] shadow-[0_-10px_30px_rgba(0,0,0,0.25)] transition-[height] duration-300 motion-reduce:transition-none"
+                  style={{ height: sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY }}
+                />
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideShown && (
                 <div
@@ -11242,7 +11340,9 @@ export function RoofDesigner(props: {
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
                   style={
                     sideDeck
-                      ? solNotch(0, deskFoot ? DESK_NOTCH : 40)
+                      ? deskFoot
+                        ? undefined
+                        : solNotch(0, 40)
                       : underUp && foot !== null
                         ? ({
                             top: foot,
@@ -11332,7 +11432,9 @@ export function RoofDesigner(props: {
                   )}
                   style={
                     sideDeck
-                      ? solNotch(0, deskFoot ? DESK_NOTCH : 40)
+                      ? deskFoot
+                        ? undefined
+                        : solNotch(0, 40)
                       : underUp && foot !== null
                         ? ({
                             top: foot,
@@ -11406,7 +11508,7 @@ export function RoofDesigner(props: {
               )}
               {/* Sol's card under the picture, an outlined box whose outline runs round him (22 Nov 2026, Martin): a ring
                   of the same line round his round, meeting the box's edge at its notch. */}
-              {(deckUp || sideDeckUp) && (guideShown || nudgeShown) && (
+              {(deckUp || sideDeckUp) && !deskFoot && (guideShown || nudgeShown) && (
                 <span
                   aria-hidden
                   className="pointer-events-none absolute z-[54] rounded-full border-[1.5px] border-sun-line/70"
@@ -11492,7 +11594,26 @@ export function RoofDesigner(props: {
                   </div>
                 </div>
               )}
-              <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
+              {/* In a computer's pop-up the tray's left end: zoom out, zoom in and the whole picture as rounds of the tray. */}
+              {deskFoot && (
+                <div
+                  className="pointer-events-auto absolute bottom-[14px] left-4 z-[56] flex items-center gap-2 transition-transform duration-300 motion-reduce:transition-none"
+                  style={trayRow}
+                  role="group"
+                  aria-label="Getting about"
+                >
+                  <FootRound label="Zoom out" on={false} onClick={() => zoom(1.4)}>
+                    <ZoomOut className="size-5" aria-hidden />
+                  </FootRound>
+                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / 1.4)}>
+                    <ZoomIn className="size-5" aria-hidden />
+                  </FootRound>
+                  <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
+                    <Maximize className="size-5" aria-hidden />
+                  </FootRound>
+                </div>
+              )}
+              <div data-lift className={clsx("absolute bottom-8 left-4 z-10", (solHolds || deskFoot) && "hidden")}>
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"
@@ -11601,11 +11722,20 @@ export function RoofDesigner(props: {
                     Record
                   </button>
                 )}
+                {/* The peak of the tray behind Sol (22 Nov 2026, Martin: Sol "a little higher than the icons either side… like
+                    a mountain peak"): a graphite round risen with him out of the tray's top edge. */}
+                {deskFoot && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-3 left-1/2 size-24 -translate-x-1/2 rounded-full bg-[#26282c] transition-transform duration-300 motion-reduce:transition-none"
+                    style={sideDeckUp ? { transform: `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)` } : undefined}
+                  />
+                )}
                 {/* The foot row on a computer (22 Nov 2026, Martin: the phone's bottom tool bar on the desktop designer):
                     Select and Add a panel to Sol's left, the hand and Erase to his right, risen with him when his plate is up. */}
                 {deskFoot && (
                   <div
-                    className="pointer-events-none absolute inset-x-0 bottom-3.5 transition-transform duration-300 motion-reduce:transition-none"
+                    className="pointer-events-none absolute inset-x-0 -bottom-3.5 transition-transform duration-300 motion-reduce:transition-none"
                     style={sideDeckUp ? { transform: `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)` } : undefined}
                   >
                     <div className="pointer-events-auto absolute bottom-0 right-[calc(50%+2.875rem)] flex items-end gap-2">
