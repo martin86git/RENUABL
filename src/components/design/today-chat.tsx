@@ -71,10 +71,10 @@ function TodayDate({ today }: { today: ISODate }) {
     };
   }, []);
   return (
-    <h1 className="mt-4 flex flex-wrap items-baseline justify-center gap-x-3 text-center text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+    <h1 className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-3 text-center text-[22px] sm:text-[clamp(24px,3vw,32px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
       <span>{todayHeading(today)}</span>
       {weather && (weather.sky || weather.degrees !== null) && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2.5 py-0.5 text-[15px] tracking-normal text-muted ring-1 ring-line">
+        <span className="inline-flex translate-y-0.5 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[14px] tracking-normal text-white">
           {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
           {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
         </span>
