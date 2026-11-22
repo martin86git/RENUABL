@@ -97,6 +97,15 @@ export function Spotlight({
     // onGo and onEnd are the page's; the step and its place are what start a look.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, measure]);
+  // The step on show is told to the page, so what floats over it (a deal's Sol sheet on a phone) can step aside while
+  // another place is lit (23 Nov 2026, Martin: the Sol sheet covered the Design round the tour was pointing at).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (step) root.dataset.spotlight = step.at;
+    return () => {
+      delete root.dataset.spotlight;
+    };
+  }, [step]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") onEnd();

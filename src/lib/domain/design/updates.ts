@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the tour of a deal folds Sol's box away while it points at other buttons, so nothing covers them.",
+  },
+  {
+    day: "2026-11-23",
     area: "Phone",
     words: "On a phone, once RENUABL scrolls away a slim bar keeps it small at the top, so screenshots still show it.",
   },

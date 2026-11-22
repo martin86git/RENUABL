@@ -1362,7 +1362,7 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
           type="button"
           onClick={() => set(false)}
           aria-label={name ? `Sol on ${name}'s deal` : "Sol on this deal"}
-          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-30 flex items-center gap-1.5 rounded-full bg-surface py-1 pl-1 pr-3 text-[12px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.22)] ring-1 ring-line sm:hidden"
+          className="deal-sol-tab fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-30 flex items-center gap-1.5 rounded-full bg-surface py-1 pl-1 pr-3 text-[12px] font-medium text-ink shadow-[0_6px_24px_rgba(20,22,26,0.22)] ring-1 ring-line sm:hidden"
         >
           <SolMark className="size-7" />
           Sol
