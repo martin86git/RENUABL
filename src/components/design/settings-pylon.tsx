@@ -15,6 +15,7 @@ import {
 } from "@/lib/domain/design/pylon-import";
 import { bringFromPylon, checkPylon } from "@/lib/services/pylon-import";
 import { PylonCsvImport } from "./settings-pylon-csv";
+import { PylonFill } from "./settings-pylon-fill";
 import { PATHS, ui } from "./design-shell";
 
 type Found = { projects: PylonListed[]; already: string[]; more: boolean };
@@ -130,6 +131,8 @@ export function PylonImportSettings() {
         </form>
         <p className="mt-2 text-xs text-muted">{PYLON_WORDS.keyKept}</p>
       </div>
+
+      <PylonFill pylonKey={key} />
 
       <PylonCsvImport />
 

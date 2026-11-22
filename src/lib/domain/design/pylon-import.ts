@@ -576,3 +576,61 @@ export function dealFromCsv(row: PylonCsvRow, stage: PylonStage): PylonDeal {
     proposalPdf: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Filling in what the export lacked (22 Nov 2026, Martin: every deal from Pylon's CSV read as solar only, since the
+// export has no battery or products). With the business's Pylon key each deal already brought in is read again from
+// Pylon's API and given its system lines, battery, EV charger, site details and place on the map. Nothing a person typed
+// is written over: only empty fields are filled, and the two the export set itself (system type and size) are replaced.
+// ---------------------------------------------------------------------------
+
+/** The fields the export's own import set, which Pylon's API may replace. */
+const EXPORT_SET = ["systemType", "systemSize"] as const;
+
+export const PYLON_FILL_WORDS = {
+  title: "Fill in the equipment from Pylon",
+  how: "Deals brought in from Pylon's export have no battery, panels or inverter on them. With your Pylon key, each one is read again from Pylon and filled in: the battery, panels, inverter, EV charger, site details, the place on the map and the signed PDF. Nothing you've typed on a deal is changed.",
+  button: (n: number) => `Fill in ${n.toLocaleString("en-AU")} deal${n === 1 ? "" : "s"}`,
+  none: "Every deal from Pylon has been filled in.",
+} as const;
+
+export interface PylonFill {
+  /** The deal's details with Pylon's filled in. */
+  details: Record<string, string>;
+  /** The title, "Solar" turned into "Solar and battery" when Pylon says so. */
+  title: string;
+  /** The place on the map, only when the deal has none. */
+  place: { address: string; lat: number; lng: number } | null;
+  /** Which fields were filled. */
+  filled: string[];
+}
+
+/** What Pylon's answer adds to a deal as it stands, never over what a person typed. */
+export function fillFromPylon(
+  current: { title: string; details: Record<string, string>; address: string; lat: number | null },
+  deal: Pick<PylonDeal, "job">,
+): PylonFill {
+  const details = { ...current.details };
+  const filled: string[] = [];
+  for (const [k, v] of Object.entries(deal.job.details)) {
+    if (!v) continue;
+    const now = (details[k] ?? "").trim();
+    const replaceable = (EXPORT_SET as readonly string[]).includes(k);
+    if (now === v || (now && !replaceable)) continue;
+    details[k] = v;
+    filled.push(k);
+  }
+  const title = /^solar$/i.test(current.title.trim()) && deal.job.title !== "Solar" ? deal.job.title : current.title;
+  const place =
+    current.lat === null && deal.job.lat !== null && deal.job.lng !== null
+      ? { address: current.address || deal.job.address, lat: deal.job.lat, lng: deal.job.lng }
+      : null;
+  if (place) filled.push("place");
+  return { details, title, place, filled };
+}
+
+/** What became of one deal filled in. */
+export type PylonFillOutcome =
+  | { id: string; result: "filled"; filled: number; battery: boolean; pdf: boolean }
+  | { id: string; result: "gone" }
+  | { id: string; result: "failed"; why: string };
