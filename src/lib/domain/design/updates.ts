@@ -16,8 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-22",
     area: "Marketing",
-    words:
-      "Email builder: a Spacer block for room between blocks, and Social links for your Facebook, Instagram and more, as icons, icons with names, or names.",
+    words: "Email builder: a Spacer block, and Social links for Facebook, Instagram and more, shown as icons or names.",
   },
   {
     day: "2026-11-22",
