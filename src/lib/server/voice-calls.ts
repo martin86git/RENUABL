@@ -5,7 +5,7 @@
  *
  * Off unless VOICE_CALLS_ENABLED=true and VAPI_API_KEY, VAPI_PHONE_NUMBER_ID (a number imported into Vapi, e.g.
  * RENUABL's Twilio number), VAPI_WEBHOOK_SECRET (20+ characters, our own) and SITE_URL are set. Optional: VAPI_MODEL
- * (default claude-sonnet-5), VAPI_VOICE_PROVIDER + VAPI_VOICE_ID, VOICE_TRANSFER_NUMBER (put through to a person).
+ * (default claude-haiku-5-5, `VOICE_MODEL`), VAPI_VOICE_PROVIDER + VAPI_VOICE_ID, VOICE_TRANSFER_NUMBER (put through to a person).
  * A business's deals are called once it has the voice add-on and a number of its own (`voiceOnFor`, add-ons.ts,
  * business-numbers.ts); RENUABL's own business (RENUABL_CRM_EMAIL) on RENUABL's number, always.
  *
@@ -19,6 +19,7 @@
  * assistant answers. It speaks under the name the business gave it (design_caller, Settings → Phone assistant).
  */
 import { overCap } from "./design-voice-usage";
+import { VOICE_MODEL } from "@/lib/domain/voice-agent";
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { outOfCallCredit } from "@/lib/domain/call-credit";
 import { placeVapiCall } from "./vapi-call";
@@ -111,7 +112,7 @@ export function voiceSettings(env: Record<string, string | undefined> = process.
     phoneNumberId,
     secret,
     site,
-    model: env.VAPI_MODEL?.trim() || "claude-sonnet-5",
+    model: env.VAPI_MODEL?.trim() || VOICE_MODEL,
     voice: voiceId ? { provider: env.VAPI_VOICE_PROVIDER?.trim() || "11labs", voiceId } : null,
     transferNumber: /^\+61\d{9}$/.test(transfer) ? transfer : transfer ? normaliseMobile(transfer) : null,
   };
@@ -779,7 +780,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
   const businessId = s && dbConfigured() ? await businessOfNumber({ vapiId: e.phoneNumberId ?? s.phoneNumberId }).catch(() => null) : null;
   const named = businessId ? await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]).catch(() => []) : [];
   const closed = (): InboundAnswer => ({
-    assistant: closedAssistant({ business: named[0]?.name ?? "", model: s?.model ?? "claude-sonnet-5" }),
+    assistant: closedAssistant({ business: named[0]?.name ?? "", model: s?.model ?? VOICE_MODEL }),
   });
   if (!s || !businessId || !(await voiceOnFor(businessId).catch(() => false))) return closed();
   const mobile = normaliseMobile(e.number ?? "");
