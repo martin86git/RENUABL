@@ -16,8 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
     area: "Phone",
-    words:
-      "On a phone, once the RENUABL name scrolls away a slim bar keeps it small at the top of the screen, with Search, so screenshots still show it.",
+    words: "On a phone, once RENUABL scrolls away a slim bar keeps it small at the top, so screenshots still show it.",
   },
   {
     day: "2026-11-23",
