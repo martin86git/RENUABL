@@ -94,7 +94,7 @@ function Leaf({
     animationDelay: `${delay}ms`,
   };
   const className =
-    "sol-clover-leaf absolute flex items-center justify-center rounded-[50%_50%_50%_26%] bg-primary text-white shadow-[0_8px_22px_rgba(0,0,0,0.28)] ring-1 ring-white/15";
+    "sol-clover-leaf absolute flex items-center justify-center rounded-[50%_50%_50%_26%] bg-white text-ink shadow-[0_8px_22px_rgba(0,0,0,0.22)] ring-1 ring-black/10";
   // The words stand upright whatever way the leaf turns.
   const inner = (
     <span className="flex flex-col items-center gap-0.5" style={{ transform: `rotate(${-turn}deg)` }}>
