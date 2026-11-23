@@ -11,8 +11,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   CalendarDays,
   ClipboardCheck,
+  Eye,
+  MessageCircle,
   FileCheck2,
   FileText,
   Package,
@@ -62,7 +65,7 @@ import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
 import { BackToTop } from "./back-to-top";
 import { setDockSet, useDockSet } from "@/lib/services/dock-set";
-import { DOCK_SET_WORDS, otherDockSet } from "@/lib/domain/design/dock-set";
+import { DOCK_SETS, DOCK_SET_WORDS, nextDockSet, reelPlace, type DockSet } from "@/lib/domain/design/dock-set";
 
 export { MarketplaceMark };
 
@@ -156,6 +159,22 @@ const POST_TABS: PhoneTab[] = [
   { label: "Paperwork", href: PATHS.completed, icon: FileCheck2, match: (p) => p.startsWith(PATHS.completed) },
   { label: "Service", href: PATHS.service, icon: Wrench, match: (p) => p.startsWith(PATHS.service) },
 ];
+// The dock's third set, the Marketplace's tools (23 Nov 2026, Martin: "We should make a 3rd orb toggle position -
+// marketplace"): job listings, buying and selling equipment, what is watched and the Marketplace's messages, each on the
+// same reel under the post-sale tool in its place. While the Marketplace is closed each opens its launch page.
+const MARKET = "/design/marketplace";
+const MARKET_TABS: PhoneTab[] = [
+  {
+    label: "Listings",
+    href: MARKET,
+    icon: Store,
+    match: (p) => p === MARKET || p.startsWith(`${MARKET}/mine`) || p.startsWith(`${MARKET}/bids`) || p.startsWith(`${MARKET}/job`),
+  },
+  { label: "Buy & sell", href: `${MARKET}/equipment`, icon: ArrowLeftRight, match: (p) => p.startsWith(`${MARKET}/equipment`) },
+  { label: "Watching", href: `${MARKET}/watching`, icon: Eye, match: (p) => p.startsWith(`${MARKET}/watching`) },
+  { label: "Messages", href: `${MARKET}/messages`, icon: MessageCircle, match: (p) => p.startsWith(`${MARKET}/messages`) },
+];
+const DOCK_TABS: Record<DockSet, PhoneTab[]> = { sales: PHONE_TABS, post: POST_TABS, market: MARKET_TABS };
 
 /**
  * The frame every signed-in screen sits in (31 Oct 2026, Martin: Primero's layout, in RENUABL's own colours and type).
@@ -254,9 +273,8 @@ function Shell({
   const unread = useUnreadMessages(retail);
   // This member's unread team chat lines, for the Team tab on a phone's foot bar.
   const teamUnread = useTeamUnread();
-  // The dock's set (sales or post sale tools).
+  // The dock's set (sales, post sale or Marketplace tools).
   const dock = useDockSet();
-  const post = dock === "post";
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -445,8 +463,8 @@ function Shell({
         })}
       </nav>
     ) : null;
-  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the post-sale dock. */
-  const tabFor = (t: PhoneTab, dark: boolean) => {
+  /** One place on the phone's foot bar. `dark`: a post-sale or Marketplace tool, drawn as a graphite tile. */
+  const tabFor = (t: PhoneTab, dark: boolean, glyph = "text-[#d6ff3d]") => {
     if (retail && t.label === VOICE_TAB)
       return (
         <PhoneVoiceTab
@@ -478,7 +496,7 @@ function Shell({
           )}
         >
           <span className={clsx("dock-tile relative flex size-9 items-center justify-center", lit && "dock-tile-lit")}>
-            <t.icon className="size-[19px] text-[#d6ff3d]" strokeWidth={1.9} aria-hidden />
+            <t.icon className={clsx("size-[19px]", glyph)} strokeWidth={1.9} aria-hidden />
             {n > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
                 {n}
@@ -857,7 +875,7 @@ function Shell({
           // taller so it wouldn't encroach on the chat icon", and "a graphite colored orb"): a lip rising out of the
           // dock's top edge above Team, high enough to clear Team's round and its count, holding a graphite ball. A tap
           // dips the ball like a lever and the dock's reels turn.
-          <DockTurn post={post} label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo} onTurn={() => setDockSet(otherDockSet(dock))} />
+          <DockTurn label={DOCK_SET_WORDS[nextDockSet(dock)].turnTo} onTurn={() => setDockSet(nextDockSet(dock))} />
         )}
         {retail
           ? [0, 1, 2, 3].map((i) => [
@@ -873,13 +891,18 @@ function Shell({
                 </div>
               ) : null,
               <div key={`reel-${i}`} className="relative h-16 self-end overflow-hidden">
-                <div className="dock-reel" style={{ transform: post ? "translateY(-50%)" : undefined, transitionDelay: `${i * 80}ms` }}>
-                  <div className="h-16 [&>*]:w-full" inert={post}>
-                    {tabFor(PHONE_TABS[i], false)}
-                  </div>
-                  <div className="h-16 [&>*]:w-full" inert={!post}>
-                    {tabFor(POST_TABS[i], true)}
-                  </div>
+                <div
+                  className="dock-reel"
+                  style={{
+                    transform: reelPlace(dock) ? `translateY(-${(reelPlace(dock) * 100) / DOCK_SETS.length}%)` : undefined,
+                    transitionDelay: `${i * 80}ms`,
+                  }}
+                >
+                  {DOCK_SETS.map((set) => (
+                    <div key={set} className="h-16 [&>*]:w-full" inert={set !== dock}>
+                      {tabFor(DOCK_TABS[set][i], set !== "sales", set === "market" ? "text-[#8fb8ff]" : undefined)}
+                    </div>
+                  ))}
                 </div>
               </div>,
             ])
@@ -1088,7 +1111,7 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
 }
 
 /** The dock's lip and its graphite ball: a tap dips the ball like a pulled lever and turns the dock. */
-function DockTurn({ label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
+function DockTurn({ label, onTurn }: { label: string; onTurn: () => void }) {
   const [pulls, setPulls] = useState(0);
   return (
     <span className="dock-lip absolute -top-[44px] right-3.5 flex h-[44px] w-12 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
