@@ -750,7 +750,7 @@ function Shell({
           const sol =
             retail && i === 2 ? (
               <div key="sol" className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink">
-                <span className="-mt-5">
+                <span className="-mt-6">
                   <SolNavButton phone />
                 </span>
                 Sol
