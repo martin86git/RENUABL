@@ -6,7 +6,7 @@
  */
 
 export interface ImportRun {
-  /** Where they came from: "pylon" (the API key or Pylon's export) or "sheet" (another CRM's export). */
+  /** Where they came from: "pylon" (the API key or Pylon's export), "hubspot" (HubSpot's API) or "sheet" (another CRM's export). */
   source: string;
   /** How many people or deals it brought in. */
   brought: number;
@@ -29,7 +29,7 @@ export interface ContactCounts {
   since: { day: string; people: number; customers: number } | null;
 }
 
-const IMPORT_NAMES: Record<string, string> = { pylon: "Pylon", sheet: "a CRM export sheet" };
+const IMPORT_NAMES: Record<string, string> = { pylon: "Pylon", sheet: "a CRM export sheet", hubspot: "HubSpot" };
 
 /** A day typed as YYYY-MM-DD, else null. */
 export function cleanSinceDay(raw: unknown): string | null {
@@ -47,7 +47,7 @@ export function contactCountsWords(c: ContactCounts): string {
   ];
   if (c.bySource.length)
     lines.push(`By where they came from: ${c.bySource.map((b) => `${b.source || "not recorded"} ${b.people}`).join(", ")}.`);
-  if (!c.imports.length) lines.push("Nothing has been brought in from Pylon or a CRM export sheet.");
+  if (!c.imports.length) lines.push("Nothing has been brought in from Pylon, HubSpot or a CRM export sheet.");
   for (const run of c.imports) {
     const name = IMPORT_NAMES[run.source] ?? run.source;
     const when = run.first === run.last ? `on ${run.first}` : `from ${run.first} to ${run.last}`;

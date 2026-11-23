@@ -67,6 +67,8 @@ export interface Session {
   email: string;
   role: AccountRole;
   partner: PartnerRow | null;
+  /** When the session was last really used, for the screen lock (null before it was first recorded). */
+  activeAt?: Date | null;
 }
 
 /** The signed-in account, if any. Partners must still be approved; staff must still be listed. */
@@ -85,7 +87,7 @@ export async function currentSession(): Promise<Session | null> {
 export class SessionUnknown extends Error {}
 
 /**
- * The signed-in session, asked twice before giving up (22 Nov 2026, Martin: a database hiccup on the first load after
+ * The signed-in session, asked three times before giving up (22 Nov 2026, Martin: a database hiccup on the first load after
  * signing in read as signed out, and Today said "Sign in to your business"). A failure throws `SessionUnknown`, so a
  * route answers "couldn't reach your account" and the page tries again, instead of saying nobody is signed in.
  */
@@ -93,11 +95,11 @@ export async function readSession(sessionId?: string): Promise<Session | null> {
   const id = sessionId ?? (await cookies()).get(SESSION_COOKIE)?.value;
   if (!id || !/^[a-f0-9]{64}$/.test(id)) return null;
   let last: unknown;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const s = (
-        await query<{ email: string; role: AccountRole; expires_at: Date }>(
-          `select email, role, expires_at from sessions where id_hash = $1 and expires_at > now()`,
+        await query<{ email: string; role: AccountRole; expires_at: Date; active_at: Date | null }>(
+          `select email, role, expires_at, active_at from sessions where id_hash = $1 and expires_at > now()`,
           [hash(id)],
         )
       )[0];
@@ -108,7 +110,9 @@ export async function readSession(sessionId?: string): Promise<Session | null> {
           hash(id),
           String(SESSION_DAYS),
         ]).catch(() => undefined);
-      const who = { email: s.email, role: s.role };
+      // The screen lock counts from now for a session from before it (never fails the check).
+      if (!s.active_at) await query(`update sessions set active_at = now() where id_hash = $1`, [hash(id)]).catch(() => undefined);
+      const who = { email: s.email, role: s.role, activeAt: s.active_at ? new Date(s.active_at) : null };
       if (s.role === "staff") return isStaff(s.email) ? { ...who, partner: null } : null;
       if (s.role === "partner") {
         const partner = await partnerByEmail(s.email);
@@ -117,7 +121,8 @@ export async function readSession(sessionId?: string): Promise<Session | null> {
       return { ...who, partner: null };
     } catch (e) {
       last = e;
-      if (attempt === 0) await new Promise((r) => setTimeout(r, 300));
+      // A database waking from sleep: give it a moment, then longer (23 Nov 2026).
+      if (attempt < 2) await new Promise((r) => setTimeout(r, attempt === 0 ? 400 : 1_500));
     }
   }
   throw new SessionUnknown(last instanceof Error ? last.message : "session check failed");

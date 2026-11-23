@@ -9339,7 +9339,9 @@ export function RoofDesigner(props: {
                     />
                   )}
                   {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : 30) * u})`}>
+                  <g
+                    transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : solHolds && !sideways ? 64 : 30) * u})`}
+                  >
                     <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
                     <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
                       5 m
@@ -11657,7 +11659,10 @@ export function RoofDesigner(props: {
                   className="pointer-events-auto absolute z-[55]"
                   // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
                   style={
-                    deckUp
+                    // Upright the foot row always stands on the picture's foot either side of Sol, his card up or not
+                    // (23 Nov 2026, Martin: "a glitch in the designer dock": with nothing said, the rounds sat off centre on
+                    // the map while Sol dropped into the grey under it).
+                    underUp
                       ? { left: "calc(50% + 3.75rem)", top: deckTop ?? 0, transform: "translate(-50%, -50%)" }
                       : sideways
                         ? { left: "calc(50% + 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
@@ -11722,7 +11727,7 @@ export function RoofDesigner(props: {
                   style={
                     sideways
                       ? { left: "calc(50% - 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
-                      : deckUp
+                      : underUp
                         ? { left: "calc(50% - 3.75rem)", top: (deckTop ?? 300) + 22, transform: "translate(-50%, -100%)" }
                         : { left: "50%", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
                   }
@@ -12010,7 +12015,7 @@ export function RoofDesigner(props: {
                               ? `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)`
                               : `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)`,
                           }
-                        : deckUp && stage
+                        : underUp && stage
                           ? { transform: `translateY(${-Math.max(0, (stage.pb + lift - 43.5) / 0.68)}px)` }
                           : undefined
                     }

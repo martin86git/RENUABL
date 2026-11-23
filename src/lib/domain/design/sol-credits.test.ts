@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SOL_PACKS, cleanSolPack, creditSource, includedThisMonth, monthOf, solBalance } from "./sol-credits";
+import { SOL_PACKS, cleanSolPack, solPackBonus, creditSource, includedThisMonth, monthOf, solBalance } from "./sol-credits";
 
 describe("Sol credits", () => {
   it("brings 50 a paid user a month, 100 on an old trial, none without a plan", () => {
@@ -33,5 +33,11 @@ describe("Sol credits", () => {
 
   it("counts a credit in the market's month", () => {
     expect(monthOf("2026-11-30")).toBe("2026-11");
+  });
+});
+
+describe("solPackBonus", () => {
+  it("counts the credits a larger pack gives over the smallest pack's price", () => {
+    expect(SOL_PACKS.map(solPackBonus)).toEqual([0, 240, 811]);
   });
 });

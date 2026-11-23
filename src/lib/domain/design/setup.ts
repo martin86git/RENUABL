@@ -103,7 +103,13 @@ export const SETUP_PLACES: Record<SetupStep, { href: string; connect?: "email" |
     ],
   },
   "lead-inbox": { href: "/design/settings/lead-inbox" },
-  import: { href: "/design/settings/import", also: [{ label: "Sold jobs from Pylon", href: "/design/settings/pylon" }] },
+  import: {
+    href: "/design/settings/import",
+    also: [
+      { label: "Deals from HubSpot", href: "/design/settings/hubspot" },
+      { label: "Sold jobs from Pylon", href: "/design/settings/pylon" },
+    ],
+  },
   proposal: {
     href: "/design/settings/company",
     also: [

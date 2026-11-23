@@ -32,7 +32,7 @@ import {
 import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, type SalesTargets } from "@/lib/domain/design/sales-rings";
 import { GoalLine, MonthCard, MonthBars, Tally, PipelineBar, SunArc } from "./gauges";
 import { newDealPanels } from "@/lib/domain/design/gauges";
-import { useDesignAccount } from "./design-account";
+import { Reconnecting, useDesignAccount } from "./design-account";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 import { SalesPage } from "./sales-page";
 import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
@@ -80,7 +80,7 @@ export const ACTIVITY_WORD = {
  * (a one-time link by email, the same whether it is someone's first time or
  * not). Signed in, the business's overview inside the app's frame.
  */
-export function DesignHome() {
+export function DesignHome({ only }: { only?: "feed" | "calendar" } = {}) {
   const [account] = useDesignAccount();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (account.signedIn) {
@@ -95,6 +95,7 @@ export function DesignHome() {
             firstName={account.firstName ?? null}
             welcome={Boolean(account.welcome)}
             owner={account.business?.role === "owner"}
+            only={only}
           />
         ) : kind === "installer" ? (
           // An installer's home is My Jobs (my-jobs.ts, 2 Nov 2026, Martin).
@@ -113,7 +114,9 @@ export function DesignHome() {
  * Signing in is in its top bar, and on /design/sign-in.
  */
 function FrontPage({ unreachable }: { unreachable: boolean }) {
-  return <SalesPage notice={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />;
+  // A signed-in device that can't reach its account yet waits to reconnect, never the signed-out page.
+  if (unreachable) return <Reconnecting />;
+  return <SalesPage notice={null} />;
 }
 
 /** A change against an earlier period, as a small signed percentage: green up, red down, quiet when there is nothing to compare. */
@@ -162,12 +165,15 @@ function OverviewPage({
   firstName,
   welcome,
   owner,
+  only,
 }: {
   business: string;
   email: string;
   firstName: string | null;
   welcome: boolean;
   owner: boolean;
+  /** Feed or the calendar, each its own page now (23 Nov 2026, Martin). */
+  only?: "feed" | "calendar";
 }) {
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
@@ -202,7 +208,7 @@ function OverviewPage({
   /** A job changed from one of the lists (its installer or its paperwork), put back in place. */
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
 
-  if (view !== null) {
+  if (view !== null && !only) {
     const label = OVERVIEW_VIEWS.find((v) => v.id === view)?.label ?? "";
     return (
       <div className={ui.page}>
@@ -248,8 +254,9 @@ function OverviewPage({
       business={business}
       name={name}
       email={email}
-      welcome={welcome}
+      welcome={only ? false : welcome}
       owner={owner}
+      only={only}
       mine={data?.mine ?? (problem ? [] : null)}
       problem={problem}
       day={

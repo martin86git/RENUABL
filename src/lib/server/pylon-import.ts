@@ -28,7 +28,8 @@ import {
   type PylonOutcome,
   type PylonStage,
 } from "@/lib/domain/design/pylon-import";
-import { cleanCustomerInput, cleanJobInput } from "@/lib/domain/design/crm";
+import { WON_STAGES, cleanCustomerInput, cleanJobInput } from "@/lib/domain/design/crm";
+import { batteryOf } from "@/lib/domain/design/deal-feed";
 import { typedFields } from "@/lib/domain/design/deal-sections";
 import { query, transaction } from "./db";
 import { loadPrefs } from "./design-after-sale-repo";
@@ -491,4 +492,66 @@ export async function fillFromPylonRun(
   }
   if (passing && todo.length && results.every((r) => r.result === "failed")) throw passing;
   return { results, left: await fillLeft(businessId, pdfs) };
+}
+
+/** A sold deal brought in from Pylon, for the Closed list beside the proposals signed here. */
+export interface ImportedSale {
+  jobId: string;
+  customer: string;
+  title: string;
+  address: string;
+  kw: number;
+  batteryKwh: number;
+  value: number;
+  /** When it sold (the export's sold day), else when it came in. */
+  soldAt: string;
+  /** Pylon's own reference, when it had one. */
+  reference: string;
+  /** The signed proposal PDF kept on the deal, when one was brought in. */
+  pdf: string | null;
+}
+
+/**
+ * Every sold deal brought in from Pylon (23 Nov 2026, Martin: "there should be a list of all the sold proposals data I
+ * brought in from pylon"), still at a sold stage, newest first. Read only; nothing before the table exists.
+ */
+export async function importedSales(businessId: string): Promise<ImportedSale[]> {
+  const there = await query<{ t: string | null }>(`select to_regclass('design_imports') as t`, []);
+  if (!there[0]?.t) return [];
+  const rows = await query<{
+    job_id: string;
+    customer: string;
+    title: string;
+    address: string;
+    kw: string | number | null;
+    value: string | number | null;
+    details: Record<string, string> | null;
+    sold_at: Date | string;
+    reference: string | null;
+    file_id: string | null;
+  }>(
+    `select j.id as job_id, c.name as customer, j.title, j.address, j.kw, j.value, j.details,
+            coalesce(j.won_at, i.at) as sold_at, i.reference,
+            (select f.id from design_deal_files f
+              where f.business_id = j.business_id and f.job_id = j.id and f.type = 'application/pdf' and f.name like '%(Pylon%'
+              order by f.at desc limit 1) as file_id
+       from design_imports i
+       join design_jobs j on j.business_id = i.business_id and j.id = i.job_id
+       join design_customers c on c.business_id = j.business_id and c.id = j.customer_id
+      where i.business_id = $1 and i.source = 'pylon' and j.stage = any($2::text[])
+      order by coalesce(j.won_at, i.at) desc`,
+    [businessId, [...WON_STAGES]],
+  );
+  return rows.map((r) => ({
+    jobId: r.job_id,
+    customer: r.customer,
+    title: r.title,
+    address: r.address,
+    kw: Number(r.kw) || 0,
+    batteryKwh: batteryOf(r.details ?? {}) ?? 0,
+    value: Number(r.value) || 0,
+    soldAt: new Date(r.sold_at).toISOString(),
+    reference: r.reference ?? "",
+    pdf: r.file_id ? `/api/design/jobs/${encodeURIComponent(r.job_id)}/files/${encodeURIComponent(r.file_id)}` : null,
+  }));
 }
