@@ -70,6 +70,58 @@ export function reachContacts(customers: readonly ReachCustomer[], jobs: readonl
     });
 }
 
+/** The most contacts the phone book draws at once (a business's whole list, kept sane). */
+export const PHONE_BOOK_MAX = 5000;
+
+export interface PhoneBookSection {
+  /** A to Z, or "#" for a name that doesn't start with a letter. */
+  letter: string;
+  contacts: ReachContact[];
+}
+
+const letterOf = (name: string) => {
+  const first = name.trim().charAt(0).toLocaleUpperCase("en-AU");
+  return /[A-Z]/.test(first) ? first : "#";
+};
+
+/**
+ * The phone book (23 Nov 2026, Martin: "I should be able to scroll the entire contact list like a phone book"): every
+ * contact, or every one matching what was typed, A to Z by name in sections by first letter ("#" last), each with the
+ * deal a call or text is kept on. Pure, tested.
+ */
+export function phoneBook(customers: readonly ReachCustomer[], jobs: readonly ReachJob[], typed: string): PhoneBookSection[] {
+  const q = typed.trim();
+  const found = (q ? customers.filter((c) => matches({ words: [c.name, c.email, c.address], phone: c.phone }, q)) : customers)
+    .filter((c) => c.name.trim() || c.phone.trim())
+    .slice()
+    .sort((a, b) => {
+      const la = letterOf(a.name);
+      const lb = letterOf(b.name);
+      if (la !== lb) return la === "#" ? 1 : lb === "#" ? -1 : la.localeCompare(lb);
+      return a.name.localeCompare(b.name, "en-AU", { sensitivity: "base" });
+    })
+    .slice(0, PHONE_BOOK_MAX);
+  const byCustomer = new Map<string, ReachJob[]>();
+  for (const j of jobs) byCustomer.set(j.customerId, [...(byCustomer.get(j.customerId) ?? []), j]);
+  const sections: PhoneBookSection[] = [];
+  for (const c of found) {
+    const job = dealFor(c.id, byCustomer.get(c.id) ?? []);
+    const contact: ReachContact = {
+      id: c.id,
+      name: c.name.trim() || c.phone.trim(),
+      firstName: c.firstName || c.name.split(/\s+/)[0] || "",
+      phone: c.phone.trim(),
+      mobile: normaliseMobile(c.phone) !== null,
+      job: job ? { id: job.id, title: job.title, stage: job.stage } : null,
+    };
+    const letter = letterOf(c.name);
+    const last = sections[sections.length - 1];
+    if (last?.letter === letter) last.contacts.push(contact);
+    else sections.push({ letter, contacts: [contact] });
+  }
+  return sections;
+}
+
 /** The longest text taken: three standard messages' worth. */
 export const TEXT_MAX = 480;
 

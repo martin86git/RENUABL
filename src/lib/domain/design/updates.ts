@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-23",
+    area: "Signing in",
+    words: "Back after the phone was locked, RENUABL waits to reconnect and goes back in by itself, instead of asking you to sign in.",
+  },
+  {
+    day: "2026-11-23",
     area: "Today",
     words: "Topping up from the usage box now pays by card right in the box, without leaving the page.",
   },

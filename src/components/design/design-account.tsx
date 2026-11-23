@@ -35,6 +35,7 @@ import { PlanCodeField, type AppliedCode } from "./plan-code-field";
 import { PLAN_CODE_WORDS } from "@/lib/domain/design/plan-codes";
 import { MemberAvatar } from "./member-avatar";
 import { SignInPageSection } from "./sign-in-page-section";
+import { ScreenLockSection } from "./screen-lock-settings";
 import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from "@/lib/services/design-store";
 
 const SIGN_IN = "/design/sign-in";
@@ -64,6 +65,37 @@ export function useDesignAccount(): [DesignAccount | null, () => void] {
     return () => window.removeEventListener(ACCOUNT_EVENT, heard);
   }, []);
   return [account, () => setAsks((n) => n + 1)];
+}
+
+/**
+ * A signed-in device that can't reach its account just now (23 Nov 2026, Martin: back to a Safari tab after the phone
+ * was locked, it read as signed out). Not the sign-in page: it keeps asking by itself (services/design-account.ts
+ * `keepTrying`) and goes back in the moment the account answers; Try now asks at once, Sign in is there if wanted.
+ */
+export function Reconnecting() {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="theme-studio flex min-h-dvh flex-col items-center justify-center px-5 text-center" aria-busy="true">
+      <Wordmark />
+      <p className="mt-6 max-w-sm text-[15px] leading-relaxed text-ink-2">
+        Reconnecting to your account… You&rsquo;re still signed in: this goes back in by itself in a moment.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void designAccount(true).finally(() => setBusy(false));
+        }}
+        className="mt-5 inline-flex h-11 items-center rounded-md bg-primary px-6 text-sm font-medium text-primary-ink hover:bg-forest disabled:bg-line disabled:text-muted"
+      >
+        {busy ? "Trying…" : "Try now"}
+      </button>
+      <Link href="/design/sign-in" className="tap-area mt-4 text-[13px] text-muted underline underline-offset-2">
+        Sign in again
+      </Link>
+    </div>
+  );
 }
 
 /** The page frame the account screens share: the wordmark, and one centred column. */
@@ -673,6 +705,8 @@ export function DesignAccountPage() {
         />
 
         <PasswordSection />
+
+        {!account.viewedBy && <ScreenLockSection />}
 
         <section className={card} aria-labelledby="people">
           <h2 id="people" className="text-[19px] tracking-tight text-ink">

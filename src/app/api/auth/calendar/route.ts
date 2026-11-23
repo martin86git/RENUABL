@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const done = (why: string) => calendarDone(why, { popup, back, origin: url.origin });
   if (!isProvider(provider)) return done("failed");
   const access = await designAccess();
-  if (access.state !== "ready" || access.member.viewedBy) return done("signed-out");
+  if (access.state !== "ready" || access.member.viewedBy || access.locked) return done("signed-out");
   const config = calendarConfig(provider, url.origin);
   if (!config) return done(`off-${provider}`);
   const state = randomToken(16);

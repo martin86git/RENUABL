@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
+import { ScreenLock } from "./screen-lock";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
 import { withMarketing } from "@/lib/domain/marketing/access";
 import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
@@ -38,7 +39,7 @@ import { DemoBar, DemoDetailsPrompt } from "./demo-details";
 import { staffView } from "./staff-view-as";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
-import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
+import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
 import { PhoneVoiceTab } from "./phone-voice";
@@ -378,6 +379,7 @@ function Shell({
 
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
+    if (account.unreachable) return <Reconnecting />;
     if (!needsAccount) return <>{children}</>;
     return (
       <div className="theme-studio flex min-h-dvh flex-col items-center justify-center px-5 text-center">
@@ -443,7 +445,7 @@ function Shell({
         })}
       </nav>
     ) : null;
-  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the navy dock. */
+  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the post-sale dock. */
   const tabFor = (t: PhoneTab, dark: boolean) => {
     if (retail && t.label === VOICE_TAB)
       return (
@@ -457,8 +459,37 @@ function Shell({
       );
     const lit = !more && t.match(path);
     const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
-    // The designer is the orange round it is in the top menu; Orders is the post-sale tools' round, in steel blue.
-    const round = t.href === PATHS.designer || (dark && t.href === PATHS.orders);
+    // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
+    // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
+    if (dark)
+      return (
+        <Link
+          key={t.label}
+          href={t.href}
+          onClick={() => {
+            setMore(false);
+            leaveSol();
+          }}
+          aria-current={lit ? "page" : undefined}
+          className={clsx(
+            "flex flex-col items-center justify-center gap-1 text-[11px] font-semibold tracking-[0.01em] text-ink",
+            retail ? "h-16" : "min-h-14",
+            !lit && "opacity-80",
+          )}
+        >
+          <span className={clsx("dock-tile relative flex size-9 items-center justify-center", lit && "dock-tile-lit")}>
+            <t.icon className="size-[19px] text-[#d6ff3d]" strokeWidth={1.9} aria-hidden />
+            {n > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                {n}
+              </span>
+            )}
+          </span>
+          {t.label}
+        </Link>
+      );
+    // The designer is the orange round it is in the top menu.
+    const round = t.href === PATHS.designer;
     return (
       <Link
         key={t.label}
@@ -471,20 +502,15 @@ function Shell({
         className={clsx(
           "flex flex-col items-center justify-center gap-1 font-medium",
           retail ? "h-16 text-[11px]" : "min-h-14 text-[10px]",
-          dark ? (lit ? "text-white" : "text-[#b7c6da]") : lit ? "text-ink" : "text-muted",
+          lit ? "text-ink" : "text-muted",
         )}
       >
         <span
           className={clsx(
             "relative flex items-center justify-center rounded-full",
             round
-              ? clsx(
-                  retail ? "size-9" : "size-7",
-                  "shadow-sm",
-                  dark ? "bg-[#8fb3d9] text-[#0f1a2b]" : "bg-sun-line text-white",
-                  lit && (dark ? "ring-2 ring-white/30 ring-offset-1 ring-offset-[#15233a]" : "ring-2 ring-sun-line/30 ring-offset-1"),
-                )
-              : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && (dark ? "bg-white/10" : "bg-sun")),
+              ? clsx(retail ? "size-9" : "size-7", "shadow-sm", "bg-sun-line text-white", lit && "ring-2 ring-sun-line/30 ring-offset-1")
+              : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && "bg-sun"),
           )}
         >
           <t.icon className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
@@ -500,6 +526,8 @@ function Shell({
   };
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
+      {/* The screen lock: covers the page after a while unused, until Face ID, the PIN or signing in again. */}
+      <ScreenLock />
       {/* The design tool slides over whatever page this is, never a page of its own. */}
       <ShellDesignDrawer />
       {/* A call made from the computer: who, how long, Mute and Hang up, over every page while it lasts. */}
@@ -819,7 +847,7 @@ function Shell({
         aria-label="Sections, on a phone"
         data-dock={retail ? dock : undefined}
         className={clsx(
-          "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
+          "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line pb-[env(safe-area-inset-bottom)] print:hidden lg:hidden",
           // A retailer's More is in the top right (23 Nov 2026, Martin), so five across with Sol in the middle.
           kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
         )}
@@ -1063,7 +1091,7 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
 function DockTurn({ label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
   const [pulls, setPulls] = useState(0);
   return (
-    <span className="dock-lip absolute -top-[38px] right-3 flex h-[38px] w-14 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
+    <span className="dock-lip absolute -top-[44px] right-3.5 flex h-[44px] w-12 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
       <button
         key={pulls}
         type="button"

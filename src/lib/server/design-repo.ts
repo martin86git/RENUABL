@@ -208,7 +208,12 @@ export async function removeMember(businessId: string, email: string): Promise<b
     businessId,
     email.toLowerCase(),
   ]);
-  return rows.length > 0;
+  if (!rows.length) return false;
+  // Signed out of every device at once, and their screen lock's PIN and passkeys for this business go too.
+  await query(`delete from sessions where email = $1`, [email.toLowerCase()]);
+  await query(`delete from design_lock_pins where business_id = $1 and email = $2`, [businessId, email.toLowerCase()]);
+  await query(`delete from design_passkeys where business_id = $1 and email = $2`, [businessId, email.toLowerCase()]);
+  return true;
 }
 
 // ---------------------------------------------------------------------------

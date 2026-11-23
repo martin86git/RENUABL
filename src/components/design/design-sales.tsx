@@ -648,23 +648,23 @@ export function PipelinesPage() {
                       }}
                       onClick={() => router.push(dealOf(job))}
                       className={clsx(
-                        "cursor-pointer rounded-md bg-surface p-2.5 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
+                        "cursor-pointer rounded-md bg-surface p-2.5 max-sm:px-2.5 max-sm:py-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
                         dragging === job.id && "opacity-60",
                       )}
                     >
                       <div className="flex items-baseline justify-between gap-3">
                         <Link
                           href={dealOf(job)}
-                          className="min-w-0 truncate text-[15px] font-medium text-ink hover:underline sm:text-sm"
+                          className="min-w-0 truncate text-[14px] font-medium text-ink hover:underline sm:text-sm"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {job.customerName}
                         </Link>
-                        <span className="shrink-0 text-[15px] font-semibold tabular-nums text-ink sm:text-sm">
+                        <span className="shrink-0 text-[14px] font-semibold tabular-nums text-ink sm:text-sm">
                           {job.value ? dollars(job.value) : ""}
                         </span>
                       </div>
-                      <p className="mt-0.5 flex items-center gap-2 text-[13px] text-ink-2 sm:text-xs">
+                      <p className="mt-0.5 flex items-center gap-2 text-[12px] text-ink-2 sm:text-xs">
                         <span className="min-w-0 truncate">{job.address ? job.address.split(",")[0] : job.title}</span>
                         {job.address ? <KitMarks job={job} /> : null}
                       </p>
@@ -672,26 +672,43 @@ export function PipelinesPage() {
                         pulse={pulses[job.id]}
                         end={
                           <span className="flex items-center gap-1.5">
-                            {job.lat === null && (
-                              <span className="sm:hidden">
-                                <Owner email={job.owner} />
+                            {/* On a phone the card's last row folds into this one (23 Nov 2026, Martin: smaller cards). */}
+                            <span className="sm:hidden">
+                              <Owner email={job.owner} />
+                            </span>
+                            {job.sample ? (
+                              <span
+                                title={SAMPLE_DEAL_HINT}
+                                className="rounded-full bg-sun px-1.5 py-0.5 font-medium text-sun-ink ring-1 ring-sun-line/30 sm:hidden"
+                              >
+                                Tour
                               </span>
-                            )}
-                            {!job.sample && (
+                            ) : (
                               <span className="text-muted" title={`Changed ${shortDate(job.updatedAt)}`}>
                                 {agoWords(job.updatedAt)}
                               </span>
+                            )}
+                            {job.lat !== null && (
+                              <Link
+                                href={`${PATHS.designer}?job=${job.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={job.projectId ? `Open ${job.customerName}'s design` : `Design ${job.customerName}'s roof`}
+                                title={job.projectId ? "Open design" : "Design it"}
+                                className="tap-area inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sun-line/12 text-sun-line sm:hidden"
+                              >
+                                <PenTool className="size-3" aria-hidden />
+                              </Link>
                             )}
                           </span>
                         }
                       />
                       {job.sample && (
-                        <p className="mt-1.5 truncate rounded-full bg-sun px-2.5 py-1 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
+                        <p className="mt-1.5 truncate rounded-full bg-sun px-2.5 py-1 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30 max-sm:hidden">
                           {SAMPLE_DEAL_HINT}
                         </p>
                       )}
                       {/* One row: who owns it, its stage (changed here on a computer) and the designer's round. */}
-                      <div className={clsx("mt-2 items-center gap-1.5", job.lat === null ? "hidden sm:flex" : "flex")}>
+                      <div className="mt-2 hidden items-center gap-1.5 sm:flex">
                         <Owner email={job.owner} />
                         <label className="hidden min-w-0 flex-1 sm:block" onClick={(e) => e.stopPropagation()}>
                           <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>

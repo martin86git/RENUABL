@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const back = (why: string) =>
     NextResponse.redirect(new URL(popup ? `/api/auth/outlook/callback?done=${why}&popup=1` : `/design/inbox?gmail=${why}`, url.origin));
   const access = await designAccess();
-  if (access.state !== "ready" || access.member.viewedBy) return back("signed-out");
+  if (access.state !== "ready" || access.member.viewedBy || access.locked) return back("signed-out");
   const config = outlookMailConfig(url.origin);
   if (!config) return back("outlook-off");
   const state = `${randomToken(16)}${popup ? ".p" : ""}`;

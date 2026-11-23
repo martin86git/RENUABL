@@ -23,6 +23,7 @@ import {
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-sun";
+import { SolEtch } from "./sol-icon";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";
@@ -353,7 +354,7 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
       {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
           panel is open and no stars (18 Nov 2026, Martin: "lose its halo ring and resemble the same as the sol icon in
           the right hand chat"). */}
-      <span className="sol-heartbeat inline-flex">
+      <span className={clsx("sol-heartbeat inline-flex", phone && "sol-sun-face")}>
         <SolMark
           className={clsx(
             "transition-transform duration-300 group-hover:scale-110",
@@ -361,6 +362,14 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
           )}
         />
       </span>
+      {/* On the post-sale dock he is his etched brain glowing lime in a graphite round, the tiles' family (23 Nov 2026,
+          Martin: "imagine sol with all the orange taken away. The etch lines remain", then D of four); the sun fades
+          out and the round in as the dock turns. */}
+      {phone && (
+        <span className="sol-etch-face pointer-events-none absolute inset-0 flex items-center justify-center rounded-full">
+          <SolEtch className="size-10" width={2.4} />
+        </span>
+      )}
       {waiting && (
         <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
           {unread}
