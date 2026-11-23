@@ -50,7 +50,7 @@ import {
   retrySol,
   type SolDraft,
 } from "@/lib/services/sol";
-import { askToStartAfresh, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
+import { askToStartAfresh, showStarters, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
 import { SolUsage } from "./sol-usage";
@@ -611,19 +611,20 @@ export function SolChat({
               </button>
             )}
             <p>I&apos;m Sol. Ask me about your deals, a customer or anything solar. Type # to bring in a deal.</p>
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setText(s);
-                  box.current?.focus();
-                }}
-                className="block w-full rounded-xl bg-surface px-3 py-1.5 text-left text-[13px] text-ink ring-1 ring-line hover:ring-sun-line"
-              >
-                {s}
-              </button>
-            ))}
+            {showStarters(state.chats) &&
+              STARTERS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    setText(s);
+                    box.current?.focus();
+                  }}
+                  className="block w-full rounded-xl bg-surface px-3 py-1.5 text-left text-[13px] text-ink ring-1 ring-line hover:ring-sun-line"
+                >
+                  {s}
+                </button>
+              ))}
           </div>
         )}
         {(resting ? [] : redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
