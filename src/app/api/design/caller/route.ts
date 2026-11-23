@@ -1,5 +1,5 @@
 import { can } from "@/lib/domain/design/account";
-import { cleanCallerName, cleanTint, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
+import { cleanBrain, cleanCallerName, cleanTint, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
 import { cleanCallerKey } from "@/lib/domain/install-call";
 import {
   callerOf,
@@ -7,6 +7,7 @@ import {
   moreSalesAgents,
   saveHiddenVoices,
   setCallerName,
+  setCallerBrain,
   setCallerTint,
   setCallerVoice,
 } from "@/lib/server/design-caller-repo";
@@ -74,6 +75,13 @@ export async function PUT(request: Request) {
       const was = await hiddenVoicesOf(who.member.businessId);
       const next = v.all === true ? [] : typeof v.hide === "string" ? hideVoice(was, v.hide) : showVoice(was, v.show);
       return Response.json({ ok: true, hiddenVoices: await saveHiddenVoices(who.member.businessId, next) });
+    }
+    if ("brain" in read.body) {
+      // The model it thinks with on calls: quicker or more careful, or null for RENUABL's default (caller.ts).
+      return Response.json({
+        ok: true,
+        caller: await setCallerBrain(who.member.businessId, cleanBrain(read.body.brain), who.member.email, role),
+      });
     }
     if ("tint" in read.body) {
       // The colour of its stand-in picture: one of the six, or null for its name's own.

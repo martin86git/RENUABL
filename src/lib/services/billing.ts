@@ -51,6 +51,10 @@ export function askSales(o: { name: string; business: string; email: string; mob
   return post("/api/design/sales-enquiry", o);
 }
 
+export function requestDemo(o: { name: string; business: string; email: string; mobile: string; note: string }) {
+  return post("/api/design/demo-request", o);
+}
+
 export interface BillingState {
   /** RENUABL doesn't bill this business: no plan to choose, nothing charged. */
   notBilled?: boolean;
@@ -127,6 +131,24 @@ export function manageBilling() {
 
 export function buySolCredits(credits: number) {
   return post("/api/design/billing", { do: "sol", credits });
+}
+
+/**
+ * Stripe's card form for a pack, to open in place (the usage box): its client secret, and Stripe comes back to `back`
+ * (a page under /design) with ?usage=bought once paid.
+ */
+export async function packCardForm(
+  pack: { sol: number } | { tokens: TokenPack },
+  back: string,
+): Promise<{ ok: true; secret: string } | { ok: false; message: string }> {
+  const a = await post(
+    "/api/design/billing",
+    "sol" in pack ? { do: "sol", credits: pack.sol, form: back } : { do: "tokens", pack: pack.tokens, form: back },
+  );
+  const secret = (a as { secret?: unknown }).secret;
+  return a.ok && typeof secret === "string"
+    ? { ok: true, secret }
+    : { ok: false, message: a.message ?? "The card form couldn't open just now." };
 }
 
 export async function saveBillingDetails(

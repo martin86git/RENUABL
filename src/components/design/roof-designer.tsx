@@ -93,6 +93,7 @@ import {
   Trash2,
   X,
   ChevronDown,
+  GripHorizontal,
   Ellipsis,
   Move,
   Settings2,
@@ -149,6 +150,7 @@ import { SolMark } from "./sol-sun";
 import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
+import { stcPricingDate } from "@/lib/domain/design/stc-change";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { clashRefusal, clashWords, clashesWithSupply, supplyClashes } from "@/lib/domain/design/supply-match";
@@ -182,6 +184,7 @@ import {
 import { DictateButton } from "./dictate";
 import { usePageAbout } from "@/lib/services/page-context";
 import { MAX_PROPOSAL_OPTIONS } from "@/lib/domain/design/proposal";
+import { lineupWords, proposalLineup, withLeading, withOnProposal, withRecommended } from "@/lib/domain/design/proposal-lineup";
 import {
   DESIGN_GOALS,
   FACINGS,
@@ -415,14 +418,42 @@ const SIDEWAYS_BELOW = 500;
 const TURN_HINT_KEY = "renuabl.design.turn-hint";
 const HOME_HINT_KEY = "renuabl.design.home-hint";
 const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAYS_BELOW && window.innerWidth > window.innerHeight;
+/** On a computer, Sol's round in the pop-up's foot: his middle above the picture's foot, and the notch his plate leaves. */
+const DESK_SOL_MIDDLE = 64;
+/** The graphite tray along the pop-up's foot on a computer (22 Nov 2026, Martin: "graphite tray end to end"), px tall. */
+const DESK_TRAY = 72;
+
+/** A round in the desktop pop-up's foot row (Select, Add a panel, the hand, Erase), lit while its tool is in hand. */
+function FootRound(props: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      aria-pressed={props.on}
+      aria-label={props.label}
+      title={props.label}
+      className={clsx(
+        "relative flex size-11 items-center justify-center rounded-full border shadow-lift transition",
+        props.on ? "border-sun-line bg-sun-line text-white" : "border-line bg-surface text-ink hover:bg-canvas",
+      )}
+    >
+      {props.children}
+    </button>
+  );
+}
+
 /**
  * The bands on a phone held upright (21 Nov 2026, Martin: the picture higher and longer, the tools on it). Above the
  * picture only room for the top half of the kit, which sits on the picture's top edge; below it the toolbar hugging the
  * picture's foot (`bar`: zoom, Roof, Sides, the picture's switch), then Ask Sol, then the rail as a toolbar at the foot.
  */
-// Below: room for Sol's card under the picture (22 Nov 2026, Martin: "very squashed in"; the slimmer figures gave the map
-// the room to move up).
-const PHONE_BANDS = { above: 34, below: 156, rail: 0, bar: 0 };
+// Below: the least room kept for Sol's card under the picture; his card then runs on to the foot of the screen (`rest`).
+// 104 (22 Nov 2026, Martin: "the map should be at least 20% bigger", Sol "can also lower slightly"; it was 156).
+// Above: none (22 Nov 2026, Martin: the empty band between the figures and the map was "wasted space"): the map
+// starts right under the figures and the kit and designs round stand on it.
+const PHONE_BANDS = { above: 0, below: 104, rail: 0, bar: 0 };
+// The band under the picture while Sol's box is folded to its strip (3rem) at the foot of the screen.
+const PHONE_FOLDED_BAND = 56;
 /**
  * How tall the picture may be on a phone upright, as a share of its width: at least the photo's own shape, and up to
  * this, so the screen is used. A taller picture shows a narrower band of the photo, larger.
@@ -1752,7 +1783,21 @@ export function RoofDesigner(props: {
   const [foldPx, setFoldPx] = useState<number | null>(null);
   // On a phone, in the pop-up (18 Nov 2026, Martin: every control lay on a picture 220 px wide): the picture runs the
   // screen's width and the controls stand in a band above it and a band below, not on it. `stage` is those bands.
-  const [stage, setStage] = useState<{ top: number; pt: number; pb: number; photoH: number; across: number; bleed: number } | null>(null);
+  const [stage, setStage] = useState<{
+    top: number;
+    pt: number;
+    pb: number;
+    photoH: number;
+    across: number;
+    bleed: number;
+    /** From the picture's foot to the foot of the screen: Sol's box fills it (22 Nov 2026, Martin). */
+    rest: number;
+    // How much taller the picture stands while Sol's box is folded (the room the box gave up), 0 while it is open.
+    drop: number;
+  } | null>(null);
+  // Sol's box folded on a phone: the picture grows down into its room (22 Nov 2026, Martin: "minimize down so that there
+  // is more of the map"), read by the measure below.
+  const solFoldedNow = useRef(false);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1781,12 +1826,24 @@ export function RoofDesigner(props: {
         const photoH = Math.round(
           Math.min(across * PHONE_TALLEST, Math.max(shortest, room - PHONE_BANDS.above - PHONE_BANDS.below - PHONE_BANDS.rail)),
         );
-        const pb = PHONE_BANDS.below;
         const stripH = Math.round(box.height);
+        const restOpen = Math.max(PHONE_BANDS.below, Math.round(window.innerHeight - box.top - box.height - PHONE_BANDS.above - photoH));
+        // Folded, the strip sits at the foot of the screen and the picture takes the rest of the box's room.
+        const drop = solFoldedNow.current ? Math.max(0, restOpen - PHONE_FOLDED_BAND) : 0;
+        const pb = drop ? PHONE_FOLDED_BAND : PHONE_BANDS.below;
+        const rest = restOpen - drop;
+        const tall = photoH + drop;
         setStage((was) =>
-          was && was.photoH === photoH && was.pb === pb && was.top === stripH && was.across === across && was.bleed === bleed
+          was &&
+          was.photoH === tall &&
+          was.pb === pb &&
+          was.top === stripH &&
+          was.across === across &&
+          was.bleed === bleed &&
+          was.rest === rest &&
+          was.drop === drop
             ? was
-            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH, across, bleed },
+            : { top: stripH, pt: PHONE_BANDS.above, pb, photoH: tall, across, bleed, rest, drop },
         );
       } else setStage(null);
       setFitPx(Math.max(360, Math.round(room * (ROOF_IMAGE.width / ROOF_IMAGE.height))));
@@ -1806,6 +1863,11 @@ export function RoofDesigner(props: {
   const phone = Boolean(props.tight && stage);
   // Sol holds the tools on a phone, upright or turned sideways (22 Nov 2026, Martin): his tray and his card for what is picked.
   const solHolds = Boolean(props.tight && (phone || sideways));
+  // On a phone held upright the quote is a sheet over the whole screen, minimised back to the design (22 Nov 2026, Martin).
+  const quoteSheet = phone && shown === "quote";
+  // The pop-up on a computer (22 Nov 2026, Martin: the phone's foot row on the desktop designer, with Sol's tray and his
+  // replies at the foot): Select and Add a panel, Sol with his +, the hand and Erase along the picture's foot.
+  const deskFoot = Boolean(props.tight && !solHolds);
   // In the pop-up the picture takes the window's whole width, its height the first fold's (21 Nov 2026, Martin: widening
   // the window should widen the map, not the grey round it); `across` is then its width to height.
   const fills = Boolean(props.tight && !phone && fitPx);
@@ -1840,7 +1902,38 @@ export function RoofDesigner(props: {
     </div>
   );
   const kitSearchFoot = (placeholder: string) =>
-    searchDown && <div className="sticky -bottom-2 -mx-2 -mb-2 mt-2 border-t border-line bg-surface p-2">{searchBox(placeholder)}</div>;
+    searchDown && (
+      <div
+        className={clsx(
+          "sticky mt-2 border-t border-line p-2",
+          kitSheet ? "bg-[#2b2e33] -mx-3 bottom-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]" : "-bottom-2 -mx-2 -mb-2 bg-surface",
+        )}
+      >
+        {searchBox(placeholder)}
+      </div>
+    );
+  // On a phone held upright (22 Nov 2026, Martin: the inverter list was covered by the rounds along the picture's foot;
+  // "allow it to take over the page as much as possible"), each kit list is a sheet over the whole screen, headed by a
+  // way back to the roof, like the designs menu. The white cross in the top right is the window's, so the back is left.
+  const kitSheet = props.tight && phone;
+  const kitMenuClass = (usual: string) =>
+    kitSheet ? "fixed inset-0 z-[90] space-y-1 overflow-y-auto bg-[#2b2e33] px-3 pb-[env(safe-area-inset-bottom)] text-ink" : usual;
+  const kitMenuStyle: React.CSSProperties | undefined = kitSheet ? { zoom: 1.15 } : undefined;
+  const kitSheetHead = (title: string) =>
+    kitSheet && (
+      <div className="sticky top-0 z-10 -mx-3 mb-1 flex items-center gap-2 border-b border-line bg-[#2b2e33] pb-2 pl-2 pr-16 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <button
+          type="button"
+          onClick={() => openMenu(false)}
+          aria-label="Back to the roof"
+          title="Back to the roof"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink hover:bg-white/15"
+        >
+          <ChevronLeft className="size-5" aria-hidden />
+        </button>
+        <p className="text-base font-semibold">{title}</p>
+      </div>
+    );
   const seeks = (text: string) =>
     seek
       .toLowerCase()
@@ -1857,6 +1950,13 @@ export function RoofDesigner(props: {
   const [zooming, setZooming] = useState(false);
   // Sol holds the tools on a phone upright (sol-tray.tsx): his tray, and the roof pitch marks shown only when asked for.
   const [solTray, setSolTray] = useState(false);
+  // Sol's box under the picture on a phone, folded to a strip (22 Nov 2026, Martin: "minimize down to a height where I
+  // can still see the sol icon, pointer, eraser etc"); a new step or suggestion opens it again.
+  const [solFolded, setSolFolded] = useState(false);
+  // How far the box has been slid up over the picture to show more words (22 Nov 2026, Martin: "slide it up higher").
+  const [solLift, setSolLift] = useState(0);
+  const [solDragging, setSolDragging] = useState(false);
+  const solDrag = useRef<{ y: number; from: number; moved: boolean } | null>(null);
   // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
   const [panelCard, setPanelCard] = useState(false);
   const [phonePitch, setPhonePitch] = useState(false);
@@ -2141,25 +2241,29 @@ export function RoofDesigner(props: {
    * Offered to the customer beside the primary, or not; and the one recommended among those offered (one at most).
    * As Primero's (1 Nov 2026): the next proposal published carries them as options, up to five with the primary.
    */
-  const flagDesign = (index: number, flag: "offer" | "recommended") => {
-    const list = everyDesign();
-    const on = !list[index][flag];
-    const offered = list.filter((d, i) => d.offer && i !== primary).length;
-    if (flag === "offer" && on && offered >= MAX_PROPOSAL_OPTIONS - 1) return;
-    setDesigns(
-      list.map((d, i) => {
-        const next = { ...d };
-        if (i === index) {
-          if (on) next[flag] = true;
-          else delete next[flag];
-        } else if (flag === "recommended" && on) delete next.recommended; // one recommended at most
-        return next;
-      }),
-    );
+  const [lineupFull, setLineupFull] = useState(false);
+  const setOnProposal = (index: number, on: boolean) => {
+    const next = withOnProposal({ designs: everyDesign(), primary }, index, on);
+    setLineupFull(next === null);
+    if (!next) return;
+    setDesigns(next);
     setSaved("changed");
+  };
+  const recommend = (index: number) => {
+    setDesigns(withRecommended({ designs: everyDesign(), primary }, index));
+    setSaved("changed");
+  };
+  /** Another design leads, keeping what is on the proposal. */
+  const makeLeading = (index: number) => {
+    setLineupFull(false);
+    setDesigns(withLeading({ designs: everyDesign(), primary }, index));
+    setPrimary(index);
+    changed();
   };
   /** Every design, with the one being worked on as it stands now. */
   const everyDesign = () => designs.map((d, i) => (i === active ? working() : d));
+  // Which designs go on the next proposal, and which is recommended (22 Nov 2026).
+  const lineup = proposalLineup({ designs: everyDesign(), primary });
   /** Puts a list of designs in place and opens one of them. Undo starts afresh: it doesn't reach across designs. */
   const show = (list: RoofDesign[], index: number) => {
     const next = list[index];
@@ -4194,7 +4298,13 @@ export function RoofDesigner(props: {
       designs: everyDesign().map((d, i) => {
         const sum = designSummary(d, props.yieldPerKwDay);
         const costing = costSystem(systemSpecOf(d, firstListed), quoteNow.form, props.workspace);
-        const stc = stcValue(costing, postcode, todayInMarket(), props.rates, props.workspace.settings.stcPrice);
+        const stc = stcValue(
+          costing,
+          postcode,
+          stcPricingDate(props.workspace.settings.stcFrom, todayInMarket()),
+          props.rates,
+          props.workspace.settings.stcPrice,
+        );
         // The open design's price is the quote's own (with its hand changes); the others as the quote would make them.
         const youPay =
           costsHidden || costing.missing > 0 || sum.panels === 0
@@ -4538,7 +4648,7 @@ export function RoofDesigner(props: {
       form: quoteNow.form,
       workspace: props.workspace,
       rates: props.rates,
-      date: todayInMarket(),
+      date: stcPricingDate(props.workspace.settings.stcFrom, todayInMarket()),
       newId,
     });
     if (auto && !result.options.length) return setMine("idle");
@@ -6190,11 +6300,24 @@ export function RoofDesigner(props: {
           )}
         </div>
       )}
+      {designs.length > 1 && (
+        <p className="rounded-md bg-sun-line/10 px-3 py-2 text-xs font-medium text-ink" role="status">
+          {lineupWords(lineup)}
+        </p>
+      )}
+      {lineupFull && <p className="text-xs text-warning">A proposal holds {MAX_PROPOSAL_OPTIONS} designs at most.</p>}
       <ul className="space-y-1.5">
         {everyDesign().map((d, i) => {
           const sum = designSummary(d);
           return (
-            <li key={i} className={clsx("rounded-md border", i === active ? "border-forest" : "border-line")}>
+            <li
+              key={i}
+              className={clsx(
+                "rounded-md border",
+                i === active ? "border-forest" : "border-line",
+                lineup.on.includes(i) && designs.length > 1 && "border-l-4 !border-l-sun-line",
+              )}
+            >
               <div className="flex items-center gap-1 p-1">
                 <button
                   onClick={() => (i === active ? openMenu(false) : show(everyDesign(), i))}
@@ -6219,45 +6342,14 @@ export function RoofDesigner(props: {
                   </span>
                 </button>
                 <button
-                  onClick={() => {
-                    setPrimary(i);
-                    changed();
-                  }}
+                  onClick={() => makeLeading(i)}
                   disabled={i === primary}
-                  title={i === primary ? "The primary design" : "Make this the primary design"}
-                  aria-label={i === primary ? `Design ${i + 1} is the primary` : `Make design ${i + 1} the primary`}
+                  title={i === primary ? "The leading design: the quote this roof opens on" : "Make this the leading design"}
+                  aria-label={i === primary ? `Design ${i + 1} is the leading design` : `Make design ${i + 1} the leading design`}
                   className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
                 >
                   <Star className={clsx("size-4", i === primary ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
                 </button>
-                {designs.length > 1 && i !== primary && (
-                  <button
-                    onClick={() => flagDesign(i, "offer")}
-                    title={
-                      d.offer
-                        ? "Offered to the customer as an option: press to stop"
-                        : "Offer it to the customer as an option, beside the primary"
-                    }
-                    aria-pressed={Boolean(d.offer)}
-                    className={clsx(
-                      "h-8 rounded-full px-2.5 text-[11px] font-semibold",
-                      d.offer ? "bg-primary text-primary-ink" : "text-muted ring-1 ring-line hover:text-ink",
-                    )}
-                  >
-                    {d.offer ? "Offered" : "Offer"}
-                  </button>
-                )}
-                {designs.length > 1 && (d.offer || i === primary) && everyDesign().some((x, j) => x.offer && j !== primary) && (
-                  <button
-                    onClick={() => flagDesign(i, "recommended")}
-                    title={d.recommended ? "Recommended to the customer: press to stop" : "Recommend this one to the customer"}
-                    aria-label={d.recommended ? `Design ${i + 1} is recommended` : `Recommend design ${i + 1}`}
-                    aria-pressed={Boolean(d.recommended)}
-                    className="flex size-9 items-center justify-center rounded-lg hover:bg-canvas"
-                  >
-                    <ThumbsUp className={clsx("size-4", d.recommended ? "fill-sun-line text-sun-line" : "text-muted")} aria-hidden />
-                  </button>
-                )}
                 {designs.length > 1 && (
                   <button
                     onClick={() => setDoomed(doomed === i ? null : i)}
@@ -6269,6 +6361,54 @@ export function RoofDesigner(props: {
                   </button>
                 )}
               </div>
+              {/* Where it stands on the proposal, in words (22 Nov 2026, Martin: which is the leading quote, which are on the
+                  proposal, which is recommended). */}
+              {designs.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-2 py-1.5">
+                  {i === primary ? (
+                    <span className="inline-flex h-7 items-center gap-1 rounded-full bg-sun-line/15 px-2.5 text-[11px] font-semibold text-sun-line">
+                      <Star className="size-3 fill-current" aria-hidden /> Leading quote · always on the proposal
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setOnProposal(i, !lineup.on.includes(i))}
+                      aria-pressed={lineup.on.includes(i)}
+                      title={lineup.on.includes(i) ? "Take it off the proposal" : "Offer it on the proposal as an option"}
+                      className={clsx(
+                        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold",
+                        lineup.on.includes(i) ? "bg-sun-line text-white" : "text-muted ring-1 ring-line hover:text-ink",
+                      )}
+                    >
+                      {lineup.on.includes(i) ? (
+                        <>
+                          <Check className="size-3" aria-hidden /> On the proposal
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="size-3" aria-hidden /> Add to the proposal
+                        </>
+                      )}
+                    </button>
+                  )}
+                  {lineup.on.length > 1 && lineup.on.includes(i) && (
+                    <button
+                      type="button"
+                      onClick={() => recommend(i)}
+                      disabled={lineup.recommended === i}
+                      aria-pressed={lineup.recommended === i}
+                      title={lineup.recommended === i ? "Recommended to the customer" : "Recommend this one to the customer"}
+                      className={clsx(
+                        "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold",
+                        lineup.recommended === i ? "bg-ink text-canvas" : "text-muted ring-1 ring-line hover:text-ink",
+                      )}
+                    >
+                      <ThumbsUp className={clsx("size-3", lineup.recommended === i && "fill-current")} aria-hidden />
+                      {lineup.recommended === i ? "Recommended" : "Recommend"}
+                    </button>
+                  )}
+                </div>
+              )}
               {/* The open design names itself inside its own card (10 Nov 2026, Martin: the label box outside it read as apart). */}
               {i === active && (
                 <label className="flex items-center gap-2 border-t border-line px-3 py-1.5">
@@ -6314,8 +6454,8 @@ export function RoofDesigner(props: {
         </span>
       </div>
       <p className={clsx("text-xs text-muted", compactMenu && !sheetMenu && "hidden")}>
-        The starred design is the primary: the one this roof opens on. Offer up to {MAX_PROPOSAL_OPTIONS - 1} more to the customer as
-        options on the next proposal published, and mark the one you recommend.
+        The starred design is the leading quote: the one this roof opens on, always on the proposal. Add up to {MAX_PROPOSAL_OPTIONS - 1}{" "}
+        more as options, and one of them is recommended to the customer.
       </p>
     </div>
   );
@@ -6667,12 +6807,19 @@ export function RoofDesigner(props: {
   );
 
   // Sol's step and suggestions, when shown.
+  // On a phone held upright the strings take Sol's place under the picture while stringing (22 Nov 2026).
+  const stringsUnder = solHolds && !sideways && tool === "string";
   const guideShown =
-    guideActive && !menu && !(solHolds && (picks.length > 0 || solTray)) && !(props.tight && !solAway && (commandReply || commandBusy));
+    guideActive &&
+    !menu &&
+    !stringsUnder &&
+    !((solHolds && picks.length > 0) || solTray) &&
+    !(props.tight && !solAway && (commandReply || commandBusy));
   const nudgeShown =
     !guideActive &&
     !solQuiet &&
-    !(solHolds && (picks.length > 0 || solTray)) &&
+    !stringsUnder &&
+    !((solHolds && picks.length > 0) || solTray) &&
     nudges.length > 0 &&
     !menu &&
     !opening &&
@@ -6684,11 +6831,81 @@ export function RoofDesigner(props: {
   // in a notch of the plate under it.
   const foot = stage ? stage.pt + stage.photoH : null;
   const underUp = solHolds && !sideways && foot !== null && !solTray;
-  const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown);
+  const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown || stringsUnder);
+  const solSaying = guideShown ? `g:${guideNow}` : nudgeShown ? `n:${nudges[0]?.id ?? ""}` : "";
+  const [solSaid, setSolSaid] = useState(solSaying);
+  if (solSaid !== solSaying) {
+    setSolSaid(solSaying);
+    if (solSaying) setSolFolded(false);
+  }
+  const foldable = underUp && (guideShown || nudgeShown);
+  // Folded, the picture grows down into the box's room: measured again whenever that changes.
+  const growDown = foldable && solFolded;
+  useEffect(() => {
+    if (solFoldedNow.current === growDown) return;
+    solFoldedNow.current = growDown;
+    window.dispatchEvent(new Event("resize"));
+  }, [growDown]);
+  // The box's top edge: the picture's foot, or higher once slid up. Sol and the foot row stand on it.
+  const liftMost = stage ? Math.round(stage.photoH * 0.6) : 0;
+  const lift = foldable && !solFolded ? Math.min(solLift, liftMost) : 0;
+  const deckTop = foot === null ? null : foot - lift;
+  const restFolded = 48;
+  // One handle in the box's top left: pressed, it folds or opens the box; dragged, it slides the box up or down (down
+  // past its usual height folds it, up from folded opens it).
+  const foldButton = foldable ? (
+    <button
+      type="button"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const from = solFolded ? -(stage?.drop ?? (stage?.rest ?? 156) - 8 - restFolded) : lift;
+        solDrag.current = { y: e.clientY, from, moved: false };
+      }}
+      onPointerMove={(e) => {
+        const d = solDrag.current;
+        if (!d) return;
+        const dy = d.y - e.clientY;
+        if (!d.moved && Math.abs(dy) < 6) return;
+        if (!d.moved) setSolDragging(true);
+        d.moved = true;
+        const v = d.from + dy;
+        if (v < -40) {
+          setSolFolded(true);
+          setSolLift(0);
+        } else {
+          setSolFolded(false);
+          setSolLift(Math.max(0, Math.min(liftMost, Math.round(v))));
+        }
+      }}
+      onPointerUp={() => {
+        const d = solDrag.current;
+        solDrag.current = null;
+        setSolDragging(false);
+        if (d && !d.moved) setSolFolded((f) => !f);
+      }}
+      onPointerCancel={() => {
+        solDrag.current = null;
+        setSolDragging(false);
+      }}
+      aria-expanded={!solFolded}
+      aria-label={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
+      title={solFolded ? "Open Sol's box, or drag it up" : "Fold Sol's box away, or drag it up to read more"}
+      className="pointer-events-auto absolute left-2.5 top-1.5 z-10 flex h-8 w-12 touch-none flex-col items-center justify-center rounded-full text-white/70 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+    >
+      <GripHorizontal className="-mb-1 size-4" aria-hidden />
+      <ChevronDown className={clsx("size-3.5 transition-transform", solFolded && "rotate-180")} aria-hidden />
+    </button>
+  ) : null;
   // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
   // (22 Nov 2026, Martin: the same places as upright), with Sol and the rounds beside him on its top edge.
-  const sideDeck = solHolds && sideways && !solTray && picks.length === 0 && (guideShown || nudgeShown);
+  // On the desktop pop-up too: Sol's step and suggestions form along the foot round him (22 Nov 2026, Martin: "sols
+  // replies should form in the bottom half like on mobile").
+  const sideDeck = ((solHolds && sideways && picks.length === 0) || deskFoot) && !solTray && (guideShown || nudgeShown);
   const sideDeckUp = sideDeck && sideDeckH > 0;
+  // How far the tray's top row has risen while Sol's card fills the tray: the foot row, Sol, and the tray's own ends
+  // (zoom and the tips' bulb on the left, Roof, Sides and the picture's switch on the right) rise together.
+  const trayRise = deskFoot && sideDeckUp ? Math.max(0, sideDeckH - DESK_SOL_MIDDLE) : 0;
+  const trayRow: React.CSSProperties | undefined = trayRise ? { transform: `translateY(${-trayRise}px)` } : undefined;
   // On a phone, the whole array(s) of what is picked, when that is more than is picked: Sol's controller offers them all
   // (22 Nov 2026, Martin: "when I select a single panel… select the whole array").
   const wholeArray = (() => {
@@ -6707,9 +6924,54 @@ export function RoofDesigner(props: {
     }
     return all.length > picks.length ? all : null;
   })();
+  // Which way new panels go down, opened from the foot's Add a panel round (phone and computer alike).
+  const panelWayCard = (
+    <div
+      className="mb-2 w-56 rounded-2xl bg-[#26282c] p-1.5 text-white shadow-lift ring-1 ring-white/10"
+      role="radiogroup"
+      aria-label="New panels"
+    >
+      <span className="grid grid-cols-2 gap-1.5">
+        {([false, true] as const).map((land) => (
+          <button
+            key={String(land)}
+            type="button"
+            role="radio"
+            aria-checked={addLandscape === land}
+            onClick={() => {
+              setAddLandscape(land);
+              setPanelCard(false);
+            }}
+            className={clsx(
+              "flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-semibold",
+              addLandscape === land ? "bg-white text-[#1d1d1f]" : "bg-white/10 text-white/80 hover:bg-white/15",
+            )}
+          >
+            <PanelDrawing landscape={land} size={24} />
+            {land ? "Landscape" : "Portrait"}
+          </button>
+        ))}
+      </span>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={addLandscape === null}
+        onClick={() => {
+          setAddLandscape(null);
+          setPanelCard(false);
+        }}
+        className={clsx(
+          "mt-1.5 w-full rounded-xl px-2 py-1.5 text-[11px] font-medium",
+          addLandscape === null ? "bg-sun-line text-white" : "text-white/60 hover:text-white",
+        )}
+      >
+        Follow the roof face
+      </button>
+    </div>
+  );
   return (
     <div data-design-popup className={clsx(props.tight && "relative p-2")}>
-      {solHolds && (
+      {props.tight && (
         <SolTray
           open={solTray}
           onClose={() => setSolTray(false)}
@@ -6728,17 +6990,16 @@ export function RoofDesigner(props: {
           drawn={illustrated}
           onDrawn={toggleIllustrated}
           zooming={zooming}
-          onZoom={() => setZooming((z) => !z)}
+          {...(solHolds ? { onPitch: () => setPhonePitch((v) => !v) } : {})}
           pitchShown={phonePitch}
-          onPitch={() => setPhonePitch((v) => !v)}
           pitchWords={quoteNow.form.roof === "flat" ? "Pitch: flat" : `Pitch ${quoteNow.form.pitch ?? TILT.roof}°`}
           {...(costsHidden ? {} : { onDesignForMe: () => setMineIntro(true) })}
           onUndo={undo}
           onRedo={redo}
           onWhole={() => setView(WHOLE)}
-          {...(props.sidesReady ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} icon /> } : {})}
-          {...(props.pictureMenu ? { pictureMenu: props.pictureMenu } : {})}
-          footRoom={78}
+          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} icon /> } : {})}
+          {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
+          footRoom={solHolds ? 78 : 0}
         />
       )}
       {/* The bar that stays at the top of the page, in two rows so nothing is squashed: the wordmark, the address search
@@ -6970,16 +7231,13 @@ export function RoofDesigner(props: {
           {designs.length > 1 && (
             <button
               type="button"
-              onClick={() => {
-                setPrimary(active);
-                changed();
-              }}
+              onClick={() => makeLeading(active)}
               disabled={active === primary}
-              data-leg={active === primary ? "The primary design" : "Make it the primary"}
+              data-leg={active === primary ? "The leading design" : "Make it the leading design"}
               title={
                 active === primary
-                  ? "This is the primary design"
-                  : "Make the open design the primary: the one priced on the deal and sent first"
+                  ? "This is the leading design: the quote this roof opens on"
+                  : "Make the open design the leading one: the quote priced on the deal and shown first"
               }
               className={clsx(
                 "inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium ring-1",
@@ -7090,12 +7348,15 @@ export function RoofDesigner(props: {
             <section
               ref={stripBox}
               className={clsx(
-                "relative z-30 mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                "relative mx-auto flex items-stretch rounded-lg bg-primary text-white",
+                // The bill box opens from here: while it is open the strip stands over the picture's controls, Sol's round and
+                // his cards (22 Nov 2026, Martin: on a phone they lay over the bill box).
+                menu === "bill" ? "z-[85]" : "z-30",
                 // On a phone it wraps, and keeps clear of the window's close round in the corner.
                 props.tight
                   ? phone
                     ? // Full bleed across the top of the screen (21 Nov 2026, Martin), the figures in a grid of their own.
-                      "mb-1.5 flex-col !rounded-none"
+                      "flex-col !rounded-none"
                     : sideways
                       ? "designer-compact-strip mb-1.5 mr-11 flex-nowrap"
                       : "mb-1.5 flex-nowrap"
@@ -7111,31 +7372,49 @@ export function RoofDesigner(props: {
               {/* Three boxes (1 Nov 2026, Martin, as Primero's): Solar (kW and panels, with the daily yield beside them), Battery
                   (kWh and modules), then what it does for this home on white, so the money reads apart from the system. */}
               {phone ? (
-                // On a phone, three figures across, each with its unit under it; clear of the window's close round on the right.
-                // One slim line (22 Nov 2026, Martin: the two bars took room the map and Sol needed).
+                // On a phone, three figures across, each named over it with its detail under it; clear of the window's close
+                // round on the right. Roomier (22 Nov 2026, Martin: "they do not need to be so skinny").
                 <div
                   className={clsx(
-                    "flex items-baseline gap-x-3 whitespace-nowrap py-1 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
+                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-2 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
                     growing ? "bg-sun-line" : "",
                   )}
-                  style={{ paddingTop: "max(0.25rem, env(safe-area-inset-top))" }}
+                  style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
                 >
-                  <p className="min-w-0 truncate" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
-                    <span className={clsx("text-[15px] font-semibold", growing ? "text-white" : "text-sun-bright")}>
-                      {liveKw.toFixed(2)}
-                    </span>
-                    <span className="ml-0.5 text-[10.5px] text-white/60">
-                      kW · {livePanels}×{panelOf(design).watts}W
-                    </span>
-                  </p>
-                  <p className={clsx("shrink-0", oversize?.over && "text-sun-bright")}>
-                    <span className="text-[15px] font-semibold text-white">{summary.kwhPerDay}</span>
-                    <span className="ml-0.5 text-[10.5px] text-white/60">kWh/day</span>
-                  </p>
-                  <p className="shrink-0" title={battery ? `${battery.qty} modules` : "No battery"}>
-                    <span className="text-[15px] font-semibold text-white">{battery ? batteryKwh : "–"}</span>
-                    <span className="ml-0.5 text-[10.5px] text-white/60">{battery ? "kWh batt" : "no batt"}</span>
-                  </p>
+                  <div className="min-w-0" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
+                    <p className={clsx("text-[9px] font-medium uppercase tracking-[0.16em]", growing ? "text-white" : "text-sun-bright")}>
+                      Solar
+                    </p>
+                    <p className="whitespace-nowrap">
+                      <span className={clsx("text-[20px] font-semibold tracking-[-0.02em]", growing ? "text-white" : "text-sun-bright")}>
+                        {liveKw.toFixed(2)}
+                      </span>
+                      <span className="ml-0.5 text-[11px] text-white/60">kW</span>
+                    </p>
+                    <p className="truncate text-[10.5px] text-white/60">
+                      {livePanels} × {panelOf(design).watts} W
+                    </p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">Daily yield</p>
+                    <p className="whitespace-nowrap">
+                      <span className="text-[20px] font-semibold tracking-[-0.02em] text-white">{summary.kwhPerDay}</span>
+                      <span className="ml-0.5 text-[11px] text-white/60">kWh</span>
+                    </p>
+                    <p className={clsx("truncate text-[10.5px]", oversize?.over ? "font-medium text-sun-bright" : "text-white/60")}>
+                      {fitted.length ? `${fittedKw} kW${oversize ? ` · ${oversize.percent}%` : " inverter"}` : "no inverter"}
+                    </p>
+                  </div>
+                  <div className="min-w-0" title={battery ? `${battery.qty} modules` : "No battery"}>
+                    <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">Battery</p>
+                    <p className="whitespace-nowrap">
+                      <span className="text-[20px] font-semibold tracking-[-0.02em] text-white">{battery ? batteryKwh : "–"}</span>
+                      {battery && <span className="ml-0.5 text-[11px] text-white/60">kWh</span>}
+                    </p>
+                    <p className="truncate text-[10.5px] text-white/60">
+                      {battery ? `${battery.qty} ${battery.qty === 1 ? "module" : "modules"}` : "none"}
+                    </p>
+                  </div>
                 </div>
               ) : props.tight ? (
                 <div
@@ -7254,7 +7533,7 @@ export function RoofDesigner(props: {
                     // Clipped, so a figure that runs long never paints under the shade widget beside it.
                     "min-w-0 flex-1 cursor-pointer overflow-hidden",
                     (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
-                    phone ? "flex items-center py-1 pl-4 pr-[4.5rem]" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    phone ? "flex items-center px-4 py-2" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -7272,30 +7551,30 @@ export function RoofDesigner(props: {
                   {finance && phone ? (
                     // On a phone, the bill, the saving and the payback as three figures across, each named over it.
                     <dl
-                      className="flex w-full items-baseline gap-x-3 whitespace-nowrap tabular-nums"
+                      className="grid w-full grid-cols-[1.25fr_1fr_1fr] gap-x-3 tabular-nums leading-tight"
                       title="What it does for this home: open the bill"
                     >
                       {(
                         [
-                          // On a narrow phone the bill after alone, so the line fits beside the window's close round.
                           [
-                            "Bill",
                             <>
-                              <span className="max-[409px]:hidden">{dollars(finance.billNow)}→</span>
+                              Bill <span className="max-[409px]:hidden">now → </span>after
+                            </>,
+                            <>
+                              <span className="max-[409px]:hidden">{dollars(finance.billNow)} → </span>
                               {dollars(finance.billAfter)}
                             </>,
                             false,
                           ],
-                          ["Saves", `${dollars(finance.saving)}/yr`, true],
+                          ["Saves a year", dollars(finance.saving), true],
                           ["Payback", net !== null && finance.saving > 0 ? `${(net / finance.saving).toFixed(1)} yrs` : "–", false],
                         ] as const
-                      ).map(([name, value, gold]) => (
-                        <div key={name} className={clsx("flex items-baseline gap-1", name === "Bill" ? "min-w-0" : "shrink-0")}>
-                          <dt className="text-[8px] font-medium uppercase tracking-[0.08em] text-muted">
-                            {name}
-                            {name === "Bill" && <span className="min-[410px]:hidden"> after</span>}
-                          </dt>
-                          <dd className={clsx("truncate text-[12px] font-semibold leading-tight", gold && "text-positive")}>{value}</dd>
+                      ).map(([name, value, gold], i) => (
+                        <div key={i} className="min-w-0">
+                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.12em] text-muted">{name}</dt>
+                          <dd className={clsx("truncate text-[16px] font-semibold tracking-[-0.01em]", gold && "text-positive")}>
+                            {value}
+                          </dd>
                         </div>
                       ))}
                     </dl>
@@ -7419,7 +7698,12 @@ export function RoofDesigner(props: {
                   </button>
                 )}
                 {menu === "bill" && (
-                  <div className="absolute right-0 top-full z-40 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw] overflow-y-auto text-ink shadow-lift rounded-lg border border-line bg-surface p-3">
+                  <div
+                    className={clsx(
+                      "absolute top-full z-40 overflow-y-auto overscroll-contain rounded-lg border border-line bg-surface p-3 text-ink shadow-lift",
+                      phone ? "inset-x-3 mt-1.5 max-h-[calc(100dvh-9rem)]" : "right-0 mt-2 max-h-[70vh] w-[22rem] max-w-[85vw]",
+                    )}
+                  >
                     <p className={label}>The customer&apos;s electricity bill</p>
                     {props.jobId && (
                       <button
@@ -7586,10 +7870,12 @@ export function RoofDesigner(props: {
                 Everything floating on it is dark glass (glass-dark, 10 Nov 2026, Martin). */}
             <div
               ref={picBox}
-              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact")}
+              className={clsx("glass-dark relative mx-auto", (sideways || phone) && "designer-compact", deskFoot && "desk-tray")}
               style={
                 {
                   maxWidth: fit,
+                  // What stands at the picture's foot rises above the tray, however tall Sol's card makes it.
+                  ...(deskFoot ? { "--tray-h": `${sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY}px` } : {}),
                   ...(fitPx ? { "--pic-h": `${Math.round((fitPx * ROOF_IMAGE.height) / ROOF_IMAGE.width)}px` } : {}),
                   // A phone: a band above the picture and one below, where the controls stand.
                   ...(phone && stage
@@ -9041,7 +9327,9 @@ export function RoofDesigner(props: {
                     />
                   )}
                   {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g transform={`translate(${view.x + 100 * u} ${view.y + view.h - 30 * u})`}>
+                  <g
+                    transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : solHolds && !sideways ? 64 : 30) * u})`}
+                  >
                     <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
                     <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
                       5 m
@@ -9049,11 +9337,41 @@ export function RoofDesigner(props: {
                   </g>
                 </svg>
               </div>
-              {/* Zoom mode on a phone: what it does, and the way out, at the picture's foot. */}
-              {phone && stage && zooming && (
+              {/* Zoom on a phone (22 Nov 2026, Martin: the pinch pill was hidden behind Sol, and "the zoom + and - … out of the
+                  tool bar and on the right hand side … with a small magnifying glass next to it"): + and − on the map's right
+                  edge, the magnifier beside them turning pinch zoom on, its pill at the picture's top where nothing covers it. */}
+              {solHolds && !solTray && (
                 <div
-                  className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
-                  style={{ top: stage.pt + stage.photoH - 44 }}
+                  className="pointer-events-auto absolute right-2 z-30 flex -translate-y-1/2 items-center gap-1.5"
+                  style={{ top: stage ? stage.pt + stage.photoH / 2 : "50%" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setZooming((z) => !z)}
+                    aria-pressed={zooming}
+                    aria-label={zooming ? "Stop pinch zoom" : "Pinch to zoom"}
+                    className={clsx(
+                      "grid size-7 place-items-center rounded-full shadow-lift",
+                      zooming ? "bg-sun-line text-white" : "bg-primary/85 text-primary-ink",
+                    )}
+                  >
+                    <Search className="size-3.5" aria-hidden />
+                  </button>
+                  <div className="flex flex-col overflow-hidden rounded-full bg-primary/90 text-primary-ink shadow-lift">
+                    <button type="button" aria-label="Zoom in" onClick={() => zoom(1 / 1.4)} className="grid size-10 place-items-center">
+                      <Plus className="size-5" aria-hidden />
+                    </button>
+                    <span className="mx-2.5 h-px bg-primary-ink/25" aria-hidden />
+                    <button type="button" aria-label="Zoom out" onClick={() => zoom(1.4)} className="grid size-10 place-items-center">
+                      <Minus className="size-5" aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {solHolds && zooming && (
+                <div
+                  className="pointer-events-auto absolute inset-x-0 z-40 flex justify-center"
+                  style={{ top: (stage ? stage.pt : 0) + 64 }}
                 >
                   <button
                     type="button"
@@ -9081,10 +9399,17 @@ export function RoofDesigner(props: {
                 </div>
               )}
               <div
+                {...(deskFoot ? {} : { "data-lift": true })}
+                style={deskFoot ? trayRow : undefined}
                 className={clsx(
-                  "pointer-events-auto absolute right-4 z-20 flex flex-col items-end gap-2",
+                  "pointer-events-auto absolute right-4 flex gap-2",
+                  // On a computer's pop-up they stand in the graphite tray's right end, level with the foot row (22 Nov 2026,
+                  // Martin: the dock should take in the other tools, not leave them floating over the roof).
+                  deskFoot
+                    ? "bottom-[14px] z-[56] flex-row-reverse items-center transition-transform duration-300 motion-reduce:transition-none"
+                    : "z-20 flex-col items-end",
                   // On a phone it stands over Ask Sol, not beside it.
-                  props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
+                  deskFoot ? "" : props.tight ? (phone ? "bottom-[6.25rem]" : "bottom-10") : "bottom-3",
                   // Sideways the dial for what is picked takes the foot; on a phone upright these are in the toolbar under the picture.
                   solHolds && "hidden",
                 )}
@@ -9133,7 +9458,7 @@ export function RoofDesigner(props: {
               )}
               {/* The Drawn view's wall: the inverter, battery, switchboard and EV charger standing where they go. */}
               {art && (
-                <div className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
+                <div data-lift className="absolute bottom-[5.75rem] left-[4.5rem] z-10">
                   <WallStrip kit={wallKit} panels={summary.panels} />
                 </div>
               )}
@@ -9692,18 +10017,64 @@ export function RoofDesigner(props: {
               {/* On the picture, half way down its right edge: the controls for whatever is picked, in a half-round. With nothing picked, the turn buttons for the rows of the face being worked on. */}
               {tool === "string" ? (
                 <div
-                  className="absolute right-3 top-[6.75rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 overflow-y-auto rounded-lg border border-line bg-surface p-3 shadow-lift"
+                  className={clsx(
+                    "absolute overflow-y-auto rounded-lg border border-line bg-surface shadow-lift",
+                    // On a phone (22 Nov 2026, Martin: "optimise the string designer… wider, text smaller"): drawn at full
+                    // size (its own style keeps it out of the phone's smaller drawing) across the picture, smaller type,
+                    // a string a line.
+                    solHolds
+                      ? clsx(
+                          "z-30 space-y-1.5 p-2 text-[12px]",
+                          // Upright, a plate under the picture notched round Sol, so the roof stays clear to tap.
+                          sideways ? "right-2 top-2 w-[24rem] max-w-[calc(100%-1rem)]" : "inset-x-0 rounded-b-none rounded-t-[26px] !pt-8",
+                        )
+                      : "right-3 top-[6.75rem] z-10 max-h-[calc(100%-13rem)] w-72 space-y-2 p-3",
+                  )}
+                  style={
+                    solHolds && !sideways && stage
+                      ? { top: foot ?? 0, maxHeight: stage.rest, ...solNotch(0, 30) }
+                      : solHolds
+                        ? { zIndex: 30, maxHeight: `calc(100% - ${(sideDeckUp ? sideDeckH : 0) + 64}px)` }
+                        : undefined
+                  }
                   role="group"
                   aria-label="Strings"
                   data-popup
                 >
                   <div className="flex items-start gap-2">
-                    <p className={clsx(label, "flex-1")}>
+                    <p className={clsx(label, "flex-1", solHolds && "!text-[10px] leading-snug")}>
                       Strings
-                      {fitted.length
-                        ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
-                        : " · no inverter chosen"}
+                      {solHolds
+                        ? fitted.length
+                          ? ` · ${fittedKw} kW inverter · ${summary.kw.toFixed(2)} kW panels`
+                          : " · no inverter"
+                        : fitted.length
+                          ? ` · ${fitted.length > 1 ? `${fitted.length} inverters, ` : ""}${fittedKw} kW of inverter for ${summary.kw.toFixed(2)} kW of panels`
+                          : " · no inverter chosen"}
                     </p>
+                    {/* On a phone the two ways to start strings sit in the header, so the strings below stay in view. */}
+                    {solHolds && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={stringForMe}
+                          disabled={summary.panels === 0}
+                          title="String the panels by rule, checked against the inverter's inputs"
+                          className="-mt-1 flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-semibold text-ink ring-1 ring-sun-line disabled:opacity-50"
+                        >
+                          <Sparkles className="size-3.5 text-sun-ink" aria-hidden /> Auto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setWiring(newId("s"))}
+                          disabled={startedString}
+                          aria-label="New string"
+                          className="-mt-1 flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11.5px] font-semibold text-ink ring-1 ring-line disabled:opacity-50"
+                        >
+                          <Plus className="size-3.5" aria-hidden /> New
+                        </button>
+                      </>
+                    )}
                     <button
                       onClick={() => pickTool("select")}
                       title="Done stringing (Esc)"
@@ -9713,12 +10084,20 @@ export function RoofDesigner(props: {
                       <X className="size-4" aria-hidden />
                     </button>
                   </div>
-                  {strings.length === 0 && <p className="text-sm text-muted">Click panels on the roof in the order they&apos;re wired.</p>}
-                  <ul className="space-y-1">
+                  {strings.length === 0 && (
+                    <p className={clsx("text-muted", solHolds ? "text-[12px]" : "text-sm")}>
+                      Click panels on the roof in the order they&apos;re wired.
+                    </p>
+                  )}
+                  <ul className={solHolds ? "space-y-0.5" : "space-y-1"}>
                     {strings.map((x, i) => (
                       <li
                         key={x.id}
-                        className={clsx("flex items-center gap-1 rounded-md border p-1", x.id === wiring ? "border-forest" : "border-line")}
+                        className={clsx(
+                          "flex items-center gap-1 rounded-md border",
+                          solHolds ? "px-1 py-0.5" : "p-1",
+                          x.id === wiring ? "border-forest" : "border-line",
+                        )}
                         onMouseEnter={() => setHover(x.id)}
                         onMouseLeave={() => setHover(null)}
                       >
@@ -9731,13 +10110,24 @@ export function RoofDesigner(props: {
                             style={{ background: STRING_COLOURS[i % STRING_COLOURS.length] }}
                             aria-hidden
                           />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-semibold">String {letter(i)}</span>
-                            <span className="block truncate text-xs tabular-nums text-muted">
-                              {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
-                              {checks[i].coldVoc ? ` · Voc ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                          {solHolds ? (
+                            // On a phone, one line: the letter, then its panels, kW and voltage.
+                            <span className="flex min-w-0 items-baseline gap-1.5">
+                              <span className="text-[13px] font-semibold">{letter(i)}</span>
+                              <span className="truncate text-[11px] tabular-nums text-muted">
+                                {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
+                                {checks[i].coldVoc ? ` · ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                              </span>
                             </span>
-                          </span>
+                          ) : (
+                            <span className="min-w-0">
+                              <span className="block text-sm font-semibold">String {letter(i)}</span>
+                              <span className="block truncate text-xs tabular-nums text-muted">
+                                {x.panels.length} panels · {((x.panels.length * size.watts) / 1000).toFixed(2)} kW
+                                {checks[i].coldVoc ? ` · Voc ${Math.round(checks[i].coldVoc ?? 0)} V` : ""}
+                              </span>
+                            </span>
+                          )}
                         </button>
                         <select
                           value={`${x.inverter ?? 0}:${x.mppt ?? 0}`}
@@ -9752,12 +10142,15 @@ export function RoofDesigner(props: {
                           }}
                           aria-label={`The inverter input string ${letter(i)} is on`}
                           title="The inverter and the input (MPPT) this string is on"
-                          className="h-8 max-w-[6.5rem] rounded-lg border border-line bg-surface px-1 text-xs font-medium"
+                          className={clsx(
+                            "rounded-lg border border-line bg-surface px-1 font-medium",
+                            solHolds ? "h-7 max-w-[5.5rem] text-[11px]" : "h-8 max-w-[6.5rem] text-xs",
+                          )}
                         >
                           {Array.from({ length: Math.max(1, fitted.length, (x.inverter ?? 0) + 1) }, (_, n) =>
                             Array.from({ length: Math.max(inputsOf(n), n === (x.inverter ?? 0) ? (x.mppt ?? 0) + 1 : 0) }, (_, input) => (
                               <option key={`${n}:${input}`} value={`${n}:${input}`}>
-                                {fitted.length > 1 ? `Inv ${n + 1} · in ${input + 1}` : `Input ${input + 1}`}
+                                {fitted.length > 1 ? `Inv ${n + 1} · in ${input + 1}` : solHolds ? `In ${input + 1}` : `Input ${input + 1}`}
                               </option>
                             )),
                           )}
@@ -9791,7 +10184,10 @@ export function RoofDesigner(props: {
                   </ul>
                   {startedString && (
                     <p
-                      className="flex items-center gap-2 rounded-md border border-sun-line bg-sun px-2.5 py-2 text-sm text-sun-ink"
+                      className={clsx(
+                        "flex items-center gap-2 rounded-md border border-sun-line bg-sun px-2.5 text-sun-ink",
+                        solHolds ? "py-1.5 text-[11.5px]" : "py-2 text-sm",
+                      )}
                       role="status"
                     >
                       <span
@@ -9805,18 +10201,36 @@ export function RoofDesigner(props: {
                       </span>
                     </p>
                   )}
-                  <button
-                    className={clsx(button, "!min-h-9 w-full justify-center !border-sun-line")}
-                    onClick={stringForMe}
-                    disabled={summary.panels === 0}
-                    title="String the panels by rule, checked against the inverter's inputs"
-                  >
-                    <Sparkles className="mr-1.5 size-4 text-sun-ink" aria-hidden /> String automatically
-                  </button>
+                  {/* On a phone, String automatically and New string side by side. */}
+                  <div className={solHolds ? "hidden" : "contents"}>
+                    <button
+                      className={clsx(
+                        button,
+                        "w-full justify-center !border-sun-line",
+                        solHolds ? "!min-h-8 !px-2 !py-1 !text-[12px]" : "!min-h-9",
+                      )}
+                      onClick={stringForMe}
+                      disabled={summary.panels === 0}
+                      title="String the panels by rule, checked against the inverter's inputs"
+                    >
+                      <Sparkles className={clsx("shrink-0 text-sun-ink", solHolds ? "mr-1 size-3.5" : "mr-1.5 size-4")} aria-hidden />{" "}
+                      String automatically
+                    </button>
+                    {solHolds && (
+                      <button
+                        className={clsx(button, "!min-h-8 w-full justify-center !px-2 !py-1 !text-[12px]")}
+                        onClick={() => setWiring(newId("s"))}
+                        disabled={startedString}
+                      >
+                        <Plus className="mr-1 size-3.5 shrink-0" aria-hidden /> New string
+                      </button>
+                    )}
+                  </div>
                   {autoNote && (
                     <p
                       className={clsx(
-                        "rounded-md px-2.5 py-2 text-xs",
+                        "rounded-md px-2.5",
+                        solHolds ? "py-1.5 text-[11px] leading-snug" : "py-2 text-xs",
                         autoNote.ok ? "bg-positive-soft text-positive" : "bg-sun text-sun-ink",
                       )}
                       role="status"
@@ -9863,7 +10277,7 @@ export function RoofDesigner(props: {
                     ].filter((s, n, all) => all.findIndex((x) => x.kind === s.kind && x.sku === s.sku) === n);
                     if (!sheets.length) return null;
                     return (
-                      <div className="rounded-md bg-surface-2 px-2.5 py-2 text-xs">
+                      <div className={clsx("rounded-md bg-surface-2 px-2.5", solHolds ? "py-1.5 text-[11px]" : "py-2 text-xs")}>
                         <p className="font-semibold text-ink">The figures behind these strings</p>
                         <ul className="mt-1.5 space-y-1.5">
                           {sheets.map((s) => (
@@ -9904,16 +10318,19 @@ export function RoofDesigner(props: {
                       </div>
                     );
                   })()}
-                  <button
-                    className={clsx(button, "!min-h-9 w-full justify-center")}
-                    onClick={() => setWiring(newId("s"))}
-                    disabled={startedString}
-                  >
-                    <Plus className="mr-1.5 size-4" aria-hidden /> New string
-                  </button>
-                  <p className="text-xs text-muted">
+                  {!solHolds && (
+                    <button
+                      className={clsx(button, "!min-h-9 w-full justify-center")}
+                      onClick={() => setWiring(newId("s"))}
+                      disabled={startedString}
+                    >
+                      <Plus className="mr-1.5 size-4" aria-hidden /> New string
+                    </button>
+                  )}
+                  <p className={clsx("text-muted", solHolds ? "text-[11px]" : "text-xs")}>
                     {summary.panels - strings.reduce((n, x) => n + x.panels.length, 0)} of {summary.panels} panels aren&apos;t on a string.
-                    Tap the tick or cross beside a string for its check. String last: re-laying a face&apos;s rows renumbers its panels.
+                    {!solHolds &&
+                      " Tap the tick or cross beside a string for its check. String last: re-laying a face's rows renumbers its panels."}
                   </p>
                 </div>
               ) : picks.length > 0 ? (
@@ -10025,9 +10442,12 @@ export function RoofDesigner(props: {
                   the customer's bill in the figures above the picture.) */}
               <div
                 className={clsx(
-                  "absolute z-20 flex -translate-x-1/2 flex-col items-center",
-                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner.
-                  phone ? "designer-kit left-[calc(50%-1.1rem)] top-[0.78rem]" : "left-1/2 top-4",
+                  "absolute flex flex-col items-center",
+                  // On a phone a little left of the middle, so it keeps clear of the two rounds in the top right corner;
+                  // centred without a transform there, so a kit list can be a sheet over the whole screen (a transform
+                  // would hold a fixed sheet inside the kit). Above everything on the picture while its sheet is open.
+                  phone ? "designer-kit left-0 right-[2.75rem] top-[0.78rem] mx-auto w-max" : "left-1/2 top-4 -translate-x-1/2",
+                  kitSheet && menu && menu !== "designs" && menu !== "bill" ? "z-[95]" : "z-20",
                 )}
                 role="group"
                 aria-label="System"
@@ -10070,8 +10490,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift space-y-1 rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Panels")}
                         <p className={clsx(label, "px-2 py-1")}>Panels to choose from</p>
                         {kitSearchHere("Search panels")}
                         {[
@@ -10113,6 +10537,15 @@ export function RoofDesigner(props: {
                               )}
                             </div>
                           ))}
+                        {props.catalogue.length <= 1 && (
+                          <p className="px-2 pt-1 pb-1.5 text-xs text-muted">
+                            Only one panel to offer: none of your price lists has panels on it.{" "}
+                            <Link href="/design/settings/price-lists" className="font-medium text-ink underline underline-offset-2">
+                              Upload a price list
+                            </Link>{" "}
+                            to choose from your wholesaler&apos;s panels.
+                          </p>
+                        )}
                         {kitSearchFoot("Search panels")}
                       </div>
                     )}
@@ -10141,8 +10574,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-2 shadow-lift",
+                        )}
                       >
+                        {kitSheetHead("EV chargers")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {charger ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -10242,8 +10679,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Inverters")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {fitted.length === 0 && (
                           <p className="px-2 pb-1 text-sm text-muted">None yet. Add one, or more for a larger system.</p>
@@ -10464,8 +10905,12 @@ export function RoofDesigner(props: {
                       <div
                         ref={kitMenu}
                         onScroll={kitScrolled}
-                        className="absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2"
+                        style={kitMenuStyle}
+                        className={kitMenuClass(
+                          "absolute left-1/2 top-full z-30 mt-2 max-h-[calc(var(--pic-h,60vh)-8.5rem)] w-[24rem] max-w-[85vw] -translate-x-1/2 overflow-y-auto shadow-lift rounded-lg border border-line bg-surface p-2",
+                        )}
                       >
+                        {kitSheetHead("Batteries")}
                         <p className={clsx(label, "px-2 py-1")}>On this design</p>
                         {battery ? (
                           <div className="rounded-md bg-canvas px-2 py-2">
@@ -10652,7 +11097,7 @@ export function RoofDesigner(props: {
                   is left for, with two smaller half-rounds growing out of it for the two things done most with it:
                   add a panel (to its right) and erase (beneath it). */}
               <div
-                className={clsx("absolute z-20 size-[6.25rem]", solHolds ? "hidden" : "left-4 top-4")}
+                className={clsx("absolute z-20 size-[6.25rem]", props.tight ? "hidden" : "left-4 top-4")}
                 role="toolbar"
                 aria-label="Select, add a panel, landscape, erase"
               >
@@ -10975,7 +11420,13 @@ export function RoofDesigner(props: {
                   </ToolFan>
                 </div>
               )}
-              {!(solHolds && picks.length > 0) && tips.corner}
+              {!(solHolds && picks.length > 0) &&
+                (deskFoot
+                  ? tips.cornerAt({
+                      className: "bottom-[18px] left-[10.75rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
+                      style: trayRow,
+                    })
+                  : tips.corner)}
               {phone && stage && turnHint && !zooming && (
                 <div
                   className="pointer-events-auto absolute inset-x-0 z-20 flex justify-center"
@@ -11017,6 +11468,15 @@ export function RoofDesigner(props: {
                   </p>
                 </div>
               )}
+              {/* The graphite tray end to end along the picture's foot on a computer (22 Nov 2026, Martin): the foot row
+                  stands in it, and Sol's step or suggestion forms inside it, the tray growing to hold the card. */}
+              {deskFoot && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-[29] rounded-t-[22px] bg-[#26282c] shadow-[0_-10px_30px_rgba(0,0,0,0.25)] transition-[height] duration-300 motion-reduce:transition-none"
+                  style={{ height: sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY }}
+                />
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideShown && (
                 <div
@@ -11026,18 +11486,42 @@ export function RoofDesigner(props: {
                     props.tight && !solAway && commandOpen ? "z-[56]" : "z-30",
                     // Sideways, short and at the foot of the picture, so the roof stays in view (sideways-sol in globals.css).
                     (underUp || sideDeck) && "sol-moulded",
-                    sideways
-                      ? sideDeck
-                        ? "sideways-sol sideways-deck bottom-0"
-                        : "sideways-sol bottom-[5.5rem]"
-                      : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
+                    underUp && solFolded && "sol-folded",
+                    underUp && solDragging && "sol-dragging",
+                    deskFoot
+                      ? sideDeck && "desk-deck bottom-0"
+                      : sideways
+                        ? sideDeck
+                          ? "sideways-sol sideways-deck bottom-0"
+                          : "sideways-sol bottom-[5.5rem]"
+                        : !phone && (props.tight && !solAway && commandOpen ? "bottom-[10.5rem]" : "bottom-[6.25rem]"),
                   )}
                   // On a phone it starts just under the picture, so the roof it asks about stays in view.
                   style={
-                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                    sideDeck
+                      ? deskFoot
+                        ? undefined
+                        : solNotch(0, 40)
+                      : underUp && foot !== null
+                        ? ({
+                            top: deckTop ?? foot,
+                            bottom: "auto",
+                            ...solNotch(0, 30),
+                            "--sol-rest": `${(stage?.rest ?? 156) - 8 + lift}px`,
+                          } as React.CSSProperties)
+                        : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
+                  onClickCapture={(e) => {
+                    // Folded, a press anywhere on the strip opens it again.
+                    if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSolFolded(false);
+                    }
+                  }}
                 >
+                  {foldButton}
                   <SolGuide
                     step={guideNow}
                     house={
@@ -11106,17 +11590,41 @@ export function RoofDesigner(props: {
                     "pointer-events-none absolute inset-x-0 z-30 flex justify-center",
                     // Sideways it stands above Sol's round, which holds the tools there too.
                     (underUp || sideDeck) && "sol-moulded",
-                    sideways
-                      ? sideDeck
-                        ? "sideways-sol sideways-deck bottom-0"
-                        : "sideways-sol bottom-[5.5rem]"
-                      : !phone && "bottom-[6.25rem]",
+                    underUp && solFolded && "sol-folded",
+                    underUp && solDragging && "sol-dragging",
+                    deskFoot
+                      ? sideDeck && "desk-deck bottom-0"
+                      : sideways
+                        ? sideDeck
+                          ? "sideways-sol sideways-deck bottom-0"
+                          : "sideways-sol bottom-[5.5rem]"
+                        : !phone && "bottom-[6.25rem]",
                   )}
                   style={
-                    sideDeck ? solNotch(0, 40) : underUp && foot !== null ? { top: foot, bottom: "auto", ...solNotch(0, 30) } : undefined
+                    sideDeck
+                      ? deskFoot
+                        ? undefined
+                        : solNotch(0, 40)
+                      : underUp && foot !== null
+                        ? ({
+                            top: deckTop ?? foot,
+                            bottom: "auto",
+                            ...solNotch(0, 30),
+                            "--sol-rest": `${(stage?.rest ?? 156) - 8 + lift}px`,
+                          } as React.CSSProperties)
+                        : undefined
                   }
                   ref={sideDeck ? sideDeckRef : undefined}
+                  onClickCapture={(e) => {
+                    // Folded, a press anywhere on the strip opens it again.
+                    if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setSolFolded(false);
+                    }
+                  }}
                 >
+                  {foldButton}
                   <SolNudges
                     nudges={nudges}
                     onAct={actOnNudge}
@@ -11139,8 +11647,11 @@ export function RoofDesigner(props: {
                   className="pointer-events-auto absolute z-[55]"
                   // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
                   style={
-                    deckUp
-                      ? { left: "calc(50% + 3.75rem)", top: foot ?? 0, transform: "translate(-50%, -50%)" }
+                    // Upright the foot row always stands on the picture's foot either side of Sol, his card up or not
+                    // (23 Nov 2026, Martin: "a glitch in the designer dock": with nothing said, the rounds sat off centre on
+                    // the map while Sol dropped into the grey under it).
+                    underUp
+                      ? { left: "calc(50% + 3.75rem)", top: deckTop ?? 0, transform: "translate(-50%, -50%)" }
                       : sideways
                         ? { left: "calc(50% + 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
                         : { left: "calc(50% + 3.75rem)", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
@@ -11179,14 +11690,20 @@ export function RoofDesigner(props: {
               )}
               {/* Sol's card under the picture, an outlined box whose outline runs round him (22 Nov 2026, Martin): a ring
                   of the same line round his round, meeting the box's edge at its notch. */}
-              {(deckUp || sideDeckUp) && (guideShown || nudgeShown) && (
+              {(deckUp || sideDeckUp) && !deskFoot && (guideShown || nudgeShown) && (
                 <span
                   aria-hidden
                   className="pointer-events-none absolute z-[54] rounded-full border-[1.5px] border-sun-line/70"
                   style={
                     sideDeckUp
-                      ? { left: "50%", bottom: sideDeckH, width: 60, height: 60, transform: "translate(-50%, 50%)" }
-                      : { left: "50%", top: foot ?? 0, width: 60, height: 60, transform: "translate(-50%, -50%)" }
+                      ? {
+                          left: "50%",
+                          bottom: sideDeckH,
+                          width: deskFoot ? 84 : 60,
+                          height: deskFoot ? 84 : 60,
+                          transform: "translate(-50%, 50%)",
+                        }
+                      : { left: "50%", top: deckTop ?? 0, width: 60, height: 60, transform: "translate(-50%, -50%)" }
                   }
                 />
               )}
@@ -11198,55 +11715,12 @@ export function RoofDesigner(props: {
                   style={
                     sideways
                       ? { left: "calc(50% - 3.4rem)", bottom: sideDeckUp ? sideDeckH - 18 : 20, transform: "translateX(-50%)" }
-                      : deckUp
-                        ? { left: "calc(50% - 3.75rem)", top: (foot ?? 300) + 22, transform: "translate(-50%, -100%)" }
+                      : underUp
+                        ? { left: "calc(50% - 3.75rem)", top: (deckTop ?? 300) + 22, transform: "translate(-50%, -100%)" }
                         : { left: "50%", top: (foot ?? 300) - 12, transform: "translate(-50%, -100%)" }
                   }
                 >
-                  {panelCard && tool === "panel" && (
-                    <div
-                      className="mb-2 w-56 rounded-2xl bg-surface p-1.5 text-ink shadow-lift ring-1 ring-line"
-                      role="radiogroup"
-                      aria-label="New panels"
-                    >
-                      <span className="grid grid-cols-2 gap-1.5">
-                        {([false, true] as const).map((land) => (
-                          <button
-                            key={String(land)}
-                            type="button"
-                            role="radio"
-                            aria-checked={addLandscape === land}
-                            onClick={() => {
-                              setAddLandscape(land);
-                              setPanelCard(false);
-                            }}
-                            className={clsx(
-                              "flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-semibold",
-                              addLandscape === land ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink-2",
-                            )}
-                          >
-                            <PanelDrawing landscape={land} size={24} />
-                            {land ? "Landscape" : "Portrait"}
-                          </button>
-                        ))}
-                      </span>
-                      <button
-                        type="button"
-                        role="radio"
-                        aria-checked={addLandscape === null}
-                        onClick={() => {
-                          setAddLandscape(null);
-                          setPanelCard(false);
-                        }}
-                        className={clsx(
-                          "mt-1.5 w-full rounded-xl px-2 py-1.5 text-[11px] font-medium",
-                          addLandscape === null ? "bg-sun text-sun-ink" : "text-muted",
-                        )}
-                      >
-                        Follow the roof face
-                      </button>
-                    </div>
-                  )}
+                  {panelCard && tool === "panel" && panelWayCard}
                   <div className="relative">
                     {/* Select, the pointer, beside it (22 Nov 2026, Martin: "we are missing the pointer… only discoverable in
                       the tools menu"): the tool every other is left for, lit while in hand. */}
@@ -11302,7 +11776,26 @@ export function RoofDesigner(props: {
                   </div>
                 </div>
               )}
-              <div className={clsx("absolute bottom-8 left-4 z-10", solHolds && "hidden")}>
+              {/* In a computer's pop-up the tray's left end: zoom out, zoom in and the whole picture as rounds of the tray. */}
+              {deskFoot && (
+                <div
+                  className="pointer-events-auto absolute bottom-[14px] left-4 z-[56] flex items-center gap-2 transition-transform duration-300 motion-reduce:transition-none"
+                  style={trayRow}
+                  role="group"
+                  aria-label="Getting about"
+                >
+                  <FootRound label="Zoom out" on={false} onClick={() => zoom(1.4)}>
+                    <ZoomOut className="size-5" aria-hidden />
+                  </FootRound>
+                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / 1.4)}>
+                    <ZoomIn className="size-5" aria-hidden />
+                  </FootRound>
+                  <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
+                    <Maximize className="size-5" aria-hidden />
+                  </FootRound>
+                </div>
+              )}
+              <div data-lift className={clsx("absolute bottom-8 left-4 z-10", (solHolds || deskFoot) && "hidden")}>
                 <ToolFan
                   label="Getting about: zoom in, zoom out, move the picture"
                   direction="right"
@@ -11325,9 +11818,12 @@ export function RoofDesigner(props: {
                   <Leg label="Zoom out" onClick={() => zoom(1.4)}>
                     <ZoomOut className="size-5" aria-hidden />
                   </Leg>
-                  <Leg label="Move the picture" on={tool === "pan"} onClick={() => pickTool(tool === "pan" ? "select" : "pan")}>
-                    <Hand className="size-5" aria-hidden />
-                  </Leg>
+                  {/* In the pop-up the hand is in the foot row beside Sol. */}
+                  {!props.tight && (
+                    <Leg label="Move the picture" on={tool === "pan"} onClick={() => pickTool(tool === "pan" ? "select" : "pan")}>
+                      <Hand className="size-5" aria-hidden />
+                    </Leg>
+                  )}
                 </ToolFan>
               </div>
               {drawn && faces.length === 0 && modelFaces !== null && !Array.isArray(modelFaces) && (
@@ -11370,7 +11866,7 @@ export function RoofDesigner(props: {
                       sliding.current = holding;
                       if (!holding) setSettled((n) => n + 1);
                     }}
-                    height={stage?.pb ?? 140}
+                    height={stage?.rest ?? 140}
                   />
                 </div>
               )}
@@ -11382,7 +11878,7 @@ export function RoofDesigner(props: {
                 className={clsx(
                   "pointer-events-none absolute inset-x-2 bottom-7 flex items-end gap-2",
                   // Over Sol's black panel while it is out, so the pill stands at its foot as one piece.
-                  (props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen)) || solHolds
+                  (props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen)) || props.tight
                     ? "z-[55]"
                     : "z-10",
                 )}
@@ -11408,6 +11904,77 @@ export function RoofDesigner(props: {
                     Record
                   </button>
                 )}
+                {/* The peak of the tray behind Sol (22 Nov 2026, Martin: Sol "a little higher than the icons either side… like
+                    a mountain peak"): a graphite round risen with him out of the tray's top edge. */}
+                {deskFoot && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-3 left-1/2 size-24 -translate-x-1/2 rounded-full bg-[#26282c] transition-transform duration-300 motion-reduce:transition-none"
+                    style={sideDeckUp ? { transform: `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)` } : undefined}
+                  />
+                )}
+                {/* The foot row on a computer (22 Nov 2026, Martin: the phone's bottom tool bar on the desktop designer):
+                    Select and Add a panel to Sol's left, the hand and Erase to his right, risen with him when his plate is up. */}
+                {deskFoot && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 -bottom-3.5 transition-transform duration-300 motion-reduce:transition-none"
+                    style={sideDeckUp ? { transform: `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)` } : undefined}
+                  >
+                    <div className="pointer-events-auto absolute bottom-0 right-[calc(50%+2.875rem)] flex items-end gap-2">
+                      <FootRound
+                        label="Select (V)"
+                        on={tool === "select"}
+                        onClick={() => {
+                          setPanelCard(false);
+                          pickTool("select");
+                        }}
+                      >
+                        <MousePointer2 className="size-5" aria-hidden />
+                      </FootRound>
+                      <div className="relative">
+                        {panelCard && tool === "panel" && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2">{panelWayCard}</div>
+                        )}
+                        <FootRound
+                          label={tool === "panel" ? "Adding panels: press to stop" : "Add a panel (P)"}
+                          on={tool === "panel"}
+                          onClick={() => {
+                            if (tool === "panel" && !panelCard) return pickTool("select");
+                            if (tool !== "panel") pickTool("panel");
+                            setPanelCard((v) => !v);
+                          }}
+                        >
+                          <SquarePlus className="size-5" aria-hidden />
+                          {addLandscape !== null && (
+                            <span
+                              aria-hidden
+                              className={clsx(
+                                "absolute -bottom-0.5 -right-0.5 block rounded-[2px] border border-current bg-inherit",
+                                addLandscape ? "h-2 w-3" : "h-3 w-2",
+                              )}
+                            />
+                          )}
+                        </FootRound>
+                      </div>
+                    </div>
+                    <div className="pointer-events-auto absolute bottom-0 left-[calc(50%+2.875rem)] flex items-end gap-2">
+                      <FootRound
+                        label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it (H)"}
+                        on={tool === "pan"}
+                        onClick={() => pickTool(tool === "pan" ? "select" : "pan")}
+                      >
+                        <Hand className="size-5" aria-hidden />
+                      </FootRound>
+                      <FootRound
+                        label={tool === "erase" ? "Put the eraser down" : "Erase: press or drag across what to take away (E)"}
+                        on={tool === "erase"}
+                        onClick={() => pickTool(tool === "erase" ? "select" : "erase")}
+                      >
+                        <Eraser className="size-5" aria-hidden />
+                      </FootRound>
+                    </div>
+                  </div>
+                )}
                 {/* In the pop-up the foot of the picture is Sol alone (8 Nov 2026, Martin): ask him to change the design. */}
                 {props.tight ? (
                   <button
@@ -11418,7 +11985,7 @@ export function RoofDesigner(props: {
                       const shown = !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen);
                       if (shown) return putSolAway();
                       // On a phone upright Sol holds the tools: his tray, with the way to ask him at its top.
-                      if (solHolds) return setSolTray((open) => !open);
+                      if (props.tight) return setSolTray((open) => !open);
                       tips.nudge("sol-pressed");
                       setAwayFrom(null);
                       setCommandOpen(true);
@@ -11431,34 +11998,38 @@ export function RoofDesigner(props: {
                     // stands above where he sits (the dock is drawn at 0.68, his middle 43.5 px up).
                     style={
                       sideDeckUp
-                        ? { transform: `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)` }
-                        : deckUp && stage
-                          ? { transform: `translateY(${-Math.max(0, (stage.pb - 43.5) / 0.68)}px)` }
+                        ? {
+                            transform: deskFoot
+                              ? `translateY(${-Math.max(0, sideDeckH - DESK_SOL_MIDDLE)}px)`
+                              : `translateY(${-Math.max(0, (sideDeckH - 43.5) / 0.68)}px)`,
+                          }
+                        : underUp && stage
+                          ? { transform: `translateY(${-Math.max(0, (stage.pb + lift - 43.5) / 0.68)}px)` }
                           : undefined
                     }
-                    title="Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
+                    title={
+                      props.tight
+                        ? "Sol's tools, and asking him to change the design (/)"
+                        : "Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
+                    }
                     className={clsx(
                       "pointer-events-auto absolute bottom-0 left-1/2 flex h-14 -translate-x-1/2 items-center gap-3 rounded-full bg-primary pl-2 pr-5 text-white shadow-[0_12px_32px_rgba(11,11,12,0.35)] ring-1 ring-white/10 transition hover:brightness-110",
                       // On a phone, with something picked, his card is this round grown open: no second pill under it.
                       // Upright with his plate under the picture, he rises to sit on the picture's foot, in its notch.
                       "transition-transform duration-300 motion-reduce:transition-none",
-                      // On a phone Sol is a round of his own, a tool and a + coming out of him: no words.
-                      solHolds && "!size-[4.5rem] !gap-0 !p-0 justify-center",
+                      // In the pop-up (phone and computer alike) Sol is a round of his own, a + coming out of him: no words.
+                      "!size-[4.5rem] !gap-0 !p-0 justify-center",
                     )}
-                    aria-label={solHolds ? (solTray ? "Put Sol's tools away" : `Sol's tools: ${phoneSolWords}`) : undefined}
+                    aria-label={props.tight ? (solTray ? "Put Sol's tools away" : `Sol's tools: ${phoneSolWords}`) : undefined}
                   >
                     {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
-                    <span
-                      className={clsx(
-                        "sol-orb relative flex items-center justify-center rounded-full",
-                        solHolds ? "size-[3.75rem]" : "size-11",
-                      )}
-                    >
+                    <span className={clsx("sol-orb relative flex items-center justify-center rounded-full", "size-[3.75rem]")}>
                       <span className="sol-heartbeat inline-flex">
-                        <SolMark className={solHolds ? "size-12" : "size-[35px]"} />
+                        <SolMark className="size-12" />
                       </span>
-                      {solHolds ? (
+                      {props.tight ? (
                         <SolEmerging
+                          small={deskFoot}
                           tray={solTray}
                           held={tool !== "select" && tool !== "panel" ? (TOOLS.find((x) => x.tool === tool)?.icon ?? null) : null}
                         />
@@ -11466,7 +12037,7 @@ export function RoofDesigner(props: {
                         <SolStars className="pointer-events-none absolute -right-3 -top-3.5 size-[22px]" />
                       )}
                     </span>
-                    {!solHolds && (
+                    {!props.tight && (
                       <>
                         <span className="whitespace-nowrap text-[15px] font-medium">Ask Sol</span>
                         <kbd className="rounded border border-white/25 px-1.5 text-[11px] text-white/60 max-sm:hidden">/</kbd>
@@ -11977,26 +12548,50 @@ export function RoofDesigner(props: {
             }, 450);
           }}
           className={clsx(
-            "absolute right-0 top-0 z-40 transition duration-200 ease-out motion-reduce:transition-none",
-            shown === "proposal"
-              ? "w-[min(calc(50%+10rem),100%)]"
-              : shown === "quote" && quoteShort
-                ? "w-[min(15rem,100%)]"
-                : shown === "quote"
-                  ? // The quote's lines down one side, what needs deciding on the other (8 Nov 2026, Martin).
-                    "w-[min(calc(100%-1.5rem),70rem)]"
-                  : "w-[min(26rem,100%)]",
+            "transition duration-200 ease-out motion-reduce:transition-none",
+            quoteSheet ? "quote-sheet fixed inset-0 z-[90] bg-canvas" : "absolute right-0 top-0 z-40",
+            quoteSheet
+              ? ""
+              : shown === "proposal"
+                ? "w-[min(calc(50%+10rem),100%)]"
+                : shown === "quote" && quoteShort
+                  ? "w-[min(15rem,100%)]"
+                  : shown === "quote"
+                    ? // The quote's lines down one side, what needs deciding on the other (8 Nov 2026, Martin).
+                      "w-[min(calc(100%-1.5rem),70rem)]"
+                    : "w-[min(26rem,100%)]",
             peek ? "translate-x-0 opacity-100" : "pointer-events-none invisible translate-x-6 opacity-0",
             !shown && "hidden",
           )}
         >
           <div
-            className="max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto overscroll-contain rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur"
+            className={
+              quoteSheet
+                ? "h-full space-y-3 overflow-y-auto overscroll-contain px-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                : "max-h-[calc(100dvh-7rem)] space-y-3 overflow-y-auto overscroll-contain rounded-3xl bg-canvas/95 p-3 shadow-[0_12px_40px_rgba(20,22,26,0.22)] ring-1 ring-line backdrop-blur"
+            }
             // No taller than the first fold, so it scrolls inside itself and never the page under it.
-            style={foldPx ? { maxHeight: foldPx } : undefined}
+            style={foldPx && !quoteSheet ? { maxHeight: foldPx } : undefined}
           >
+            {/* On a phone the quote is a sheet over the whole screen (22 Nov 2026, Martin: Finalise the quote opened it
+                cramped over the roof); Minimise folds it back to the design as it was, nothing reloaded. The window's own
+                white cross is top right, so the way back is on the left. */}
+            {quoteSheet && (
+              <div className="sticky top-0 z-20 -mx-3 flex items-center gap-2 border-b border-line bg-canvas/95 pb-2 pl-3 pr-16 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setPeek(false)}
+                  aria-label="Minimise the quote and go back to the design"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-3.5 text-sm font-semibold text-primary-ink"
+                >
+                  <ChevronDown className="size-4" aria-hidden />
+                  Back to the design
+                </button>
+                <p className="ml-auto text-sm font-semibold text-ink">{net !== null ? dollars(net) : "Quote"}</p>
+              </div>
+            )}
             {/* One view at a time, chosen at the top of the column (as Primero's); the cross folds it away. */}
-            <div className="flex items-center justify-end gap-1.5">
+            <div className={clsx("items-center justify-end gap-1.5", quoteSheet ? "hidden" : "flex")}>
               <div
                 role="tablist"
                 aria-label="Beside the picture"
@@ -12129,7 +12724,7 @@ export function RoofDesigner(props: {
                 onNet={onNet}
                 compact={quoteShort}
                 wide={shown === "quote" && !quoteShort}
-                onCompact={shortQuote}
+                onCompact={quoteSheet ? undefined : shortQuote}
                 homeless
                 onProceed={props.sitesOnly ? undefined : () => void toProposal()}
                 proceedSaid={proceedSaid}

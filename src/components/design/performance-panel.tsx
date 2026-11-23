@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, Check, ChevronDown, SlidersHorizontal } from "lucide-react";
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/lib/domain/design/performance";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, type JobLine } from "@/lib/services/crm";
+import { usePerfRows } from "@/lib/services/performance";
 
 /** Kept on the device: the range, a custom range's days and the figures chosen. */
 const PERF_KEY = "renuabl.design.perf";
@@ -43,35 +44,27 @@ function kept(): { range: PerfRange; custom: { from: ISODate; to: ISODate } | nu
  * and small bars across the period. `extra` (the month's goal and the sun, your own month) is drawn under it.
  */
 export function PerformancePanel({ jobs, today, extra }: { jobs: JobLine[] | null; today: ISODate; extra?: React.ReactNode }) {
-  const [range, setRange] = useState<PerfRange>("month");
-  const [custom, setCustom] = useState<{ from: ISODate; to: ISODate } | null>(null);
-  const [metrics, setMetrics] = useState<PerfMetric[]>(() => cleanMetrics(null));
+  // Only ever drawn after a tab is pressed (never on the server), so the saved choices are read at once: reading them
+  // a moment later drew the panel twice and worked every figure out twice (22 Nov 2026, Martin: it was slow to open).
+  const [first] = useState(kept);
+  const [range, setRange] = useState<PerfRange>(first.range);
+  const [custom, setCustom] = useState<{ from: ISODate; to: ISODate } | null>(first.custom);
+  const [metrics, setMetrics] = useState<PerfMetric[]>(first.metrics);
   const [open, setOpen] = useState<"range" | "figures" | null>(null);
-  const [ready, setReady] = useState(false);
-
-  // Read after the page is up, so the server's page and the browser's agree.
   useEffect(() => {
-    const k = kept();
-    const t = window.setTimeout(() => {
-      setRange(k.range);
-      setCustom(k.custom);
-      setMetrics(k.metrics);
-      setReady(true);
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (!ready) return;
     try {
       localStorage.setItem(PERF_KEY, JSON.stringify({ range, custom, metrics }));
     } catch {
       // Not kept: the defaults next time.
     }
-  }, [ready, range, custom, metrics]);
+  }, [range, custom, metrics]);
 
   const period = useMemo(() => perfPeriod(range, today, custom), [range, today, custom]);
-  const figures = useMemo(() => (jobs ? performance(jobs, period, metrics) : null), [jobs, period, metrics]);
-  const series = useMemo(() => (jobs ? perfSeries(jobs, period) : []), [jobs, period]);
+  // The small rows Today asked for as it opened, else the deals list once it is here.
+  const rows = usePerfRows();
+  const source = useMemo(() => (rows ? { rows } : jobs), [rows, jobs]);
+  const figures = useMemo(() => (source ? performance(source, period, metrics) : null), [source, period, metrics]);
+  const series = useMemo(() => (source ? perfSeries(source, period) : []), [source, period]);
   const year = today.slice(0, 4);
   const toggle = (m: PerfMetric) =>
     setMetrics((all) =>
@@ -168,6 +161,20 @@ function Menu(props: {
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  // Kept on the screen (22 Nov 2026, Martin: on a phone the range menu opened past the left edge, half cut off): it opens
+  // from the button's left edge, and is moved back in by however much it would run past either side.
+  const [shift, setShift] = useState(0);
+  useLayoutEffect(() => {
+    if (!props.open || !list.current) return;
+    const box = list.current.getBoundingClientRect();
+    const room = document.documentElement.clientWidth;
+    const gutter = 12;
+    const past = box.right - shift - (room - gutter);
+    const before = box.left - shift - gutter;
+    const next = past > 0 ? -Math.min(past, Math.max(0, before)) : 0;
+    if (next !== shift) setShift(next);
+  }, [props.open, shift]);
   useEffect(() => {
     if (!props.open) return;
     const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && props.onOpen(false);
@@ -197,7 +204,12 @@ function Menu(props: {
         {!props.iconOnly && <ChevronDown className={clsx("size-4 text-muted transition", props.open && "rotate-180")} aria-hidden />}
       </button>
       {props.open && (
-        <div role="menu" className="absolute right-0 top-11 z-30 w-56 rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line">
+        <div
+          ref={list}
+          role="menu"
+          style={{ transform: shift ? `translateX(${shift}px)` : undefined }}
+          className="absolute left-0 top-11 z-30 w-56 max-w-[calc(100vw-1.5rem)] rounded-2xl bg-surface p-1.5 shadow-lift ring-1 ring-line"
+        >
           {props.children}
         </div>
       )}

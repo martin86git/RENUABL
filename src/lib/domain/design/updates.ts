@@ -14,6 +14,163 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-23",
+    area: "Designer",
+    words: "On a phone, Select, Add a panel, the hand and Erase always sit either side of Sol at the foot of the roof.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Signing in",
+    words: "Back after the phone was locked, RENUABL waits to reconnect and goes back in by itself, instead of asking you to sign in.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Topping up from the usage box now pays by card right in the box, without leaving the page.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "A usage gauge under the date on Today opens this month's usage, with packs to top up Sol and design credits.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Usage",
+    words:
+      "A Usage page under the settings cog shows this month's allowances and Sol's use by day, and the owner is emailed at 50, 80 and 100%.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Designer",
+    words: "Today warns before STCs change, and you choose the installation period new quotes are priced for.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Proposals",
+    words: "Customer proposals carry a small, quiet Powered by RENUABL in the bottom corner and the footer.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the tour of a deal folds Sol's box away while it points at other buttons, so nothing covers them.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On a phone, once RENUABL scrolls away a slim bar keeps it small at the top, so screenshots still show it.",
+  },
+  {
+    day: "2026-11-23",
+    area: "On a phone",
+    words: "Scrolled well down a page, a small arrow in the bottom right takes you back to the top in one press.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Your account",
+    words: "Your team's own sign-in page, with your logo and a private code in its address. Copy it from Your account.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Everywhere",
+    words: "When Safari won't take dictation, the microphone says why and the next tap opens your keyboard to use its own.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words:
+      "The Business and Feed switch is a smoother segmented control with icons, and Sol's brain etch is a lighter grey, on phones too.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Quote",
+    words: "Including RCBOs in the quote now asks how many, with a stepper beside it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designs list: the leading quote, what's on the proposal and which is recommended are said in words on each design.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: zoom in and out with the + and − on the map's right; the magnifier beside them turns on pinch zoom.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: drag Sol's box up to read more, or down to fold it to a strip; tap the strip to open it again.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "A brief hiccup reaching your account no longer says you need to sign in; the page tries again by itself.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Today on a phone: the page scrolls down through Needs you and Performance, and their cards fit the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the panel, inverter, battery and charger lists open over the whole screen, easy to browse.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the map is about a fifth bigger, and Sol's box runs edge to edge under it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: roomier figures at the top, each named, and Sol's box runs to the foot of the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Each voice agent can be set to answer quicker or more carefully, under How it speaks in its settings.",
+  },
+  {
+    day: "2026-11-22",
+    area: "CRM",
+    words: "Deals brought in from Pylon's export can be filled in from Pylon: the battery, panels, inverter and place on the map.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Pages answer taps sooner on phones: Sol's sun does less work in the background, and his cards type their lines more lightly.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Video block, the video's picture with a play button that opens it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a clear place at the top of the email to drop or upload your business logo.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Countdown block, a timer to the end of an offer that is right each time the email is opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Products block, each product with its picture, price, a few words and a button.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Spacer block, and Social links for Facebook, Instagram and more, shown as icons or names.",
+  },
+  {
     day: "2026-11-22",
     area: "Designer",
     words: "A datasheet shared from another business is marked to check until someone in your business confirms it.",
@@ -27,6 +184,11 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-22",
     area: "Phone assistants",
     words: "Your voice agents answer quicker on calls.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the strings sit under the map, one line each, so the roof stays clear to tap; Auto and New in their header.",
   },
   {
     day: "2026-11-22",

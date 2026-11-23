@@ -3,6 +3,7 @@ import { cleanKind, needsPlan } from "@/lib/domain/design/business-kind";
 import { isDemoEmail } from "@/lib/domain/design/demo";
 import { sampleByEmail } from "@/lib/domain/design/staff-view";
 import { subscriptionOf } from "@/lib/server/design-billing-repo";
+import { renewSessionCookie } from "@/lib/server/accounts";
 import { answer, designAccess } from "@/lib/server/design-context";
 import { staffBehind } from "@/lib/server/design-staff-view";
 import { marketingOn } from "@/lib/server/marketing-access";
@@ -16,8 +17,11 @@ import { isNotBilled } from "@/lib/server/design-not-billed";
  */
 export async function GET() {
   return answer(async () => {
-    const access = await designAccess();
+    // Strict (23 Nov 2026, Martin: signed out far too quickly): a database that is slow to wake answers 503 and the
+    // page asks again, instead of reading as signed out.
+    const access = await designAccess(true);
     if (access.state === "signed-out") return Response.json({ signedIn: false });
+    await renewSessionCookie();
     const member = access.state === "no-business" ? null : access.member;
     const staff = await staffBehind().catch(() => null);
     // A new retailer's owner chooses a plan and pays before going in (needsPlan). Not RENUABL's own business, nor the
@@ -48,6 +52,8 @@ export async function GET() {
         members: can(member.role, "members", member.permissions),
       },
       termsVersion: BUSINESS_TERMS_VERSION,
+      // The screen lock (screen-lock.ts): the shell covers itself until it is unlocked.
+      ...(access.state === "ready" && access.locked ? { locked: true } : {}),
       ...(planDue ? { needsPlan: true } : {}),
       ...(marketing ? { marketing: true } : {}),
       // A demo account (demo.ts): no plan asked for, and the shell says it is a demo.

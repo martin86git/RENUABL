@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { asBuiltDifferences, asBuiltFrom, asBuiltInWords, asBuiltMissing, cleanAsBuilt, serialsOf, type Designed } from "./as-built";
+import {
+  asBuiltDifferences,
+  asBuiltFrom,
+  asBuiltInWords,
+  asBuiltLines,
+  asBuiltMissing,
+  cleanAsBuilt,
+  plannedFromDetails,
+  serialsOf,
+  type Designed,
+} from "./as-built";
 
 const designed: Designed = {
   panels: 16,
@@ -39,6 +49,7 @@ describe("the as-built record", () => {
       panelSerials: [],
       inverters: [{ model: "X", serial: "S1" }],
       battery: null,
+      charger: null,
       notes: "",
     });
   });
@@ -60,5 +71,51 @@ describe("the as-built in words, for Sol", () => {
     expect(words).toContain("Inverter: SH8.0RS, serial INV9");
     expect(words).toContain("Battery: SigenStor, 1 module; no serials recorded");
     expect(words).not.toContain("@");
+  });
+});
+
+describe("an as-built without a roof design (22 Nov 2026)", () => {
+  it("plans from the system typed on the deal", () => {
+    const plan = plannedFromDetails({
+      systemType: "Battery",
+      inverter: "SigenStor-15T",
+      inverterQty: "1",
+      batteryStorage: "36.2 kWh",
+      evCharger: "Sigen EV AC Charger",
+    });
+    expect(plan).toEqual({
+      panels: 0,
+      panelModel: "",
+      inverters: ["SigenStor-15T"],
+      battery: { model: "", modules: 1, kwh: 36.2 },
+      charger: "Sigen EV AC Charger",
+      from: "deal",
+    });
+    const start = asBuiltFrom(plan!);
+    expect(start.charger).toEqual({ model: "Sigen EV AC Charger", serial: "" });
+    expect(start.battery?.kwh).toBe(36.2);
+    expect(asBuiltDifferences({ ...start, charger: null }, plan!)).toEqual(["EV charger: Sigen EV AC Charger planned, none installed."]);
+    expect(asBuiltMissing(start)).toContain("the EV charger's serial");
+  });
+  it("says nothing when the deal says nothing", () => {
+    expect(plannedFromDetails({ systemType: "", propertyType: "House" })).toBeNull();
+  });
+  it("keeps the charger and the battery's storage, and lists what was installed for the card", () => {
+    const clean = cleanAsBuilt({
+      installedOn: "2026-11-01",
+      panels: { model: "", count: 0 },
+      inverters: [{ model: "SigenStor-15T", serial: "inv1" }],
+      battery: { model: "SigenStor", modules: 4, kwh: 36.2, serials: "b1\nb2" },
+      charger: { model: "Sigen EV", serial: "ev9" },
+    });
+    expect(clean.charger).toEqual({ model: "Sigen EV", serial: "EV9" });
+    expect(clean.battery?.kwh).toBe(36.2);
+    expect(asBuiltLines(clean)).toEqual([
+      { label: "Installed on", value: "2026-11-01" },
+      { label: "Inverter", value: "SigenStor-15T · S/N INV1" },
+      { label: "Battery", value: "SigenStor · 36.2 kWh · 4 modules" },
+      { label: "EV charger", value: "Sigen EV · S/N EV9" },
+      { label: "Serials kept", value: "0 panel, 2 battery" },
+    ]);
   });
 });

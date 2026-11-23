@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   // Already signed in as the owner who paid (a new retailer choosing a plan straight after naming the business): the
   // plan is theirs at once, and they go in without an email.
   const access = await designAccess().catch(() => null);
-  if (access?.state === "ready" && access.member.email.toLowerCase() === email && access.member.role === "owner") {
+  if (access?.state === "ready" && !access.locked && access.member.email.toLowerCase() === email && access.member.role === "owner") {
     await claimSubscriptions(access.member.businessId, email);
     return Response.json({ ok: true, email, claimed: true });
   }

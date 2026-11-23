@@ -16,6 +16,16 @@ export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; signe
 const UNREACHABLE = "We couldn't reach your account just now. Try again in a moment.";
 
 export async function ask<T>(path: string, init?: { method: string; body?: unknown }): Promise<Answer<T>> {
+  const first = await askOnce<T>(path, init);
+  // A read that met a busy server is asked once more (22 Nov 2026: a hiccup on the first load left Today's figures out).
+  if (!first.ok && (init?.method ?? "GET") === "GET" && first.retry) {
+    await new Promise((r) => setTimeout(r, 800));
+    return askOnce<T>(path, init);
+  }
+  return first;
+}
+
+async function askOnce<T>(path: string, init?: { method: string; body?: unknown }): Promise<Answer<T> & { retry?: boolean }> {
   try {
     const res = await fetch(path, {
       method: init?.method ?? "GET",
@@ -29,9 +39,14 @@ export async function ask<T>(path: string, init?: { method: string; body?: unkno
     });
     const json = (await res.json().catch(() => null)) as (Record<string, unknown> & { ok?: boolean; message?: string }) | null;
     if (res.ok && json?.ok) return json as { ok: true } & T;
-    return { ok: false, message: json?.message ?? UNREACHABLE, ...(res.status === 401 ? { signedOut: true } : {}) };
+    return {
+      ok: false,
+      message: json?.message ?? UNREACHABLE,
+      ...(res.status === 401 ? { signedOut: true } : {}),
+      ...(res.status >= 502 && res.status <= 504 ? { retry: true } : {}),
+    };
   } catch {
-    return { ok: false, message: UNREACHABLE };
+    return { ok: false, message: UNREACHABLE, retry: true };
   }
 }
 

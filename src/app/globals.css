@@ -890,15 +890,40 @@ button.team-flash:not([aria-pressed="true"]) {
 .sol-moulded > [data-popup] {
   /* An outlined box with room round it (22 Nov 2026, Martin: "within an outlined text box - with the outline also
      integrating in the sol icon"): the notch cuts the outline at the top, where a ring of the same line round Sol meets it. */
-  width: calc(100% - 1rem);
-  margin-inline: 0.5rem;
-  /* Within the band under the picture (PHONE_BANDS.below, 156 px): it scrolls inside past that. */
-  max-height: 9.25rem;
+  /* Edge to edge under the full-bleed picture (22 Nov 2026, Martin: "should bleed edge to edge"). */
+  width: 100%;
+  margin-inline: 0;
+  /* From the picture's foot to the foot of the screen (22 Nov 2026, Martin: "extend down to the bottom of the page"),
+     set as --sol-rest by the designer; it scrolls inside past that. */
+  height: var(--sol-rest, 9.25rem);
+  max-height: var(--sol-rest, 9.25rem);
   overflow-y: auto;
   padding-top: 2rem;
-  border-radius: 22px;
+  border-radius: 22px 22px 0 0;
   outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
   outline-offset: -1.5px;
+}
+/* Folded to a strip (22 Nov 2026, Martin): only the plate's top edge, where Sol and the foot row stand, stays. */
+.sol-moulded > [data-popup] {
+  transition:
+    height 0.25s ease-out,
+    max-height 0.25s ease-out,
+    opacity 0.2s ease-out,
+    translate 0.2s ease-out;
+}
+.sol-moulded.sol-folded > [data-popup] {
+  height: 3rem;
+  max-height: 3rem;
+  overflow: hidden;
+}
+.sol-moulded.sol-folded > [data-popup] {
+  cursor: pointer;
+}
+.sol-moulded.sol-dragging > [data-popup] {
+  transition: none;
+}
+.sol-moulded.sol-folded > [data-popup] > * {
+  visibility: hidden;
 }
 /* Sol's spanner and + on a phone come out of him once as he appears. */
 .sol-emerge {
@@ -1529,11 +1554,30 @@ html:has(.sales-snap) {
     0 16px 36px -20px rgb(255 90 31 / 0.5);
 }
 
+/* Sol's panel on a phone keeps the foot bar under it (22 Nov 2026, Martin: "maintain the bottom nav bar even when in a
+   chat with sol as it isn't easy to navigate away"): the panel stops above the bar, and the bar stands over the panel so
+   Sol's raised round in its middle isn't cut off. While something is typed the bar steps aside and the panel runs to the
+   foot again (the rule below). */
+@media (max-width: 1023px) {
+  .sol-panel {
+    bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  body:has(.sol-panel[aria-hidden="false"]) .phone-tabbar {
+    z-index: 55;
+  }
+}
+@media (max-width: 1023px) and (pointer: coarse) {
+  body:has(.sol-panel :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
+    .sol-panel {
+    bottom: 0;
+  }
+}
+
 /* On a phone, while something is being typed, the foot bar steps aside so the keyboard doesn't push it up over the box
    being typed in (21 Nov 2026, Martin, Safari on iPhone). */
 @media (max-width: 1023px) and (pointer: coarse) {
   body:has(:is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
-    .phone-tabbar {
+    :is(.phone-tabbar, .back-to-top) {
     display: none;
   }
 }
@@ -1574,6 +1618,12 @@ html:has(.sales-snap) {
     border-radius: 0.5rem;
     background: transparent;
     box-shadow: none;
+    /* 22 Nov 2026, Martin: the values read too large beside the 12px labels. !important beats the 16px touch-screen
+       floor above; an iPhone doesn't zoom into them (maximum-scale=1, design-shell.tsx) and Android never does. */
+    font-size: 13px !important;
+  }
+  .deal-fields :is(input, select, textarea)::placeholder {
+    font-size: 13px;
   }
   .deal-fields textarea {
     height: auto;
@@ -1671,9 +1721,51 @@ html:has(.sales-snap) {
 /* Sideways on a phone, Sol's step and suggestions are a plate along the foot moulded round him (22 Nov 2026, Martin: as
    upright), short so the roof stays in view; it scrolls inside past that. */
 .sol-moulded.sideways-deck > [data-popup] {
+  width: calc(100% - 1rem);
+  margin-inline: 0.5rem;
+  border-radius: 22px;
+  height: auto;
   max-height: 6.5rem;
   padding-top: 1.9rem;
   margin-bottom: 0.5rem;
+}
+/* On a computer, Sol's step and suggestions form along the picture's foot round him as on a phone (22 Nov 2026, Martin:
+   "sols replies should form in the bottom half like on mobile"): a card up to the lower half of the picture, his notch
+   in its top edge, scrolling inside past that. */
+.sol-moulded.desk-deck > * {
+  height: auto;
+  border-radius: 22px;
+  width: min(46rem, 100% - 2rem);
+  margin-inline: auto;
+  max-height: calc(var(--pic-h, 40rem) * 0.48);
+  /* Room under the foot row and Sol's peak, which stand on its top edge. */
+  padding-top: 3.75rem;
+  margin-bottom: 0.5rem;
+  /* Inside the graphite tray: the tray is its ground, so no box of its own. */
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  outline: 0;
+  backdrop-filter: none;
+}
+/* On a computer what stands at the picture's foot (the zoom round, the tip bulb, Roof and the picture's switch, the
+   Drawn view's wall) rises above the graphite tray, as tall as it is at the time. */
+.desk-tray [data-lift] {
+  translate: 0 calc(-1 * var(--tray-h, 72px) + 1.25rem);
+  transition: translate 0.3s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk-tray [data-lift] {
+    transition: none;
+  }
+}
+
+/* The designer's quote as a sheet on a phone (22 Nov 2026, Martin): the 16px touch rule made its number boxes spill over
+   the item names. maximum-scale (DesignShell) stops Safari zooming into them. */
+@media (max-width: 639px) {
+  .quote-sheet input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+    font-size: 13px !important;
+  }
 }
 
 /* The deal's email on a phone (22 Nov 2026, Martin: smaller fields and words for the phone). Unlayered, so it wins over
@@ -1704,6 +1796,262 @@ html:has(.sales-snap) {
   }
   .deal-email button {
     font-size: 13px;
+  }
+}
+
+/* Sol's chat: a finger pulled left slides the turns over to show each one's time (sol-chat.tsx, usePullForTimes). */
+.sol-peek-turn {
+  transform: translateX(calc(var(--sol-peek, 0px) * -1));
+  transition: var(--sol-peek-ease, none);
+}
+.sol-peek-time {
+  position: absolute;
+  top: 0.1rem;
+  left: calc(100% + 0.75rem);
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
+  opacity: var(--sol-peek-shown, 0);
+  transition: var(--sol-peek-ease, none);
+}
+
+/* A window open full over the page on a phone (the voice agent's chat) stops below the phone's header, whose wordmark
+   steps down a size while it is open, so RENUABL is never half under it (22 Nov 2026, Martin). */
+@media (max-width: 1023px) {
+  .coach-window {
+    max-height: calc(100dvh - 5rem - 3.5rem - env(safe-area-inset-bottom));
+  }
+  html[data-phone-window] .phone-wordmark {
+    font-size: 13px;
+  }
+}
+
+/* The voice agent's chat stands off the page on a phone (22 Nov 2026, Martin: "the bot card should have a contrast"):
+   the page behind it dims a little (the foot bar stays as it is) and the window carries a graphite edge and a deeper
+   shadow, so the white window no longer runs into the white page. Nothing is blocked: the dim takes no presses. */
+@media (max-width: 1023px) {
+  html[data-phone-window] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background: rgba(11, 11, 12, 0.28);
+    pointer-events: none;
+  }
+  .coach-window {
+    box-shadow:
+      0 0 0 1.5px #3a3d43,
+      0 22px 60px rgba(11, 11, 12, 0.38);
+  }
+}
+
+/* A deal's Sol sheet folds into the foot bar's Sol round on a phone, and comes back out of it (22 Nov 2026, Martin:
+   "he should minimise visually onto the centre sol icon so the user can see that's where they can re-engage Sol on
+   the deal"). The sheet shrinks towards the round (its origin is the round's middle, below the sheet's foot), and the
+   round then carries an orange ring with a small dot: Sol is in there, a press brings him out. */
+@media (max-width: 639px) {
+  .deal-sol-sheet {
+    transform-origin: 50% calc(100% + 2.25rem);
+    transition:
+      transform 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s ease,
+      visibility 0s linear 0s;
+  }
+  .deal-sol-sheet.deal-sol-tucked {
+    transform: scale(0.05);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.3s ease 0.08s,
+      visibility 0s linear 0.38s;
+  }
+  .phone-tabbar .sol-orb[data-holding] {
+    box-shadow:
+      0 0 0 2px var(--surface),
+      0 0 0 4px var(--sun-line);
+    animation: sol-lands 0.5s ease-out 0.3s both;
+  }
+  .phone-tabbar .sol-orb[data-holding]::after {
+    content: "";
+    position: absolute;
+    right: 1px;
+    top: 1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--sun-line);
+    box-shadow: 0 0 0 2px var(--surface);
+  }
+}
+@keyframes sol-lands {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal-sol-sheet,
+  .deal-sol-sheet.deal-sol-tucked {
+    transition: none;
+  }
+  .phone-tabbar .sol-orb[data-holding] {
+    animation: none;
+  }
+}
+
+/* Team chat on a phone is the page (23 Nov 2026, Martin: "allow it to fill most of the page", as Slack): the pad's
+   padding and least height, and the frame's side and foot padding, are taken off, so the chat runs the screen's width and the page doesn't scroll under it. */
+@media (max-width: 639px) {
+  .studio-pad:has(.team-phone) {
+    min-height: 0;
+    padding: 0;
+  }
+  .studio-frame:has(.team-phone),
+  .studio-frame:has(.team-phone) div:has(> .studio-pad) {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* While a tour lights another place, a deal's Sol sheet on a phone steps aside, so it never covers the
+   round being pointed at; it comes back on Sol's own step and when the tour ends (23 Nov 2026, Martin). */
+@media (max-width: 639px) {
+  html[data-spotlight]:not([data-spotlight*="deal-sol"]) .deal-sol-sheet {
+    display: none !important;
+  }
+}
+
+/* The dock's two sets of tools (23 Nov 2026, Martin: a solar business's owner wears every hat; a ball in a lip on the
+   dock turns it like a slot machine between the sales tools and the post-sale ones). Both docks are glass: frosted,
+   the page blurred and brightened through them, a fine light along the top edge (Martin: "a little bit of a glass
+   look"). Each reel holds a sales tool over its post-sale one and slides with a
+   little overshoot, one after another. Sol never turns. */
+:root {
+  --dock-post: #d6ff3d;
+}
+.phone-tabbar {
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.82), rgb(250 250 251 / 0.74));
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 -6px 24px -12px rgb(20 22 26 / 0.18);
+}
+.phone-tabbar[data-dock] {
+  transition:
+    border-color 450ms ease,
+    box-shadow 450ms ease;
+}
+/* The post-sale dock is the same white glass, with a hi-vis stripe along its top edge like the reflective strip on a site
+   vest, and lime in its tools (23 Nov 2026, Martin chose E of six over the lime glass, which fought the greys). */
+.phone-tabbar[data-dock="post"] {
+  border-top-color: var(--dock-post);
+  box-shadow:
+    inset 0 2px 0 var(--dock-post),
+    inset 0 3px 0 rgb(255 255 255 / 0.9),
+    0 -6px 24px -12px rgb(20 22 26 / 0.18);
+}
+/* Sol on the post-sale dock is his etched brain glowing in the hi-vis lime inside a graphite round lit from above, the
+   same family as the tiles but round and raised (23 Nov 2026, Martin: "imagine sol with all the orange taken away. The
+   etch lines remain"; lime lines on the white glass were too faint, and of four he chose D, the dark round with no
+   ring). The sun fades out and the round in as the dock turns. His count and the dot when he holds a deal stay. */
+.sol-etch-face {
+  opacity: 0;
+  color: #d6ff3d;
+  background: radial-gradient(circle at 50% 35%, #4a4e56, #1e2024);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.15),
+    0 4px 12px -3px rgb(0 0 0 / 0.45);
+  transition: opacity 450ms ease;
+}
+.sol-etch-face svg {
+  filter: drop-shadow(0 0 3px rgb(214 255 61 / 0.8));
+}
+.sol-sun-face {
+  transition: opacity 450ms ease;
+}
+.phone-tabbar[data-dock="post"] .sol-etch-face {
+  opacity: 1;
+}
+.phone-tabbar[data-dock="post"] .sol-sun-face {
+  opacity: 0;
+}
+.phone-tabbar[data-dock="post"] .sol-orb {
+  box-shadow: none;
+}
+/* A post-sale tool: a graphite tile lit from above, a fine light rim and a soft shadow on the lime. */
+.dock-tile {
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #474b52, #24262a);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 3px 8px -2px rgb(40 50 0 / 0.45);
+}
+.dock-tile-lit {
+  box-shadow:
+    0 0 0 2px #fff,
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 4px 12px -2px rgb(40 50 0 / 0.55);
+}
+.dock-reel {
+  transition: transform 620ms cubic-bezier(0.25, 1.55, 0.45, 1);
+}
+/* The lip: a rounded bump rising out of the dock's top edge above Team, the dock's own colour, holding the ball. */
+.dock-lip {
+  background-color: rgb(255 255 255 / 0.82);
+  border-color: var(--line);
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
+  transition:
+    background-color 450ms ease,
+    border-color 450ms ease;
+}
+/* On the post-sale dock the stripe runs up and round the lip: the lip reaches down over the stripe under it, so the
+   stripe never crosses its mouth. */
+.phone-tabbar[data-dock="post"] .dock-lip {
+  border-color: var(--dock-post);
+  border-width: 3px 3px 0;
+  height: 48px;
+  top: -45px;
+  z-index: 1;
+  background-color: rgb(251 251 252);
+}
+/* The ball: a graphite orb, lit from the upper left. */
+.dock-ball {
+  background: radial-gradient(circle at 35% 28%, #8a8f98, #3a3d43 52%, #17181b);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 0.35),
+    inset 0 -2px 3px rgb(0 0 0 / 0.35);
+}
+.dock-ball-pull {
+  animation: dock-ball-pull 520ms ease-out;
+}
+@keyframes dock-ball-pull {
+  30% {
+    transform: translateY(6px) scale(0.92);
+  }
+  65% {
+    transform: translateY(-3px);
+  }
+}
+/* A deal's Sol sheet sits where the lip rises: it steps aside while the sheet is open. */
+html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-reel {
+    transition: none;
+  }
+  .dock-ball-pull {
+    animation: none;
   }
 }
 

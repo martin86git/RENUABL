@@ -71,7 +71,7 @@ import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { SolOnDealCard } from "./sol-on-deal";
-import { DEAL_SOL_TOGGLE } from "@/lib/services/sol";
+import { DEAL_SOL_STATE, DEAL_SOL_TOGGLE } from "@/lib/services/sol";
 import { Spotlight } from "./new-look";
 import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
 import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
@@ -606,7 +606,11 @@ export function DealPage({ id }: { id: string }) {
             customer={customer}
             pulse={pulse && hasPulse(job.stage) ? pulse : null}
             compact={tab !== "activities"}
-            figures={bannerFigures(details, job.kw)}
+            // The system as drawn when it has a design (22 Nov 2026, Martin: an imported 3.8 kW beside two 7 kW designs).
+            figures={bannerFigures(
+              details.map((d) => (d.designed ? { ...d, value: d.designed } : d)),
+              job.kw,
+            )}
             onDesign={job.lat !== null ? () => openTool("design") : null}
             onPlace={() => setAskPlace("place")}
             actions={
@@ -1257,7 +1261,8 @@ function useCentredRail() {
 /**
  * Sol's card for the deal. On a wide screen it sits in the page; on a phone (21 Nov 2026, Martin: "sols chat box should
  * be a pop up which can be collapsed or reintroduced via the centre sol icon at the footer") it is a sheet over the foot
- * bar, folded away by its handle and brought back by the foot bar's Sol round (`DEAL_SOL_TOGGLE`). One element either
+ * bar, folded away by its handle into the foot bar's Sol round, which brings it back (`DEAL_SOL_TOGGLE`; elsewhere
+ * the round goes to Today). One element either
  * way, so the card is never mounted twice (it drafts a reply when it opens). Folded or not is kept for the tab.
  */
 const SOL_TUCKED_KEY = "renuabl.design.deal-sol-tucked";
@@ -1307,6 +1312,18 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
     watch.observe(el);
     return () => watch.disconnect();
   }, []);
+  // Folded, he goes into the foot bar's Sol round (22 Nov 2026, Martin: "he should minimise visually onto the centre
+  // sol icon so the user can see that's where they can re-engage Sol on the deal"): the round is told, and lands him.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (tucked) root.dataset.dealSolTucked = "1";
+    else delete root.dataset.dealSolTucked;
+    window.dispatchEvent(new Event(DEAL_SOL_STATE));
+    return () => {
+      delete root.dataset.dealSolTucked;
+      window.dispatchEvent(new Event(DEAL_SOL_STATE));
+    };
+  }, [tucked]);
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty("--deal-sol-h", tucked || !height ? "0px" : `${height + 16}px`);
@@ -1324,8 +1341,9 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
           "max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(3.75rem+env(safe-area-inset-bottom))] max-sm:z-30",
           "deal-sol-sheet max-sm:max-h-[58dvh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-2xl max-sm:bg-surface max-sm:ring-1 max-sm:ring-line",
           "max-sm:shadow-[0_-6px_30px_rgba(11,11,12,0.22)]",
-          tucked && "max-sm:hidden",
+          tucked && "deal-sol-tucked",
         )}
+        aria-hidden={tucked || undefined}
       >
         {/* On a phone it reads as a chat window (22 Nov 2026, Martin: "sols chat tab doesn't feel like a chat tab"): a
             header with Sol and who it's about, his line as a bubble, quick replies under it, the box at the foot. */}
@@ -1342,7 +1360,7 @@ function DealSolSheet({ children, name }: { children: React.ReactNode; name: str
           <button
             type="button"
             onClick={() => set(true)}
-            aria-label="Fold Sol away (the Sol button below brings him back)"
+            aria-label="Fold Sol into the Sol round below (press it to bring him back)"
             title="Fold away"
             className="mt-1 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface-2"
           >

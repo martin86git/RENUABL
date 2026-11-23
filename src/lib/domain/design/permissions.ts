@@ -11,7 +11,7 @@
  * from the real figures either way.
  */
 import type { WorkspaceSettings } from "./account";
-import { DEFAULT_WORKSPACE, type SupplierList } from "./pricing";
+import { DEFAULT_WORKSPACE, panelsOfList, type SupplierList } from "./pricing";
 import type { DesignExtras } from "./quote";
 
 /**
@@ -39,14 +39,17 @@ export function withoutCosts(
       install: { ...DEFAULT_WORKSPACE.install },
       settings: {
         ...structuredClone(DEFAULT_WORKSPACE.settings),
-        ...(settings ? { bill: { ...settings.settings.bill }, stcPrice: settings.settings.stcPrice } : {}),
+        ...(settings
+          ? { bill: { ...settings.settings.bill }, stcPrice: settings.settings.stcPrice, stcFrom: settings.settings.stcFrom ?? null }
+          : {}),
       },
     },
     lists: lists.map((list) => ({
       name: list.name,
       uploadedAt: list.uploadedAt,
       items: [],
-      panels: list.panels.map(hide),
+      // Panels priced per panel are read from the rows before the rows are taken away (22 Nov 2026).
+      panels: panelsOfList(null, list.items, list.panels).map(hide),
       inverters: list.inverters.map(hide),
       batteries: list.batteries.map(hide),
       chargers: (list.chargers ?? []).map(hide),

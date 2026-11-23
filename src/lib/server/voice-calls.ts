@@ -76,7 +76,7 @@ import { jobById, record } from "./design-crm-repo";
 import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
-import { testCallWords } from "@/lib/domain/design/caller";
+import { BRAIN_MODELS, modelOfBrain, testCallWords } from "@/lib/domain/design/caller";
 import { callerOf, scriptFor } from "./design-caller-repo";
 import { pencilledLine, PENCILLED_WORDS, readInstallDay, cleanCallerKey, roleOfMode, type CallerKey } from "@/lib/domain/install-call";
 import { installDaysFor, pencilInstall } from "./design-install-call";
@@ -311,9 +311,13 @@ export async function callMeFor(businessId: string): Promise<{ assistant: string
 }
 
 /** What the assistant is told for this call, read fresh each time (the proposal as it stands now). */
-async function briefFor(
-  row: VoiceRow,
-): Promise<{ brief: CallBrief; token: string | null; voice: { provider: string; voiceId: string } | null }> {
+async function briefFor(row: VoiceRow): Promise<{
+  brief: CallBrief;
+  token: string | null;
+  voice: { provider: string; voiceId: string } | null;
+  /** The model the agent was set to think with (caller.ts CALLER_BRAINS), or null for the site's. */
+  model: string | null;
+}> {
   const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [row.business_id]);
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
@@ -327,6 +331,7 @@ async function briefFor(
     return {
       token: null,
       voice: caller.voice,
+      model: caller.brain ? BRAIN_MODELS[caller.brain] : null,
       brief: {
         mode: "install",
         assistant: caller.name,
@@ -348,6 +353,8 @@ async function briefFor(
     token: view ? token : null,
     // The voice the business chose for its assistant, else the site's own (VAPI_VOICE_ID), else Vapi's default.
     voice: caller.voice,
+    // The model the business chose for this agent (caller.ts CALLER_BRAINS), else the site's own.
+    model: caller.brain ? BRAIN_MODELS[caller.brain] : null,
     brief: {
       mode: view ? "proposal" : "lead",
       assistant: caller.name,
@@ -378,7 +385,7 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
     await finish(row.id, "stopped", { stop_reason: "the business has no phone number" });
     return false;
   }
-  const { brief, voice } = await briefFor(row);
+  const { brief, voice, model } = await briefFor(row);
   const scheduled = window.from.getTime() > Date.now() + 60_000;
   const body = {
     phoneNumberId: from,
@@ -389,7 +396,7 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
       slots: brief.canBook ? voiceSlots(todayInMarket(window.from)) : [],
       serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
       secret: s.secret,
-      model: s.model,
+      model: model ?? s.model,
       voice: voice ?? s.voice,
       transferNumber: s.transferNumber,
     }),
@@ -788,7 +795,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
   try {
     const row = await inboundRow(s, businessId, mobile, e.callId);
     if (!row) return closed();
-    const { brief, voice } = await briefFor(row);
+    const { brief, voice, model } = await briefFor(row);
     const today = todayInMarket();
     return {
       assistant: assistantConfig({
@@ -796,7 +803,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
         slots: brief.canBook ? voiceSlots(today) : [],
         serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
         secret: s.secret,
-        model: s.model,
+        model: model ?? s.model,
         voice: voice ?? s.voice,
         transferNumber: s.transferNumber,
       }),
@@ -916,7 +923,7 @@ export async function ringToHearVoice(
           firstMessageMode: "assistant-speaks-first",
           model: {
             provider: "anthropic",
-            model: s.model,
+            model: modelOfBrain(caller.brain, s.model),
             messages: [{ role: "system", content: "You have just said a short test message. Say nothing more and end the call at once." }],
             tools: [{ type: "endCall" }],
           },

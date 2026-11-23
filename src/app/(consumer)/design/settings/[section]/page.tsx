@@ -15,6 +15,7 @@ import { LeadInboxSettings } from "@/components/design/settings-lead-inbox";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
 import { CallerSettings } from "@/components/design/settings-caller";
 import { StaffViewAs } from "@/components/design/staff-view-as";
+import { UsagePage } from "@/components/design/usage-page";
 import { settingBySlug } from "@/components/design/settings-list";
 import { SettingSoon, SettingsFrame } from "@/components/design/settings-nav";
 import { BillingPage, NeedsCosts, ProposalSettings, type ProposalPart } from "@/components/design/settings-proposal";
@@ -84,6 +85,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <StandardsSettings />
         ) : section === "deal-fields" ? (
           <DealFieldsSettings />
+        ) : section === "usage" ? (
+          <UsagePage />
         ) : section === "billing" ? (
           <BillingPage />
         ) : section === "calls" ? (

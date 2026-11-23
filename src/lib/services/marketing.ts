@@ -197,6 +197,10 @@ export const switchSequence = (id: string, on: boolean) =>
 export const deleteSequence = (id: string) => send(`/api/design/marketing/sequences/${id}`, { method: "DELETE" });
 
 export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/design/marketing/settings`, { cache: "no-store" });
+/** Sets or clears the logo at the top of every email (anyone who builds emails). */
+export const saveMarketingLogo = (logoId: string | null) =>
+  send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", { logoId }));
+
 export const saveMarketingSettings = (s: MarketingSettingsView["settings"]) =>
   send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", s));
 
@@ -229,8 +233,9 @@ export const writeWithSol = (body: {
     button?: string;
   }>(`/api/design/marketing/write`, json("POST", body));
 
-export function uploadMarketingImage(file: File) {
+export function uploadMarketingImage(file: File, kind: "photo" | "logo" = "photo") {
   const form = new FormData();
   form.set("file", file);
+  if (kind === "logo") form.set("kind", "logo");
   return send<{ id: string }>(`/api/design/marketing/images`, { method: "POST", body: form });
 }

@@ -4,22 +4,7 @@ import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import {
-  ArrowUpRight,
-  Bell,
-  Copy,
-  CornerUpLeft,
-  Eye,
-  EyeOff,
-  FileText,
-  History,
-  MessageSquarePlus,
-  Minus,
-  Plus,
-  RefreshCw,
-  X,
-  Pin,
-} from "lucide-react";
+import { Bell, Copy, CornerUpLeft, Eye, EyeOff, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
@@ -63,6 +48,7 @@ import {
   resumeSolChat,
   rememberAnswer,
   retrySol,
+  type SolDraft,
 } from "@/lib/services/sol";
 import { askToStartAfresh, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
@@ -94,6 +80,50 @@ const STARTERS = [
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
+
+const timeOnly = (iso: string) => new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+
+/** How far a pull to the left goes, in pixels: room for a time. */
+const PEEK_MOST = 64;
+
+/**
+ * A finger dragged left over the conversation slides every turn over to show its time; let go, it slides back.
+ * Sets `--sol-peek` on the element straight away, so a drag never re-renders the chat.
+ */
+function usePullForTimes() {
+  const start = useRef<{ x: number; y: number; on: boolean | null } | null>(null);
+  const settle = (el: HTMLElement, px: number, eased: boolean) => {
+    el.style.setProperty("--sol-peek-ease", eased ? "transform 0.25s ease, opacity 0.25s ease" : "none");
+    el.style.setProperty("--sol-peek", `${px}px`);
+    el.style.setProperty("--sol-peek-shown", String(px / PEEK_MOST));
+  };
+  return {
+    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
+      const t = e.touches[0];
+      start.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY, on: null } : null;
+    },
+    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
+      const s = start.current;
+      if (!s) return;
+      const t = e.touches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (s.on === null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        s.on = dx < 0 && Math.abs(dx) > Math.abs(dy);
+      }
+      if (s.on) settle(e.currentTarget, Math.min(PEEK_MOST, Math.max(0, -dx)), false);
+    },
+    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
+      if (start.current?.on) settle(e.currentTarget, 0, true);
+      start.current = null;
+    },
+    onTouchCancel: (e: React.TouchEvent<HTMLElement>) => {
+      settle(e.currentTarget, 0, true);
+      start.current = null;
+    },
+  };
+}
 
 function base64Of(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -168,12 +198,15 @@ export function SolChat({
   onClose,
   onMinimise,
   question,
+  draft,
 }: {
   side?: boolean;
   onClose?: () => void;
   /** Tucks the panel away to a tab on the screen's edge, the conversation kept (19 Nov 2026, Martin). */
   onMinimise?: () => void;
   question?: { id: number; text: string; shown?: string } | null;
+  /** Words begun in a small Sol box elsewhere (a deal's card, the feed), to finish here: put in the box, not sent. */
+  draft?: (SolDraft & { id: number }) | null;
 }) {
   // The business's own names for the stages (pipeline-stages.ts).
   const stageNames = useStageNames();
@@ -181,7 +214,18 @@ export function SolChat({
   const { state, problem, run, runFor } = useSol();
   // Try another answer: the conversation from that question on is hidden while he answers it again.
   const [redoFrom, setRedoFrom] = useState<number | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => draft?.text ?? "");
+  // Which deal the carried words are about (22 Nov 2026): named over the box and put in front of what is sent.
+  const [onDealDraft, setOnDealDraft] = useState<{ about: string; label?: string } | null>(() =>
+    draft?.about ? { about: draft.about, label: draft.label } : null,
+  );
+  const [draftSeen, setDraftSeen] = useState(draft?.id ?? 0);
+  if (draft && draft.id !== draftSeen) {
+    // Taken in the same render, so the box holds them as soon as the panel is focused.
+    setDraftSeen(draft.id);
+    setText(draft.text);
+    setOnDealDraft(draft.about ? { about: draft.about, label: draft.label } : null);
+  }
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [heard, setHeard] = useState("");
@@ -197,6 +241,7 @@ export function SolChat({
     queuedRef.current = queued;
   }, [queued]);
   const picker = useRef<HTMLInputElement>(null);
+  const pullForTimes = usePullForTimes();
   const box = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   // "#" finds a deal: the business's deals are read the first time, then matched here as each letter goes in.
@@ -305,8 +350,9 @@ export function SolChat({
   const send = async (over?: string, deep = false, shownAs?: string, followUp = false) => {
     const typed = (over ?? text).trim();
     const answering = !over && replyTo && typed ? replyTo : null;
-    const said = answering ? answerFor(answering, typed) : typed;
-    const shown = shownAs ?? (answering ? typed : undefined);
+    const onDeal = !over && !answering && onDealDraft && typed ? onDealDraft : null;
+    const said = answering ? answerFor(answering, typed) : onDeal ? `${onDeal.about}${typed}` : typed;
+    const shown = shownAs ?? (answering || onDeal ? typed : undefined);
     const sending = over ? [] : files;
     if (!said && !sending.length) return;
     if (busy) {
@@ -316,6 +362,7 @@ export function SolChat({
       setQueued((q) => [...q, { said, shown }]);
       setText("");
       setReplyTo(null);
+      setOnDealDraft(null);
       setDealAt(null);
       return;
     }
@@ -333,6 +380,7 @@ export function SolChat({
       setFiles([]);
       setFileProblem("");
       setReplyTo(null);
+      setOnDealDraft(null);
     }
     setDealAt(null);
     setBusy(true);
@@ -346,6 +394,7 @@ export function SolChat({
     } else if (!over) {
       setText(typed);
       if (answering) setReplyTo(answering);
+      if (onDeal) setOnDealDraft(onDeal);
       setFiles(sending);
     }
     sendQueued();
@@ -453,11 +502,15 @@ export function SolChat({
                   : "Sol can't see the page beside this chat. Press to let him."
               }
               className={clsx(
-                "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-canvas",
+                "inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full transition-colors hover:bg-canvas",
                 seePage ? "text-sun-line" : "text-muted hover:text-ink",
               )}
             >
-              {seePage ? <Eye className="size-3.5" aria-hidden /> : <EyeOff className="size-3.5" aria-hidden />}
+              {seePage ? (
+                <Eye className="size-3.5 max-lg:size-[18px]" aria-hidden />
+              ) : (
+                <EyeOff className="size-3.5 max-lg:size-[18px]" aria-hidden />
+              )}
             </button>
           )}
           {/* A new chat: a speech bubble with a plus (8 Nov 2026; 18 Nov 2026, Martin). The current one is filed away. */}
@@ -467,9 +520,9 @@ export function SolChat({
             disabled={busy || turns.length === 0}
             aria-label="New chat"
             title="New chat"
-            className="inline-flex size-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
+            className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
           >
-            <MessageSquarePlus className="size-3.5" aria-hidden />
+            <MessageSquarePlus className="size-3.5 max-lg:size-[18px]" aria-hidden />
           </button>
           {/* Chat history (1 Nov 2026, Martin): the clock wound back. */}
           <button
@@ -479,11 +532,11 @@ export function SolChat({
             aria-label="Chat history"
             title="Chat history"
             className={clsx(
-              "inline-flex size-7 items-center justify-center rounded-full transition-colors",
+              "inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full transition-colors",
               history ? "bg-ink text-sun-line" : "text-muted hover:bg-canvas hover:text-ink",
             )}
           >
-            <History className="size-3.5" aria-hidden />
+            <History className="size-3.5 max-lg:size-[18px]" aria-hidden />
           </button>
           {onMinimise && (
             <button
@@ -491,9 +544,9 @@ export function SolChat({
               onClick={onMinimise}
               aria-label="Minimise Sol"
               title="Minimise Sol: a tab on the edge brings him back"
-              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
             >
-              <Minus className="size-3.5" aria-hidden />
+              <Minus className="size-3.5 max-lg:size-[18px]" aria-hidden />
             </button>
           )}
           {onClose && (
@@ -502,9 +555,9 @@ export function SolChat({
               onClick={onClose}
               aria-label="Close Sol"
               title="Close Sol (Esc)"
-              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
             >
-              <X className="size-3.5" aria-hidden />
+              <X className="size-3.5 max-lg:size-[18px]" aria-hidden />
             </button>
           )}
         </div>
@@ -565,7 +618,15 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
+      {/* Pulled to the left with a finger, the turns slide over and each shows its time, as iMessage does (22 Nov 2026,
+          Martin: no time under every reply). On a computer the time shows on hover beside Copy and Pin. */}
+      <div
+        {...pullForTimes}
+        className={clsx(
+          "staff-scroll min-h-0 flex-1 touch-pan-y space-y-7 overflow-x-hidden overflow-y-auto px-6 py-6 text-sm",
+          history && "hidden",
+        )}
+      >
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
         {state && !inducting && (turns.length === 0 || resting) && !pending && (
           <div className="space-y-2 text-ink-2">
@@ -598,7 +659,12 @@ export function SolChat({
           </div>
         )}
         {(resting ? [] : redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
-          <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn scroll-mt-3 space-y-2">
+          <div key={`${t.at}-${i}`} id={turnId(t)} className="sol-peek-turn group/turn relative scroll-mt-3 space-y-2">
+            {t.at && (
+              <span className="sol-peek-time" aria-hidden>
+                {timeOnly(t.at)}
+              </span>
+            )}
             <Bubble
               you={t.role === "you"}
               text={t.shown || t.text}
@@ -628,16 +694,6 @@ export function SolChat({
                 }
               />
             ) : null}
-            {/* A page he opened: the chat went there as the answer came in; pressed, it goes again. */}
-            {t.role === "sol" && t.goTo && (
-              <button
-                type="button"
-                onClick={() => openSolPage(t.goTo!, router)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-sun px-3 py-1 text-xs font-medium text-sun-ink ring-1 ring-sun-line/30 transition hover:ring-sun-line"
-              >
-                Opened {t.goTo.label} <ArrowUpRight className="size-3.5" aria-hidden />
-              </button>
-            )}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}
@@ -741,6 +797,16 @@ export function SolChat({
               </span>
             ))}
             {fileProblem && <span className="text-xs text-danger">{fileProblem}</span>}
+          </div>
+        )}
+        {onDealDraft && !replyTo && (
+          <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
+            <span className="min-w-0 flex-1 truncate">
+              About <span className="font-medium text-ink">{onDealDraft.label ? `${onDealDraft.label}'s deal` : "this deal"}</span>
+            </span>
+            <button type="button" onClick={() => setOnDealDraft(null)} aria-label="Not about this deal" className="shrink-0 hover:text-ink">
+              <X className="size-3.5" aria-hidden />
+            </button>
           </div>
         )}
         {replyTo && (
@@ -1031,7 +1097,6 @@ function Bubble({
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
         {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
-        {at && <span className={clsx("block text-[10.5px] text-muted", you ? "mt-1" : "mt-3")}>{when(at)}</span>}
       </div>
       {at && (
         <div
@@ -1040,6 +1105,7 @@ function Bubble({
             pinned ? "opacity-100" : "opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100",
           )}
         >
+          <span className="max-sm:hidden">{when(at)}</span>
           <button
             type="button"
             onClick={() => {

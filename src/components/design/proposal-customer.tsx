@@ -10,7 +10,7 @@ import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
 import { PaySchedule } from "./pay-schedule";
 import type { PublicPayments } from "@/lib/services/proposals";
-import { ProposalPage } from "./proposal-view";
+import { PoweredByRenuabl, ProposalPage } from "./proposal-view";
 import { WalkthroughPlayer } from "./walkthrough-player";
 
 /**
@@ -84,7 +84,12 @@ export function CustomerProposal(props: {
           {props.callMe && state !== "withdrawn" && <CallMe token={token} assistant={props.callMe.assistant} />}
         </>
       }
-      chat={<ChatDock chat={chat} />}
+      chat={
+        <>
+          <ChatDock chat={chat} />
+          <PoweredByRenuabl />
+        </>
+      }
       actions={{
         accept: async (name, agree) => {
           const res = await acceptProposal(token, name, agree, chosen);

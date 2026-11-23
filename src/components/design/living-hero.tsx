@@ -10,6 +10,7 @@ import { Sunrise } from "./business-brand";
 import { SolMark } from "./sol-sun";
 import { LiveSun } from "./live-sun";
 import { Ray, RayStyles } from "./rays";
+import { DemoRequestButton } from "./demo-request";
 
 /**
  * The living hero (17 Nov 2026, Martin: "the bots themselves are the marketing… it makes the software feel alive",
@@ -396,6 +397,7 @@ export function LivingHero() {
           >
             {SALES_HERO.cta}
           </a>
+          <DemoRequestButton />
         </div>
 
         {/* Get started sits level with the voice agents on a wide screen (18 Nov 2026, Martin: symmetry), the words above it

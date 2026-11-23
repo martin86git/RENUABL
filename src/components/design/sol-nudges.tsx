@@ -5,7 +5,6 @@ import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { NUDGE_KIND_WORDS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
 import { BatteryWallPicture } from "./battery-wall-picture";
-import { SolIcon } from "./sol-icon";
 
 /**
  * Sol beside the design (10 Nov 2026, Martin; `sol-nudges.ts`): one thing at a time in a small dark bubble over Ask
@@ -61,13 +60,16 @@ export function SolNudges({
       )}
     >
       <div className="flex items-start gap-2.5">
-        <SolIcon className="mt-0.5 size-4 shrink-0 text-sun-line" />
         <div className="min-w-0 flex-1">
           {resume && <p className="mb-1.5 text-[12.5px] leading-snug text-white/75">{resume}</p>}
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/50">
-            {NUDGE_KIND_WORDS[n.kind]}
-            {nudges.length > 1 && ` · ${i + 1} of ${nudges.length}`}
-          </p>
+          {/* 22 Nov 2026, Martin: no "For the quote" over the question, only where it is in the run. */}
+          {(n.kind !== "question" || nudges.length > 1) && (
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/50">
+              {[n.kind === "question" ? "" : NUDGE_KIND_WORDS[n.kind], nudges.length > 1 ? `${i + 1} of ${nudges.length}` : ""]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="mt-0.5 text-[13px] leading-snug text-white/95">{n.words}</p>

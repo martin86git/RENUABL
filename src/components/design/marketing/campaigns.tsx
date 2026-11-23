@@ -275,7 +275,14 @@ export function CampaignEditor({ id }: { id: string }) {
 
       {c.status !== "draft" && <ReportStrip counts={c.counts} />}
 
-      <EdmBuilder content={content} brand={brand} sender={sender} readOnly={!draft} onChange={(next) => (setContent(next), changed())} />
+      <EdmBuilder
+        content={content}
+        brand={brand}
+        onBrand={setBrand}
+        sender={sender}
+        readOnly={!draft}
+        onChange={(next) => (setContent(next), changed())}
+      />
 
       {draft ? (
         <SendPanel

@@ -11,11 +11,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  CalendarDays,
   ClipboardCheck,
+  FileCheck2,
   FileText,
+  Package,
   LayoutDashboard,
   Menu,
-  MessageCircle,
   MessagesSquare,
   PenTool,
   Search,
@@ -25,10 +27,10 @@ import {
   Wrench,
   type LucideIcon,
   Mail,
-  ArrowLeft,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
+import { ScreenLock } from "./screen-lock";
 import { KIND_SECTIONS, designsRoofs, pageAt, sectionAt } from "@/lib/domain/design/sections";
 import { withMarketing } from "@/lib/domain/marketing/access";
 import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
@@ -37,9 +39,12 @@ import { DemoBar, DemoDetailsPrompt } from "./demo-details";
 import { staffView } from "./staff-view-as";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
-import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
+import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
-import { SolDock, SolNavButton, SolRail } from "./sol-dock";
+import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
+import { PhoneVoiceTab } from "./phone-voice";
+import { PhoneTop } from "./phone-top";
+import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
 import { AssistantCallWindow } from "./assistant-call";
@@ -51,10 +56,13 @@ import { RoutinesRound } from "./routines-round";
 import { AgentsWindow } from "./agents-window";
 import { SetupWizard } from "./setup-wizard";
 import { openSetup } from "@/lib/services/setup";
-import { TeamChatButton } from "./team-chat";
+import { TeamChatButton, useTeamUnread } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
+import { BackToTop } from "./back-to-top";
+import { setDockSet, useDockSet } from "@/lib/services/dock-set";
+import { DOCK_SET_WORDS, otherDockSet } from "@/lib/domain/design/dock-set";
 
 export { MarketplaceMark };
 
@@ -120,12 +128,33 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
 
 // The designer beside Sol (22 Nov 2026, Martin: "we need the designer icon in the bottom menu bar… rapid lookup of
 // existing deal or new address to design on the spot"): it opens the design tool's home, with its one search for a
-// deal or an address, over the page.
+// deal or an address, over the page. Messages left the bar (22 Nov 2026, Martin: "remove the chat icon from the tool
+// bar in mobile view. this will allow all icons to be a little larger"); it is under More.
+// A retailer's foot bar (22 Nov 2026, Martin: "replace the today icon out with voice agent… Deals will shift into
+// today's position, designer will shift into deals position and voice will shift into designers position"): Deals,
+// Designer, Sol raised in the middle (he goes to Today), Voice, More. Voice is a button (`PhoneVoiceTab`), not a link.
+const VOICE_TAB = "Voice";
 const PHONE_TABS: PhoneTab[] = [
-  { label: "Today", href: PATHS.home, icon: LayoutDashboard, match: (p) => p === PATHS.home },
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
-  { label: "Messages", href: PATHS.messages, icon: MessageCircle, match: (p) => p.startsWith(PATHS.messages) },
+  { label: VOICE_TAB, href: PATHS.home, icon: PenTool, match: () => false },
+  // Team chat in the foot bar (22 Nov 2026, Martin: "we need to introduce the team chat into the bottom nav"): its own
+  // page on a phone, with this member's unread team lines on it.
+  { label: "Team", href: PATHS.team, icon: MessagesSquare, match: (p) => p.startsWith(PATHS.team) },
+];
+// The dock's post-sale tools (23 Nov 2026, Martin: the owner wears every hat; the ball in the dock's lip turns it like a
+// slot machine to these, on navy, and back). Each sits on the same reel as the sales tool in its place: Deals and the
+// Calendar, Designer and Orders, Voice and Paperwork, Team and Service. Sol stays in the middle and never turns.
+const POST_TABS: PhoneTab[] = [
+  {
+    label: "Calendar",
+    href: PATHS.installations,
+    icon: CalendarDays,
+    match: (p) => p.startsWith(PATHS.installations) && !p.startsWith(PATHS.completed) && !p.startsWith(PATHS.invoices),
+  },
+  { label: "Orders", href: PATHS.orders, icon: Package, match: (p) => p.startsWith(PATHS.orders) },
+  { label: "Paperwork", href: PATHS.completed, icon: FileCheck2, match: (p) => p.startsWith(PATHS.completed) },
+  { label: "Service", href: PATHS.service, icon: Wrench, match: (p) => p.startsWith(PATHS.service) },
 ];
 
 /**
@@ -174,7 +203,7 @@ export function DesignShell(props: { children: React.ReactNode; compact?: boolea
 }
 
 /** The pad every page sits on (Primero's `PAGE_PAD`): a soft grey ground with rounded corners, white cards on it. */
-const PAD = "studio-pad min-h-[calc(100dvh-10rem)] rounded-[28px] bg-canvas p-4 sm:p-6 lg:pt-10";
+const PAD = "studio-pad min-h-[calc(100dvh-10rem)] max-sm:min-h-[calc(100dvh-15rem)] rounded-[28px] bg-canvas p-4 sm:p-6 lg:pt-10";
 
 /**
  * How far the sections menu drops below the top bar on a wide screen, so it sits half over the pad's top edge (14 Nov
@@ -208,6 +237,12 @@ function Shell({
   const [account] = useDesignAccount();
   // Inside the design drawer's frame every page is bare, wherever the designer goes within it.
   const bare = useInDrawer() || bareAsked;
+  // On a phone Sol's panel covers the page with the foot bar under it (22 Nov 2026, Martin): a tab pressed there puts
+  // the panel away so the page it opens is seen.
+  const solOpen = useSolOpen();
+  const leaveSol = () => {
+    if (solOpen && !window.matchMedia("(min-width: 1024px)").matches) toggleSolHere(false);
+  };
   const on = Boolean(account?.signedIn && account.business);
   // What kind of business this login is (business-kind.ts): an installer or inspector has part of the product, and
   // nothing of the CRM is asked for.
@@ -217,6 +252,11 @@ function Shell({
   const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.business));
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
   const unread = useUnreadMessages(retail);
+  // This member's unread team chat lines, for the Team tab on a phone's foot bar.
+  const teamUnread = useTeamUnread();
+  // The dock's set (sales or post sale tools).
+  const dock = useDockSet();
+  const post = dock === "post";
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -339,6 +379,7 @@ function Shell({
 
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
+    if (account.unreachable) return <Reconnecting />;
     if (!needsAccount) return <>{children}</>;
     return (
       <div className="theme-studio flex min-h-dvh flex-col items-center justify-center px-5 text-center">
@@ -404,8 +445,89 @@ function Shell({
         })}
       </nav>
     ) : null;
+  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the post-sale dock. */
+  const tabFor = (t: PhoneTab, dark: boolean) => {
+    if (retail && t.label === VOICE_TAB)
+      return (
+        <PhoneVoiceTab
+          key={t.label}
+          onOpen={() => {
+            setMore(false);
+            leaveSol();
+          }}
+        />
+      );
+    const lit = !more && t.match(path);
+    const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
+    // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
+    // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
+    if (dark)
+      return (
+        <Link
+          key={t.label}
+          href={t.href}
+          onClick={() => {
+            setMore(false);
+            leaveSol();
+          }}
+          aria-current={lit ? "page" : undefined}
+          className={clsx(
+            "flex flex-col items-center justify-center gap-1 text-[11px] font-semibold tracking-[0.01em] text-ink",
+            retail ? "h-16" : "min-h-14",
+            !lit && "opacity-80",
+          )}
+        >
+          <span className={clsx("dock-tile relative flex size-9 items-center justify-center", lit && "dock-tile-lit")}>
+            <t.icon className="size-[19px] text-[#d6ff3d]" strokeWidth={1.9} aria-hidden />
+            {n > 0 && (
+              <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                {n}
+              </span>
+            )}
+          </span>
+          {t.label}
+        </Link>
+      );
+    // The designer is the orange round it is in the top menu.
+    const round = t.href === PATHS.designer;
+    return (
+      <Link
+        key={t.label}
+        href={t.href}
+        onClick={() => {
+          setMore(false);
+          leaveSol();
+        }}
+        aria-current={lit ? "page" : undefined}
+        className={clsx(
+          "flex flex-col items-center justify-center gap-1 font-medium",
+          retail ? "h-16 text-[11px]" : "min-h-14 text-[10px]",
+          lit ? "text-ink" : "text-muted",
+        )}
+      >
+        <span
+          className={clsx(
+            "relative flex items-center justify-center rounded-full",
+            round
+              ? clsx(retail ? "size-9" : "size-7", "shadow-sm", "bg-sun-line text-white", lit && "ring-2 ring-sun-line/30 ring-offset-1")
+              : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && "bg-sun"),
+          )}
+        >
+          <t.icon className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+          {n > 0 && (
+            <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+              {n}
+            </span>
+          )}
+        </span>
+        {t.label}
+      </Link>
+    );
+  };
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
+      {/* The screen lock: covers the page after a while unused, until Face ID, the PIN or signing in again. */}
+      <ScreenLock />
       {/* The design tool slides over whatever page this is, never a page of its own. */}
       <ShellDesignDrawer />
       {/* A call made from the computer: who, how long, Mute and Hang up, over every page while it lasts. */}
@@ -653,6 +775,7 @@ function Shell({
                 connections={kind === "installer" ? { href: "/design/connections", waiting: requests } : undefined}
                 unseen={updates}
                 onSetup={retail && !account.demo ? openSetup : undefined}
+                usage={kind !== "inspector" ? `${PATHS.settings}/usage` : undefined}
                 on={
                   settingsOn ||
                   path.startsWith(PATHS.updates) ||
@@ -675,37 +798,31 @@ function Shell({
         {tool && sectionPages}
       </header>
 
-      {/* On a phone: the wordmark, Search and the day across the top. */}
-      <div className="flex items-center gap-3 px-4 pb-1 pt-3 print:hidden lg:hidden">
-        {/^\/design\/deals\/[^/]+$/.test(path) ? (
-          // On a deal, the way back to Deals takes the wordmark's place (21 Nov 2026, Martin).
-          <Link href={PATHS.pipelines} className="-ml-1 inline-flex h-9 items-center gap-1.5 pr-2 text-[15px] font-medium text-ink">
-            <ArrowLeft className="size-[18px]" aria-hidden />
-            Deals
-          </Link>
-        ) : (
-          <Link href={PATHS.home} aria-label="RENUABL, today">
-            <Wordmark className="text-[16px]" />
-          </Link>
-        )}
-        {retail && (
-          <button
-            type="button"
-            onClick={() => setSearching(true)}
-            aria-label="Search, or ask Sol"
-            className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
-          >
-            <Search className="size-4" aria-hidden />
-          </button>
-        )}
-      </div>
+      {/* On a phone: the wordmark, Search and the day across the top; once scrolled away, the wordmark small at the top. */}
+      <PhoneTop
+        home={PATHS.home}
+        back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
+        onSearch={retail ? () => setSearching(true) : undefined}
+        more={
+          retail
+            ? {
+                open: more,
+                count: unread,
+                toggle: () => {
+                  if (!more) leaveSol();
+                  setMore(!more);
+                },
+              }
+            : undefined
+        }
+      />
 
       {tool ? (
         <div data-sol-page className="relative min-w-0 lg:pt-5">
           {children}
         </div>
       ) : (
-        <div className="px-3 pb-20 pt-2 sm:px-6 lg:px-14 lg:pt-9">
+        <div className="px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
             {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad
                 disappeared): its own grey with its rounded corners, drawn on a wide screen only (globals.css .pad-cap). */}
@@ -723,72 +840,77 @@ function Shell({
         </div>
       )}
 
+      {!tool && <BackToTop />}
+
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
         aria-label="Sections, on a phone"
+        data-dock={retail ? dock : undefined}
         className={clsx(
-          "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
-          retail || kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
+          "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line pb-[env(safe-area-inset-bottom)] print:hidden lg:hidden",
+          // A retailer's More is in the top right (23 Nov 2026, Martin), so five across with Sol in the middle.
+          kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
         )}
       >
-        {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
-          const lit = !more && t.match(path);
-          const sol =
-            retail && i === 2 ? (
-              <div key="sol" className="flex min-h-14 flex-col items-center justify-end gap-0.5 pb-1 text-[10px] font-medium text-ink">
-                <span className="-mt-5">
-                  <SolNavButton phone />
-                </span>
-                Sol
-              </div>
-            ) : null;
-          const n = t.href === PATHS.messages ? unread : 0;
-          return [
-            sol,
-            <Link
-              key={t.label}
-              href={t.href}
-              onClick={() => setMore(false)}
-              aria-current={lit ? "page" : undefined}
-              className={clsx(
-                "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
-                lit ? "text-ink" : "text-muted",
-              )}
-            >
-              <span
-                className={clsx(
-                  "relative flex items-center justify-center rounded-full",
-                  // The designer is the orange round it is in the top menu.
-                  t.href === PATHS.designer
-                    ? clsx("size-7 bg-sun-line text-white shadow-sm", lit && "ring-2 ring-sun-line/30 ring-offset-1")
-                    : clsx("h-7 w-12", lit && "bg-sun"),
-                )}
-              >
-                <t.icon className="size-[18px]" aria-hidden />
-                {n > 0 && (
-                  <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
-                    {n}
+        {retail && (
+          // The dock's lip and ball (23 Nov 2026, Martin: back on the right and part of the dock, "it just needed to be
+          // taller so it wouldn't encroach on the chat icon", and "a graphite colored orb"): a lip rising out of the
+          // dock's top edge above Team, high enough to clear Team's round and its count, holding a graphite ball. A tap
+          // dips the ball like a lever and the dock's reels turn.
+          <DockTurn post={post} label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo} onTurn={() => setDockSet(otherDockSet(dock))} />
+        )}
+        {retail
+          ? [0, 1, 2, 3].map((i) => [
+              i === 2 ? (
+                <div
+                  key="sol"
+                  className="dock-sol flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink"
+                >
+                  <span className="-mt-6">
+                    <SolNavButton phone />
                   </span>
-                )}
-              </span>
-              {t.label}
-            </Link>,
-          ];
-        })}
-        <button
-          type="button"
-          onClick={() => setMore(!more)}
-          aria-expanded={more}
-          className={clsx(
-            "flex min-h-14 flex-col items-center justify-center gap-1 text-[10px] font-medium",
-            more ? "text-ink" : "text-muted",
-          )}
-        >
-          <span className={clsx("flex h-7 w-12 items-center justify-center rounded-full", more && "bg-sun")}>
-            <Menu className="size-[18px]" aria-hidden />
-          </span>
-          More
-        </button>
+                  Sol
+                </div>
+              ) : null,
+              <div key={`reel-${i}`} className="relative h-16 self-end overflow-hidden">
+                <div className="dock-reel" style={{ transform: post ? "translateY(-50%)" : undefined, transitionDelay: `${i * 80}ms` }}>
+                  <div className="h-16 [&>*]:w-full" inert={post}>
+                    {tabFor(PHONE_TABS[i], false)}
+                  </div>
+                  <div className="h-16 [&>*]:w-full" inert={!post}>
+                    {tabFor(POST_TABS[i], true)}
+                  </div>
+                </div>
+              </div>,
+            ])
+          : KIND_TABS[kind as Exclude<BusinessKind, "retailer">].map((t) => tabFor(t, false))}
+        {!retail && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!more) leaveSol();
+              setMore(!more);
+            }}
+            aria-expanded={more}
+            className={clsx(
+              "flex flex-col items-center justify-center gap-1 font-medium",
+              retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
+              more ? "text-ink" : "text-muted",
+            )}
+          >
+            <span
+              className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
+            >
+              <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+              {retail && unread > 0 && (
+                <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                  {unread}
+                </span>
+              )}
+            </span>
+            More
+          </button>
+        )}
       </nav>
       {more && (
         <div className="fixed inset-0 z-30 lg:hidden" role="dialog" aria-label="Everything in RENUABL">
@@ -843,12 +965,14 @@ function Shell({
                 { label: "Team chat", href: PATHS.team, n: 0 },
                 ...(retail
                   ? [
+                      { label: "Messages", href: PATHS.messages, n: unread },
                       { label: "Notifications", href: PATHS.notifications, n: mentions },
                       { label: "Email", href: PATHS.inbox, n: mail },
                     ]
                   : []),
                 { label: "Updates", href: PATHS.updates, n: updates },
                 { label: "Feedback", href: PATHS.feedback, n: 0 },
+                ...(kind !== "inspector" ? [{ label: "Usage", href: `${PATHS.settings}/usage`, n: 0 }] : []),
                 { label: "Settings", href: PATHS.settings, n: 0 },
                 { label: "Your account", href: PATHS.account, n: 0 },
               ].map((r) => (
@@ -961,4 +1085,24 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
     };
   }, [on, event]);
   return on ? n : 0;
+}
+
+/** The dock's lip and its graphite ball: a tap dips the ball like a pulled lever and turns the dock. */
+function DockTurn({ label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
+  const [pulls, setPulls] = useState(0);
+  return (
+    <span className="dock-lip absolute -top-[44px] right-3.5 flex h-[44px] w-12 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
+      <button
+        key={pulls}
+        type="button"
+        aria-label={label}
+        title={label}
+        onClick={() => {
+          setPulls((n) => n + 1);
+          onTurn();
+        }}
+        className={`dock-ball size-[28px] rounded-full ${pulls > 0 ? "dock-ball-pull" : ""}`}
+      />
+    </span>
+  );
 }

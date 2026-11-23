@@ -6,7 +6,8 @@ import { Check, ChevronDown, ChevronRight, GraduationCap, Loader2, Lock, PhoneCa
 import type { CoachNote } from "@/lib/domain/design/coaching";
 import { DEFAULT_DELIVERY, DELIVERY_COPY, NATURAL_DELIVERY, sameDelivery, type Delivery } from "@/lib/domain/design/delivery";
 import { TRAINING_COPY, openProposals, type TrainingProposal, type TrainingView } from "@/lib/domain/design/training-call";
-import { TRAINING_PLACED, ringMeToHear, ringMeToTrain, type CallerState } from "@/lib/services/caller";
+import { TRAINING_PLACED, ringMeToHear, ringMeToTrain, saveCallerBrain, type CallerState } from "@/lib/services/caller";
+import { BRAIN_WORDS, CALLER_BRAINS, type CallerBrain } from "@/lib/domain/design/caller";
 import { answerProposal, loadTraining, retryTraining, saveDelivery } from "@/lib/services/coaching";
 
 const SEEN_KEY = "renuabl.design.training-seen";
@@ -30,12 +31,24 @@ export function RingMe({ caller }: { caller: CallerState }) {
   const [busy, setBusy] = useState<"train" | "test" | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const wrap = useRef<HTMLSpanElement>(null);
+  // Where the card sits under the button, kept inside the screen (23 Nov 2026, Martin: on a phone it ran off the right).
+  const [place, setPlace] = useState<{ left: number; width: number } | null>(null);
   const name = caller.name;
   const train = TRAINING_COPY.train(name);
   const test = TRAINING_COPY.test(name);
 
   useEffect(() => {
     if (!open) return;
+    const fit = () => {
+      const box = wrap.current?.getBoundingClientRect();
+      if (!box) return;
+      const gutter = 8;
+      const width = Math.min(320, window.innerWidth - gutter * 2);
+      const left = Math.min(0, window.innerWidth - gutter - width - box.left);
+      setPlace({ left: Math.max(gutter - box.left, left), width });
+    };
+    fit();
+    window.addEventListener("resize", fit);
     const away = (e: MouseEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -45,6 +58,7 @@ export function RingMe({ caller }: { caller: CallerState }) {
     window.addEventListener("mousedown", away);
     window.addEventListener("keydown", key, true);
     return () => {
+      window.removeEventListener("resize", fit);
       window.removeEventListener("mousedown", away);
       window.removeEventListener("keydown", key, true);
     };
@@ -99,13 +113,16 @@ export function RingMe({ caller }: { caller: CallerState }) {
         <div
           role="dialog"
           aria-label={TRAINING_COPY.modeTitle}
-          className="absolute left-0 top-10 z-20 w-80 space-y-2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line"
+          style={place ? { left: place.left, width: place.width } : undefined}
+          className="absolute left-0 top-10 z-20 w-80 max-w-[calc(100vw-1rem)] space-y-2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line"
         >
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Have {name} ring you</p>
           {choice("train", train)}
           {choice("test", test)}
           {said ? (
-            <p className="text-xs text-danger">{said}</p>
+            <p className="text-xs text-danger" role="alert">
+              {said}
+            </p>
           ) : (
             <p className="text-xs leading-snug text-muted">
               {TRAINING_COPY.rings} On a training call, try: {TRAINING_COPY.tryThese.join(" · ")}
@@ -592,5 +609,62 @@ export function DeliverySettings(props: { delivery: Delivery | null; editable: b
       <p className="text-[11px] leading-snug text-muted">{DELIVERY_COPY.note}</p>
       {!props.editable && <p className="text-xs text-muted">Only an admin can change how it speaks.</p>}
     </div>
+  );
+}
+
+/**
+ * The model the agent thinks with on calls (22 Nov 2026, Martin: "build the per-agent model setting"): RENUABL's
+ * default, quicker (Claude Haiku) or more careful (Claude Sonnet), each agent its own. Saved as it is pressed and used
+ * from the next call, test and training calls too.
+ */
+export function BrainSettings(props: { caller: CallerState; editable: boolean }) {
+  // What was pressed here, until the agent read back from the server says the same (undefined: as the server has it).
+  const [picked, setBrain] = useState<CallerBrain | null | undefined>(undefined);
+  const brain = picked === undefined ? (props.caller.brain ?? null) : picked;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<{ ok: boolean; text: string } | null>(null);
+  const save = async (next: CallerBrain | null) => {
+    const was = brain;
+    setBrain(next);
+    setBusy(true);
+    setSaid(null);
+    const res = await saveCallerBrain(next, props.caller.role ?? "sales");
+    setBusy(false);
+    if (!res.ok) {
+      setBrain(was);
+      return setSaid({ ok: false, text: res.message });
+    }
+    setSaid({ ok: true, text: "Saved. Used from the next call." });
+  };
+  const options: (CallerBrain | null)[] = [null, ...CALLER_BRAINS];
+  return (
+    <fieldset disabled={!props.editable || busy} className="border-t border-line pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <legend className="float-left text-[13px] font-medium text-ink">How it thinks</legend>
+        <div className="inline-flex rounded-full bg-surface-2 p-0.5">
+          {options.map((value) => {
+            const on = brain === value;
+            const [label, what] = BRAIN_WORDS[value ?? "default"];
+            return (
+              <button
+                key={value ?? "default"}
+                type="button"
+                aria-pressed={on}
+                title={what}
+                onClick={() => !on && void save(value)}
+                className={clsx(
+                  "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
+                  on ? "bg-surface text-ink shadow-soft" : "text-ink-2 hover:text-ink",
+                )}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <p className="clear-both mt-1 text-xs text-muted">{BRAIN_WORDS[brain ?? "default"][1]}</p>
+      {said && <p className={clsx("mt-1 text-xs", said.ok ? "text-positive" : "text-danger")}>{said.text}</p>}
+    </fieldset>
   );
 }

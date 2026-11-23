@@ -7,7 +7,7 @@
  * says it, with **Yes / No / Something else**; his draft is already open under it to change; and a violet **Context**
  * line says in one go what lies behind it. Rules in domain/design/sol-on-deal.ts; the deal's card from the deal feed.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import Link from "next/link";
 import { ArrowUp, Handshake, Loader2, Mail } from "lucide-react";
@@ -23,7 +23,7 @@ import { markPreparedSent } from "@/lib/services/prepared";
 import { sendReply } from "@/lib/services/chat";
 import { WRITE_ASK_MAX } from "@/lib/domain/design/deal-write";
 import { leadPageFor } from "@/lib/services/hello";
-import { askSolInPanel } from "@/lib/services/sol";
+import { askSolInPanel, draftInSolPanel, handsToPanel } from "@/lib/services/sol";
 import { ContextLine } from "./context-line";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolMark } from "./sol-sun";
@@ -476,6 +476,17 @@ export function SolTerminal(props: {
                   value={heard ? withSpoken(ask, heard) : ask}
                   onChange={(e) => {
                     setHeard("");
+                    // On a phone the box is too small to write in (22 Nov 2026, Martin): the first letter brings up
+                    // Sol's full chat with the words in its box, about this deal. Changing the drafted reply stays here.
+                    if (e.target.value.trim() && handsToPanel() && !(waiting && answer)) {
+                      draftInSolPanel({
+                        text: e.target.value,
+                        about: `On ${deal.customer}'s deal (#${props.jobId}): `,
+                        label: deal.customer,
+                      });
+                      setAsk("");
+                      return;
+                    }
                     setAsk(e.target.value);
                   }}
                   placeholder={
@@ -525,30 +536,40 @@ export function SolLive() {
   );
 }
 
-/** Words typed out as Sol says them, as a terminal would (all at once with reduced motion). */
-export function useTyped(text: string): { text: string; done: boolean } {
+/**
+ * Words typed out as Sol says them, as a terminal would (all at once with reduced motion). Only the words re-render as
+ * they type (22 Nov 2026, Martin: the screens drew slowly; each letter re-rendered the whole card, eight cards at once
+ * on Needs you); the card hears once, when the line is whole.
+ */
+export function useTyped(text: string): { text: ReactNode; done: boolean } {
+  const [doneFor, setDoneFor] = useState<string | null>(null);
+  return { text: <Typing key={text} text={text} onDone={setDoneFor} />, done: doneFor === text };
+}
+
+function Typing({ text, onDone }: { text: string; onDone: (text: string) => void }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    /* eslint-disable react-hooks/set-state-in-effect -- the words start again when they change */
-    if (still) {
+    if (still || !text) {
+      /* eslint-disable-next-line react-hooks/set-state-in-effect -- shown whole at once */
       setShown(text.length);
+      onDone(text);
       return;
     }
-    setShown(0);
-    /* eslint-enable react-hooks/set-state-in-effect */
     // How far along is worked out from the time since it started, and the ticking stops only once the line is whole
-    // (18 Nov 2026, Martin: lines stopped part way). It used to count one letter a tick and stop on a timer, so a page
-    // whose ticks ran late (busy, or behind another tab) was cut off before the end.
+    // (18 Nov 2026, Martin: lines stopped part way). Ticked once a frame at most, never faster than the screen draws.
     const started = performance.now();
-    const t = window.setInterval(() => {
+    let frame = 0;
+    const tick = () => {
       const n = Math.min(text.length, Math.floor((performance.now() - started) / TYPE_MS));
       setShown(n);
-      if (n >= text.length) window.clearInterval(t);
-    }, TYPE_MS);
-    return () => window.clearInterval(t);
-  }, [text]);
-  return { text: text.slice(0, shown), done: shown >= text.length };
+      if (n >= text.length) onDone(text);
+      else frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [text, onDone]);
+  return <>{text.slice(0, shown)}</>;
 }
 
 /**

@@ -11,6 +11,7 @@ import { isCustomer, jobHas, together, type CustomerHas } from "@/lib/domain/des
 import { leadOwnerFor } from "@/lib/domain/design/deal-feed";
 import { marketDateTime, todayInMarket } from "@/lib/domain/market";
 import { roofKey, type DealViewer } from "@/lib/domain/design/account";
+import { homeFor } from "@/lib/domain/design/same-home";
 import {
   INSTALLED_STAGES,
   JOB_STAGES,
@@ -105,31 +106,80 @@ export async function record(
  * "lead" moves to "designed", which is written down like any other move.
  * Narrowed to one job or one roof. Doing it again changes nothing.
  */
-async function link(q: Q, businessId: string, only: { jobId?: string; roofKey?: string }, by: string): Promise<void> {
-  const jobs = await q<{ id: string; customer_id: string; stage: JobStage; project: string }>(
-    `select j.id, j.customer_id, j.stage, p.id as project
-       from design_jobs j join design_projects p on p.business_id = j.business_id and p.roof_key = j.roof_key
-      where j.business_id = $1 and j.project_id is null
-        and ($2::text is null or j.id = $2) and ($3::text is null or j.roof_key = $3)
-        for update of j`,
-    [businessId, only.jobId ?? null, only.roofKey ?? null],
-  );
-  for (const job of jobs) {
+async function link(q: Q, businessId: string, only: { jobId?: string; roof?: { lat: number; lng: number } }, by: string): Promise<void> {
+  const names = { got: null as Awaited<ReturnType<typeof stageNamesIn>> | null };
+  const stageNames = async () => (names.got ??= await stageNamesIn(q, businessId));
+  const join = async (job: { id: string; customer_id: string; stage: JobStage }, project: string, moveTo?: ProjectSpot) => {
     const designed = job.stage === "lead";
-    await q(`update design_jobs set project_id = $3, stage = $4, updated_at = now() where business_id = $1 and id = $2`, [
-      businessId,
-      job.id,
-      job.project,
-      designed ? "designed" : job.stage,
-    ]);
+    await q(
+      moveTo
+        ? `update design_jobs set project_id = $3, stage = $4, lat = $5, lng = $6, roof_key = $7, updated_at = now() where business_id = $1 and id = $2`
+        : `update design_jobs set project_id = $3, stage = $4, updated_at = now() where business_id = $1 and id = $2`,
+      [businessId, job.id, project, designed ? "designed" : job.stage, ...(moveTo ? [moveTo.lat, moveTo.lng, roofKey(moveTo)] : [])],
+    );
+    if (moveTo)
+      await record(q, businessId, {
+        customerId: job.customer_id,
+        jobId: job.id,
+        kind: "note",
+        text: `Joined to the roof design drawn at ${moveTo.address || "this address"}`,
+        by,
+      });
     if (designed)
       await record(q, businessId, {
         customerId: job.customer_id,
         jobId: job.id,
         kind: "stage",
-        text: stageMoveText("designed", await stageNamesIn(q, businessId)),
+        text: stageMoveText("designed", await stageNames()),
         by,
       });
+  };
+
+  const key = only.roof ? roofKey(only.roof) : null;
+  const exact = await q<{ id: string; customer_id: string; stage: JobStage; project: string }>(
+    `select j.id, j.customer_id, j.stage, p.id as project
+       from design_jobs j join design_projects p on p.business_id = j.business_id and p.roof_key = j.roof_key
+      where j.business_id = $1 and j.project_id is null
+        and ($2::text is null or j.id = $2) and ($3::text is null or j.roof_key = $3)
+        for update of j`,
+    [businessId, only.jobId ?? null, key],
+  );
+  for (const job of exact) await join(job, job.project);
+
+  // Then the same home a few metres apart (22 Nov 2026): a deal placed by one map and a design drawn on another.
+  const box = (at: { lat: number; lng: number }) => [at.lat - NEAR_DEG, at.lat + NEAR_DEG, at.lng - NEAR_DEG, at.lng + NEAR_DEG];
+  const loose = await q<{ id: string; customer_id: string; stage: JobStage; address: string; lat: number; lng: number }>(
+    `select j.id, j.customer_id, j.stage, j.address, j.lat, j.lng from design_jobs j
+      where j.business_id = $1 and j.project_id is null and j.lat is not null and j.lng is not null
+        and ($2::text is null or j.id = $2)
+        and ($3::float8 is null or (j.lat between $3 and $4 and j.lng between $5 and $6))
+        for update of j`,
+    [businessId, only.jobId ?? null, ...(only.roof ? box(only.roof) : [null, null, null, null])],
+  );
+  for (const job of loose) {
+    const near = await q<ProjectSpot & { id: string }>(
+      `select id, address, lat, lng from design_projects
+        where business_id = $1 and lat between $2 and $3 and lng between $4 and $5`,
+      [businessId, ...box(job)],
+    );
+    const home = homeFor(job, near);
+    if (home) await join(job, home.id, home);
+  }
+}
+
+type ProjectSpot = { address: string; lat: number; lng: number };
+/** How far round a deal to look for a design of the same home: a little over `SAME_HOME_M` in degrees. */
+const NEAR_DEG = 0.0005;
+
+/**
+ * A deal with no design yet joined to one of the same home drawn a few metres off (an imported deal's place and
+ * the designer's), so its proposal and designer find it. Never a failure for the reader: logged and left.
+ */
+export async function joinNearbyDesign(businessId: string, jobId: string, by: string): Promise<void> {
+  try {
+    await transaction((q) => link(q, businessId, { jobId }, by.toLowerCase()));
+  } catch (e) {
+    console.error("joining a deal to a nearby design failed", e instanceof Error ? e.message : e);
   }
 }
 
@@ -140,7 +190,7 @@ async function link(q: Q, businessId: string, only: { jobId?: string; roofKey?: 
  */
 export async function linkJobsToRoof(businessId: string, roof: { lat: number; lng: number }, by: string): Promise<void> {
   try {
-    await transaction((q) => link(q, businessId, { roofKey: roofKey(roof) }, by.toLowerCase()));
+    await transaction((q) => link(q, businessId, { roof }, by.toLowerCase()));
   } catch (e) {
     console.error("joining jobs to a roof design failed", e instanceof Error ? e.message : e);
   }

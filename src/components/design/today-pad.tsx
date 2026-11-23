@@ -29,7 +29,7 @@ import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
+import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, askSolInPanel, handsToPanel, loadSol, retrySol } from "@/lib/services/sol";
 import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
@@ -38,6 +38,9 @@ import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { InstallListPage } from "./install-lists";
+import { useDockSet } from "@/lib/services/dock-set";
+import { TODAY_FIRST } from "@/lib/services/sol";
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -157,7 +160,14 @@ export function TodayPad(props: {
     } catch {
       // Nothing kept.
     }
-    const opens = todayOpensOn(seen, props.today);
+    // Come from the phone's Sol round (`?today=first`): Business, or My month, whatever was last had.
+    const first = new URLSearchParams(window.location.search).get("today") === "first";
+    if (first) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("today");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    const opens = first ? "chat" : todayOpensOn(seen, props.today);
     const t = window.setTimeout(() => setView(opens), 0);
     return () => window.clearTimeout(t);
   }, [props.welcome, props.today, setView]);
@@ -168,6 +178,17 @@ export function TodayPad(props: {
     window.setTimeout(() => setTouring(true), 80);
   };
   const [turns, setTurns] = useState<Turn[]>([]);
+  // The phone's Sol round pressed while already on Today: back to the first view, out of any conversation.
+  useEffect(() => {
+    const first = () => {
+      setTurns([]);
+      setView("chat");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener(TODAY_FIRST, first);
+    return () => window.removeEventListener(TODAY_FIRST, first);
+  }, [setView]);
+  const jobsView = useDockSet() === "post";
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
   const insights = useInsights();
@@ -194,6 +215,12 @@ export function TodayPad(props: {
   const ask = async (q: string, files: SolFile[] = [], about: string | null = null) => {
     if (asking) return;
     setReplyTo(null);
+    // On a phone a question asked on Today goes to Sol's own chat, not into a conversation under the Business | Feed
+    // switch (23 Nov 2026, Martin). A file still goes in here: his panel's ask carries words only.
+    if (handsToPanel() && !files.length && q.trim()) {
+      askSolInPanel(about ? { text: answerFor(about, q), shown: q } : q);
+      return;
+    }
     const id = Date.now();
     setOnFeed(false);
     setAsking(true);
@@ -279,7 +306,13 @@ export function TodayPad(props: {
             onTour={tour}
           />
         )}
-        {!welcoming && onFeed && (
+        {/* On the dock's post-sale tools, Feed is Jobs: every sold job not yet installed (23 Nov 2026, Martin). */}
+        {!welcoming && onFeed && jobsView && (
+          <div className="pb-6">
+            <InstallListPage switcher={null} />
+          </div>
+        )}
+        {!welcoming && onFeed && !jobsView && (
           <div className="pb-6">
             <InductionReminder />
             <DealFeed
@@ -302,9 +335,15 @@ export function TodayPad(props: {
           aria-hidden={talking}
         >
           <div
-            className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
+            className={clsx(
+              "grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows] duration-500 ease-out",
+              talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+            )}
           >
-            <div className="overflow-hidden">
+            {/* Clipped only while it folds away (22 Nov 2026, Martin, on an iPhone: "I can't scroll down"): left on, Safari
+                can size the grid's row to the screen and cut Needs you and Performance off under it, so the page has
+                nothing more to scroll to. */}
+            <div className={clsx("min-w-0", talking && "min-h-0 overflow-hidden")}>
               <TodayChat
                 name={props.name}
                 views={insights}
@@ -535,7 +574,10 @@ export function SolBox({
               type="submit"
               disabled={asking || !ready}
               aria-label="Ask Sol"
-              className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+              // Pressed with the keyboard up, the box keeps its focus (23 Nov 2026, Martin, on an iPhone: it "isn't
+              // responding"): a first tap that closed the keyboard moved the page under the finger and the press was lost.
+              onPointerDown={(e) => e.preventDefault()}
+              className="ml-auto grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
@@ -565,6 +607,7 @@ export function SolBox({
             type="submit"
             disabled={asking || !ready}
             aria-label="Ask Sol"
+            onPointerDown={(e) => e.preventDefault()}
             className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
           >
             <ArrowUp className="size-4" aria-hidden />

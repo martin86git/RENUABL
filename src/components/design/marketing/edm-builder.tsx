@@ -12,15 +12,20 @@ import {
   Loader2,
   Minus,
   Monitor,
+  MoveVertical,
   MousePointerClick,
   Pencil,
   Plus,
   Redo2,
+  Share2,
   Smartphone,
   Trash2,
   Type,
   Undo2,
   X,
+  ShoppingBag,
+  Timer,
+  CirclePlay,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
@@ -29,8 +34,19 @@ import {
   EDM_BLOCK_WORDS,
   EDM_LIMITS,
   EMPTY_TILE,
+  EMPTY_PRODUCT,
+  PRODUCT_BUTTON,
   MERGE_FIELDS,
+  SOCIAL_NETWORKS,
+  SOCIAL_WORDS,
+  SPACER_SIZES,
+  SPACER_WORDS,
+  SOCIAL_LOOKS,
+  SOCIAL_LOOK_WORDS,
+  cleanSocialLook,
   TILE_COLUMNS,
+  cleanSpace,
+  networkOf,
   cleanColumns,
   cleanLink,
   footerLines,
@@ -49,11 +65,18 @@ import {
   type EdmBrand,
   type EdmContent,
   type EdmSender,
+  type EdmSocial,
+  type SocialNetwork,
+  type SpacerSize,
+  type SocialLook,
   type EdmStyle,
   type EdmTile,
+  type EdmProduct,
 } from "@/lib/domain/marketing/edm";
+import { VIDEO_LINE, videoStillKey, youTubeId } from "@/lib/domain/marketing/edm-video";
+import { COUNTDOWN_UNITS, cleanEndsAt, endsAtMs, endsWords } from "@/lib/domain/marketing/countdown";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
-import { uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
+import { saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
 import { emptyHistory, record, redo as redoHistory, undo as undoHistory } from "@/lib/domain/marketing/edm-history";
 import { SolAsk, type SolAskResult } from "./edm-sol-ask";
 import { SolIcon } from "../sol-icon";
@@ -66,14 +89,19 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   tiles: LayoutGrid,
   button: MousePointerClick,
   divider: Minus,
+  spacer: MoveVertical,
+  social: Share2,
+  products: ShoppingBag,
+  countdown: Timer,
+  video: CirclePlay,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
 const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
-  { name: "Basics", kinds: ["heading", "text", "button", "image"] },
-  { name: "Layout", kinds: ["tiles", "divider"] },
+  { name: "Basics", kinds: ["heading", "text", "button", "image", "video", "products", "countdown"] },
+  { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
 ];
 
 /** When a change was made, for grouping typing into one undo step. */
@@ -107,6 +135,9 @@ export function EdmPreview({
           unsubscribe: "#",
           // The whole address: a sandboxed frame doesn't take its page's address, so "/api/…" alone loads nothing.
           image: (id) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/i/${id}`,
+          social: (network, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/s/${network}.png?c=${colour}`,
+          countdown: (end, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/t/${end}.gif?c=${colour}`,
+          video: (key, colour) => `${typeof window === "undefined" ? "" : window.location.origin}/api/m/v/${key}.jpg?c=${colour}`,
         },
       ).html,
     [content, brand, sender],
@@ -133,12 +164,15 @@ export function EdmPreview({
 export function EdmBuilder({
   content,
   brand,
+  onBrand,
   sender,
   onChange,
   readOnly = false,
 }: {
   content: EdmContent;
   brand: EdmBrand;
+  /** The settings as saved after the logo changes (it is set once for every email). */
+  onBrand?: (b: EdmBrand) => void;
   sender: EdmSender;
   onChange: (c: EdmContent) => void;
   readOnly?: boolean;
@@ -215,7 +249,7 @@ export function EdmBuilder({
     const now = latest.current;
     // Typing (words, a label, a link, a caption) is one step per field while it carries on.
     const part = typeof patch === "function" ? "" : Object.keys(patch).join();
-    const typed = ["text", "url", "tiles"].includes(part);
+    const typed = ["text", "url", "tiles", "socials", "products", "endsAt"].includes(part);
     change(
       {
         ...now,
@@ -473,9 +507,7 @@ export function EdmBuilder({
                 drop(e, dropAt ?? content.blocks.length);
               }}
             >
-              <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
-                {sender.name}
-              </p>
+              <LogoField brand={brand} sender={sender} ink={ink} readOnly={readOnly} onBrand={onBrand} />
               {content.blocks.length === 0 && (
                 <p
                   className={cn(
@@ -860,7 +892,7 @@ function CanvasBlock({
           <GripVertical className="size-3.5" /> {EDM_BLOCK_WORDS[b.kind]}
         </span>
         {sol}
-        {b.kind !== "divider" && b.kind !== "image" && (
+        {b.kind !== "divider" && b.kind !== "image" && b.kind !== "spacer" && (
           <Toggle on={b.align === "center"} onClick={() => onChange({ align: b.align === "center" ? "left" : "center" })} label="Centre it">
             <AlignCenter className="size-3.5" />
           </Toggle>
@@ -957,6 +989,195 @@ function CanvasBlock({
           </div>
         ))}
       {b.kind === "divider" && <div className="my-2 h-px bg-[#e4e4e7]" />}
+      {b.kind === "spacer" && (
+        <div
+          className="grid place-items-center rounded-md bg-[repeating-linear-gradient(135deg,transparent_0_6px,rgba(127,127,127,0.12)_6px_7px)] text-[11px]"
+          style={{ height: SPACER_SIZES[cleanSpace(b.space)], color: `color-mix(in srgb, ${ink.words} 55%, transparent)` }}
+        >
+          {picked ? null : `Space · ${SPACER_WORDS[cleanSpace(b.space)]}`}
+        </div>
+      )}
+      {b.kind === "spacer" && picked && (
+        <div
+          className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] ring-1 ring-line"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-muted">Height</span>
+          {(Object.keys(SPACER_SIZES) as SpacerSize[]).map((k) => (
+            <Toggle key={k} on={cleanSpace(b.space) === k} onClick={() => onChange({ space: k })} label={`${SPACER_WORDS[k]} space`}>
+              <span className="px-1 text-[12px]">{SPACER_WORDS[k]}</span>
+            </Toggle>
+          ))}
+        </div>
+      )}
+      {b.kind === "social" && <SocialPills socials={b.socials ?? []} look={cleanSocialLook(b.socialLook)} colour={colour} align={align} />}
+      {b.kind === "social" && picked && <SocialFields block={b} onChange={onChange} />}
+      {b.kind === "video" && <VideoView block={b} colour={colour} align={align} />}
+      {b.kind === "video" && picked && <VideoFields block={b} onChange={onChange} />}
+      {b.kind === "countdown" && (
+        <>
+          <AutoText
+            value={b.text}
+            max={EDM_LIMITS.caption}
+            align={align}
+            onChange={(text) => onChange({ text })}
+            placeholder="A line over the timer (optional)"
+            className="text-[17px] leading-snug font-semibold"
+            colour={ink.heading}
+          />
+          <CountdownView endsAt={b.endsAt ?? null} colour={colour} ink={ink} align={align} />
+          {picked && <CountdownFields block={b} onChange={onChange} />}
+        </>
+      )}
+      {b.kind === "products" &&
+        (picked ? (
+          <ProductsFields block={b} onChange={onChange} />
+        ) : (
+          <ProductCards products={b.products ?? []} columns={cols} align={align} colour={colour} ink={ink} />
+        ))}
+    </div>
+  );
+}
+
+/** A social links block as it will look: each network's icon, icon and name, or name, in the button colour; until a link is in, a hint. */
+function SocialPills({
+  socials,
+  look,
+  colour,
+  align,
+}: {
+  socials: EdmSocial[];
+  look: SocialLook;
+  colour: string;
+  align: "left" | "center";
+}) {
+  const shown = socials.filter((s) => s.url);
+  if (!shown.length)
+    return (
+      <div className="grid h-12 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <Share2 className="size-4" /> Press to add your social links
+        </span>
+      </div>
+    );
+  const icon = (n: SocialNetwork) => `/api/m/s/${n}.png?c=${colour.replace("#", "")}`;
+  return (
+    <div
+      className={cn("flex flex-wrap py-1", look === "icons" ? "gap-2.5" : "gap-2")}
+      style={{ justifyContent: align === "center" ? "center" : "flex-start" }}
+    >
+      {shown.map((s) =>
+        look === "icons" ? (
+          // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+          <img key={s.network} src={icon(s.network)} alt={SOCIAL_WORDS[s.network]} width={32} height={32} className="size-8" />
+        ) : (
+          <span
+            key={s.network}
+            className={cn(
+              "inline-flex items-center rounded-full border text-[13px] font-semibold",
+              look === "both" ? "gap-1.5 py-1 pr-3.5 pl-1.5" : "px-3.5 py-1.5",
+            )}
+            style={{ borderColor: colour, color: colour }}
+          >
+            {look === "both" && (
+              // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+              <img src={icon(s.network)} alt="" width={20} height={20} className="size-5" />
+            )}
+            {SOCIAL_WORDS[s.network]}
+          </span>
+        ),
+      )}
+    </div>
+  );
+}
+
+/**
+ * A social links block's settings: a row a network with its link, and the networks not yet in it to add. A link
+ * pasted into the first box finds its own network.
+ */
+function SocialFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const socials = b.socials ?? [];
+  const [paste, setPaste] = useState("");
+  const missing = SOCIAL_NETWORKS.filter((n) => !socials.some((s) => s.network === n));
+  // Typing a link is an object patch, so it is one undo step while it carries on (setBlock's typing key).
+  const set = (network: SocialNetwork, url: string | null) =>
+    onChange({ socials: socials.map((s) => (s.network === network ? { ...s, url } : s)) });
+  const add = (network: SocialNetwork, url: string | null = null) =>
+    onChange((now) =>
+      (now.socials ?? []).some((s) => s.network === network) ? {} : { socials: [...(now.socials ?? []), { network, url }] },
+    );
+  const remove = (network: SocialNetwork) => onChange((now) => ({ socials: (now.socials ?? []).filter((s) => s.network !== network) }));
+  const pasted = cleanLink(paste);
+  const pastedNetwork = pasted && !pasted.startsWith("mailto:") ? networkOf(pasted) : null;
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
+        <span className="text-muted">Show as</span>
+        {SOCIAL_LOOKS.map((k) => (
+          <Toggle key={k} on={cleanSocialLook(b.socialLook) === k} onClick={() => onChange({ socialLook: k })} label={SOCIAL_LOOK_WORDS[k]}>
+            <span className="px-1 text-[12px]">{SOCIAL_LOOK_WORDS[k]}</span>
+          </Toggle>
+        ))}
+      </div>
+      {socials.map((s) => (
+        <div key={s.network} className="flex items-center gap-2">
+          <span className="w-20 shrink-0 text-[13px] font-medium text-ink">{SOCIAL_WORDS[s.network]}</span>
+          <div className="min-w-0 flex-1">
+            <LinkInput value={s.url} onChange={(url) => set(s.network, url)} placeholder={`Your ${SOCIAL_WORDS[s.network]} link`} />
+          </div>
+          <IconButton label={`Take ${SOCIAL_WORDS[s.network]} out`} onClick={() => remove(s.network)}>
+            <X className="size-3.5" />
+          </IconButton>
+        </div>
+      ))}
+      {missing.length > 0 && (
+        <>
+          <div className="flex items-center gap-2">
+            <input
+              value={paste}
+              onChange={(e) => setPaste(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && pastedNetwork && missing.includes(pastedNetwork)) {
+                  e.preventDefault();
+                  add(pastedNetwork, pasted);
+                  setPaste("");
+                }
+              }}
+              placeholder="Paste a link to add it"
+              className={field}
+            />
+            <button
+              type="button"
+              disabled={!pastedNetwork || !missing.includes(pastedNetwork)}
+              onClick={() => {
+                if (!pastedNetwork) return;
+                add(pastedNetwork, pasted);
+                setPaste("");
+              }}
+              className="h-10 shrink-0 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas disabled:bg-line disabled:text-muted"
+            >
+              {pastedNetwork ? `Add ${SOCIAL_WORDS[pastedNetwork]}` : "Add"}
+            </button>
+          </div>
+          {pastedNetwork && !missing.includes(pastedNetwork) && (
+            <p className="text-[12px] text-muted">{SOCIAL_WORDS[pastedNetwork]} is already in. Change its link above.</p>
+          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] text-muted">Or add</span>
+            {missing.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => add(n)}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-line px-2.5 text-[12px] hover:border-ink/40"
+              >
+                <Plus className="size-3" /> {SOCIAL_WORDS[n]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <p className="text-[12px] text-muted">Where an inbox blocks pictures, each icon shows its network&apos;s name instead.</p>
     </div>
   );
 }
@@ -1232,6 +1453,240 @@ function TilesFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch
   );
 }
 
+/** A products block as it will look: each named product's picture, name, price, words and button; until one is named, a hint. */
+function ProductCards({
+  products,
+  columns,
+  align,
+  colour,
+  ink,
+}: {
+  products: EdmProduct[];
+  columns: number;
+  align: "left" | "center";
+  colour: string;
+  ink: { heading: string; words: string };
+}) {
+  const shown = products.filter((p) => p.name);
+  if (!shown.length)
+    return (
+      <div className="grid h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <ShoppingBag className="size-4" /> Press to add your products
+        </span>
+      </div>
+    );
+  const cols = Math.min(columns, shown.length);
+  return (
+    <div className={cn("grid gap-4", cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3")} style={{ textAlign: align }}>
+      {shown.map((p, i) => (
+        <div key={i}>
+          {p.imageId && (
+            // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+            <img src={`/api/m/i/${p.imageId}`} alt={p.name} className="mb-2.5 block w-full rounded-lg" />
+          )}
+          <p className="text-[16px] leading-snug font-semibold" style={{ color: ink.heading }}>
+            {p.name}
+          </p>
+          {p.price && (
+            <p className="pt-0.5 text-[15px] font-semibold" style={{ color: colour }}>
+              {p.price}
+            </p>
+          )}
+          {p.text && (
+            <p className="pt-1.5 text-[13px] leading-normal" style={{ color: ink.words }}>
+              {p.text}
+            </p>
+          )}
+          {p.url && (
+            <span
+              className="mt-3 inline-block rounded-full px-[18px] py-[9px] text-[13px] font-semibold text-white"
+              style={{ background: colour }}
+            >
+              {p.label || PRODUCT_BUTTON}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A products block's settings: one, two or three across, and a card a product with its picture, name, price, words,
+ * button words and link. A product with no name is left out of the email; one with no link has no button.
+ */
+function ProductsFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const products = b.products ?? [];
+  const columns = cleanColumns(b.columns);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const full = products.length >= EDM_LIMITS.products;
+  // Typing is an object patch, so it is one undo step while it carries on (setBlock's typing key).
+  const setProduct = (i: number, patch: Partial<EdmProduct>) =>
+    onChange({ products: products.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
+
+  async function picture(file: File | undefined, i: number) {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setProblem("Pictures are JPEG, PNG or WebP.");
+      return;
+    }
+    setProblem(null);
+    setBusy(i);
+    const r = await uploadMarketingImage(file);
+    setBusy(null);
+    if (!r.ok) {
+      setProblem(r.message);
+      return;
+    }
+    // Placed in the block as it stands once the upload is in.
+    onChange((now) => ({ products: (now.products ?? []).map((p, j) => (j === i ? { ...p, imageId: r.id } : p)) }));
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+        <span>Across</span>
+        <span className="inline-flex rounded-full bg-canvas p-0.5">
+          {TILE_COLUMNS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-pressed={columns === c}
+              onClick={() => onChange({ columns: c })}
+              className={cn(
+                "h-7 min-w-8 rounded-full px-2 text-[12px] font-medium",
+                columns === c ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-muted hover:text-ink",
+              )}
+            >
+              {c}
+            </button>
+          ))}
+        </span>
+        <span className="ml-auto">
+          {products.filter((p) => p.name).length} of {EDM_LIMITS.products} products
+        </span>
+      </div>
+      <div className={cn("grid gap-3", columns === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
+        {products.map((p, i) => (
+          <div key={i} className="space-y-1.5 rounded-lg border border-line p-2">
+            <div className="relative">
+              <label
+                className={cn(
+                  "grid aspect-[4/3] cursor-pointer place-items-center overflow-hidden rounded-md bg-canvas text-muted hover:text-ink",
+                  !p.imageId && "border border-dashed border-line-strong",
+                )}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void picture(e.dataTransfer.files[0], i);
+                }}
+              >
+                {p.imageId ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={`/api/m/i/${p.imageId}`} alt="" className="size-full object-cover" />
+                ) : busy === i ? (
+                  <Loader2 className="size-5 animate-spin" />
+                ) : (
+                  <span className="flex flex-col items-center gap-1 text-[12px]">
+                    <ImagePlus className="size-5" /> Drop or choose a picture
+                  </span>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    void picture(e.target.files?.[0], i);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {p.imageId && (
+                <button
+                  type="button"
+                  aria-label="Remove the picture"
+                  title="Remove the picture"
+                  onClick={() => setProduct(i, { imageId: null })}
+                  className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] hover:text-ink"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+            <input
+              value={p.name}
+              maxLength={EDM_LIMITS.productName}
+              onChange={(e) => setProduct(i, { name: e.target.value })}
+              placeholder="Product name"
+              aria-label="Product name"
+              className={field}
+            />
+            <input
+              value={p.price}
+              maxLength={EDM_LIMITS.price}
+              onChange={(e) => setProduct(i, { price: e.target.value })}
+              placeholder="Price, e.g. From $9,990 installed (optional)"
+              aria-label="Price"
+              className={field}
+            />
+            <textarea
+              value={p.text}
+              maxLength={EDM_LIMITS.productText}
+              onChange={(e) => setProduct(i, { text: e.target.value })}
+              placeholder="A line or two about it (optional)"
+              aria-label="About the product"
+              rows={2}
+              className={cn(field, "h-auto py-2")}
+            />
+            <div className="space-y-1.5">
+              <input
+                value={p.label}
+                maxLength={EDM_LIMITS.label}
+                onChange={(e) => setProduct(i, { label: e.target.value })}
+                placeholder={PRODUCT_BUTTON}
+                aria-label="Button words"
+                className={field}
+              />
+              <div>
+                <LinkInput
+                  value={p.url}
+                  onChange={(url) => setProduct(i, { url })}
+                  placeholder="Link (the button shows once there is one)"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange({ products: products.filter((_, j) => j !== i) })}
+              className="text-[12px] text-muted hover:text-danger"
+            >
+              Remove this product
+            </button>
+          </div>
+        ))}
+        {!full && (
+          <button
+            type="button"
+            onClick={() => onChange({ products: [...products, EMPTY_PRODUCT] })}
+            className="grid min-h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted hover:border-ink/40 hover:text-ink"
+          >
+            <span className="flex items-center gap-1.5">
+              <Plus className="size-4" /> Add a product
+            </span>
+          </button>
+        )}
+      </div>
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] text-muted">
+        A product with no name is left out of the email. Prices are as you type them: check they are ones you can honour.
+      </p>
+    </div>
+  );
+}
+
 function IconButton({
   label,
   onClick,
@@ -1354,6 +1809,291 @@ function ColourField({
         />
       </div>
       {note && <p className="mt-1 text-[11px] text-muted">{note}</p>}
+    </div>
+  );
+}
+
+/** A countdown as it will look: the timer as it stands now, the units and the end in words; until it has an end, a hint. */
+function CountdownView({
+  endsAt,
+  colour,
+  ink,
+  align,
+}: {
+  endsAt: string | null;
+  colour: string;
+  ink: { heading: string; words: string };
+  align: "left" | "center";
+}) {
+  if (!endsAt)
+    return (
+      <div className="mt-2 grid h-20 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <Timer className="size-4" /> Press to set when it ends
+        </span>
+      </div>
+    );
+  const src = `/api/m/t/${Math.round(endsAtMs(endsAt) / 1000)}.gif?c=${colour.replace("#", "")}`;
+  return (
+    <div className="mt-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={endsWords(endsAt)} className="block w-full" />
+      <div className="grid grid-cols-4 pt-1.5">
+        {COUNTDOWN_UNITS.map((u) => (
+          <span key={u} className="text-center text-[11px] tracking-[0.08em] uppercase" style={{ color: ink.words }}>
+            {u}
+          </span>
+        ))}
+      </div>
+      <p className="pt-2 text-[13px]" style={{ textAlign: align, color: ink.words }}>
+        {endsWords(endsAt)}
+      </p>
+    </div>
+  );
+}
+
+/** A countdown's settings: the day and time it ends, in the market's time, and how the timer behaves. */
+function CountdownFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const [now] = useState(Date.now);
+  const passed = b.endsAt ? endsAtMs(b.endsAt) <= now : false;
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <label className="block text-[12px] text-muted">
+        Ends (Melbourne time)
+        <input
+          type="datetime-local"
+          value={b.endsAt ?? ""}
+          onChange={(e) => onChange({ endsAt: cleanEndsAt(e.target.value) })}
+          className={cn(field, "mt-1")}
+        />
+      </label>
+      {passed && <p className="text-[12px] font-medium text-warning">That time has passed: the timer will show zeros.</p>}
+      <p className="text-[12px] leading-snug text-muted">
+        Each time someone opens the email, the timer shows the time left then and counts down for a minute. Where an inbox blocks pictures,
+        the end in words still shows. Only set an end you&apos;ll keep to.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The business's logo at the top of the email (22 Nov 2026, Martin: "we need a clear upload business logo drop field"):
+ * with none, a plain drop field that says what it is for; with one, the logo with Change and Remove. It is saved as the
+ * business's marketing setting at once, so it heads every email, not only this one.
+ */
+function LogoField({
+  brand,
+  sender,
+  ink,
+  readOnly,
+  onBrand,
+}: {
+  brand: EdmBrand;
+  sender: EdmSender;
+  ink: { heading: string; words: string };
+  readOnly: boolean;
+  onBrand?: (b: EdmBrand) => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const files = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+  const keep = async (id: string | null) => {
+    const r = await saveMarketingLogo(id);
+    if (!r.ok) return setProblem(r.message);
+    onBrand?.(r.settings.brand);
+  };
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    setProblem(null);
+    setBusy(true);
+    const r = await uploadMarketingImage(file, "logo");
+    if (r.ok) await keep(r.id);
+    else setProblem(r.message);
+    setBusy(false);
+  };
+  const dropProps = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOver(true);
+    },
+    onDragLeave: () => setOver(false),
+    onDrop: (e: React.DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOver(false);
+      void upload(e.dataTransfer.files[0]);
+    },
+  };
+  const picker = (
+    <input
+      ref={input}
+      type="file"
+      accept="image/png,image/jpeg,image/webp"
+      className="hidden"
+      onChange={(e) => {
+        void upload(e.target.files?.[0]);
+        e.target.value = "";
+      }}
+    />
+  );
+  if (readOnly || !onBrand)
+    return brand.logoId ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="mx-8 mb-2 block h-11 w-auto max-w-[240px]" />
+    ) : (
+      <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
+        {sender.name}
+      </p>
+    );
+  return (
+    <div className="px-5 pb-2" onClick={(e) => e.stopPropagation()}>
+      {picker}
+      {brand.logoId ? (
+        <div
+          {...dropProps}
+          className={cn(
+            "group/logo relative flex items-center gap-3 rounded-xl px-3 py-2 ring-1 ring-transparent hover:ring-line",
+            over && "bg-sun/30 ring-sun-line",
+          )}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="block h-11 w-auto max-w-[240px]" />
+          <div className="ml-auto flex gap-1.5 opacity-0 transition-opacity group-focus-within/logo:opacity-100 group-hover/logo:opacity-100">
+            <button
+              type="button"
+              onClick={() => input.current?.click()}
+              disabled={busy}
+              className="h-8 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink/40"
+            >
+              {busy ? "Uploading…" : "Change logo"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void keep(null)}
+              disabled={busy}
+              className="h-8 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink/40"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          {...dropProps}
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3 text-left transition-colors",
+            over ? "border-sun-line bg-sun/30" : "border-line-strong hover:border-ink/40 hover:bg-canvas",
+          )}
+        >
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-canvas text-muted">
+            {busy ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[14px] font-semibold text-ink">{busy ? "Uploading your logo…" : "Add your business logo"}</span>
+            <span className="block text-[12px] text-muted">
+              Drop it here, or press to choose. A PNG with a clear background works best. It heads every email; until then,{" "}
+              {sender.name || "your business name"} shows in words.
+            </span>
+          </span>
+        </button>
+      )}
+      {problem && <p className="mt-1.5 px-1 text-[12px] text-warning">{problem}</p>}
+    </div>
+  );
+}
+
+/** A video block as it will look: its still with the play button and the line under it; until it has one, a hint. */
+function VideoView({ block: b, colour, align }: { block: EdmBlock; colour: string; align: "left" | "center" }) {
+  const key = videoStillKey(b.imageId, b.url);
+  return (
+    <div className="mt-1">
+      {key ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/m/v/${key}.jpg?c=${colour.replace("#", "")}`} alt="" className="block w-full rounded-lg" />
+      ) : (
+        <div className="grid aspect-video place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+          <span className="flex items-center gap-1.5">
+            <CirclePlay className="size-4" /> Press to add the video&apos;s link
+          </span>
+        </div>
+      )}
+      <p className="pt-2.5 text-[14px] font-semibold" style={{ textAlign: align, color: colour }}>
+        &#9654;&nbsp;{b.text || VIDEO_LINE}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A video block's settings: the link where it plays, the line under it, and the still (a YouTube link brings its own;
+ * any other needs a picture). Mail apps don't play video, so the still and the line open the link.
+ */
+function VideoFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const yt = youTubeId(b.url);
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setBusy(true);
+    setProblem(null);
+    const r = await uploadMarketingImage(file);
+    setBusy(false);
+    if (!r.ok) return setProblem(r.message);
+    onChange({ imageId: r.id });
+  }
+  return (
+    <div className="mt-3 space-y-2 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <LinkInput
+        value={b.url}
+        onChange={(url) => onChange({ url: url && url.startsWith("https://") ? url : null })}
+        placeholder="The video's link: YouTube, Vimeo, your website…"
+      />
+      <input
+        value={b.text}
+        maxLength={EDM_LIMITS.caption}
+        onChange={(e) => onChange({ text: e.target.value })}
+        placeholder={`The line under it (blank: ${VIDEO_LINE})`}
+        className={field}
+      />
+      <div
+        className="flex flex-wrap items-center gap-2"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          pick(e.dataTransfer.files?.[0]);
+        }}
+      >
+        <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line-strong px-3 text-[13px] hover:border-ink/40">
+          {busy && <Loader2 className="size-4 animate-spin" />}
+          {b.imageId ? "Change the picture" : yt ? "Use my own picture" : "Choose a picture"}
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+        </label>
+        {b.imageId && (
+          <button
+            type="button"
+            onClick={() => onChange({ imageId: null })}
+            className="h-9 rounded-full px-3 text-[13px] text-muted hover:text-ink"
+          >
+            {yt ? "Use YouTube's picture" : "Remove the picture"}
+          </button>
+        )}
+      </div>
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] leading-snug text-muted">
+        {yt && !b.imageId
+          ? "The video's own picture from YouTube is used, with a play button on it."
+          : b.url && !b.imageId
+            ? "Add a picture to show for the video: only YouTube links bring their own."
+            : "Mail apps don't play video, so the picture and the line under it open the video's link."}
+      </p>
     </div>
   );
 }
