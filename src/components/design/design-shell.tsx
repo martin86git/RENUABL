@@ -1063,7 +1063,7 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
 function DockTurn({ label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
   const [pulls, setPulls] = useState(0);
   return (
-    <span className="dock-lip absolute -top-[38px] right-3 flex h-[38px] w-14 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
+    <span className="dock-lip absolute -top-[44px] right-3.5 flex h-[44px] w-12 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
       <button
         key={pulls}
         type="button"
