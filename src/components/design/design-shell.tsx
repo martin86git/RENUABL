@@ -443,7 +443,7 @@ function Shell({
         })}
       </nav>
     ) : null;
-  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the lime dock. */
+  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the post-sale dock. */
   const tabFor = (t: PhoneTab, dark: boolean) => {
     if (retail && t.label === VOICE_TAB)
       return (
@@ -458,7 +458,7 @@ function Shell({
     const lit = !more && t.match(path);
     const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
     // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
-    // of graphite tiles lit from above, each glyph in the hi-vis lime, on the lime glass dock; the one open ringed white.
+    // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
     if (dark)
       return (
         <Link
@@ -470,7 +470,7 @@ function Shell({
           }}
           aria-current={lit ? "page" : undefined}
           className={clsx(
-            "flex flex-col items-center justify-center gap-1 text-[11px] font-semibold tracking-[0.01em] text-[#1d2306]",
+            "flex flex-col items-center justify-center gap-1 text-[11px] font-semibold tracking-[0.01em] text-ink",
             retail ? "h-16" : "min-h-14",
             !lit && "opacity-80",
           )}
