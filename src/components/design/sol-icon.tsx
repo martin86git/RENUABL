@@ -133,10 +133,10 @@ export function SolMarkFlat({ className, glow = true }: { className?: string; gl
  * the color from the sun", to keep the brand and the focus on intelligence without Sol's bright, intense look): the
  * same brain as `SunBrainLines` in fine lines of the text colour, with no disc, fill or glow.
  */
-export function SolEtch({ className }: { className?: string }) {
+export function SolEtch({ className, width = 1.5 }: { className?: string; width?: number }) {
   return (
     <svg viewBox="9 10 82 82" className={className} aria-hidden>
-      <SunBrainLines stroke="currentColor" width={1.5} />
+      <SunBrainLines stroke="currentColor" width={width} />
     </svg>
   );
 }

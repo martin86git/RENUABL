@@ -1958,14 +1958,27 @@ html:has(.sales-snap) {
     inset 0 3px 0 rgb(255 255 255 / 0.9),
     0 -6px 24px -12px rgb(20 22 26 / 0.18);
 }
-/* Sol on the post-sale dock takes the hi-vis colour (23 Nov 2026, Martin: "bring sol inline with the neon theme"): his
-   live sun turned from orange to lime by its hue, the white brain lines unchanged, easing across as the dock turns.
-   Only the sun itself, so his count and the dot when he holds a deal keep their colours. */
-.dock-sol canvas {
-  transition: filter 450ms ease;
+/* Sol on the post-sale dock is only his etched brain in the hi-vis lime (23 Nov 2026, Martin: "imagine sol with all the
+   orange taken away. The etch lines remain"; a lime-tinted sun was tried first and he didn't want him filled in). The
+   sun fades out and the lines in as the dock turns; a faint graphite shadow keeps the lime lines readable on the white
+   glass. His count and the dot when he holds a deal stay as they are. */
+.sol-etch-face {
+  opacity: 0;
+  color: #b9e80c;
+  filter: drop-shadow(0 0 0.5px rgb(30 34 20 / 0.6)) drop-shadow(0 0 6px rgb(200 255 40 / 0.55));
+  transition: opacity 450ms ease;
 }
-.phone-tabbar[data-dock="post"] .dock-sol canvas {
-  filter: hue-rotate(46deg) saturate(1.05) brightness(1.15);
+.sol-sun-face {
+  transition: opacity 450ms ease;
+}
+.phone-tabbar[data-dock="post"] .sol-etch-face {
+  opacity: 1;
+}
+.phone-tabbar[data-dock="post"] .sol-sun-face {
+  opacity: 0;
+}
+.phone-tabbar[data-dock="post"] .sol-orb {
+  box-shadow: none;
 }
 /* A post-sale tool: a graphite tile lit from above, a fine light rim and a soft shadow on the lime. */
 .dock-tile {
