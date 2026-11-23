@@ -1952,29 +1952,43 @@ html:has(.sales-snap) {
 .dock-reel {
   transition: transform 620ms cubic-bezier(0.25, 1.55, 0.45, 1);
 }
-/* The turn round: over the dock's left end, two arrows chasing each other that spin a full turn as the dock turns. */
-.dock-turn {
+/* The lip: a rounded bump rising out of the dock's top edge above Team, the dock's own colour, holding the ball. */
+.dock-lip {
   background-color: var(--surface);
   border-color: var(--line);
-  box-shadow: 0 6px 16px -6px rgb(20 22 26 / 0.35);
   transition:
     background-color 450ms ease,
     border-color 450ms ease;
 }
-.phone-tabbar[data-dock="post"] .dock-turn {
+.phone-tabbar[data-dock="post"] .dock-lip {
   background-color: var(--dock-post);
-  border-color: rgb(255 255 255 / 0.16);
+  border-color: var(--dock-post-line);
 }
-.dock-turn-arrows {
-  transition: transform 700ms cubic-bezier(0.25, 1.35, 0.45, 1);
+/* The ball: a graphite orb, lit from the upper left. */
+.dock-ball {
+  background: radial-gradient(circle at 35% 28%, #8a8f98, #3a3d43 52%, #17181b);
+  box-shadow:
+    0 2px 6px rgb(0 0 0 / 0.35),
+    inset 0 -2px 3px rgb(0 0 0 / 0.35);
 }
-/* A deal's Sol sheet sits where the turn round floats: it steps aside while the sheet is open. */
-html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-turn {
+.dock-ball-pull {
+  animation: dock-ball-pull 520ms ease-out;
+}
+@keyframes dock-ball-pull {
+  30% {
+    transform: translateY(6px) scale(0.92);
+  }
+  65% {
+    transform: translateY(-3px);
+  }
+}
+/* A deal's Sol sheet sits where the lip rises: it steps aside while the sheet is open. */
+html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .dock-reel,
-  .dock-turn-arrows {
-    transition: none;
+  .dock-ball-pull {
+    animation: none;
   }
 }

@@ -16,7 +16,6 @@ import {
   FileCheck2,
   FileText,
   Package,
-  RefreshCw,
   LayoutDashboard,
   Menu,
   MessagesSquare,
@@ -826,9 +825,10 @@ function Shell({
         )}
       >
         {retail && (
-          // The dock's turn round (23 Nov 2026, Martin: a slot-machine drum read poorly, "maybe it should be an arrow in a
-          // circular motion"): a round floating above the dock's left end with two arrows chasing each other; a tap spins
-          // it a full turn and the dock's reels follow. On the left so it never meets the back-to-top round.
+          // The dock's lip and ball (23 Nov 2026, Martin: back on the right and part of the dock, "it just needed to be
+          // taller so it wouldn't encroach on the chat icon", and "a graphite colored orb"): a lip rising out of the
+          // dock's top edge above Team, high enough to clear Team's round and its count, holding a graphite ball. A tap
+          // dips the ball like a lever and the dock's reels turn.
           <DockTurn post={post} label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo} onTurn={() => setDockSet(otherDockSet(dock))} />
         )}
         {retail
@@ -1059,26 +1059,22 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
   return on ? n : 0;
 }
 
-/** The round that turns the dock between its two sets: a full spin each tap, always the same way round. */
-function DockTurn({ post, label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
-  const [turns, setTurns] = useState(0);
+/** The dock's lip and its graphite ball: a tap dips the ball like a pulled lever and turns the dock. */
+function DockTurn({ label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
+  const [pulls, setPulls] = useState(0);
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={() => {
-        setTurns((t) => t + 1);
-        onTurn();
-      }}
-      className="dock-turn absolute -top-[52px] left-3 grid size-10 place-items-center rounded-full border"
-    >
-      <RefreshCw
-        className={`dock-turn-arrows size-[19px] ${post ? "text-[#8fb3d9]" : "text-sun-line"}`}
-        style={{ transform: `rotate(${turns * 360}deg)` }}
-        strokeWidth={2.25}
-        aria-hidden
+    <span className="dock-lip absolute -top-[38px] right-3 flex h-[38px] w-14 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
+      <button
+        key={pulls}
+        type="button"
+        aria-label={label}
+        title={label}
+        onClick={() => {
+          setPulls((n) => n + 1);
+          onTurn();
+        }}
+        className={`dock-ball size-[28px] rounded-full ${pulls > 0 ? "dock-ball-pull" : ""}`}
       />
-    </button>
+    </span>
   );
 }
