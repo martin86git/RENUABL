@@ -488,6 +488,8 @@ export function TeamChatPanel({
           className={clsx(
             "relative flex shrink-0 flex-col bg-canvas/60",
             !narrow && "border-r border-line",
+            // Narrow, the whole list scrolls as one, as Slack's does, not only the people at its foot.
+            narrow && "staff-scroll overflow-y-auto",
             narrow && !listShown && "hidden",
           )}
         >
@@ -530,7 +532,7 @@ export function TeamChatPanel({
           {(view?.channels ?? TEAM_CHANNELS.map((c) => ({ room: c.id as string, label: c.label, unread: 0, own: false }))).map((c) => (
             <div key={c.room} className="group relative">
               <RoomButton on={room === c.room} unread={c.unread} onClick={() => setRoom(c.room)}>
-                <Hash className="size-3.5 shrink-0 text-muted" aria-hidden />
+                <Hash className="size-3.5 shrink-0 text-muted max-sm:size-5" aria-hidden />
                 <span className="truncate">{c.label}</span>
               </RoomButton>
               {c.own && view?.mayRemoveChannels && (
@@ -568,7 +570,7 @@ export function TeamChatPanel({
               onClose={() => setAdding(null)}
             />
           )}
-          <div className="staff-scroll min-h-0 flex-1 overflow-y-auto pb-2">
+          <div className={narrow ? "flex-1 pb-2" : "staff-scroll min-h-0 flex-1 overflow-y-auto pb-2"}>
             {view && view.people.length === 0 && (
               <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Settings → Users.</p>
             )}
@@ -579,18 +581,20 @@ export function TeamChatPanel({
               </RoomButton>
             ))}
           </div>
-          <NewChatButton
-            sol={hasSol}
-            onMessage={() => setAdding("person")}
-            onChannel={() => setAdding("channel")}
-            onSol={async () => {
-              setSide("team");
-              const r = await newSolChat();
-              if (!r.ok) setError(r.message);
-              setSolFresh((n) => n + 1);
-              setRoom(SOL_ROOM);
-            }}
-          />
+          <div className={clsx(narrow && "pointer-events-none sticky bottom-0 [&>*]:pointer-events-auto")}>
+            <NewChatButton
+              sol={hasSol}
+              onMessage={() => setAdding("person")}
+              onChannel={() => setAdding("channel")}
+              onSol={async () => {
+                setSide("team");
+                const r = await newSolChat();
+                if (!r.ok) setError(r.message);
+                setSolFresh((n) => n + 1);
+                setRoom(SOL_ROOM);
+              }}
+            />
+          </div>
         </nav>
 
         {solOpen && (
@@ -613,7 +617,7 @@ export function TeamChatPanel({
                   {dealOpen ? `${dealOpen.customer} · ${dealOpen.title}` : "Deal chat"}
                 </p>
                 {dealOpen?.address && <p className="truncate text-xs text-ink-2">{dealOpen.address}</p>}
-                <p className="truncate text-[11px] text-muted">Everyone who may see the deal · never seen by customers</p>
+                <p className="truncate text-[11px] text-muted max-sm:hidden">Everyone who may see the deal · never seen by customers</p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <Link
@@ -675,7 +679,7 @@ export function TeamChatPanel({
                 {channel && <Hash className="size-3.5 text-muted" aria-hidden />}
                 {channel ? channel.label : roomLabel(room, me)}
               </p>
-              <p className="truncate text-[11px] text-muted">
+              <p className="truncate text-[11px] text-muted max-sm:hidden">
                 {channel ? "Everyone in the business" : "Just the two of you"} · never seen by customers
               </p>
             </div>
@@ -1103,7 +1107,13 @@ export function TeamChatPanel({
                     void send();
                   }
                 }}
-                placeholder={channel ? `Message ${channel.label} (@ to tag, # for a deal)` : `Message ${nameOf(other ?? "")}`}
+                placeholder={
+                  channel
+                    ? narrow
+                      ? `Message ${channel.label}`
+                      : `Message ${channel.label} (@ to tag, # for a deal)`
+                    : `Message ${nameOf(other ?? "")}`
+                }
                 aria-label="Your message"
                 className="max-h-40 min-h-[2.75rem] w-full min-w-0 flex-1 resize-none bg-transparent px-1.5 py-2.5 text-left text-sm outline-none [field-sizing:content] placeholder:text-muted"
               />
@@ -1382,7 +1392,7 @@ function NewChatButton(props: { sol: boolean; onMessage: () => void; onChannel: 
 /** A heading in the list of conversations with a plus at its end (14 Nov 2026, Martin: "add channels + and dm +"). */
 function ListHead(props: { label: string; plus: string; on: boolean; onPlus: () => void }) {
   return (
-    <p className="flex items-center justify-between px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+    <p className="flex items-center justify-between px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted max-sm:px-5 max-sm:pt-5 max-sm:text-[12px]">
       {props.label}
       <button
         type="button"
@@ -1395,7 +1405,7 @@ function ListHead(props: { label: string; plus: string; on: boolean; onPlus: () 
           props.on ? "bg-surface-2 text-ink" : "text-ink-2",
         )}
       >
-        <Plus className="size-3.5" aria-hidden />
+        <Plus className="size-3.5 max-sm:size-5" aria-hidden />
       </button>
     </p>
   );
@@ -1517,7 +1527,7 @@ function RoomButton(props: { on: boolean; unread: number; onClick: () => void; t
       title={props.title}
       aria-current={props.on ? "true" : undefined}
       className={clsx(
-        "mx-1.5 flex w-[calc(100%-0.75rem)] min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm",
+        "mx-1.5 flex w-[calc(100%-0.75rem)] min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm max-sm:mx-2 max-sm:w-[calc(100%-1rem)] max-sm:gap-3 max-sm:rounded-xl max-sm:px-3 max-sm:py-2.5 max-sm:text-[16px]",
         props.on
           ? "bg-surface font-medium text-ink shadow-[0_1px_3px_rgba(11,11,12,0.1)]"
           : props.unread
@@ -2060,8 +2070,49 @@ export function TeamChatPage() {
   const [account] = useDesignAccount();
   if (!account?.signedIn || !("email" in account) || !account.email) return null;
   return (
-    <div className="h-[calc(100dvh-12rem)] min-h-[28rem] overflow-hidden rounded-2xl ring-1 ring-line max-sm:h-[calc(100dvh-17rem)] max-sm:min-h-[22rem]">
+    <PhoneFill>
       <TeamChatPanel me={account.email} />
+    </PhoneFill>
+  );
+}
+
+/**
+ * The chat's frame on its page. On a phone (23 Nov 2026, Martin: "allow it to fill most of the page", as Slack) it runs
+ * the pad's whole width (the pad's padding taken off, globals.css), from where it starts down to just above the foot bar, measured as the screen
+ * changes; larger, the rounded card it was.
+ */
+function PhoneFill({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const phone = window.matchMedia("(max-width: 639px)");
+    const fit = () => {
+      if (!phone.matches) return setH(null);
+      const view = window.visualViewport?.height ?? window.innerHeight;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      // The foot bar stands over the page's foot: leave it its height and a little air.
+      const foot = (document.querySelector(".phone-tabbar")?.getBoundingClientRect().height ?? 72) + 12;
+      setH(Math.max(320, Math.round(view - top - foot)));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    phone.addEventListener("change", fit);
+    window.visualViewport?.addEventListener("resize", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      phone.removeEventListener("change", fit);
+      window.visualViewport?.removeEventListener("resize", fit);
+    };
+  }, []);
+  return (
+    <div
+      ref={ref}
+      style={h ? { height: h } : undefined}
+      className="team-phone h-[calc(100dvh-12rem)] min-h-[28rem] overflow-hidden rounded-2xl ring-1 ring-line max-sm:min-h-0 max-sm:rounded-b-none max-sm:rounded-t-[28px] max-sm:ring-0"
+    >
+      {children}
     </div>
   );
 }
