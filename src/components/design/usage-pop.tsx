@@ -15,7 +15,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { ArrowLeft, CreditCard, Gauge, PencilRuler, Phone, Sparkles, X } from "lucide-react";
 import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
-import { SOL_PACKS } from "@/lib/domain/design/sol-credits";
+import { SOL_PACKS, solPackBonus } from "@/lib/domain/design/sol-credits";
 import { TOKEN_PACKS, dollars, packBonus, packDollars, packPriceCents, type TokenPack } from "@/lib/domain/design/plans";
 import { packCardForm } from "@/lib/services/billing";
 import { mountDepositForm } from "@/lib/services/stripe-form";
@@ -198,6 +198,7 @@ function UsageBox({ s, paid, onClose }: { s: UsagePop; paid: boolean; onClose: (
                           key={p.credits}
                           disabled={!mayBuy}
                           top={`${p.credits.toLocaleString("en-AU")} credits`}
+                          extra={solPackBonus(p) > 0 ? `+${solPackBonus(p).toLocaleString("en-AU")} bonus` : undefined}
                           price={dollars(p.cents)}
                           onClick={() =>
                             setPaying({

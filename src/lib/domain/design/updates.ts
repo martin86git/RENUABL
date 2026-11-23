@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
+    area: "Billing",
+    words: "Sol's larger credit packs show the extra credits you get in green: +240 on 1,000 and +811 on 3,000.",
+  },
+  {
+    day: "2026-11-24",
     area: "Marketplace",
     words: "On a phone, the Marketplace dock's icons are plain blue outlines, no dark tiles.",
   },
