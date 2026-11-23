@@ -30,6 +30,7 @@ import {
   Wrench,
   type LucideIcon,
   Mail,
+  Phone,
 } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
@@ -76,6 +77,8 @@ export const PATHS = {
   home: "/design",
   sales: "/design/sales",
   pipelines: "/design/sales/pipelines",
+  feed: "/design/sales/feed",
+  calendar: "/design/calendar",
   deals: "/design/deals",
   installations: "/design/installations",
   customers: "/design/customers",
@@ -109,12 +112,43 @@ export const PATHS = {
  * closed, Pipeline, Calls"): the Sales section's four pages, which a computer shows under the menu, as one segmented
  * control at the top of the pad; the two proposal pages under one word.
  */
+// Feed first, the landing view (23 Nov 2026, Martin: "Feed moves into deals as the landing view… proposals open / closed
+// become icons, perhaps proposals open icon contains an incomplete ring, proposals closed is a complete ring. Calls is a
+// phone").
 const DEALS_SWITCH = [
-  { href: PATHS.pipelines, top: null, label: "Pipeline", full: "Pipeline" },
-  { href: PATHS.proposalsSent, top: "Proposals", label: "Open", full: "Proposals open" },
-  { href: PATHS.proposalsSigned, top: "Proposals", label: "Closed", full: "Proposals closed" },
-  { href: PATHS.calls, top: null, label: "Calls", full: "Calls" },
+  { href: PATHS.feed, label: "Feed", full: "Feed", icon: null },
+  { href: PATHS.pipelines, label: "Pipeline", full: "Pipeline", icon: null },
+  { href: PATHS.proposalsSent, label: "Open", full: "Proposals open", icon: "open" },
+  { href: PATHS.proposalsSigned, label: "Closed", full: "Proposals closed", icon: "closed" },
+  { href: PATHS.calls, label: "Calls", full: "Calls", icon: "calls" },
 ] as const;
+
+/**
+ * A proposal, as a page with its corner folded, holding a ring (23 Nov 2026, Martin: "proposals open icon contains an
+ * incomplete ring, proposals closed is a complete ring"): open, the ring not yet closed; closed, the ring complete.
+ */
+function ProposalRing({ closed }: { closed: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-[21px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M6.5 2.5h8l4 4v14a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-17a1 1 0 0 1 1-1z" />
+      <path d="M14.5 2.5v4h4" />
+      {closed ? (
+        <circle cx="12" cy="14" r="3.6" strokeWidth={2.2} className="text-positive" />
+      ) : (
+        <circle cx="12" cy="14" r="3.6" strokeWidth={2} strokeDasharray="15.5 7.1" transform="rotate(-90 12 14)" />
+      )}
+    </svg>
+  );
+}
 
 /**
  * On the pipeline (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can dock
@@ -137,12 +171,12 @@ export function PhoneDealsSwitch({
       <div
         className={clsx(
           "grid gap-1 rounded-2xl bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]",
-          pipeline ? "grid-cols-[1.6fr_1fr_1fr_0.8fr] gap-0.5" : "grid-cols-4",
+          pipeline ? "grid-cols-[0.9fr_1.7fr_0.6fr_0.6fr_0.6fr] gap-0.5" : "grid-cols-[1fr_1fr_0.7fr_0.7fr_0.7fr]",
           tray && "rounded-bl-none",
         )}
       >
         {DEALS_SWITCH.map((t) => {
-          const lit = path === t.href || path.startsWith(`${t.href}/`) || (t.href === PATHS.pipelines && path === PATHS.sales);
+          const lit = path === t.href || path.startsWith(`${t.href}/`) || (t.href === PATHS.feed && path === PATHS.sales);
           const cell = clsx(
             "flex min-h-11 min-w-0 flex-col items-center justify-center rounded-xl px-1 text-center leading-tight transition-colors",
             lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted active:bg-surface/60",
@@ -155,18 +189,16 @@ export function PhoneDealsSwitch({
             );
           }
           return (
-            <Link key={t.href} href={t.href} aria-label={t.full} aria-current={lit ? "page" : undefined} className={cell}>
-              {t.top && (
-                <span
-                  className={clsx(
-                    "font-medium uppercase opacity-70",
-                    pipeline ? "text-[8.5px] tracking-[0.04em]" : "text-[9.5px] tracking-[0.08em]",
-                  )}
-                >
-                  {t.top}
+            <Link key={t.href} href={t.href} aria-label={t.full} title={t.full} aria-current={lit ? "page" : undefined} className={cell}>
+              {t.icon === null ? (
+                <span className="text-[13px] font-medium">{t.label}</span>
+              ) : t.icon === "calls" ? (
+                <Phone className={clsx("size-[18px]", lit && "text-sun-line")} aria-hidden />
+              ) : (
+                <span className={lit ? "text-sun-line" : undefined}>
+                  <ProposalRing closed={t.icon === "closed"} />
                 </span>
               )}
-              <span className="text-[13px] font-medium">{t.label}</span>
             </Link>
           );
         })}
@@ -219,7 +251,7 @@ const VOICE_TAB = "Voice";
 const PHONE_TABS: PhoneTab[] = [
   {
     label: "Deals",
-    href: PATHS.pipelines,
+    href: PATHS.feed,
     icon: SquareKanban,
     match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) || p.startsWith(PATHS.calls),
   },
@@ -594,6 +626,7 @@ function Shell({
         />
       );
     const lit = !more && t.match(path);
+    const market = t.href.startsWith(MARKET);
     const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : t.href === `${MARKET}/messages` ? (trade ?? 0) : 0;
     // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
     // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
@@ -613,7 +646,15 @@ function Shell({
             !lit && "opacity-80",
           )}
         >
-          <span className={clsx("dock-tile relative flex size-9 items-center justify-center", lit && "dock-tile-lit")}>
+          {/* The Marketplace's tools are the blue line icon alone, no graphite tile (24 Nov 2026, Martin: "remove graphite
+              from the marketplace icons and keep to blue outline"). */}
+          <span
+            className={clsx(
+              "relative flex size-9 items-center justify-center",
+              market ? "dock-tile-market" : "dock-tile",
+              lit && (market ? "dock-tile-market-lit" : "dock-tile-lit"),
+            )}
+          >
             <t.icon className={clsx("size-[19px]", glyph)} strokeWidth={1.9} aria-hidden />
             {n > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
@@ -899,6 +940,9 @@ function Shell({
               {retail && tool && <SolNavButton small />}
               {retail && tool && <TeamChatButton me={account.email} customers={unread + mentions} />}
               {/* Email, with its unread count, on every page. */}
+              {retail && (
+                <TopIcon href={PATHS.calendar} label="Calendar" icon={CalendarDays} on={path.startsWith(PATHS.calendar)} badge={0} />
+              )}
               {retail && <TopIcon href={PATHS.inbox} label="Email" icon={Mail} on={path.startsWith(PATHS.inbox)} badge={mail} />}
               {!retail && <TopIcon href={PATHS.team} label="Team chat" icon={MessagesSquare} on={path.startsWith(PATHS.team)} badge={0} />}
               <ProfileMenu
@@ -940,6 +984,7 @@ function Shell({
         back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
         onSearch={retail ? () => setSearching(true) : undefined}
         mail={retail ? { href: PATHS.inbox, count: mail, on: path.startsWith(PATHS.inbox) } : undefined}
+        calendar={retail ? { href: PATHS.calendar, on: path.startsWith(PATHS.calendar) } : undefined}
         more={
           retail
             ? {
@@ -1044,7 +1089,7 @@ function Shell({
                 >
                   {DOCK_SETS.map((set) => (
                     <div key={set} className="h-16 [&>*]:w-full" inert={set !== dock}>
-                      {tabFor(DOCK_TABS[set][i], set !== "sales", set === "market" ? "text-[#8fb8ff]" : undefined)}
+                      {tabFor(DOCK_TABS[set][i], set !== "sales", set === "market" ? "text-[var(--dock-market)]" : undefined)}
                     </div>
                   ))}
                 </div>

@@ -44,6 +44,8 @@ export const SECTIONS: readonly Section[] = [
     id: "proposals",
     label: "Sales",
     pages: [
+      // The deal feed, the landing view (23 Nov 2026, Martin: "Feed moves into deals as the landing view").
+      { id: "feed", label: "Feed", href: "/design/sales/feed" },
       { id: "pipeline", label: "Pipeline", href: "/design/sales/pipelines" },
       { id: "sent", label: "Proposals open", href: "/design/sales/proposals" },
       { id: "signed", label: "Proposals closed", href: "/design/sales/signed" },

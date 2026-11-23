@@ -37,13 +37,13 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
-import { TODAY_CALENDAR, TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { TODAY_CALENDAR, TodayChat, useInsights } from "./today-chat";
 import { TodayCalendar } from "./today-calendar";
 import { InstallListPage } from "./install-lists";
 import { useDockSet } from "@/lib/services/dock-set";
 import { TODAY_FIRST } from "@/lib/services/sol";
 import { useNameHintBox } from "./name-hint-box";
-import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
+import type { TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolIcon } from "./sol-icon";
@@ -131,50 +131,25 @@ export function TodayPad(props: {
   welcome?: boolean;
   /** The owner: the welcome asks them to add the team. */
   owner?: boolean;
+  /** The feed or the calendar as a page of its own (23 Nov 2026, Martin: Today is Sol's screen alone). */
+  only?: "feed" | "calendar";
 }) {
   const router = useRouter();
   // The new deal form at the top of Today, opened by the orange + on the feed.
   const [adding, setAdding] = useState(false);
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
-  // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
-  // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Deals" comes back.
-  // Chat or Feed (20 Nov 2026, Martin): Chat the first visit of the day, as a welcome after a night away, else the one
-  // last had today (today-view.ts, kept on the device). Read after the page is up, so the server's page and the
-  // browser's agree; until then neither is drawn.
-  const [view, setViewState] = useState<TodayView | null>(props.welcome ? "chat" : null);
+  // Today is Sol's screen (23 Nov 2026, Martin: no switch; Feed lives in Deals, the calendar beside email). The feed
+  // and the calendar are drawn by this same pad on their own pages (`only`).
+  const view: TodayView = props.only ?? "chat";
   const onFeed = view === "feed";
   const onCal = view === "calendar";
-  const setView = useCallback(
-    (v: TodayView) => {
-      setViewState(v);
-      try {
-        localStorage.setItem(TODAY_VIEW_KEY, JSON.stringify({ day: props.today, view: v }));
-      } catch {
-        // Not kept: Today opens on Chat next time.
-      }
-    },
-    [props.today],
-  );
-  const setOnFeed = (feed: boolean) => setView(feed ? "feed" : "chat");
   useEffect(() => {
-    if (props.welcome) return;
-    let seen = null;
-    try {
-      seen = cleanSeen(JSON.parse(localStorage.getItem(TODAY_VIEW_KEY) ?? "null"));
-    } catch {
-      // Nothing kept.
-    }
-    // Come from the phone's Sol round (`?today=first`): Business, or My month, whatever was last had.
-    const first = new URLSearchParams(window.location.search).get("today") === "first";
-    if (first) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("today");
-      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
-    }
-    const opens = first ? "chat" : todayOpensOn(seen, props.today);
-    const t = window.setTimeout(() => setView(opens), 0);
-    return () => window.clearTimeout(t);
-  }, [props.welcome, props.today, setView]);
+    // Come from the phone's Sol round (`?today=first`): the address is tidied.
+    if (new URLSearchParams(window.location.search).get("today") !== "first") return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("today");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, []);
   // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
   const [touring, setTouring] = useState(false);
   const tour = () => {
@@ -182,25 +157,21 @@ export function TodayPad(props: {
     window.setTimeout(() => setTouring(true), 80);
   };
   const [turns, setTurns] = useState<Turn[]>([]);
-  // The phone's Sol round pressed while already on Today: back to the first view, out of any conversation.
+  // The phone's Sol round pressed while already on Today: back to the start, out of any conversation.
   useEffect(() => {
     const first = () => {
       setTurns([]);
-      setView("chat");
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
     window.addEventListener(TODAY_FIRST, first);
     return () => window.removeEventListener(TODAY_FIRST, first);
-  }, [setView]);
-  // The date heading opens the calendar (today-chat.tsx).
+  }, []);
+  // The date heading opens the calendar, its own page now (today-chat.tsx).
   useEffect(() => {
-    const cal = () => {
-      setView("calendar");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    };
+    const cal = () => router.push("/design/calendar");
     window.addEventListener(TODAY_CALENDAR, cal);
     return () => window.removeEventListener(TODAY_CALENDAR, cal);
-  }, [setView]);
+  }, [router]);
   const jobsView = useDockSet() === "post";
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
@@ -220,7 +191,6 @@ export function TodayPad(props: {
   // My day pressed on the feed: written up in the feed's place, the deals staying beside it.
   const [feedDay, setFeedDay] = useState(false);
   const showDay = () => {
-    setOnFeed(false);
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
@@ -236,7 +206,6 @@ export function TodayPad(props: {
       return;
     }
     const id = Date.now();
-    setOnFeed(false);
     setAsking(true);
     const replied = replyToSol(about, q);
     const shownQ = (replied.shown ?? q) + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
@@ -297,25 +266,6 @@ export function TodayPad(props: {
         </p>
       )}
 
-      {!welcoming && view && (
-        // Over the pad's sticky top edge (.pad-cap, z 15), which on Today reaches down to the strip: under it the pill was
-        // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
-        <div
-          data-tour="today-switch"
-          className="relative z-[16] mt-4 flex justify-center sm:mt-1 transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
-        >
-          <TodaySwitch
-            first={firstViewLabel(insights)}
-            view={view}
-            onView={(v) => {
-              // Chat pressed while in the conversation: back to the start, with the cards (it carries on in Sol's panel).
-              if (v === "chat" && view === "chat" && talking) setTurns([]);
-              setView(v);
-            }}
-          />
-        </div>
-      )}
-
       <div className="mt-2 flex flex-1 flex-col">
         {welcoming && (
           <Welcome
@@ -350,7 +300,7 @@ export function TodayPad(props: {
         <div
           className={clsx(
             "flex flex-col justify-start transition-[flex-grow,opacity] duration-500 ease-out",
-            (welcoming || onFeed || onCal || !view) && "hidden",
+            (welcoming || onFeed || onCal) && "hidden",
             talking ? "grow-0 opacity-0" : "grow opacity-100",
           )}
           aria-hidden={talking}
@@ -454,11 +404,8 @@ export function TodayPad(props: {
       {touring && (
         <Spotlight
           steps={WELCOME_TOUR}
-          onGo={(v) => setView(v === "feed" ? "feed" : "chat")}
           onEnd={() => {
             setTouring(false);
-            // Back to Chat, where Sol picks up with his introduction.
-            setView("chat");
             window.dispatchEvent(new Event(SOL_INDUCTION));
           }}
         />
@@ -517,7 +464,10 @@ export function SolBox({
   replyTo = null,
   onStopReply,
   tall = false,
+  extras = null,
 }: {
+  /** Shown in the box's foot after the +. */
+  extras?: React.ReactNode;
   /** Twice as thick (20 Nov 2026, Martin): the words on top, the paperclip, microphone and send along its foot. */
   tall?: boolean;
   /** One of Sol's questions being answered, or a message replied to, shown over the box. */
@@ -555,7 +505,7 @@ export function SolBox({
       }}
       className={clsx(
         "bg-surface text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line",
-        tall ? "rounded-[28px] p-3 pl-5 pt-4" : "rounded-[26px] p-2 pl-4",
+        tall ? "rounded-[28px] p-3 pl-5 pt-5" : "rounded-[26px] p-2 pl-4",
       )}
     >
       {replyTo && <ReplyBanner reply={replyTo} onStop={() => onStopReply?.()} className="mb-1.5 mr-2 bg-canvas" />}
@@ -585,15 +535,16 @@ export function SolBox({
                 void send();
               }
             }}
-            rows={2}
+            rows={3}
             maxLength={4000}
             autoComplete="off"
             placeholder={placeholder}
-            className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
+            className="block min-h-[5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
           {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
             <AttachButton attach={attach} plus />
+            {extras && <span className="ml-1 min-w-0">{extras}</span>}
             <button
               type="submit"
               disabled={asking || !ready}
@@ -609,9 +560,11 @@ export function SolBox({
           </div>
         </>
       ) : (
-        <div className="flex items-center gap-1.5">
+        // With Today's views in it (23 Nov 2026, Martin), the words take a row of their own on top and the + , the views,
+        // send and the microphone sit along the foot, so typing keeps its room on a phone.
+        <div className={clsx("flex items-center gap-1.5", extras && "flex-wrap gap-y-1")}>
           <AttachButton attach={attach} plus />
-          <SolBadge className="size-5 shrink-0" />
+          {extras ? <span className="shrink-0">{extras}</span> : <SolBadge className="size-5 shrink-0" />}
           <label className="sr-only" htmlFor={id}>
             Ask Sol
           </label>
@@ -630,14 +583,20 @@ export function SolBox({
             maxLength={4000}
             autoComplete="off"
             placeholder={placeholder}
-            className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+            className={clsx(
+              "h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted",
+              extras ? "order-first basis-full pl-1 pr-2" : "ml-1",
+            )}
           />
           <button
             type="submit"
             disabled={asking || !ready}
             aria-label="Ask Sol"
             onPointerDown={(e) => e.preventDefault()}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+            className={clsx(
+              extras && "ml-auto",
+              "grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted",
+            )}
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>

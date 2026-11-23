@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Menu, Search } from "lucide-react";
+import { ArrowLeft, CalendarDays, Mail, Menu, Search } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 
@@ -17,6 +17,7 @@ export function PhoneTop({
   back,
   onSearch,
   mail,
+  calendar,
   more,
 }: {
   home: string;
@@ -25,6 +26,8 @@ export function PhoneTop({
   onSearch?: () => void;
   /** The inbox, with its unread count (23 Nov 2026, Martin: mail is checked from anywhere, so it sits up here). */
   mail?: { href: string; count: number; on: boolean };
+  /** The calendar, beside the mail (23 Nov 2026, Martin: "Calendar moves into the top nav next to email"). */
+  calendar?: { href: string; on: boolean };
   /** A retailer's More, in the top right (23 Nov 2026, Martin: off the foot bar so Sol sits in its middle). */
   more?: { open: boolean; count: number; toggle: () => void };
 }) {
@@ -68,6 +71,20 @@ export function PhoneTop({
         )}
       </Link>
     );
+  const calendarButton = (small: boolean) =>
+    calendar && (
+      <Link
+        href={calendar.href}
+        aria-label="Calendar"
+        className={clsx(
+          "relative flex items-center justify-center rounded-full text-ink",
+          small ? "size-8" : "size-9 ring-1 ring-line",
+          calendar.on ? "bg-sun" : !small && "bg-surface",
+        )}
+      >
+        <CalendarDays className={small ? "size-[15px]" : "size-4"} aria-hidden />
+      </Link>
+    );
   const row = useRef<HTMLDivElement>(null);
   const [gone, setGone] = useState(false);
 
@@ -93,7 +110,12 @@ export function PhoneTop({
             <Wordmark className="phone-wordmark text-[16px] transition-[font-size]" />
           </Link>
         )}
-        {mail && <div className="ml-auto">{mailButton(false)}</div>}
+        {(calendar || mail) && (
+          <div className="ml-auto flex items-center gap-3">
+            {calendarButton(false)}
+            {mailButton(false)}
+          </div>
+        )}
         {onSearch && (
           <button
             type="button"
@@ -133,7 +155,12 @@ export function PhoneTop({
             {/* Its own span: Wordmark's 20px would win over a size passed to it (cn only joins classes). */}
             <span className="select-none text-[11px] font-normal tracking-[0.34em] text-ink">RENUABL</span>
           </Link>
-          {mail && <div className={clsx("absolute", more ? "right-20" : "right-11")}>{mailButton(true)}</div>}
+          {(calendar || mail) && (
+            <div className={clsx("absolute flex items-center gap-1", more ? "right-20" : "right-11")}>
+              {calendarButton(true)}
+              {mailButton(true)}
+            </div>
+          )}
           {onSearch && (
             <button
               type="button"
