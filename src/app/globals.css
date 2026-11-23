@@ -1905,3 +1905,18 @@ html:has(.sales-snap) {
     animation: none;
   }
 }
+
+/* Team chat on a phone is the page (23 Nov 2026, Martin: "allow it to fill most of the page", as Slack): the pad's
+   padding and least height, and the frame's side and foot padding, are taken off, so the chat runs the screen's width and the page doesn't scroll under it. */
+@media (max-width: 639px) {
+  .studio-pad:has(.team-phone) {
+    min-height: 0;
+    padding: 0;
+  }
+  .studio-frame:has(.team-phone),
+  .studio-frame:has(.team-phone) div:has(> .studio-pad) {
+    padding-left: 0;
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+}
