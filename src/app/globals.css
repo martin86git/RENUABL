@@ -1979,6 +1979,20 @@ html:has(.sales-snap) {
   transition: opacity 450ms ease;
 }
 .phone-tabbar[data-dock="post"] .sol-etch-face,
+/* The Marketplace's blue round rising into Sol's place in the middle of the dock. */
+.dock-market-centre {
+  transition:
+    opacity 300ms ease,
+    transform 520ms cubic-bezier(0.25, 1.55, 0.45, 1);
+}
+.dock-market-centre:not(.dock-market-in) {
+  transform: translateY(14px) scale(0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-market-centre {
+    transition: none;
+  }
+}
 .phone-tabbar[data-dock="market"] .sol-etch-face {
   opacity: 1;
 }

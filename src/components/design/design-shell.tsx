@@ -160,19 +160,21 @@ const POST_TABS: PhoneTab[] = [
   { label: "Service", href: PATHS.service, icon: Wrench, match: (p) => p.startsWith(PATHS.service) },
 ];
 // The dock's third set, the Marketplace's tools (23 Nov 2026, Martin: "We should make a 3rd orb toggle position -
-// marketplace"): job listings, buying and selling equipment, what is watched and the Marketplace's messages, each on the
-// same reel under the post-sale tool in its place. While the Marketplace is closed each opens its launch page.
+// marketplace"; then "the marketplace is the focal thing… it should likely replace sol as the centre icon… to the left
+// is my listings… the right hand side is my messages"): the Marketplace's blue round takes Sol's place in the middle
+// (its home, the job listings), My listings (jobs out for bids and goods for sale) beside it on the left and Messages on
+// the right, Buy & sell and Watching at the ends. While the Marketplace is closed each opens its launch page.
 const MARKET = "/design/marketplace";
 const MARKET_TABS: PhoneTab[] = [
+  { label: "Buy & sell", href: `${MARKET}/equipment`, icon: ArrowLeftRight, match: (p) => p === `${MARKET}/equipment` },
   {
-    label: "Listings",
-    href: MARKET,
+    label: "My listings",
+    href: `${MARKET}/mine`,
     icon: Store,
-    match: (p) => p === MARKET || p.startsWith(`${MARKET}/mine`) || p.startsWith(`${MARKET}/bids`) || p.startsWith(`${MARKET}/job`),
+    match: (p) => p.startsWith(`${MARKET}/mine`) || p.startsWith(`${MARKET}/equipment/mine`) || p.startsWith(`${MARKET}/bids`),
   },
-  { label: "Buy & sell", href: `${MARKET}/equipment`, icon: ArrowLeftRight, match: (p) => p.startsWith(`${MARKET}/equipment`) },
-  { label: "Watching", href: `${MARKET}/watching`, icon: Eye, match: (p) => p.startsWith(`${MARKET}/watching`) },
   { label: "Messages", href: `${MARKET}/messages`, icon: MessageCircle, match: (p) => p.startsWith(`${MARKET}/messages`) },
+  { label: "Watching", href: `${MARKET}/watching`, icon: Eye, match: (p) => p.startsWith(`${MARKET}/watching`) },
 ];
 const DOCK_TABS: Record<DockSet, PhoneTab[]> = { sales: PHONE_TABS, post: POST_TABS, market: MARKET_TABS };
 
@@ -476,7 +478,7 @@ function Shell({
         />
       );
     const lit = !more && t.match(path);
-    const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
+    const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : t.href === `${MARKET}/messages` ? (trade ?? 0) : 0;
     // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
     // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
     if (dark)
@@ -880,14 +882,37 @@ function Shell({
         {retail
           ? [0, 1, 2, 3].map((i) => [
               i === 2 ? (
-                <div
-                  key="sol"
-                  className="dock-sol flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink"
-                >
-                  <span className="-mt-6">
-                    <SolNavButton phone />
-                  </span>
-                  Sol
+                <div key="sol" className="dock-sol relative min-h-16">
+                  {/* On the Marketplace's tools its blue round takes Sol's place (23 Nov 2026, Martin); Sol stays
+                      mounted underneath, so his panel and counts carry on. */}
+                  <div
+                    className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink transition-opacity duration-300"
+                    style={{ opacity: dock === "market" ? 0 : 1 }}
+                    inert={dock === "market"}
+                  >
+                    <span className="-mt-6">
+                      <SolNavButton phone />
+                    </span>
+                    Sol
+                  </div>
+                  <Link
+                    href={MARKET}
+                    inert={dock !== "market"}
+                    aria-current={dock === "market" && path === MARKET ? "page" : undefined}
+                    onClick={() => {
+                      setMore(false);
+                      leaveSol();
+                    }}
+                    className={clsx(
+                      "dock-market-centre absolute inset-0 flex flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-semibold text-ink",
+                      dock === "market" ? "dock-market-in" : "pointer-events-none opacity-0",
+                    )}
+                  >
+                    <span className="glass-orb-market -mt-6 flex size-[53px] items-center justify-center rounded-full text-white">
+                      <MarketplaceMark className="size-7" />
+                    </span>
+                    Marketplace
+                  </Link>
                 </div>
               ) : null,
               <div key={`reel-${i}`} className="relative h-16 self-end overflow-hidden">
