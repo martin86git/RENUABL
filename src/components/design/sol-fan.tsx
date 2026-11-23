@@ -15,9 +15,10 @@ import { createPortal } from "react-dom";
 
 /** How far above Sol's middle the clover's centre sits, and how big a leaf is. */
 const CENTRE_UP = 36;
-const LEAF = 66;
-/** How far each leaf's point reaches past the heart, so Chat and Feed overlap a little in the middle (Martin). */
-const OVERLAP = 12;
+const LEAF = 56;
+/** How far each leaf's point reaches past the heart, so Chat and Feed join in the middle (Martin). One shadow under
+    the two together, none on each, so they read as one shape, conjoined, not one over the other. */
+const OVERLAP = 10;
 /** A leaf's point is its bottom-left corner; unturned it reaches up and right (45°). Up-left and up-right leaves sit a
     third of a turn from Sol's, which points straight down. */
 const TURN = { chat: -105, feed: 15 } as const;
@@ -49,7 +50,12 @@ export function SolFan({
   return createPortal(
     <div className="theme-studio contents">
       <div className="fixed inset-0 z-[95] bg-black/15" onClick={onClose} aria-hidden />
-      <div role="menu" aria-label="Sol" className="fixed z-[96] size-0" style={{ left: at.x, top: at.y }}>
+      <div
+        role="menu"
+        aria-label="Sol"
+        className="fixed z-[96] size-0 drop-shadow-[0_6px_14px_rgba(0,0,0,0.22)]"
+        style={{ left: at.x, top: at.y }}
+      >
         <Leaf
           turn={TURN.chat}
           icon={MessageCircle}
@@ -93,13 +99,12 @@ function Leaf({
     ["--leaf-turn" as string]: `${turn}deg`,
     animationDelay: `${delay}ms`,
   };
-  const className =
-    "sol-clover-leaf absolute flex items-center justify-center rounded-[50%_50%_50%_26%] bg-white text-ink shadow-[0_8px_22px_rgba(0,0,0,0.22)] ring-1 ring-black/10";
+  const className = "sol-clover-leaf absolute flex items-center justify-center rounded-[50%_50%_50%_26%] bg-white text-ink";
   // The words stand upright whatever way the leaf turns.
   const inner = (
     <span className="flex flex-col items-center gap-0.5" style={{ transform: `rotate(${-turn}deg)` }}>
-      <Icon className={label === "Feed" ? "size-5 text-sun-line" : "size-5"} aria-hidden />
-      <span className="text-[10px] font-semibold leading-none">{label}</span>
+      <Icon className={label === "Feed" ? "size-[18px] text-sun-line" : "size-[18px]"} aria-hidden />
+      <span className="text-[9.5px] font-semibold leading-none">{label}</span>
     </span>
   );
   return href ? (

@@ -22,7 +22,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
     area: "Today",
-    words: "Chat and Feed's leaves are rounder, white and overlap in the middle, and Proposals closed shows a green ring.",
+    words: "Chat and Feed's leaves are smaller, rounder, white and joined in the middle, and Proposals closed shows a green ring.",
   },
   {
     day: "2026-11-23",
