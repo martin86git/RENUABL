@@ -29,7 +29,7 @@ import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
+import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, askSolInPanel, handsToPanel, loadSol, retrySol } from "@/lib/services/sol";
 import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
@@ -215,6 +215,12 @@ export function TodayPad(props: {
   const ask = async (q: string, files: SolFile[] = [], about: string | null = null) => {
     if (asking) return;
     setReplyTo(null);
+    // On a phone a question asked on Today goes to Sol's own chat, not into a conversation under the Business | Feed
+    // switch (23 Nov 2026, Martin). A file still goes in here: his panel's ask carries words only.
+    if (handsToPanel() && !files.length && q.trim()) {
+      askSolInPanel(about ? { text: answerFor(about, q), shown: q } : q);
+      return;
+    }
     const id = Date.now();
     setOnFeed(false);
     setAsking(true);
