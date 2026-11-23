@@ -11,8 +11,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  CalendarDays,
   ClipboardCheck,
+  FileCheck2,
   FileText,
+  Package,
   LayoutDashboard,
   Menu,
   MessagesSquare,
@@ -57,6 +60,8 @@ import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
 import { BackToTop } from "./back-to-top";
+import { setDockSet, useDockSet } from "@/lib/services/dock-set";
+import { DOCK_SET_WORDS, otherDockSet } from "@/lib/domain/design/dock-set";
 
 export { MarketplaceMark };
 
@@ -135,6 +140,20 @@ const PHONE_TABS: PhoneTab[] = [
   // Team chat in the foot bar (22 Nov 2026, Martin: "we need to introduce the team chat into the bottom nav"): its own
   // page on a phone, with this member's unread team lines on it.
   { label: "Team", href: PATHS.team, icon: MessagesSquare, match: (p) => p.startsWith(PATHS.team) },
+];
+// The dock's post-sale tools (23 Nov 2026, Martin: the owner wears every hat; the ball in the dock's lip turns it like a
+// slot machine to these, on navy, and back). Each sits on the same reel as the sales tool in its place: Deals and the
+// Calendar, Designer and Orders, Voice and Paperwork, Team and Service. Sol stays in the middle and never turns.
+const POST_TABS: PhoneTab[] = [
+  {
+    label: "Calendar",
+    href: PATHS.installations,
+    icon: CalendarDays,
+    match: (p) => p.startsWith(PATHS.installations) && !p.startsWith(PATHS.completed) && !p.startsWith(PATHS.invoices),
+  },
+  { label: "Orders", href: PATHS.orders, icon: Package, match: (p) => p.startsWith(PATHS.orders) },
+  { label: "Paperwork", href: PATHS.completed, icon: FileCheck2, match: (p) => p.startsWith(PATHS.completed) },
+  { label: "Service", href: PATHS.service, icon: Wrench, match: (p) => p.startsWith(PATHS.service) },
 ];
 
 /**
@@ -234,6 +253,10 @@ function Shell({
   const unread = useUnreadMessages(retail);
   // This member's unread team chat lines, for the Team tab on a phone's foot bar.
   const teamUnread = useTeamUnread();
+  // The dock's set, and how many times its ball has been pulled (to play the pull again on each tap).
+  const dock = useDockSet();
+  const post = dock === "post";
+  const [pulls, setPulls] = useState(0);
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -421,6 +444,61 @@ function Shell({
         })}
       </nav>
     ) : null;
+  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the navy dock. */
+  const tabFor = (t: PhoneTab, dark: boolean) => {
+    if (retail && t.label === VOICE_TAB)
+      return (
+        <PhoneVoiceTab
+          key={t.label}
+          onOpen={() => {
+            setMore(false);
+            leaveSol();
+          }}
+        />
+      );
+    const lit = !more && t.match(path);
+    const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
+    // The designer is the orange round it is in the top menu; Orders is the post-sale tools' round, in steel blue.
+    const round = t.href === PATHS.designer || (dark && t.href === PATHS.orders);
+    return (
+      <Link
+        key={t.label}
+        href={t.href}
+        onClick={() => {
+          setMore(false);
+          leaveSol();
+        }}
+        aria-current={lit ? "page" : undefined}
+        className={clsx(
+          "flex flex-col items-center justify-center gap-1 font-medium",
+          retail ? "h-16 text-[11px]" : "min-h-14 text-[10px]",
+          dark ? (lit ? "text-white" : "text-[#b7c6da]") : lit ? "text-ink" : "text-muted",
+        )}
+      >
+        <span
+          className={clsx(
+            "relative flex items-center justify-center rounded-full",
+            round
+              ? clsx(
+                  retail ? "size-9" : "size-7",
+                  "shadow-sm",
+                  dark ? "bg-[#8fb3d9] text-[#0f1a2b]" : "bg-sun-line text-white",
+                  lit && (dark ? "ring-2 ring-white/30 ring-offset-1 ring-offset-[#15233a]" : "ring-2 ring-sun-line/30 ring-offset-1"),
+                )
+              : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && (dark ? "bg-white/10" : "bg-sun")),
+          )}
+        >
+          <t.icon className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+          {n > 0 && (
+            <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+              {n}
+            </span>
+          )}
+        </span>
+        {t.label}
+      </Link>
+    );
+  };
   return (
     <div className="theme-studio studio-frame min-h-dvh pb-24 lg:pb-0">
       {/* The design tool slides over whatever page this is, never a page of its own. */}
@@ -740,71 +818,62 @@ function Shell({
       {/* On a phone: the places used most along the foot, and the rest in a sheet that comes up from More. */}
       <nav
         aria-label="Sections, on a phone"
+        data-dock={retail ? dock : undefined}
         className={clsx(
           "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
           // A retailer's More is in the top right (23 Nov 2026, Martin), so five across with Sol in the middle.
           kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
         )}
       >
-        {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
-          const lit = !more && t.match(path);
-          const sol =
-            retail && i === 2 ? (
-              <div key="sol" className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink">
-                <span className="-mt-6">
-                  <SolNavButton phone />
-                </span>
-                Sol
-              </div>
-            ) : null;
-          const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
-          if (retail && t.label === VOICE_TAB)
-            return [
-              sol,
-              <PhoneVoiceTab
-                key={t.label}
-                onOpen={() => {
-                  setMore(false);
-                  leaveSol();
-                }}
-              />,
-            ];
-          return [
-            sol,
-            <Link
-              key={t.label}
-              href={t.href}
+        {retail && (
+          // The dock's lip with its ball (23 Nov 2026, Martin): a tap turns the reels to the other set of tools. The ball
+          // is the colour of the set it turns to.
+          <span
+            aria-hidden={false}
+            className="dock-lip absolute -top-[21px] right-3 flex h-[21px] w-12 justify-center rounded-t-full border border-b-0"
+          >
+            <button
+              key={pulls}
+              type="button"
+              aria-label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
+              title={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
               onClick={() => {
-                setMore(false);
-                leaveSol();
+                setPulls((n) => n + 1);
+                setDockSet(otherDockSet(dock));
               }}
-              aria-current={lit ? "page" : undefined}
               className={clsx(
-                "flex flex-col items-center justify-center gap-1 font-medium",
-                retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
-                lit ? "text-ink" : "text-muted",
+                "dock-ball mt-1 size-[22px] rounded-full",
+                pulls > 0 && "dock-ball-pull",
+                post ? "dock-ball-sales" : "dock-ball-post",
               )}
-            >
-              <span
-                className={clsx(
-                  "relative flex items-center justify-center rounded-full",
-                  // The designer is the orange round it is in the top menu.
-                  t.href === PATHS.designer
-                    ? clsx(retail ? "size-9" : "size-7", "bg-sun-line text-white shadow-sm", lit && "ring-2 ring-sun-line/30 ring-offset-1")
-                    : clsx(retail ? "h-9 w-14" : "h-7 w-12", lit && "bg-sun"),
-                )}
-              >
-                <t.icon className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
-                {n > 0 && (
-                  <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
-                    {n}
+            />
+          </span>
+        )}
+        {retail
+          ? [0, 1, 2, 3].map((i) => [
+              i === 2 ? (
+                <div
+                  key="sol"
+                  className="dock-sol flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink"
+                >
+                  <span className="-mt-6">
+                    <SolNavButton phone />
                   </span>
-                )}
-              </span>
-              {t.label}
-            </Link>,
-          ];
-        })}
+                  Sol
+                </div>
+              ) : null,
+              <div key={`reel-${i}`} className="relative h-16 self-end overflow-hidden">
+                <div className="dock-reel" style={{ transform: post ? "translateY(-50%)" : undefined, transitionDelay: `${i * 80}ms` }}>
+                  <div className="h-16" inert={post}>
+                    {tabFor(PHONE_TABS[i], false)}
+                  </div>
+                  <div className="h-16" inert={!post}>
+                    {tabFor(POST_TABS[i], true)}
+                  </div>
+                </div>
+              </div>,
+            ])
+          : KIND_TABS[kind as Exclude<BusinessKind, "retailer">].map((t) => tabFor(t, false))}
         {!retail && (
           <button
             type="button"

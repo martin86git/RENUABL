@@ -8,8 +8,11 @@ import {
   BatteryCharging,
   CircleAlert,
   Eye,
+  FileCheck2,
   FileText,
+  HardHat,
   Lightbulb,
+  Package,
   Phone,
   PhoneCall,
   Rows3,
@@ -43,6 +46,11 @@ import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { StcNoticeCard } from "./stc-period";
+import { useDockSet } from "@/lib/services/dock-set";
+import { DOCK_SET_WORDS, installingOn } from "@/lib/domain/design/dock-set";
+import { INSTALLER_KEY } from "@/lib/domain/design/crm";
+import { OrdersPage } from "./design-orders";
+import { AfterInstallPage } from "./install-lists";
 
 /**
  * Today's Business and My month (21 Nov 2026, Martin: the Chat page wasn't a plus, chat is everywhere already; what
@@ -99,7 +107,7 @@ function TodayDate({ today }: { today: ISODate }) {
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
 
-type TrayTab = "performance" | "needs" | "proposals" | "calls" | "sol" | "changes";
+type TrayTab = "performance" | "needs" | "proposals" | "calls" | "sol" | "changes" | "installs" | "orders" | "paperwork";
 
 export function TodayChat(props: {
   name: string | null;
@@ -138,7 +146,18 @@ export function TodayChat(props: {
   // Worked out once a feed, not on every press of a tab (it reads every deal's next move).
   const needsCount = useMemo(() => (feed ? dealsNeedingYou(feed).length : undefined), [feed]);
   // 21 Nov 2026, Martin: the tray holds what Sol or a voice agent can act on, with Performance first.
-  const tabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
+  // The tray follows the dock (23 Nov 2026, Martin: flipping the dock changes what Today shows by default, the page the
+  // same): on the post-sale tools, today's installs, orders and the paperwork after install.
+  const dock = useDockSet();
+  const post = dock === "post";
+  const installsToday = useMemo(() => (props.jobs ? installingOn(props.jobs, props.today).length : undefined), [props.jobs, props.today]);
+  const postTabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
+    { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
+    { key: "installs", label: "Installs", icon: HardHat, count: installsToday },
+    { key: "orders", label: "Orders", icon: Package },
+    { key: "paperwork", label: "Paperwork", icon: FileCheck2 },
+  ];
+  const salesTabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
     { key: "needs", label: "Needs you", icon: CircleAlert, count: needsCount },
     { key: "proposals", label: "Proposals", icon: FileText },
@@ -146,15 +165,18 @@ export function TodayChat(props: {
     { key: "sol", label: "Sol's work", icon: Sparkles },
     { key: "changes", label: mine ? "Next wins" : "Worth changing", icon: Lightbulb, count: first?.insights.length },
   ];
+  const tabs = post ? postTabs : salesTabs;
+  // A tab of the other set closes as the dock turns.
+  const shown = tab && tabs.some((t) => t.key === tab) ? tab : null;
   // Whose panel isn't about the month: drawn wider than the box, as the pages they come from are.
-  const wide = tab === "calls" || tab === "proposals";
+  const wide = shown === "calls" || shown === "proposals" || shown === "orders" || shown === "paperwork";
   // As the screenshot Martin chose (21 Nov 2026): the greeting, Sol's box straight under it, and a tray tucked under the
   // box whose tabs open what was on the cards (the month, what is worth changing) below it, one at a time.
   return (
     <div
       className={clsx(
         "mx-auto flex w-full max-w-[54rem] flex-col items-center px-1 pb-16 pt-2",
-        !tab && "min-h-[calc(100dvh-15rem)] justify-center",
+        !shown && "min-h-[calc(100dvh-15rem)] justify-center",
       )}
       inert={props.hidden}
     >
@@ -162,7 +184,13 @@ export function TodayChat(props: {
           in place of "How's the business going". */}
       {/* 22 Nov 2026, Martin: here Sol is only the etched brain (`SolEtch`), no colour or glow, a little higher, clear of
           the date; then "more like a white / grey… less dark", on phones too. */}
-      <span className="relative -mt-2 mb-3 inline-flex text-[#c9ccd3] sm:-mt-6 sm:mb-5">
+      {/* 23 Nov 2026, Martin: the brain takes the dock's colour, a pale navy on the post-sale tools. */}
+      <span
+        className={clsx(
+          "relative -mt-2 mb-3 inline-flex transition-colors duration-500 sm:-mt-6 sm:mb-5",
+          post ? "text-[#7f97bb]" : "text-[#c9ccd3]",
+        )}
+      >
         <SolEtch className="size-12 sm:size-16" />
       </span>
       <TodayDate today={props.today} />
@@ -172,7 +200,7 @@ export function TodayChat(props: {
           tall
           onAsk={props.onAsk}
           asking={props.asking}
-          placeholder={mine ? "Ask Sol: how do I win a quiet deal back?" : "Ask about the business: why are we down on last month?"}
+          placeholder={post ? DOCK_SET_WORDS.post.ask : mine ? "Ask Sol: how do I win a quiet deal back?" : DOCK_SET_WORDS.sales.ask}
         />
       </div>
 
@@ -186,11 +214,11 @@ export function TodayChat(props: {
             key={key}
             type="button"
             role="tab"
-            aria-selected={tab === key}
-            onClick={() => setTab((t) => (t === key ? null : key))}
+            aria-selected={shown === key}
+            onClick={() => setTab(shown === key ? null : key)}
             className={clsx(
               "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition",
-              tab === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
+              shown === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
             )}
           >
             <Icon className="size-3.5" aria-hidden />
@@ -207,17 +235,23 @@ export function TodayChat(props: {
       {/* STC changes (stc-change.ts): one card under the tray, only for who may change settings, only while there is something to say. */}
       {first && !mine && <StcNoticeCard className="mt-5 w-full text-left" />}
 
-      {tab && (
+      {shown && (
         <div role="tabpanel" className={clsx("mt-5 text-left", wide ? "w-[min(72rem,calc(100vw-3rem))]" : "w-full")}>
-          {tab === "needs" ? (
+          {shown === "installs" ? (
+            <TrayInstalls jobs={props.jobs} today={props.today} />
+          ) : shown === "orders" ? (
+            <OrdersPage />
+          ) : shown === "paperwork" ? (
+            <AfterInstallPage />
+          ) : shown === "needs" ? (
             <TrayNeeds deals={feed} onChanged={() => void readFeed()} />
-          ) : tab === "calls" ? (
+          ) : shown === "calls" ? (
             <CallLogPage />
-          ) : tab === "proposals" ? (
+          ) : shown === "proposals" ? (
             <ProposalsPage signed={false} bare />
-          ) : tab === "sol" ? (
+          ) : shown === "sol" ? (
             <SolWorkPanel />
-          ) : tab === "performance" ? (
+          ) : shown === "performance" ? (
             <PerformancePanel
               jobs={props.jobs}
               today={props.today}
@@ -383,9 +417,11 @@ function InsightRow({ insight }: { insight: Insight }) {
 export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
   // 22 Nov 2026, Martin: "I don't notice [Feed] sometimes", then "we can do better on the pill shapes". A segmented control: a soft recessed track, two halves of
   // one width, and a white thumb that slides to the one open, each with its icon.
+  // 23 Nov 2026, Martin: on the dock's post-sale tools, Feed is Jobs (the jobs under way, not the deals).
+  const post = useDockSet() === "post";
   const tabs = [
     ["chat", first, TrendingUp],
-    ["feed", "Feed", Rows3],
+    ["feed", DOCK_SET_WORDS[post ? "post" : "sales"].feed, post ? HardHat : Rows3],
   ] as const;
   const at = view === "feed" ? 1 : 0;
   return (
@@ -415,6 +451,49 @@ export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: 
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Installs, on the dock's post-sale tools: today's installs, each opening its deal, then how many are booked this week. */
+function TrayInstalls({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  if (!jobs) return <div className="h-32 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />;
+  const now = installingOn(jobs, today);
+  const soon = jobs
+    .filter((j) => j.stage !== "lost" && j.installDate && j.installDate > today)
+    .sort((a, b) => (a.installDate! < b.installDate! ? -1 : 1));
+  return (
+    <div className="rounded-[22px] bg-surface px-4 py-3.5 ring-1 ring-line/70">
+      <p className="text-[13px] font-semibold text-ink">Installing today</p>
+      {now.length ? (
+        <ul className="mt-2 divide-y divide-line">
+          {now.map((j) => (
+            <li key={j.id}>
+              <Link href={`/design/deals/${j.id}`} className="flex items-center gap-3 py-2.5 text-[13.5px] text-ink hover:text-sun-ink">
+                <HardHat className="size-4 shrink-0 text-sun-line" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">
+                  {j.customerName}
+                  {j.address ? <span className="text-ink-2"> · {j.address.split(",")[1]?.trim() || j.address}</span> : null}
+                </span>
+                {j.details?.[INSTALLER_KEY] ? (
+                  <span className="shrink-0 text-[12px] text-ink-2">{String(j.details[INSTALLER_KEY])}</span>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1.5 text-[13px] text-ink-2">
+          No installs today.
+          {soon[0] ? ` The next is ${soon[0].customerName} on ${soon[0].installDate}.` : ""}
+        </p>
+      )}
+      <Link
+        href="/design/installations"
+        className="mt-2 inline-flex items-center gap-1 text-[13px] font-medium text-ink hover:text-sun-ink"
+      >
+        The install calendar <ArrowRight className="size-3.5" aria-hidden />
+      </Link>
     </div>
   );
 }

@@ -1928,3 +1928,69 @@ html:has(.sales-snap) {
     display: none !important;
   }
 }
+
+/* The dock's two sets of tools (23 Nov 2026, Martin: a solar business's owner wears every hat; a ball in a lip on the
+   dock turns it like a slot machine between the sales tools and the post-sale ones). The post-sale dock is workwear navy
+   (Martin chose navy over graphite, which the app already uses everywhere); each reel holds a sales tool over its post
+   sale one and slides with a little overshoot, one after another. Sol never turns. */
+:root {
+  --dock-post: #15233a;
+  --dock-post-line: rgb(255 255 255 / 0.1);
+}
+.phone-tabbar[data-dock] {
+  transition:
+    background-color 450ms ease,
+    border-color 450ms ease;
+}
+.phone-tabbar[data-dock="post"] {
+  background-color: var(--dock-post);
+  border-color: var(--dock-post-line);
+}
+.phone-tabbar[data-dock="post"] .dock-sol {
+  color: #f2f3f5;
+}
+.dock-reel {
+  transition: transform 620ms cubic-bezier(0.25, 1.55, 0.45, 1);
+}
+.dock-lip {
+  background-color: var(--surface);
+  border-color: var(--line);
+  transition:
+    background-color 450ms ease,
+    border-color 450ms ease;
+}
+.phone-tabbar[data-dock="post"] .dock-lip {
+  background-color: var(--dock-post);
+  border-color: var(--dock-post-line);
+}
+.dock-ball {
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 0.3),
+    inset 0 -2px 3px rgb(0 0 0 / 0.25);
+}
+/* The ball is the colour of the set it turns to: navy towards the post-sale tools, orange back to sales. */
+.dock-ball-post {
+  background: radial-gradient(circle at 35% 30%, #c9d8ee, #3d5f8f 55%, #15233a);
+}
+.dock-ball-sales {
+  background: radial-gradient(circle at 35% 30%, #ffd9b8, #ff7a3d 55%, #c8400f);
+}
+.dock-ball-pull {
+  animation: dock-ball-pull 520ms ease-out;
+}
+@keyframes dock-ball-pull {
+  30% {
+    transform: translateY(7px) scale(0.92);
+  }
+  65% {
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-reel {
+    transition: none;
+  }
+  .dock-ball-pull {
+    animation: none;
+  }
+}
