@@ -1932,12 +1932,12 @@ html:has(.sales-snap) {
 /* The dock's two sets of tools (23 Nov 2026, Martin: a solar business's owner wears every hat; a ball in a lip on the
    dock turns it like a slot machine between the sales tools and the post-sale ones). Both docks are glass: frosted,
    the page blurred and brightened through them, a fine light along the top edge (Martin: "a little bit of a glass
-   look"). The post-sale dock is hi-vis lime glass, the colour of a site vest (Martin: "the navy is underwhelming… a neon
+   look"). The post-sale dock is a soft hi-vis lime glass, toned to sit with the greys, white and graphite (Martin), the colour of a site vest (Martin: "the navy is underwhelming… a neon
    green yellow"), over the navy tried first. Each reel holds a sales tool over its post-sale one and slides with a
    little overshoot, one after another. Sol never turns. */
 :root {
-  --dock-post: rgb(206 246 54 / 0.86);
-  --dock-post-line: rgb(120 150 10 / 0.45);
+  --dock-post: rgb(216 238 128 / 0.88);
+  --dock-post-line: rgb(140 165 40 / 0.4);
 }
 .phone-tabbar {
   background: linear-gradient(to bottom, rgb(255 255 255 / 0.82), rgb(250 250 251 / 0.74));
@@ -1952,11 +1952,11 @@ html:has(.sales-snap) {
     border-color 450ms ease;
 }
 .phone-tabbar[data-dock="post"] {
-  background: linear-gradient(to bottom, rgb(222 252 92 / 0.9), var(--dock-post));
+  background: linear-gradient(to bottom, rgb(232 247 164 / 0.9), var(--dock-post));
   border-color: var(--dock-post-line);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.65),
-    0 -6px 26px -10px rgb(150 190 0 / 0.45);
+    0 -6px 24px -12px rgb(110 140 20 / 0.3);
 }
 .phone-tabbar[data-dock="post"] .dock-sol {
   color: #1d2306;
@@ -1990,7 +1990,7 @@ html:has(.sales-snap) {
     border-color 450ms ease;
 }
 .phone-tabbar[data-dock="post"] .dock-lip {
-  background-color: rgb(222 252 92 / 0.9);
+  background-color: rgb(232 247 164 / 0.9);
   border-color: var(--dock-post-line);
 }
 /* The ball: a graphite orb, lit from the upper left. */
