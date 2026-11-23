@@ -20,6 +20,12 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-23",
+    area: "Marketplace",
+    words:
+      "Make an offer on equipment for sale: pick 10% lower, the asking price or your own. The seller accepts or declines within 48 hours.",
+  },
+  {
+    day: "2026-11-23",
     area: "Deals",
     words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
   },
@@ -28,6 +34,16 @@ export const UPDATES: readonly Update[] = [
     area: "Settings",
     words:
       "Bring in your HubSpot deals: match its stages and fields to yours, and each comes across with its contact, notes, emails and calls.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On the Marketplace dock, its blue round takes Sol's place, with My listings to its left and Messages to its right.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "The ball on the phone's dock now has a third turn: the Marketplace, with listings, buy and sell, watching and messages.",
   },
   {
     day: "2026-11-23",

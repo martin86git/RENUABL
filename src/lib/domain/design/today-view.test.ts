@@ -31,3 +31,11 @@ describe("todayHeading", () => {
     expect(todayHeading("2026-11-11" as ISODate)).toBe("Wednesday, 11th November");
   });
 });
+
+describe("the calendar view", () => {
+  it("is kept and opened again the same day", () => {
+    const seen = cleanSeen({ day: "2026-11-23", view: "calendar" });
+    expect(seen).toEqual({ day: "2026-11-23", view: "calendar" });
+    expect(todayOpensOn(seen, "2026-11-23")).toBe("calendar");
+  });
+});

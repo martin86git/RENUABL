@@ -111,7 +111,7 @@ export function MarketplacePage({ view }: { view: "browse" | "mine" | "bids" }) 
         {view === "browse"
           ? "Installations other businesses need done, near you. Each shows the suburb, the system and the dates; the address and contact come once your bid is chosen."
           : view === "mine"
-            ? "Jobs you've listed for installers to bid on. List a sold job from its deal page."
+            ? "Jobs you've listed for installers to bid on, with the bids on each. List a sold job from its deal page. Equipment you're selling is under it."
             : "Listings you've bid on, and where each stands."}
       </p>
       {view === "browse" && data && !data.base && <BaseNote what="job" onSaved={(base) => setData((d) => d && { ...d, base })} />}

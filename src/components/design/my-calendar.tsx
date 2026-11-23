@@ -38,7 +38,7 @@ const dayTitle = (d: ISODate) => at(d).toLocaleDateString("en-AU", { weekday: "l
  * Google Calendar or Outlook (read only). With none connected, one press on either connects it in a small window over
  * the page, so they never leave what they were doing; the events fill in when it closes.
  */
-export function MyCalendar(props: { note?: string | null }) {
+export function MyCalendar(props: { note?: string | null; wide?: boolean }) {
   const path = usePathname();
   const today = todayInMarket();
   const [month, setMonth] = useState<ISODate>(today);
@@ -50,13 +50,15 @@ export function MyCalendar(props: { note?: string | null }) {
   const [view, setViewState] = useState<View>("month");
   useEffect(() => {
     try {
+      const kept = window.localStorage.getItem(VIEW_KEY);
+      // On Today the day by the hour comes first, so the next appointment is in view (23 Nov 2026, Martin).
       // A remembered choice is only known in the browser.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (window.localStorage.getItem(VIEW_KEY) === "day") setViewState("day");
+      if (kept === "day" || (props.wide && kept !== "month")) setViewState("day");
     } catch {
       // No storage: Month it is.
     }
-  }, []);
+  }, [props.wide]);
   const setView = (v: View) => {
     setViewState(v);
     try {
@@ -111,7 +113,7 @@ export function MyCalendar(props: { note?: string | null }) {
   };
 
   return (
-    <div className="w-[21rem] text-ink">
+    <div className={clsx(props.wide ? "w-full" : "w-[21rem]", "text-ink")}>
       <div className="flex items-center justify-between px-1">
         <div className="flex rounded-full bg-canvas p-0.5 text-[12px] font-medium" role="tablist" aria-label="Calendar view">
           {(["month", "day"] as const).map((v) => (

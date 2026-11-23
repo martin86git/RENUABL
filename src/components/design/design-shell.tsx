@@ -11,8 +11,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowLeftRight,
   CalendarDays,
   ClipboardCheck,
+  Eye,
+  MessageCircle,
   FileCheck2,
   FileText,
   Package,
@@ -42,7 +45,7 @@ import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
-import { UsageButton, openUsagePop, usagePopReady } from "./usage-pop";
+import { UsageButton } from "./usage-pop";
 import { PhoneVoiceTab } from "./phone-voice";
 import { PhoneTop } from "./phone-top";
 import { toggleSolHere } from "@/lib/services/sol";
@@ -59,11 +62,12 @@ import { SetupWizard } from "./setup-wizard";
 import { openSetup } from "@/lib/services/setup";
 import { TeamChatButton, useTeamUnread } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
+import { MoreProfile, MoreUsage } from "./more-sheet";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
 import { BackToTop } from "./back-to-top";
 import { setDockSet, useDockSet } from "@/lib/services/dock-set";
-import { DOCK_SET_WORDS, otherDockSet } from "@/lib/domain/design/dock-set";
+import { DOCK_SETS, DOCK_SET_WORDS, nextDockSet, reelPlace, type DockSet } from "@/lib/domain/design/dock-set";
 
 export { MarketplaceMark };
 
@@ -112,29 +116,66 @@ const DEALS_SWITCH = [
   { href: PATHS.calls, top: null, label: "Calls", full: "Calls" },
 ] as const;
 
-function PhoneDealsSwitch({ path }: { path: string }) {
+/**
+ * On the pipeline (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can dock
+ * / spawn off of it"), the Pipeline segment is the pipeline picker itself (`pipeline`), wider than the others, and
+ * the page's controls hang under it as a tray joined to the switch (`tray`), in place of a card of their own.
+ */
+export function PhoneDealsSwitch({
+  path,
+  pipeline,
+  tray,
+  className,
+}: {
+  path: string;
+  pipeline?: React.ReactNode;
+  tray?: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <nav aria-label="Deals" className="-mt-1 mb-4 lg:hidden">
-      <div className="grid grid-cols-4 gap-1 rounded-2xl bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
+    <nav aria-label="Deals" className={className ?? "-mt-1 mb-4 lg:hidden"}>
+      <div
+        className={clsx(
+          "grid gap-1 rounded-2xl bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]",
+          pipeline ? "grid-cols-[1.6fr_1fr_1fr_0.8fr] gap-0.5" : "grid-cols-4",
+          tray && "rounded-bl-none",
+        )}
+      >
         {DEALS_SWITCH.map((t) => {
           const lit = path === t.href || path.startsWith(`${t.href}/`) || (t.href === PATHS.pipelines && path === PATHS.sales);
+          const cell = clsx(
+            "flex min-h-11 min-w-0 flex-col items-center justify-center rounded-xl px-1 text-center leading-tight transition-colors",
+            lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted active:bg-surface/60",
+          );
+          if (pipeline && t.href === PATHS.pipelines) {
+            return (
+              <div key={t.href} aria-current="page" className={clsx(cell, "items-stretch px-2")}>
+                {pipeline}
+              </div>
+            );
+          }
           return (
-            <Link
-              key={t.href}
-              href={t.href}
-              aria-label={t.full}
-              aria-current={lit ? "page" : undefined}
-              className={clsx(
-                "flex min-h-11 flex-col items-center justify-center rounded-xl px-1 text-center leading-tight transition-colors",
-                lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted active:bg-surface/60",
+            <Link key={t.href} href={t.href} aria-label={t.full} aria-current={lit ? "page" : undefined} className={cell}>
+              {t.top && (
+                <span
+                  className={clsx(
+                    "font-medium uppercase opacity-70",
+                    pipeline ? "text-[8.5px] tracking-[0.04em]" : "text-[9.5px] tracking-[0.08em]",
+                  )}
+                >
+                  {t.top}
+                </span>
               )}
-            >
-              {t.top && <span className="text-[9.5px] font-medium uppercase tracking-[0.08em] opacity-70">{t.top}</span>}
               <span className="text-[13px] font-medium">{t.label}</span>
             </Link>
           );
         })}
       </div>
+      {tray && (
+        <div className="flex w-fit max-w-full items-center gap-1 rounded-b-2xl bg-ink/[0.06] px-1 pb-1 pt-0.5 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.04)]">
+          {tray}
+        </div>
+      )}
     </nav>
   );
 }
@@ -202,6 +243,24 @@ const POST_TABS: PhoneTab[] = [
   { label: "Paperwork", href: PATHS.completed, icon: FileCheck2, match: (p) => p.startsWith(PATHS.completed) },
   { label: "Service", href: PATHS.service, icon: Wrench, match: (p) => p.startsWith(PATHS.service) },
 ];
+// The dock's third set, the Marketplace's tools (23 Nov 2026, Martin: "We should make a 3rd orb toggle position -
+// marketplace"; then "the marketplace is the focal thing… it should likely replace sol as the centre icon… to the left
+// is my listings… the right hand side is my messages"): the Marketplace's blue round takes Sol's place in the middle
+// (its home, the job listings), My listings (jobs out for bids and goods for sale) beside it on the left and Messages on
+// the right, Buy & sell and Watching at the ends. While the Marketplace is closed each opens its launch page.
+const MARKET = "/design/marketplace";
+const MARKET_TABS: PhoneTab[] = [
+  { label: "Buy & sell", href: `${MARKET}/equipment`, icon: ArrowLeftRight, match: (p) => p === `${MARKET}/equipment` },
+  {
+    label: "My listings",
+    href: `${MARKET}/mine`,
+    icon: Store,
+    match: (p) => p.startsWith(`${MARKET}/mine`) || p.startsWith(`${MARKET}/equipment/mine`) || p.startsWith(`${MARKET}/bids`),
+  },
+  { label: "Messages", href: `${MARKET}/messages`, icon: MessageCircle, match: (p) => p.startsWith(`${MARKET}/messages`) },
+  { label: "Watching", href: `${MARKET}/watching`, icon: Eye, match: (p) => p.startsWith(`${MARKET}/watching`) },
+];
+const DOCK_TABS: Record<DockSet, PhoneTab[]> = { sales: PHONE_TABS, post: POST_TABS, market: MARKET_TABS };
 
 /**
  * The frame every signed-in screen sits in (31 Oct 2026, Martin: Primero's layout, in RENUABL's own colours and type).
@@ -300,9 +359,8 @@ function Shell({
   const unread = useUnreadMessages(retail);
   // This member's unread team chat lines, for the Team tab on a phone's foot bar.
   const teamUnread = useTeamUnread();
-  // The dock's set (sales or post sale tools).
+  // The dock's set (sales, post sale or Marketplace tools).
   const dock = useDockSet();
-  const post = dock === "post";
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -491,8 +549,40 @@ function Shell({
         })}
       </nav>
     ) : null;
-  /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the post-sale dock. */
-  const tabFor = (t: PhoneTab, dark: boolean) => {
+  // The More sheet: what the dock on show already reaches isn't repeated (23 Nov 2026, Martin). Sol's round goes to
+  // Today and the designer is on every designing dock, so both are always left out.
+  const dockTabs = retail ? DOCK_TABS[dock] : (KIND_TABS[kind as Exclude<BusinessKind, "retailer">] ?? []);
+  const docked = (href: string) =>
+    href === PATHS.home || href === PATHS.designer || dockTabs.some((t) => t.label !== VOICE_TAB && t.href === href);
+  const inboxLinks = [
+    { label: "Team chat", href: PATHS.team, n: teamUnread },
+    ...(retail
+      ? [
+          { label: "Messages from customers", href: PATHS.messages, n: unread },
+          { label: "Notifications", href: PATHS.notifications, n: mentions },
+          { label: "Email", href: PATHS.inbox, n: mail },
+        ]
+      : []),
+  ];
+  const renuablLinks = [
+    ...(retail ? [{ label: "Sol: reminders and what he knows", href: PATHS.sol, n: 0 }] : []),
+    { label: "Industry news", href: "/design/news", n: 0 },
+    { label: "Updates", href: PATHS.updates, n: updates },
+    { label: "Feedback", href: PATHS.feedback, n: 0 },
+  ];
+  const linkRow = (r: { label: string; href: string; n: number }) => (
+    <Link
+      key={r.href}
+      href={r.href}
+      onClick={() => setMore(false)}
+      className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
+    >
+      <span className="flex-1">{r.label}</span>
+      {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
+    </Link>
+  );
+  /** One place on the phone's foot bar. `dark`: a post-sale or Marketplace tool, drawn as a graphite tile. */
+  const tabFor = (t: PhoneTab, dark: boolean, glyph = "text-[#d6ff3d]") => {
     if (retail && t.label === VOICE_TAB)
       return (
         <PhoneVoiceTab
@@ -504,7 +594,7 @@ function Shell({
         />
       );
     const lit = !more && t.match(path);
-    const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
+    const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : t.href === `${MARKET}/messages` ? (trade ?? 0) : 0;
     // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
     // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
     if (dark)
@@ -524,7 +614,7 @@ function Shell({
           )}
         >
           <span className={clsx("dock-tile relative flex size-9 items-center justify-center", lit && "dock-tile-lit")}>
-            <t.icon className="size-[19px] text-[#d6ff3d]" strokeWidth={1.9} aria-hidden />
+            <t.icon className={clsx("size-[19px]", glyph)} strokeWidth={1.9} aria-hidden />
             {n > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
                 {n}
@@ -849,6 +939,7 @@ function Shell({
         home={PATHS.home}
         back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
         onSearch={retail ? () => setSearching(true) : undefined}
+        mail={retail ? { href: PATHS.inbox, count: mail, on: path.startsWith(PATHS.inbox) } : undefined}
         more={
           retail
             ? {
@@ -878,7 +969,8 @@ function Shell({
             {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
                 the launch page's demo carries it. */}
             {sectionPages && <div className="studio-pages -mt-2 mb-5 hidden lg:block">{sectionPages}</div>}
-            {current.id === "proposals" && <PhoneDealsSwitch path={path} />}
+            {/* The pipeline draws its own, with the pipeline picker in it (PipelinesPage). */}
+            {current.id === "proposals" && path !== PATHS.pipelines && path !== PATHS.sales && <PhoneDealsSwitch path={path} />}
             {current.id === "marketplace" && marketplaceOpen() && (
               <MarketplaceMenu className="-mt-1 mb-6 border-b border-line pb-3" pages={current.pages} lit={here?.page.id} count={count} />
             )}
@@ -904,29 +996,57 @@ function Shell({
           // taller so it wouldn't encroach on the chat icon", and "a graphite colored orb"): a lip rising out of the
           // dock's top edge above Team, high enough to clear Team's round and its count, holding a graphite ball. A tap
           // dips the ball like a lever and the dock's reels turn.
-          <DockTurn post={post} label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo} onTurn={() => setDockSet(otherDockSet(dock))} />
+          <DockTurn label={DOCK_SET_WORDS[nextDockSet(dock)].turnTo} onTurn={() => setDockSet(nextDockSet(dock))} />
         )}
         {retail
           ? [0, 1, 2, 3].map((i) => [
               i === 2 ? (
-                <div
-                  key="sol"
-                  className="dock-sol flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink"
-                >
-                  <span className="-mt-6">
-                    <SolNavButton phone />
-                  </span>
-                  Sol
+                <div key="sol" className="dock-sol relative min-h-16">
+                  {/* On the Marketplace's tools its blue round takes Sol's place (23 Nov 2026, Martin); Sol stays
+                      mounted underneath, so his panel and counts carry on. */}
+                  <div
+                    className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink transition-opacity duration-300"
+                    style={{ opacity: dock === "market" ? 0 : 1 }}
+                    inert={dock === "market"}
+                  >
+                    <span className="-mt-6">
+                      <SolNavButton phone />
+                    </span>
+                    Sol
+                  </div>
+                  <Link
+                    href={MARKET}
+                    inert={dock !== "market"}
+                    aria-current={dock === "market" && path === MARKET ? "page" : undefined}
+                    onClick={() => {
+                      setMore(false);
+                      leaveSol();
+                    }}
+                    className={clsx(
+                      "dock-market-centre absolute inset-0 flex flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-semibold text-ink",
+                      dock === "market" ? "dock-market-in" : "pointer-events-none opacity-0",
+                    )}
+                  >
+                    <span className="glass-orb-market -mt-6 flex size-[53px] items-center justify-center rounded-full text-white">
+                      <MarketplaceMark className="size-7" />
+                    </span>
+                    Marketplace
+                  </Link>
                 </div>
               ) : null,
               <div key={`reel-${i}`} className="relative h-16 self-end overflow-hidden">
-                <div className="dock-reel" style={{ transform: post ? "translateY(-50%)" : undefined, transitionDelay: `${i * 80}ms` }}>
-                  <div className="h-16 [&>*]:w-full" inert={post}>
-                    {tabFor(PHONE_TABS[i], false)}
-                  </div>
-                  <div className="h-16 [&>*]:w-full" inert={!post}>
-                    {tabFor(POST_TABS[i], true)}
-                  </div>
+                <div
+                  className="dock-reel"
+                  style={{
+                    transform: reelPlace(dock) ? `translateY(-${(reelPlace(dock) * 100) / DOCK_SETS.length}%)` : undefined,
+                    transitionDelay: `${i * 80}ms`,
+                  }}
+                >
+                  {DOCK_SETS.map((set) => (
+                    <div key={set} className="h-16 [&>*]:w-full" inert={set !== dock}>
+                      {tabFor(DOCK_TABS[set][i], set !== "sales", set === "market" ? "text-[#8fb8ff]" : undefined)}
+                    </div>
+                  ))}
                 </div>
               </div>,
             ])
@@ -964,85 +1084,45 @@ function Shell({
           <button type="button" aria-label="Close" className="absolute inset-0 bg-ink/40" onClick={() => setMore(false)} />
           <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-[2rem] bg-surface px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3">
             <span className="mx-auto block h-1 w-10 rounded-full bg-line" aria-hidden />
-            {retail && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMore(false);
-                  setSearching(true);
-                }}
-                className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
-              >
-                <Search className="size-5" aria-hidden /> Search, or ask Sol
-              </button>
-            )}
-            {designsRoofs(kind) && (
-              <Link
-                href={PATHS.designer}
-                onClick={() => setMore(false)}
-                className="mt-2 flex min-h-12 items-center gap-3 rounded-xl bg-sun-line px-3 text-base font-medium text-white"
-              >
-                <PenTool className="size-5" aria-hidden /> Design tool
-              </Link>
-            )}
-            {sections.map((sec) => (
-              <div key={sec.id}>
-                <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
-                {sec.pages.map((p) => (
-                  <Link
-                    key={p.id}
-                    href={p.href}
-                    onClick={() => setMore(false)}
-                    className={clsx(
-                      "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
-                      here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
-                    )}
-                  >
-                    <span className="flex-1">{p.label}</span>
-                    {count(p.id) > 0 && (
-                      <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            ))}
-            <div className="mt-4 border-t border-line pt-2">
-              {[
-                ...(retail ? [{ label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 }] : []),
-                { label: "Team chat", href: PATHS.team, n: 0 },
-                ...(retail
-                  ? [
-                      { label: "Messages", href: PATHS.messages, n: unread },
-                      { label: "Notifications", href: PATHS.notifications, n: mentions },
-                      { label: "Email", href: PATHS.inbox, n: mail },
-                    ]
-                  : []),
-                { label: "Updates", href: PATHS.updates, n: updates },
-                { label: "Feedback", href: PATHS.feedback, n: 0 },
-                ...(kind !== "inspector" ? [{ label: "Usage", href: `${PATHS.settings}/usage`, n: 0 }] : []),
-                { label: "Settings", href: PATHS.settings, n: 0 },
-                { label: "Your account", href: PATHS.account, n: 0 },
-              ].map((r) => (
-                <Link
-                  key={r.href}
-                  href={r.href}
-                  onClick={(e) => {
-                    setMore(false);
-                    // Usage opens its box with the top-ups when it can (usage-pop.tsx), else the Usage page.
-                    if (r.label === "Usage" && usagePopReady()) {
-                      e.preventDefault();
-                      openUsagePop();
-                    }
-                  }}
-                  className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
-                >
-                  <span className="flex-1">{r.label}</span>
-                  {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
-                </Link>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-line px-3 pt-4 text-sm text-muted">
-              <span className="truncate">{account.email}</span>
+            {/* A menu, not a summary (23 Nov 2026, Martin): you first (your profile and its settings), then this
+                month's usage, then where things come in, the rest of the product, and RENUABL's own. */}
+            <MoreProfile
+              email={account.email}
+              firstName={account.firstName}
+              business={account.business?.name}
+              onGo={() => setMore(false)}
+            />
+            <MoreUsage billing={!!account.may?.prices} onGo={() => setMore(false)} />
+            <p className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Coming in</p>
+            {inboxLinks.filter((r) => !docked(r.href)).map(linkRow)}
+            {sections.map((sec) => {
+              const pages = sec.pages.filter((p) => !docked(p.href));
+              if (!pages.length) return null;
+              return (
+                <div key={sec.id}>
+                  <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
+                  {pages.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={p.href}
+                      onClick={() => setMore(false)}
+                      className={clsx(
+                        "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
+                        here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
+                      )}
+                    >
+                      <span className="flex-1">{p.label}</span>
+                      {count(p.id) > 0 && (
+                        <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              );
+            })}
+            <p className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">RENUABL</p>
+            {renuablLinks.map(linkRow)}
+            <div className="mt-4 flex items-center gap-3 border-t border-line px-3 pt-4 text-base">
               <SignOut className="font-medium text-ink-2" />
             </div>
           </div>
@@ -1143,7 +1223,7 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
 }
 
 /** The dock's lip and its graphite ball: a tap dips the ball like a pulled lever and turns the dock. */
-function DockTurn({ label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
+function DockTurn({ label, onTurn }: { label: string; onTurn: () => void }) {
   const [pulls, setPulls] = useState(0);
   return (
     <span className="dock-lip absolute -top-[44px] right-3.5 flex h-[44px] w-12 justify-center rounded-t-[28px] border border-b-0 pt-1.5">
