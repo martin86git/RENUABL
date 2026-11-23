@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
+  },
+  {
+    day: "2026-11-23",
     area: "Settings",
     words:
       "Bring in your HubSpot deals: match its stages and fields to yours, and each comes across with its contact, notes, emails and calls.",
