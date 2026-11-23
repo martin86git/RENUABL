@@ -188,7 +188,7 @@ export function TodayChat(props: {
       <span
         className={clsx(
           "relative -mt-2 mb-3 inline-flex transition-colors duration-500 sm:-mt-6 sm:mb-5",
-          post ? "text-[#7f97bb]" : "text-[#c9ccd3]",
+          post ? "text-[#a9cf1c]" : "text-[#c9ccd3]",
         )}
       >
         <SolEtch className="size-12 sm:size-16" />
