@@ -568,7 +568,10 @@ export function SolBox({
               type="submit"
               disabled={asking || !ready}
               aria-label="Ask Sol"
-              className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+              // Pressed with the keyboard up, the box keeps its focus (23 Nov 2026, Martin, on an iPhone: it "isn't
+              // responding"): a first tap that closed the keyboard moved the page under the finger and the press was lost.
+              onPointerDown={(e) => e.preventDefault()}
+              className="ml-auto grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
@@ -598,6 +601,7 @@ export function SolBox({
             type="submit"
             disabled={asking || !ready}
             aria-label="Ask Sol"
+            onPointerDown={(e) => e.preventDefault()}
             className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
           >
             <ArrowUp className="size-4" aria-hidden />
