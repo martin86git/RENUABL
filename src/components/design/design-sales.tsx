@@ -4,7 +4,22 @@ import { SAMPLE_DEAL_HINT } from "@/lib/domain/design/deal-tour";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, List, PenTool, Pencil, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  List,
+  PenTool,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  User,
+  UserX,
+  Users,
+  X,
+} from "lucide-react";
 import clsx from "clsx";
 import { JOB_STAGES, OPEN_STAGES, STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { DEFAULT_PIPELINE, cleanPipelineChoice, type PipelineChoice } from "@/lib/domain/design/deal";
@@ -45,7 +60,7 @@ import {
 import { NewDeal } from "./design-customers";
 import { useDesignAccount } from "./design-account";
 import { PATHS, PageHead, ui } from "./design-shell";
-import { PulseMarks } from "./deal-pulse";
+import { HEAT, PulseMarks } from "./deal-pulse";
 import { BatteryIcon, ChargerIcon, PanelIcon } from "./deal-banner";
 import { jobHas } from "@/lib/domain/design/customers";
 import { loadPulses } from "@/lib/services/deal-pulse";
@@ -90,6 +105,9 @@ function agoWords(at: string): string {
   if (days < 60) return `${Math.floor(days / 7)}w ago`;
   return shortDate(at);
 }
+
+/** A deal's clock in the list, in its band's colour. */
+const CLOCK_TEXT = { green: "text-positive", amber: "text-warning", red: "text-danger", over: "text-danger" } as const;
 
 const stageSelect =
   "block h-8 w-full appearance-auto rounded-md border border-line bg-surface px-2 text-xs text-ink-2 outline-none focus:border-forest";
@@ -374,65 +392,77 @@ export function PipelinesPage() {
 
   return (
     <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10">
-      {/* On a phone: one graphite card. The pipeline is the title (pressed to pick another), with how many deals and
-          what they are worth under it and New deal beside it; under them whose deals, and cards or list as two icons. */}
-      <div className="rounded-2xl bg-primary p-4 text-primary-ink sm:hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <label className="relative flex min-w-0 items-center">
-              <span className="sr-only">Pipeline</span>
-              {pipelineSelect(
-                "min-w-0 max-w-full appearance-none truncate bg-transparent pr-6 text-[21px] font-semibold tracking-[-0.02em] text-primary-ink outline-none [field-sizing:content] [&_option]:text-ink",
-                false,
-              )}
-              <ChevronDown className="pointer-events-none absolute right-0 size-4 opacity-80" aria-hidden />
-            </label>
-            <p className="mt-0.5 text-[12px] tabular-nums opacity-70">
-              {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : "\u00a0"}
-            </p>
-          </div>
-          {leadAt < 0 && (
-            <button
-              onClick={() => setAdding(true)}
-              disabled={adding}
-              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-white/12 px-3.5 text-[14px] font-medium ring-1 ring-white/15 active:bg-white/20"
-            >
-              <Plus className="size-4" aria-hidden /> New deal
-            </button>
-          )}
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3">
+      {/* On a phone: one slim graphite bar (23 Nov 2026, Martin: the card wasted space). The pipeline is the title
+          (pressed to pick another) with its count and worth under it; then whose deals as a round, cards or list, and
+          New deal as a plus. */}
+      <div className="flex items-center gap-1.5 rounded-2xl bg-primary py-2 pl-3.5 pr-2 text-primary-ink sm:hidden">
+        <div className="min-w-0 flex-1">
           <label className="relative flex min-w-0 items-center">
-            <span className="sr-only">Whose deals</span>
-            <select
-              className="h-9 min-w-0 appearance-none truncate rounded-lg bg-transparent pl-3 pr-8 text-[14px] text-primary-ink outline-none ring-1 ring-white/25 [&_option]:text-ink"
-              value={whose}
-              onChange={(e) => setWhose(e.target.value as typeof whose)}
-            >
-              <option value="all">Everyone&apos;s deals</option>
-              <option value="mine">My deals</option>
-              <option value="none">No owner yet</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 size-4 opacity-80" aria-hidden />
+            <span className="sr-only">Pipeline</span>
+            {pipelineSelect(
+              "min-w-0 max-w-full appearance-none truncate bg-transparent pr-5 text-[16px] font-semibold tracking-[-0.01em] text-primary-ink outline-none [field-sizing:content] [&_option]:text-ink",
+              false,
+            )}
+            <ChevronDown className="pointer-events-none absolute right-0 size-3.5 opacity-80" aria-hidden />
           </label>
-          <div className="flex shrink-0 items-center rounded-lg bg-white/8 p-0.5 ring-1 ring-white/15" role="group" aria-label="View">
-            {views.map(({ view, name, Icon }) => (
-              <button
-                key={view}
-                aria-pressed={choice.view === view}
-                aria-label={name}
-                title={name}
-                onClick={() => choose({ ...choice, view })}
-                className={clsx(
-                  "inline-flex size-9 items-center justify-center rounded-md",
-                  choice.view === view ? "bg-white/18" : "opacity-70",
-                )}
-              >
-                <Icon className="size-4" aria-hidden />
-              </button>
-            ))}
-          </div>
+          <p className="text-[11px] leading-tight tabular-nums opacity-70">
+            {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${shortDollars(worth)}` : ""}` : "\u00a0"}
+            {whose !== "all" && <span> · {whose === "mine" ? "mine" : "no owner"}</span>}
+          </p>
         </div>
+        <label
+          className={clsx(
+            "relative inline-flex size-9 shrink-0 items-center justify-center rounded-lg ring-1",
+            whose === "all" ? "ring-white/15" : "bg-white/18 ring-white/30",
+          )}
+          title="Whose deals"
+        >
+          <span className="sr-only">Whose deals</span>
+          {whose === "all" ? (
+            <Users className="size-4" aria-hidden />
+          ) : whose === "mine" ? (
+            <User className="size-4" aria-hidden />
+          ) : (
+            <UserX className="size-4" aria-hidden />
+          )}
+          <select
+            className="absolute inset-0 cursor-pointer opacity-0"
+            value={whose}
+            onChange={(e) => setWhose(e.target.value as typeof whose)}
+          >
+            <option value="all">Everyone&apos;s deals</option>
+            <option value="mine">My deals</option>
+            <option value="none">No owner yet</option>
+          </select>
+        </label>
+        <div className="flex shrink-0 items-center rounded-lg bg-white/8 p-0.5 ring-1 ring-white/15" role="group" aria-label="View">
+          {views.map(({ view, name, Icon }) => (
+            <button
+              key={view}
+              aria-pressed={choice.view === view}
+              aria-label={name}
+              title={name}
+              onClick={() => choose({ ...choice, view })}
+              className={clsx(
+                "inline-flex size-8 items-center justify-center rounded-md",
+                choice.view === view ? "bg-white/18" : "opacity-60",
+              )}
+            >
+              <Icon className="size-4" aria-hidden />
+            </button>
+          ))}
+        </div>
+        {(leadAt < 0 || choice.view === "list") && (
+          <button
+            onClick={() => setAdding(true)}
+            disabled={adding}
+            aria-label="New deal"
+            title="New deal"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-sun-line text-white active:opacity-80"
+          >
+            <Plus className="size-4.5" aria-hidden />
+          </button>
+        )}
       </div>
 
       <div className="hidden sm:block">
@@ -743,60 +773,129 @@ export function PipelinesPage() {
           <AddStageColumn stages={stages} own={own} names={names} pipelineName={named.name} onAdd={addOwnStage} />
         </div>
       ) : (
-        <div className={clsx(ui.card, "mt-4 overflow-x-auto")}>
-          <table className="w-full min-w-[46rem] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
-                <th className="px-5 py-3 font-medium">Deal</th>
-                <th className="px-3 py-3 font-medium">Address</th>
-                <th className="px-3 py-3 font-medium">Stage</th>
-                <th className="px-3 py-3 text-right font-medium">Value</th>
-                <th className="px-3 py-3 font-medium">Install</th>
-                <th className="px-5 py-3 font-medium">Changed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!jobs && !problem && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-6 text-muted">
-                    Loading…
-                  </td>
+        <>
+          {/* The list on a phone (23 Nov 2026, Martin: the table showed little and scrolled sideways): every stage down the
+              page, its deals two short lines each, so the list is the overview where the cards are the board. */}
+          <div className="mt-3 space-y-3 sm:hidden">
+            {!jobs && !problem && <p className="px-1 text-[13px] text-muted">Loading…</p>}
+            {jobs && shown.length === 0 && (
+              <p className="px-1 text-[13px] text-ink-2">No deals at {stages.length === 1 ? "this stage" : "these stages"}.</p>
+            )}
+            {stages.map((stage, at) => {
+              const column = shown
+                .filter((j) => columnOf(j, stages, own) === stage)
+                .sort((a, b) => (pulses[b.id]?.priority ?? -Infinity) - (pulses[a.id]?.priority ?? -Infinity));
+              if (column.length === 0) return null;
+              const sum = column.reduce((n, j) => n + (j.value ?? 0), 0);
+              return (
+                <section key={stage} aria-label={stageName(stage, own, names)}>
+                  <h2 className="flex items-center gap-2 px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-2">
+                    <span className={clsx("size-2 rounded-full", stageBar(baseAt(stages, at, own)))} aria-hidden />
+                    <span className="min-w-0 truncate">{stageName(stage, own, names)}</span>
+                    <span className="font-medium text-muted tabular-nums">{column.length}</span>
+                    {sum ? <span className="ml-auto font-medium normal-case tracking-normal tabular-nums">{shortDollars(sum)}</span> : null}
+                  </h2>
+                  <ul className="divide-y divide-line overflow-hidden rounded-xl bg-surface ring-1 ring-line">
+                    {column.map((job) => {
+                      const pulse = pulses[job.id];
+                      return (
+                        <li key={job.id} onClick={() => router.push(dealOf(job))} className="cursor-pointer px-3 py-2 active:bg-surface-2">
+                          <div className="flex items-center gap-2">
+                            {pulse && (
+                              <span
+                                className={clsx("size-1.5 shrink-0 rounded-full", HEAT[pulse.heat.heat].dot)}
+                                title={HEAT[pulse.heat.heat].label}
+                                aria-label={HEAT[pulse.heat.heat].label}
+                                role="img"
+                              />
+                            )}
+                            <Link
+                              href={dealOf(job)}
+                              className="min-w-0 truncate text-[14px] font-medium text-ink"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {job.customerName}
+                            </Link>
+                            {job.address ? <KitMarks job={job} /> : <span className="flex-1" />}
+                            <span className="shrink-0 text-[13.5px] font-semibold tabular-nums text-ink">
+                              {job.value ? dollars(job.value) : ""}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 flex items-center gap-2 text-[11.5px] text-muted">
+                            <span className="min-w-0 flex-1 truncate">{job.address ? job.address.split(",")[0] : job.title}</span>
+                            {pulse && (
+                              <span className={clsx("shrink-0 tabular-nums", CLOCK_TEXT[pulse.clock.band])}>
+                                {pulse.clock.words.replace(/ days?\b/, "d")}
+                              </span>
+                            )}
+                            <span className="shrink-0 tabular-nums text-ink-2" title={`Changed ${shortDate(job.updatedAt)}`}>
+                              {job.sample ? "Tour" : job.installDate ? `Install ${shortDate(job.installDate)}` : agoWords(job.updatedAt)}
+                            </span>
+                            <Owner email={job.owner} />
+                          </p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+          <div className={clsx(ui.card, "mt-4 overflow-x-auto max-sm:hidden")}>
+            <table className="w-full min-w-[46rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                  <th className="px-5 py-3 font-medium">Deal</th>
+                  <th className="px-3 py-3 font-medium">Address</th>
+                  <th className="px-3 py-3 font-medium">Stage</th>
+                  <th className="px-3 py-3 text-right font-medium">Value</th>
+                  <th className="px-3 py-3 font-medium">Install</th>
+                  <th className="px-5 py-3 font-medium">Changed</th>
                 </tr>
-              )}
-              {jobs && shown.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-6 text-ink-2">
-                    No deals at {stages.length === 1 ? "this stage" : "these stages"}.
-                  </td>
-                </tr>
-              )}
-              {shown.map((job) => (
-                <tr
-                  key={job.id}
-                  onClick={() => router.push(dealOf(job))}
-                  className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
-                >
-                  <td className="px-5 py-3">
-                    <Link href={dealOf(job)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
-                      {job.customerName}
-                    </Link>
-                    <span className="block text-xs text-muted">{job.title}</span>
-                  </td>
-                  <td className="max-w-[16rem] truncate px-3 py-3 text-ink-2">{job.address || "–"}</td>
-                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                    <label>
-                      <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
-                      {stagePicker(job, clsx(stageSelect, "w-40"))}
-                    </label>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums text-ink">{dollars(job.value)}</td>
-                  <td className="px-3 py-3 tabular-nums text-ink-2">{job.installDate ? shortDate(job.installDate) : "–"}</td>
-                  <td className="px-5 py-3 tabular-nums text-ink-2">{shortDate(job.updatedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {!jobs && !problem && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-6 text-muted">
+                      Loading…
+                    </td>
+                  </tr>
+                )}
+                {jobs && shown.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-6 text-ink-2">
+                      No deals at {stages.length === 1 ? "this stage" : "these stages"}.
+                    </td>
+                  </tr>
+                )}
+                {shown.map((job) => (
+                  <tr
+                    key={job.id}
+                    onClick={() => router.push(dealOf(job))}
+                    className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+                  >
+                    <td className="px-5 py-3">
+                      <Link href={dealOf(job)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {job.customerName}
+                      </Link>
+                      <span className="block text-xs text-muted">{job.title}</span>
+                    </td>
+                    <td className="max-w-[16rem] truncate px-3 py-3 text-ink-2">{job.address || "–"}</td>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <label>
+                        <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
+                        {stagePicker(job, clsx(stageSelect, "w-40"))}
+                      </label>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-ink">{dollars(job.value)}</td>
+                    <td className="px-3 py-3 tabular-nums text-ink-2">{job.installDate ? shortDate(job.installDate) : "–"}</td>
+                    <td className="px-5 py-3 tabular-nums text-ink-2">{shortDate(job.updatedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
