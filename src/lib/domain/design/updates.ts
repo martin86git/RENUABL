@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
     area: "Today",
+    words: "Topping up from the usage box now pays by card right in the box, without leaving the page.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
     words: "A usage gauge under the date on Today opens this month's usage, with packs to top up Sol and design credits.",
   },
   {

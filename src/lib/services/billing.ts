@@ -133,6 +133,24 @@ export function buySolCredits(credits: number) {
   return post("/api/design/billing", { do: "sol", credits });
 }
 
+/**
+ * Stripe's card form for a pack, to open in place (the usage box): its client secret, and Stripe comes back to `back`
+ * (a page under /design) with ?usage=bought once paid.
+ */
+export async function packCardForm(
+  pack: { sol: number } | { tokens: TokenPack },
+  back: string,
+): Promise<{ ok: true; secret: string } | { ok: false; message: string }> {
+  const a = await post(
+    "/api/design/billing",
+    "sol" in pack ? { do: "sol", credits: pack.sol, form: back } : { do: "tokens", pack: pack.tokens, form: back },
+  );
+  const secret = (a as { secret?: unknown }).secret;
+  return a.ok && typeof secret === "string"
+    ? { ok: true, secret }
+    : { ok: false, message: a.message ?? "The card form couldn't open just now." };
+}
+
 export async function saveBillingDetails(
   details: BillingDetails,
 ): Promise<{ ok: true; details: BillingDetails } | { ok: false; message: string }> {
