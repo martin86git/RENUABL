@@ -1301,13 +1301,14 @@ function SolarVicAsk(props: { rebate: number; onChoose: (rebate: boolean, loan: 
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);
   const choice = "w-full rounded-full px-4 py-2.5 text-sm font-semibold";
-  // Drawn on the page body (19 Nov 2026, Martin: it opened half drawn over the quote): the quote sits in a panel whose own
+  // Above the phone's quote sheet (z 90; 23 Nov 2026, Martin: Proceed to proposal "isn't working": the question opened
+  // behind it, so nothing seemed to happen). Drawn on the page body (19 Nov 2026, Martin: it opened half drawn over the quote): the quote sits in a panel whose own
   // frame pinned a "fixed" box to it, so the dimming stopped part way and the question sat over the column headings.
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="theme-studio contents">
       <div
-        className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/40 p-4"
+        className="fixed inset-0 z-[120] flex items-center justify-center bg-ink/40 p-4"
         onMouseDown={(e) => e.target === e.currentTarget && onClose()}
       >
         <div
