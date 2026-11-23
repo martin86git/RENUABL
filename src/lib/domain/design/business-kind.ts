@@ -117,6 +117,8 @@ const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
     "import",
     "billing",
     "usage",
+    // The STC change notice and the installation period new quotes are priced for.
+    "stc",
     "marketplace",
     "trade",
   ],

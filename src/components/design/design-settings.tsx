@@ -19,6 +19,7 @@ import {
   type Workspace,
 } from "@/lib/domain/design/pricing";
 import { loadWorkspace, saveWorkspace, savedLabel } from "@/lib/services/design-store";
+import { StcPeriodSetting } from "./stc-period";
 
 const input =
   "block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm tabular-nums outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
@@ -406,6 +407,8 @@ export function DesignSettings({ part }: { part: PricePart }) {
                 </div>
               </section>
             ))}
+
+            {part === "margin" && <StcPeriodSetting workspace={workspace} onChange={(next) => void change(next)} />}
 
             <div hidden={part !== "lists"} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-5">
               <p className="max-w-xl text-sm text-ink-2">

@@ -26,6 +26,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-23",
+    area: "Designer",
+    words: "Today warns before STCs change, and you choose the installation period new quotes are priced for.",
+  },
+  {
+    day: "2026-11-23",
     area: "Proposals",
     words: "Customer proposals carry a small, quiet Powered by RENUABL in the bottom corner and the footer.",
   },

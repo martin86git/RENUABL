@@ -42,6 +42,7 @@ import { loadPrepared } from "@/lib/services/prepared";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
+import { StcNoticeCard } from "./stc-period";
 
 /**
  * Today's Business and My month (21 Nov 2026, Martin: the Chat page wasn't a plus, chat is everywhere already; what
@@ -202,6 +203,9 @@ export function TodayChat(props: {
           </button>
         ))}
       </div>
+
+      {/* STC changes (stc-change.ts): one card under the tray, only for who may change settings, only while there is something to say. */}
+      {first && !mine && <StcNoticeCard className="mt-5 w-full text-left" />}
 
       {tab && (
         <div role="tabpanel" className={clsx("mt-5 text-left", wide ? "w-[min(72rem,calc(100vw-3rem))]" : "w-full")}>

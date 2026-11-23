@@ -150,6 +150,7 @@ import { SolMark } from "./sol-sun";
 import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
+import { stcPricingDate } from "@/lib/domain/design/stc-change";
 import { heldModulesOf, shiftingKwhOf, systemSpecOf } from "@/lib/domain/design/system";
 import { arrayOversize, suggestInverters, type InverterSuggestion } from "@/lib/domain/design/inverter-suggest";
 import { clashRefusal, clashWords, clashesWithSupply, supplyClashes } from "@/lib/domain/design/supply-match";
@@ -4297,7 +4298,13 @@ export function RoofDesigner(props: {
       designs: everyDesign().map((d, i) => {
         const sum = designSummary(d, props.yieldPerKwDay);
         const costing = costSystem(systemSpecOf(d, firstListed), quoteNow.form, props.workspace);
-        const stc = stcValue(costing, postcode, todayInMarket(), props.rates, props.workspace.settings.stcPrice);
+        const stc = stcValue(
+          costing,
+          postcode,
+          stcPricingDate(props.workspace.settings.stcFrom, todayInMarket()),
+          props.rates,
+          props.workspace.settings.stcPrice,
+        );
         // The open design's price is the quote's own (with its hand changes); the others as the quote would make them.
         const youPay =
           costsHidden || costing.missing > 0 || sum.panels === 0
@@ -4641,7 +4648,7 @@ export function RoofDesigner(props: {
       form: quoteNow.form,
       workspace: props.workspace,
       rates: props.rates,
-      date: todayInMarket(),
+      date: stcPricingDate(props.workspace.settings.stcFrom, todayInMarket()),
       newId,
     });
     if (auto && !result.options.length) return setMine("idle");

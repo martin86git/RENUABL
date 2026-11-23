@@ -34,10 +34,12 @@ import {
   type QuoteFields,
   type SystemSpec,
 } from "@/lib/domain/design/quote";
+import { quoteStcLine, stcPricingDate } from "@/lib/domain/design/stc-change";
 import { todayInMarket } from "@/lib/domain/market";
 import type { RebateRates } from "@/lib/domain/rebates";
 import { priceAdvice, typedCostFlags, type Advice } from "@/lib/domain/design/price-check";
 import { usePricePoints } from "@/lib/services/price-check";
+import { StcPeriodLine } from "./stc-period";
 import { askSolInPanel } from "@/lib/services/sol";
 import { SolBadge } from "./sol-sun";
 
@@ -174,7 +176,18 @@ export function DesignQuote(props: {
     });
   const empty = spec.panels === 0;
   const costing = costSystem(spec, form, workspace);
-  const stcs = stcSplit(costing, /^\d{4}$/.test(form.postcode) ? form.postcode : null, todayInMarket(), rates, workspace.settings.stcPrice);
+  // STCs go by the install day: the business's installation period for new quotes, else today (stc-change.ts).
+  const postcode = /^\d{4}$/.test(form.postcode) ? form.postcode : null;
+  const today = todayInMarket();
+  const stcs = stcSplit(costing, postcode, stcPricingDate(workspace.settings.stcFrom, today), rates, workspace.settings.stcPrice);
+  const stcLine = quoteStcLine({
+    today,
+    rates,
+    stcFrom: workspace.settings.stcFrom,
+    stcPrice: workspace.settings.stcPrice,
+    system: { pvKw: costing.pvKw, batteryKwh: costing.batteryKwh ?? 0 },
+    postcode,
+  });
   const stc = stcs.total;
 
   const all = costing.lines;
@@ -368,6 +381,7 @@ export function DesignQuote(props: {
                   <dd className="tabular-nums">{v}</dd>
                 </div>
               ))}
+              <StcPeriodLine line={stcLine} small />
               {solarVic && (
                 <div className="flex justify-between text-sun-ink">
                   <dt>After Solar Vic, if approved</dt>
@@ -843,6 +857,7 @@ export function DesignQuote(props: {
         <dt>After STCs ({money(stc)})</dt>
         <dd className="tabular-nums">{money(totals.priceIncGst - stc)}</dd>
       </div>
+      <StcPeriodLine line={stcLine} workspace={workspace} onWorkspace={props.onWorkspace} />
     </dl>
   );
   const priceCheckBox = advice.length > 0 && <PriceCheck advice={advice} typed={Object.keys(typedFlags).length} />;

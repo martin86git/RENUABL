@@ -39,7 +39,9 @@ export function withoutCosts(
       install: { ...DEFAULT_WORKSPACE.install },
       settings: {
         ...structuredClone(DEFAULT_WORKSPACE.settings),
-        ...(settings ? { bill: { ...settings.settings.bill }, stcPrice: settings.settings.stcPrice } : {}),
+        ...(settings
+          ? { bill: { ...settings.settings.bill }, stcPrice: settings.settings.stcPrice, stcFrom: settings.settings.stcFrom ?? null }
+          : {}),
       },
     },
     lists: lists.map((list) => ({
