@@ -65,9 +65,9 @@ export const SOL_TYPES: Record<string, string> = {
     "Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.",
   xlead:
     "A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.",
-  xdesigner: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
+  xdesigner: "You lay out the panels and the quote builds as you go. Your customer chooses a design and signs online.",
   xcrm: "I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.",
-  xruns: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
+  xruns: "Once they sign, the order, approvals, install calendar and your installer's job card are in one place for your team.",
   solintro: "Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.",
   sol: "I know every deal. I write your emails in your voice, and tell you who to ring next.",
 };
@@ -80,7 +80,7 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
   solintro: { file: "/design/launch/sol-intro.gif", alt: SOL_TYPES.solintro },
   cards: {
     file: "/design/launch/cards.gif",
-    alt: "Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.",
+    alt: "Your customers, answered. Your emails, written. Calls written up. Your advisor. Quotes priced as you draw. Installs on one calendar.",
   },
   call: { file: "/design/launch/call.gif", alt: "A RENUABL voice agent on a call with a new lead, booking them in (example)" },
   xvoice: { file: "/design/launch/explain-voice.gif", alt: SOL_TYPES.xvoice },
@@ -94,7 +94,7 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
   },
   sol: { file: "/design/launch/sol.gif", alt: SOL_TYPES.sol },
   psol: { file: "/design/launch/product-sol.jpg", alt: "In RENUABL: Sol on Today, saying who to call and what to say (example data)" },
-  designer: { file: "/design/launch/designer.jpg", alt: "Two homes designed in RENUABL's designer: panels laid, strung and priced" },
+  designer: { file: "/design/launch/designer.jpg", alt: "A roof in RENUABL's designer, whole and close up: panels laid out by hand, strung and priced" },
   xlead: { file: "/design/launch/explain-lead.gif", alt: SOL_TYPES.xlead },
   xdesigner: { file: "/design/launch/explain-designer.gif", alt: SOL_TYPES.xdesigner },
   today: { file: "/design/launch/today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
@@ -173,10 +173,10 @@ export const GTM_SEQUENCE_NAME = "One giant leap · the series";
 export const GTM_LAUNCH: EdmContent = email(
   "l",
   "Solar just got an AI sales force",
-  "Your leads answered in minutes. Your emails written. Your systems designed with you.",
+  "Your leads answered in minutes. Your follow-ups drafted. Your quotes priced as you draw.",
   [
     { hook: "Solar just got an AI sales force.", pictures: ["solintro"], cta: ["Meet Sol", SITE] },
-    { hook: "Answered, written, designed, booked. While you're on the roof.", pictures: ["cards"], cta: ["See it work", DEMO] },
+    { hook: "Leads answered, follow-ups drafted, while you're on the roof.", pictures: ["cards"], cta: ["See it work", DEMO] },
   ],
 );
 
@@ -213,15 +213,15 @@ const SERIES: { wait: number; content: EdmContent }[] = [
   },
   {
     wait: 3,
-    content: email("c", "Quote it before you leave the driveway", "One press. Three priced designs. Signed online.", [
-      { hook: "Quote it before you leave the driveway.", pictures: ["xdesigner"], cta: ["See it design", DEMO] },
+    content: email("c", "Quote it before you leave the driveway", "Lay out the panels and it's priced as you go. Signed online.", [
+      { hook: "Quote it before you leave the driveway.", pictures: ["xdesigner"], cta: ["See it price", DEMO] },
       { hook: "Real roofs, laid out and priced as you draw.", pictures: ["designer"], cta: ["Try the designer", DEMO] },
     ]),
   },
   {
     wait: 3,
-    content: email("e", "Signed? It's already moving.", "The order, approvals and the job card, from the moment they sign.", [
-      { hook: "Signed? It's already moving.", pictures: ["xruns"], cta: ["See after the sale", DEMO] },
+    content: email("e", "Signed? Everything after the sale, in one place", "The order, approvals, install calendar and job card, together for your team.", [
+      { hook: "Signed? Everything after the sale, in one place.", pictures: ["xruns"], cta: ["See after the sale", DEMO] },
       { hook: "Every install on one calendar, ready for your crew.", pictures: ["runs"], cta: ["Open the calendar", DEMO] },
     ]),
   },

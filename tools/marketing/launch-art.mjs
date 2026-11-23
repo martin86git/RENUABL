@@ -127,8 +127,8 @@ const CARDS = [
   { icon: "%%SOL%%", head: "Your emails, written.", sub: "Sol drafts every follow-up in your voice" },
   { icon: NOTEBOOK(56), head: "Your calls, written up.", sub: "The note-taker fills in the deal" },
   { icon: "%%SOL%%", head: "Your super-intelligent advisor.", sub: "Sol knows every deal, and the trade" },
-  { icon: DESIGNER(56), head: "Your roofs, designed.", sub: "Three priced designs in one press" },
-  { icon: AGENT(56, "#2bb5a0"), head: "Your installs, lined up.", sub: "The post-sale agent pencils in the day" },
+  { icon: DESIGNER(56), head: "Your quotes, priced as you draw.", sub: "You lay the panels, the price follows" },
+  { icon: AGENT(56, "#2bb5a0"), head: "Your installs, on one calendar.", sub: "Orders, approvals and job cards together" },
 ];
 
 /**
@@ -149,8 +149,8 @@ const EXPLAINERS = {
   },
   "explain-designer.gif": {
     icon: DESIGNER(88),
-    head: "Your roofs, designed.",
-    says: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
+    head: "Priced as you draw.",
+    says: "You lay out the panels and the quote builds as you go. Your customer chooses a design and signs online.",
   },
   "explain-crm.gif": {
     icon: NOTEBOOK(88),
@@ -159,8 +159,8 @@ const EXPLAINERS = {
   },
   "explain-runs.gif": {
     icon: CALENDAR(88),
-    head: "Signed. Then it runs itself.",
-    says: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
+    head: "After the sale, in one place.",
+    says: "Once they sign, the order, approvals, install calendar and your installer's job card are in one place for your team.",
   },
 };
 

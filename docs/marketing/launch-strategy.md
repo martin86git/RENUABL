@@ -10,13 +10,13 @@ The emails live in code as drafts (`src/lib/domain/marketing/gtm-drafts.ts`), th
 
 **One giant leap for solar.**
 
-Solar businesses have run the same way for years: leads in a spreadsheet, a CRM you type into, a design tool, a proposal tool, and somebody on the phone chasing. RENUABL Business is the step change. Every part of the business is in one place, and AI does the work in every part of it.
+Solar businesses have run the same way for years: leads in a spreadsheet, a CRM you type into, a design tool, a proposal tool, and somebody on the phone chasing. RENUABL Business is the step change. Every part of the business is in one place, and AI helps in every part of it.
 
 For the retailer it comes down to one thing: **an AI sales force.**
 
 - **Voice agents** ring each new lead in calling hours, answer their questions, meet the usual worries and book them a call with the team. The business names each one and chooses its voice.
 - **Sol**, the brain of the business, knows every deal, puts the day in order, drafts the follow-ups in the business's voice and answers questions with his sources.
-- **The rest of the business keeps up**: the roof is priced as it's drawn, the proposal is signed online, and the order, the install and the paperwork after the sale carry on in the same place.
+- **The rest of the business keeps up**: the roof is priced as it's drawn, the proposal is signed online, and the order, the install and the paperwork after the sale are worked through in the same place.
 
 **The tone** is Tesla, SpaceX and Apple: short sentences, one idea at a time, big quiet pictures on black, the signal orange used once. It's confident without bragging. We say what it does, never that it's the best.
 
@@ -26,10 +26,10 @@ For the retailer it comes down to one thing: **an AI sales force.**
 | ------------------------------ | ------------------------------------------------------------------------------ | ---------------- |
 | More sales from the same leads | Leads rung in minutes, in calling hours, by a voice agent, and booked in       | Launch, email 1  |
 | Not chasing                    | Sol drafts every follow-up; the agents send them once switched on              | Email 2, email 4 |
-| Quotes out faster              | Three priced designs in one press; a proposal signed online                    | Email 3          |
+| Quotes out faster              | Priced as it's drawn; a proposal signed online                               | Email 3          |
 | Less admin                     | Calls written up, emailed leads turned into deals, one feed of what needs them | Email 4          |
-| A smooth install               | Order, approvals, calendar, job cards and the post-sale agent                  | Email 5          |
-| One bill, no lock-in           | One price for everything, cancel any time                                      | Email 6          |
+| A smooth install               | Order, approvals, calendar and job cards in one place for the team             | Email 5          |
+| One bill, no lock-in           | From $39 a user, then pay as you go; cancel any time                           | Email 6          |
 
 ## 3. Who it's for
 
@@ -235,3 +235,5 @@ Victoria first, then by state.
 **The designer in every email** (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it… so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): under each hook sits `/design/launch/designer-band.jpg`, the new designer pop-up on the website's site (a made-up label, no address), tagged "Made for solar · The RENUABL designer", linking to the demo. The designer email leads with both roofs (`designer.jpg`, retaken in the new look) instead. Every email is a band taller for it.
 
 **A hook and a button on every picture, the designer last, the live pricing** (23 Nov 2026, Martin: "dont just dump images without a hook call to action"; "dont make the designer the first slide"; the pictures "are not the updated designer"; "check with other sessions on the pricing"): each email is now a run of parts, each a hook over its picture and its own button. The designer is the last part before the footers in every email but the designer's own, as **Made for solar. Design and price a roof while you're on the phone.** with Try the designer. Both designer pictures were taken again from the live branch's designer: the dark dock at the foot with Sol in the middle, and the strings on the roof. The second roof (Rowville) is left out until it has a better layout; the designer email shows the website's site whole and close up. The live pricing was confirmed with the other sessions: $49 a user a month, the first month free, $39 on the 12-month plan, the designer paid by the site, Calls & Texts $49 and Growth $19, all with GST. The coupon now says **From $39 a user, then pay as you go** in place of Every feature, for every user, and the deal email names the 12-month plan. Calls & Texts' allowances (30 minutes and 30 texts, then 50c a minute and 30c a text) are not quoted in any email.
+
+**No claim that a roof designs itself or that anything runs by itself after signing** (23 Nov 2026, Martin: "the roofs do not design themselves. do not make that claim. also once the contract it signed - nothing works on its own so dont make that claim either"): the designer card is **Priced as you draw** (you lay out the panels and the quote builds as you go), the launch's cards read **Your quotes, priced as you draw** and **Your installs, on one calendar**, and the after-sale email is **Signed? Everything after the sale, in one place** (the order, approvals, install calendar and job card together for your team). Never write that RENUABL designs a roof, lays out designs in one press, or that the order, approvals or install happen by themselves.
