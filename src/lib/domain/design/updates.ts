@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Today",
+    words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
+  },
+  {
+    day: "2026-11-23",
     area: "Deals",
     words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
   },

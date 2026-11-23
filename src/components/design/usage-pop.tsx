@@ -25,7 +25,19 @@ import { settingsPath } from "./settings-list";
 const tone = (p: number) => (p >= 100 ? "var(--danger)" : p >= 80 ? "var(--sun-line)" : "var(--ink)");
 const barTone = (p: number) => (p >= 100 ? "bg-danger" : p >= 80 ? "bg-sun-line" : "bg-primary");
 
-export function UsageButton() {
+/** Opens the box from a menu (the cog's Usage this month, the phone's More sheet's Usage). */
+export const USAGE_OPEN = "renuabl:usage-open";
+let ready = false;
+/** Whether the box can open here (this person may see usage); a menu otherwise goes to the Usage page. */
+export const usagePopReady = () => ready;
+export const openUsagePop = () => window.dispatchEvent(new Event(USAGE_OPEN));
+
+/**
+ * The box, mounted once in the shell. Its round left Today on 23 Nov 2026 (Martin: "Usage icon should be moved out
+ * as it's now in the menu"): `bare` draws no round and the menus open the box, so top-ups still happen in it and
+ * Stripe's return still reopens it.
+ */
+export function UsageButton({ bare }: { bare?: boolean } = {}) {
   const [state, setState] = useState<UsagePop | null>(null);
   const [open, setOpen] = useState(false);
   const [paid, setPaid] = useState(false);
@@ -42,13 +54,18 @@ export function UsageButton() {
     void loadUsagePop().then((s) => {
       if (!on) return;
       setState(s);
+      ready = !!s;
       if (back && s) {
         setPaid(true);
         setOpen(true);
       }
     });
+    const show = () => setOpen(true);
+    window.addEventListener(USAGE_OPEN, show);
     return () => {
       on = false;
+      ready = false;
+      window.removeEventListener(USAGE_OPEN, show);
     };
   }, []);
   // Read again each time it opens, so a pack bought in another tab shows.
@@ -65,31 +82,33 @@ export function UsageButton() {
   const c = 2 * Math.PI * r;
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-label={`Usage this month${state.meters.length ? `, up to ${top}% used` : ""}`}
-        title="Usage and top-ups"
-        className="relative grid size-8 place-items-center rounded-full bg-surface text-ink shadow-sm ring-1 ring-line transition hover:ring-ink/30"
-      >
-        <Gauge className="size-4" aria-hidden />
-        {state.meters.length > 0 && (
-          <svg viewBox="0 0 32 32" className="pointer-events-none absolute inset-0 size-8 -rotate-90" aria-hidden>
-            <circle
-              cx="16"
-              cy="16"
-              r={r}
-              fill="none"
-              stroke={tone(top)}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeDasharray={`${((c * Math.min(100, top)) / 100).toFixed(2)} ${c.toFixed(2)}`}
-            />
-          </svg>
-        )}
-        {top >= 80 && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas" aria-hidden />}
-      </button>
+      {!bare && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`Usage this month${state.meters.length ? `, up to ${top}% used` : ""}`}
+          title="Usage and top-ups"
+          className="relative grid size-8 place-items-center rounded-full bg-surface text-ink shadow-sm ring-1 ring-line transition hover:ring-ink/30"
+        >
+          <Gauge className="size-4" aria-hidden />
+          {state.meters.length > 0 && (
+            <svg viewBox="0 0 32 32" className="pointer-events-none absolute inset-0 size-8 -rotate-90" aria-hidden>
+              <circle
+                cx="16"
+                cy="16"
+                r={r}
+                fill="none"
+                stroke={tone(top)}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray={`${((c * Math.min(100, top)) / 100).toFixed(2)} ${c.toFixed(2)}`}
+              />
+            </svg>
+          )}
+          {top >= 80 && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas" aria-hidden />}
+        </button>
+      )}
       {open &&
         typeof document !== "undefined" &&
         createPortal(

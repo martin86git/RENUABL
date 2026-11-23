@@ -23,7 +23,7 @@ import {
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-sun";
-import { SolEtch } from "./sol-icon";
+import { SunBrainLines } from "./sol-icon";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";
@@ -368,8 +368,16 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
           Martin: "imagine sol with all the orange taken away. The etch lines remain", then D of four); the sun fades
           out and the round in as the dock turns. */}
       {phone && (
-        <span className="sol-etch-face pointer-events-none absolute inset-0 flex items-center justify-center rounded-full">
-          <SolEtch className="size-10" width={2.4} />
+        // Shown by display, not opacity (23 Nov 2026, Martin: missing on his iPhone): Safari left the round unpainted
+        // when its opacity changed under the dock's frosted glass. The glow is a wide faint stroke inside the drawing,
+        // not a CSS filter, for the same reason.
+        <span className="sol-etch-face pointer-events-none absolute inset-0 items-center justify-center rounded-full">
+          <svg viewBox="9 10 82 82" className="size-10" aria-hidden>
+            <g opacity={0.3}>
+              <SunBrainLines stroke="currentColor" width={6} />
+            </g>
+            <SunBrainLines stroke="currentColor" width={2.4} />
+          </svg>
         </span>
       )}
       {waiting && (

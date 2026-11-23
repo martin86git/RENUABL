@@ -35,7 +35,6 @@ import { loadFeed } from "@/lib/services/deal-feed";
 import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
 import { SolEtch } from "./sol-icon";
-import { UsageButton } from "./usage-pop";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
 import { loadPerfRows } from "@/lib/services/performance";
@@ -96,8 +95,6 @@ function TodayDate({ today }: { today: ISODate }) {
             {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
           </span>
         )}
-        {/* Usage and top-ups, for the owner and admins (usage-pop.tsx; 23 Nov 2026, Martin). */}
-        <UsageButton />
       </div>
     </div>
   );
@@ -207,7 +204,7 @@ export function TodayChat(props: {
       <div
         role="tablist"
         aria-label="About the month"
-        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] max-sm:ml-5 max-sm:w-[calc(100%-1rem)] max-sm:self-start flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
       >
         {tabs.map(({ key, label, icon: Icon, count }) => (
           <button

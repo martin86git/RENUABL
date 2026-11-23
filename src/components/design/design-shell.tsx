@@ -42,6 +42,7 @@ import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
+import { UsageButton, openUsagePop, usagePopReady } from "./usage-pop";
 import { PhoneVoiceTab } from "./phone-voice";
 import { PhoneTop } from "./phone-top";
 import { toggleSolHere } from "@/lib/services/sol";
@@ -1025,7 +1026,14 @@ function Shell({
                 <Link
                   key={r.href}
                   href={r.href}
-                  onClick={() => setMore(false)}
+                  onClick={(e) => {
+                    setMore(false);
+                    // Usage opens its box with the top-ups when it can (usage-pop.tsx), else the Usage page.
+                    if (r.label === "Usage" && usagePopReady()) {
+                      e.preventDefault();
+                      openUsagePop();
+                    }
+                  }}
                   className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
                 >
                   <span className="flex-1">{r.label}</span>
@@ -1058,6 +1066,7 @@ function Shell({
         />
       )}
       {retail && <SolDock />}
+      {kind !== "inspector" && <UsageButton bare />}
     </div>
   );
 }
