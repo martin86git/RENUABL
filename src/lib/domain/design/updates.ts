@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
     area: "Billing",
-    words: "Sol's larger credit packs show the extra credits you get in green: +240 on 1,000 and +811 on 3,000.",
+    words: "Top-up packs are clearer cards: the credits large, extra credits in green, the price below, and the best value marked.",
   },
   {
     day: "2026-11-24",

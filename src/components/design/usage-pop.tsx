@@ -197,8 +197,10 @@ function UsageBox({ s, paid, onClose }: { s: UsagePop; paid: boolean; onClose: (
                         <PackButton
                           key={p.credits}
                           disabled={!mayBuy}
-                          top={`${p.credits.toLocaleString("en-AU")} credits`}
-                          extra={solPackBonus(p) > 0 ? `+${solPackBonus(p).toLocaleString("en-AU")} bonus` : undefined}
+                          figure={p.credits.toLocaleString("en-AU")}
+                          unit="credits"
+                          best={p === SOL_PACKS[SOL_PACKS.length - 1]}
+                          extra={solPackBonus(p) > 0 ? `+${solPackBonus(p).toLocaleString("en-AU")} free` : undefined}
                           price={dollars(p.cents)}
                           onClick={() =>
                             setPaying({
@@ -226,8 +228,10 @@ function UsageBox({ s, paid, onClose }: { s: UsagePop; paid: boolean; onClose: (
                     <PackButton
                       key={pack}
                       disabled={!mayBuy}
-                      top={`$${packDollars(pack)} credits`}
-                      extra={packBonus(pack) > 0 ? `+${packBonus(pack)} bonus` : undefined}
+                      figure={`$${packDollars(pack)}`}
+                      unit="of design credit"
+                      best={pack === TOKEN_PACKS[TOKEN_PACKS.length - 1]}
+                      extra={packBonus(pack) > 0 ? `+$${packBonus(pack)} free` : undefined}
                       price={dollars(packPriceCents(pack))}
                       onClick={() =>
                         setPaying({
@@ -385,17 +389,48 @@ const Packs = ({ children, three }: { children: React.ReactNode; three?: boolean
   </div>
 );
 
-function PackButton(props: { top: string; extra?: string; price: string; disabled: boolean; onClick: () => void }) {
+/**
+ * One pack to buy (24 Nov 2026, Martin: "can we improve the look"): what it gives large, its bonus as a green pill, the
+ * price as the card's foot, the largest marked Best value. Cards in a row are one height whether or not they have a bonus.
+ */
+function PackButton(props: {
+  figure: string;
+  unit: string;
+  extra?: string;
+  price: string;
+  best?: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={props.onClick}
       disabled={props.disabled}
-      className="flex flex-col items-center rounded-xl border border-line bg-surface px-2 py-2.5 text-center hover:border-ink/40 disabled:cursor-not-allowed disabled:bg-surface-2"
+      className={clsx(
+        "group relative flex flex-col items-center overflow-hidden rounded-2xl bg-surface pt-5 text-center shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition hover:-translate-y-px hover:shadow-[0_6px_16px_-6px_rgb(0_0_0/0.25)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none",
+        props.best ? "ring-2 ring-sun-line" : "ring-1 ring-line",
+      )}
     >
-      <span className="text-sm font-semibold text-ink">{props.top}</span>
-      {props.extra && <span className="text-[11px] font-medium text-positive">{props.extra}</span>}
-      <span className="text-xs tabular-nums text-ink-2">{props.price}</span>
+      {props.best && (
+        <span className="absolute left-1/2 top-0 -translate-x-1/2 rounded-b-md bg-sun-line px-2 py-px text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap text-white">
+          Best value
+        </span>
+      )}
+      <span className="text-xl font-semibold leading-none tabular-nums tracking-tight text-ink">{props.figure}</span>
+      <span className="mt-1 text-[11px] text-muted">{props.unit}</span>
+      <span
+        className={clsx(
+          "mt-2 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+          props.extra ? "bg-positive/12 text-positive" : "invisible",
+        )}
+        aria-hidden={!props.extra}
+      >
+        {props.extra ?? "none"}
+      </span>
+      <span className="mt-3 w-full border-t border-line bg-canvas py-2 text-sm font-semibold tabular-nums text-ink transition group-hover:bg-primary group-hover:text-white group-disabled:bg-canvas group-disabled:text-ink">
+        {props.price}
+      </span>
     </button>
   );
 }
