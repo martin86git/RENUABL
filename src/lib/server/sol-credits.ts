@@ -11,6 +11,7 @@ import { addToSolCredit, keepSolCost, refundSolCredit, spendSolCredit } from "./
 import { isDemoBusiness } from "./design-demo-check";
 import { isNotBilled } from "./design-not-billed";
 import { topUpSoon } from "./design-top-up";
+import { noticeUsageSoon } from "./design-usage-meters";
 
 /** Whether running out of design tokens or Sol credits stops anything (off until RENUABL's plans are live). Counted either way. */
 export const billingEnforced = () => process.env.BILLING_ENFORCED?.trim() === "true";
@@ -23,6 +24,8 @@ export async function takeSolCredit(businessId: string, use: SolUse, by: string 
   const id = await spendSolCredit(businessId, use, by, todayInMarket(), await enforcedFor(businessId), credits);
   // Running low: the business's own top-up, when it has switched one on (top-up.ts).
   topUpSoon(businessId, "sol");
+  // Passing 50%, 80% or 100% of the month's credits emails the owner once (usage.ts).
+  if (id) noticeUsageSoon(businessId);
   return id;
 }
 

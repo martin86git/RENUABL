@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Usage",
+    words:
+      "A Usage page under the settings cog shows this month's allowances and Sol's use by day, and the owner is emailed at 50, 80 and 100%.",
+  },
+  {
+    day: "2026-11-23",
     area: "Proposals",
     words: "Customer proposals carry a small, quiet Powered by RENUABL in the bottom corner and the footer.",
   },

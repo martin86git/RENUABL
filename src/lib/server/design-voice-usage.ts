@@ -25,6 +25,7 @@ import { isNotBilled } from "./design-not-billed";
 import { renuablCrm } from "./renuabl-crm";
 import { gstTaxRate } from "./stripe-billing";
 import { sendEmail } from "./email";
+import { noticeUsageSoon } from "./design-usage-meters";
 import { siteUrl } from "@/lib/domain/sms";
 
 let made: Promise<void> | null = null;
@@ -81,13 +82,13 @@ async function keep(businessId: string, kind: "minute" | "text", ref: string, un
 /** A voice-agent call that ended (Vapi's end-of-call report): its minutes, rounded up. Then the cap is looked at. */
 export const recordCallMinutes = (businessId: string, callId: string, seconds: number, at = new Date()) =>
   keep(businessId, "minute", callId, minutesOf(seconds), at)
-    .then(() => warnNearCap(businessId))
+    .then(() => (noticeUsageSoon(businessId), warnNearCap(businessId)))
     .catch((e) => console.error("call minutes not kept", e instanceof Error ? e.message : e));
 
 /** A text sent from the business's number: the parts it goes as. Then the cap is looked at. */
 export const recordTextSent = (businessId: string, textId: string, text: string, at = new Date()) =>
   keep(businessId, "text", textId, textParts(text), at)
-    .then(() => warnNearCap(businessId))
+    .then(() => (noticeUsageSoon(businessId), warnNearCap(businessId)))
     .catch((e) => console.error("text not counted", e instanceof Error ? e.message : e));
 
 /**
@@ -96,7 +97,7 @@ export const recordTextSent = (businessId: string, textId: string, text: string,
  * for a business RENUABL doesn't charge, or a made-up one (an owner on a .example address).
  */
 export async function warnNearCap(businessId: string, now = new Date()): Promise<"near" | "reached" | null> {
-  if (!dbConfigured() || (await free(businessId))) return null;
+  if (!dbConfigured() || (await voiceFree(businessId))) return null;
   const month = usageMonth(now);
   const [u, cap] = await Promise.all([usageOf(businessId, month), capOf(businessId)]);
   const kind = capStanding(u, cap);
@@ -162,12 +163,12 @@ export async function setCap(businessId: string, cents: number): Promise<void> {
 }
 
 /** RENUABL's own business, or one RENUABL doesn't bill: never charged or capped. */
-const free = async (businessId: string) =>
+export const voiceFree = async (businessId: string) =>
   (await renuablCrm().catch(() => null))?.businessId === businessId || (await isNotBilled(businessId).catch(() => false));
 
 /** Whether the cap stops this business starting a call (or sending a text) now. */
 export async function overCap(businessId: string, kind: "minute" | "text"): Promise<boolean> {
-  if (!dbConfigured() || (await free(businessId))) return false;
+  if (!dbConfigured() || (await voiceFree(businessId))) return false;
   const [u, cap] = await Promise.all([usageOf(businessId), capOf(businessId)]);
   return capReached(u, cap, kind);
 }
@@ -187,7 +188,7 @@ export async function chargeLastMonth(stripe: Stripe | null, now = new Date()): 
   );
   let charged = 0;
   for (const { business_id: businessId } of due) {
-    if (await free(businessId)) continue;
+    if (await voiceFree(businessId)) continue;
     const u = await usageOf(businessId, month);
     const bill = usageBill(u);
     if (bill.cents <= 0) continue;

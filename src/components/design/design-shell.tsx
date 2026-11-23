@@ -665,6 +665,7 @@ function Shell({
                 connections={kind === "installer" ? { href: "/design/connections", waiting: requests } : undefined}
                 unseen={updates}
                 onSetup={retail && !account.demo ? openSetup : undefined}
+                usage={kind !== "inspector" ? `${PATHS.settings}/usage` : undefined}
                 on={
                   settingsOn ||
                   path.startsWith(PATHS.updates) ||
@@ -872,6 +873,7 @@ function Shell({
                   : []),
                 { label: "Updates", href: PATHS.updates, n: updates },
                 { label: "Feedback", href: PATHS.feedback, n: 0 },
+                ...(kind !== "inspector" ? [{ label: "Usage", href: `${PATHS.settings}/usage`, n: 0 }] : []),
                 { label: "Settings", href: PATHS.settings, n: 0 },
                 { label: "Your account", href: PATHS.account, n: 0 },
               ].map((r) => (
