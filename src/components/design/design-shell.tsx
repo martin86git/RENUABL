@@ -697,6 +697,18 @@ function Shell({
         home={PATHS.home}
         back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
         onSearch={retail ? () => setSearching(true) : undefined}
+        more={
+          retail
+            ? {
+                open: more,
+                count: unread,
+                toggle: () => {
+                  if (!more) leaveSol();
+                  setMore(!more);
+                },
+              }
+            : undefined
+        }
       />
 
       {tool ? (
@@ -729,7 +741,8 @@ function Shell({
         aria-label="Sections, on a phone"
         className={clsx(
           "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
-          kind === "installer" ? "grid-cols-5" : "grid-cols-6",
+          // A retailer's More is in the top right (23 Nov 2026, Martin), so five across with Sol in the middle.
+          kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
         )}
       >
         {(retail ? PHONE_TABS : KIND_TABS[kind as Exclude<BusinessKind, "retailer">]).map((t, i) => {
@@ -791,31 +804,33 @@ function Shell({
             </Link>,
           ];
         })}
-        <button
-          type="button"
-          onClick={() => {
-            if (!more) leaveSol();
-            setMore(!more);
-          }}
-          aria-expanded={more}
-          className={clsx(
-            "flex flex-col items-center justify-center gap-1 font-medium",
-            retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
-            more ? "text-ink" : "text-muted",
-          )}
-        >
-          <span
-            className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
-          >
-            <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
-            {retail && unread > 0 && (
-              <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
-                {unread}
-              </span>
+        {!retail && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!more) leaveSol();
+              setMore(!more);
+            }}
+            aria-expanded={more}
+            className={clsx(
+              "flex flex-col items-center justify-center gap-1 font-medium",
+              retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
+              more ? "text-ink" : "text-muted",
             )}
-          </span>
-          More
-        </button>
+          >
+            <span
+              className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
+            >
+              <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+              {retail && unread > 0 && (
+                <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                  {unread}
+                </span>
+              )}
+            </span>
+            More
+          </button>
+        )}
       </nav>
       {more && (
         <div className="fixed inset-0 z-30 lg:hidden" role="dialog" aria-label="Everything in RENUABL">
