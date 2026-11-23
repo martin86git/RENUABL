@@ -22,7 +22,12 @@ function pool(): Pool {
   const url = dbUrl();
   if (!url) throw new DbError("The database isn't set up (DATABASE_URL)");
   // One small pool per server instance; Neon's pooled connection string handles the rest.
-  g.__renuablPool ??= new Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000 });
+  // A connection that won't open in 10 s fails (and is asked again) rather than hanging the request.
+  if (!g.__renuablPool) {
+    g.__renuablPool = new Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 10_000 });
+    // An idle connection the database dropped (Neon sleeping) is let go, never an unhandled error.
+    g.__renuablPool.on("error", (e) => console.error("database connection dropped", e.message));
+  }
   return g.__renuablPool;
 }
 
@@ -348,6 +353,30 @@ create table if not exists design_pipelines (
   unique (business_id, id)
 );
 create index if not exists design_pipelines_business on design_pipelines(business_id, created_at);
+-- A business's own pipelines and stages (domain/design/pipeline-stages.ts). A pipeline's stages are keys in its order:
+-- one of the twelve or an added stage's id. base_id: the set pipeline ("sales", ...) a row stands in for once renamed
+-- or changed; one a set pipeline. An added stage counts as one of the twelve (base); a deal at it keeps that stage in
+-- design_jobs.stage, which every rule reads, and the added stage's id in sub_stage.
+alter table design_pipelines add column if not exists base_id text;
+create unique index if not exists design_pipelines_base on design_pipelines(business_id, base_id) where base_id is not null;
+create table if not exists design_stages (
+  id text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  name text not null,
+  base text not null,
+  created_by text,
+  created_at timestamptz not null default now(),
+  unique (business_id, id)
+);
+create index if not exists design_stages_business on design_stages(business_id, created_at);
+alter table design_jobs add column if not exists sub_stage text;
+-- The business's own names for the twelve stages (domain/design/pipeline-stages.ts StageNames): only the words change.
+create table if not exists design_stage_names (
+  business_id text not null references businesses(id) on delete cascade,
+  stage text not null,
+  name text not null,
+  primary key (business_id, stage)
+);
 -- Proposals (server/design-proposal-repo.ts): a business's branding, the pictures it has put up, and what it has sent.
 -- design_brand: one row a business. design_files: its logo, cover and photos, made safe and small before they are kept;
 -- a picture taken out of the brand kit is only marked removed, so a proposal already sent keeps its pictures.
@@ -1493,6 +1522,17 @@ create table if not exists design_leads (
   note text,
   at timestamptz not null default now()
 );
+alter table design_leads add column if not exists stage text;
+alter table design_leads add column if not exists stage_at timestamptz;
+alter table design_leads add column if not exists moved_by text;
+alter table design_leads add column if not exists staff_note text;
+-- A booked demo and its reminders (business-leads.ts, 21 Nov 2026).
+alter table design_leads add column if not exists demo_at timestamptz;
+alter table design_leads add column if not exists demo_link text;
+alter table design_leads add column if not exists demo_remind_lead boolean not null default false;
+alter table design_leads add column if not exists demo_by text;
+alter table design_leads add column if not exists demo_staff_reminded_at timestamptz;
+alter table design_leads add column if not exists demo_lead_reminded_at timestamptz;
 create table if not exists design_sol_credits (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,
@@ -1558,6 +1598,32 @@ create table if not exists sessions (
   expires_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+-- The screen lock (domain/design/screen-lock.ts, server/screen-lock.ts): when the session was last really used, wrong
+-- unlock tries, and a passkey challenge in flight.
+alter table sessions add column if not exists active_at timestamptz;
+alter table sessions add column if not exists unlock_tries integer not null default 0;
+alter table sessions add column if not exists lock_challenge text;
+create index if not exists sessions_email on sessions(email);
+-- A person's lock PIN (scrypt, never the PIN) and their passkeys (Face ID, Touch ID, Windows Hello), by business.
+create table if not exists design_lock_pins (
+  business_id text not null,
+  email text not null,
+  hash text not null,
+  created_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
+create table if not exists design_passkeys (
+  id text primary key,
+  business_id text not null,
+  email text not null,
+  public_key bytea not null,
+  counter bigint not null default 0,
+  transports text[] not null default '{}',
+  name text not null,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz
+);
+create index if not exists design_passkeys_owner on design_passkeys(business_id, email);
 -- The assistant's phone calls on a CRM deal (server/voice-calls.ts, Vapi): one row a run of calls on a deal (a new Kept after the businesses table it points at, so a new database is made in order.
 -- lead, or a customer who asked to be called about their proposal), and one event a call ended or a tool used. What
 -- happened is also written on the deal's own record. Never HubSpot.
@@ -1718,6 +1784,8 @@ alter table design_caller add column if not exists delivery jsonb;
 alter table design_caller add column if not exists call_setup jsonb;
 -- The colour chosen for its stand-in picture (domain/design/caller.ts): null leaves it to its name.
 alter table design_caller add column if not exists tint smallint;
+-- The model it thinks with on calls (domain/design/caller.ts CALLER_BRAINS): null leaves it to RENUABL's default.
+alter table design_caller add column if not exists brain text;
 -- Its scripts (domain/design/call-scripts.ts): the name of the one in use (coach_notes and call_setup hold it), and the others filed away.
 alter table design_caller add column if not exists script_name text;
 alter table design_caller add column if not exists scripts jsonb;

@@ -1,9 +1,10 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, MapPin, Plus, Search, Wrench } from "lucide-react";
 import clsx from "clsx";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import { ALREADY_OPEN, MAX_ISSUE, serviceDealMatches, type ServiceCase } from "@/lib/domain/design/service";
 import { listJobs, raiseService, type JobLine } from "@/lib/services/crm";
 import { ui } from "./design-shell";
@@ -38,6 +39,8 @@ export function NewCaseCard({
   /** The deal already has a case open: show that one. */
   onOpenCase: (jobId: string) => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [deals, setDeals] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [typed, setTyped] = useState(query);
@@ -105,7 +108,7 @@ export function NewCaseCard({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-ink">{deal.customerName}</p>
             <p className="truncate text-xs text-muted">
-              {deal.title} · {STAGE_LABELS[deal.stage]}
+              {deal.title} · {stageLabel(deal.stage, stageNames)}
               {deal.address && ` · ${deal.address}`}
             </p>
           </div>
@@ -159,7 +162,7 @@ export function NewCaseCard({
                         {d.customerName} <span className="font-normal text-muted">· {d.title}</span>
                       </span>
                       <span className="block truncate text-xs text-muted">
-                        {STAGE_LABELS[d.stage]}
+                        {stageLabel(d.stage, stageNames)}
                         {d.address && ` · ${d.address}`}
                       </span>
                     </span>

@@ -1,14 +1,58 @@
 /**
  * Server only. A business's checked product datasheets (domain/design/datasheets.ts). Under the designer's tenant
  * rule: the business id first in every function, only ever from the signed-in member. Only figures are kept.
+ *
+ * **Shared with every business (22 Nov 2026, Martin: "any datasheet downloaded by any user then becomes available to
+ * all users").** A datasheet is a maker's public document, not a business's own data, so a product a business has no
+ * sheet for reads another business's: its figures, its file, and whether a person has checked them. What is never
+ * shared is whose it is: no business's name, no person's email (`SHARED_BY`, `sharedBasis`). A business only ever
+ * writes its own rows; made-up businesses (demos and samples, owners on `.example`) share nothing.
  */
-import type { Datasheets, SavedSheet, SheetKind } from "@/lib/domain/design/datasheets";
+import { SHARED_BY, sharedBasis, sharedFor, type Datasheets, type SavedSheet, type SheetKind } from "@/lib/domain/design/datasheets";
 import type { InverterElectrical, PanelElectrical } from "@/lib/domain/design/electrical";
 import { query } from "./db";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
+/** Where a shared sheet with no address of its own sends someone to check it. */
+const SHARED_CHECK_PAGE = "/design/settings/datasheets";
+
+/** Not a made-up business: a demo's or a sample's figures are never shared. */
+const REAL_BUSINESS = `not exists (select 1 from business_members m
+   where m.business_id = d.business_id and m.role = 'owner' and m.email like '%.example')`;
+
+const dayWords = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric", timeZone: "Australia/Melbourne" });
+
+/** Other businesses' sheets for the products this one has none of its own for, named for nobody. */
+async function sharedSheets(businessId: string, own: readonly SavedSheet[]): Promise<SavedSheet[]> {
+  const others = await query<SavedSheet>(
+    `select d.kind, d.sku, d.model, d.figures, d.file_name as "fileName", ${moment("d.checked_at")} as "checkedAt",
+            d.file_bytes is not null as "hasFile", d.found_url as "foundUrl", d.unchecked
+       from design_datasheets d where d.business_id <> $1 and ${REAL_BUSINESS}
+      order by d.unchecked asc, d.checked_at desc limit 5000`,
+    [businessId],
+  );
+  return sharedFor(own, others).map((s) => ({
+    ...s,
+    shared: true,
+    // To check for every business it is shared with, until someone there confirms it (22 Nov 2026, Martin), whoever
+    // checked it where it came from.
+    checkedElsewhere: !s.unchecked,
+    unchecked: true,
+    checkedBy: SHARED_BY,
+    figures: { ...s.figures, basis: sharedBasis(s.model, s.fileName, dayWords(s.checkedAt), Boolean(s.unchecked)) },
+  }));
+}
+
+/** The business's own sheets, then those shared with it (`shared`), each kind by product code. */
 export async function listSheets(businessId: string): Promise<SavedSheet[]> {
+  const own = await ownSheets(businessId);
+  const shared = await sharedSheets(businessId, own);
+  return [...own, ...shared.sort((a, b) => a.kind.localeCompare(b.kind) || a.sku.localeCompare(b.sku))];
+}
+
+async function ownSheets(businessId: string): Promise<SavedSheet[]> {
   return query<SavedSheet>(
     `select kind, sku, model, figures, file_name as "fileName", checked_by as "checkedBy", ${moment("checked_at")} as "checkedAt",
             file_bytes is not null as "hasFile", found_url as "foundUrl", unchecked
@@ -22,7 +66,7 @@ export async function businessDatasheets(businessId: string): Promise<Datasheets
   const sheets: Datasheets = { panels: {}, inverters: {} };
   for (const s of await listSheets(businessId)) {
     // Figures found online and not yet checked carry where they came from, so the string check says so.
-    const figures = s.unchecked ? { ...s.figures, unchecked: s.foundUrl ?? "found online" } : s.figures;
+    const figures = s.unchecked ? { ...s.figures, unchecked: s.foundUrl ?? (s.shared ? SHARED_CHECK_PAGE : "found online") } : s.figures;
     if (s.kind === "panel") sheets.panels[s.sku] = figures as PanelElectrical;
     else sheets.inverters[s.sku] = figures as InverterElectrical;
   }
@@ -57,12 +101,33 @@ export async function sheetFile(
   kind: SheetKind,
   sku: string,
 ): Promise<{ fileName: string; type: string; bytes: Buffer } | null> {
+  // The business's own first, else the one shared with it (a checked one before one only found, then the newest).
   const rows = await query<{ fileName: string; type: string; bytes: Buffer }>(
-    `select file_name as "fileName", file_type as type, file_bytes as bytes from design_datasheets
-      where business_id = $1 and kind = $2 and sku = $3 and file_bytes is not null`,
+    `select d.file_name as "fileName", d.file_type as type, d.file_bytes as bytes from design_datasheets d
+      where d.kind = $2 and d.sku = $3 and d.file_bytes is not null and (d.business_id = $1 or ${REAL_BUSINESS})
+      order by (d.business_id = $1) desc, d.unchecked asc, d.checked_at desc limit 1`,
     [businessId, kind, sku],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * A person in this business has checked a shared sheet's figures: it becomes the business's own, checked by them, with
+ * the sheet's file. False when no sheet is shared for the product, or the business already has its own.
+ */
+export async function adoptSharedSheet(businessId: string, kind: SheetKind, sku: string, by: string): Promise<boolean> {
+  const rows = await query(
+    `insert into design_datasheets (business_id, kind, sku, model, figures, file_name, checked_by, found_url, unchecked, file_bytes, file_type)
+     select $1, d.kind, d.sku, d.model,
+            jsonb_set(d.figures - 'unchecked', '{basis}', to_jsonb(coalesce(nullif(d.model, ''), 'Datasheet') || ' (' ||
+              coalesce(nullif(d.file_name, ''), 'datasheet') || '), read and checked by ' || $5::text || ' on ' || $6::text)),
+            d.file_name, $4, d.found_url, false, d.file_bytes, d.file_type
+       from design_datasheets d where d.business_id <> $1 and d.kind = $2 and d.sku = $3 and ${REAL_BUSINESS}
+      order by d.unchecked asc, d.checked_at desc limit 1
+     on conflict (business_id, kind, sku) do nothing returning sku`,
+    [businessId, kind, sku, by.toLowerCase(), by.toLowerCase().split("@")[0], dayWords(new Date().toISOString())],
+  );
+  return rows.length > 0;
 }
 
 /**

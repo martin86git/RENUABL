@@ -21,7 +21,7 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/
     if (!card) return missing();
     const input = cleanAsBuilt(read.body.asBuilt);
     const differences = card.designed ? asBuiltDifferences(input, card.designed) : [];
-    const saved = await saveAsBuilt(who.member.businessId, id, input, who.member.email, differences);
+    const saved = await saveAsBuilt(who.member.businessId, id, input, who.member.email, differences, card.designed);
     return saved ? Response.json({ ok: true, asBuilt: saved }) : missing();
   });
 }

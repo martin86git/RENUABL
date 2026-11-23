@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -28,7 +29,7 @@ import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
+import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, askSolInPanel, handsToPanel, loadSol, retrySol } from "@/lib/services/sol";
 import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
@@ -37,6 +38,10 @@ import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { InstallListPage } from "./install-lists";
+import { useDockSet } from "@/lib/services/dock-set";
+import { TODAY_FIRST } from "@/lib/services/sol";
+import { useNameHintBox } from "./name-hint-box";
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -157,7 +162,14 @@ export function TodayPad(props: {
     } catch {
       // Nothing kept.
     }
-    const opens = todayOpensOn(seen, props.today);
+    // Come from the phone's Sol round (`?today=first`): Business, or My month, whatever was last had.
+    const first = new URLSearchParams(window.location.search).get("today") === "first";
+    if (first) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("today");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+    const opens = first ? "chat" : todayOpensOn(seen, props.today);
     const t = window.setTimeout(() => setView(opens), 0);
     return () => window.clearTimeout(t);
   }, [props.welcome, props.today, setView]);
@@ -168,6 +180,17 @@ export function TodayPad(props: {
     window.setTimeout(() => setTouring(true), 80);
   };
   const [turns, setTurns] = useState<Turn[]>([]);
+  // The phone's Sol round pressed while already on Today: back to the first view, out of any conversation.
+  useEffect(() => {
+    const first = () => {
+      setTurns([]);
+      setView("chat");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener(TODAY_FIRST, first);
+    return () => window.removeEventListener(TODAY_FIRST, first);
+  }, [setView]);
+  const jobsView = useDockSet() === "post";
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
   const insights = useInsights();
@@ -194,6 +217,13 @@ export function TodayPad(props: {
   const ask = async (q: string, files: SolFile[] = [], about: SolReply | null = null) => {
     if (asking) return;
     setReplyTo(null);
+    // On a phone a question asked on Today goes to Sol's own chat, not into a conversation under the Business | Feed
+    // switch (23 Nov 2026, Martin). A file still goes in here: his panel's ask carries words only.
+    if (handsToPanel() && !files.length && q.trim()) {
+      const replied = replyToSol(about, q);
+      askSolInPanel(replied.shown ? { text: replied.said, shown: replied.shown } : q);
+      return;
+    }
     const id = Date.now();
     setOnFeed(false);
     setAsking(true);
@@ -261,7 +291,7 @@ export function TodayPad(props: {
         // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
         <div
           data-tour="today-switch"
-          className="relative z-[16] mt-1 flex justify-center transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
+          className="relative z-[16] mt-4 flex justify-center sm:mt-1 transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
         >
           <TodaySwitch
             first={firstViewLabel(insights)}
@@ -285,7 +315,13 @@ export function TodayPad(props: {
             onTour={tour}
           />
         )}
-        {!welcoming && onFeed && (
+        {/* On the dock's post-sale tools, Feed is Jobs: every sold job not yet installed (23 Nov 2026, Martin). */}
+        {!welcoming && onFeed && jobsView && (
+          <div className="pb-6">
+            <InstallListPage switcher={null} />
+          </div>
+        )}
+        {!welcoming && onFeed && !jobsView && (
           <div className="pb-6">
             <InductionReminder />
             <DealFeed
@@ -308,9 +344,15 @@ export function TodayPad(props: {
           aria-hidden={talking}
         >
           <div
-            className={clsx("grid transition-[grid-template-rows] duration-500 ease-out", talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}
+            className={clsx(
+              "grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows] duration-500 ease-out",
+              talking ? "grid-rows-[0fr]" : "grid-rows-[1fr]",
+            )}
           >
-            <div className="overflow-hidden">
+            {/* Clipped only while it folds away (22 Nov 2026, Martin, on an iPhone: "I can't scroll down"): left on, Safari
+                can size the grid's row to the screen and cut Needs you and Performance off under it, so the page has
+                nothing more to scroll to. */}
+            <div className={clsx("min-w-0", talking && "min-h-0 overflow-hidden")}>
               <TodayChat
                 name={props.name}
                 views={insights}
@@ -477,6 +519,8 @@ export function SolBox({
 }) {
   const [text, setText] = useState("");
   const [heard, setHeard] = useState("");
+  const field = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  const names = useNameHintBox(text, setText, field);
   // Speak and attach, as in his panel (5 Nov 2026, Martin): the microphone and the paperclip.
   const attach = useSolAttach();
   const ready = text.trim().length >= 2 || attach.files.length > 0;
@@ -487,6 +531,7 @@ export function SolBox({
     if (!files) return attach.setProblem("That file couldn't be read: try again.");
     setText("");
     setHeard("");
+    names.clear();
     attach.clear();
     onAsk(said, files);
   };
@@ -503,19 +548,26 @@ export function SolBox({
     >
       {replyTo && <ReplyBanner reply={replyTo} onStop={() => onStopReply?.()} className="mb-1.5 mr-2 bg-canvas" />}
       <AttachedFiles attach={attach} />
+      {names.chips}
       {tall ? (
         <>
           <label className="sr-only" htmlFor={id}>
             Ask Sol
           </label>
           <textarea
+            ref={field}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
               setHeard("");
               setText(e.target.value);
+              names.typed(e.target.value, e.target.selectionStart);
             }}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && names.escape()) {
+                e.stopPropagation();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void send();
@@ -534,7 +586,10 @@ export function SolBox({
               type="submit"
               disabled={asking || !ready}
               aria-label="Ask Sol"
-              className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+              // Pressed with the keyboard up, the box keeps its focus (23 Nov 2026, Martin, on an iPhone: it "isn't
+              // responding"): a first tap that closed the keyboard moved the page under the finger and the press was lost.
+              onPointerDown={(e) => e.preventDefault()}
+              className="ml-auto grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
@@ -549,11 +604,16 @@ export function SolBox({
             Ask Sol
           </label>
           <input
+            ref={field}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
               setHeard("");
               setText(e.target.value);
+              names.typed(e.target.value, e.target.selectionStart);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && names.escape()) e.stopPropagation();
             }}
             maxLength={4000}
             autoComplete="off"
@@ -564,6 +624,7 @@ export function SolBox({
             type="submit"
             disabled={asking || !ready}
             aria-label="Ask Sol"
+            onPointerDown={(e) => e.preventDefault()}
             className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
           >
             <ArrowUp className="size-4" aria-hidden />
@@ -672,6 +733,8 @@ function Made({
 /** Before you call, read from the first customer's record: undefined while looking, null when there is none. */
 type CallFacts = { id: string; name: string; phone: string; email: string; facts: BeforeCall };
 function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null | undefined {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [got, setGot] = useState<{ for: string | null; facts: CallFacts | null } | null>(null);
   useEffect(() => {
     if (!jobId) return;
@@ -688,14 +751,14 @@ function useBeforeCall(jobId: string | null, today: ISODate): CallFacts | null |
           name: j.customer.name,
           phone: j.customer.phone,
           email: j.customer.email,
-          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today }),
+          facts: beforeYouCall({ job: j.job, customer: j.customer, activity: c.ok ? c.activity : [], today, names: stageNames }),
         },
       });
     });
     return () => {
       gone = true;
     };
-  }, [jobId, today]);
+  }, [jobId, today, stageNames]);
   if (!jobId) return null;
   return got?.for === jobId ? got.facts : undefined;
 }
@@ -1134,6 +1197,8 @@ function MailBadge({ mark }: { mark: MailMark }) {
 
 /** The deals being sold as a board, or the numbers. */
 export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [numbers, setNumbers] = useState(false);
   // Which deals an email has gone from, and whether the latest was opened (Sol and the team's emails alike).
   const [marks, setMarks] = useState<Record<string, MailMark> | null>(null);
@@ -1169,7 +1234,7 @@ export function PipelineView({ jobs, today }: { jobs: JobLine[] | null; today: I
           <p className="animate-pulse text-center text-sm text-muted">Looking…</p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {pipelineBoard(jobs).map((s) => (
+            {pipelineBoard(jobs, 6, stageNames).map((s) => (
               <div key={s.stage} className="rounded-2xl bg-canvas p-3">
                 <div className="flex items-center justify-between gap-2 px-1">
                   <p className="min-w-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">

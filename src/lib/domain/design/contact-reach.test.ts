@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoRefuses } from "./demo";
-import { REACH_MAX, TEXT_MAX, TEXT_WORDS, cleanText, dealFor, reachContacts, textParts, textRecord } from "./contact-reach";
+import { REACH_MAX, TEXT_MAX, TEXT_WORDS, cleanText, dealFor, phoneBook, reachContacts, textParts, textRecord } from "./contact-reach";
 
 const customer = (id: string, name: string, phone: string, extra: Partial<{ email: string; address: string }> = {}) => ({
   id,
@@ -89,5 +89,29 @@ describe("a text", () => {
   });
   it("never goes out from a demo", () => {
     expect(demoRefuses("POST", "/api/design/jobs/job_abc12345/text")).toBe(true);
+  });
+});
+
+describe("the phone book", () => {
+  const book = [
+    customer("p1", "zoe Last", "0491 570 111"),
+    customer("p2", "Amy First", ""),
+    customer("p3", "ben Middle", "0491 570 112"),
+    customer("p4", "123 Pty Ltd", "0491 570 113"),
+    customer("p5", "Adam Early", "0491 570 114"),
+  ];
+  it("lists everyone A to Z in sections, names not starting with a letter last", () => {
+    const sections = phoneBook(book, [], "");
+    expect(sections.map((s) => s.letter)).toEqual(["A", "B", "Z", "#"]);
+    expect(sections[0].contacts.map((c) => c.id)).toEqual(["p5", "p2"]);
+  });
+  it("filters by what is typed, with no limit of a few", () => {
+    const many = Array.from({ length: 40 }, (_, i) => customer(`m${i}`, `Sam ${String(i).padStart(2, "0")}`, "0491 570 110"));
+    expect(phoneBook(many, [], "sam").flatMap((s) => s.contacts)).toHaveLength(40);
+    expect(phoneBook(book, [], "ben").flatMap((s) => s.contacts.map((c) => c.id))).toEqual(["p3"]);
+  });
+  it("keeps each contact's deal", () => {
+    const [a] = phoneBook([customer("c1", "Tom Example", "0491 570 156")], JOBS, "");
+    expect(a.contacts[0].job?.id).toBe("job_b");
   });
 });

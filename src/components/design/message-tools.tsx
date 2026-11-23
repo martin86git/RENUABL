@@ -16,6 +16,7 @@ export function MessageTools({
   onReply,
   shown = false,
   className,
+  before,
   children,
 }: {
   /** The message as said; copied without Sol's layout marks. */
@@ -23,6 +24,8 @@ export function MessageTools({
   onReply?: () => void;
   shown?: boolean;
   className?: string;
+  /** Shown ahead of the buttons (the message's time in his panel). */
+  before?: React.ReactNode;
   /** More buttons after these two (Pin in his panel). */
   children?: React.ReactNode;
 }) {
@@ -42,6 +45,7 @@ export function MessageTools({
         className,
       )}
     >
+      {before}
       <button type="button" onClick={copy} className={button} title={copied ? "Copied" : "Copy"} aria-label={copied ? "Copied" : "Copy"}>
         {copied ? <Check className="size-3.5 text-positive" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
       </button>

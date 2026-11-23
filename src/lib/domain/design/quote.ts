@@ -306,6 +306,12 @@ export interface LineEdit {
    * installation's 30c a watt must be clearly editable): the line is priced again at it, unless a cost is typed too.
    */
   rate?: number;
+  /**
+   * The `amount` is the whole line's cost on a line with no count (22 Nov 2026), so it is the same on every design and is
+   * shared with the roof's other designs (`withHomeOf`). An `amount` without it is a whole line's cost typed on a counted
+   * line before costs were typed each, which belongs to that design's count alone.
+   */
+  whole?: boolean;
   /** A line of the business's own, added by hand (kept under an `addedKey`): its name and group. Its `amount` is the cost each. */
   label?: string;
   group?: CostGroup;
@@ -454,6 +460,23 @@ export const DECIDED_LINES: readonly (readonly [CostGroup, string])[] = [
 const DECIDED_KEYS = DECIDED_LINES.map(([group, label]) => lineKey({ group, label }));
 
 /**
+ * The cost typed on a line that holds for the same product on every design (22 Nov 2026, Martin: "when I have applied
+ * prices to one design it should apply those same prices to the same product line items to each other design"): the cost
+ * each, a rate a watt, a whole line's cost on a line with no count, or a line left at $0. Null when there is none to share.
+ */
+export function sharedCost(edit: LineEdit | undefined): Pick<LineEdit, "amount" | "each" | "rate" | "whole"> | null {
+  if (!edit || edit.removed || edit.own) return null;
+  const cost: Pick<LineEdit, "amount" | "each" | "rate" | "whole"> = {};
+  if (edit.each !== undefined) cost.each = edit.each;
+  if (edit.rate !== undefined) cost.rate = edit.rate;
+  if (edit.amount !== undefined && (edit.whole || edit.amount === 0)) {
+    cost.amount = edit.amount;
+    if (edit.whole) cost.whole = true;
+  }
+  return Object.keys(cost).length ? cost : null;
+}
+
+/**
  * One quote given the home of another (8 Nov 2026, Martin: phase, storeys and the roof, and the costs decided on each job,
  * are the home's, set once for every design on the roof; deciding them on one left the others' proposals blocked): the
  * form, and the decision on each cost decided on each job, taken from `from`; its own hand changes to other lines kept.
@@ -465,6 +488,20 @@ export function withHomeOf(from: QuoteFields, to: QuoteFields): QuoteFields {
     if (edits[key]?.own || from.edits[key]?.own) continue;
     if (from.edits[key]) edits[key] = from.edits[key];
     else delete edits[key];
+  }
+  // Prices typed on one design hold for the same lines on the others (22 Nov 2026): the cost replaces theirs, while their
+  // own count, a line taken out, or a cost set for that design alone stays.
+  for (const [key, edit] of Object.entries(from.edits)) {
+    if (key === MARGIN_KEY || isAddedKey(key) || DECIDED_KEYS.includes(key)) continue;
+    const cost = sharedCost(edit);
+    const mine = edits[key];
+    if (!cost || mine?.removed || mine?.own) continue;
+    const rest: LineEdit = { ...mine };
+    delete rest.amount;
+    delete rest.each;
+    delete rest.rate;
+    delete rest.whole;
+    edits[key] = { ...rest, ...cost };
   }
   // A design's shade is its own panels', never the home's.
   return { form: { ...from.form }, edits, ...(to.shade ? { shade: to.shade } : {}) };
@@ -539,10 +576,33 @@ export function stcValue(
   rates: RebateRates,
   stcPrice: number,
 ): number {
+  return stcSplit(system, postcode, date, rates, stcPrice).total;
+}
+
+/** The STCs split into the panels' (STC) and the battery's (BSTC), each its certificates and dollars; the two add up to `total`. */
+export interface StcSplit {
+  solar: { certificates: number; value: number };
+  battery: { certificates: number; value: number };
+  total: number;
+}
+
+export function stcSplit(
+  system: { pvKw: number; batteryKwh: number },
+  postcode: string | null,
+  date: string,
+  rates: RebateRates,
+  stcPrice: number,
+): StcSplit {
   const rating = (postcode && zoneRating(postcode)?.rating) || DEFAULT_ZONE_RATING;
   const solar = Math.floor(system.pvKw * rating * deemingYears(date, rates));
   const battery = Math.floor(taperedKwh(system.batteryKwh, rates) * batteryFactor(date, rates));
-  return Math.round((solar + battery) * stcPrice);
+  const total = Math.round((solar + battery) * stcPrice);
+  const solarValue = Math.round(solar * stcPrice);
+  return {
+    solar: { certificates: solar, value: solarValue },
+    battery: { certificates: battery, value: total - solarValue },
+    total,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -774,6 +834,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         group?: unknown;
         rate?: unknown;
         own?: unknown;
+        whole?: unknown;
       };
       const money = (x: unknown) =>
         typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1_000_000 ? Math.round(x * 100) / 100 : undefined;
@@ -814,6 +875,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
           ...(rate !== undefined ? { rate } : {}),
           ...(on ? { on: true } : {}),
           ...(on && v.own === true ? { own: true } : {}),
+          ...(amount !== undefined && v.whole === true ? { whole: true } : {}),
         };
     }
     quotes.push({

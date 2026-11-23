@@ -6,19 +6,19 @@ Drafts only. Nothing here has been sent, scheduled or put into the product yet.
 
 1. **Consent of the bought list.** Confirm what consent the list carries. Contacts without express or inferred consent are imported as "Not checked" and are never emailed. Nothing goes out until this is answered.
 2. **/business is still hidden** (`BUSINESS_LINK_SHOWN` is false: noindex, kept out of search). Every email links there, so decide whether it flips to true before the first send.
-3. **Sender domain.** A sending subdomain (for example `mail.renuabl.com.au`) authenticated on SendGrid or Resend: SPF, DKIM and a DMARC record (start at `p=none`, move to `quarantine` once reports are clean). Set `EMAIL_FROM` to it. *Martin, in the DNS and the email provider.*
-4. **Live settings:** `CRON_SECRET`, `SITE_URL`, and the provider's event webhook pointed at `/api/m/events` with its secret. Marketing → Settings shows what is missing. *Martin, on Vercel.*
+3. **Sender domain.** A sending subdomain (for example `mail.renuabl.com.au`) authenticated on SendGrid or Resend: SPF, DKIM and a DMARC record (start at `p=none`, move to `quarantine` once reports are clean). Set `EMAIL_FROM` to it. _Martin, in the DNS and the email provider._
+4. **Live settings:** `CRON_SECRET`, `SITE_URL`, and the provider's event webhook pointed at `/api/m/events` with its secret. Marketing → Settings shows what is missing. _Martin, on Vercel._
 5. **Brand kit:** Settings → Branding has RENUABL's name, ABN, an email or phone and the address (they go in every footer).
-6. **Seed tests:** Send a test of each email to your own Gmail and Outlook addresses. Check the inbox it lands in, the pictures, the links and the unsubscribe. *The product sends the test (Send a test); you check it.*
+6. **Seed tests:** Send a test of each email to your own Gmail and Outlook addresses. Check the inbox it lands in, the pictures, the links and the unsubscribe. _The product sends the test (Send a test); you check it._
 
 ## Warm-up (the daily cap in Marketing → Settings)
 
-| Days | Daily cap | Who |
-|---|---|---|
-| 1–3 | 50 | The most engaged-looking contacts first (named people with a company) |
-| 4–7 | 100 | |
-| 8–14 | 200 | |
-| 15+ | 300 (default), up only while bounces stay under 2% and complaints near zero | |
+| Days | Daily cap                                                                   | Who                                                                   |
+| ---- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 1–3  | 50                                                                          | The most engaged-looking contacts first (named people with a company) |
+| 4–7  | 100                                                                         |                                                                       |
+| 8–14 | 200                                                                         |                                                                       |
+| 15+  | 300 (default), up only while bounces stay under 2% and complaints near zero |                                                                       |
 
 The product sends only on working days, 9 am to 5 pm Melbourne time, 100 at a time each hour, never past the cap, and never while paused.
 
@@ -42,14 +42,14 @@ The product sends only on working days, 9 am to 5 pm Melbourne time, 100 at a ti
 
 ## Who does what
 
-| Step | Martin | The product |
-|---|---|---|
-| Consent answer, DNS, provider, Vercel settings | ✓ | |
-| Import, lists, consent per contact | ✓ (once) | keeps it, never emails "Not checked" |
-| Writing and editing the emails | ✓ reviews | Sol drafts on request |
-| Sending hours, caps, batches, unsubscribes, bounces | | ✓ |
-| Sequence steps and stops | switches it on | ✓ |
-| Reading reports, pausing | ✓ | shows them |
+| Step                                                | Martin         | The product                          |
+| --------------------------------------------------- | -------------- | ------------------------------------ |
+| Consent answer, DNS, provider, Vercel settings      | ✓              |                                      |
+| Import, lists, consent per contact                  | ✓ (once)       | keeps it, never emails "Not checked" |
+| Writing and editing the emails                      | ✓ reviews      | Sol drafts on request                |
+| Sending hours, caps, batches, unsubscribes, bounces |                | ✓                                    |
+| Sequence steps and stops                            | switches it on | ✓                                    |
+| Reading reports, pausing                            | ✓              | shows them                           |
 
 ---
 
@@ -98,8 +98,8 @@ Button: See RENUABL Business → https://www.renuabl.com.au/business
 **4 · after 5 more working days**
 Subject: One price for {company}
 Preview: $49 a user a month, first month free. Cancel any time.
-Heading: One price. Everything in it.
-Hi {firstName}, every feature for every user: the designer, CRM, proposals, after the sale, service and Sol. $49 a user a month, or $39 a user a month on the 12-month plan. Your first month is free. Prices include GST, and you can cancel any time.
+Heading: One price a user. Then pay as you go.
+Hi {firstName}, every user gets the same CRM, proposals, after the sale, service and Sol, with no feature tiers. The designer is paid for by the site, and voice agents and marketing email are added when you want them. $49 a user a month, or $39 a user a month on the 12-month plan. Your first month is free. Prices include GST, and you can cancel any time.
 Button: Sign up → https://www.renuabl.com.au/business#pricing
 
 ---

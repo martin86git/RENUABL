@@ -47,7 +47,7 @@ import {
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
-import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { customerDetail, jobById, listCustomers, listJobs, stageNamesOf } from "./design-crm-repo";
 import { asksForMeeting, cleanAgreed, cleanMeeting } from "@/lib/domain/design/sol-meeting";
 import { connectedCalendar } from "./my-calendar";
 import { proposeMeeting } from "./design-meetings";
@@ -82,6 +82,8 @@ import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
 import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
 import { channelContext, solSaysInTeam, teamChannelLabel } from "./design-team-repo";
 import { query } from "./db";
+import { contactCounts } from "./design-contact-counts";
+import { cleanSinceDay, contactCountsWords } from "@/lib/domain/design/contact-counts";
 import { dealTeamContext, solPostsOnDeal } from "./design-deal-team-repo";
 import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
@@ -175,6 +177,15 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       'The deals at a stage (say "lead", "proposal sent", "won", "installed"; part of the name will do), longest unchanged first, each with how many days since it last changed. With no stage, every stage and how many deals it holds.',
     input_schema: { type: "object", properties: { stage: { type: "string" } } },
+  },
+  {
+    name: "contact_counts",
+    description:
+      'How many people the business has: everyone on the books (customers with a job installed, and contacts), by where they came from, what was brought in from Pylon or a CRM export sheet and when, how many were added since the last import finished, and, with since_day, how many were added since that day. Use it for questions like "how many contacts do I have" or "how many since the Pylon import". Only for someone who sees every deal.',
+    input_schema: {
+      type: "object",
+      properties: { since_day: { type: "string", description: "Optional: a day as YYYY-MM-DD, to count those added since it." } },
+    },
   },
   {
     name: "draft_email",
@@ -497,7 +508,8 @@ async function runTool(
   }
   if (name === "find_deal") {
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
-    return found.length ? found.map(dealLine).join("\n") : "No deal matches that.";
+    const names = await stageNamesOf(businessId);
+    return found.length ? found.map((j) => dealLine(j, names)).join("\n") : "No deal matches that.";
   }
   if (name === "deal_details") {
     const got = await jobById(businessId, s(input.deal_id), viewer);
@@ -513,7 +525,7 @@ async function runTool(
       `Customer: ${customer.name}${customer.sample ? " (a made-up sample customer)" : ""} · phone ${customer.phone || "none"} · email ${customer.email || "none"} · ${customer.address || "no address"}`,
       customer.source ? `Source: ${customer.source}` : "",
       customer.notes ? `Notes on the customer: ${customer.notes}` : "",
-      `Deal: ${dealLine({ ...job, customerName: customer.name })}`,
+      `Deal: ${dealLine({ ...job, customerName: customer.name }, await stageNamesOf(businessId))}`,
       `Owner: ${job.owner ?? "no one yet"} · made ${job.createdAt.slice(0, 10)}${job.wonAt ? ` · sold ${job.wonAt.slice(0, 10)}` : ""}${job.installedAt ? ` · installed ${job.installedAt.slice(0, 10)}` : ""}`,
       details.length ? `Details typed in: ${details.map(([k, v]) => `${k}: ${v}`).join("; ")}` : "",
       activity.length ? "Latest activity, newest first:" : "No activity yet.",
@@ -525,7 +537,11 @@ async function runTool(
       .filter(Boolean)
       .join("\n");
   }
-  if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket());
+  if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket(), await stageNamesOf(businessId));
+  if (name === "contact_counts") {
+    if (!viewer.all) return "This person sees only some of the business's deals, so the business's own counts aren't theirs to read.";
+    return contactCountsWords(await contactCounts(businessId, cleanSinceDay(input.since_day)));
+  }
   if (name === "price_lookup") {
     if (!can(member.role, "costs", member.permissions)) return "This person can't see costs.";
     const words = s(input.query).toLowerCase().split(/\s+/).filter(Boolean);
@@ -778,11 +794,12 @@ export async function askSol(
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
   const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text };
-  const [state, jobs, customers, serviceOpen] = await Promise.all([
+  const [state, jobs, customers, serviceOpen, stageNames] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
     listCustomers(businessId),
     casesToResolve(businessId),
+    stageNamesOf(businessId),
   ]);
   const visible = new Set(jobs.map((j) => j.customerId));
   const phones = new Map(customers.filter((c) => visible.has(c.id)).map((c) => [c.id, c.phone]));
@@ -791,7 +808,7 @@ export async function askSol(
       business: member.businessName,
       member: email,
       costs,
-      facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
+      facts: canvasFacts(jobs, serviceOpen, todayInMarket(), stageNames),
       prefs: state.prefs,
       businessPrefs: state.businessPrefs ?? [],
       now: new Date(),

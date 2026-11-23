@@ -59,7 +59,7 @@ export function SolBadgeFlat({ className }: { className?: string }) {
  * "make the small icons match too"): two hemispheres seen from above and a few folds, in fine white lines on a grid
  * whose box "11 12 78 78" is the disc. The live sun and `SolMark` both draw it, softly blended into the disc.
  */
-export function SunBrainLines() {
+export function SunBrainLines({ stroke = "white", width = 1.2 }: { stroke?: string; width?: number } = {}) {
   const half = (
     <>
       <path d="M48 17C37 13 24 18 20 30C13 35 11 47 16 55C12 64 17 76 27 80C31 87 41 89 48 85" />
@@ -72,7 +72,7 @@ export function SunBrainLines() {
     </>
   );
   return (
-    <g fill="none" stroke="white" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round">
+    <g fill="none" stroke={stroke} strokeWidth={width} strokeLinecap="round" strokeLinejoin="round">
       {half}
       <g transform="translate(100 0) scale(-1 1)">{half}</g>
       <path d="M50 18C51 30 49 42 50 54C51 66 49 76 50 84" strokeOpacity={0.7} />
@@ -124,6 +124,19 @@ export function SolMarkFlat({ className, glow = true }: { className?: string; gl
         <circle cx="19.93" cy="4.07" r="1.15" fill="#FFD27A" />
         <circle cx="19.93" cy="4.07" r="0.5" fill="#fff" />
       </g>
+    </svg>
+  );
+}
+
+/**
+ * Sol as an etching (22 Nov 2026, Martin, on Today's Business view: "only the outlines / etches of the brain. remove
+ * the color from the sun", to keep the brand and the focus on intelligence without Sol's bright, intense look): the
+ * same brain as `SunBrainLines` in fine lines of the text colour, with no disc, fill or glow.
+ */
+export function SolEtch({ className, width = 1.5 }: { className?: string; width?: number }) {
+  return (
+    <svg viewBox="9 10 82 82" className={className} aria-hidden>
+      <SunBrainLines stroke="currentColor" width={width} />
     </svg>
   );
 }

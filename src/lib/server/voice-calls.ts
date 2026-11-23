@@ -5,7 +5,7 @@
  *
  * Off unless VOICE_CALLS_ENABLED=true and VAPI_API_KEY, VAPI_PHONE_NUMBER_ID (a number imported into Vapi, e.g.
  * RENUABL's Twilio number), VAPI_WEBHOOK_SECRET (20+ characters, our own) and SITE_URL are set. Optional: VAPI_MODEL
- * (default claude-sonnet-5), VAPI_VOICE_PROVIDER + VAPI_VOICE_ID, VOICE_TRANSFER_NUMBER (put through to a person).
+ * (default claude-haiku-5-5, `VOICE_MODEL`), VAPI_VOICE_PROVIDER + VAPI_VOICE_ID, VOICE_TRANSFER_NUMBER (put through to a person).
  * A business's deals are called once it has the voice add-on and a number of its own (`voiceOnFor`, add-ons.ts,
  * business-numbers.ts); RENUABL's own business (RENUABL_CRM_EMAIL) on RENUABL's number, always.
  *
@@ -19,6 +19,7 @@
  * assistant answers. It speaks under the name the business gave it (design_caller, Settings → Phone assistant).
  */
 import { overCap } from "./design-voice-usage";
+import { VOICE_MODEL } from "@/lib/domain/voice-agent";
 import { buildIcs, consultEvent, staffCallEvent } from "@/lib/domain/calendar";
 import { outOfCallCredit } from "@/lib/domain/call-credit";
 import { placeVapiCall } from "./vapi-call";
@@ -75,7 +76,7 @@ import { jobById, record } from "./design-crm-repo";
 import { loadBrand, publicProposal, tokenForJob } from "./design-proposal-repo";
 import { emailProvider, sendEmail } from "./email";
 import { alertNewLead, textStaff } from "./lead-alert";
-import { testCallWords } from "@/lib/domain/design/caller";
+import { BRAIN_MODELS, modelOfBrain, testCallWords } from "@/lib/domain/design/caller";
 import { callerOf, scriptFor } from "./design-caller-repo";
 import { pencilledLine, PENCILLED_WORDS, readInstallDay, cleanCallerKey, roleOfMode, type CallerKey } from "@/lib/domain/install-call";
 import { installDaysFor, pencilInstall } from "./design-install-call";
@@ -111,7 +112,7 @@ export function voiceSettings(env: Record<string, string | undefined> = process.
     phoneNumberId,
     secret,
     site,
-    model: env.VAPI_MODEL?.trim() || "claude-sonnet-5",
+    model: env.VAPI_MODEL?.trim() || VOICE_MODEL,
     voice: voiceId ? { provider: env.VAPI_VOICE_PROVIDER?.trim() || "11labs", voiceId } : null,
     transferNumber: /^\+61\d{9}$/.test(transfer) ? transfer : transfer ? normaliseMobile(transfer) : null,
   };
@@ -310,9 +311,13 @@ export async function callMeFor(businessId: string): Promise<{ assistant: string
 }
 
 /** What the assistant is told for this call, read fresh each time (the proposal as it stands now). */
-async function briefFor(
-  row: VoiceRow,
-): Promise<{ brief: CallBrief; token: string | null; voice: { provider: string; voiceId: string } | null }> {
+async function briefFor(row: VoiceRow): Promise<{
+  brief: CallBrief;
+  token: string | null;
+  voice: { provider: string; voiceId: string } | null;
+  /** The model the agent was set to think with (caller.ts CALLER_BRAINS), or null for the site's. */
+  model: string | null;
+}> {
   const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [row.business_id]);
   const brand = await loadBrand(row.business_id, biz[0]?.name ?? "");
   const own = (await renuablCrm().catch(() => null))?.businessId === row.business_id;
@@ -326,6 +331,7 @@ async function briefFor(
     return {
       token: null,
       voice: caller.voice,
+      model: caller.brain ? BRAIN_MODELS[caller.brain] : null,
       brief: {
         mode: "install",
         assistant: caller.name,
@@ -347,6 +353,8 @@ async function briefFor(
     token: view ? token : null,
     // The voice the business chose for its assistant, else the site's own (VAPI_VOICE_ID), else Vapi's default.
     voice: caller.voice,
+    // The model the business chose for this agent (caller.ts CALLER_BRAINS), else the site's own.
+    model: caller.brain ? BRAIN_MODELS[caller.brain] : null,
     brief: {
       mode: view ? "proposal" : "lead",
       assistant: caller.name,
@@ -377,7 +385,7 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
     await finish(row.id, "stopped", { stop_reason: "the business has no phone number" });
     return false;
   }
-  const { brief, voice } = await briefFor(row);
+  const { brief, voice, model } = await briefFor(row);
   const scheduled = window.from.getTime() > Date.now() + 60_000;
   const body = {
     phoneNumberId: from,
@@ -388,7 +396,7 @@ async function placeCall(s: VoiceSettings, row: VoiceRow, window: { from: Date; 
       slots: brief.canBook ? voiceSlots(todayInMarket(window.from)) : [],
       serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
       secret: s.secret,
-      model: s.model,
+      model: model ?? s.model,
       voice: voice ?? s.voice,
       transferNumber: s.transferNumber,
     }),
@@ -779,7 +787,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
   const businessId = s && dbConfigured() ? await businessOfNumber({ vapiId: e.phoneNumberId ?? s.phoneNumberId }).catch(() => null) : null;
   const named = businessId ? await query<{ name: string }>(`select name from businesses where id = $1`, [businessId]).catch(() => []) : [];
   const closed = (): InboundAnswer => ({
-    assistant: closedAssistant({ business: named[0]?.name ?? "", model: s?.model ?? "claude-sonnet-5" }),
+    assistant: closedAssistant({ business: named[0]?.name ?? "", model: s?.model ?? VOICE_MODEL }),
   });
   if (!s || !businessId || !(await voiceOnFor(businessId).catch(() => false))) return closed();
   const mobile = normaliseMobile(e.number ?? "");
@@ -787,7 +795,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
   try {
     const row = await inboundRow(s, businessId, mobile, e.callId);
     if (!row) return closed();
-    const { brief, voice } = await briefFor(row);
+    const { brief, voice, model } = await briefFor(row);
     const today = todayInMarket();
     return {
       assistant: assistantConfig({
@@ -795,7 +803,7 @@ export async function answerInbound(e: VapiEvent): Promise<InboundAnswer> {
         slots: brief.canBook ? voiceSlots(today) : [],
         serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(row.id)}`,
         secret: s.secret,
-        model: s.model,
+        model: model ?? s.model,
         voice: voice ?? s.voice,
         transferNumber: s.transferNumber,
       }),
@@ -915,7 +923,7 @@ export async function ringToHearVoice(
           firstMessageMode: "assistant-speaks-first",
           model: {
             provider: "anthropic",
-            model: s.model,
+            model: modelOfBrain(caller.brain, s.model),
             messages: [{ role: "system", content: "You have just said a short test message. Say nothing more and end the call at once." }],
             tools: [{ type: "endCall" }],
           },

@@ -95,9 +95,9 @@ const NURTURE: { wait: number; content: EdmContent }[] = [
       "d",
       "One price for {company}",
       `${dollars(SEAT_MONTHLY_CENTS)} a user a month, first month ${firstMonthWords}. Cancel any time.`,
-      "One price. Everything in it.",
+      "One price a user. Then pay as you go.",
       [
-        "Every feature for every user: the designer, CRM, proposals, after the sale, service and Sol.",
+        "Every user gets the same CRM, proposals, after the sale, service and Sol, with no feature tiers. The designer is paid for by the site, and voice agents and marketing email are added when you want them.",
         `${dollars(SEAT_MONTHLY_CENTS)} a user a month, or ${dollars(COMMIT_SEAT_CENTS)} a user a month on the ${COMMIT_MONTHS}-month plan. Your first month is ${firstMonthWords}. Prices include GST, and you can cancel any time.`,
       ],
       ["Sign up", PRICING],

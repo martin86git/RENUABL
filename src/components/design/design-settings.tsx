@@ -19,6 +19,7 @@ import {
   type Workspace,
 } from "@/lib/domain/design/pricing";
 import { loadWorkspace, saveWorkspace, savedLabel } from "@/lib/services/design-store";
+import { StcPeriodSetting } from "./stc-period";
 
 const input =
   "block min-h-10 w-full rounded-md border border-line bg-surface px-3 text-sm tabular-nums outline-none focus:border-forest disabled:bg-surface-2 disabled:text-muted";
@@ -172,7 +173,7 @@ export function DesignSettings({ part }: { part: PricePart }) {
 
   return (
     <div className="theme-studio min-h-dvh pb-24">
-      <main className="mx-auto w-full max-w-4xl space-y-6 px-5 pt-8 lg:px-10">
+      <main className="mx-auto w-full max-w-6xl space-y-6 px-5 pt-8 lg:px-10">
         <div>
           <p className={eyebrow}>Settings</p>
           <h1 className="mt-2 text-[28px] leading-tight tracking-tight text-ink">{PART_TITLES[part]}</h1>
@@ -278,13 +279,15 @@ export function DesignSettings({ part }: { part: PricePart }) {
                       <th className="pb-2 pr-3 font-medium">Part</th>
                       <th className="w-44 pb-2 pr-3 font-medium">Product code</th>
                       <th className="pb-2 pr-3 font-medium">On your lists</th>
-                      <th className="w-28 pb-2 font-medium">Your cost ($)</th>
+                      <th className="w-36 pb-2 font-medium">Your cost ($)</th>
                     </tr>
                   </thead>
                   <tbody>
                     {COMPONENTS.map((c) => {
                       const choice = workspace.components[c.key];
-                      const hit = listed(workspace, choice.sku);
+                      const hit = choice.sku ? listed(workspace, choice.sku) : null;
+                      // A common code offered only once it is on the business's own lists, never assumed.
+                      const found = !choice.sku ? listed(workspace, c.example) : null;
                       const set = (patch: Partial<typeof choice>) =>
                         change({ ...workspace, components: { ...workspace.components, [c.key]: { ...choice, ...patch } } });
                       return (
@@ -294,6 +297,7 @@ export function DesignSettings({ part }: { part: PricePart }) {
                             <input
                               value={choice.sku}
                               onChange={(e) => set({ sku: e.target.value.trim().slice(0, 60) })}
+                              placeholder="Your product code"
                               aria-label={`Product code for ${c.label}`}
                               className={input}
                             />
@@ -305,6 +309,15 @@ export function DesignSettings({ part }: { part: PricePart }) {
                               </span>
                             ) : choice.cost !== null ? (
                               <span className="text-muted">Using the cost typed in</span>
+                            ) : found ? (
+                              <span className="text-ink-2">
+                                On your list: {found.name} ·{" "}
+                                <button type="button" onClick={() => set({ sku: found.sku })} className="font-medium text-ink underline">
+                                  Use {found.sku}
+                                </button>
+                              </span>
+                            ) : !choice.sku ? (
+                              <span className="text-muted">No code yet: add one, or type a cost</span>
                             ) : (
                               <span className="text-warning">Not found: no cost on file</span>
                             )}
@@ -394,6 +407,8 @@ export function DesignSettings({ part }: { part: PricePart }) {
                 </div>
               </section>
             ))}
+
+            {part === "margin" && <StcPeriodSetting workspace={workspace} onChange={(next) => void change(next)} />}
 
             <div hidden={part !== "lists"} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-2 p-5">
               <p className="max-w-xl text-sm text-ink-2">

@@ -3,7 +3,7 @@ import { typedFields } from "@/lib/domain/design/deal-sections";
 import { loadPrefs } from "@/lib/server/design-after-sale-repo";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { listMembers } from "@/lib/server/design-repo";
-import { deleteJob, jobById, setJobOwner, updateJob } from "@/lib/server/design-crm-repo";
+import { deleteJob, jobById, joinNearbyDesign, listOwnStages, setJobOwner, updateJob } from "@/lib/server/design-crm-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 /** The same answer for an id that doesn't exist and one that is another business's. */
@@ -16,7 +16,12 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     // A deal the member doesn't see (someone else's, when they don't see every deal) answers as if it weren't there.
-    const found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
+    let found = validId(id) ? await jobById(who.member.businessId, id, viewerOf(who.member)) : null;
+    // A deal with no design yet looks for one of the same home drawn a few metres off (an imported deal's place).
+    if (found && !found.job.projectId && found.job.lat !== null && !who.member.viewedBy) {
+      await joinNearbyDesign(who.member.businessId, id, who.member.email);
+      found = (await jobById(who.member.businessId, id, viewerOf(who.member))) ?? found;
+    }
     return found ? Response.json({ ok: true, ...found }) : notFound();
   });
 }
@@ -44,7 +49,9 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/
     }
     // A deal's fields are cleaned against the business's own (Settings → Deal fields): its dropdown choices, its own fields.
     const fields = typedFields((await loadPrefs(who.member.businessId)).dealFields);
-    const job = await updateJob(who.member.businessId, id, (current) => cleanJobInput(read.body, current, fields), who.member.email);
+    // A deal put at a stage the business added (`subStage`) is checked against its own stages.
+    const own = "subStage" in read.body ? await listOwnStages(who.member.businessId) : [];
+    const job = await updateJob(who.member.businessId, id, (current) => cleanJobInput(read.body, current, fields, own), who.member.email);
     if (!job) return notFound();
     if ("refused" in job) return Response.json({ ok: false, message: job.refused }, { status: 422 });
     return Response.json({ ok: true, job });

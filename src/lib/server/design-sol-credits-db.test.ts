@@ -88,7 +88,7 @@ describe.skipIf(!url)("Sol credits (database)", () => {
   it("only counts an answer with none left while billing isn't enforced", async () => {
     expect((await billing.solBalanceOf(b, TODAY)).left).toBe(0);
     expect(await billing.spendSolCredit(b, "chat", B, TODAY, false)).toBeTruthy();
-    expect(await billing.solUseThisMonth(b, TODAY)).toEqual([{ use: "chat", count: 1 }]);
+    expect(await billing.solUseThisMonth(b, TODAY)).toEqual([{ use: "chat", count: 1, credits: 0 }]);
     expect((await billing.solBalanceOf(b, TODAY)).left).toBe(0);
     // Business A's packs are its own.
     expect((await billing.solBalanceOf(a, TODAY)).bought).toBe(500);

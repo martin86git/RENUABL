@@ -388,31 +388,25 @@ function Pricing() {
 
         <p className="mt-4 text-center text-[13px] text-ink-2">{PRICING.firstMonth}</p>
 
-        {/* What's charged beside a plan: the designer by the job, and the two add-ons, one price for the business. */}
-        <div className="mt-16 text-center">
-          <p className="text-[22px] font-semibold tracking-[-0.02em]">{PRICING.addOnsTitle}</p>
-          <p className="mx-auto mt-2 max-w-2xl text-[15px] text-ink-2">{PRICING.addOnsSub}</p>
+        {/* Then the team, each priced on its own (21 Nov 2026, Martin): the two AI cards large across the top, the voice
+            team dark with the sun's glow, then the designer, marketing and checkout. */}
+        <div className="mt-20 text-center">
+          <p className="text-[clamp(26px,2.8vw,36px)] font-semibold leading-[1.05] tracking-[-0.03em]">{PRICING.addOnsTitle}</p>
+          <p className="mx-auto mt-3 max-w-2xl text-[15px] text-ink-2">{PRICING.addOnsSub}</p>
         </div>
-        <div className="mt-8 grid gap-5 lg:grid-cols-3">
-          <div className="rounded-[28px] bg-surface p-8 ring-1 ring-line">
-            <p className="text-[17px] font-semibold">{PRICING.tokensTitle}</p>
-            <p className="mt-3 text-[15px] leading-relaxed text-ink-2">{PRICING.tokens}</p>
-            <p className="mt-5 flex flex-wrap gap-2 text-[13px]">
-              {TOKEN_PACKS.map((p) => (
-                <span key={p} className="rounded-full bg-canvas px-3 py-1 tabular-nums ring-1 ring-line">
-                  {packWords(p)}
-                </span>
-              ))}
-            </p>
-          </div>
-          {PRICING.addOns.map((a) => (
-            <div key={a.key} className="rounded-[28px] bg-surface p-8 ring-1 ring-line">
-              <p className="text-[17px] font-semibold">{a.name}</p>
-              <p className="mt-3 text-[15px] font-medium">{a.price}</p>
-              <p className="mt-2 text-[15px] leading-relaxed text-ink-2">{a.what}</p>
-            </div>
+        <div className="mt-8 grid gap-4 lg:grid-cols-6">
+          {PRICING.team.map((t, i) => (
+            <TeamCard key={t.key} card={t} wide={i < 2} dark={t.key === "voice"} />
           ))}
         </div>
+        <p className="mt-5 flex flex-wrap justify-center gap-2 text-[12px] text-ink-2">
+          <span className="py-1">Designer credit packs:</span>
+          {TOKEN_PACKS.map((p) => (
+            <span key={p} className="rounded-full bg-surface px-3 py-1 tabular-nums ring-1 ring-line">
+              {packWords(p)}
+            </span>
+          ))}
+        </p>
         <p className="mx-auto mt-6 max-w-2xl text-center text-[13px] leading-relaxed text-muted">{PRICING.start}</p>
       </Reveal>
     </section>
@@ -538,6 +532,49 @@ function PlanCard({
       <p className="mt-6 text-[14px] font-semibold">{listHead}</p>
       <ul className="mt-3 space-y-2">
         {list.map((l) => (
+          <li key={l} className={clsx("flex gap-2.5 text-[14px] leading-snug", quiet)}>
+            <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
+            {l}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** One member of the team you can add: what it is, its price and how it's charged, what it does. */
+function TeamCard({ card, wide, dark }: { card: (typeof PRICING.team)[number]; wide: boolean; dark: boolean }) {
+  const quiet = dark ? "text-white/65" : "text-ink-2";
+  return (
+    <div
+      className={clsx(
+        "relative isolate flex flex-col overflow-hidden rounded-[28px] p-6 sm:p-7",
+        wide ? "lg:col-span-3" : "lg:col-span-2",
+        dark ? "bg-[#0b0b0c] text-white shadow-[0_30px_70px_-30px_rgba(255,90,31,0.45)]" : "bg-surface ring-1 ring-line",
+      )}
+    >
+      {dark && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-20 -top-24 -z-10 size-72 rounded-full bg-[radial-gradient(circle,rgba(255,110,40,0.5)_0%,rgba(255,90,31,0.16)_40%,transparent_70%)]"
+        />
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className={clsx("text-[13px] font-medium uppercase tracking-[0.08em]", quiet)}>{card.label}</p>
+        <span className="rounded-full bg-sun-line/12 px-2.5 py-1 text-[12px] font-semibold text-sun-line ring-1 ring-sun-line/35">
+          {card.how}
+        </span>
+      </div>
+      <h3 className={clsx("mt-3 font-semibold leading-[1.05] tracking-[-0.03em]", wide ? "text-[clamp(26px,2.4vw,32px)]" : "text-[22px]")}>
+        {card.title}
+      </h3>
+      <p className="mt-4 flex items-baseline gap-2">
+        <span className="text-[clamp(30px,2.6vw,40px)] font-semibold leading-none tracking-[-0.04em] tabular-nums">{card.price}</span>
+        <span className={clsx("text-[14px]", quiet)}>{card.per}</span>
+      </p>
+      <p className={clsx("mt-3 text-[14px] leading-[1.5]", quiet)}>{card.body}</p>
+      <ul className={clsx("mt-5 grid gap-2", wide && "sm:grid-cols-2")}>
+        {card.list.map((l) => (
           <li key={l} className={clsx("flex gap-2.5 text-[14px] leading-snug", quiet)}>
             <Check className="mt-0.5 size-4 shrink-0 text-sun-line" aria-hidden />
             {l}

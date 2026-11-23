@@ -6,11 +6,16 @@
 import type { PreparedItem } from "@/lib/domain/design/prepared";
 import { markFollowUp } from "./after-sale";
 import { ask, emailDeal } from "./crm";
+import { fresh, warm, warmed } from "./warm";
 
 /** Said on the window when something new may be waiting (a call's write-up applied), so the tray looks again. */
 export const PREPARED_CHANGED = "renuabl:prepared";
 
-export const loadPrepared = () => ask<{ items: PreparedItem[] }>("/api/design/prepared");
+const askPrepared = () => ask<{ items: PreparedItem[] }>("/api/design/prepared");
+/** Sol's tray; `again` asks afresh after a change rather than sharing an ask already out. */
+export const loadPrepared = (again = false) => (again ? fresh : warm)("prepared", askPrepared);
+/** The last tray read this visit, so it opens on it. */
+export const keptPrepared = () => warmed<{ ok: true; items: PreparedItem[] }>("prepared");
 
 const close = (id: string, act: "sent" | "dismiss") => ask<object>("/api/design/prepared", { method: "POST", body: { id, do: act } });
 

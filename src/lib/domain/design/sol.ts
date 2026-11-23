@@ -10,7 +10,7 @@ import { isMeetingId } from "./sol-meeting";
 import { cleanCharts, MORE_DETAIL, type SolChart } from "./sol-charts";
 import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 import { cleanDesignsShown, type SolDesignShown } from "./sol-designs";
-import { STAGE_LABELS, JOB_STAGES, type Job, type JobStage } from "./crm";
+import { STAGE_LABELS, JOB_STAGES, stageLabel, type Job, type JobStage, type StageNames } from "./crm";
 import { matches } from "./find";
 import { SECTIONS } from "./sections";
 import { SOL_MAKER_DOCS } from "./maker-docs";
@@ -470,12 +470,12 @@ export type SolJob = Job & { customerName: string };
 const money = (n: number | null) => (n == null ? "no value yet" : `$${Math.round(n).toLocaleString("en-AU")}`);
 
 /** One deal in a line, as Sol's tools give it: id, customer, title, stage, value, kW, install date, address. */
-export function dealLine(j: SolJob): string {
+export function dealLine(j: SolJob, names: StageNames = {}): string {
   return [
     `deal ${j.id}`,
     j.customerName,
     j.title,
-    STAGE_LABELS[j.stage],
+    stageLabel(j.stage, names),
     money(j.value),
     j.kw ? `${j.kw} kW` : "",
     j.installDate ? `installs ${j.installDate}` : "",
@@ -493,31 +493,38 @@ export function findDeals(jobs: readonly SolJob[], q: string, phoneOf: (customer
   return jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address], phone: phoneOf(j.customerId) }, typed)).slice(0, 12);
 }
 
-/** The stage a name means: its key or any part of its label ("proposal", "Proposal sent"), or null. */
-export function stageNamed(name: string): JobStage | null {
+/**
+ * The stage a name means: its key, or any part of the business's name for it or ours ("proposal", "Quote sent",
+ * "Proposal sent"), the business's names first; or null.
+ */
+export function stageNamed(name: string, names: StageNames = {}): JobStage | null {
   const n = name.trim().toLowerCase();
   if (!n) return null;
+  const theirs = (s: JobStage) => (names[s] ?? "").toLowerCase();
+  const ours = (s: JobStage) => STAGE_LABELS[s].toLowerCase();
   return (
     JOB_STAGES.find((s) => s === n) ??
-    JOB_STAGES.find((s) => STAGE_LABELS[s].toLowerCase() === n) ??
-    JOB_STAGES.find((s) => STAGE_LABELS[s].toLowerCase().includes(n)) ??
+    JOB_STAGES.find((s) => theirs(s) === n) ??
+    JOB_STAGES.find((s) => ours(s) === n) ??
+    JOB_STAGES.find((s) => theirs(s).includes(n) && theirs(s) !== "") ??
+    JOB_STAGES.find((s) => ours(s).includes(n)) ??
     null
   );
 }
 
 /** The deals at a stage, with how long since each last changed; with no stage, every stage and its count. */
-export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: string): string {
+export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: string, names: StageNames = {}): string {
   if (!stage.trim()) {
-    return JOB_STAGES.map((s) => `${STAGE_LABELS[s]}: ${jobs.filter((j) => j.stage === s).length}`).join("\n");
+    return JOB_STAGES.map((s) => `${stageLabel(s, names)}: ${jobs.filter((j) => j.stage === s).length}`).join("\n");
   }
-  const s = stageNamed(stage);
-  if (!s) return `There's no stage called "${stage}". The stages are: ${JOB_STAGES.map((x) => STAGE_LABELS[x]).join(", ")}.`;
+  const s = stageNamed(stage, names);
+  if (!s) return `There's no stage called "${stage}". The stages are: ${JOB_STAGES.map((x) => stageLabel(x, names)).join(", ")}.`;
   const at = jobs.filter((j) => j.stage === s).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-  if (!at.length) return `No deals are at ${STAGE_LABELS[s]}.`;
+  if (!at.length) return `No deals are at ${stageLabel(s, names)}.`;
   const days = (iso: string) => Math.max(0, Math.floor((Date.parse(`${today}T12:00:00Z`) - Date.parse(iso)) / 86_400_000));
   return [
-    `${at.length} at ${STAGE_LABELS[s]}, longest unchanged first:`,
-    ...at.slice(0, 40).map((j) => `- ${dealLine(j)} · unchanged ${days(j.updatedAt)} days`),
+    `${at.length} at ${stageLabel(s, names)}, longest unchanged first:`,
+    ...at.slice(0, 40).map((j) => `- ${dealLine(j, names)} · unchanged ${days(j.updatedAt)} days`),
   ].join("\n");
 }
 

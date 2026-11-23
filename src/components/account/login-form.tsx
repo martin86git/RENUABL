@@ -120,6 +120,8 @@ export function LoginForm({
               </Link>
             </p>
             {demo && (
+              // An API route that sets a cookie and redirects: a full page load, not a client-side Link.
+              // eslint-disable-next-line @next/next/no-html-link-for-pages
               <a
                 href="/api/auth/demo"
                 className="tap-area relative inline-flex items-center gap-1.5 text-ink-2 underline underline-offset-4"
