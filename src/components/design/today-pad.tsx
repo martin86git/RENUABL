@@ -37,7 +37,7 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
-import { TODAY_CALENDAR, TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { TODAY_CALENDAR, TodayChat, TodayViews, firstViewLabel, useInsights } from "./today-chat";
 import { TodayCalendar } from "./today-calendar";
 import { InstallListPage } from "./install-lists";
 import { useDockSet } from "@/lib/services/dock-set";
@@ -257,6 +257,27 @@ export function TodayPad(props: {
     window.setTimeout(() => document.getElementById("today-ask")?.focus(), 0);
   };
   const askIn = (q: string, files: SolFile[]) => void ask(q, files, replyTo);
+  /** Business, Feed and the calendar, in the foot of Sol's box wherever it is (23 Nov 2026, Martin: no switch over Today). */
+  const viewRoundsOf = (small: boolean) =>
+    view ? (
+      <TodayViews
+        small={small}
+        first={firstViewLabel(insights)}
+        view={view}
+        onView={(v) => {
+          // The first view pressed while in the conversation: back to the start (it carries on in Sol's panel).
+          if (v === "chat" && view === "chat" && talking) setTurns([]);
+          setView(v);
+        }}
+      />
+    ) : null;
+  const viewRounds = viewRoundsOf(false);
+  const viewIcons = viewRoundsOf(true);
+  /** Asked from Feed or the calendar: the answer is written on the first view, in the conversation. */
+  const askFromAway = (q: string, files: SolFile[]) => {
+    setView("chat");
+    void ask(q, files, replyTo);
+  };
   /** Try another answer: his latest answer replaced by a new one to the same question, a different way. */
   const retry = async (id: number) => {
     if (asking) return;
@@ -289,25 +310,6 @@ export function TodayPad(props: {
         </p>
       )}
 
-      {!welcoming && view && (
-        // Over the pad's sticky top edge (.pad-cap, z 15), which on Today reaches down to the strip: under it the pill was
-        // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
-        <div
-          data-tour="today-switch"
-          className="relative z-[16] mt-4 flex justify-center sm:mt-1 transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
-        >
-          <TodaySwitch
-            first={firstViewLabel(insights)}
-            view={view}
-            onView={(v) => {
-              // Chat pressed while in the conversation: back to the start, with the cards (it carries on in Sol's panel).
-              if (v === "chat" && view === "chat" && talking) setTurns([]);
-              setView(v);
-            }}
-          />
-        </div>
-      )}
-
       <div className="mt-2 flex flex-1 flex-col">
         {welcoming && (
           <Welcome
@@ -319,6 +321,18 @@ export function TodayPad(props: {
           />
         )}
         {/* On the dock's post-sale tools, Feed is Jobs: every sold job not yet installed (23 Nov 2026, Martin). */}
+        {/* Feed and the calendar keep Sol's box at their head, one line, with the three rounds in it. */}
+        {!welcoming && (onFeed || onCal) && (
+          <div data-tour="today-sol" className="relative z-[16] mx-auto mb-4 mt-2 w-full max-w-3xl">
+            <SolBox
+              id="today-ask-away"
+              onAsk={askFromAway}
+              asking={asking}
+              extras={viewIcons}
+              placeholder="Ask Sol about your deals or your day"
+            />
+          </div>
+        )}
         {!welcoming && onFeed && jobsView && (
           <div className="pb-6">
             <InstallListPage switcher={null} />
@@ -366,6 +380,7 @@ export function TodayPad(props: {
                 jobs={props.jobs}
                 today={props.today}
                 items={items}
+                viewRounds={viewRounds}
               />
             </div>
           </div>
@@ -468,7 +483,7 @@ export function TodayPad(props: {
                 <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
               </button>
             )}
-            <SolBox onAsk={askIn} asking={asking} replyTo={replyTo} onStopReply={() => setReplyTo(null)} />
+            <SolBox onAsk={askIn} asking={asking} replyTo={replyTo} onStopReply={() => setReplyTo(null)} extras={viewIcons} />
           </div>
         </div>
       )}
@@ -507,7 +522,10 @@ export function SolBox({
   replyTo = null,
   onStopReply,
   tall = false,
+  extras = null,
 }: {
+  /** Shown in the box's foot after the + (Today's views, `TodayViews`). */
+  extras?: React.ReactNode;
   /** Twice as thick (20 Nov 2026, Martin): the words on top, the paperclip, microphone and send along its foot. */
   tall?: boolean;
   /** One of Sol's questions being answered, shown over the box. */
@@ -545,7 +563,7 @@ export function SolBox({
       }}
       className={clsx(
         "bg-surface text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line",
-        tall ? "rounded-[28px] p-3 pl-5 pt-4" : "rounded-[26px] p-2 pl-4",
+        tall ? "rounded-[28px] p-3 pl-5 pt-5" : "rounded-[26px] p-2 pl-4",
       )}
     >
       {replyTo && (
@@ -584,15 +602,16 @@ export function SolBox({
                 void send();
               }
             }}
-            rows={2}
+            rows={3}
             maxLength={4000}
             autoComplete="off"
             placeholder={placeholder}
-            className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
+            className="block min-h-[5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
           {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
             <AttachButton attach={attach} plus />
+            {extras && <span className="ml-1 min-w-0">{extras}</span>}
             <button
               type="submit"
               disabled={asking || !ready}
@@ -608,9 +627,11 @@ export function SolBox({
           </div>
         </>
       ) : (
-        <div className="flex items-center gap-1.5">
+        // With Today's views in it (23 Nov 2026, Martin), the words take a row of their own on top and the + , the views,
+        // send and the microphone sit along the foot, so typing keeps its room on a phone.
+        <div className={clsx("flex items-center gap-1.5", extras && "flex-wrap gap-y-1")}>
           <AttachButton attach={attach} plus />
-          <SolBadge className="size-5 shrink-0" />
+          {extras ? <span className="shrink-0">{extras}</span> : <SolBadge className="size-5 shrink-0" />}
           <label className="sr-only" htmlFor={id}>
             Ask Sol
           </label>
@@ -629,14 +650,20 @@ export function SolBox({
             maxLength={4000}
             autoComplete="off"
             placeholder={placeholder}
-            className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+            className={clsx(
+              "h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted",
+              extras ? "order-first basis-full pl-1 pr-2" : "ml-1",
+            )}
           />
           <button
             type="submit"
             disabled={asking || !ready}
             aria-label="Ask Sol"
             onPointerDown={(e) => e.preventDefault()}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+            className={clsx(
+              extras && "ml-auto",
+              "grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted",
+            )}
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>

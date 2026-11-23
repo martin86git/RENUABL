@@ -56,7 +56,7 @@ export function welcomeLines(firstName: string | null, business: string): Record
 export const WELCOME_TOUR: { what: string; now: string; at: string; go?: "chat" | "feed" }[] = [
   {
     what: "Today",
-    now: "is your home screen, in two views. The first is how the month is going and what's worth changing; Feed is your deals as they happen.",
+    now: "is your home screen. These rounds in Sol's box switch it: how the month is going, Feed (your deals as they happen) and your calendar.",
     at: '[data-tour="today-switch"] [role="tablist"]',
     go: "chat",
   },

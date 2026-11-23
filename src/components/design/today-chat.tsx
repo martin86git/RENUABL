@@ -88,7 +88,7 @@ function TodayDate({ today }: { today: ISODate }) {
   return (
     <div className="mt-4 flex flex-col items-center gap-2">
       {/* The date opens the calendar, as the date tile does on a computer (23 Nov 2026, Martin). */}
-      <h1 className="text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+      <h1 className="text-center text-[17px] sm:text-[clamp(17px,1.7vw,20px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event(TODAY_CALENDAR))}
@@ -131,6 +131,8 @@ export function TodayChat(props: {
   today: ISODate;
   /** What needs the member now, most pressing first (next-up.ts). */
   items: NextItem[] | null;
+  /** Business, Feed and the calendar, in the foot of Sol's box (`TodayViews`). */
+  viewRounds?: React.ReactNode;
 }) {
   const views = Array.isArray(props.views) ? props.views : null;
   const first = views?.[0];
@@ -212,6 +214,7 @@ export function TodayChat(props: {
           tall
           onAsk={props.onAsk}
           asking={props.asking}
+          extras={props.viewRounds}
           placeholder={post ? DOCK_SET_WORDS.post.ask : mine ? "Ask Sol: how do I win a quiet deal back?" : DOCK_SET_WORDS.sales.ask}
         />
       </div>
@@ -425,65 +428,61 @@ function InsightRow({ insight }: { insight: Insight }) {
   );
 }
 
-/** Business (or My month) | Feed, at the top of Today. */
-export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
-  // 22 Nov 2026, Martin: "I don't notice [Feed] sometimes", then "we can do better on the pill shapes". A segmented control: a soft recessed track, two halves of
-  // one width, and a white thumb that slides to the one open, each with its icon.
-  // 23 Nov 2026, Martin: on the dock's post-sale tools, Feed is Jobs (the jobs under way, not the deals).
+/**
+ * Business (or My month), Feed and the calendar, as three small rounds in the foot of Sol's box (23 Nov 2026, Martin: the
+ * switch over Today was "filling the page with buttons eroding and diluting its simple sophistication"; "incorporate into
+ * the chat box"). The one on show is lit and says its name; the others are icons with their names as titles.
+ */
+export function TodayViews({
+  view,
+  onView,
+  first,
+  small = false,
+}: {
+  view: TodayView;
+  onView: (v: TodayView) => void;
+  first: string;
+  /** In the one-line box: icons only, the one on show lit, so the box keeps room to type. */
+  small?: boolean;
+}) {
+  // On the dock's post-sale tools, Feed is Jobs (the jobs under way, not the deals).
   const post = useDockSet() === "post";
-  // 23 Nov 2026, Martin: the calendar as a third part, an icon alone so the switch still fits a phone.
   const tabs = [
     ["chat", first, TrendingUp],
     ["feed", DOCK_SET_WORDS[post ? "post" : "sales"].feed, post ? HardHat : Rows3],
+    ["calendar", "Calendar", CalendarDays],
   ] as const;
-  const at = view === "feed" ? 1 : view === "calendar" ? 2 : 0;
-  // Two word halves of one width and a narrow icon part at the end: the thumb's place and width follow the one open.
-  const thumb =
-    at === 2
-      ? { left: "calc(100% - 3rem - 0.25rem)", width: "3rem" }
-      : { left: at === 0 ? "0.25rem" : "calc(50% - 1.5rem)", width: "calc(50% - 1.75rem)" };
   return (
-    <div
-      role="tablist"
-      aria-label="Today"
-      className="relative grid h-10 w-[18rem] grid-cols-[1fr_1fr_3rem] rounded-full bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgb(20_22_26_/_0.08)] ring-1 ring-inset ring-ink/[0.04] backdrop-blur"
-    >
-      <span
-        aria-hidden
-        className="absolute inset-y-1 rounded-full bg-surface shadow-[0_1px_2px_rgb(20_22_26_/_0.12),0_4px_12px_-4px_rgb(20_22_26_/_0.18)] ring-1 ring-ink/[0.05] transition-[left,width] duration-300 ease-out motion-reduce:transition-none"
-        style={thumb}
-      />
-      {tabs.map(([v, label, Icon]) => (
-        <button
-          key={v}
-          type="button"
-          role="tab"
-          aria-selected={view === v}
-          onClick={() => onView(v)}
-          className={clsx(
-            "relative z-[1] flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium transition-colors",
-            view === v ? "text-ink" : "text-ink/80 hover:text-ink",
-          )}
-        >
-          <Icon className={clsx("size-[15px]", view === v ? "text-sun-line" : "opacity-70")} aria-hidden />
-          {label}
-        </button>
-      ))}
-      <button
-        type="button"
-        role="tab"
-        aria-selected={view === "calendar"}
-        aria-label="Calendar"
-        title="Calendar"
-        onClick={() => onView("calendar")}
-        className={clsx(
-          "relative z-[1] flex items-center justify-center rounded-full transition-colors",
-          view === "calendar" ? "text-ink" : "text-ink/80 hover:text-ink",
-        )}
-      >
-        <CalendarDays className={clsx("size-[16px]", view === "calendar" ? "text-sun-line" : "opacity-70")} aria-hidden />
-      </button>
-    </div>
+    <span data-tour="today-switch" className="inline-flex">
+      <span role="tablist" aria-label="Today" className="inline-flex items-center gap-0.5">
+        {tabs.map(([v, label, Icon]) => {
+          const on = view === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              aria-label={label}
+              title={label}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => onView(v)}
+              className={clsx(
+                "inline-flex h-8 items-center gap-1.5 rounded-full text-[12px] font-medium transition-colors",
+                on && !small
+                  ? "bg-canvas px-2.5 text-ink ring-1 ring-line"
+                  : on
+                    ? "w-8 justify-center bg-canvas text-ink ring-1 ring-line"
+                    : "w-8 justify-center text-ink-2 hover:bg-canvas hover:text-ink",
+              )}
+            >
+              <Icon className={clsx("size-[15px]", on && "text-sun-line")} aria-hidden />
+              {on && !small && <span>{label}</span>}
+            </button>
+          );
+        })}
+      </span>
+    </span>
   );
 }
 
