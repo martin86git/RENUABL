@@ -5,7 +5,21 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useNameHintBox } from "./name-hint-box";
-import { Bell, Copy, CornerUpLeft, Eye, EyeOff, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
+import {
+  ArrowUpRight,
+  Bell,
+  CornerUpLeft,
+  Eye,
+  EyeOff,
+  FileText,
+  History,
+  MessageSquarePlus,
+  Minus,
+  Plus,
+  RefreshCw,
+  X,
+  Pin,
+} from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
 import { lookingAt } from "@/lib/domain/design/page-context";
@@ -67,7 +81,8 @@ import { MeetingCard } from "./meeting-card";
 import { LearnCard, SolInduction } from "./sol-induction";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer, type OnPick } from "./sol-text";
-import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
+import { answerFor, replyToSol, solPlain, type SolReply } from "@/lib/domain/design/sol-format";
+import { MessageTools, QuotedWords, ReplyBanner } from "./message-tools";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
@@ -228,7 +243,7 @@ export function SolChat({
     setOnDealDraft(draft.about ? { about: draft.about, label: draft.label } : null);
   }
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
-  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<SolReply | null>(null);
   const [heard, setHeard] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [fileProblem, setFileProblem] = useState("");
@@ -353,8 +368,9 @@ export function SolChat({
     const typed = (over ?? text).trim();
     const answering = !over && replyTo && typed ? replyTo : null;
     const onDeal = !over && !answering && onDealDraft && typed ? onDealDraft : null;
-    const said = answering ? answerFor(answering, typed) : onDeal ? `${onDeal.about}${typed}` : typed;
-    const shown = shownAs ?? (answering || onDeal ? typed : undefined);
+    const replied = replyToSol(answering, typed);
+    const said = answering ? replied.said : onDeal ? `${onDeal.about}${typed}` : typed;
+    const shown = shownAs ?? (answering ? replied.shown : onDeal ? typed : undefined);
     const sending = over ? [] : files;
     if (!said && !sending.length) return;
     if (busy) {
@@ -416,7 +432,7 @@ export function SolChat({
   /** A Yes or No goes straight to Sol; Reply puts the question over the box to answer in his own words. */
   const answer: OnAnswer = (question, yes) => {
     if (yes) return void send(answerFor(question, yes), false, yes);
-    setReplyTo(question);
+    setReplyTo({ kind: "question", text: question });
     box.current?.focus();
   };
 
@@ -676,6 +692,10 @@ export function SolChat({
               onPick={t.role === "sol" && !busy ? (item) => void send(`Let's work on this one: ${item}`) : undefined}
               pinned={t.pinned}
               onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
+              onReply={() => {
+                setReplyTo({ kind: "message", from: t.role, text: t.shown || t.text });
+                box.current?.focus();
+              }}
             />
             {t.role === "sol" && t.sources?.length ? (
               <SolSources sources={t.sources} remembered={t.remembered} onRemember={() => run(rememberAnswer(t.at))} />
@@ -811,17 +831,7 @@ export function SolChat({
             </button>
           </div>
         )}
-        {replyTo && (
-          <div className="mb-1.5 flex items-start gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
-            <CornerUpLeft className="mt-px size-3.5 shrink-0 text-sun-line" aria-hidden />
-            <span className="min-w-0 flex-1">
-              Replying to <span className="font-medium text-ink">{replyTo}</span>
-            </span>
-            <button type="button" onClick={() => setReplyTo(null)} aria-label="Stop replying" className="shrink-0 hover:text-ink">
-              <X className="size-3.5" aria-hidden />
-            </button>
-          </div>
-        )}
+        {replyTo && <ReplyBanner reply={replyTo} onStop={() => setReplyTo(null)} className="mb-1.5 bg-surface" />}
         {names.chips}
         <div className="relative">
           {dealAt && dealAt.query.trim().length >= 2 && (
@@ -1077,6 +1087,7 @@ function Bubble({
   at,
   pinned,
   onPin,
+  onReply,
   onAnswer,
   onPick,
 }: {
@@ -1085,10 +1096,10 @@ function Bubble({
   at: string;
   pinned?: boolean;
   onPin?: () => void;
+  onReply?: () => void;
   onAnswer?: OnAnswer;
   onPick?: OnPick;
 }) {
-  const [copied, setCopied] = useState(false);
   if (!text) return null;
   return (
     <div className={clsx("flex flex-col", you ? "items-end" : "items-stretch")}>
@@ -1106,38 +1117,31 @@ function Bubble({
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
-        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
+        {you ? <QuotedWords text={text} /> : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
       </div>
       {at && (
-        <div
-          className={clsx(
-            "mt-0.5 flex gap-2 px-1 text-[11px] text-muted transition-opacity",
-            pinned ? "opacity-100" : "opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100",
-          )}
+        <MessageTools
+          text={text}
+          onReply={onReply}
+          shown={pinned}
+          className="mt-0.5 px-1 text-[11px]"
+          before={<span className="mr-1 max-sm:hidden">{when(at)}</span>}
         >
-          <span className="max-sm:hidden">{when(at)}</span>
-          <button
-            type="button"
-            onClick={() => {
-              void navigator.clipboard?.writeText(solPlain(text)).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-            className="inline-flex items-center gap-1 hover:text-ink"
-          >
-            <Copy className="size-3" aria-hidden /> {copied ? "Copied" : "Copy"}
-          </button>
           {onPin && (
             <button
               type="button"
               onClick={onPin}
-              className={clsx("inline-flex items-center gap-1 hover:text-ink", pinned && "text-sun-ink")}
+              title={pinned ? "Unpin" : "Pin"}
+              aria-label={pinned ? "Unpin" : "Pin"}
+              className={clsx(
+                "inline-flex size-7 items-center justify-center rounded-full hover:bg-ink/5 hover:text-ink",
+                pinned && "text-sun-ink",
+              )}
             >
-              <Pin className="size-3" aria-hidden /> {pinned ? "Unpin" : "Pin"}
+              <Pin className="size-3.5" aria-hidden />
             </button>
           )}
-        </div>
+        </MessageTools>
       )}
     </div>
   );

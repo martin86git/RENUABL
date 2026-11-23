@@ -33,6 +33,8 @@ import { SolDesignView } from "./sol-design-view";
 import { SolThinking, SolWorking } from "./sol-thinking";
 import type { SolFile } from "@/lib/domain/design/sol";
 import { SolBox, SolSays, Typed } from "./today-pad";
+import { MessageTools, QuotedWords } from "./message-tools";
+import { replyToSol, type SolReply } from "@/lib/domain/design/sol-format";
 import type { NewCaseAsk } from "@/lib/domain/design/sol-rooms";
 import { NewCaseButton, NewCaseCard } from "./service-new-case";
 
@@ -214,15 +216,24 @@ export function ServicePlanner() {
     if (below > -40 && below < 480) el.scrollIntoView({ block: "end", behavior: "smooth" });
   }, []);
 
-  const ask = async (q: string, on: ServiceLine | null = focus, files: SolFile[] = []) => {
+  // A message replied to from its reply arrow (21 Nov 2026, Martin): named for Sol, quoted over the reply in the chat.
+  const [replyTo, setReplyTo] = useState<SolReply | null>(null);
+  const replyToMessage = (from: "you" | "sol", text: string) => {
+    setReplyTo({ kind: "message", from, text });
+    window.setTimeout(() => document.getElementById("service-ask")?.focus(), 0);
+  };
+  const ask = async (typed: string, on: ServiceLine | null = focus, files: SolFile[] = [], about: SolReply | null = null) => {
     if (asking || !cases) return;
+    const replied = replyToSol(about, typed);
+    const q = replied.shown ?? typed;
+    setReplyTo(null);
     const id = ++turnNo.current;
     setAsking(true);
     setTurns((t) => [...t, { id, kind: "ask", q, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
     const page = { path: PATHS.service, title: "Service", about: on ? serviceFocusWords(on, cases) : pipelineWords(cases), screen: "" };
     // The Service screen's own conversation: Sol is given only what was said here (sol-rooms.ts).
-    const r = await askSol(q, files, page, false, undefined, "service");
+    const r = await askSol(replied.said || typed, files, page, false, replied.shown, "service");
     setAsking(false);
     let a: { text: string; more: boolean; designs?: SolDesignShown[]; newCase?: NewCaseAsk };
     if (!r.ok) a = { text: r.message, more: false };
@@ -277,7 +288,9 @@ export function ServicePlanner() {
   const box = (
     <SolBox
       id="service-ask"
-      onAsk={(q, files) => void ask(q, focus, files)}
+      onAsk={(q, files) => void ask(q, focus, files, replyTo)}
+      replyTo={replyTo}
+      onStopReply={() => setReplyTo(null)}
       asking={asking || !cases}
       placeholder={focus ? `Ask Sol about ${focus.customer.split(/\s+/)[0]}'s case` : "Ask Sol about your service cases"}
     />
@@ -340,16 +353,18 @@ export function ServicePlanner() {
                   </SolSays>
                 ) : (
                   <div key={t.id} className="space-y-4">
-                    <div className="flex justify-end">
+                    <div className="group/turn flex flex-col items-end">
                       <p className="max-w-[80%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-primary px-4 py-2.5 text-[15px] text-primary-ink">
-                        {t.q}
+                        <QuotedWords text={t.q} />
                       </p>
+                      <MessageTools text={t.q} onReply={() => replyToMessage("you", t.q)} className="mt-0.5" />
                     </div>
                     <SolSays>
                       <SolWorking busy={!t.a} />
                       {!t.a ? null : (
-                        <div className="text-[15px] leading-relaxed text-ink">
+                        <div className="group/turn text-[15px] leading-relaxed text-ink">
                           <Typed text={t.a.text} onDone={follow} />
+                          <MessageTools text={t.a.text} onReply={() => replyToMessage("sol", t.a!.text)} className="-ml-1.5 mt-1" />
                           {t.a.newCase && <div className="mt-3">{newCard(t.a.newCase)}</div>}
                           {t.a.designs?.length ? (
                             <div className="mt-3 max-w-2xl space-y-3">
