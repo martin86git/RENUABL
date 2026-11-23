@@ -122,17 +122,28 @@ const DEALS_SWITCH = [
   { href: PATHS.calls, label: "Calls", full: "Calls", icon: "calls" },
 ] as const;
 
-/** Proposals open: a ring not yet closed. Proposals closed: the ring complete, with its tick. */
+/**
+ * A proposal, as a page with its corner folded, holding a ring (23 Nov 2026, Martin: "proposals open icon contains an
+ * incomplete ring, proposals closed is a complete ring"): open, the ring not yet closed; closed, the ring complete.
+ */
 function ProposalRing({ closed }: { closed: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" className="size-[19px]" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+    <svg
+      viewBox="0 0 24 24"
+      className="size-[21px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M6.5 2.5h8l4 4v14a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-17a1 1 0 0 1 1-1z" />
+      <path d="M14.5 2.5v4h4" />
       {closed ? (
-        <>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="m8.4 12.2 2.4 2.4 4.8-5" strokeLinecap="round" strokeLinejoin="round" />
-        </>
+        <circle cx="12" cy="14" r="3.6" strokeWidth={2} />
       ) : (
-        <circle cx="12" cy="12" r="8.5" strokeDasharray="38 15.4" strokeLinecap="round" transform="rotate(-90 12 12)" />
+        <circle cx="12" cy="14" r="3.6" strokeWidth={2} strokeDasharray="15.5 7.1" transform="rotate(-90 12 14)" />
       )}
     </svg>
   );
