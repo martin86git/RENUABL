@@ -938,6 +938,7 @@ function Shell({
         home={PATHS.home}
         back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
         onSearch={retail ? () => setSearching(true) : undefined}
+        mail={retail ? { href: PATHS.inbox, count: mail, on: path.startsWith(PATHS.inbox) } : undefined}
         more={
           retail
             ? {

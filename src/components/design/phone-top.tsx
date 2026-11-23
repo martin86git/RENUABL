@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Menu, Search } from "lucide-react";
+import { ArrowLeft, Mail, Menu, Search } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 
@@ -16,12 +16,15 @@ export function PhoneTop({
   home,
   back,
   onSearch,
+  mail,
   more,
 }: {
   home: string;
   /** On a deal: where the way back goes and what it says. */
   back?: { href: string; label: string };
   onSearch?: () => void;
+  /** The inbox, with its unread count (23 Nov 2026, Martin: mail is checked from anywhere, so it sits up here). */
+  mail?: { href: string; count: number; on: boolean };
   /** A retailer's More, in the top right (23 Nov 2026, Martin: off the foot bar so Sol sits in its middle). */
   more?: { open: boolean; count: number; toggle: () => void };
 }) {
@@ -45,6 +48,25 @@ export function PhoneTop({
           </span>
         )}
       </button>
+    );
+  const mailButton = (small: boolean) =>
+    mail && (
+      <Link
+        href={mail.href}
+        aria-label={mail.count > 0 ? `Email, ${mail.count} unread` : "Email"}
+        className={clsx(
+          "relative flex items-center justify-center rounded-full text-ink",
+          small ? "size-8" : "size-9 ring-1 ring-line",
+          mail.on ? "bg-sun" : !small && "bg-surface",
+        )}
+      >
+        <Mail className={small ? "size-[15px]" : "size-4"} aria-hidden />
+        {mail.count > 0 && (
+          <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+            {mail.count > 99 ? "99+" : mail.count}
+          </span>
+        )}
+      </Link>
     );
   const row = useRef<HTMLDivElement>(null);
   const [gone, setGone] = useState(false);
@@ -71,17 +93,21 @@ export function PhoneTop({
             <Wordmark className="phone-wordmark text-[16px] transition-[font-size]" />
           </Link>
         )}
+        {mail && <div className="ml-auto">{mailButton(false)}</div>}
         {onSearch && (
           <button
             type="button"
             onClick={onSearch}
             aria-label="Search, or ask Sol"
-            className="ml-auto flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
+            className={clsx(
+              !mail && "ml-auto",
+              "flex size-9 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line",
+            )}
           >
             <Search className="size-4" aria-hidden />
           </button>
         )}
-        {more && <div className={onSearch ? "" : "ml-auto"}>{moreButton(false)}</div>}
+        {more && <div className={onSearch || mail ? "" : "ml-auto"}>{moreButton(false)}</div>}
       </div>
 
       {/* Once the row above has gone: the wordmark small, kept at the top of the screen. */}
@@ -107,6 +133,7 @@ export function PhoneTop({
             {/* Its own span: Wordmark's 20px would win over a size passed to it (cn only joins classes). */}
             <span className="select-none text-[11px] font-normal tracking-[0.34em] text-ink">RENUABL</span>
           </Link>
+          {mail && <div className={clsx("absolute", more ? "right-20" : "right-11")}>{mailButton(true)}</div>}
           {onSearch && (
             <button
               type="button"
