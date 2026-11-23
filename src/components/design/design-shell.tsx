@@ -52,7 +52,7 @@ import { RoutinesRound } from "./routines-round";
 import { AgentsWindow } from "./agents-window";
 import { SetupWizard } from "./setup-wizard";
 import { openSetup } from "@/lib/services/setup";
-import { TeamChatButton } from "./team-chat";
+import { TeamChatButton, useTeamUnread } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
@@ -132,6 +132,9 @@ const PHONE_TABS: PhoneTab[] = [
   { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
   { label: VOICE_TAB, href: PATHS.home, icon: PenTool, match: () => false },
+  // Team chat in the foot bar (22 Nov 2026, Martin: "we need to introduce the team chat into the bottom nav"): its own
+  // page on a phone, with this member's unread team lines on it.
+  { label: "Team", href: PATHS.team, icon: MessagesSquare, match: (p) => p.startsWith(PATHS.team) },
 ];
 
 /**
@@ -229,6 +232,8 @@ function Shell({
   const sections = withMarketing(KIND_SECTIONS[kind], Boolean(account?.signedIn && account.business));
   // How many of the customers' messages nobody has seen, the service cases to put right, and this member's unread mentions.
   const unread = useUnreadMessages(retail);
+  // This member's unread team chat lines, for the Team tab on a phone's foot bar.
+  const teamUnread = useTeamUnread();
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -693,6 +698,18 @@ function Shell({
         home={PATHS.home}
         back={/^\/design\/deals\/[^/]+$/.test(path) ? { href: PATHS.pipelines, label: "Deals" } : undefined}
         onSearch={retail ? () => setSearching(true) : undefined}
+        more={
+          retail
+            ? {
+                open: more,
+                count: unread,
+                toggle: () => {
+                  if (!more) leaveSol();
+                  setMore(!more);
+                },
+              }
+            : undefined
+        }
       />
 
       {tool ? (
@@ -725,6 +742,7 @@ function Shell({
         aria-label="Sections, on a phone"
         className={clsx(
           "phone-tabbar fixed inset-x-0 bottom-0 z-40 grid border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur print:hidden lg:hidden",
+          // A retailer's More is in the top right (23 Nov 2026, Martin), so five across with Sol in the middle.
           kind === "inspector" ? "grid-cols-6" : "grid-cols-5",
         )}
       >
@@ -733,13 +751,13 @@ function Shell({
           const sol =
             retail && i === 2 ? (
               <div key="sol" className="flex min-h-16 flex-col items-center justify-end gap-0.5 pb-1 text-[11px] font-medium text-ink">
-                <span className="-mt-5">
+                <span className="-mt-6">
                   <SolNavButton phone />
                 </span>
                 Sol
               </div>
             ) : null;
-          const n = t.href === PATHS.messages ? unread : 0;
+          const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : 0;
           if (retail && t.label === VOICE_TAB)
             return [
               sol,
@@ -787,31 +805,33 @@ function Shell({
             </Link>,
           ];
         })}
-        <button
-          type="button"
-          onClick={() => {
-            if (!more) leaveSol();
-            setMore(!more);
-          }}
-          aria-expanded={more}
-          className={clsx(
-            "flex flex-col items-center justify-center gap-1 font-medium",
-            retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
-            more ? "text-ink" : "text-muted",
-          )}
-        >
-          <span
-            className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
-          >
-            <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
-            {retail && unread > 0 && (
-              <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
-                {unread}
-              </span>
+        {!retail && (
+          <button
+            type="button"
+            onClick={() => {
+              if (!more) leaveSol();
+              setMore(!more);
+            }}
+            aria-expanded={more}
+            className={clsx(
+              "flex flex-col items-center justify-center gap-1 font-medium",
+              retail ? "min-h-16 text-[11px]" : "min-h-14 text-[10px]",
+              more ? "text-ink" : "text-muted",
             )}
-          </span>
-          More
-        </button>
+          >
+            <span
+              className={clsx("relative flex items-center justify-center rounded-full", retail ? "h-9 w-14" : "h-7 w-12", more && "bg-sun")}
+            >
+              <Menu className={retail ? "size-[22px]" : "size-[18px]"} aria-hidden />
+              {retail && unread > 0 && (
+                <span className="absolute -top-0.5 right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+                  {unread}
+                </span>
+              )}
+            </span>
+            More
+          </button>
+        )}
       </nav>
       {more && (
         <div className="fixed inset-0 z-30 lg:hidden" role="dialog" aria-label="Everything in RENUABL">
