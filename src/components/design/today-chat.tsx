@@ -45,7 +45,7 @@ import { loadPrepared } from "@/lib/services/prepared";
 import { CallLogPage } from "./call-log";
 import { ProposalsPage } from "./design-proposals-list";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
-import { StcNoticeCard } from "./stc-period";
+import { NoticeBulb, StcNoticeCard, useStcNotice } from "./stc-period";
 import { useDockSet } from "@/lib/services/dock-set";
 import { DOCK_SET_WORDS, installingOn } from "@/lib/domain/design/dock-set";
 import { INSTALLER_KEY } from "@/lib/domain/design/crm";
@@ -125,6 +125,8 @@ export function TodayChat(props: {
   const own = views?.[1];
   const mine = first?.scope === "me";
   const [tab, setTab] = useState<TrayTab | null>(null);
+  // Today's notices (only STC changes for now): a card under the tray, or a lightbulb on Sol's box once minimised.
+  const stc = useStcNotice();
   // The deals Sol has a suggestion on, for Needs you (the feed's own answer, read again as Sol's cards change).
   const [feed, setFeed] = useState<FeedDeal[] | null>(null);
   const readFeed = useCallback(async () => {
@@ -198,6 +200,18 @@ export function TodayChat(props: {
       <div data-tour="today-sol" className="relative z-10 mt-6 w-full">
         <SolBox
           tall
+          corner={
+            first && !mine ? (
+              <NoticeBulb
+                state={stc}
+                onOpen={() =>
+                  requestAnimationFrame(() =>
+                    document.getElementById("stc-notice")?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+                  )
+                }
+              />
+            ) : null
+          }
           onAsk={props.onAsk}
           asking={props.asking}
           placeholder={post ? DOCK_SET_WORDS.post.ask : mine ? "Ask Sol: how do I win a quiet deal back?" : DOCK_SET_WORDS.sales.ask}
@@ -233,7 +247,7 @@ export function TodayChat(props: {
       </div>
 
       {/* STC changes (stc-change.ts): one card under the tray, only for who may change settings, only while there is something to say. */}
-      {first && !mine && <StcNoticeCard className="mt-5 w-full text-left" />}
+      {first && !mine && <StcNoticeCard state={stc} className="mt-5 w-full text-left" />}
 
       {shown && (
         <div role="tabpanel" className={clsx("mt-5 text-left", wide ? "w-[min(72rem,calc(100vw-3rem))]" : "w-full")}>
