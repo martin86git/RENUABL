@@ -2107,3 +2107,25 @@ html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
     overscroll-behavior: none;
   }
 }
+
+/* Chat and Feed coming out of Sol on the phone's dock (23 Nov 2026, Martin). Each round starts inside Sol, small, and
+   flies to its place above him with a little overshoot. */
+.sol-fan-item {
+  transform: translate(var(--fan-x), var(--fan-y));
+  animation: sol-fan-out 0.34s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+@keyframes sol-fan-out {
+  from {
+    transform: translate(0, 0) scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: translate(var(--fan-x), var(--fan-y)) scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sol-fan-item {
+    animation: none;
+  }
+}

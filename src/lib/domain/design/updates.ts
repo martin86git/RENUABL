@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
     area: "Today",
-    words: "Business, Feed and Calendar are now three small rounds in Sol's box, in place of the switch over Today. The date is smaller.",
+    words: "Today is Sol's screen alone. The deal feed opens Deals, the calendar sits beside email, and Sol's round offers Chat or Feed.",
   },
   {
     day: "2026-11-23",

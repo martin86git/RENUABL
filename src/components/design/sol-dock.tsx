@@ -24,6 +24,7 @@ import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-sun";
 import { SolEtch } from "./sol-icon";
+import { SolFan } from "./sol-fan";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";
@@ -328,56 +329,73 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
     if (path === "/design") window.dispatchEvent(new Event(TODAY_FIRST));
     else router.push("/design?today=first");
   };
+  // On the phone, a press brings Chat and Feed out of him (23 Nov 2026, Martin): Chat is Today, Feed the deal feed.
+  const [fan, setFan] = useState<HTMLElement | null>(null);
+  const [fanPath, setFanPath] = useState(path);
+  if (fanPath !== path) {
+    setFanPath(path);
+    setFan(null);
+  }
+  const press = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!phone) return toggleSolHere(false);
+    if (dealSol) return window.dispatchEvent(new Event(DEAL_SOL_TOGGLE));
+    const at = e.currentTarget;
+    setFan((f) => (f ? null : at));
+  };
   return (
-    <button
-      type="button"
-      onClick={() => (phone ? goToday() : toggleSolHere(false))}
-      title={phone ? (dealSol ? "Sol on this deal" : "Today") : "Sol, your assistant"}
-      data-holding={phone && dealSol ? "" : undefined}
-      aria-label={
-        phone
-          ? dealSol
-            ? "Sol on this deal"
+    <>
+      {phone && fan && <SolFan anchor={fan} onChat={goToday} feedHref="/design/sales/feed" onClose={() => setFan(null)} />}
+      <button
+        type="button"
+        aria-expanded={phone && !dealSol ? Boolean(fan) : undefined}
+        onClick={press}
+        title={phone ? (dealSol ? "Sol on this deal" : "Chat or Feed") : "Sol, your assistant"}
+        data-holding={phone && dealSol ? "" : undefined}
+        aria-label={
+          phone
+            ? dealSol
+              ? "Sol on this deal"
+              : unread
+                ? `Sol: ${unread} unread. Chat or Feed`
+                : "Sol: Chat or Feed"
             : unread
-              ? `Today. Sol: ${unread} unread`
-              : "Today"
-          : unread
-            ? `Sol: ${unread} unread`
-            : "Sol, your assistant"
-      }
-      aria-pressed={open}
-      className={clsx(
-        "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
-        // On the bar he is a bulb: wider than the bar and standing out of its top, as team chat's round used to
-        // (20 Nov 2026, Martin: "lets make the Sol brain larger so sits like a bulb (like the chat used to)").
-        small ? "size-10" : rail ? "-mx-2 -mt-5 mb-0.5 size-16" : phone ? "size-[53px]" : "-my-2 size-12",
-      )}
-    >
-      {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
+              ? `Sol: ${unread} unread`
+              : "Sol, your assistant"
+        }
+        aria-pressed={open}
+        className={clsx(
+          "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
+          // On the bar he is a bulb: wider than the bar and standing out of its top, as team chat's round used to
+          // (20 Nov 2026, Martin: "lets make the Sol brain larger so sits like a bulb (like the chat used to)").
+          small ? "size-10" : rail ? "-mx-2 -mt-5 mb-0.5 size-16" : phone ? "size-[53px]" : "-my-2 size-12",
+        )}
+      >
+        {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
           panel is open and no stars (18 Nov 2026, Martin: "lose its halo ring and resemble the same as the sol icon in
           the right hand chat"). */}
-      <span className={clsx("sol-heartbeat inline-flex", phone && "sol-sun-face")}>
-        <SolMark
-          className={clsx(
-            "transition-transform duration-300 group-hover:scale-110",
-            small ? "size-8" : rail ? "size-10" : phone ? "size-11" : "size-[38px]",
-          )}
-        />
-      </span>
-      {/* On the post-sale dock he is his etched brain glowing lime in a graphite round, the tiles' family (23 Nov 2026,
+        <span className={clsx("sol-heartbeat inline-flex", phone && "sol-sun-face")}>
+          <SolMark
+            className={clsx(
+              "transition-transform duration-300 group-hover:scale-110",
+              small ? "size-8" : rail ? "size-10" : phone ? "size-11" : "size-[38px]",
+            )}
+          />
+        </span>
+        {/* On the post-sale dock he is his etched brain glowing lime in a graphite round, the tiles' family (23 Nov 2026,
           Martin: "imagine sol with all the orange taken away. The etch lines remain", then D of four); the sun fades
           out and the round in as the dock turns. */}
-      {phone && (
-        <span className="sol-etch-face pointer-events-none absolute inset-0 flex items-center justify-center rounded-full">
-          <SolEtch className="size-10" width={2.4} />
-        </span>
-      )}
-      {waiting && (
-        <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
-          {unread}
-        </span>
-      )}
-    </button>
+        {phone && (
+          <span className="sol-etch-face pointer-events-none absolute inset-0 flex items-center justify-center rounded-full">
+            <SolEtch className="size-10" width={2.4} />
+          </span>
+        )}
+        {waiting && (
+          <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
+            {unread}
+          </span>
+        )}
+      </button>
+    </>
   );
 }
 

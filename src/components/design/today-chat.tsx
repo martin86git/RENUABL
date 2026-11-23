@@ -6,7 +6,6 @@ import clsx from "clsx";
 import {
   ArrowRight,
   BatteryCharging,
-  CalendarDays,
   CircleAlert,
   Eye,
   FileCheck2,
@@ -16,7 +15,6 @@ import {
   Package,
   Phone,
   PhoneCall,
-  Rows3,
   Sparkles,
   Stamp,
   TrendingUp,
@@ -26,7 +24,6 @@ import type { ISODate } from "@/lib/domain/types";
 import type { NextItem } from "@/lib/domain/design/next-up";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
-import type { TodayView } from "@/lib/domain/design/today-view";
 import { dollars, loadWeather, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
 import { todayHeading } from "@/lib/domain/design/today-view";
@@ -131,8 +128,6 @@ export function TodayChat(props: {
   today: ISODate;
   /** What needs the member now, most pressing first (next-up.ts). */
   items: NextItem[] | null;
-  /** Business, Feed and the calendar, in the foot of Sol's box (`TodayViews`). */
-  viewRounds?: React.ReactNode;
 }) {
   const views = Array.isArray(props.views) ? props.views : null;
   const first = views?.[0];
@@ -214,7 +209,6 @@ export function TodayChat(props: {
           tall
           onAsk={props.onAsk}
           asking={props.asking}
-          extras={props.viewRounds}
           placeholder={post ? DOCK_SET_WORDS.post.ask : mine ? "Ask Sol: how do I win a quiet deal back?" : DOCK_SET_WORDS.sales.ask}
         />
       </div>
@@ -425,64 +419,6 @@ function InsightRow({ insight }: { insight: Insight }) {
         {insight.action.label} <ArrowRight className="size-3.5" aria-hidden />
       </Link>
     </div>
-  );
-}
-
-/**
- * Business (or My month), Feed and the calendar, as three small rounds in the foot of Sol's box (23 Nov 2026, Martin: the
- * switch over Today was "filling the page with buttons eroding and diluting its simple sophistication"; "incorporate into
- * the chat box"). The one on show is lit and says its name; the others are icons with their names as titles.
- */
-export function TodayViews({
-  view,
-  onView,
-  first,
-  small = false,
-}: {
-  view: TodayView;
-  onView: (v: TodayView) => void;
-  first: string;
-  /** In the one-line box: icons only, the one on show lit, so the box keeps room to type. */
-  small?: boolean;
-}) {
-  // On the dock's post-sale tools, Feed is Jobs (the jobs under way, not the deals).
-  const post = useDockSet() === "post";
-  const tabs = [
-    ["chat", first, TrendingUp],
-    ["feed", DOCK_SET_WORDS[post ? "post" : "sales"].feed, post ? HardHat : Rows3],
-    ["calendar", "Calendar", CalendarDays],
-  ] as const;
-  return (
-    <span data-tour="today-switch" className="inline-flex">
-      <span role="tablist" aria-label="Today" className="inline-flex items-center gap-0.5">
-        {tabs.map(([v, label, Icon]) => {
-          const on = view === v;
-          return (
-            <button
-              key={v}
-              type="button"
-              role="tab"
-              aria-selected={on}
-              aria-label={label}
-              title={label}
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={() => onView(v)}
-              className={clsx(
-                "inline-flex h-8 items-center gap-1.5 rounded-full text-[12px] font-medium transition-colors",
-                on && !small
-                  ? "bg-canvas px-2.5 text-ink ring-1 ring-line"
-                  : on
-                    ? "w-8 justify-center bg-canvas text-ink ring-1 ring-line"
-                    : "w-8 justify-center text-ink-2 hover:bg-canvas hover:text-ink",
-              )}
-            >
-              <Icon className={clsx("size-[15px]", on && "text-sun-line")} aria-hidden />
-              {on && !small && <span>{label}</span>}
-            </button>
-          );
-        })}
-      </span>
-    </span>
   );
 }
 
