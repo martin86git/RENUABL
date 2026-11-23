@@ -1930,39 +1930,71 @@ html:has(.sales-snap) {
 }
 
 /* The dock's two sets of tools (23 Nov 2026, Martin: a solar business's owner wears every hat; a ball in a lip on the
-   dock turns it like a slot machine between the sales tools and the post-sale ones). The post-sale dock is workwear navy
-   (Martin chose navy over graphite, which the app already uses everywhere); each reel holds a sales tool over its post
-   sale one and slides with a little overshoot, one after another. Sol never turns. */
+   dock turns it like a slot machine between the sales tools and the post-sale ones). Both docks are glass: frosted,
+   the page blurred and brightened through them, a fine light along the top edge (Martin: "a little bit of a glass
+   look"). Each reel holds a sales tool over its post-sale one and slides with a
+   little overshoot, one after another. Sol never turns. */
 :root {
-  --dock-post: #15233a;
-  --dock-post-line: rgb(255 255 255 / 0.1);
+  --dock-post: #d6ff3d;
+}
+.phone-tabbar {
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.82), rgb(250 250 251 / 0.74));
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 -6px 24px -12px rgb(20 22 26 / 0.18);
 }
 .phone-tabbar[data-dock] {
   transition:
-    background-color 450ms ease,
-    border-color 450ms ease;
+    border-color 450ms ease,
+    box-shadow 450ms ease;
 }
+/* The post-sale dock is the same white glass, with a hi-vis stripe along its top edge like the reflective strip on a site
+   vest, and lime in its tools (23 Nov 2026, Martin chose E of six over the lime glass, which fought the greys). */
 .phone-tabbar[data-dock="post"] {
-  background-color: var(--dock-post);
-  border-color: var(--dock-post-line);
+  border-top-color: var(--dock-post);
+  box-shadow:
+    inset 0 2px 0 var(--dock-post),
+    inset 0 3px 0 rgb(255 255 255 / 0.9),
+    0 -6px 24px -12px rgb(20 22 26 / 0.18);
 }
-.phone-tabbar[data-dock="post"] .dock-sol {
-  color: #f2f3f5;
+/* A post-sale tool: a graphite tile lit from above, a fine light rim and a soft shadow on the lime. */
+.dock-tile {
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #474b52, #24262a);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 3px 8px -2px rgb(40 50 0 / 0.45);
+}
+.dock-tile-lit {
+  box-shadow:
+    0 0 0 2px #fff,
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 4px 12px -2px rgb(40 50 0 / 0.55);
 }
 .dock-reel {
   transition: transform 620ms cubic-bezier(0.25, 1.55, 0.45, 1);
 }
 /* The lip: a rounded bump rising out of the dock's top edge above Team, the dock's own colour, holding the ball. */
 .dock-lip {
-  background-color: var(--surface);
+  background-color: rgb(255 255 255 / 0.82);
   border-color: var(--line);
+  backdrop-filter: blur(18px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9);
   transition:
     background-color 450ms ease,
     border-color 450ms ease;
 }
+/* On the post-sale dock the stripe runs up and round the lip: the lip reaches down over the stripe under it, so the
+   stripe never crosses its mouth. */
 .phone-tabbar[data-dock="post"] .dock-lip {
-  background-color: var(--dock-post);
-  border-color: var(--dock-post-line);
+  border-color: var(--dock-post);
+  border-width: 3px 3px 0;
+  height: 48px;
+  top: -45px;
+  z-index: 1;
+  background-color: rgb(251 251 252);
 }
 /* The ball: a graphite orb, lit from the upper left. */
 .dock-ball {
@@ -1987,7 +2019,9 @@ html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .dock-reel,
+  .dock-reel {
+    transition: none;
+  }
   .dock-ball-pull {
     animation: none;
   }
