@@ -9,6 +9,8 @@ import {
   SOL_ASK,
   SOL_CHANGED,
   SOL_DRAFT,
+  DEAL_SOL_STATE,
+  DEAL_SOL_TOGGLE,
   SOL_INDUCTION,
   SOL_STATE,
   SOL_TOGGLE,
@@ -272,6 +274,18 @@ export function useSolUnread(): number {
   return n;
 }
 
+/** Whether a deal's Sol sheet is folded into the phone's foot bar round (`data-deal-sol-tucked`, `DEAL_SOL_STATE`). */
+function useDealSolTucked(): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    const read = () => setHeld(document.documentElement.dataset.dealSolTucked === "1" && document.documentElement.dataset.dealSol === "1");
+    read();
+    window.addEventListener(DEAL_SOL_STATE, read);
+    return () => window.removeEventListener(DEAL_SOL_STATE, read);
+  }, []);
+  return held;
+}
+
 /** Whether Sol's panel is open, as it says (`SOL_STATE`). */
 export function useSolOpen(): boolean {
   const [open, setOpen] = useState(false);
@@ -302,7 +316,11 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
   // On the phone's foot bar he takes you to Today's first view, Business or My month (22 Nov 2026, Martin: "tapping
   // the centre sol icon in the dock should actually avail the today business page"); his chat opens from the small
   // boxes on a deal and the feed as soon as something is typed in them.
+  const dealSol = useDealSolTucked();
   const goToday = () => {
+    // On a deal, Sol folded away sits in this round (22 Nov 2026, Martin: "he should minimise visually onto the centre
+    // sol icon so the user can see that's where they can re-engage Sol on the deal"): a press brings him back out.
+    if (dealSol) return window.dispatchEvent(new Event(DEAL_SOL_TOGGLE));
     if (open) toggleSolHere(false);
     if (path === "/design") window.dispatchEvent(new Event(TODAY_FIRST));
     else router.push("/design?today=first");
@@ -311,8 +329,19 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
     <button
       type="button"
       onClick={() => (phone ? goToday() : toggleSolHere(false))}
-      title={phone ? "Today" : "Sol, your assistant"}
-      aria-label={phone ? (unread ? `Today. Sol: ${unread} unread` : "Today") : unread ? `Sol: ${unread} unread` : "Sol, your assistant"}
+      title={phone ? (dealSol ? "Sol on this deal" : "Today") : "Sol, your assistant"}
+      data-holding={phone && dealSol ? "" : undefined}
+      aria-label={
+        phone
+          ? dealSol
+            ? "Sol on this deal"
+            : unread
+              ? `Today. Sol: ${unread} unread`
+              : "Today"
+          : unread
+            ? `Sol: ${unread} unread`
+            : "Sol, your assistant"
+      }
       aria-pressed={open}
       className={clsx(
         "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
