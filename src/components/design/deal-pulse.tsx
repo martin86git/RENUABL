@@ -113,20 +113,32 @@ export function DealPulseBadges({ clock, heat }: { clock: DealClock | null; heat
 }
 
 /** On a board card: the temperature as a dot, the clock in words, and "Call first" for the top three. */
-export function PulseMarks({ pulse, end }: { pulse: DealPulse | undefined; end?: ReactNode }) {
+export function PulseMarks({ pulse, end, short }: { pulse: DealPulse | undefined; end?: ReactNode; short?: boolean }) {
   if (!pulse) return end ? <p className="mt-1.5 flex items-center justify-end text-[11px]">{end}</p> : null;
   const h = HEAT[pulse.heat.heat];
+  // `short`: on a phone the narrow pipeline card says it in fewer letters (24 Nov 2026, Martin: "these cards don't need
+  // to be as wide"): "#2" for Call first 2, the heat as its dot alone, "17d left" for 17 days left. Computers unchanged.
+  const left = pulse.clock.left;
+  const shortClock = left > 0 ? `${left}d left` : left === 0 ? "Last day" : `${-left}d over`;
+  const phone = short ? "sm:hidden" : "hidden";
+  const wide = short ? "max-sm:hidden" : "";
   return (
     <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-      {pulse.rank && <span className="rounded-full bg-sun-line px-1.5 py-0.5 font-semibold text-white">Call first {pulse.rank}</span>}
-      <span
-        className="inline-flex items-center gap-1 text-ink-2"
-        title={pulse.heat.reasons.map((r) => r.text).join("\n") || "Nothing to go on yet"}
-      >
+      {pulse.rank && (
+        <span className="rounded-full bg-sun-line px-1.5 py-0.5 font-semibold text-white" title={`Call first ${pulse.rank}`}>
+          <span className={wide}>Call first {pulse.rank}</span>
+          <span className={phone}>#{pulse.rank}</span>
+        </span>
+      )}
+      <span className="inline-flex items-center gap-1 text-ink-2" title={[h.label, ...pulse.heat.reasons.map((r) => r.text)].join("\n")}>
         <span className={clsx("size-1.5 rounded-full", h.dot)} aria-hidden />
-        {h.label}
+        <span className={wide}>{h.label}</span>
+        {short && <span className="sr-only sm:hidden">{h.label}</span>}
       </span>
-      <span className={clsx("tabular-nums", BAND[pulse.clock.band].text)}>· {pulse.clock.words}</span>
+      <span className={clsx("tabular-nums", BAND[pulse.clock.band].text)}>
+        <span className={wide}>· {pulse.clock.words}</span>
+        <span className={phone}>{shortClock}</span>
+      </span>
       {end && <span className="ml-auto">{end}</span>}
     </p>
   );
