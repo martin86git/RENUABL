@@ -86,6 +86,7 @@ export function SolDock() {
     return () => window.removeEventListener("keydown", key);
   }, [shown]);
   const width = useSolWidth();
+  const fit = useFitToKeyboard(shown);
   return (
     <>
       {open && tucked && (
@@ -102,8 +103,9 @@ export function SolDock() {
       <aside
         aria-label="Sol"
         aria-hidden={!shown}
+        style={fit}
         className={clsx(
-          "fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
+          "sol-panel fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
           shown
             ? "translate-x-0 shadow-2xl min-[1440px]:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]"
             : "pointer-events-none invisible translate-x-full",
@@ -341,4 +343,34 @@ export function SolRail({
       {routines}
     </aside>
   );
+}
+
+/**
+ * On a phone the panel follows the part of the screen the keyboard leaves (23 Nov 2026, Martin: with the keyboard up
+ * in Safari the panel stopped short and the page showed under it). Safari keeps a fixed panel on the whole page while
+ * the keyboard is up and scrolls the page under it, so the panel is set to the visible part (`visualViewport`) and the
+ * page behind it is held still. A wide screen keeps the panel as it is (globals.css reads these only under 1024px).
+ */
+function useFitToKeyboard(shown: boolean): React.CSSProperties | undefined {
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!shown || !vv || window.matchMedia("(min-width: 1024px)").matches) {
+      queueMicrotask(() => setBox(null));
+      return;
+    }
+    const root = document.documentElement;
+    root.classList.add("sol-phone-open");
+    const fit = () => setBox({ top: Math.max(0, vv.offsetTop), height: vv.height });
+    fit();
+    vv.addEventListener("resize", fit);
+    vv.addEventListener("scroll", fit);
+    return () => {
+      vv.removeEventListener("resize", fit);
+      vv.removeEventListener("scroll", fit);
+      root.classList.remove("sol-phone-open");
+    };
+  }, [shown]);
+  if (!box) return undefined;
+  return { ["--vv-top" as string]: `${box.top}px`, ["--vv-h" as string]: `${box.height}px` };
 }
