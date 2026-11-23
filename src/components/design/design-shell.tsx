@@ -61,6 +61,7 @@ import { SetupWizard } from "./setup-wizard";
 import { openSetup } from "@/lib/services/setup";
 import { TeamChatButton, useTeamUnread } from "./team-chat";
 import { DayWeather, ProfileMenu, TopIcon } from "./shell-menus";
+import { MoreProfile, MoreUsage } from "./more-sheet";
 import { RenuablMark } from "./business-loading";
 import { QuickCalc } from "./quick-calc";
 import { BackToTop } from "./back-to-top";
@@ -510,6 +511,38 @@ function Shell({
         })}
       </nav>
     ) : null;
+  // The More sheet: what the dock on show already reaches isn't repeated (23 Nov 2026, Martin). Sol's round goes to
+  // Today and the designer is on every designing dock, so both are always left out.
+  const dockTabs = retail ? DOCK_TABS[dock] : (KIND_TABS[kind as Exclude<BusinessKind, "retailer">] ?? []);
+  const docked = (href: string) =>
+    href === PATHS.home || href === PATHS.designer || dockTabs.some((t) => t.label !== VOICE_TAB && t.href === href);
+  const inboxLinks = [
+    { label: "Team chat", href: PATHS.team, n: teamUnread },
+    ...(retail
+      ? [
+          { label: "Messages from customers", href: PATHS.messages, n: unread },
+          { label: "Notifications", href: PATHS.notifications, n: mentions },
+          { label: "Email", href: PATHS.inbox, n: mail },
+        ]
+      : []),
+  ];
+  const renuablLinks = [
+    ...(retail ? [{ label: "Sol: reminders and what he knows", href: PATHS.sol, n: 0 }] : []),
+    { label: "Industry news", href: "/design/news", n: 0 },
+    { label: "Updates", href: PATHS.updates, n: updates },
+    { label: "Feedback", href: PATHS.feedback, n: 0 },
+  ];
+  const linkRow = (r: { label: string; href: string; n: number }) => (
+    <Link
+      key={r.href}
+      href={r.href}
+      onClick={() => setMore(false)}
+      className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
+    >
+      <span className="flex-1">{r.label}</span>
+      {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
+    </Link>
+  );
   /** One place on the phone's foot bar. `dark`: a post-sale or Marketplace tool, drawn as a graphite tile. */
   const tabFor = (t: PhoneTab, dark: boolean, glyph = "text-[#d6ff3d]") => {
     if (retail && t.label === VOICE_TAB)
@@ -1011,78 +1044,45 @@ function Shell({
           <button type="button" aria-label="Close" className="absolute inset-0 bg-ink/40" onClick={() => setMore(false)} />
           <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-[2rem] bg-surface px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3">
             <span className="mx-auto block h-1 w-10 rounded-full bg-line" aria-hidden />
-            {retail && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMore(false);
-                  setSearching(true);
-                }}
-                className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
-              >
-                <Search className="size-5" aria-hidden /> Search, or ask Sol
-              </button>
-            )}
-            {designsRoofs(kind) && (
-              <Link
-                href={PATHS.designer}
-                onClick={() => setMore(false)}
-                className="mt-2 flex min-h-12 items-center gap-3 rounded-xl bg-sun-line px-3 text-base font-medium text-white"
-              >
-                <PenTool className="size-5" aria-hidden /> Design tool
-              </Link>
-            )}
-            {sections.map((sec) => (
-              <div key={sec.id}>
-                <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
-                {sec.pages.map((p) => (
-                  <Link
-                    key={p.id}
-                    href={p.href}
-                    onClick={() => setMore(false)}
-                    className={clsx(
-                      "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
-                      here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
-                    )}
-                  >
-                    <span className="flex-1">{p.label}</span>
-                    {count(p.id) > 0 && (
-                      <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            ))}
-            <div className="mt-4 border-t border-line pt-2">
-              {[
-                ...(retail ? [{ label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 }] : []),
-                { label: "Team chat", href: PATHS.team, n: 0 },
-                ...(retail
-                  ? [
-                      { label: "Messages", href: PATHS.messages, n: unread },
-                      { label: "Notifications", href: PATHS.notifications, n: mentions },
-                      { label: "Email", href: PATHS.inbox, n: mail },
-                    ]
-                  : []),
-                { label: "Updates", href: PATHS.updates, n: updates },
-                { label: "Feedback", href: PATHS.feedback, n: 0 },
-                ...(kind !== "inspector" ? [{ label: "Usage", href: `${PATHS.settings}/usage`, n: 0 }] : []),
-                { label: "Settings", href: PATHS.settings, n: 0 },
-                { label: "Your account", href: PATHS.account, n: 0 },
-              ].map((r) => (
-                <Link
-                  key={r.href}
-                  href={r.href}
-                  onClick={() => setMore(false)}
-                  className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
-                >
-                  <span className="flex-1">{r.label}</span>
-                  {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
-                </Link>
-              ))}
-            </div>
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-line px-3 pt-4 text-sm text-muted">
-              <span className="truncate">{account.email}</span>
+            {/* A menu, not a summary (23 Nov 2026, Martin): you first (your profile and its settings), then this
+                month's usage, then where things come in, the rest of the product, and RENUABL's own. */}
+            <MoreProfile
+              email={account.email}
+              firstName={account.firstName}
+              business={account.business?.name}
+              onGo={() => setMore(false)}
+            />
+            <MoreUsage billing={!!account.may?.prices} onGo={() => setMore(false)} />
+            <p className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Coming in</p>
+            {inboxLinks.filter((r) => !docked(r.href)).map(linkRow)}
+            {sections.map((sec) => {
+              const pages = sec.pages.filter((p) => !docked(p.href));
+              if (!pages.length) return null;
+              return (
+                <div key={sec.id}>
+                  <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
+                  {pages.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={p.href}
+                      onClick={() => setMore(false)}
+                      className={clsx(
+                        "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
+                        here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
+                      )}
+                    >
+                      <span className="flex-1">{p.label}</span>
+                      {count(p.id) > 0 && (
+                        <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              );
+            })}
+            <p className="px-3 pb-1 pt-5 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">RENUABL</p>
+            {renuablLinks.map(linkRow)}
+            <div className="mt-4 flex items-center gap-3 border-t border-line px-3 pt-4 text-base">
               <SignOut className="font-medium text-ink-2" />
             </div>
           </div>
