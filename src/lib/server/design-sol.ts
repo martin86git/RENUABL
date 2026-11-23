@@ -82,6 +82,8 @@ import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
 import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
 import { channelContext, solSaysInTeam, teamChannelLabel } from "./design-team-repo";
 import { query } from "./db";
+import { contactCounts } from "./design-contact-counts";
+import { cleanSinceDay, contactCountsWords } from "@/lib/domain/design/contact-counts";
 import { dealTeamContext, solPostsOnDeal } from "./design-deal-team-repo";
 import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
@@ -175,6 +177,15 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       'The deals at a stage (say "lead", "proposal sent", "won", "installed"; part of the name will do), longest unchanged first, each with how many days since it last changed. With no stage, every stage and how many deals it holds.',
     input_schema: { type: "object", properties: { stage: { type: "string" } } },
+  },
+  {
+    name: "contact_counts",
+    description:
+      'How many people the business has: everyone on the books (customers with a job installed, and contacts), by where they came from, what was brought in from Pylon or a CRM export sheet and when, how many were added since the last import finished, and, with since_day, how many were added since that day. Use it for questions like "how many contacts do I have" or "how many since the Pylon import". Only for someone who sees every deal.',
+    input_schema: {
+      type: "object",
+      properties: { since_day: { type: "string", description: "Optional: a day as YYYY-MM-DD, to count those added since it." } },
+    },
   },
   {
     name: "draft_email",
@@ -527,6 +538,10 @@ async function runTool(
       .join("\n");
   }
   if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket(), await stageNamesOf(businessId));
+  if (name === "contact_counts") {
+    if (!viewer.all) return "This person sees only some of the business's deals, so the business's own counts aren't theirs to read.";
+    return contactCountsWords(await contactCounts(businessId, cleanSinceDay(input.since_day)));
+  }
   if (name === "price_lookup") {
     if (!can(member.role, "costs", member.permissions)) return "This person can't see costs.";
     const words = s(input.query).toLowerCase().split(/\s+/).filter(Boolean);

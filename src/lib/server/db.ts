@@ -1593,6 +1593,32 @@ create table if not exists sessions (
   expires_at timestamptz not null,
   created_at timestamptz not null default now()
 );
+-- The screen lock (domain/design/screen-lock.ts, server/screen-lock.ts): when the session was last really used, wrong
+-- unlock tries, and a passkey challenge in flight.
+alter table sessions add column if not exists active_at timestamptz;
+alter table sessions add column if not exists unlock_tries integer not null default 0;
+alter table sessions add column if not exists lock_challenge text;
+create index if not exists sessions_email on sessions(email);
+-- A person's lock PIN (scrypt, never the PIN) and their passkeys (Face ID, Touch ID, Windows Hello), by business.
+create table if not exists design_lock_pins (
+  business_id text not null,
+  email text not null,
+  hash text not null,
+  created_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
+create table if not exists design_passkeys (
+  id text primary key,
+  business_id text not null,
+  email text not null,
+  public_key bytea not null,
+  counter bigint not null default 0,
+  transports text[] not null default '{}',
+  name text not null,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz
+);
+create index if not exists design_passkeys_owner on design_passkeys(business_id, email);
 -- The assistant's phone calls on a CRM deal (server/voice-calls.ts, Vapi): one row a run of calls on a deal (a new Kept after the businesses table it points at, so a new database is made in order.
 -- lead, or a customer who asked to be called about their proposal), and one event a call ended or a tool used. What
 -- happened is also written on the deal's own record. Never HubSpot.

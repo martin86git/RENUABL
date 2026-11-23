@@ -31,12 +31,24 @@ export function RingMe({ caller }: { caller: CallerState }) {
   const [busy, setBusy] = useState<"train" | "test" | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const wrap = useRef<HTMLSpanElement>(null);
+  // Where the card sits under the button, kept inside the screen (23 Nov 2026, Martin: on a phone it ran off the right).
+  const [place, setPlace] = useState<{ left: number; width: number } | null>(null);
   const name = caller.name;
   const train = TRAINING_COPY.train(name);
   const test = TRAINING_COPY.test(name);
 
   useEffect(() => {
     if (!open) return;
+    const fit = () => {
+      const box = wrap.current?.getBoundingClientRect();
+      if (!box) return;
+      const gutter = 8;
+      const width = Math.min(320, window.innerWidth - gutter * 2);
+      const left = Math.min(0, window.innerWidth - gutter - width - box.left);
+      setPlace({ left: Math.max(gutter - box.left, left), width });
+    };
+    fit();
+    window.addEventListener("resize", fit);
     const away = (e: MouseEvent) => !wrap.current?.contains(e.target as Node) && setOpen(false);
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -46,6 +58,7 @@ export function RingMe({ caller }: { caller: CallerState }) {
     window.addEventListener("mousedown", away);
     window.addEventListener("keydown", key, true);
     return () => {
+      window.removeEventListener("resize", fit);
       window.removeEventListener("mousedown", away);
       window.removeEventListener("keydown", key, true);
     };
@@ -100,13 +113,16 @@ export function RingMe({ caller }: { caller: CallerState }) {
         <div
           role="dialog"
           aria-label={TRAINING_COPY.modeTitle}
-          className="absolute left-0 top-10 z-20 w-80 space-y-2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line"
+          style={place ? { left: place.left, width: place.width } : undefined}
+          className="absolute left-0 top-10 z-20 w-80 max-w-[calc(100vw-1rem)] space-y-2 rounded-2xl bg-surface p-3 text-ink shadow-lift ring-1 ring-line"
         >
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Have {name} ring you</p>
           {choice("train", train)}
           {choice("test", test)}
           {said ? (
-            <p className="text-xs text-danger">{said}</p>
+            <p className="text-xs text-danger" role="alert">
+              {said}
+            </p>
           ) : (
             <p className="text-xs leading-snug text-muted">
               {TRAINING_COPY.rings} On a training call, try: {TRAINING_COPY.tryThese.join(" · ")}

@@ -52,6 +52,8 @@ export async function GET() {
         members: can(member.role, "members", member.permissions),
       },
       termsVersion: BUSINESS_TERMS_VERSION,
+      // The screen lock (screen-lock.ts): the shell covers itself until it is unlocked.
+      ...(access.state === "ready" && access.locked ? { locked: true } : {}),
       ...(planDue ? { needsPlan: true } : {}),
       ...(marketing ? { marketing: true } : {}),
       // A demo account (demo.ts): no plan asked for, and the shell says it is a demo.
