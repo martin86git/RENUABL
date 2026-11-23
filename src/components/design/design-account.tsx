@@ -35,6 +35,7 @@ import { PlanCodeField, type AppliedCode } from "./plan-code-field";
 import { PLAN_CODE_WORDS } from "@/lib/domain/design/plan-codes";
 import { MemberAvatar } from "./member-avatar";
 import { SignInPageSection } from "./sign-in-page-section";
+import { ScreenLockSection } from "./screen-lock-settings";
 import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from "@/lib/services/design-store";
 
 const SIGN_IN = "/design/sign-in";
@@ -673,6 +674,8 @@ export function DesignAccountPage() {
         />
 
         <PasswordSection />
+
+        {!account.viewedBy && <ScreenLockSection />}
 
         <section className={card} aria-labelledby="people">
           <h2 id="people" className="text-[19px] tracking-tight text-ink">

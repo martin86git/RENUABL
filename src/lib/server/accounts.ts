@@ -67,6 +67,8 @@ export interface Session {
   email: string;
   role: AccountRole;
   partner: PartnerRow | null;
+  /** When the session was last really used, for the screen lock (null before it was first recorded). */
+  activeAt?: Date | null;
 }
 
 /** The signed-in account, if any. Partners must still be approved; staff must still be listed. */
@@ -96,8 +98,8 @@ export async function readSession(sessionId?: string): Promise<Session | null> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const s = (
-        await query<{ email: string; role: AccountRole; expires_at: Date }>(
-          `select email, role, expires_at from sessions where id_hash = $1 and expires_at > now()`,
+        await query<{ email: string; role: AccountRole; expires_at: Date; active_at: Date | null }>(
+          `select email, role, expires_at, active_at from sessions where id_hash = $1 and expires_at > now()`,
           [hash(id)],
         )
       )[0];
@@ -108,7 +110,9 @@ export async function readSession(sessionId?: string): Promise<Session | null> {
           hash(id),
           String(SESSION_DAYS),
         ]).catch(() => undefined);
-      const who = { email: s.email, role: s.role };
+      // The screen lock counts from now for a session from before it (never fails the check).
+      if (!s.active_at) await query(`update sessions set active_at = now() where id_hash = $1`, [hash(id)]).catch(() => undefined);
+      const who = { email: s.email, role: s.role, activeAt: s.active_at ? new Date(s.active_at) : null };
       if (s.role === "staff") return isStaff(s.email) ? { ...who, partner: null } : null;
       if (s.role === "partner") {
         const partner = await partnerByEmail(s.email);
