@@ -1936,6 +1936,7 @@ html:has(.sales-snap) {
    little overshoot, one after another. Sol never turns. */
 :root {
   --dock-post: #d6ff3d;
+  --dock-market: #2f6fe4;
 }
 .phone-tabbar {
   background: linear-gradient(to bottom, rgb(255 255 255 / 0.82), rgb(250 250 251 / 0.74));
@@ -1977,14 +1978,47 @@ html:has(.sales-snap) {
 .sol-sun-face {
   transition: opacity 450ms ease;
 }
-.phone-tabbar[data-dock="post"] .sol-etch-face {
+.phone-tabbar[data-dock="post"] .sol-etch-face,
+/* The Marketplace's blue round rising into Sol's place in the middle of the dock. */
+.dock-market-centre {
+  transition:
+    opacity 300ms ease,
+    transform 520ms cubic-bezier(0.25, 1.55, 0.45, 1);
+}
+.dock-market-centre:not(.dock-market-in) {
+  transform: translateY(14px) scale(0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-market-centre {
+    transition: none;
+  }
+}
+.phone-tabbar[data-dock="market"] .sol-etch-face {
   opacity: 1;
 }
-.phone-tabbar[data-dock="post"] .sol-sun-face {
+.phone-tabbar[data-dock="post"] .sol-sun-face,
+.phone-tabbar[data-dock="market"] .sol-sun-face {
   opacity: 0;
 }
-.phone-tabbar[data-dock="post"] .sol-orb {
+.phone-tabbar[data-dock="post"] .sol-orb,
+.phone-tabbar[data-dock="market"] .sol-orb {
   box-shadow: none;
+}
+/* The Marketplace's dock (23 Nov 2026, Martin: a third position for the ball): the same white glass with the
+   Marketplace's blue along its top edge and round the lip, its tools graphite tiles with a light blue glyph, and Sol's
+   etched brain in that blue. */
+.phone-tabbar[data-dock="market"] {
+  border-top-color: var(--dock-market);
+  box-shadow:
+    inset 0 2px 0 var(--dock-market),
+    inset 0 3px 0 rgb(255 255 255 / 0.9),
+    0 -6px 24px -12px rgb(20 22 26 / 0.18);
+}
+.phone-tabbar[data-dock="market"] .sol-etch-face {
+  color: #8fb8ff;
+}
+.phone-tabbar[data-dock="market"] .sol-etch-face svg {
+  filter: drop-shadow(0 0 3px rgb(143 184 255 / 0.8));
 }
 /* A post-sale tool: a graphite tile lit from above, a fine light rim and a soft shadow on the lime. */
 .dock-tile {
@@ -2016,13 +2050,17 @@ html:has(.sales-snap) {
 }
 /* On the post-sale dock the stripe runs up and round the lip: the lip reaches down over the stripe under it, so the
    stripe never crosses its mouth. */
-.phone-tabbar[data-dock="post"] .dock-lip {
+.phone-tabbar[data-dock="post"] .dock-lip,
+.phone-tabbar[data-dock="market"] .dock-lip {
   border-color: var(--dock-post);
   border-width: 3px 3px 0;
   height: 48px;
   top: -45px;
   z-index: 1;
   background-color: rgb(251 251 252);
+}
+.phone-tabbar[data-dock="market"] .dock-lip {
+  border-color: var(--dock-market);
 }
 /* The ball: a graphite orb, lit from the upper left. */
 .dock-ball {
