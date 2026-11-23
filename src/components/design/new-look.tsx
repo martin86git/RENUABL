@@ -155,6 +155,12 @@ export function Spotlight({
             <span className="font-semibold">{step.what}</span> {step.now}
           </p>
           <div className="mt-3 flex items-center gap-2">
+            {/* Skip ends the tour at any step (24 Nov 2026, Martin: "you should be able to exit the tour… by clicking skip"). */}
+            {n + 1 < steps.length && (
+              <button type="button" onClick={onEnd} className="rounded-full px-2 py-1 text-sm text-muted hover:text-ink">
+                Skip
+              </button>
+            )}
             {n > 0 && (
               <button type="button" onClick={() => go(n - 1)} className="rounded-full px-3 py-1 text-sm text-ink-2 hover:text-ink">
                 Back
