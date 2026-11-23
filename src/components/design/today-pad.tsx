@@ -37,7 +37,8 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
-import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { TODAY_CALENDAR, TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { TodayCalendar } from "./today-calendar";
 import { InstallListPage } from "./install-lists";
 import { useDockSet } from "@/lib/services/dock-set";
 import { TODAY_FIRST } from "@/lib/services/sol";
@@ -142,6 +143,7 @@ export function TodayPad(props: {
   // browser's agree; until then neither is drawn.
   const [view, setViewState] = useState<TodayView | null>(props.welcome ? "chat" : null);
   const onFeed = view === "feed";
+  const onCal = view === "calendar";
   const setView = useCallback(
     (v: TodayView) => {
       setViewState(v);
@@ -189,6 +191,15 @@ export function TodayPad(props: {
     };
     window.addEventListener(TODAY_FIRST, first);
     return () => window.removeEventListener(TODAY_FIRST, first);
+  }, [setView]);
+  // The date heading opens the calendar (today-chat.tsx).
+  useEffect(() => {
+    const cal = () => {
+      setView("calendar");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener(TODAY_CALENDAR, cal);
+    return () => window.removeEventListener(TODAY_CALENDAR, cal);
   }, [setView]);
   const jobsView = useDockSet() === "post";
   const [asking, setAsking] = useState(false);
@@ -334,11 +345,12 @@ export function TodayPad(props: {
             />
           </div>
         )}
+        {!welcoming && onCal && <TodayCalendar jobs={props.jobs} today={props.today} />}
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
         <div
           className={clsx(
             "flex flex-col justify-start transition-[flex-grow,opacity] duration-500 ease-out",
-            (welcoming || onFeed || !view) && "hidden",
+            (welcoming || onFeed || onCal || !view) && "hidden",
             talking ? "grow-0 opacity-0" : "grow opacity-100",
           )}
           aria-hidden={talking}
@@ -367,7 +379,7 @@ export function TodayPad(props: {
           </div>
         </div>
 
-        {talking && !onFeed && (
+        {talking && !onFeed && !onCal && (
           <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
             {turns.map((t) =>
               t.kind === "day" ? (
@@ -454,7 +466,7 @@ export function TodayPad(props: {
 
       {/* Not on the deal feed (8 Nov 2026, Martin: a third place to ask Sol confused more than it helped; each deal has
           its own chat and Sol's round is in the nav). */}
-      {talking && !onFeed && (
+      {talking && !onFeed && !onCal && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
             {!dayTold && (

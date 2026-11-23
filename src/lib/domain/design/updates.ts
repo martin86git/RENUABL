@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Marketplace",
+    words:
+      "Make an offer on equipment for sale: pick 10% lower, the asking price or your own. The seller accepts or declines within 48 hours.",
+  },
+  {
+    day: "2026-11-23",
     area: "Deals",
     words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
   },
