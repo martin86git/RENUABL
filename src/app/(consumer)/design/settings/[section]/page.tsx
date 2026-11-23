@@ -11,6 +11,7 @@ import { StandardsSettings } from "@/components/design/settings-standards";
 import { TargetsSettings } from "@/components/design/settings-targets";
 import { CrmImportSettings } from "@/components/design/settings-crm-import";
 import { PylonImportSettings } from "@/components/design/settings-pylon";
+import { HubSpotImportSettings } from "@/components/design/settings-hubspot";
 import { LeadInboxSettings } from "@/components/design/settings-lead-inbox";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
 import { CallerSettings } from "@/components/design/settings-caller";
@@ -75,6 +76,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <CrmImportSettings />
         ) : section === "pylon" ? (
           <PylonImportSettings />
+        ) : section === "hubspot" ? (
+          <HubSpotImportSettings />
         ) : section === "lead-inbox" ? (
           <LeadInboxSettings />
         ) : section === "targets" ? (
