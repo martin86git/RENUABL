@@ -32,7 +32,7 @@ import {
 import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, type SalesTargets } from "@/lib/domain/design/sales-rings";
 import { GoalLine, MonthCard, MonthBars, Tally, PipelineBar, SunArc } from "./gauges";
 import { newDealPanels } from "@/lib/domain/design/gauges";
-import { useDesignAccount } from "./design-account";
+import { Reconnecting, useDesignAccount } from "./design-account";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 import { SalesPage } from "./sales-page";
 import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
@@ -113,7 +113,9 @@ export function DesignHome() {
  * Signing in is in its top bar, and on /design/sign-in.
  */
 function FrontPage({ unreachable }: { unreachable: boolean }) {
-  return <SalesPage notice={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />;
+  // A signed-in device that can't reach its account yet waits to reconnect, never the signed-out page.
+  if (unreachable) return <Reconnecting />;
+  return <SalesPage notice={null} />;
 }
 
 /** A change against an earlier period, as a small signed percentage: green up, red down, quiet when there is nothing to compare. */

@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Signing in",
+    words: "Back after the phone was locked, RENUABL waits to reconnect and goes back in by itself, instead of asking you to sign in.",
+  },
+  {
+    day: "2026-11-23",
     area: "Today",
     words: "A usage gauge under the date on Today opens this month's usage, with packs to top up Sol and design credits.",
   },

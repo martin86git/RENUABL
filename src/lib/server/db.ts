@@ -22,7 +22,12 @@ function pool(): Pool {
   const url = dbUrl();
   if (!url) throw new DbError("The database isn't set up (DATABASE_URL)");
   // One small pool per server instance; Neon's pooled connection string handles the rest.
-  g.__renuablPool ??= new Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000 });
+  // A connection that won't open in 10 s fails (and is asked again) rather than hanging the request.
+  if (!g.__renuablPool) {
+    g.__renuablPool = new Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 10_000 });
+    // An idle connection the database dropped (Neon sleeping) is let go, never an unhandled error.
+    g.__renuablPool.on("error", (e) => console.error("database connection dropped", e.message));
+  }
   return g.__renuablPool;
 }
 
