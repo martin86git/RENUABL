@@ -39,7 +39,7 @@ import { DemoBar, DemoDetailsPrompt } from "./demo-details";
 import { staffView } from "./staff-view-as";
 import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
-import { DesignAccountGate, SignOut, useDesignAccount } from "./design-account";
+import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
 import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
 import { PhoneVoiceTab } from "./phone-voice";
@@ -379,6 +379,7 @@ function Shell({
 
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (!account.signedIn) {
+    if (account.unreachable) return <Reconnecting />;
     if (!needsAccount) return <>{children}</>;
     return (
       <div className="theme-studio flex min-h-dvh flex-col items-center justify-center px-5 text-center">
