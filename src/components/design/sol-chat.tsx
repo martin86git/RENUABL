@@ -4,6 +4,7 @@ import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { useNameHintBox } from "./name-hint-box";
 import { Bell, Copy, CornerUpLeft, Eye, EyeOff, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
@@ -243,6 +244,7 @@ export function SolChat({
   const picker = useRef<HTMLInputElement>(null);
   const pullForTimes = usePullForTimes();
   const box = useRef<HTMLTextAreaElement>(null);
+  const names = useNameHintBox(text, setText, box);
   const end = useRef<HTMLDivElement>(null);
   // "#" finds a deal: the business's deals are read the first time, then matched here as each letter goes in.
   const [dealAt, setDealAt] = useState<{ start: number; query: string } | null>(null);
@@ -820,6 +822,7 @@ export function SolChat({
             </button>
           </div>
         )}
+        {names.chips}
         <div className="relative">
           {dealAt && dealAt.query.trim().length >= 2 && (
             <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-2xl bg-surface text-sm text-ink shadow-[0_8px_30px_rgba(20,22,26,0.14)] ring-1 ring-line">
@@ -865,8 +868,11 @@ export function SolChat({
               onChange={(e) => {
                 setHeard("");
                 setText(e.target.value);
-                setDealAt(typingDeal(e.target.value, e.target.selectionStart ?? e.target.value.length));
+                const deal = typingDeal(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                setDealAt(deal);
                 setHi(0);
+                if (deal) names.clear();
+                else names.typed(e.target.value, e.target.selectionStart);
               }}
               onKeyDown={(e) => {
                 if (dealAt && hits.length) {
@@ -880,6 +886,10 @@ export function SolChat({
                     pickDeal(hits[hi] ?? hits[0]);
                     return;
                   }
+                }
+                if (e.key === "Escape" && names.escape()) {
+                  e.stopPropagation();
+                  return;
                 }
                 if (dealAt && e.key === "Escape") {
                   e.stopPropagation();

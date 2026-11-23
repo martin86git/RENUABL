@@ -41,6 +41,7 @@ import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-cha
 import { InstallListPage } from "./install-lists";
 import { useDockSet } from "@/lib/services/dock-set";
 import { TODAY_FIRST } from "@/lib/services/sol";
+import { useNameHintBox } from "./name-hint-box";
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
@@ -508,6 +509,8 @@ export function SolBox({
 }) {
   const [text, setText] = useState("");
   const [heard, setHeard] = useState("");
+  const field = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  const names = useNameHintBox(text, setText, field);
   // Speak and attach, as in his panel (5 Nov 2026, Martin): the microphone and the paperclip.
   const attach = useSolAttach();
   const ready = text.trim().length >= 2 || attach.files.length > 0;
@@ -518,6 +521,7 @@ export function SolBox({
     if (!files) return attach.setProblem("That file couldn't be read: try again.");
     setText("");
     setHeard("");
+    names.clear();
     attach.clear();
     onAsk(said, files);
   };
@@ -543,19 +547,26 @@ export function SolBox({
         </p>
       )}
       <AttachedFiles attach={attach} />
+      {names.chips}
       {tall ? (
         <>
           <label className="sr-only" htmlFor={id}>
             Ask Sol
           </label>
           <textarea
+            ref={field}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
               setHeard("");
               setText(e.target.value);
+              names.typed(e.target.value, e.target.selectionStart);
             }}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && names.escape()) {
+                e.stopPropagation();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void send();
@@ -592,11 +603,16 @@ export function SolBox({
             Ask Sol
           </label>
           <input
+            ref={field}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
               setHeard("");
               setText(e.target.value);
+              names.typed(e.target.value, e.target.selectionStart);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && names.escape()) e.stopPropagation();
             }}
             maxLength={4000}
             autoComplete="off"
