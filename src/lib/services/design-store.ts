@@ -67,22 +67,32 @@ interface ServerAnswer {
 }
 
 /** A request to the designer's API. The answer as sent, or a message to show when there wasn't one. */
+const CALL_SECONDS = 40;
+const TOOK_TOO_LONG = "The server took too long to answer. Check your connection and try again.";
+
 async function call<T extends ServerAnswer = ServerAnswer>(
   url: string,
   method = "GET",
   body?: unknown,
 ): Promise<(T & { ok: true }) | { ok: false; message: string }> {
+  // Never waits for good (23 Nov 2026, Martin: Proceed to proposal stuck on "Saving the design…"): a request that hangs
+  // (a phone's connection gone quiet) gives up after `CALL_SECONDS`, says so, and frees the saves queued behind it.
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), CALL_SECONDS * 1000);
   try {
     const res = await fetch(url, {
       method,
       cache: "no-store",
+      signal: stop.signal,
       ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
     });
     if (res.status === 401) return { ok: false, message: SIGNED_OUT };
     const json = (await res.json()) as T;
     return json.ok ? (json as T & { ok: true }) : { ok: false, message: json.message ?? CANT_REACH };
   } catch {
-    return { ok: false, message: CANT_REACH };
+    return { ok: false, message: stop.signal.aborted ? TOOK_TOO_LONG : CANT_REACH };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

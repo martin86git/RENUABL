@@ -4846,18 +4846,30 @@ export function RoofDesigner(props: {
    * On from the quote to the proposal (15 Nov 2026, Martin): saved first (the proposal reads the saved design), then the
    * deal's proposal opens in the same window, or on its own page; a site with no deal shows why there is none yet.
    */
+  const SAVING_FOR_PROPOSAL = "Saving the design…";
   // Why Proceed to proposal didn't go on, said under it (18 Nov 2026, Martin: "the proceed to proposal button isnt
   // working": a save refused, or no deal to put it on, showed nowhere he could see).
   const [proceedSaid, setProceedSaid] = useState<string | null>(null);
   const toProposal = async () => {
+    if (proceedSaid === SAVING_FOR_PROPOSAL) return;
     setProceedSaid(null);
     if (!props.jobId) {
       if (props.onNeedDeal) return props.onNeedDeal();
       setProceedSaid("This roof isn't on a deal yet, so there's no proposal to open. Put it on a deal first.");
       return showSide("proposal");
     }
-    setProceedSaid("Saving the design…");
-    if (!(await saveNow.current())) {
+    setProceedSaid(SAVING_FOR_PROPOSAL);
+    // Whatever goes wrong in saving is said here, never left at "Saving the design…" (23 Nov 2026, Martin).
+    let kept: boolean;
+    try {
+      kept = await saveNow.current();
+    } catch (e) {
+      console.error("saving before the proposal failed", e);
+      return setProceedSaid(
+        `The design couldn't be saved, so the proposal can't open yet${e instanceof Error && e.message ? `: ${e.message}` : "."} Try again.`,
+      );
+    }
+    if (!kept) {
       const why = typeof savedRef.current === "object" && savedRef.current ? savedRef.current.error : null;
       return setProceedSaid(
         why
