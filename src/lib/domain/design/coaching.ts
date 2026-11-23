@@ -35,6 +35,8 @@ export interface CoachTurn {
   changes?: { added: string[]; removed: string[]; changed: string[]; settings?: string[]; locked?: string[] };
   /** The call the feedback was about, said in words ("A call with Jo, 12 Nov"). */
   about?: string;
+  /** A call they asked the agent to make (22 Nov 2026): who, as they said it, and what for; confirmed in the window. */
+  ring?: { customer: string; about: string };
 }
 
 export const MAX_NOTES = 40;
@@ -211,6 +213,7 @@ export function cleanTurns(raw: unknown): CoachTurn[] {
             }
           : {}),
         ...(typeof t.about === "string" ? { about: t.about.slice(0, 120) } : {}),
+        ...(t.role === "assistant" && cleanRing(t.ring) ? { ring: cleanRing(t.ring)! } : {}),
       };
     })
     .slice(-MAX_TURNS);
@@ -260,7 +263,7 @@ export function coachingBlock(notes: readonly string[], business: string, locked
 export const COACH_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["messages", "add", "remove", "change", "lock", "rename", "voice"],
+  required: ["messages", "add", "remove", "change", "lock", "rename", "voice", "ring"],
   properties: {
     messages: {
       type: "array",
@@ -287,6 +290,16 @@ export const COACH_SCHEMA = {
     },
     rename: { type: "string", description: "Your new name when they ask you to change it, else an empty string." },
     voice: { type: "string", description: "The id of the voice they asked for, from the list you were given, else an empty string." },
+    ring: {
+      type: "object",
+      additionalProperties: false,
+      required: ["customer", "about"],
+      properties: {
+        customer: { type: "string", description: "The customer they asked you to ring now, by the name they used; else empty." },
+        about: { type: "string", description: "What the call is for, one short line in their words; else empty." },
+      },
+      description: "When they ask you to call or ring a customer now; both empty otherwise.",
+    },
   },
 } as const;
 
@@ -329,6 +342,8 @@ export interface CoachAnswer {
   rename: string | null;
   /** A voice asked for, by its id from the list offered, or null. */
   voice: string | null;
+  /** A customer they asked it to ring now, and what for, or null: never placed until they confirm it in the window. */
+  ring?: { customer: string; about: string } | null;
 }
 
 /** Claude's answer, checked: a reply, and only changes to notes that exist. */
@@ -363,7 +378,15 @@ export function cleanCoachAnswer(raw: unknown, notes: readonly CoachNote[], voic
       .slice(0, 10),
     rename: oneLine(a.rename, 40) || null,
     voice: typeof a.voice === "string" && voiceIds.includes(a.voice.trim()) ? a.voice.trim() : null,
+    ...(cleanRing(a.ring) ? { ring: cleanRing(a.ring) } : {}),
   };
+}
+
+/** A call asked for in the chat: a name and what it's for, both plain one-liners; null when there's no name. */
+export function cleanRing(raw: unknown): { customer: string; about: string } | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const customer = oneLine(r.customer, 80);
+  return customer ? { customer, about: oneLine(r.about, 300) } : null;
 }
 
 /** The notes after the assistant's answer, and what changed, in words for the window. */
@@ -454,7 +477,9 @@ ${dealBlock(o.deal, name, day)}
   const job =
     o.job ??
     "an automated assistant that rings their leads and customers about solar and batteries, answers questions, meets worries and guides people towards the next step";
-  return `You are ${name}, ${business}'s phone assistant: ${job}. Right now you are not on a call: someone from ${business} is coaching you on how you talk on calls.
+  return `You are ${name}, ${business}'s phone assistant: ${job}. Right now you are not on a call: someone from ${business} is talking to you in your chat. They may ask you something, ask you to ring one of their customers, or coach you on how you talk on calls.
+
+Ringing someone (22 Nov 2026): when they ask you to call or ring a customer, put the customer's name as they said it in ring.customer and what the call is for in ring.about (one short line in their words, e.g. "ask whether they'd like to go ahead with the proposal"). Say you've got the call ready and that they press Ring below to send you off; you ring in calling hours, on the number on the customer's record, under every rule below. Never say you can't ring from this chat, and don't turn the request into a note. Otherwise leave ring empty.
 
 What you do with their feedback:
 - Answer them as yourself, warmly and briefly, in Australian English, as short messages like texts (two to five): a quick acknowledgement first ("Got it, thanks!"), then one message for each thing you'll do differently, each starting a new point. Never one long block.
@@ -504,7 +529,7 @@ export const COACH_COPY = {
   empty: (name: string) =>
     `${name} hasn't been given any notes yet. Try "Mention we're a local Melbourne business" or "Slow down when you give the call times."`,
   hello: (name: string) =>
-    `Hi, I'm ${name}. Tell me what to say on calls, how to say it, or what to leave out, and I'll keep it as a note for every call from then on. You can rename me or change my voice here too, and the pencil on my photo changes my picture.`,
+    `Hi, I'm ${name}. Ask me anything, or ask me to ring a customer and I'll get the call ready for you to send. Tell me what to say on calls, how to say it, or what to leave out, and I'll keep it as a note for every call from then on.`,
   script: (name: string) =>
     `What ${name} has been told to say and how. Everything you tell ${name} in the chat is written here and used on every call.`,
   fixedTitle: "What never changes",

@@ -42,7 +42,11 @@ export const PYLON_WORDS = {
 
 /** Pylon turned a request down for a reason of its own: said with its status and words, so it can be put right. */
 export function pylonSaid(status: number, title: string): string {
-  const words = title.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  const words = title
+    .replace(/[\u0000-\u001f<>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
   return `Pylon turned the request down (${status}${words ? `: ${words}` : ""}). Tell RENUABL, so it can be put right.`;
 }
 

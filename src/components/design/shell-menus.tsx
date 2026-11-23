@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  Gauge,
   Bell,
   CheckCheck,
   Cloud,
@@ -38,6 +39,9 @@ import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from
 import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
 import { MyCalendar } from "./my-calendar";
+import { loadUsageBrief, type MeterNow } from "@/lib/services/usage";
+import { openUsagePop, usagePopReady } from "./usage-pop";
+import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
 import { CONNECT_RESULTS } from "@/lib/domain/design/my-calendar";
 
 /**
@@ -373,8 +377,20 @@ export function ProfileMenu(props: {
   on: boolean;
   /** Opens Sol's setup wizard (setup-wizard.tsx), where the shell mounts it. */
   onSetup?: () => void;
+  /** The Usage page: this month's allowances, read as the menu opens (only for those who may see them). */
+  usage?: string;
 }) {
   const [open, setOpen, box] = useWindow();
+  const [meters, setMeters] = useState<MeterNow[] | null>(null);
+  const usageHref = props.usage;
+  useEffect(() => {
+    if (!open || !usageHref) return;
+    let gone = false;
+    void loadUsageBrief().then((m) => !gone && setMeters(m));
+    return () => {
+      gone = true;
+    };
+  }, [open, usageHref]);
   const row = (label: string, href: string, Icon: LucideIcon, n = 0) => (
     <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-ink hover:bg-canvas">
       <Icon className="size-4" aria-hidden /> <span className="flex-1">{label}</span>
@@ -407,6 +423,34 @@ export function ProfileMenu(props: {
           <p className="truncate px-3 pb-2 pt-1 text-xs text-muted">{props.email}</p>
           {row("Settings", props.settings, SlidersHorizontal)}
           {row("Your account", props.account, UserRound)}
+          {usageHref && meters && (
+            // Plan usage at a glance (23 Nov 2026, Martin, from instant.one's menu): each allowance and how much is used.
+            <Link
+              href={usageHref}
+              onClick={(e) => {
+                if (!usagePopReady()) return;
+                e.preventDefault();
+                setOpen(false);
+                openUsagePop();
+              }}
+              className="mx-1 my-1 block rounded-xl bg-canvas px-3 py-2.5 hover:bg-line/60"
+            >
+              <span className="flex items-center justify-between text-xs font-medium text-ink">
+                <span className="flex items-center gap-2">
+                  <Gauge className="size-4" aria-hidden /> Usage this month
+                </span>
+                <span className="text-ink-2 underline underline-offset-2">View</span>
+              </span>
+              {meters.map((m) => (
+                <span key={m.key} className="mt-1.5 flex items-center gap-2 text-xs text-ink-2">
+                  <span className="flex-1 truncate">{METER_WORDS[m.key].label}</span>
+                  <span className="tabular-nums text-ink">{percentWords(m)}</span>
+                  <UsageRing percent={m.percent} />
+                </span>
+              ))}
+              {!meters.length && <span className="mt-1 block text-xs text-muted">Sol, design credits and Calls &amp; Texts</span>}
+            </Link>
+          )}
           {props.connections && row("Connections", props.connections.href, Users, props.connections.waiting)}
           {props.onSetup && (
             <button
@@ -431,5 +475,28 @@ export function ProfileMenu(props: {
         </div>
       )}
     </div>
+  );
+}
+
+/** A small ring filling with an allowance's use: graphite, the signal colour from 80%, red once used. */
+function UsageRing({ percent }: { percent: number }) {
+  const r = 6;
+  const c = 2 * Math.PI * r;
+  const share = Math.min(100, Math.max(0, percent)) / 100;
+  const tone = percent >= 100 ? "var(--danger)" : percent >= 80 ? "var(--sun-line)" : "var(--ink)";
+  return (
+    <svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>
+      <circle cx="8" cy="8" r={r} fill="none" stroke="var(--line)" strokeWidth="2.5" />
+      <circle
+        cx="8"
+        cy="8"
+        r={r}
+        fill="none"
+        stroke={tone}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={`${(c * share).toFixed(2)} ${c.toFixed(2)}`}
+      />
+    </svg>
   );
 }

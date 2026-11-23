@@ -9,15 +9,16 @@ import type { InstallCost, InstallerInvoice } from "@/lib/domain/design/installe
 import type { OrderState } from "@/lib/domain/design/orders";
 import type { BusinessPrefs } from "@/lib/domain/design/prefs";
 import type { BookedJob, InvoicesView, JobOrder, OrderRow, ProposalLine } from "@/lib/server/design-after-sale-repo";
+import type { ImportedSale } from "@/lib/server/pylon-import";
 import { ask, type Answer } from "./crm";
 import { warm, warmed } from "./warm";
 
-export type { BookedJob, InvoicesView, JobOrder, OrderRow, ProposalLine };
+export type { BookedJob, ImportedSale, InvoicesView, JobOrder, OrderRow, ProposalLine };
 
 export const loadPrefs = () => ask<{ prefs: BusinessPrefs }>("/api/design/prefs");
 export const savePrefs = (prefs: BusinessPrefs) => ask<{ prefs: BusinessPrefs }>("/api/design/prefs", { method: "PUT", body: { prefs } });
 
-type Proposals = { proposals: ProposalLine[]; followUpDays?: number[] };
+type Proposals = { proposals: ProposalLine[]; imported?: ImportedSale[]; followUpDays?: number[] };
 export const listProposals = () => warm("proposals", () => ask<Proposals>("/api/design/proposals"));
 /** The last proposals list read this visit, so Today's Proposals tab opens on it. */
 export const keptProposals = () => warmed<{ ok: true } & Proposals>("proposals");

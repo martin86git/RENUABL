@@ -24,6 +24,16 @@ export const SOL_PACKS = [
 ] as const;
 export type SolPack = (typeof SOL_PACKS)[number];
 
+/**
+ * The extra credits a larger pack gives over buying the same at the smallest pack's price (24 Nov 2026, Martin: "should
+ * show in green how many extra credits I'm receiving on the larger tiers"): 1,000 for $149 is 240 more than $149 buys
+ * at 250 for $49. Nought for the smallest pack.
+ */
+export function solPackBonus(pack: SolPack): number {
+  const base = SOL_PACKS[0];
+  return Math.max(0, pack.credits - Math.round((pack.cents * base.credits) / base.cents));
+}
+
 /** A pack from the browser, by its credits: only one we sell. */
 export function cleanSolPack(raw: unknown): SolPack | null {
   const n = typeof raw === "string" ? Number(raw) : raw;

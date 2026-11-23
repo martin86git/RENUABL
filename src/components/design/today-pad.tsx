@@ -29,7 +29,7 @@ import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, loadSol, retrySol } from "@/lib/services/sol";
+import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, askSolInPanel, handsToPanel, loadSol, retrySol } from "@/lib/services/sol";
 import { goWhereAsked, openSolPage } from "./sol-chat";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
@@ -37,8 +37,13 @@ import { DealFeed } from "./deal-feed";
 import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
-import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
-import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
+import { TODAY_CALENDAR, TodayChat, useInsights } from "./today-chat";
+import { TodayCalendar } from "./today-calendar";
+import { InstallListPage } from "./install-lists";
+import { useDockSet } from "@/lib/services/dock-set";
+import { TODAY_FIRST } from "@/lib/services/sol";
+import { useNameHintBox } from "./name-hint-box";
+import type { TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
 import { ReadyForYou, usePrepared } from "./ready-for-you";
 import { SolIcon } from "./sol-icon";
@@ -46,7 +51,8 @@ import { SolBadge, SolMark } from "./sol-sun";
 import { AgentCard, AgentRound, OutboxChip, entryFor, useOutbox } from "./sol-agents";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
-import { answerFor } from "@/lib/domain/design/sol-format";
+import { replyToSol, type SolReply } from "@/lib/domain/design/sol-format";
+import { MessageTools, QuotedWords, ReplyBanner } from "./message-tools";
 import { AttachButton, AttachedFiles, solFilesOf, useSolAttach } from "./sol-attach";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolThinking, SolWorking } from "./sol-thinking";
@@ -125,42 +131,25 @@ export function TodayPad(props: {
   welcome?: boolean;
   /** The owner: the welcome asks them to add the team. */
   owner?: boolean;
+  /** The feed or the calendar as a page of its own (23 Nov 2026, Martin: Today is Sol's screen alone). */
+  only?: "feed" | "calendar";
 }) {
   const router = useRouter();
   // The new deal form at the top of Today, opened by the orange + on the feed.
   const [adding, setAdding] = useState(false);
   const [welcoming, setWelcoming] = useState(Boolean(props.welcome));
-  // After the first visit Today opens on the deal feed (deal-feed.ts, 6 Nov 2026, Martin): Sol's typed greeting is for
-  // the first time only. Asking Sol, or Show me my day, turns to the conversation; "Deals" comes back.
-  // Chat or Feed (20 Nov 2026, Martin): Chat the first visit of the day, as a welcome after a night away, else the one
-  // last had today (today-view.ts, kept on the device). Read after the page is up, so the server's page and the
-  // browser's agree; until then neither is drawn.
-  const [view, setViewState] = useState<TodayView | null>(props.welcome ? "chat" : null);
+  // Today is Sol's screen (23 Nov 2026, Martin: no switch; Feed lives in Deals, the calendar beside email). The feed
+  // and the calendar are drawn by this same pad on their own pages (`only`).
+  const view: TodayView = props.only ?? "chat";
   const onFeed = view === "feed";
-  const setView = useCallback(
-    (v: TodayView) => {
-      setViewState(v);
-      try {
-        localStorage.setItem(TODAY_VIEW_KEY, JSON.stringify({ day: props.today, view: v }));
-      } catch {
-        // Not kept: Today opens on Chat next time.
-      }
-    },
-    [props.today],
-  );
-  const setOnFeed = (feed: boolean) => setView(feed ? "feed" : "chat");
+  const onCal = view === "calendar";
   useEffect(() => {
-    if (props.welcome) return;
-    let seen = null;
-    try {
-      seen = cleanSeen(JSON.parse(localStorage.getItem(TODAY_VIEW_KEY) ?? "null"));
-    } catch {
-      // Nothing kept.
-    }
-    const opens = todayOpensOn(seen, props.today);
-    const t = window.setTimeout(() => setView(opens), 0);
-    return () => window.clearTimeout(t);
-  }, [props.welcome, props.today, setView]);
+    // Come from the phone's Sol round (`?today=first`): the address is tidied.
+    if (new URLSearchParams(window.location.search).get("today") !== "first") return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("today");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, []);
   // The welcome's tour, run once the greeting is back on the page so every place it lights is there.
   const [touring, setTouring] = useState(false);
   const tour = () => {
@@ -168,6 +157,22 @@ export function TodayPad(props: {
     window.setTimeout(() => setTouring(true), 80);
   };
   const [turns, setTurns] = useState<Turn[]>([]);
+  // The phone's Sol round pressed while already on Today: back to the start, out of any conversation.
+  useEffect(() => {
+    const first = () => {
+      setTurns([]);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    window.addEventListener(TODAY_FIRST, first);
+    return () => window.removeEventListener(TODAY_FIRST, first);
+  }, []);
+  // The date heading opens the calendar, its own page now (today-chat.tsx).
+  useEffect(() => {
+    const cal = () => router.push("/design/calendar");
+    window.addEventListener(TODAY_CALENDAR, cal);
+    return () => window.removeEventListener(TODAY_CALENDAR, cal);
+  }, [router]);
+  const jobsView = useDockSet() === "post";
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
   const insights = useInsights();
@@ -186,21 +191,27 @@ export function TodayPad(props: {
   // My day pressed on the feed: written up in the feed's place, the deals staying beside it.
   const [feedDay, setFeedDay] = useState(false);
   const showDay = () => {
-    setOnFeed(false);
     if (!dayTold) setTurns((t) => [...t, { id: Date.now(), kind: "day" }]);
   };
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
-  const [replyTo, setReplyTo] = useState<string | null>(null);
-  const ask = async (q: string, files: SolFile[] = [], about: string | null = null) => {
+  const [replyTo, setReplyTo] = useState<SolReply | null>(null);
+  const ask = async (q: string, files: SolFile[] = [], about: SolReply | null = null) => {
     if (asking) return;
     setReplyTo(null);
+    // On a phone a question asked on Today goes to Sol's own chat, not into a conversation under the Business | Feed
+    // switch (23 Nov 2026, Martin). A file still goes in here: his panel's ask carries words only.
+    if (handsToPanel() && !files.length && q.trim()) {
+      const replied = replyToSol(about, q);
+      askSolInPanel(replied.shown ? { text: replied.said, shown: replied.shown } : q);
+      return;
+    }
     const id = Date.now();
-    setOnFeed(false);
     setAsking(true);
-    const shownQ = q + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
+    const replied = replyToSol(about, q);
+    const shownQ = (replied.shown ?? q) + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
     setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
-    const r = await askSol(about ? answerFor(about, q) : q, files, null, false, about ? q : undefined);
+    const r = await askSol(replied.said || q, files, null, false, replied.shown);
     setAsking(false);
     let a: TodayAnswer;
     if (!r.ok) a = { text: r.message, more: false };
@@ -213,11 +224,16 @@ export function TodayPad(props: {
   };
   /** A Yes or No goes straight to Sol; Reply answers the question in the box. */
   const answer: OnAnswer = (question, yes) => {
-    if (yes) return void ask(yes, [], question);
-    setReplyTo(question);
+    if (yes) return void ask(yes, [], { kind: "question", text: question });
+    setReplyTo({ kind: "question", text: question });
     window.setTimeout(() => document.getElementById("today-ask")?.focus(), 0);
   };
   const askIn = (q: string, files: SolFile[]) => void ask(q, files, replyTo);
+  /** The reply arrow on a message: the box replies to it. */
+  const replyToMessage = (from: "you" | "sol", text: string) => {
+    setReplyTo({ kind: "message", from, text });
+    window.setTimeout(() => document.getElementById("today-ask")?.focus(), 0);
+  };
   /** Try another answer: his latest answer replaced by a new one to the same question, a different way. */
   const retry = async (id: number) => {
     if (asking) return;
@@ -250,25 +266,6 @@ export function TodayPad(props: {
         </p>
       )}
 
-      {!welcoming && view && (
-        // Over the pad's sticky top edge (.pad-cap, z 15), which on Today reaches down to the strip: under it the pill was
-        // cut in half. It sticks in that band on a wide screen, so it stays in view as the feed slides under.
-        <div
-          data-tour="today-switch"
-          className="relative z-[16] mt-4 flex justify-center sm:mt-1 transition-[top] duration-300 ease-out motion-reduce:transition-none print:hidden lg:sticky lg:top-[var(--studio-head,8rem)]"
-        >
-          <TodaySwitch
-            first={firstViewLabel(insights)}
-            view={view}
-            onView={(v) => {
-              // Chat pressed while in the conversation: back to the start, with the cards (it carries on in Sol's panel).
-              if (v === "chat" && view === "chat" && talking) setTurns([]);
-              setView(v);
-            }}
-          />
-        </div>
-      )}
-
       <div className="mt-2 flex flex-1 flex-col">
         {welcoming && (
           <Welcome
@@ -279,7 +276,13 @@ export function TodayPad(props: {
             onTour={tour}
           />
         )}
-        {!welcoming && onFeed && (
+        {/* On the dock's post-sale tools, Feed is Jobs: every sold job not yet installed (23 Nov 2026, Martin). */}
+        {!welcoming && onFeed && jobsView && (
+          <div className="pb-6">
+            <InstallListPage switcher={null} />
+          </div>
+        )}
+        {!welcoming && onFeed && !jobsView && (
           <div className="pb-6">
             <InductionReminder />
             <DealFeed
@@ -292,11 +295,12 @@ export function TodayPad(props: {
             />
           </div>
         )}
+        {!welcoming && onCal && <TodayCalendar jobs={props.jobs} today={props.today} />}
         {/* The greeting, in the middle of the screen until the conversation starts, then folded away. */}
         <div
           className={clsx(
             "flex flex-col justify-start transition-[flex-grow,opacity] duration-500 ease-out",
-            (welcoming || onFeed || !view) && "hidden",
+            (welcoming || onFeed || onCal) && "hidden",
             talking ? "grow-0 opacity-0" : "grow opacity-100",
           )}
           aria-hidden={talking}
@@ -325,23 +329,25 @@ export function TodayPad(props: {
           </div>
         </div>
 
-        {talking && !onFeed && (
+        {talking && !onFeed && !onCal && (
           <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
             {turns.map((t) =>
               t.kind === "day" ? (
                 <SolDay key={t.id} {...props} items={items} onGrow={follow} />
               ) : (
                 <div key={t.id} className="space-y-4">
-                  <div className="flex justify-end">
+                  <div className="group/turn flex flex-col items-end">
                     <p className="max-w-[75%] whitespace-pre-wrap rounded-[20px] rounded-br-md bg-sun px-4 py-2 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] [font-feature-settings:'cv11','ss03','tnum'] text-ink ring-1 ring-sun-line/25">
-                      {t.q}
+                      <QuotedWords text={t.q} />
                     </p>
+                    <MessageTools text={t.q} onReply={() => replyToMessage("you", t.q)} className="mt-0.5" />
                   </div>
                   <SolSays>
                     <SolWorking busy={!t.a} />
                     {!t.a ? null : (
-                      <div className="sol-prose">
+                      <div className="sol-prose group/turn">
                         <Typed text={t.a.text} onDone={follow} onAnswer={asking ? undefined : answer} />
+                        <MessageTools text={t.a.text} onReply={() => replyToMessage("sol", t.a!.text)} className="-ml-1.5 mt-1" />
                         {t.a.designs?.length ? (
                           <div className="mt-3 max-w-2xl space-y-3">
                             {t.a.designs.map((d) => (
@@ -398,11 +404,8 @@ export function TodayPad(props: {
       {touring && (
         <Spotlight
           steps={WELCOME_TOUR}
-          onGo={(v) => setView(v === "feed" ? "feed" : "chat")}
           onEnd={() => {
             setTouring(false);
-            // Back to Chat, where Sol picks up with his introduction.
-            setView("chat");
             window.dispatchEvent(new Event(SOL_INDUCTION));
           }}
         />
@@ -410,7 +413,7 @@ export function TodayPad(props: {
 
       {/* Not on the deal feed (8 Nov 2026, Martin: a third place to ask Sol confused more than it helped; each deal has
           its own chat and Sol's round is in the nav). */}
-      {talking && !onFeed && (
+      {talking && !onFeed && !onCal && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
             {!dayTold && (
@@ -461,11 +464,14 @@ export function SolBox({
   replyTo = null,
   onStopReply,
   tall = false,
+  extras = null,
 }: {
+  /** Shown in the box's foot after the +. */
+  extras?: React.ReactNode;
   /** Twice as thick (20 Nov 2026, Martin): the words on top, the paperclip, microphone and send along its foot. */
   tall?: boolean;
-  /** One of Sol's questions being answered, shown over the box. */
-  replyTo?: string | null;
+  /** One of Sol's questions being answered, or a message replied to, shown over the box. */
+  replyTo?: SolReply | null;
   onStopReply?: () => void;
   /** The words, and any PDFs or pictures attached (read for Sol). */
   onAsk: (q: string, files: SolFile[]) => void;
@@ -475,6 +481,8 @@ export function SolBox({
 }) {
   const [text, setText] = useState("");
   const [heard, setHeard] = useState("");
+  const field = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  const names = useNameHintBox(text, setText, field);
   // Speak and attach, as in his panel (5 Nov 2026, Martin): the microphone and the paperclip.
   const attach = useSolAttach();
   const ready = text.trim().length >= 2 || attach.files.length > 0;
@@ -485,6 +493,7 @@ export function SolBox({
     if (!files) return attach.setProblem("That file couldn't be read: try again.");
     setText("");
     setHeard("");
+    names.clear();
     attach.clear();
     onAsk(said, files);
   };
@@ -496,52 +505,54 @@ export function SolBox({
       }}
       className={clsx(
         "bg-surface text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line",
-        tall ? "rounded-[28px] p-3 pl-5 pt-4" : "rounded-[26px] p-2 pl-4",
+        tall ? "rounded-[28px] p-3 pl-5 pt-5" : "rounded-[26px] p-2 pl-4",
       )}
     >
-      {replyTo && (
-        <p className="mb-1.5 mr-2 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
-          <span className="min-w-0 flex-1">
-            Replying to <span className="font-medium text-ink">{replyTo}</span>
-          </span>
-          <button type="button" onClick={onStopReply} className="shrink-0 hover:text-ink">
-            Cancel
-          </button>
-        </p>
-      )}
+      {replyTo && <ReplyBanner reply={replyTo} onStop={() => onStopReply?.()} className="mb-1.5 mr-2 bg-canvas" />}
       <AttachedFiles attach={attach} />
+      {names.chips}
       {tall ? (
         <>
           <label className="sr-only" htmlFor={id}>
             Ask Sol
           </label>
           <textarea
+            ref={field}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
               setHeard("");
               setText(e.target.value);
+              names.typed(e.target.value, e.target.selectionStart);
             }}
             onKeyDown={(e) => {
+              if (e.key === "Escape" && names.escape()) {
+                e.stopPropagation();
+                return;
+              }
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void send();
               }
             }}
-            rows={2}
+            rows={3}
             maxLength={4000}
             autoComplete="off"
             placeholder={placeholder}
-            className="block min-h-[3.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
+            className="block min-h-[5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
           {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
             <AttachButton attach={attach} plus />
+            {extras && <span className="ml-1 min-w-0">{extras}</span>}
             <button
               type="submit"
               disabled={asking || !ready}
               aria-label="Ask Sol"
-              className="ml-auto grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+              // Pressed with the keyboard up, the box keeps its focus (23 Nov 2026, Martin, on an iPhone: it "isn't
+              // responding"): a first tap that closed the keyboard moved the page under the finger and the press was lost.
+              onPointerDown={(e) => e.preventDefault()}
+              className="ml-auto grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
             >
               <ArrowUp className="size-4" aria-hidden />
             </button>
@@ -549,29 +560,43 @@ export function SolBox({
           </div>
         </>
       ) : (
-        <div className="flex items-center gap-1.5">
+        // With Today's views in it (23 Nov 2026, Martin), the words take a row of their own on top and the + , the views,
+        // send and the microphone sit along the foot, so typing keeps its room on a phone.
+        <div className={clsx("flex items-center gap-1.5", extras && "flex-wrap gap-y-1")}>
           <AttachButton attach={attach} plus />
-          <SolBadge className="size-5 shrink-0" />
+          {extras ? <span className="shrink-0">{extras}</span> : <SolBadge className="size-5 shrink-0" />}
           <label className="sr-only" htmlFor={id}>
             Ask Sol
           </label>
           <input
+            ref={field}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
               setHeard("");
               setText(e.target.value);
+              names.typed(e.target.value, e.target.selectionStart);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && names.escape()) e.stopPropagation();
             }}
             maxLength={4000}
             autoComplete="off"
             placeholder={placeholder}
-            className="ml-1 h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted"
+            className={clsx(
+              "h-10 min-w-0 flex-1 bg-transparent text-[15px] text-ink outline-none placeholder:text-muted",
+              extras ? "order-first basis-full pl-1 pr-2" : "ml-1",
+            )}
           />
           <button
             type="submit"
             disabled={asking || !ready}
             aria-label="Ask Sol"
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+            onPointerDown={(e) => e.preventDefault()}
+            className={clsx(
+              extras && "ml-auto",
+              "grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted",
+            )}
           >
             <ArrowUp className="size-4" aria-hidden />
           </button>

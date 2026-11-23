@@ -304,6 +304,11 @@ export interface QuoteSettings {
   commission: { perPvKw: number; perBatteryKwh: number };
   /** $ per STC credited to customers (a market price; the clearing house caps it at $40). */
   stcPrice: number;
+  /**
+   * The first install day new quotes are priced for (domain/design/stc-change.ts): STCs go by the day a system is
+   * installed and step down over time. Null, or a day that has passed, is the day the quote is made, as it always was.
+   */
+  stcFrom: string | null;
   /** Cable, conduit, labels and sundries not itemised, $ per job. */
   sundries: number;
   bill: {
@@ -415,6 +420,7 @@ export const DEFAULT_WORKSPACE: Workspace = {
     margin: { base: 2000, solarOnlyBase: 1000, baseKw: 6.6, perKwAbove: 100, perBatteryKwh: 60, floor: 0 },
     commission: { perPvKw: 0, perBatteryKwh: 0 },
     stcPrice: 38,
+    stcFrom: null,
     sundries: 120,
     bill: { selfUseShare: 0.35, rate: 0.3, feedIn: 0.04, supplyPerDay: 1 },
   },
@@ -445,6 +451,13 @@ export function withSetting(settings: QuoteSettings, path: string, value: number
   return cleanSettings(next);
 }
 
+/** The installation period setting as kept: a real day, or null for "the day the quote is made". */
+export function cleanStcFrom(v: unknown): string | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v) || v < "2020-01-01" || v > "2040-12-31") return null;
+  const ms = Date.parse(`${v}T00:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === v ? v : null;
+}
+
 /** Saved settings read back: every field a number within its bounds, anything missing or wrong replaced by the starting figure. */
 export function cleanSettings(raw: unknown): QuoteSettings {
   const out = structuredClone(DEFAULT_WORKSPACE.settings) as unknown as Bag;
@@ -452,6 +465,7 @@ export function cleanSettings(raw: unknown): QuoteSettings {
     const n = numberIn(read(raw, f.path), f.min, f.max);
     if (n !== null) write(out, f.path, n);
   }
+  out.stcFrom = cleanStcFrom(bag(raw).stcFrom);
   return out as unknown as QuoteSettings;
 }
 

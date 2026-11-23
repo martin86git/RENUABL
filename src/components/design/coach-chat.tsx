@@ -75,6 +75,9 @@ import { ContactReach } from "./coach-contacts";
 import { CoachDeals } from "./coach-deals";
 import { CoachWelcome } from "./coach-welcome";
 import { DictateButton, withSpoken } from "./dictate";
+import { NameHints, RingCard, useContactBook } from "./coach-ring";
+import { nameAt, withName, type NameSpan } from "@/lib/domain/design/name-hint";
+import type { CallerKey } from "@/lib/domain/install-call";
 
 /** A time in the market's own: "7:02 pm". */
 const marketTime = (iso: string) =>
@@ -268,6 +271,7 @@ function CoachWindowFor() {
   const [turns, setTurns] = useState<CoachTurn[]>([]);
   const [fixed, setFixed] = useState<string[]>([]);
   const [mayCoach, setMayCoach] = useState(false);
+  const book = useContactBook(mayCoach);
   // How it speaks (delivery.ts): null until the business has chosen.
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   // Its name as said, who it rings and why (call-setup.ts), and the business it speaks for.
@@ -279,6 +283,10 @@ function CoachWindowFor() {
   const [text, setText] = useState("");
   // What the microphone is hearing, shown in the box as it comes (14 Nov 2026, Martin: talk into the chat field).
   const [heard, setHeard] = useState("");
+  // A customer's name being typed, offered as chips (name-hint.ts), and the names tapped, for the call card.
+  const [nameSpan, setNameSpan] = useState<NameSpan | null>(null);
+  const [nameDismissed, setNameDismissed] = useState<number | null>(null);
+  const [tapped] = useState(() => new Map<string, string>());
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   const [settings, setSettings] = useState(() => readSettingsOpen() && !readDealsOpen());
@@ -295,6 +303,17 @@ function CoachWindowFor() {
   }, []);
   // Folded to its header bar (13 Nov 2026, Martin: minimise it, so what is behind it can be reached).
   const [small, setSmall] = useState(false);
+  // Open full, it tells the phone's header to make its wordmark smaller, and the window stops below that header
+  // (22 Nov 2026, Martin: the half-covered RENUABL looked like a mistake; `.coach-window` in globals.css).
+  const shown = !!state && !small;
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    root.dataset.phoneWindow = "";
+    return () => {
+      delete root.dataset.phoneWindow;
+    };
+  }, [shown]);
   // Searching a contact to call or text: the contacts take the chat's place (13 Nov 2026, Martin).
   const [reaching, setReaching] = useState(false);
   // The assistant's call window sits bottom right too: while one is open, this window stands beside it, not on it.
@@ -454,6 +473,7 @@ function CoachWindowFor() {
       { role: "you", text: message, at, ...(state.call ? { about: state.call.about } : about ? { about: `${aboutFirst}'s deal` } : {}) },
     ]);
     setText("");
+    setNameSpan(null);
     const res = await coachAssistant(message, state.call, about?.jobId ?? null, fresh);
     setSending(false);
     if (!res.ok) {
@@ -508,7 +528,7 @@ function CoachWindowFor() {
               } as React.CSSProperties)
         }
         className={clsx(
-          "fixed bottom-20 right-4 z-[86] flex max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-lift lg:bottom-6 print:hidden",
+          "coach-window fixed bottom-20 right-4 z-[86] flex max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-surface text-ink shadow-lift lg:bottom-6 print:hidden",
           // A call on its own window bottom right (folded, or a narrow screen): this one stands beside it.
           watching && !dockCall ? "lg:right-[25.5rem]" : "lg:right-20",
           small ? "w-[min(19rem,calc(100vw-2rem))]" : "lg:bottom-auto lg:top-[var(--coach-top)]",
@@ -731,6 +751,17 @@ function CoachWindowFor() {
                           label={`${name} says`}
                         />
                         {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
+                        {/* A call asked for in the chat, ready to send (22 Nov 2026): only under the latest answer. */}
+                        {t.ring && i === turns.length - 1 && (reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && (
+                          <RingCard
+                            key={t.at}
+                            ring={t.ring}
+                            book={book}
+                            picked={tapped}
+                            agent={(caller.role ?? "sales") as CallerKey}
+                            agentName={name}
+                          />
+                        )}
                       </div>
                     </div>
                   ),
@@ -773,6 +804,24 @@ function CoachWindowFor() {
                   </p>
                 )}
                 {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
+                {mayCoach && (
+                  <NameHints
+                    book={book}
+                    span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
+                    onPick={(full, id) => {
+                      if (!nameSpan) return;
+                      const next = withName(text, nameSpan, full);
+                      tapped.set(full, id);
+                      setText(next.text);
+                      setNameSpan(null);
+                      requestAnimationFrame(() => {
+                        box.current?.focus();
+                        box.current?.setSelectionRange(next.caret, next.caret);
+                      });
+                    }}
+                    onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
+                  />
+                )}
                 {mayCoach ? (
                   <div className="flex items-end gap-2">
                     {/* The microphone sits inside the box, as in Sol's. */}
@@ -788,8 +837,16 @@ function CoachWindowFor() {
                         onChange={(e) => {
                           setHeard("");
                           setText(e.target.value);
+                          const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                          setNameSpan(span);
+                          if (!span) setNameDismissed(null);
                         }}
                         onKeyDown={(e) => {
+                          if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
+                            e.stopPropagation();
+                            setNameDismissed(nameSpan.start);
+                            return;
+                          }
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             void send();
@@ -804,7 +861,7 @@ function CoachWindowFor() {
                               ? `Ask ${name} about ${aboutFirst}…`
                               : landing && turns.length > 0
                                 ? `Start a new chat with ${name}…`
-                                : `Tell ${name} what to change…`
+                                : `Ask ${name} anything, or to ring someone…`
                         }
                         className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
                       />

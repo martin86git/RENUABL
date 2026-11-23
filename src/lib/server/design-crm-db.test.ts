@@ -209,6 +209,32 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     expect((await crm.jobById(a, third.id))?.job).toMatchObject({ projectId: null, stage: "proposal" });
   });
 
+  it("joins a deal to a design of the same home drawn a few metres off, never the house next door", async () => {
+    const mine = (await crm.listCustomers(a)).find((c) => c.name === "Morgan Example")!;
+    const HOME: RoofPlace = { address: "12 Sample Street, Rowville VIC 3178", lat: -37.92612, lng: 145.24011 };
+    // Placed by another map about 18 metres away, written another way.
+    const deal = await crm.createJob(a, mine.id, job({ address: "12 Sample St Rowville", lat: -37.92627, lng: 145.24026 }), A);
+    const nextDoor = await crm.createJob(
+      a,
+      mine.id,
+      job({ address: "14 Sample Street, Rowville VIC 3178", lat: -37.92627, lng: 145.24026 }),
+      A,
+    );
+    if (typeof deal === "string" || typeof nextDoor === "string") throw new Error("unexpected");
+    const drawn = await repo.createProject(a, HOME, work(HOME), A);
+    if (drawn === "full") throw new Error("unexpected");
+    // Saving the design joined it, and the deal now sits where the design was drawn.
+    expect((await crm.jobById(a, deal.id))?.job).toMatchObject({ projectId: drawn.project.id, lat: HOME.lat, lng: HOME.lng });
+    expect((await crm.jobById(a, nextDoor.id))?.job.projectId).toBeNull();
+    // Asked again from the deal (as its page does), nothing more happens.
+    await crm.joinNearbyDesign(a, nextDoor.id, A);
+    expect((await crm.jobById(a, nextDoor.id))?.job.projectId).toBeNull();
+    // Gone again, so the counts the tests after this one read are as they were.
+    await crm.deleteJob(a, deal.id);
+    await crm.deleteJob(a, nextDoor.id);
+    await repo.deleteProject(a, drawn.project.id);
+  });
+
   it("writes down each move between stages, and only moves", async () => {
     const mine = (await crm.listCustomers(a)).find((c) => c.name === "Morgan Example")!;
     const first = (await crm.customerDetail(a, mine.id))!.jobs.find((j) => j.title === "Solar" && j.address === ROOF.address)!;

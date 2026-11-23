@@ -1,12 +1,30 @@
 "use client";
 
+import { flushSync } from "react-dom";
 import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import type { SolState } from "@/lib/domain/design/sol";
-import { SOL_ASK, SOL_CHANGED, SOL_INDUCTION, SOL_STATE, SOL_TOGGLE, loadSol, toggleSolHere, type SolAsk } from "@/lib/services/sol";
+import {
+  SOL_ASK,
+  SOL_CHANGED,
+  SOL_DRAFT,
+  DEAL_SOL_STATE,
+  DEAL_SOL_TOGGLE,
+  SOL_INDUCTION,
+  SOL_STATE,
+  SOL_TOGGLE,
+  TODAY_FIRST,
+  loadSol,
+  toggleSolHere,
+  type SolAsk,
+  type SolDraft,
+} from "@/lib/services/sol";
 import { SOL_PANEL, solPanelWidth } from "@/lib/domain/design/sol-panel";
 import { SolChat } from "./sol-chat";
 import { SolMark } from "./sol-sun";
+import { SunBrainLines } from "./sol-icon";
+import { SolFan } from "./sol-fan";
 
 /** The page makes room for the panel on a wide screen (`html.sol-docked`, globals.css); kept for this tab. */
 const OPEN_CLASS = "sol-docked";
@@ -28,6 +46,7 @@ export function SolDock() {
   const [tucked, setTucked] = useState(false);
   const shown = open && !tucked;
   const [question, setQuestion] = useState<{ id: number; text: string; shown?: string } | null>(null);
+  const [draft, setDraft] = useState<(SolDraft & { id: number }) | null>(null);
   useEffect(() => {
     const toggle = () => {
       setTucked(false);
@@ -47,11 +66,30 @@ export function SolDock() {
       setTucked(false);
       setOpen(true);
     };
+    // Words begun in a small box elsewhere: the panel opens with them in its box, focused at once (inside the same key
+    // press, so a phone keeps its keyboard up), to be finished and sent there.
+    const drafted = (e: Event) => {
+      const d = (e as CustomEvent<SolDraft>).detail;
+      if (!d) return;
+      flushSync(() => {
+        setDraft({ ...d, id: Date.now() });
+        setTucked(false);
+        setOpen(true);
+      });
+      const box = document.querySelector<HTMLTextAreaElement>(".sol-panel textarea");
+      if (box) {
+        box.focus({ preventScroll: true });
+        const end = box.value.length;
+        box.setSelectionRange(end, end);
+      }
+    };
     window.addEventListener(SOL_TOGGLE, toggle);
+    window.addEventListener(SOL_DRAFT, drafted);
     window.addEventListener(SOL_ASK, asked);
     window.addEventListener(SOL_INDUCTION, induct);
     return () => {
       window.removeEventListener(SOL_TOGGLE, toggle);
+      window.removeEventListener(SOL_DRAFT, drafted);
       window.removeEventListener(SOL_ASK, asked);
       window.removeEventListener(SOL_INDUCTION, induct);
     };
@@ -86,6 +124,7 @@ export function SolDock() {
     return () => window.removeEventListener("keydown", key);
   }, [shown]);
   const width = useSolWidth();
+  const fit = useFitToKeyboard(shown);
   return (
     <>
       {open && tucked && (
@@ -102,8 +141,9 @@ export function SolDock() {
       <aside
         aria-label="Sol"
         aria-hidden={!shown}
+        style={fit}
         className={clsx(
-          "fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
+          "sol-panel fixed inset-y-0 right-0 z-50 w-full border-l border-line bg-surface transition-transform duration-300 motion-reduce:transition-none print:hidden lg:z-40 lg:w-[var(--sol-w)]",
           shown
             ? "translate-x-0 shadow-2xl min-[1440px]:shadow-[-8px_0_30px_rgba(20,22,26,0.06)]"
             : "pointer-events-none invisible translate-x-full",
@@ -136,6 +176,7 @@ export function SolDock() {
           <SolChat
             side
             question={question}
+            draft={draft}
             onClose={() => {
               setTucked(false);
               setOpen(false);
@@ -237,6 +278,18 @@ export function useSolUnread(): number {
   return n;
 }
 
+/** Whether a deal's Sol sheet is folded into the phone's foot bar round (`data-deal-sol-tucked`, `DEAL_SOL_STATE`). */
+function useDealSolTucked(): boolean {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    const read = () => setHeld(document.documentElement.dataset.dealSolTucked === "1" && document.documentElement.dataset.dealSol === "1");
+    read();
+    window.addEventListener(DEAL_SOL_STATE, read);
+    return () => window.removeEventListener(DEAL_SOL_STATE, read);
+  }, []);
+  return held;
+}
+
 /** Whether Sol's panel is open, as it says (`SOL_STATE`). */
 export function useSolOpen(): boolean {
   const [open, setOpen] = useState(false);
@@ -262,37 +315,95 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
   const unread = useSolUnread();
   const open = useSolOpen();
   const waiting = unread > 0 && !open;
+  const router = useRouter();
+  const path = usePathname();
+  // On the phone's foot bar he takes you to Today's first view, Business or My month (22 Nov 2026, Martin: "tapping
+  // the centre sol icon in the dock should actually avail the today business page"); his chat opens from the small
+  // boxes on a deal and the feed as soon as something is typed in them.
+  const dealSol = useDealSolTucked();
+  const goToday = () => {
+    // On a deal, Sol folded away sits in this round (22 Nov 2026, Martin: "he should minimise visually onto the centre
+    // sol icon so the user can see that's where they can re-engage Sol on the deal"): a press brings him back out.
+    if (dealSol) return window.dispatchEvent(new Event(DEAL_SOL_TOGGLE));
+    if (open) toggleSolHere(false);
+    if (path === "/design") window.dispatchEvent(new Event(TODAY_FIRST));
+    else router.push("/design?today=first");
+  };
+  // On the phone, a press brings Chat and Feed out of him (23 Nov 2026, Martin): Chat is Today, Feed the deal feed.
+  const [fan, setFan] = useState<HTMLElement | null>(null);
+  const [fanPath, setFanPath] = useState(path);
+  if (fanPath !== path) {
+    setFanPath(path);
+    setFan(null);
+  }
+  const press = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!phone) return toggleSolHere(false);
+    if (dealSol) return window.dispatchEvent(new Event(DEAL_SOL_TOGGLE));
+    const at = e.currentTarget;
+    setFan((f) => (f ? null : at));
+  };
   return (
-    <button
-      type="button"
-      onClick={() => toggleSolHere(phone)}
-      title="Sol, your assistant"
-      aria-label={unread ? `Sol: ${unread} unread` : "Sol, your assistant"}
-      aria-pressed={open}
-      className={clsx(
-        "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
-        // On the bar he is a bulb: wider than the bar and standing out of its top, as team chat's round used to
-        // (20 Nov 2026, Martin: "lets make the Sol brain larger so sits like a bulb (like the chat used to)").
-        small ? "size-10" : rail ? "-mx-2 -mt-5 mb-0.5 size-16" : phone ? "size-12" : "-my-2 size-12",
-      )}
-    >
-      {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
+    <>
+      {phone && fan && <SolFan anchor={fan} onChat={goToday} feedHref="/design/sales/feed" onClose={() => setFan(null)} />}
+      <button
+        type="button"
+        aria-expanded={phone && !dealSol ? Boolean(fan) : undefined}
+        onClick={press}
+        title={phone ? (dealSol ? "Sol on this deal" : "Chat or Feed") : "Sol, your assistant"}
+        data-holding={phone && dealSol ? "" : undefined}
+        aria-label={
+          phone
+            ? dealSol
+              ? "Sol on this deal"
+              : unread
+                ? `Sol: ${unread} unread. Chat or Feed`
+                : "Sol: Chat or Feed"
+            : unread
+              ? `Sol: ${unread} unread`
+              : "Sol, your assistant"
+        }
+        aria-pressed={open}
+        className={clsx(
+          "sol-orb group relative flex shrink-0 items-center justify-center rounded-full transition-shadow",
+          // On the bar he is a bulb: wider than the bar and standing out of its top, as team chat's round used to
+          // (20 Nov 2026, Martin: "lets make the Sol brain larger so sits like a bulb (like the chat used to)").
+          small ? "size-10" : rail ? "-mx-2 -mt-5 mb-0.5 size-16" : phone ? "size-[53px]" : "-my-2 size-12",
+        )}
+      >
+        {/* No rays (3 Nov 2026, Martin): the sun itself beats like a heart, a subtle signal to engage. No ring when his
           panel is open and no stars (18 Nov 2026, Martin: "lose its halo ring and resemble the same as the sol icon in
           the right hand chat"). */}
-      <span className="sol-heartbeat inline-flex">
-        <SolMark
-          className={clsx(
-            "transition-transform duration-300 group-hover:scale-110",
-            small ? "size-8" : rail ? "size-10" : phone ? "size-10" : "size-[38px]",
-          )}
-        />
-      </span>
-      {waiting && (
-        <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
-          {unread}
+        <span className={clsx("sol-heartbeat inline-flex", phone && "sol-sun-face")}>
+          <SolMark
+            className={clsx(
+              "transition-transform duration-300 group-hover:scale-110",
+              small ? "size-8" : rail ? "size-10" : phone ? "size-11" : "size-[38px]",
+            )}
+          />
         </span>
-      )}
-    </button>
+        {/* On the post-sale dock he is his etched brain glowing lime in a graphite round, the tiles' family (23 Nov 2026,
+          Martin: "imagine sol with all the orange taken away. The etch lines remain", then D of four); the sun fades
+          out and the round in as the dock turns. */}
+        {phone && (
+          // Shown by display, not opacity (23 Nov 2026, Martin: missing on his iPhone): Safari left the round unpainted
+          // when its opacity changed under the dock's frosted glass. The glow is a wide faint stroke inside the drawing,
+          // not a CSS filter, for the same reason.
+          <span className="sol-etch-face pointer-events-none absolute inset-0 items-center justify-center rounded-full">
+            <svg viewBox="9 10 82 82" className="size-10" aria-hidden>
+              <g opacity={0.3}>
+                <SunBrainLines stroke="currentColor" width={6} />
+              </g>
+              <SunBrainLines stroke="currentColor" width={2.4} />
+            </svg>
+          </span>
+        )}
+        {waiting && (
+          <span className="sol-glow absolute -bottom-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
+            {unread}
+          </span>
+        )}
+      </button>
+    </>
   );
 }
 
@@ -341,4 +452,34 @@ export function SolRail({
       {routines}
     </aside>
   );
+}
+
+/**
+ * On a phone the panel follows the part of the screen the keyboard leaves (23 Nov 2026, Martin: with the keyboard up
+ * in Safari the panel stopped short and the page showed under it). Safari keeps a fixed panel on the whole page while
+ * the keyboard is up and scrolls the page under it, so the panel is set to the visible part (`visualViewport`) and the
+ * page behind it is held still. A wide screen keeps the panel as it is (globals.css reads these only under 1024px).
+ */
+function useFitToKeyboard(shown: boolean): React.CSSProperties | undefined {
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!shown || !vv || window.matchMedia("(min-width: 1024px)").matches) {
+      queueMicrotask(() => setBox(null));
+      return;
+    }
+    const root = document.documentElement;
+    root.classList.add("sol-phone-open");
+    const fit = () => setBox({ top: Math.max(0, vv.offsetTop), height: vv.height });
+    fit();
+    vv.addEventListener("resize", fit);
+    vv.addEventListener("scroll", fit);
+    return () => {
+      vv.removeEventListener("resize", fit);
+      vv.removeEventListener("scroll", fit);
+      root.classList.remove("sol-phone-open");
+    };
+  }, [shown]);
+  if (!box) return undefined;
+  return { ["--vv-top" as string]: `${box.top}px`, ["--vv-h" as string]: `${box.height}px` };
 }

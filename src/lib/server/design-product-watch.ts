@@ -24,11 +24,13 @@ const designProducts = (d: RoofDesign | null): string[] =>
     : [];
 
 const builtProducts = (b: AsBuiltInput): string[] =>
-  [b.panels?.model, ...(b.inverters ?? []).map((i) => i.model), b.battery?.model].filter((m): m is string => Boolean(m?.trim()));
+  [b.panels?.model, ...(b.inverters ?? []).map((i) => i.model), b.battery?.model, b.charger?.model].filter((m): m is string =>
+    Boolean(m?.trim()),
+  );
 
 /**
  * Every sold and installed deal the viewer may see, with the products in its system: what was recorded as built when
- * there is an as-built (and the design's EV charger, which the as-built doesn't hold), else the design the customer
+ * there is an as-built (its EV charger too, since 22 Nov 2026), else the design the customer
  * signed for (else the roof's primary) and the product lines typed on the deal.
  */
 export async function dealKits(businessId: string, viewer: DealViewer): Promise<JobKit[]> {

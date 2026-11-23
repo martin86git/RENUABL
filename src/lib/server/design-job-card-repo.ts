@@ -8,19 +8,21 @@ import { randomBytes } from "node:crypto";
 import { systemDetails } from "@/lib/domain/design/deal";
 import { jobDrawing, stringsInWords, type Installer, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
 import { designSummary, type RoofDesign } from "@/lib/domain/design/roof-design";
-import { cleanAsBuilt, type AsBuilt, type AsBuiltInput, type Designed } from "@/lib/domain/design/as-built";
+import { cleanAsBuilt, plannedFromDetails, type AsBuilt, type AsBuiltInput, type Designed } from "@/lib/domain/design/as-built";
 import { query, transaction } from "./db";
 import { loadPrefs } from "./design-after-sale-repo";
 import { jobById, record, stageWordsOf } from "./design-crm-repo";
 import { NO_DESIGN, savedFor } from "./design-proposal-repo";
 import { linkedBusiness } from "./design-job-shares-repo";
 import { BUSINESS_LINK } from "@/lib/domain/design/job-shares";
+import { INSTALLED_STAGES } from "@/lib/domain/design/crm";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
 export interface JobCardView {
   business: string;
-  job: { id: string; title: string; address: string; installDate: string | null; stage: string };
+  /** `installed`: the deal is at an installed stage or past it, so the as-built is due. */
+  job: { id: string; title: string; address: string; installDate: string | null; stage: string; installed?: boolean };
   customer: { name: string; phone: string; email?: string };
   /** The system, as the deal and its design say: only the lines filled in. */
   details: { label: string; value: string }[];
@@ -32,7 +34,10 @@ export interface JobCardView {
   strings: JobDrawing | null;
   stringWords: string[];
   notes: JobNote[];
-  /** What the design says to install, and what was really installed (null until recorded): the as-built. */
+  /**
+   * What was to be installed (the design's, else the deal's typed system; null when neither says anything), and what
+   * was really installed (null until recorded): the as-built, kept apart from the design so later changes never touch it.
+   */
   designed: Designed | null;
   asBuilt: AsBuilt | null;
   /** For the business's own people: the installers on file, and when the card last went to each. */
@@ -74,9 +79,13 @@ export async function jobCard(
         panels: designSummary(design).panels,
         panelModel: design.panel?.name ?? "",
         inverters: (design.inverters ?? []).map((i) => i.name),
-        battery: design.battery ? { model: design.battery.name, modules: design.battery.qty } : null,
+        battery: design.battery
+          ? { model: design.battery.name, modules: design.battery.qty, kwh: Math.round(design.battery.kwh * design.battery.qty * 10) / 10 }
+          : null,
+        charger: design.charger?.name ?? null,
+        from: "design",
       }
-    : null;
+    : plannedFromDetails(job.details ?? {});
   const [notes, prefs, links, built] = await Promise.all([
     jobNotes(member.businessId, jobId),
     loadPrefs(member.businessId),
@@ -96,6 +105,7 @@ export async function jobCard(
       address: job.address || customer.address,
       installDate: job.installDate,
       stage: (await stageWordsOf(member.businessId))(job),
+      installed: INSTALLED_STAGES.includes(job.stage),
     },
     customer: { name: customer.name, phone: customer.phone, ...(forInstaller ? {} : { email: customer.email }) },
     details,
@@ -138,6 +148,7 @@ export async function saveAsBuilt(
   raw: unknown,
   by: string,
   differences: string[],
+  planned: Designed | null = null,
 ): Promise<AsBuilt | null> {
   const found = await jobById(businessId, jobId);
   if (!found) return null;
@@ -151,7 +162,9 @@ export async function saveAsBuilt(
     customerId: found.customer.id,
     jobId,
     kind: "note",
-    text: `As built recorded by ${by}${differences.length ? `: ${differences.join(" ")}` : ": as designed."}`,
+    text: `As built recorded by ${by}${
+      differences.length ? `: ${differences.join(" ")}` : !planned ? "." : planned.from === "deal" ? ": as planned." : ": as designed."
+    }`,
     by,
   }).catch(() => undefined);
   return asBuiltOf(businessId, jobId);

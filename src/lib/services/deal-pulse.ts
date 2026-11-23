@@ -39,3 +39,9 @@ export async function uploadDealFiles(jobId: string, files: File[]): Promise<Ans
     return { ok: false, message: "Those files couldn't be kept just now." };
   }
 }
+
+/** The customer's emails to and from them in the signed-in member's own mailboxes, for the deal's Notes timeline. */
+export const loadDealMail = (jobId: string) =>
+  ask<{ mail: import("@/lib/domain/design/deal-mail").DealMail[]; connected: boolean }>(
+    `/api/design/jobs/${encodeURIComponent(jobId)}/mail`,
+  );

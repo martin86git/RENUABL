@@ -6,7 +6,20 @@
  */
 import { randomBytes } from "node:crypto";
 import { roughPlace, suburbAlone } from "@/lib/domain/design/marketplace";
-import { PHOTOS_MAX, askedEmail, type ItemInput, type ItemState, type TradeItem, type TradeMessage } from "@/lib/domain/design/trade";
+import {
+  OFFER_STATE_WORDS,
+  PHOTOS_MAX,
+  askedEmail,
+  cleanOffer,
+  offerAnsweredEmail,
+  offerEmail,
+  offerStateNow,
+  offerWords,
+  type ItemInput,
+  type ItemState,
+  type TradeItem,
+  type TradeMessage,
+} from "@/lib/domain/design/trade";
 import { siteUrl } from "@/lib/domain/sms";
 import { query, transaction } from "./db";
 import { safeImage } from "./design-images";
@@ -180,9 +193,21 @@ export async function itemDetail(businessId: string, id: string): Promise<ItemDe
     [businessId, id],
   );
   const lines = threads.length
-    ? await query<{ id: string; thread: string; own: boolean; business: string; text: string; at: string; unread: boolean }>(
+    ? await query<{
+        id: string;
+        thread: string;
+        own: boolean;
+        business: string;
+        text: string;
+        at: string;
+        unread: boolean;
+        offer: number | null;
+        offerQty: number | null;
+        offerState: string | null;
+      }>(
         `select m.id, m.thread_id as thread, (m.from_business = $1) as own, b.name as business, m.text, ${moment("m.at")} as at,
-                (m.from_business <> $1 and m.read_at is null) as unread
+                (m.from_business <> $1 and m.read_at is null) as unread,
+                m.offer::float8 as offer, m.offer_qty as "offerQty", m.offer_state as "offerState"
            from design_trade_messages m join businesses b on b.id = m.from_business where m.thread_id = any($2) order by m.at`,
         [businessId, threads.map((t) => t.id)],
       )
@@ -194,7 +219,14 @@ export async function itemDetail(businessId: string, id: string): Promise<ItemDe
       return {
         id: t.id,
         with: t.with,
-        messages: mine.map(({ id: mid, own, business, text, at }) => ({ id: mid, own, business, text, at })),
+        messages: mine.map(({ id: mid, own, business, text, at, offer, offerQty, offerState }) => ({
+          id: mid,
+          own,
+          business,
+          text,
+          at,
+          ...(offer !== null ? { offer: { each: offer, qty: offerQty ?? 1, state: offerStateNow(offerState, at) } } : {}),
+        })),
         unread: mine.filter((l) => l.unread).length,
       };
     }),
@@ -211,15 +243,26 @@ export async function sendMessage(
   id: string,
   text: string,
   threadId: string | null,
+  offerRaw?: unknown,
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
   const done = await transaction(async (q) => {
-    const items = await q<{ seller: string; status: ItemState; title: string; createdBy: string }>(
-      `select business_id as seller, status, title, created_by as "createdBy" from design_trade_items where id = $1`,
+    const items = await q<{ seller: string; status: ItemState; title: string; createdBy: string; qty: number }>(
+      `select business_id as seller, status, title, created_by as "createdBy", qty from design_trade_items where id = $1 for update`,
       [id],
     );
     const item = items[0];
     if (!item) return { ok: false as const, status: 404, message: "That item isn't there any more." };
     const selling = item.seller === member.businessId;
+    let offer: { each: number; qty: number } | null = null;
+    if (offerRaw !== undefined) {
+      if (selling) return { ok: false as const, status: 409, message: "You can't make an offer on your own item." };
+      if (item.status !== "available" && item.status !== "pending")
+        return { ok: false as const, status: 409, message: "This item isn't for sale any more." };
+      const clean = cleanOffer(offerRaw, item.qty);
+      if (!clean.ok) return { ok: false as const, status: 422, message: clean.message };
+      offer = clean.value;
+      text = text ? `${offerWords(offer.each, offer.qty)}\n\n${text}` : offerWords(offer.each, offer.qty);
+    }
     let thread: string;
     if (selling) {
       const t = await q<{ id: string }>(`select id from design_trade_threads where id = $1 and item_id = $2`, [threadId ?? "", id]);
@@ -244,13 +287,27 @@ export async function sendMessage(
       thread,
       member.businessId,
     ]);
-    await q(`insert into design_trade_messages (id, thread_id, from_business, by_email, text) values ($1,$2,$3,$4,$5)`, [
-      newId("tmg"),
-      thread,
-      member.businessId,
-      member.email.toLowerCase(),
-      text,
-    ]);
+    // A new offer replaces this buyer's earlier one still open.
+    if (offer)
+      await q(
+        `update design_trade_messages set offer_state = 'withdrawn', offer_answered_at = now()
+          where thread_id = $1 and from_business = $2 and offer is not null and coalesce(offer_state, 'open') = 'open'`,
+        [thread, member.businessId],
+      );
+    await q(
+      `insert into design_trade_messages (id, thread_id, from_business, by_email, text, offer, offer_qty, offer_state)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [
+        newId("tmg"),
+        thread,
+        member.businessId,
+        member.email.toLowerCase(),
+        text,
+        offer?.each ?? null,
+        offer?.qty ?? null,
+        offer ? "open" : null,
+      ],
+    );
     // Who to tell: the seller's lister, or the buyer's last writer.
     const to = selling
       ? (
@@ -260,14 +317,18 @@ export async function sendMessage(
           )
         )[0]?.email
       : item.createdBy;
-    return { ok: true as const, tell: Number(waiting[0].n) === 0 && to ? to : null, title: item.title };
+    // An offer is always told; a message only when it is the first line the other side hasn't read.
+    return { ok: true as const, tell: (offer || Number(waiting[0].n) === 0) && to ? to : null, title: item.title, offer };
   });
   if (!done.ok) return done;
   const site = siteUrl();
+  const link = `${site}/design/marketplace/equipment/${id}`;
   if (done.tell && site && emailProvider())
     await sendEmail({
       to: done.tell,
-      ...askedEmail({ item: done.title, buyer: member.businessName, text, link: `${site}/design/marketplace/equipment/${id}` }),
+      ...(done.offer
+        ? offerEmail({ item: done.title, buyer: member.businessName, each: done.offer.each, qty: done.offer.qty, link })
+        : askedEmail({ item: done.title, buyer: member.businessName, text, link })),
     }).catch((e) => console.error("trade message email failed", e instanceof Error ? e.message : e));
   return { ok: true };
 }
@@ -335,4 +396,76 @@ export async function tradeThreads(businessId: string): Promise<ThreadLine[]> {
       order by last.at desc limit 100`,
     [businessId],
   );
+}
+
+/**
+ * The seller accepts or declines an offer still open, or the buyer withdraws its own. Accepting marks the item pending
+ * (when it was available) and puts a line in the conversation; the buyer is emailed the answer.
+ */
+export async function answerOffer(
+  member: Who,
+  itemId: string,
+  messageId: string,
+  act: "accept" | "decline" | "withdraw",
+): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+  const done = await transaction(async (q) => {
+    const rows = await q<{
+      thread: string;
+      seller: string;
+      buyer: string;
+      status: ItemState;
+      title: string;
+      each: number;
+      qty: number;
+      state: string | null;
+      at: string;
+      byEmail: string;
+    }>(
+      `select m.thread_id as thread, i.business_id as seller, t.buyer_id as buyer, i.status, i.title, m.offer::float8 as each,
+              coalesce(m.offer_qty, 1) as qty, m.offer_state as state, ${moment("m.at")} as at, m.by_email as "byEmail"
+         from design_trade_messages m join design_trade_threads t on t.id = m.thread_id join design_trade_items i on i.id = t.item_id
+        where m.id = $1 and i.id = $2 and m.offer is not null for update of m`,
+      [messageId, itemId],
+    );
+    const o = rows[0];
+    if (!o) return { ok: false as const, status: 404, message: "That offer isn't there any more." };
+    const mayAct = act === "withdraw" ? o.buyer === member.businessId : o.seller === member.businessId;
+    if (!mayAct) return { ok: false as const, status: 403, message: "That offer isn't yours to answer." };
+    const now = offerStateNow(o.state, o.at);
+    if (now !== "open")
+      return { ok: false as const, status: 409, message: `That offer is ${OFFER_STATE_WORDS[now].toLowerCase()} already.` };
+    const state = act === "accept" ? "accepted" : act === "decline" ? "declined" : "withdrawn";
+    await q(`update design_trade_messages set offer_state = $2, offer_answered_at = now() where id = $1`, [messageId, state]);
+    if (act === "accept" && o.status === "available")
+      await q(`update design_trade_items set status = 'pending', updated_at = now() where id = $1`, [itemId]);
+    const words = offerWords(o.each, o.qty).replace(/^Offered /, "");
+    const line =
+      act === "accept"
+        ? `Accepted your offer of ${words}. Let's arrange payment and pickup here.`
+        : act === "decline"
+          ? `Declined your offer of ${words}.`
+          : `Withdrew the offer of ${words}.`;
+    await q(`insert into design_trade_messages (id, thread_id, from_business, by_email, text) values ($1,$2,$3,$4,$5)`, [
+      newId("tmg"),
+      o.thread,
+      member.businessId,
+      member.email.toLowerCase(),
+      line,
+    ]);
+    return { ok: true as const, tell: act === "withdraw" ? null : o.byEmail, title: o.title, words };
+  });
+  if (!done.ok) return done;
+  const site = siteUrl();
+  if (done.tell && site && emailProvider())
+    await sendEmail({
+      to: done.tell,
+      ...offerAnsweredEmail({
+        item: done.title,
+        seller: member.businessName,
+        accepted: act === "accept",
+        words: done.words,
+        link: `${site}/design/marketplace/equipment/${itemId}`,
+      }),
+    }).catch((e) => console.error("offer answer email failed", e instanceof Error ? e.message : e));
+  return { ok: true };
 }

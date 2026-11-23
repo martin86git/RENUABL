@@ -14,6 +14,176 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "The example questions in Sol's chat show for your first three chats, then step aside.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat opens fresh each time, with your last chat a press away, a taller box to type in, and a quieter header.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "Every tour has a Skip button, so you can leave it at any step.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Deals",
+    words: "On a phone, the pipeline's columns are narrower so the next one shows, and each card says it in fewer words.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Billing",
+    words: "Top-up packs are clearer cards: the credits large, extra credits in green, the price below, and the best value marked.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketplace",
+    words: "On a phone, the Marketplace dock's icons are plain blue outlines, no dark tiles.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Email",
+    words: "On a phone, Email is tighter: the filters across the width, then search with Compact, Refresh and Compose as rounds.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words:
+      "Today is Sol's screen alone. The deal feed opens Deals, the calendar sits beside email, and Sol's round opens Chat and Feed as a clover.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Chat and Feed's leaves are smaller, rounder, white and joined in the middle, and Proposals closed shows a green ring.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Marketplace",
+    words:
+      "Make an offer on equipment for sale: pick 10% lower, the asking price or your own. The seller accepts or declines within 48 hours.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Settings",
+    words:
+      "Bring in your HubSpot deals: match its stages and fields to yours, and each comes across with its contact, notes, emails and calls.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On the Marketplace dock, its blue round takes Sol's place, with My listings to its left and Messages to its right.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "The ball on the phone's dock now has a third turn: the Marketplace, with listings, buy and sell, watching and messages.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Designer",
+    words: "On a phone, Select, Add a panel, the hand and Erase always sit either side of Sol at the foot of the roof.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Signing in",
+    words: "Back after the phone was locked, RENUABL waits to reconnect and goes back in by itself, instead of asking you to sign in.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Topping up from the usage box now pays by card right in the box, without leaving the page.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "A usage gauge under the date on Today opens this month's usage, with packs to top up Sol and design credits.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Usage",
+    words:
+      "A Usage page under the settings cog shows this month's allowances and Sol's use by day, and the owner is emailed at 50, 80 and 100%.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Designer",
+    words: "Today warns before STCs change, and you choose the installation period new quotes are priced for.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Proposals",
+    words: "Customer proposals carry a small, quiet Powered by RENUABL in the bottom corner and the footer.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the tour of a deal folds Sol's box away while it points at other buttons, so nothing covers them.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On a phone, once RENUABL scrolls away a slim bar keeps it small at the top, so screenshots still show it.",
+  },
+  {
+    day: "2026-11-23",
+    area: "On a phone",
+    words: "Scrolled well down a page, a small arrow in the bottom right takes you back to the top in one press.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Your account",
+    words: "Your team's own sign-in page, with your logo and a private code in its address. Copy it from Your account.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Everywhere",
+    words: "When Safari won't take dictation, the microphone says why and the next tap opens your keyboard to use its own.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words:
+      "The Business and Feed switch is a smoother segmented control with icons, and Sol's brain etch is a lighter grey, on phones too.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Quote",
+    words: "Including RCBOs in the quote now asks how many, with a stepper beside it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designs list: the leading quote, what's on the proposal and which is recommended are said in words on each design.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: zoom in and out with the + and − on the map's right; the magnifier beside them turns on pinch zoom.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: drag Sol's box up to read more, or down to fold it to a strip; tap the strip to open it again.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "A brief hiccup reaching your account no longer says you need to sign in; the page tries again by itself.",
+  },
+  {
     day: "2026-11-22",
     area: "Today",
     words: "Today on a phone: the page scrolls down through Needs you and Performance, and their cards fit the screen.",
@@ -163,6 +333,11 @@ export const UPDATES: readonly Update[] = [
     area: "Deals",
     words:
       "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Sol",
+    words: "Hover over any message in a chat with Sol to copy it, or press the arrow to reply to that message.",
   },
   {
     day: "2026-11-21",
