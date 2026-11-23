@@ -38,6 +38,8 @@ import { NewDeal } from "./design-customers";
 import { Spotlight } from "./new-look";
 import { Welcome } from "./today-welcome";
 import { TodayChat, TodaySwitch, firstViewLabel, useInsights } from "./today-chat";
+import { InstallListPage } from "./install-lists";
+import { useDockSet } from "@/lib/services/dock-set";
 import { TODAY_FIRST } from "@/lib/services/sol";
 import { TODAY_VIEW_KEY, cleanSeen, todayOpensOn, type TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
@@ -186,6 +188,7 @@ export function TodayPad(props: {
     window.addEventListener(TODAY_FIRST, first);
     return () => window.removeEventListener(TODAY_FIRST, first);
   }, [setView]);
+  const jobsView = useDockSet() === "post";
   const [asking, setAsking] = useState(false);
   const items = useNextUp(props.jobs, props.today);
   const insights = useInsights();
@@ -297,7 +300,13 @@ export function TodayPad(props: {
             onTour={tour}
           />
         )}
-        {!welcoming && onFeed && (
+        {/* On the dock's post-sale tools, Feed is Jobs: every sold job not yet installed (23 Nov 2026, Martin). */}
+        {!welcoming && onFeed && jobsView && (
+          <div className="pb-6">
+            <InstallListPage switcher={null} />
+          </div>
+        )}
+        {!welcoming && onFeed && !jobsView && (
           <div className="pb-6">
             <InductionReminder />
             <DealFeed
