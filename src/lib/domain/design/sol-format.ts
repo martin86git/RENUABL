@@ -7,6 +7,7 @@
  * question is highlighted even unmarked, and the routine "Want more detail?" stays quiet. Pure, tested.
  */
 import { MORE_DETAIL } from "./sol-charts";
+import { withQuote } from "./chat-quote";
 
 export type SolBlock =
   | { kind: "para"; text: string }
@@ -304,4 +305,36 @@ export function answerFor(question: string, answer: string): string {
     .replace(/^\?\s+/, "")
     .slice(0, 300);
   return `Answering your question "${q}": ${answer.trim()}`;
+}
+
+/**
+ * What the box is replying to (21 Nov 2026, Martin: every message in a chat with Sol has a reply arrow on hover): one of
+ * his questions answered, or any message of the chat, his or the member's.
+ */
+export type SolReply = { kind: "question"; text: string } | { kind: "message"; text: string; from: "you" | "sol" };
+
+/** The longest piece of a replied-to message that goes to Sol (the chat shows a shorter clip, `MAX_QUOTE`). */
+export const REPLY_CLIP = 600;
+
+/**
+ * What goes to Sol and what the chat shows when the box replies to something. A question: named for him, the chat shows
+ * only the answer (`answerFor`). A message: named for him with as much of it as he needs to know which, and the chat
+ * shows the reply under a one-line quote of it (`withQuote`, the customer chat's "> " line).
+ */
+export function replyToSol(reply: SolReply | null, typed: string): { said: string; shown?: string } {
+  const words = typed.trim();
+  if (!reply || !words) return { said: words };
+  if (reply.kind === "question") return { said: answerFor(reply.text, words), shown: words };
+  const plain = solPlain(reply.text).replace(/\s+/g, " ").trim();
+  if (!plain) return { said: words };
+  const clip = plain.length > REPLY_CLIP ? `${plain.slice(0, REPLY_CLIP - 1).trimEnd()}…` : plain;
+  const whose = reply.from === "sol" ? "your message" : "what I said earlier";
+  return { said: `Replying to ${whose}: "${clip}"\n\n${words}`, shown: withQuote(words, plain) };
+}
+
+/** The line over the box while it replies: whose message, and the start of it. */
+export function replyLabel(reply: SolReply): { who: string; words: string } {
+  if (reply.kind === "question") return { who: "Sol's question", words: reply.text };
+  const plain = solPlain(reply.text).replace(/\s+/g, " ").trim();
+  return { who: reply.from === "sol" ? "Sol" : "yourself", words: plain.length > 160 ? `${plain.slice(0, 159).trimEnd()}…` : plain };
 }

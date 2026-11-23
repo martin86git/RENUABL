@@ -40,6 +40,7 @@ import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
 import { MyCalendar } from "./my-calendar";
 import { loadUsageBrief, type MeterNow } from "@/lib/services/usage";
+import { openUsagePop, usagePopReady } from "./usage-pop";
 import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
 import { CONNECT_RESULTS } from "@/lib/domain/design/my-calendar";
 
@@ -424,7 +425,16 @@ export function ProfileMenu(props: {
           {row("Your account", props.account, UserRound)}
           {usageHref && meters && (
             // Plan usage at a glance (23 Nov 2026, Martin, from instant.one's menu): each allowance and how much is used.
-            <Link href={usageHref} className="mx-1 my-1 block rounded-xl bg-canvas px-3 py-2.5 hover:bg-line/60">
+            <Link
+              href={usageHref}
+              onClick={(e) => {
+                if (!usagePopReady()) return;
+                e.preventDefault();
+                setOpen(false);
+                openUsagePop();
+              }}
+              className="mx-1 my-1 block rounded-xl bg-canvas px-3 py-2.5 hover:bg-line/60"
+            >
               <span className="flex items-center justify-between text-xs font-medium text-ink">
                 <span className="flex items-center gap-2">
                   <Gauge className="size-4" aria-hidden /> Usage this month

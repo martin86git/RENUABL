@@ -16,7 +16,7 @@ import {
   planNow,
   type TokenPack,
 } from "@/lib/domain/design/plans";
-import { SOL_PACKS, SOL_USE_WORDS, SOL_WORDS, type SolUse } from "@/lib/domain/design/sol-credits";
+import { SOL_PACKS, SOL_USE_WORDS, solPackBonus, SOL_WORDS, type SolUse } from "@/lib/domain/design/sol-credits";
 import {
   buySolCredits,
   buyTokens,
@@ -235,6 +235,9 @@ export function BillingPanel() {
                 onClick={() => void go(`sol-${p.credits}`, () => buySolCredits(p.credits))}
               >
                 <span className="text-base font-semibold text-ink">{p.credits.toLocaleString("en-AU")} credits</span>
+                {solPackBonus(p) > 0 && (
+                  <span className="text-xs font-medium text-positive">+{solPackBonus(p).toLocaleString("en-AU")} bonus</span>
+                )}
                 <span className="text-xs tabular-nums text-ink-2">
                   {busy === `sol-${p.credits}` ? "Opening Stripe…" : dollars(p.cents)}
                 </span>

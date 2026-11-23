@@ -14,6 +14,37 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-24",
+    area: "Billing",
+    words: "Top-up packs are clearer cards: the credits large, extra credits in green, the price below, and the best value marked.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketplace",
+    words: "On a phone, the Marketplace dock's icons are plain blue outlines, no dark tiles.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Email",
+    words: "On a phone, Email is tighter: the filters across the width, then search with Compact, Refresh and Compose as rounds.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words:
+      "Today is Sol's screen alone. The deal feed opens Deals, the calendar sits beside email, and Sol's round opens Chat and Feed as a clover.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Chat and Feed's leaves are smaller, rounder, white and joined in the middle, and Proposals closed shows a green ring.",
+  },
+  {
     day: "2026-11-23",
     area: "Marketplace",
     words:
@@ -282,6 +313,11 @@ export const UPDATES: readonly Update[] = [
     area: "Deals",
     words:
       "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Sol",
+    words: "Hover over any message in a chat with Sol to copy it, or press the arrow to reply to that message.",
   },
   {
     day: "2026-11-21",
