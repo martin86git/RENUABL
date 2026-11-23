@@ -3,7 +3,7 @@ import { marketClosed, marketplaceOpen } from "@/lib/domain/design/marketplace-l
 import { ITEM_STATES, cleanItemInput, cleanMessage, type ItemState } from "@/lib/domain/design/trade";
 import { can } from "@/lib/domain/design/account";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
-import { itemDetail, markThreadRead, sendMessage, updateItem } from "@/lib/server/design-trade-repo";
+import { answerOffer, itemDetail, markThreadRead, sendMessage, updateItem } from "@/lib/server/design-trade-repo";
 import { tellItemWatchers, withWatches } from "@/lib/server/design-market-watch-repo";
 import type { ItemDetail } from "@/lib/server/design-trade-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -57,7 +57,10 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/trade
   });
 }
 
-/** POST { text, thread? }: a message about the item, to the seller (from a buyer) or to one buyer (from the seller). */
+/**
+ * POST { text, thread? }: a message about the item, to the seller (from a buyer) or to one buyer (from the seller).
+ * { offer: { each, qty }, text? }: a buyer's offer. { do: "accept" | "decline" | "withdraw", message }: an offer answered.
+ */
 export async function POST(request: Request, ctx: RouteContext<"/api/design/trade/[id]">) {
   if (!marketplaceOpen()) return marketClosed();
   return answer(async () => {
@@ -68,13 +71,25 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/trad
       return Response.json({ ok: false, message: "Try again in a little while." }, { status: 429 });
     const read = await readBody(request, 6_000);
     if ("refuse" in read) return read.refuse;
+    const act = read.body.do;
+    if (act === "accept" || act === "decline" || act === "withdraw") {
+      // Answering for the seller speaks for the business; withdrawing a buyer's own offer is anyone's in it.
+      if (act !== "withdraw" && !can(who.member.role, "publish", who.member.permissions))
+        return Response.json({ ok: false, message: "You don't have access to answer offers for the business." }, { status: 403 });
+      const msg = typeof read.body.message === "string" ? read.body.message.slice(0, 80) : "";
+      const answered = await answerOffer(who.member, id.slice(0, 80), msg, act);
+      if (!answered.ok) return Response.json({ ok: false, message: answered.message }, { status: answered.status });
+      const detail = await itemDetail(who.member.businessId, id.slice(0, 80));
+      return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
+    }
+    const offer = read.body.offer;
     const text = cleanMessage(read.body.text);
-    if (!text) return Response.json({ ok: false, message: "Write a message first." }, { status: 422 });
+    if (!text && offer === undefined) return Response.json({ ok: false, message: "Write a message first." }, { status: 422 });
     // Asking about stock is anyone's; replying as the seller speaks for the business, so it needs the publish permission.
     const thread = typeof read.body.thread === "string" ? read.body.thread.slice(0, 80) : null;
     if (thread && !can(who.member.role, "publish", who.member.permissions))
       return Response.json({ ok: false, message: "You don't have access to reply for the business." }, { status: 403 });
-    const sent = await sendMessage(who.member, id.slice(0, 80), text, thread);
+    const sent = await sendMessage(who.member, id.slice(0, 80), text, thread, offer);
     if (!sent.ok) return Response.json({ ok: false, message: sent.message }, { status: sent.status });
     const detail = await itemDetail(who.member.businessId, id.slice(0, 80));
     return detail ? Response.json({ ok: true, ...(await watched(who.member, detail)) }) : missing();
