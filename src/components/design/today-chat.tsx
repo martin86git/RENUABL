@@ -32,6 +32,7 @@ import { loadFeed } from "@/lib/services/deal-feed";
 import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
 import { SolEtch } from "./sol-icon";
+import { UsageButton } from "./usage-pop";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
 import { loadPerfRows } from "@/lib/services/performance";
@@ -75,15 +76,21 @@ function TodayDate({ today }: { today: ISODate }) {
     };
   }, []);
   return (
-    <h1 className="mt-4 flex flex-col items-center justify-center gap-2 text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
-      <span>{todayHeading(today)}</span>
-      {weather && (weather.sky || weather.degrees !== null) && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[13px] tracking-normal text-white">
-          {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
-          {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
-        </span>
-      )}
-    </h1>
+    <div className="mt-4 flex flex-col items-center gap-2">
+      <h1 className="text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+        {todayHeading(today)}
+      </h1>
+      <div className="flex items-center gap-2">
+        {weather && (weather.sky || weather.degrees !== null) && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[13px] tracking-normal text-white">
+            {weather.sky && <span aria-hidden>{SKY_EMOJI[weather.sky]}</span>}
+            {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
+          </span>
+        )}
+        {/* Usage and top-ups, for the owner and admins (usage-pop.tsx; 23 Nov 2026, Martin). */}
+        <UsageButton />
+      </div>
+    </div>
   );
 }
 

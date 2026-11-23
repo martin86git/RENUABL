@@ -38,3 +38,29 @@ export async function loadUsageBrief(): Promise<MeterNow[] | null> {
     return null;
   }
 }
+
+export interface UsagePop {
+  meters: MeterNow[];
+  ends: string;
+  daysLeft: number;
+  solBought: number;
+  /** Whether this business buys Sol credits (a retailer). */
+  solPacks: boolean;
+  voice: { on: boolean; capCents: number; charged: boolean };
+  designCredits: number;
+  /** Only the owner buys. */
+  owner: boolean;
+  payments: boolean;
+}
+
+/** What Today's usage pop-up shows; null when this person may not see usage. */
+export async function loadUsagePop(): Promise<UsagePop | null> {
+  try {
+    const res = await fetch("/api/design/usage?pop=1", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { ok?: boolean } & UsagePop;
+    return json.ok ? json : null;
+  } catch {
+    return null;
+  }
+}
