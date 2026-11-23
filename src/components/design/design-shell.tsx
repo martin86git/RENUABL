@@ -445,6 +445,33 @@ function Shell({
         })}
       </nav>
     ) : null;
+  // The More sheet: what the dock on show already reaches isn't repeated (23 Nov 2026, Martin). Sol's round goes to
+  // Today and the designer is on every designing dock, so both are always left out.
+  const dockTabs = retail ? (post ? POST_TABS : PHONE_TABS) : (KIND_TABS[kind as Exclude<BusinessKind, "retailer">] ?? []);
+  const docked = (href: string) =>
+    href === PATHS.home || href === PATHS.designer || dockTabs.some((t) => t.label !== VOICE_TAB && t.href === href);
+  const moreLinks = [
+    ...(retail ? [{ label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 }] : []),
+    { label: "Team chat", href: PATHS.team, n: teamUnread },
+    ...(retail
+      ? [
+          { label: "Messages", href: PATHS.messages, n: unread },
+          { label: "Notifications", href: PATHS.notifications, n: mentions },
+          { label: "Email", href: PATHS.inbox, n: mail },
+        ]
+      : []),
+    { label: "Updates", href: PATHS.updates, n: updates },
+    { label: "Feedback", href: PATHS.feedback, n: 0 },
+    ...(kind !== "inspector" ? [{ label: "Usage", href: `${PATHS.settings}/usage`, n: 0 }] : []),
+    { label: "Settings", href: PATHS.settings, n: 0 },
+    { label: "Your account", href: PATHS.account, n: 0 },
+  ];
+  // What is waiting on this person, everywhere it is counted, docked or not: the sheet opens on it.
+  const waiting = [
+    ...moreLinks.filter((r) => r.n > 0 && r.href !== PATHS.updates),
+    ...sections.flatMap((sec) => sec.pages.filter((p) => count(p.id) > 0).map((p) => ({ label: p.label, href: p.href, n: count(p.id) }))),
+  ].filter((w, i, all) => all.findIndex((x) => x.href === w.href) === i);
+  const waitingTotal = waiting.reduce((a, w) => a + w.n, 0);
   /** One place on the phone's foot bar. `dark`: a post-sale tool, drawn for the post-sale dock. */
   const tabFor = (t: PhoneTab, dark: boolean) => {
     if (retail && t.label === VOICE_TAB)
@@ -917,75 +944,68 @@ function Shell({
           <button type="button" aria-label="Close" className="absolute inset-0 bg-ink/40" onClick={() => setMore(false)} />
           <div className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-[2rem] bg-surface px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-3">
             <span className="mx-auto block h-1 w-10 rounded-full bg-line" aria-hidden />
-            {retail && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMore(false);
-                  setSearching(true);
-                }}
-                className="mt-3 flex min-h-12 w-full items-center gap-3 rounded-xl border border-line px-3 text-base text-muted"
-              >
-                <Search className="size-5" aria-hidden /> Search, or ask Sol
-              </button>
-            )}
-            {designsRoofs(kind) && (
-              <Link
-                href={PATHS.designer}
-                onClick={() => setMore(false)}
-                className="mt-2 flex min-h-12 items-center gap-3 rounded-xl bg-sun-line px-3 text-base font-medium text-white"
-              >
-                <PenTool className="size-5" aria-hidden /> Design tool
-              </Link>
-            )}
-            {sections.map((sec) => (
-              <div key={sec.id}>
-                <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
-                {sec.pages.map((p) => (
+            {/* What is waiting first, then the contents (23 Nov 2026, Martin: "it should contain information before
+                providing a table of contents", and nothing the dock already covers). */}
+            <div className="px-3 pt-4">
+              {account.business?.name && <p className="text-[12px] text-muted">{account.business.name}</p>}
+              <p className="text-[20px] font-semibold tracking-tight text-ink">
+                {waitingTotal > 0 ? `${waitingTotal} waiting on you` : "Nothing's waiting on you"}
+              </p>
+            </div>
+            {waiting.length > 0 && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {waiting.map((w) => (
                   <Link
-                    key={p.id}
-                    href={p.href}
+                    key={w.href}
+                    href={w.href}
                     onClick={() => setMore(false)}
-                    className={clsx(
-                      "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
-                      here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
-                    )}
+                    className="flex min-h-[4.25rem] flex-col justify-center rounded-2xl bg-canvas px-3.5 py-2.5"
                   >
-                    <span className="flex-1">{p.label}</span>
-                    {count(p.id) > 0 && (
-                      <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
-                    )}
+                    <span className="text-[22px] font-semibold leading-none tabular-nums text-sun-line">{w.n}</span>
+                    <span className="mt-1 text-[13px] font-medium text-ink">{w.label}</span>
                   </Link>
                 ))}
               </div>
-            ))}
+            )}
+            {sections.map((sec) => {
+              const pages = sec.pages.filter((p) => !docked(p.href));
+              if (!pages.length) return null;
+              return (
+                <div key={sec.id}>
+                  <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">{sec.label}</p>
+                  {pages.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={p.href}
+                      onClick={() => setMore(false)}
+                      className={clsx(
+                        "flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium",
+                        here?.page.id === p.id ? "bg-ink text-white" : "text-ink",
+                      )}
+                    >
+                      <span className="flex-1">{p.label}</span>
+                      {count(p.id) > 0 && (
+                        <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{count(p.id)}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              );
+            })}
             <div className="mt-4 border-t border-line pt-2">
-              {[
-                ...(retail ? [{ label: "Sol's page: reminders and preferences", href: PATHS.sol, n: 0 }] : []),
-                { label: "Team chat", href: PATHS.team, n: 0 },
-                ...(retail
-                  ? [
-                      { label: "Messages", href: PATHS.messages, n: unread },
-                      { label: "Notifications", href: PATHS.notifications, n: mentions },
-                      { label: "Email", href: PATHS.inbox, n: mail },
-                    ]
-                  : []),
-                { label: "Updates", href: PATHS.updates, n: updates },
-                { label: "Feedback", href: PATHS.feedback, n: 0 },
-                ...(kind !== "inspector" ? [{ label: "Usage", href: `${PATHS.settings}/usage`, n: 0 }] : []),
-                { label: "Settings", href: PATHS.settings, n: 0 },
-                { label: "Your account", href: PATHS.account, n: 0 },
-              ].map((r) => (
-                <Link
-                  key={r.href}
-                  href={r.href}
-                  onClick={() => setMore(false)}
-                  className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
-                >
-                  <span className="flex-1">{r.label}</span>
-                  {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
-                </Link>
-              ))}
+              {moreLinks
+                .filter((r) => !docked(r.href))
+                .map((r) => (
+                  <Link
+                    key={r.href}
+                    href={r.href}
+                    onClick={() => setMore(false)}
+                    className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-base font-medium text-ink"
+                  >
+                    <span className="flex-1">{r.label}</span>
+                    {r.n > 0 && <span className="rounded-full bg-sun-line px-2 text-xs font-semibold text-white">{r.n}</span>}
+                  </Link>
+                ))}
             </div>
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-line px-3 pt-4 text-sm text-muted">
               <span className="truncate">{account.email}</span>
