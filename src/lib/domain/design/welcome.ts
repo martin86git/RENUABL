@@ -52,37 +52,13 @@ export function welcomeLines(firstName: string | null, business: string): Record
  * (the first view or Feed) before it is lit. A place still not on screen is passed over.
  * 20 Nov 2026, Martin: the tour "didnt show me the feed, deals pipeline". It now takes in the feed (Needs you, a deal's
  * card and its next move, the deals beside it) and Sales' pipeline, and says the menu and the bar as they are today.
+ * 23 Nov 2026: the feed left Today for Sales (its landing view), so the tour says it there and no longer turns Today.
  */
 export const WELCOME_TOUR: { what: string; now: string; at: string; go?: "chat" | "feed" }[] = [
   {
     what: "Today",
-    now: "is your home screen, in two views. The first is how the month is going and what's worth changing; Feed is your deals as they happen.",
-    at: '[data-tour="today-switch"] [role="tablist"]',
-    go: "chat",
-  },
-  {
-    what: "Ask Sol",
-    now: "about the business here: why a month is down, which leads are worth chasing, what to say to a customer.",
+    now: "is Sol's screen: how the month is going, and his box to ask anything about the business, from why a month is down to what to say to a customer.",
     at: '[data-tour="today-sol"]',
-    go: "chat",
-  },
-  {
-    what: "Needs you",
-    now: "is the top of the feed: the work only a person can do, most pressing first. Clear it and the count goes down.",
-    at: '[data-tour="feed-needs"]',
-    go: "feed",
-  },
-  {
-    what: "Each card",
-    now: "is one deal: what just happened, what Sol has lined up, and one lit button for the next move. Done or Later takes it off your list until something new happens.",
-    at: '[data-tour="feed-card"]',
-    go: "feed",
-  },
-  {
-    what: "Your deals",
-    now: "sit beside the feed: new ones, those in progress, or all of them. Pick one to bring up its card.",
-    at: 'aside[aria-label="Deals"]',
-    go: "feed",
   },
   {
     what: "The designer",
@@ -91,7 +67,7 @@ export const WELCOME_TOUR: { what: string; now: string; at: string; go?: "chat" 
   },
   {
     what: "Sales",
-    now: "holds your pipeline: every deal as a card in a column for its stage, dragged along as it moves. Proposals open and closed, and your calls, sit beside it.",
+    now: "opens on the feed: every deal as it happens, with what needs you first. The pipeline, proposals open and closed, and your calls sit beside it.",
     at: '[data-tour="section-proposals"]',
   },
   {

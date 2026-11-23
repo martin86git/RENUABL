@@ -21,7 +21,18 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
     area: "Today",
+    words:
+      "Today is Sol's screen alone. The deal feed opens Deals, the calendar sits beside email, and Sol's round opens Chat and Feed as a clover.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
     words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Chat and Feed's leaves are smaller, rounder, white and joined in the middle, and Proposals closed shows a green ring.",
   },
   {
     day: "2026-11-23",
