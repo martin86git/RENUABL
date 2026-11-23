@@ -59,7 +59,7 @@ import {
 } from "@/lib/services/crm";
 import { NewDeal } from "./design-customers";
 import { useDesignAccount } from "./design-account";
-import { PATHS, PageHead, ui } from "./design-shell";
+import { PATHS, PageHead, PhoneDealsSwitch, ui } from "./design-shell";
 import { HEAT, PulseMarks } from "./deal-pulse";
 import { BatteryIcon, ChargerIcon, PanelIcon } from "./deal-banner";
 import { jobHas } from "@/lib/domain/design/customers";
@@ -352,7 +352,8 @@ export function PipelinesPage() {
     </select>
   );
 
-  const pipelineSelect = (className: string, withNew: boolean) => (
+  // "Sales pipeline" reads "Sales" where room is short: the segment already says it is the pipeline.
+  const pipelineSelect = (className: string, withNew: boolean, short = false) => (
     <select
       className={className}
       value={named.id}
@@ -366,7 +367,7 @@ export function PipelinesPage() {
         .filter((p) => p.set)
         .map((p) => (
           <option key={p.id} value={p.id}>
-            {p.name}
+            {short ? p.name.replace(/\s+pipeline$/i, "") : p.name}
           </option>
         ))}
       {all.some((p) => !p.set) && (
@@ -375,7 +376,7 @@ export function PipelinesPage() {
             .filter((p) => !p.set)
             .map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {short ? p.name.replace(/\s+pipeline$/i, "") : p.name}
               </option>
             ))}
         </optgroup>
@@ -392,78 +393,89 @@ export function PipelinesPage() {
 
   return (
     <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10">
-      {/* On a phone: one slim graphite bar (23 Nov 2026, Martin: the card wasted space). The pipeline is the title
-          (pressed to pick another) with its count and worth under it; then whose deals as a round, cards or list, and
-          New deal as a plus. */}
-      <div className="flex items-center gap-1.5 rounded-2xl bg-primary py-2 pl-3.5 pr-2 text-primary-ink sm:hidden">
-        <div className="min-w-0 flex-1">
-          <label className="relative flex min-w-0 items-center">
-            <span className="sr-only">Pipeline</span>
-            {pipelineSelect(
-              "min-w-0 max-w-full appearance-none truncate bg-transparent pr-5 text-[16px] font-semibold tracking-[-0.01em] text-primary-ink outline-none [field-sizing:content] [&_option]:text-ink",
-              false,
-            )}
-            <ChevronDown className="pointer-events-none absolute right-0 size-3.5 opacity-80" aria-hidden />
-          </label>
-          <p className="text-[11px] leading-tight tabular-nums opacity-70">
-            {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${shortDollars(worth)}` : ""}` : "\u00a0"}
-            {whose !== "all" && <span> · {whose === "mine" ? "mine" : "no owner"}</span>}
-          </p>
-        </div>
-        <label
-          className={clsx(
-            "relative inline-flex size-9 shrink-0 items-center justify-center rounded-lg ring-1",
-            whose === "all" ? "ring-white/15" : "bg-white/18 ring-white/30",
-          )}
-          title="Whose deals"
-        >
-          <span className="sr-only">Whose deals</span>
-          {whose === "all" ? (
-            <Users className="size-4" aria-hidden />
-          ) : whose === "mine" ? (
-            <User className="size-4" aria-hidden />
-          ) : (
-            <UserX className="size-4" aria-hidden />
-          )}
-          <select
-            className="absolute inset-0 cursor-pointer opacity-0"
-            value={whose}
-            onChange={(e) => setWhose(e.target.value as typeof whose)}
-          >
-            <option value="all">Everyone&apos;s deals</option>
-            <option value="mine">My deals</option>
-            <option value="none">No owner yet</option>
-          </select>
-        </label>
-        <div className="flex shrink-0 items-center rounded-lg bg-white/8 p-0.5 ring-1 ring-white/15" role="group" aria-label="View">
-          {views.map(({ view, name, Icon }) => (
-            <button
-              key={view}
-              aria-pressed={choice.view === view}
-              aria-label={name}
-              title={name}
-              onClick={() => choose({ ...choice, view })}
-              className={clsx(
-                "inline-flex size-8 items-center justify-center rounded-md",
-                choice.view === view ? "bg-white/18" : "opacity-60",
+      {/* On a phone (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can
+          dock / spawn off of it"): the Deals switch's Pipeline segment is the pipeline picker, its count and worth under
+          the name, and whose deals, cards or list and New deal hang under it as a tray; no card of their own. */}
+      <PhoneDealsSwitch
+        path={PATHS.pipelines}
+        className="-mt-1 mb-1 sm:hidden"
+        pipeline={
+          <>
+            <label className="relative flex min-w-0 items-center justify-center">
+              <span className="sr-only">Pipeline</span>
+              {pipelineSelect(
+                "min-w-0 max-w-full appearance-none truncate bg-transparent pr-4 text-[13px] font-semibold text-ink outline-none [field-sizing:content]",
+                false,
+                true,
               )}
+              <ChevronDown className="pointer-events-none absolute right-0 size-3.5 text-muted" aria-hidden />
+            </label>
+            <span className="truncate text-[10.5px] tabular-nums text-muted" title={`${shown.length} deals`}>
+              {jobs ? `${shown.length}${worth ? ` · ${shortDollars(worth)}` : shown.length === 1 ? " deal" : " deals"}` : "\u00a0"}
+            </span>
+          </>
+        }
+        tray={
+          <>
+            <label
+              className={clsx(
+                "relative inline-flex size-8 shrink-0 items-center justify-center rounded-lg",
+                whose === "all" ? "text-ink-2" : "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]",
+              )}
+              title="Whose deals"
             >
-              <Icon className="size-4" aria-hidden />
-            </button>
-          ))}
-        </div>
-        {(leadAt < 0 || choice.view === "list") && (
-          <button
-            onClick={() => setAdding(true)}
-            disabled={adding}
-            aria-label="New deal"
-            title="New deal"
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-sun-line text-white active:opacity-80"
-          >
-            <Plus className="size-4.5" aria-hidden />
-          </button>
-        )}
-      </div>
+              <span className="sr-only">Whose deals</span>
+              {whose === "all" ? (
+                <Users className="size-4" aria-hidden />
+              ) : whose === "mine" ? (
+                <User className="size-4" aria-hidden />
+              ) : (
+                <UserX className="size-4" aria-hidden />
+              )}
+              <select
+                className="absolute inset-0 cursor-pointer opacity-0"
+                value={whose}
+                onChange={(e) => setWhose(e.target.value as typeof whose)}
+              >
+                <option value="all">Everyone&apos;s deals</option>
+                <option value="mine">My deals</option>
+                <option value="none">No owner yet</option>
+              </select>
+            </label>
+            <span className="h-5 w-px bg-line-strong" aria-hidden />
+            {views.map(({ view, name, Icon }) => (
+              <button
+                key={view}
+                aria-pressed={choice.view === view}
+                aria-label={name}
+                title={name}
+                onClick={() => choose({ ...choice, view })}
+                className={clsx(
+                  "inline-flex size-8 items-center justify-center rounded-lg",
+                  choice.view === view ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted",
+                )}
+              >
+                <Icon className="size-4" aria-hidden />
+              </button>
+            ))}
+            {(leadAt < 0 || choice.view === "list") && (
+              <>
+                <span className="h-5 w-px bg-line-strong" aria-hidden />
+                <button
+                  onClick={() => setAdding(true)}
+                  disabled={adding}
+                  aria-label="New deal"
+                  title="New deal"
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-sun-line text-white active:opacity-80"
+                >
+                  <Plus className="size-4" aria-hidden />
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
+      <PhoneDealsSwitch path={PATHS.pipelines} className="-mt-1 mb-4 hidden sm:block lg:hidden" />
 
       <div className="hidden sm:block">
         <PageHead eyebrow="CRM · Deals" title={named.name}>

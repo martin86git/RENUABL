@@ -115,29 +115,66 @@ const DEALS_SWITCH = [
   { href: PATHS.calls, top: null, label: "Calls", full: "Calls" },
 ] as const;
 
-function PhoneDealsSwitch({ path }: { path: string }) {
+/**
+ * On the pipeline (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can dock
+ * / spawn off of it"), the Pipeline segment is the pipeline picker itself (`pipeline`), wider than the others, and
+ * the page's controls hang under it as a tray joined to the switch (`tray`), in place of a card of their own.
+ */
+export function PhoneDealsSwitch({
+  path,
+  pipeline,
+  tray,
+  className,
+}: {
+  path: string;
+  pipeline?: React.ReactNode;
+  tray?: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <nav aria-label="Deals" className="-mt-1 mb-4 lg:hidden">
-      <div className="grid grid-cols-4 gap-1 rounded-2xl bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
+    <nav aria-label="Deals" className={className ?? "-mt-1 mb-4 lg:hidden"}>
+      <div
+        className={clsx(
+          "grid gap-1 rounded-2xl bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]",
+          pipeline ? "grid-cols-[1.6fr_1fr_1fr_0.8fr] gap-0.5" : "grid-cols-4",
+          tray && "rounded-bl-none",
+        )}
+      >
         {DEALS_SWITCH.map((t) => {
           const lit = path === t.href || path.startsWith(`${t.href}/`) || (t.href === PATHS.pipelines && path === PATHS.sales);
+          const cell = clsx(
+            "flex min-h-11 min-w-0 flex-col items-center justify-center rounded-xl px-1 text-center leading-tight transition-colors",
+            lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted active:bg-surface/60",
+          );
+          if (pipeline && t.href === PATHS.pipelines) {
+            return (
+              <div key={t.href} aria-current="page" className={clsx(cell, "items-stretch px-2")}>
+                {pipeline}
+              </div>
+            );
+          }
           return (
-            <Link
-              key={t.href}
-              href={t.href}
-              aria-label={t.full}
-              aria-current={lit ? "page" : undefined}
-              className={clsx(
-                "flex min-h-11 flex-col items-center justify-center rounded-xl px-1 text-center leading-tight transition-colors",
-                lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted active:bg-surface/60",
+            <Link key={t.href} href={t.href} aria-label={t.full} aria-current={lit ? "page" : undefined} className={cell}>
+              {t.top && (
+                <span
+                  className={clsx(
+                    "font-medium uppercase opacity-70",
+                    pipeline ? "text-[8.5px] tracking-[0.04em]" : "text-[9.5px] tracking-[0.08em]",
+                  )}
+                >
+                  {t.top}
+                </span>
               )}
-            >
-              {t.top && <span className="text-[9.5px] font-medium uppercase tracking-[0.08em] opacity-70">{t.top}</span>}
               <span className="text-[13px] font-medium">{t.label}</span>
             </Link>
           );
         })}
       </div>
+      {tray && (
+        <div className="flex w-fit max-w-full items-center gap-1 rounded-b-2xl bg-ink/[0.06] px-1 pb-1 pt-0.5 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.04)]">
+          {tray}
+        </div>
+      )}
     </nav>
   );
 }
@@ -930,7 +967,8 @@ function Shell({
             {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
                 the launch page's demo carries it. */}
             {sectionPages && <div className="studio-pages -mt-2 mb-5 hidden lg:block">{sectionPages}</div>}
-            {current.id === "proposals" && <PhoneDealsSwitch path={path} />}
+            {/* The pipeline draws its own, with the pipeline picker in it (PipelinesPage). */}
+            {current.id === "proposals" && path !== PATHS.pipelines && path !== PATHS.sales && <PhoneDealsSwitch path={path} />}
             {current.id === "marketplace" && marketplaceOpen() && (
               <MarketplaceMenu className="-mt-1 mb-6 border-b border-line pb-3" pages={current.pages} lit={here?.page.id} count={count} />
             )}
