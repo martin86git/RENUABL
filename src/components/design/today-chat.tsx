@@ -6,6 +6,7 @@ import clsx from "clsx";
 import {
   ArrowRight,
   BatteryCharging,
+  CalendarDays,
   CircleAlert,
   Eye,
   FileCheck2,
@@ -86,8 +87,16 @@ function TodayDate({ today }: { today: ISODate }) {
   }, []);
   return (
     <div className="mt-4 flex flex-col items-center gap-2">
+      {/* The date opens the calendar, as the date tile does on a computer (23 Nov 2026, Martin). */}
       <h1 className="text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
-        {todayHeading(today)}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event(TODAY_CALENDAR))}
+          title="Open the calendar"
+          className="rounded-lg decoration-line underline-offset-4 hover:underline"
+        >
+          {todayHeading(today)}
+        </button>
       </h1>
       <div className="flex items-center gap-2">
         {weather && (weather.sky || weather.degrees !== null) && (
@@ -102,6 +111,9 @@ function TodayDate({ today }: { today: ISODate }) {
     </div>
   );
 }
+
+/** Asks Today to open its calendar (the date heading). */
+export const TODAY_CALENDAR = "renuabl:today-calendar";
 
 /** The first view's name on the switch: Business for the owner and admins, My month for everyone else. */
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
@@ -419,21 +431,27 @@ export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: 
   // one width, and a white thumb that slides to the one open, each with its icon.
   // 23 Nov 2026, Martin: on the dock's post-sale tools, Feed is Jobs (the jobs under way, not the deals).
   const post = useDockSet() === "post";
+  // 23 Nov 2026, Martin: the calendar as a third part, an icon alone so the switch still fits a phone.
   const tabs = [
     ["chat", first, TrendingUp],
     ["feed", DOCK_SET_WORDS[post ? "post" : "sales"].feed, post ? HardHat : Rows3],
   ] as const;
-  const at = view === "feed" ? 1 : 0;
+  const at = view === "feed" ? 1 : view === "calendar" ? 2 : 0;
+  // Two word halves of one width and a narrow icon part at the end: the thumb's place and width follow the one open.
+  const thumb =
+    at === 2
+      ? { left: "calc(100% - 3rem - 0.25rem)", width: "3rem" }
+      : { left: at === 0 ? "0.25rem" : "calc(50% - 1.5rem)", width: "calc(50% - 1.75rem)" };
   return (
     <div
       role="tablist"
       aria-label="Today"
-      className="relative grid h-10 w-[15rem] grid-cols-2 rounded-full bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgb(20_22_26_/_0.08)] ring-1 ring-inset ring-ink/[0.04] backdrop-blur"
+      className="relative grid h-10 w-[18rem] grid-cols-[1fr_1fr_3rem] rounded-full bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgb(20_22_26_/_0.08)] ring-1 ring-inset ring-ink/[0.04] backdrop-blur"
     >
       <span
         aria-hidden
-        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-surface shadow-[0_1px_2px_rgb(20_22_26_/_0.12),0_4px_12px_-4px_rgb(20_22_26_/_0.18)] ring-1 ring-ink/[0.05] transition-transform duration-300 ease-out motion-reduce:transition-none"
-        style={{ transform: `translateX(${at * 100}%)` }}
+        className="absolute inset-y-1 rounded-full bg-surface shadow-[0_1px_2px_rgb(20_22_26_/_0.12),0_4px_12px_-4px_rgb(20_22_26_/_0.18)] ring-1 ring-ink/[0.05] transition-[left,width] duration-300 ease-out motion-reduce:transition-none"
+        style={thumb}
       />
       {tabs.map(([v, label, Icon]) => (
         <button
@@ -451,6 +469,20 @@ export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: 
           {label}
         </button>
       ))}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "calendar"}
+        aria-label="Calendar"
+        title="Calendar"
+        onClick={() => onView("calendar")}
+        className={clsx(
+          "relative z-[1] flex items-center justify-center rounded-full transition-colors",
+          view === "calendar" ? "text-ink" : "text-ink/80 hover:text-ink",
+        )}
+      >
+        <CalendarDays className={clsx("size-[16px]", view === "calendar" ? "text-sun-line" : "opacity-70")} aria-hidden />
+      </button>
     </div>
   );
 }
