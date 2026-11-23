@@ -418,7 +418,8 @@ function Hours(props: { days: ISODate[]; events: CalEvent[]; today: ISODate; pro
     return () => window.clearInterval(t);
   }, []);
   const allDays = props.days.map((d) =>
-    eventsOn(props.events, d).filter((e) => !layouts[props.days.indexOf(d)].some((p) => p.event.id === e.id)),
+    // eventsOn keeps the calendar's own events, so each is still a CalEvent.
+    (eventsOn(props.events, d) as CalEvent[]).filter((e) => !layouts[props.days.indexOf(d)].some((p) => p.event.id === e.id)),
   );
   const cols = `3rem repeat(${props.days.length}, minmax(0, 1fr))`;
   return (

@@ -128,6 +128,13 @@ export async function outlookInbox(token: string): Promise<ReturnType<typeof asM
   return (list.value ?? []).filter((m) => m.id).map((m) => asMailShape(m));
 }
 
+/** Emails to or from one address, in any folder (sent mail too), with who, what and when. */
+export async function outlookWith(token: string, address: string, max: number): Promise<ReturnType<typeof asMailShape>[]> {
+  const q = new URLSearchParams({ $search: `"participants:${address}"`, $top: String(max), $select: FIELDS });
+  const list = await graph<{ value?: GraphMessage[] }>(token, `messages?${q}`);
+  return (list.value ?? []).filter((m) => m.id).map((m) => asMailShape(m));
+}
+
 /** One email whole: its words, the files it carries, and its own pictures fetched to show in place. */
 export async function outlookMessage(token: string, id: string): Promise<ReturnType<typeof asMailShape>> {
   const [m, files] = await Promise.all([
