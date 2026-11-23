@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronDown, Columns3, Grid3x3, HardHat, List, Menu, RectangleVertical, X } from "lucide-react";
+import { CalendarDays, ChevronDown, Grid3x3, HardHat, List, RectangleVertical, SlidersHorizontal, X } from "lucide-react";
 import clsx from "clsx";
 import type { ISODate } from "@/lib/domain/types";
 import {
@@ -38,7 +38,7 @@ import type { JobLine } from "@/lib/services/crm";
 import { connectMyCalendar, disconnectMyCalendar, loadMyCalendar, type CalendarAnswer } from "@/lib/services/my-calendar";
 
 const HOUR_PX = 52;
-const VIEW_ICONS = { schedule: List, day: RectangleVertical, "3day": Columns3, month: Grid3x3 } as const;
+const VIEW_ICONS = { schedule: List, day: RectangleVertical, month: Grid3x3 } as const;
 /** Each calendar's colour: the member's own in the signal orange, installs in the confirmed green. */
 const COLOUR: Record<CalSource, string> = { mine: "bg-sun-line text-white", installs: "bg-positive text-white" };
 const TICK: Record<CalSource, string> = { mine: "bg-sun-line", installs: "bg-positive" };
@@ -47,7 +47,7 @@ const WEEK = ["M", "T", "W", "T", "F", "S", "S"];
 /**
  * Today's calendar, after Google Calendar's app (23 Nov 2026, Martin: "Calendar should look like Google calendar app").
  * The month with its dropdown and a round to come back to today across the top; the menu opens a drawer of views
- * (Schedule, Day, 3 Day, Month) and the calendars, ticked on or off: the member's own Google Calendar or Outlook, and the
+ * (Schedule, Day, Month) and the calendars, switched on or off: the member's own Google Calendar or Outlook, and the
  * business's installs. Swiping sideways moves a day, three days or a month. Read only: an event opens in its own
  * calendar, an install opens its deal.
  */
@@ -84,7 +84,7 @@ export function TodayCalendar({ jobs, today }: { jobs: JobLine[] | null; today: 
 
   // Ask for the whole month around the day (and Schedule's weeks ahead), so moving within it asks nothing more.
   const span = useMemo(() => {
-    const days = [...viewDays("month", day), ...viewDays(view === "schedule" ? "schedule" : "3day", day)].sort();
+    const days = [...viewDays("month", day), ...viewDays(view === "schedule" ? "schedule" : "day", day)].sort();
     return { from: days[0], to: days[days.length - 1] };
   }, [day, view]);
   useEffect(() => {
@@ -144,10 +144,10 @@ export function TodayCalendar({ jobs, today }: { jobs: JobLine[] | null; today: 
         <button
           type="button"
           onClick={() => setDrawer(true)}
-          aria-label="Views and calendars"
+          aria-label="Calendar settings"
           className="flex size-10 items-center justify-center rounded-full bg-surface text-ink ring-1 ring-line"
         >
-          <Menu className="size-[18px]" aria-hidden />
+          <SlidersHorizontal className="size-[17px]" aria-hidden />
         </button>
         <button
           type="button"
@@ -249,7 +249,10 @@ export function TodayCalendar({ jobs, today }: { jobs: JobLine[] | null; today: 
   );
 }
 
-/** The drawer from the left: the views, then each calendar with its coloured tick. */
+/**
+ * The calendar's settings, as a sheet rising from the foot (23 Nov 2026, Martin: the drawer looked too much like
+ * Google's): a graphite head, the views as three tiles, then each calendar with its colour and a switch.
+ */
 function Drawer(props: {
   kept: CalKept;
   got: CalendarAnswer | null;
@@ -270,94 +273,105 @@ function Drawer(props: {
     {
       id: "mine",
       name: "My calendar",
-      sub: got?.connected ? `${providerName(got.provider ?? "google")} · ${got.address ?? ""}` : "Not connected",
+      sub: got?.connected ? `${providerName(got.provider ?? "google")} · ${got.address ?? ""}` : "Not connected yet",
     },
     { id: "installs", name: "Installs", sub: "Every booked install, 8 am to 4 pm" },
   ];
   return (
-    <div className="fixed inset-0 z-[96]" role="dialog" aria-label="Views and calendars">
-      <button type="button" aria-label="Close" onClick={props.onClose} className="absolute inset-0 bg-ink/35" />
-      <div className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col overflow-y-auto rounded-r-[24px] bg-surface pb-6 pt-[max(1.25rem,env(safe-area-inset-top))] shadow-2xl">
-        <div className="flex items-center justify-between px-5">
-          <p className="text-[19px] font-normal text-ink">Calendar</p>
-          <button type="button" onClick={props.onClose} aria-label="Close" className="rounded-full p-2 text-ink-2 hover:bg-canvas">
+    <div className="fixed inset-0 z-[96] flex items-end justify-center sm:items-center" role="dialog" aria-label="Calendar settings">
+      <button type="button" aria-label="Close" onClick={props.onClose} className="absolute inset-0 bg-ink/40" />
+      <div className="relative w-full max-w-md overflow-hidden rounded-t-[28px] bg-canvas pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-[28px]">
+        <div className="flex items-center justify-between bg-primary px-5 py-4 text-white">
+          <span className="flex items-center gap-2.5">
+            <CalendarDays className="size-[18px] text-sun-line" aria-hidden />
+            <span className="text-[16px] font-semibold">Calendar</span>
+          </span>
+          <button type="button" onClick={props.onClose} aria-label="Close" className="rounded-full p-1.5 text-white/80 hover:bg-white/10">
             <X className="size-4" aria-hidden />
           </button>
         </div>
-        <ul className="mt-3 pr-3">
+
+        <p className="px-5 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">View</p>
+        <div className="grid grid-cols-3 gap-2 px-4">
           {CAL_VIEWS.map((v) => {
             const Icon = VIEW_ICONS[v];
             const on = props.kept.view === v;
             return (
-              <li key={v}>
-                <button
-                  type="button"
-                  onClick={() => props.onView(v)}
-                  aria-current={on ? "true" : undefined}
-                  className={clsx(
-                    "flex w-full items-center gap-5 rounded-r-full py-3 pl-6 text-left text-[15px]",
-                    on ? "bg-sun font-medium text-sun-ink" : "text-ink hover:bg-canvas",
-                  )}
-                >
-                  <Icon className="size-5" strokeWidth={1.6} aria-hidden />
-                  {CAL_VIEW_WORDS[v]}
-                </button>
-              </li>
+              <button
+                key={v}
+                type="button"
+                onClick={() => props.onView(v)}
+                aria-pressed={on}
+                className={clsx(
+                  "flex flex-col items-center gap-1.5 rounded-2xl py-3.5 text-[13px] font-medium transition-colors",
+                  on ? "bg-primary text-white shadow-md" : "bg-surface text-ink ring-1 ring-line hover:ring-ink/20",
+                )}
+              >
+                <Icon className={clsx("size-5", on ? "text-sun-line" : "text-ink-2")} strokeWidth={1.7} aria-hidden />
+                {CAL_VIEW_WORDS[v]}
+              </button>
             );
           })}
-        </ul>
-        <div className="mx-5 my-3 border-t border-line" />
-        <ul className="space-y-1 px-3">
+        </div>
+
+        <p className="px-5 pb-2 pt-5 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">Show</p>
+        <div className="mx-4 divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
           {calendars.map((c) => {
             const on = !props.kept.hidden.includes(c.id);
             return (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  role="checkbox"
-                  aria-checked={on}
-                  onClick={() => props.onToggle(c.id)}
-                  className="flex w-full items-center gap-4 rounded-xl px-3 py-2.5 text-left hover:bg-canvas"
+              <button
+                key={c.id}
+                type="button"
+                role="switch"
+                aria-checked={on}
+                onClick={() => props.onToggle(c.id)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left"
+              >
+                <span className={clsx("size-2.5 shrink-0 rounded-full", TICK[c.id])} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14.5px] font-medium text-ink">{c.name}</span>
+                  <span className="block truncate text-[12px] text-muted">{c.sub}</span>
+                </span>
+                <span
+                  className={clsx("relative h-6 w-10 shrink-0 rounded-full transition-colors", on ? "bg-primary" : "bg-line")}
+                  aria-hidden
                 >
                   <span
                     className={clsx(
-                      "flex size-5 shrink-0 items-center justify-center rounded-[5px] text-white",
-                      on ? TICK[c.id] : "ring-2 ring-inset ring-line",
+                      "absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left]",
+                      on ? "left-[1.125rem]" : "left-0.5",
                     )}
-                    aria-hidden
-                  >
-                    {on && "✓"}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[15px] text-ink">{c.name}</span>
-                    <span className="block truncate text-[12px] text-muted">{c.sub}</span>
-                  </span>
-                </button>
-              </li>
+                  />
+                </span>
+              </button>
             );
           })}
-        </ul>
-        <div className="mt-3 px-6 text-[13px]">
+        </div>
+
+        <div className="px-5 pt-4 text-[13px]">
           {got?.connected ? (
-            <button type="button" onClick={props.onDisconnect} className="text-ink-2 hover:text-ink">
+            <button type="button" onClick={props.onDisconnect} className="text-ink-2 underline-offset-2 hover:text-ink hover:underline">
               Disconnect my calendar
             </button>
           ) : got?.viewing ? (
             <p className="text-muted">{CALENDAR_WORDS.viewing}</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {CALENDAR_PROVIDERS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  disabled={props.waiting !== null}
-                  onClick={() => props.onConnect(p.id)}
-                  className="rounded-full bg-ink px-3 py-1.5 text-[12.5px] font-medium text-white disabled:bg-line disabled:text-muted"
-                >
-                  {props.waiting === p.id ? "Connecting…" : `Connect ${p.name}`}
-                </button>
-              ))}
-            </div>
+            <>
+              <p className="pb-2 text-[12px] text-muted">Connect your own calendar to see your appointments here.</p>
+              <div className="grid grid-cols-2 gap-2">
+                {CALENDAR_PROVIDERS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={props.waiting !== null}
+                    onClick={() => props.onConnect(p.id)}
+                    className="rounded-full bg-primary px-3 py-2 text-[13px] font-medium text-white disabled:bg-line disabled:text-muted"
+                  >
+                    {props.waiting === p.id ? "Connecting…" : p.name}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -386,7 +400,7 @@ function EventBox(props: { event: CalEvent; className: string; style?: React.CSS
   );
 }
 
-/** Day and 3 Day: the days' headers, their all-day events, then the hours with each event at its time. */
+/** Day: the days' headers, their all-day events, then the hours with each event at its time. */
 function Hours(props: { days: ISODate[]; events: CalEvent[]; today: ISODate; provider?: CalendarProvider }) {
   const box = useRef<HTMLDivElement>(null);
   const layouts = props.days.map((d) => dayLayout(props.events, d));

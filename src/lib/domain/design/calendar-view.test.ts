@@ -27,9 +27,9 @@ describe("today's calendar", () => {
     expect(days).toContain("2026-11-30");
   });
 
-  it("steps a day, three days or a month", () => {
+  it("steps a day, a week or a month", () => {
     expect(stepDay("day", "2026-11-23" as ISODate, 1)).toBe("2026-11-24");
-    expect(stepDay("3day", "2026-11-23" as ISODate, -1)).toBe("2026-11-20");
+    expect(stepDay("schedule", "2026-11-23" as ISODate, -1)).toBe("2026-11-16");
     expect(stepDay("month", "2026-11-23" as ISODate, 1)).toBe("2026-12-01");
   });
 
@@ -39,7 +39,8 @@ describe("today's calendar", () => {
     expect(list.map((d) => d.day)).toEqual(["2026-11-23", "2026-11-26"]);
   });
 
-  it("keeps a known view and only known calendars", () => {
+  it("keeps a known view and only known calendars, and reads a 3 Day kept before as Day", () => {
+    expect(cleanKept({ view: "3day" }).view).toBe("day");
     expect(cleanKept({ view: "month", hidden: ["installs", "nope"] })).toEqual({ view: "month", hidden: ["installs"] });
     expect(cleanKept(null)).toEqual({ view: "day", hidden: [] });
   });

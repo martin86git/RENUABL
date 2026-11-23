@@ -1,6 +1,6 @@
 /**
  * Today's calendar, drawn the way Google Calendar's app is (23 Nov 2026, Martin: "Calendar should look like Google
- * calendar app - take inspiration from it"): Schedule, Day, 3 Day and Month, and two calendars shown together and ticked
+ * calendar app - take inspiration from it"): Schedule, Day and Month, and two calendars shown together and ticked
  * on or off, the member's own (Google or Outlook) and the business's installs. Pure: no I/O.
  */
 import type { ISODate } from "../types";
@@ -9,9 +9,9 @@ import { LAUNCH_MARKET } from "../market";
 import { INSTALL_DAY } from "./install-event";
 import { eventsOn, marketMinutes, type MyEvent } from "./my-calendar";
 
-export const CAL_VIEWS = ["schedule", "day", "3day", "month"] as const;
+export const CAL_VIEWS = ["schedule", "day", "month"] as const;
 export type CalView = (typeof CAL_VIEWS)[number];
-export const CAL_VIEW_WORDS: Record<CalView, string> = { schedule: "Schedule", day: "Day", "3day": "3 Day", month: "Month" };
+export const CAL_VIEW_WORDS: Record<CalView, string> = { schedule: "Schedule", day: "Day", month: "Month" };
 export const cleanCalView = (v: unknown): CalView => (CAL_VIEWS.includes(v as CalView) ? (v as CalView) : "day");
 
 export const CAL_SOURCES = ["mine", "installs"] as const;
@@ -80,7 +80,6 @@ export const mineEvents = (events: readonly MyEvent[]): CalEvent[] =>
 /** The days a view shows around a day: one, three from it, or the month's grid (Monday first, whole weeks). */
 export function viewDays(view: CalView, day: ISODate): ISODate[] {
   if (view === "day") return [day];
-  if (view === "3day") return [0, 1, 2].map((n) => addDaysISO(day, n));
   if (view === "schedule") return Array.from({ length: SCHEDULE_DAYS }, (_, n) => addDaysISO(day, n));
   const first = `${day.slice(0, 8)}01` as ISODate;
   const back = (new Date(`${first}T00:00:00Z`).getUTCDay() + 6) % 7;
@@ -98,10 +97,9 @@ const lastOfMonth = (day: ISODate): ISODate => {
 /** How far Schedule looks ahead. */
 export const SCHEDULE_DAYS = 45;
 
-/** Where a swipe or step lands: a day, three days, a month, or (Schedule) a week. */
+/** Where a swipe or step lands: a day, a month, or (Schedule) a week. */
 export function stepDay(view: CalView, day: ISODate, dir: 1 | -1): ISODate {
   if (view === "day") return addDaysISO(day, dir);
-  if (view === "3day") return addDaysISO(day, 3 * dir);
   if (view === "schedule") return addDaysISO(day, 7 * dir);
   const [y, m] = day.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1 + dir, 1)).toISOString().slice(0, 10) as ISODate;
