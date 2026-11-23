@@ -5,26 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { useNameHintBox } from "./name-hint-box";
-import {
-  ArrowUpRight,
-  Bell,
-  CornerUpLeft,
-  Eye,
-  EyeOff,
-  FileText,
-  History,
-  MessageSquarePlus,
-  Minus,
-  Plus,
-  RefreshCw,
-  X,
-  Pin,
-} from "lucide-react";
+import { ArrowUpRight, Bell, CornerUpLeft, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
-import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
-import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
+import { currentPageContext } from "@/lib/services/page-context";
 import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
@@ -73,7 +58,6 @@ import { SolSources } from "./sol-sources";
 import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
 import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
-import { SolMark } from "./sol-sun";
 import { SolThinking, SolWorking } from "./sol-thinking";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
@@ -269,21 +253,8 @@ export function SolChat({
   // it, sent with each question unless the member switches it off for this page.
   const path = usePathname();
   const pageName = path === "/design/roof" ? "Design tool" : (pageAt(path)?.page.label ?? "This page");
-  const [about, setAbout] = useState(() => (side ? pageAboutNow() : null));
-  const [seePage, setSeePage] = useState(true);
-  useEffect(() => {
-    if (!side) return;
-    const changed = () => setAbout(pageAboutNow());
-    window.addEventListener(PAGE_ABOUT_CHANGED, changed);
-    changed();
-    return () => window.removeEventListener(PAGE_ABOUT_CHANGED, changed);
-  }, [side]);
-  // A new page is seen again, whatever was switched off on the last.
-  const [seenPath, setSeenPath] = useState(path);
-  if (seenPath !== path) {
-    setSeenPath(path);
-    setSeePage(true);
-  }
+  // Always on (23 Nov 2026, Martin: the eye that switched it off is gone).
+  const seePage = true;
   // While he can see the page beside his chat, one orange frame runs round both (15 Nov 2026, Martin: the "Looking at
   // This page" label didn't say it meant the page beside the chat; "an orange highlight should border the sol chat and
   // that adjacent window"): `html.sol-seeing`, drawn in globals.css only while his panel is open.
@@ -292,7 +263,6 @@ export function SolChat({
     document.documentElement.classList.add("sol-seeing");
     return () => document.documentElement.classList.remove("sol-seeing");
   }, [side, seePage]);
-  const seeing = side ? lookingAt({ title: about?.title || pageName, about: about?.about ?? "" }) : null;
   const hits =
     dealAt && jobs && dealAt.query.trim().length >= 2
       ? jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, dealAt.query)).slice(0, 6)
@@ -308,6 +278,9 @@ export function SolChat({
   // the tab, for that last message. Coming back to the tab looks again.
   const [history, setHistory] = useState(false);
   const [opened, setOpened] = useState(() => new Date());
+  // Every time the chat opens it starts clean (23 Nov 2026, Martin: "Chats should start fresh. Not a continuation of
+  // an old thread"): what was said before it opened is a press away under Continue your last chat, or in History.
+  const [mountedAt] = useState(() => new Date());
   useEffect(() => {
     const look = () => {
       if (document.visibilityState === "visible") setOpened(new Date());
@@ -323,7 +296,14 @@ export function SolChat({
     }
   });
   const lastAt = turns[turns.length - 1]?.at ?? null;
-  const resting = Boolean(!history && state && pending === null && lastAt && carried !== lastAt && askToStartAfresh(turns, opened));
+  const resting = Boolean(
+    !history &&
+    state &&
+    pending === null &&
+    lastAt &&
+    carried !== lastAt &&
+    (askToStartAfresh(turns, mountedAt, 0) || askToStartAfresh(turns, opened)),
+  );
   const carryOn = (at: string) => {
     setCarried(at);
     try {
@@ -495,42 +475,12 @@ export function SolChat({
         side ? "h-full" : "h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-2xl",
       )}
     >
-      <div className="flex items-center gap-3 px-5 py-3">
-        {/* Sol large at the head of his chat (16 Nov 2026, Martin: "make sols icon in the chat large like the
-            example"): the lit sun with its glow, and no words beside it (18 Nov 2026, Martin: "we dont need it to say
-            Sol your AI"). */}
-        <span className="sol-orb inline-flex size-14 shrink-0 items-center justify-center rounded-full" title="Sol">
-          <SolMark className="size-14" />
-        </span>
+      <div className="flex items-center gap-3 px-5 py-2">
         {/* The controls in one small group in the top right corner (18 Nov 2026, Martin: "the top bar is far too busy";
             no Full page and no Clear: New chat files the conversation away, and History holds it). */}
         <div className="-mr-2 ml-auto flex items-center gap-0.5 self-start">
           {/* His usage this month, in a window of its own (16 Nov 2026, Martin). */}
           <SolUsage />
-          {seeing && (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={seePage}
-              aria-label="Sol can see the page beside this chat"
-              onClick={() => setSeePage(!seePage)}
-              title={
-                seePage
-                  ? `Sol can see the page beside this chat (${seeing}), shown by the orange frame. Press to ask without it.`
-                  : "Sol can't see the page beside this chat. Press to let him."
-              }
-              className={clsx(
-                "inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full transition-colors hover:bg-canvas",
-                seePage ? "text-sun-line" : "text-muted hover:text-ink",
-              )}
-            >
-              {seePage ? (
-                <Eye className="size-3.5 max-lg:size-[18px]" aria-hidden />
-              ) : (
-                <EyeOff className="size-3.5 max-lg:size-[18px]" aria-hidden />
-              )}
-            </button>
-          )}
           {/* A new chat: a speech bubble with a plus (8 Nov 2026; 18 Nov 2026, Martin). The current one is filed away. */}
           <button
             type="button"
@@ -911,11 +861,11 @@ export function SolChat({
                   void send();
                 }
               }}
-              rows={2}
+              rows={3}
               maxLength={MAX_SAID}
               placeholder="Message Sol… (# for a deal)"
               aria-label="Message Sol"
-              className="min-h-[2.75rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
+              className="min-h-[5rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
             />
             <div className="flex items-center gap-1.5">
               <button
