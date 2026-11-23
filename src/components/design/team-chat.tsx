@@ -571,7 +571,7 @@ export function TeamChatPanel({
             />
           )}
           <div className={narrow ? "flex-1 pb-2" : "staff-scroll min-h-0 flex-1 overflow-y-auto pb-2"}>
-            {view && view.people.length === 0 && (
+            {view && view.people.length === 0 && adding !== "person" && (
               <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Settings → Users.</p>
             )}
             {view?.people.map((p) => (
@@ -1473,10 +1473,12 @@ function PickPerson(props: {
   onClose: () => void;
 }) {
   const [q, setQ] = useState("");
+  const here = useRef<HTMLDivElement>(null);
+  useEffect(() => here.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }), []);
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const shown = props.people.filter((p) => words.every((w) => `${p.label} ${p.email}`.toLowerCase().includes(w)));
   return (
-    <div className="px-2 pb-1.5">
+    <div ref={here} className="px-2 pb-1.5">
       {props.people.length > 0 && (
         <input
           autoFocus
@@ -1507,13 +1509,18 @@ function PickPerson(props: {
         {props.people.length > 0 && shown.length === 0 && <p className="px-1.5 py-1 text-[11px] text-muted">No one by that name.</p>}
       </div>
       {props.people.length === 0 && (
-        <p className="px-1 pt-1 text-[11px] text-muted">
-          No one else is in the business yet.{" "}
-          <Link href="/design/settings/users" className="underline hover:text-ink">
-            Add people in Settings
+        <div className="mx-1 mt-1 rounded-xl bg-surface p-3 ring-1 ring-line">
+          <p className="text-[13px] font-medium text-ink">It&rsquo;s only you here so far.</p>
+          <p className="mt-0.5 text-[12px] text-muted">
+            Direct messages are with people in your business. Add someone and they&rsquo;ll show here to message.
+          </p>
+          <Link
+            href="/design/settings/users"
+            className="mt-2.5 inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-medium text-white"
+          >
+            Add someone to your business →
           </Link>
-          .
-        </p>
+        </div>
       )}
     </div>
   );
