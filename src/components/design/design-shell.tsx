@@ -141,7 +141,7 @@ function ProposalRing({ closed }: { closed: boolean }) {
       <path d="M6.5 2.5h8l4 4v14a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-17a1 1 0 0 1 1-1z" />
       <path d="M14.5 2.5v4h4" />
       {closed ? (
-        <circle cx="12" cy="14" r="3.6" strokeWidth={2} />
+        <circle cx="12" cy="14" r="3.6" strokeWidth={2.2} className="text-positive" />
       ) : (
         <circle cx="12" cy="14" r="3.6" strokeWidth={2} strokeDasharray="15.5 7.1" transform="rotate(-90 12 14)" />
       )}

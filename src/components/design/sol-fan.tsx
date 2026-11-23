@@ -15,7 +15,9 @@ import { createPortal } from "react-dom";
 
 /** How far above Sol's middle the clover's centre sits, and how big a leaf is. */
 const CENTRE_UP = 36;
-const LEAF = 64;
+const LEAF = 66;
+/** How far each leaf's point reaches past the heart, so Chat and Feed overlap a little in the middle (Martin). */
+const OVERLAP = 12;
 /** A leaf's point is its bottom-left corner; unturned it reaches up and right (45°). Up-left and up-right leaves sit a
     third of a turn from Sol's, which points straight down. */
 const TURN = { chat: -105, feed: 15 } as const;
@@ -48,8 +50,6 @@ export function SolFan({
     <div className="theme-studio contents">
       <div className="fixed inset-0 z-[95] bg-black/15" onClick={onClose} aria-hidden />
       <div role="menu" aria-label="Sol" className="fixed z-[96] size-0" style={{ left: at.x, top: at.y }}>
-        {/* The clover's heart, where the three leaves meet. */}
-        <span className="sol-clover-heart absolute -left-1.5 -top-1.5 size-3 rounded-full bg-sun-line" aria-hidden />
         <Leaf
           turn={TURN.chat}
           icon={MessageCircle}
@@ -60,6 +60,8 @@ export function SolFan({
           }}
         />
         <Leaf turn={TURN.feed} icon={Rows3} label="Feed" href={feedHref} onClick={onClose} delay={70} />
+        {/* The clover's heart, where the three leaves meet, over where they overlap. */}
+        <span className="sol-clover-heart absolute -left-1.5 -top-1.5 size-3 rounded-full bg-sun-line" aria-hidden />
       </div>
     </div>,
     document.body,
@@ -82,15 +84,17 @@ function Leaf({
   delay?: number;
 }) {
   const shape = {
-    left: 0,
-    top: -LEAF,
+    left: -OVERLAP,
+    top: OVERLAP - LEAF,
+    // Turned about the heart, not the leaf's own corner, so its point sits OVERLAP past it.
+    transformOrigin: `${OVERLAP}px ${LEAF - OVERLAP}px`,
     width: LEAF,
     height: LEAF,
     ["--leaf-turn" as string]: `${turn}deg`,
     animationDelay: `${delay}ms`,
   };
   const className =
-    "sol-clover-leaf absolute flex items-center justify-center rounded-[50%_50%_50%_0] bg-primary text-white shadow-[0_8px_22px_rgba(0,0,0,0.28)] ring-1 ring-white/15";
+    "sol-clover-leaf absolute flex items-center justify-center rounded-[50%_50%_50%_26%] bg-primary text-white shadow-[0_8px_22px_rgba(0,0,0,0.28)] ring-1 ring-white/15";
   // The words stand upright whatever way the leaf turns.
   const inner = (
     <span className="flex flex-col items-center gap-0.5" style={{ transform: `rotate(${-turn}deg)` }}>
