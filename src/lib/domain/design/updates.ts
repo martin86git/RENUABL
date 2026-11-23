@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
+    area: "Calendar",
+    words:
+      "On a computer, drag the calendar's edge or corner to make it wider or taller; it stays that size, and a double click puts it back.",
+  },
+  {
+    day: "2026-11-24",
     area: "Sol",
     words: "The example questions in Sol's chat show for your first three chats, then step aside.",
   },
