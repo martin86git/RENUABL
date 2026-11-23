@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Menu, Search } from "lucide-react";
 import clsx from "clsx";
 import { Wordmark } from "@/components/ui/primitives";
 
@@ -16,12 +16,36 @@ export function PhoneTop({
   home,
   back,
   onSearch,
+  more,
 }: {
   home: string;
   /** On a deal: where the way back goes and what it says. */
   back?: { href: string; label: string };
   onSearch?: () => void;
+  /** A retailer's More, in the top right (23 Nov 2026, Martin: off the foot bar so Sol sits in its middle). */
+  more?: { open: boolean; count: number; toggle: () => void };
 }) {
+  const moreButton = (small: boolean) =>
+    more && (
+      <button
+        type="button"
+        onClick={more.toggle}
+        aria-expanded={more.open}
+        aria-label={more.count > 0 ? `More, ${more.count} waiting` : "More"}
+        className={clsx(
+          "relative flex items-center justify-center rounded-full text-ink",
+          small ? "size-8" : "size-9 ring-1 ring-line",
+          more.open ? "bg-sun" : !small && "bg-surface",
+        )}
+      >
+        <Menu className={small ? "size-[15px]" : "size-4"} aria-hidden />
+        {more.count > 0 && (
+          <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
+            {more.count}
+          </span>
+        )}
+      </button>
+    );
   const row = useRef<HTMLDivElement>(null);
   const [gone, setGone] = useState(false);
 
@@ -57,6 +81,7 @@ export function PhoneTop({
             <Search className="size-4" aria-hidden />
           </button>
         )}
+        {more && <div className={onSearch ? "" : "ml-auto"}>{moreButton(false)}</div>}
       </div>
 
       {/* Once the row above has gone: the wordmark small, kept at the top of the screen. */}
@@ -87,11 +112,12 @@ export function PhoneTop({
               type="button"
               onClick={onSearch}
               aria-label="Search, or ask Sol"
-              className="absolute right-2 flex size-8 items-center justify-center rounded-full text-ink"
+              className={clsx("absolute flex size-8 items-center justify-center rounded-full text-ink", more ? "right-11" : "right-2")}
             >
               <Search className="size-[15px]" aria-hidden />
             </button>
           )}
+          {more && <div className="absolute right-2">{moreButton(true)}</div>}
         </div>
       </div>
     </>
