@@ -1958,6 +1958,15 @@ html:has(.sales-snap) {
     inset 0 3px 0 rgb(255 255 255 / 0.9),
     0 -6px 24px -12px rgb(20 22 26 / 0.18);
 }
+/* Sol on the post-sale dock takes the hi-vis colour (23 Nov 2026, Martin: "bring sol inline with the neon theme"): his
+   live sun turned from orange to lime by its hue, the white brain lines unchanged, easing across as the dock turns.
+   Only the sun itself, so his count and the dot when he holds a deal keep their colours. */
+.dock-sol canvas {
+  transition: filter 450ms ease;
+}
+.phone-tabbar[data-dock="post"] .dock-sol canvas {
+  filter: hue-rotate(46deg) saturate(1.05) brightness(1.15);
+}
 /* A post-sale tool: a graphite tile lit from above, a fine light rim and a soft shadow on the lime. */
 .dock-tile {
   border-radius: 12px;
