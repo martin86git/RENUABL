@@ -15,7 +15,9 @@ import {
   ClipboardCheck,
   FileCheck2,
   FileText,
+  HardHat,
   Package,
+  Tag,
   LayoutDashboard,
   Menu,
   MessagesSquare,
@@ -253,10 +255,9 @@ function Shell({
   const unread = useUnreadMessages(retail);
   // This member's unread team chat lines, for the Team tab on a phone's foot bar.
   const teamUnread = useTeamUnread();
-  // The dock's set, and how many times its ball has been pulled (to play the pull again on each tap).
+  // The dock's set (sales or post sale tools).
   const dock = useDockSet();
   const post = dock === "post";
-  const [pulls, setPulls] = useState(0);
   const service = useServiceCount(retail);
   const mentions = useCount(retail, "renuabl:notifications", async () => {
     const res = await notificationCount();
@@ -826,28 +827,27 @@ function Shell({
         )}
       >
         {retail && (
-          // The dock's lip with its ball (23 Nov 2026, Martin): a tap turns the reels to the other set of tools. The ball
-          // is the colour of the set it turns to.
-          <span
-            aria-hidden={false}
-            className="dock-lip absolute -top-[21px] right-3 flex h-[21px] w-12 justify-center rounded-t-full border border-b-0"
+          // The dock's drum (23 Nov 2026, Martin: the ball in a lip "is not great", the control "up a little higher"): a
+          // small slot-machine window floating above the dock's left end, its reel showing the set the dock is on, a tag
+          // for sales and a hard hat for post sale. A tap rolls it to the other set and the dock's reels follow. On the
+          // left so it never meets the back-to-top round on the right.
+          <button
+            type="button"
+            aria-label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
+            title={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
+            onClick={() => setDockSet(otherDockSet(dock))}
+            className="dock-drum absolute -top-[52px] left-3 h-10 w-14 overflow-hidden rounded-[14px] border"
           >
-            <button
-              key={pulls}
-              type="button"
-              aria-label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
-              title={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
-              onClick={() => {
-                setPulls((n) => n + 1);
-                setDockSet(otherDockSet(dock));
-              }}
-              className={clsx(
-                "dock-ball mt-1 size-[22px] rounded-full",
-                pulls > 0 && "dock-ball-pull",
-                post ? "dock-ball-sales" : "dock-ball-post",
-              )}
-            />
-          </span>
+            <span className="dock-drum-reel flex flex-col" style={{ transform: post ? "translateY(-2.5rem)" : undefined }}>
+              <span className="flex h-10 items-center justify-center">
+                <Tag className="size-[19px] text-sun-line" aria-hidden />
+              </span>
+              <span className="flex h-10 items-center justify-center">
+                <HardHat className="size-[19px] text-[#8fb3d9]" aria-hidden />
+              </span>
+            </span>
+            <span aria-hidden className="dock-drum-shade pointer-events-none absolute inset-0" />
+          </button>
         )}
         {retail
           ? [0, 1, 2, 3].map((i) => [
@@ -864,10 +864,10 @@ function Shell({
               ) : null,
               <div key={`reel-${i}`} className="relative h-16 self-end overflow-hidden">
                 <div className="dock-reel" style={{ transform: post ? "translateY(-50%)" : undefined, transitionDelay: `${i * 80}ms` }}>
-                  <div className="h-16" inert={post}>
+                  <div className="h-16 [&>*]:w-full" inert={post}>
                     {tabFor(PHONE_TABS[i], false)}
                   </div>
-                  <div className="h-16" inert={!post}>
+                  <div className="h-16 [&>*]:w-full" inert={!post}>
                     {tabFor(POST_TABS[i], true)}
                   </div>
                 </div>
