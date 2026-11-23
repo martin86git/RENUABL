@@ -626,6 +626,7 @@ function Shell({
         />
       );
     const lit = !more && t.match(path);
+    const market = t.href.startsWith(MARKET);
     const n = t.href === PATHS.messages ? unread : t.href === PATHS.team ? teamUnread : t.href === `${MARKET}/messages` ? (trade ?? 0) : 0;
     // The post-sale tools (23 Nov 2026, Martin: the first icons looked "made on very basic design software"): one family
     // of graphite tiles lit from above, each glyph in the hi-vis lime, on the white glass dock under its hi-vis stripe; the one open ringed white.
@@ -645,7 +646,15 @@ function Shell({
             !lit && "opacity-80",
           )}
         >
-          <span className={clsx("dock-tile relative flex size-9 items-center justify-center", lit && "dock-tile-lit")}>
+          {/* The Marketplace's tools are the blue line icon alone, no graphite tile (24 Nov 2026, Martin: "remove graphite
+              from the marketplace icons and keep to blue outline"). */}
+          <span
+            className={clsx(
+              "relative flex size-9 items-center justify-center",
+              market ? "dock-tile-market" : "dock-tile",
+              lit && (market ? "dock-tile-market-lit" : "dock-tile-lit"),
+            )}
+          >
             <t.icon className={clsx("size-[19px]", glyph)} strokeWidth={1.9} aria-hidden />
             {n > 0 && (
               <span className="absolute -top-1 -right-1 inline-flex min-w-4 items-center justify-center rounded-full bg-sun-line px-1 text-[9px] font-semibold text-white">
@@ -1080,7 +1089,7 @@ function Shell({
                 >
                   {DOCK_SETS.map((set) => (
                     <div key={set} className="h-16 [&>*]:w-full" inert={set !== dock}>
-                      {tabFor(DOCK_TABS[set][i], set !== "sales", set === "market" ? "text-[#8fb8ff]" : undefined)}
+                      {tabFor(DOCK_TABS[set][i], set !== "sales", set === "market" ? "text-[var(--dock-market)]" : undefined)}
                     </div>
                   ))}
                 </div>

@@ -14,6 +14,11 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-24",
+    area: "Marketplace",
+    words: "On a phone, the Marketplace dock's icons are plain blue outlines, no dark tiles.",
+  },
+  {
     day: "2026-11-23",
     area: "Email",
     words: "On a phone, Email is tighter: the filters across the width, then search with Compact, Refresh and Compose as rounds.",
