@@ -214,7 +214,7 @@ export function InboxPage() {
       />
     );
   return (
-    <div className={clsx(ui.page, "space-y-4")}>
+    <div className={clsx(ui.page, "space-y-4 max-sm:space-y-3")}>
       <PageHead title="Email" />
       {said && GMAIL_SAYS[said] && (
         <p
@@ -315,8 +315,14 @@ export function InboxPage() {
               {rowProblem}
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-3">
-            <div role="radiogroup" aria-label="Show" className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm">
+          {/* On a phone (23 Nov 2026, Martin: "optimise for the space constraint"): the filters run the width, then the
+              search with Compact, Refresh and Compose as rounds beside it on one row. */}
+          <div className="flex flex-wrap items-center gap-3 max-sm:gap-2">
+            <div
+              role="radiogroup"
+              aria-label="Show"
+              className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm max-sm:grid max-sm:w-full max-sm:grid-cols-4 max-sm:text-[13px]"
+            >
               {INBOX_FILTERS.map((f) => (
                 <button
                   key={f.id}
@@ -324,7 +330,7 @@ export function InboxPage() {
                   aria-checked={filter === f.id}
                   onClick={() => setFilter(f.id)}
                   className={clsx(
-                    "rounded-[5px] px-3 py-1",
+                    "rounded-[5px] px-3 py-1 max-sm:px-1",
                     filter === f.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2",
                   )}
                 >
@@ -332,41 +338,53 @@ export function InboxPage() {
                 </button>
               ))}
             </div>
-            <div className="relative min-w-48 max-w-md flex-1">
+            <div className="relative min-w-48 max-w-md flex-1 max-sm:min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search these emails"
+                placeholder="Search emails"
                 className={clsx(ui.input, "h-9 min-h-9 pl-9")}
               />
             </div>
             {/* Refresh and Compose on the same row as the filters and search (8 Nov 2026, Martin). */}
-            <span className="ml-auto flex items-center gap-2">
-              {checkedAt && !refreshing && <CheckedWhen at={checkedAt} />}
+            <span className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:gap-1.5">
+              {checkedAt && !refreshing && (
+                <span className="max-sm:hidden">
+                  <CheckedWhen at={checkedAt} />
+                </span>
+              )}
               <button
                 type="button"
                 onClick={toggleCompact}
                 aria-pressed={compact}
                 title={compact ? "Back to the usual view" : "A smaller view, to see more emails at once"}
-                className={clsx(ui.quiet, "h-9 px-3", compact && "border-ink text-ink")}
+                aria-label="Compact"
+                className={clsx(ui.quiet, "h-9 px-3 max-sm:w-9 max-sm:px-0", compact && "border-ink text-ink")}
               >
                 {compact ? <Rows3 className="size-4" aria-hidden /> : <Rows2 className="size-4" aria-hidden />}
-                Compact
+                <span className="max-sm:hidden">Compact</span>
               </button>
               <button
                 type="button"
-                className={clsx(ui.quiet, "h-9 px-3")}
+                className={clsx(ui.quiet, "h-9 px-3 max-sm:w-9 max-sm:px-0")}
+                aria-label={refreshing ? "Checking" : "Refresh"}
                 onClick={refresh}
                 disabled={refreshing}
                 aria-busy={refreshing}
                 title="Check Gmail for new email"
               >
                 <RefreshCw className={clsx("size-4", refreshing && "animate-spin motion-reduce:animate-none")} aria-hidden />
-                {refreshing ? "Checking…" : "Refresh"}
+                <span className="max-sm:hidden">{refreshing ? "Checking…" : "Refresh"}</span>
               </button>
-              <button type="button" className={clsx(ui.primary, "h-9 px-3")} title="Write a new email (c)" onClick={compose}>
-                <Plus className="size-4" aria-hidden /> Compose
+              <button
+                type="button"
+                className={clsx(ui.primary, "h-9 px-3 max-sm:w-9 max-sm:rounded-full max-sm:px-0")}
+                title="Write a new email (c)"
+                aria-label="Compose"
+                onClick={compose}
+              >
+                <Plus className="size-4" aria-hidden /> <span className="max-sm:hidden">Compose</span>
               </button>
             </span>
           </div>
@@ -888,14 +906,17 @@ function Mailboxes({
       on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
     );
   return (
-    <div className="flex flex-wrap items-center gap-2" aria-label="Your mailboxes">
+    <div
+      className="flex flex-wrap items-center gap-2 max-sm:no-scrollbar max-sm:-mx-1 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-1"
+      aria-label="Your mailboxes"
+    >
       {boxes.length > 1 && (
         <button type="button" className={chip(!picked)} onClick={() => onPick(null)} aria-pressed={!picked}>
           All mailboxes
         </button>
       )}
       {boxes.map((b) => (
-        <span key={b} className={clsx(chip(picked === b), "pr-1")}>
+        <span key={b} className={clsx(chip(picked === b), "shrink-0 pr-1")}>
           <button type="button" onClick={() => onPick(picked === b ? null : b)} aria-pressed={picked === b} className="truncate">
             {b}
           </button>
@@ -915,17 +936,17 @@ function Mailboxes({
           <button
             type="button"
             onClick={() => onAdd("google")}
-            className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+            className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
           >
-            <Plus className="size-4" aria-hidden /> Add a Gmail
+            <Plus className="size-4" aria-hidden /> <span className="max-sm:hidden">Add a</span> Gmail
           </button>
           {outlookReady && (
             <button
               type="button"
               onClick={() => onAdd("outlook")}
-              className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+              className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
             >
-              <Plus className="size-4" aria-hidden /> Add an Outlook
+              <Plus className="size-4" aria-hidden /> <span className="max-sm:hidden">Add an</span> Outlook
             </button>
           )}
         </>

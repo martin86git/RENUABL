@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-23",
+    area: "Email",
+    words: "On a phone, Email is tighter: the filters across the width, then search with Compact, Refresh and Compose as rounds.",
+  },
+  {
+    day: "2026-11-23",
     area: "Today",
     words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
   },
