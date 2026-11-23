@@ -9,20 +9,20 @@
  * screenshots), taken by headless Chrome over the DevTools protocol. Moving ones are taken frame by frame (each page has
  * `window.at(t)`, t from 0 to 1) and written as GIFs, the only animation email apps play; still ones as JPEGs. Sol's
  * own GIF is filmed off the live homepage, so he is the same sun: run the dev server first (port 3100, or the second
- * argument). Everything lands in public/design/launch/, where /api/design/marketing/gtm reads it into RENUABL's
+ * argument). Everything lands in marketing/launch/ (private, never served by the site), where /api/design/marketing/gtm reads it into RENUABL's
  * Marketing pictures. Made-up customers only, no stock photos, nobody else's marks.
  *
  *   node tools/marketing/launch-art.mjs [only-this-one] [port]
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const OUT = resolve("public/design/launch");
+const OUT = resolve("marketing/launch");
 const ONLY = process.argv[2] && process.argv[2] !== "all" ? process.argv[2] : null;
 const SITE = `http://localhost:${process.argv[3] ?? "3100"}`;
 const W = 1200;
@@ -34,7 +34,9 @@ const work = mkdtempSync(join(tmpdir(), "renuabl-art-"));
 /** RENUABL's logo as the website has it (public/brand/renuabl-logo-white.png, the wordmark at weight 400, wide spaced). */
 const LOGO_FILE = resolve("public/brand/renuabl-logo-white.png");
 const LOGO = pathToFileURL(LOGO_FILE).href;
-const shot = (f) => pathToFileURL(resolve("public/design/landing", f)).href;
+// RENUABL-only shots live in marketing/launch/source (private); the rest are the sales page's own public screenshots.
+const OWN_SHOTS = resolve("marketing/launch/source");
+const shot = (f) => pathToFileURL(existsSync(resolve(OWN_SHOTS, f)) ? resolve(OWN_SHOTS, f) : resolve("public/design/landing", f)).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- The product's own marks ------------------------------------------------------------------------------------

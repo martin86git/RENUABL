@@ -26,7 +26,7 @@ For the retailer it comes down to one thing: **an AI sales force.**
 | ------------------------------ | ------------------------------------------------------------------------------ | ---------------- |
 | More sales from the same leads | Leads rung in minutes, in calling hours, by a voice agent, and booked in       | Launch, email 1  |
 | Not chasing                    | Sol drafts every follow-up; the agents send them once switched on              | Email 2, email 4 |
-| Quotes out faster              | Priced as it's drawn; a proposal signed online                               | Email 3          |
+| Quotes out faster              | Priced as it's drawn; a proposal signed online                                 | Email 3          |
 | Less admin                     | Calls written up, emailed leads turned into deals, one feed of what needs them | Email 4          |
 | A smooth install               | Order, approvals, calendar and job cards in one place for the team             | Email 5          |
 | One bill, no lock-in           | From $39 a user, then pay as you go; cancel any time                           | Email 6          |
@@ -83,16 +83,16 @@ Victoria first, then by state.
 **Preview:** Your leads answered in minutes. Your emails written. Your systems designed with you.
 
 - **Hook:** Solar just got an AI sales force.
-  - **Picture** `/design/launch/sol-intro.gif`: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.”
+  - **Picture** `marketing/launch/sol-intro.gif`: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.”
   - **Button:** Meet Sol → https://www.renuabl.com.au/
 - **Hook:** Answered, written, designed, booked. While you're on the roof.
-  - **Picture** `/design/launch/cards.gif`: “Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.”
+  - **Picture** `marketing/launch/cards.gif`: “Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.”
   - **Button:** See it work → https://www.renuabl.com.au/business/demo
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
-  - **Picture** `/design/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
+  - **Picture** `marketing/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 1 · two working days after opening
 
@@ -100,23 +100,23 @@ Victoria first, then by state.
 **Preview:** It rings every new lead in minutes and books them in. Nobody can be hired for that.
 
 - **Hook:** An AI salesperson for less than $2 a day.
-  - **Picture** `/design/launch/call.gif`: “A RENUABL voice agent on a call with a new lead, booking them in (example)”
+  - **Picture** `marketing/launch/call.gif`: “A RENUABL voice agent on a call with a new lead, booking them in (example)”
   - **Words:** Calls & Texts is $49 a month with your own business number, on top of your RENUABL plan. Calls go out in calling hours.
   - **Button:** Hear it call → https://www.renuabl.com.au/
 - **Hook:** It rings every new lead, and books them in.
-  - **Picture** `/design/launch/explain-voice.gif`: “Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.”
+  - **Picture** `marketing/launch/explain-voice.gif`: “Your voice agent rings each new lead within minutes, answers their questions and books them in. It always says it's your automated assistant.”
   - **Button:** See how it books → https://www.renuabl.com.au/business/demo
 - **Hook:** Watch any call live. Step in whenever you like.
-  - **Picture** `/design/launch/product-voice.jpg`: “In RENUABL: a voice agent's window, on a call with a customer now (example data)”
+  - **Picture** `marketing/launch/product-voice.jpg`: “In RENUABL: a voice agent's window, on a call with a customer now (example data)”
   - **Button:** Try the demo → https://www.renuabl.com.au/business/demo
 - **Hook:** $49 a month. That's $1.61 a day. Your own number included.
-  - **Picture** `/design/launch/price-voice.jpg`: “Your voice agent, with your own number: less than $2 a day. $49 a month is $1.61 a day.”
+  - **Picture** `marketing/launch/price-voice.jpg`: “Your voice agent, with your own number: less than $2 a day. $49 a month is $1.61 a day.”
   - **Button:** See the pricing → https://www.renuabl.com.au/#pricing
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
-  - **Picture** `/design/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
+  - **Picture** `marketing/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 2 · two days on
 
@@ -124,19 +124,19 @@ Victoria first, then by state.
 **Preview:** Emailed, rung and in your CRM while you're still on the roof.
 
 - **Hook:** Every new lead, answered in minutes.
-  - **Picture** `/design/launch/explain-lead.gif`: “A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.”
+  - **Picture** `marketing/launch/explain-lead.gif`: “A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.”
   - **Button:** See it answer → https://www.renuabl.com.au/business/demo
 - **Hook:** Your calls written up. Your follow-ups drafted.
-  - **Picture** `/design/launch/explain-crm.gif`: “I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.”
+  - **Picture** `marketing/launch/explain-crm.gif`: “I write up your calls, draft your follow-ups and turn emailed leads into deals. You do the selling.”
   - **Button:** See Sol at work → https://www.renuabl.com.au/business/demo
 - **Hook:** Open Today and see who needs you.
-  - **Picture** `/design/launch/today.jpg`: “RENUABL's Today screen: calls, deals and what needs you (example data)”
+  - **Picture** `marketing/launch/today.jpg`: “RENUABL's Today screen: calls, deals and what needs you (example data)”
   - **Button:** Open the demo → https://www.renuabl.com.au/business/demo
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
-  - **Picture** `/design/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
+  - **Picture** `marketing/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 3 · three days on
 
@@ -144,16 +144,16 @@ Victoria first, then by state.
 **Preview:** Sol knows. And he's written what to say.
 
 - **Hook:** Know who to call, and what to say. Every morning.
-  - **Picture** `/design/launch/sol.gif`: “I know every deal. I write your emails in your voice, and tell you who to ring next.”
+  - **Picture** `marketing/launch/sol.gif`: “I know every deal. I write your emails in your voice, and tell you who to ring next.”
   - **Button:** Meet Sol → https://www.renuabl.com.au/
 - **Hook:** Ask Sol about any deal. He knows them all.
-  - **Picture** `/design/launch/product-sol.jpg`: “In RENUABL: Sol on Today, saying who to call and what to say (example data)”
+  - **Picture** `marketing/launch/product-sol.jpg`: “In RENUABL: Sol on Today, saying who to call and what to say (example data)”
   - **Button:** Ask Sol in the demo → https://www.renuabl.com.au/business/demo
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
-  - **Picture** `/design/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
+  - **Picture** `marketing/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 4 · three days on
 
@@ -161,13 +161,13 @@ Victoria first, then by state.
 **Preview:** One press. Three priced designs. Signed online.
 
 - **Hook:** Quote it before you leave the driveway.
-  - **Picture** `/design/launch/explain-designer.gif`: “One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.”
+  - **Picture** `marketing/launch/explain-designer.gif`: “One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.”
   - **Button:** See it design → https://www.renuabl.com.au/business/demo
 - **Hook:** Real roofs, laid out and priced as you draw.
-  - **Picture** `/design/launch/designer.jpg`: “Two homes designed in RENUABL's designer: panels laid, strung and priced”
+  - **Picture** `marketing/launch/designer.jpg`: “Two homes designed in RENUABL's designer: panels laid, strung and priced”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 5 · three days on
 
@@ -175,16 +175,16 @@ Victoria first, then by state.
 **Preview:** The order, approvals and the job card, from the moment they sign.
 
 - **Hook:** Signed? It's already moving.
-  - **Picture** `/design/launch/explain-runs.gif`: “The moment they sign, the order opens, approvals line up and your installer's job card is ready.”
+  - **Picture** `marketing/launch/explain-runs.gif`: “The moment they sign, the order opens, approvals line up and your installer's job card is ready.”
   - **Button:** See after the sale → https://www.renuabl.com.au/business/demo
 - **Hook:** Every install on one calendar, ready for your crew.
-  - **Picture** `/design/launch/runs.jpg`: “RENUABL's install calendar after the sale (example data)”
+  - **Picture** `marketing/launch/runs.jpg`: “RENUABL's install calendar after the sale (example data)”
   - **Button:** Open the calendar → https://www.renuabl.com.au/business/demo
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
-  - **Picture** `/design/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
+  - **Picture** `marketing/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ### 6 · four days on
 
@@ -192,14 +192,14 @@ Victoria first, then by state.
 **Preview:** No contract. Cancel any time.
 
 - **Hook:** Here's the deal.
-  - **Picture** `/design/launch/coupon.jpg`: “Yes. I want my AI sales force. First month free. No contract, cancel any time.”
+  - **Picture** `marketing/launch/coupon.jpg`: “Yes. I want my AI sales force. First month free. No contract, cancel any time.”
   - **Words:** Your first month is free. Then it's $49 a user a month, or $39 a user a month on the 12-month plan. No contract. Cancel any time. P.S. Leads go to whoever answers soonest. Let yours answer this week.
   - **Button:** Yes, start now → https://www.renuabl.com.au/#pricing
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
-  - **Picture** `/design/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
+  - **Picture** `marketing/launch/designer-band.jpg`: “Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn”
   - **Button:** Try the designer → https://www.renuabl.com.au/business/demo
-- **Footer picture** `/design/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
-- **Footer picture** `/design/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
+- **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
+- **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
 ## 6. Must be true before anything is sent
 
@@ -232,8 +232,10 @@ Victoria first, then by state.
 
 **The real logo, and speed to lead** (22 Nov 2026, Martin: "use the correct RENUABL logo as per the website"; "dont forget other hooks… such as speed to lead. instantly get back to a customer"): every picture carries the website's own wordmark file (`public/brand/renuabl-logo-white.png`), not RENUABL typed in another weight. The second email of the series is now speed to lead, in place of "Stop typing up your calls" (its card stays in it): Sol's hello within minutes and the voice agent ringing, in the business's hours (Sol's hello and calls both wait for them, so nothing says day or night). A series can hold only 12 steps (six emails and their waits), so a new email takes an old one's place.
 
-**The designer in every email** (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it… so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): under each hook sits `/design/launch/designer-band.jpg`, the new designer pop-up on the website's site (a made-up label, no address), tagged "Made for solar · The RENUABL designer", linking to the demo. The designer email leads with both roofs (`designer.jpg`, retaken in the new look) instead. Every email is a band taller for it.
+**The designer in every email** (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it… so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): under each hook sits `marketing/launch/designer-band.jpg`, the new designer pop-up on the website's site (a made-up label, no address), tagged "Made for solar · The RENUABL designer", linking to the demo. The designer email leads with both roofs (`designer.jpg`, retaken in the new look) instead. Every email is a band taller for it.
 
 **A hook and a button on every picture, the designer last, the live pricing** (23 Nov 2026, Martin: "dont just dump images without a hook call to action"; "dont make the designer the first slide"; the pictures "are not the updated designer"; "check with other sessions on the pricing"): each email is now a run of parts, each a hook over its picture and its own button. The designer is the last part before the footers in every email but the designer's own, as **Made for solar. Design and price a roof while you're on the phone.** with Try the designer. Both designer pictures were taken again from the live branch's designer: the dark dock at the foot with Sol in the middle, and the strings on the roof. The second roof (Rowville) is left out until it has a better layout; the designer email shows the website's site whole and close up. The live pricing was confirmed with the other sessions: $49 a user a month, the first month free, $39 on the 12-month plan, the designer paid by the site, Calls & Texts $49 and Growth $19, all with GST. The coupon now says **From $39 a user, then pay as you go** in place of Every feature, for every user, and the deal email names the 12-month plan. Calls & Texts' allowances (30 minutes and 30 texts, then 50c a minute and 30c a text) are not quoted in any email.
 
 **No claim that a roof designs itself or that anything runs by itself after signing** (23 Nov 2026, Martin: "the roofs do not design themselves. do not make that claim. also once the contract it signed - nothing works on its own so dont make that claim either"): the designer card is **Priced as you draw** (you lay out the panels and the quote builds as you go), the launch's cards read **Your quotes, priced as you draw** and **Your installs, on one calendar**, and the after-sale email is **Signed? Everything after the sale, in one place** (the order, approvals, install calendar and job card together for your team). Never write that RENUABL designs a roof, lays out designs in one press, or that the order, approvals or install happen by themselves.
+
+**Kept private** (23 Nov 2026, Martin: "noone ever sees these particular assets. the actual marketing for renuabl itself"): the launch pictures and the portal shots they are drawn from live in `marketing/launch/` (and `marketing/launch/source/`), outside the site's public folder, so no address opens them. **Add the drafts** shows and works only in RENUABL's own business (the one `RENUABL_CRM_EMAIL` owns) and reads the pictures from that folder on the server (`outputFileTracingIncludes` in next.config.ts carries it with the route) into RENUABL's Marketing pictures. A picture becomes visible only once it is in an email RENUABL sends, as every email picture must be.

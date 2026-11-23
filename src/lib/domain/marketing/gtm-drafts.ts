@@ -18,7 +18,7 @@
  * force": "first" needs proof under the Australian Consumer Law, so it isn't said), prices from plans.ts and
  * add-ons.ts, only {firstName} and {company}.
  *
- * The pictures (`GTM_PICTURES`) are files in public/design/launch/, drawn by tools/marketing/launch-art.mjs; the route
+ * The pictures (`GTM_PICTURES`) are files in marketing/launch/ (private: never served by the site, so nobody sees them until they are in an email RENUABL sends), drawn by tools/marketing/launch-art.mjs; the route
  * that adds the drafts (`/api/design/marketing/gtm`) reads them into RENUABL's own Marketing pictures and puts each
  * picture's id in its block (`withPictures`). Never sent or switched on by adding them.
  */
@@ -50,7 +50,7 @@ export const PRICE_DAY_LINE = `${dollars(VOICE_CENTS)} a month is $${voiceAday()
 /** The most words an email's own text may run to: a glance, not a read. */
 export const MAX_WORDS = 45;
 
-/** A picture's file under public/, and what it shows (its alt text in the email). */
+/** A picture's file in marketing/launch/, and what it shows (its alt text in the email). */
 export interface GtmPicture {
   file: string;
   alt: string;
@@ -74,40 +74,40 @@ export const SOL_TYPES: Record<string, string> = {
 
 export const GTM_PICTURES: Record<string, GtmPicture> = {
   dband: {
-    file: "/design/launch/designer-band.jpg",
+    file: "designer-band.jpg",
     alt: "Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn",
   },
-  solintro: { file: "/design/launch/sol-intro.gif", alt: SOL_TYPES.solintro },
+  solintro: { file: "sol-intro.gif", alt: SOL_TYPES.solintro },
   cards: {
-    file: "/design/launch/cards.gif",
+    file: "cards.gif",
     alt: "Your customers, answered. Your emails, written. Calls written up. Your advisor. Quotes priced as you draw. Installs on one calendar.",
   },
-  call: { file: "/design/launch/call.gif", alt: "A RENUABL voice agent on a call with a new lead, booking them in (example)" },
-  xvoice: { file: "/design/launch/explain-voice.gif", alt: SOL_TYPES.xvoice },
+  call: { file: "call.gif", alt: "A RENUABL voice agent on a call with a new lead, booking them in (example)" },
+  xvoice: { file: "explain-voice.gif", alt: SOL_TYPES.xvoice },
   pvoice: {
-    file: "/design/launch/product-voice.jpg",
+    file: "product-voice.jpg",
     alt: "In RENUABL: a voice agent's window, on a call with a customer now (example data)",
   },
   pricev: {
-    file: "/design/launch/price-voice.jpg",
+    file: "price-voice.jpg",
     alt: `Your voice agent, with your own number: ${VOICE_DAY_WORDS}. ${PRICE_DAY_LINE}`,
   },
-  sol: { file: "/design/launch/sol.gif", alt: SOL_TYPES.sol },
-  psol: { file: "/design/launch/product-sol.jpg", alt: "In RENUABL: Sol on Today, saying who to call and what to say (example data)" },
-  designer: { file: "/design/launch/designer.jpg", alt: "A roof in RENUABL's designer, whole and close up: panels laid out by hand, strung and priced" },
-  xlead: { file: "/design/launch/explain-lead.gif", alt: SOL_TYPES.xlead },
-  xdesigner: { file: "/design/launch/explain-designer.gif", alt: SOL_TYPES.xdesigner },
-  today: { file: "/design/launch/today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
-  xcrm: { file: "/design/launch/explain-crm.gif", alt: SOL_TYPES.xcrm },
-  runs: { file: "/design/launch/runs.jpg", alt: "RENUABL's install calendar after the sale (example data)" },
-  xruns: { file: "/design/launch/explain-runs.gif", alt: SOL_TYPES.xruns },
-  coupon: { file: "/design/launch/coupon.jpg", alt: "Yes. I want my AI sales force. First month free. No contract, cancel any time." },
+  sol: { file: "sol.gif", alt: SOL_TYPES.sol },
+  psol: { file: "product-sol.jpg", alt: "In RENUABL: Sol on Today, saying who to call and what to say (example data)" },
+  designer: { file: "designer.jpg", alt: "A roof in RENUABL's designer, whole and close up: panels laid out by hand, strung and priced" },
+  xlead: { file: "explain-lead.gif", alt: SOL_TYPES.xlead },
+  xdesigner: { file: "explain-designer.gif", alt: SOL_TYPES.xdesigner },
+  today: { file: "today.jpg", alt: "RENUABL's Today screen: calls, deals and what needs you (example data)" },
+  xcrm: { file: "explain-crm.gif", alt: SOL_TYPES.xcrm },
+  runs: { file: "runs.jpg", alt: "RENUABL's install calendar after the sale (example data)" },
+  xruns: { file: "explain-runs.gif", alt: SOL_TYPES.xruns },
+  coupon: { file: "coupon.jpg", alt: "Yes. I want my AI sales force. First month free. No contract, cancel any time." },
   footv: {
-    file: "/design/launch/footer-voice.jpg",
+    file: "footer-voice.jpg",
     alt: `Your AI salesperson: ${VOICE_DAY_WORDS}. Calls & Texts, ${VOICE}.`,
   },
   footer: {
-    file: "/design/launch/footer-marketplace.jpg",
+    file: "footer-marketplace.jpg",
     alt: "RENUABL Marketplace, coming soon: find crews, win installs, trade stock.",
   },
 };
@@ -184,17 +184,26 @@ export const GTM_LAUNCH: EdmContent = email(
 const SERIES: { wait: number; content: EdmContent }[] = [
   {
     wait: 2,
-    content: email("a", `An AI salesperson for ${VOICE_DAY_WORDS}`, "It rings every new lead in minutes and books them in. Nobody can be hired for that.", [
-      {
-        hook: `An AI salesperson for ${VOICE_DAY_WORDS}.`,
-        pictures: ["call"],
-        words: [`Calls & Texts is ${VOICE} with your own business number, on top of your RENUABL plan. Calls go out in calling hours.`],
-        cta: ["Hear it call", SITE],
-      },
-      { hook: "It rings every new lead, and books them in.", pictures: ["xvoice"], cta: ["See how it books", DEMO] },
-      { hook: "Watch any call live. Step in whenever you like.", pictures: ["pvoice"], cta: ["Try the demo", DEMO] },
-      { hook: `${PRICE_DAY_LINE.replace(" is ", ". That's ")} Your own number included.`, pictures: ["pricev"], cta: ["See the pricing", PRICING] },
-    ]),
+    content: email(
+      "a",
+      `An AI salesperson for ${VOICE_DAY_WORDS}`,
+      "It rings every new lead in minutes and books them in. Nobody can be hired for that.",
+      [
+        {
+          hook: `An AI salesperson for ${VOICE_DAY_WORDS}.`,
+          pictures: ["call"],
+          words: [`Calls & Texts is ${VOICE} with your own business number, on top of your RENUABL plan. Calls go out in calling hours.`],
+          cta: ["Hear it call", SITE],
+        },
+        { hook: "It rings every new lead, and books them in.", pictures: ["xvoice"], cta: ["See how it books", DEMO] },
+        { hook: "Watch any call live. Step in whenever you like.", pictures: ["pvoice"], cta: ["Try the demo", DEMO] },
+        {
+          hook: `${PRICE_DAY_LINE.replace(" is ", ". That's ")} Your own number included.`,
+          pictures: ["pricev"],
+          cta: ["See the pricing", PRICING],
+        },
+      ],
+    ),
   },
   {
     wait: 2,
@@ -220,10 +229,15 @@ const SERIES: { wait: number; content: EdmContent }[] = [
   },
   {
     wait: 3,
-    content: email("e", "Signed? Everything after the sale, in one place", "The order, approvals, install calendar and job card, together for your team.", [
-      { hook: "Signed? Everything after the sale, in one place.", pictures: ["xruns"], cta: ["See after the sale", DEMO] },
-      { hook: "Every install on one calendar, ready for your crew.", pictures: ["runs"], cta: ["Open the calendar", DEMO] },
-    ]),
+    content: email(
+      "e",
+      "Signed? Everything after the sale, in one place",
+      "The order, approvals, install calendar and job card, together for your team.",
+      [
+        { hook: "Signed? Everything after the sale, in one place.", pictures: ["xruns"], cta: ["See after the sale", DEMO] },
+        { hook: "Every install on one calendar, ready for your crew.", pictures: ["runs"], cta: ["Open the calendar", DEMO] },
+      ],
+    ),
   },
   {
     wait: 4,

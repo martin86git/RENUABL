@@ -36,7 +36,7 @@ describe("the launch drafts", () => {
       const first = c.blocks.find((b) => b.kind === "image")!;
       const key = pictureKeyOf(first);
       expect(key && GTM_PICTURES[key]).toBeTruthy();
-      expect(existsSync(join(process.cwd(), "public", GTM_PICTURES[key!].file))).toBe(true);
+      expect(existsSync(join(process.cwd(), "marketing", "launch", GTM_PICTURES[key!].file))).toBe(true);
     }
   });
 
@@ -56,7 +56,7 @@ describe("the launch drafts", () => {
       const body = c.blocks.slice(0, -2);
       // Each part: a heading, then at least one picture, then a button before the next heading.
       const parts: (typeof body)[] = [];
-      for (const b of body) (b.kind === "heading" ? parts.push([b]) : parts.at(-1)!.push(b));
+      for (const b of body) b.kind === "heading" ? parts.push([b]) : parts.at(-1)!.push(b);
       for (const p of parts) {
         expect(p.some((b) => b.kind === "image")).toBe(true);
         expect(p.at(-1)!.kind).toBe("button");
