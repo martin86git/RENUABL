@@ -362,11 +362,12 @@ export function SolNavButton({ phone = false, rail = false, small = false }: { p
           )}
         />
       </span>
-      {/* On the post-sale dock he is only his etched brain, in the hi-vis lime (23 Nov 2026, Martin: "imagine sol with
-          all the orange taken away. The etch lines remain"); the sun fades out and the lines in as the dock turns. */}
+      {/* On the post-sale dock he is his etched brain glowing lime in a graphite round, the tiles' family (23 Nov 2026,
+          Martin: "imagine sol with all the orange taken away. The etch lines remain", then D of four); the sun fades
+          out and the round in as the dock turns. */}
       {phone && (
-        <span className="sol-etch-face pointer-events-none absolute inset-0 flex items-center justify-center">
-          <SolEtch className="size-11" width={2.6} />
+        <span className="sol-etch-face pointer-events-none absolute inset-0 flex items-center justify-center rounded-full">
+          <SolEtch className="size-10" width={2.4} />
         </span>
       )}
       {waiting && (

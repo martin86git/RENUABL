@@ -1958,15 +1958,21 @@ html:has(.sales-snap) {
     inset 0 3px 0 rgb(255 255 255 / 0.9),
     0 -6px 24px -12px rgb(20 22 26 / 0.18);
 }
-/* Sol on the post-sale dock is only his etched brain in the hi-vis lime (23 Nov 2026, Martin: "imagine sol with all the
-   orange taken away. The etch lines remain"; a lime-tinted sun was tried first and he didn't want him filled in). The
-   sun fades out and the lines in as the dock turns; a faint graphite shadow keeps the lime lines readable on the white
-   glass. His count and the dot when he holds a deal stay as they are. */
+/* Sol on the post-sale dock is his etched brain glowing in the hi-vis lime inside a graphite round lit from above, the
+   same family as the tiles but round and raised (23 Nov 2026, Martin: "imagine sol with all the orange taken away. The
+   etch lines remain"; lime lines on the white glass were too faint, and of four he chose D, the dark round with no
+   ring). The sun fades out and the round in as the dock turns. His count and the dot when he holds a deal stay. */
 .sol-etch-face {
   opacity: 0;
-  color: #b9e80c;
-  filter: drop-shadow(0 0 0.5px rgb(30 34 20 / 0.6)) drop-shadow(0 0 6px rgb(200 255 40 / 0.55));
+  color: #d6ff3d;
+  background: radial-gradient(circle at 50% 35%, #4a4e56, #1e2024);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.15),
+    0 4px 12px -3px rgb(0 0 0 / 0.45);
   transition: opacity 450ms ease;
+}
+.sol-etch-face svg {
+  filter: drop-shadow(0 0 3px rgb(214 255 61 / 0.8));
 }
 .sol-sun-face {
   transition: opacity 450ms ease;
