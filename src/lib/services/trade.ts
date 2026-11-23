@@ -19,6 +19,10 @@ export const setItemStatus = (id: string, status: ItemState) =>
   ask<ItemDetail>(`${BASE}/${encodeURIComponent(id)}`, { method: "PUT", body: { status } });
 export const messageItem = (id: string, text: string, thread?: string) =>
   ask<ItemDetail>(`${BASE}/${encodeURIComponent(id)}`, { method: "POST", body: { text, ...(thread ? { thread } : {}) } });
+export const offerOnItem = (id: string, offer: { each: number; qty: number }, text?: string) =>
+  ask<ItemDetail>(`${BASE}/${encodeURIComponent(id)}`, { method: "POST", body: { offer, text } });
+export const answerItemOffer = (id: string, message: string, act: "accept" | "decline" | "withdraw") =>
+  ask<ItemDetail>(`${BASE}/${encodeURIComponent(id)}`, { method: "POST", body: { do: act, message } });
 export const removeItemPhoto = (id: string, photo: string) =>
   ask<ItemDetail>(`${BASE}/${encodeURIComponent(id)}/photos?photo=${encodeURIComponent(photo)}`, { method: "DELETE" });
 export const tradePhotoSrc = (photoId: string) => `${BASE}/photos/${encodeURIComponent(photoId)}`;

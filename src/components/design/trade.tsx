@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowLeft, ImagePlus, MapPin, Package, Plus, Search, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, ImagePlus, MapPin, Package, Plus, Search, Send, Tag, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,11 +25,13 @@ import {
 import type { Address } from "@/lib/domain/types";
 import {
   addItemPhotos,
+  answerItemOffer,
   createItem,
   itemPath,
   loadItem,
   loadItems,
   messageItem,
+  offerOnItem,
   removeItemPhoto,
   setItemStatus,
   tradePhotoSrc,
@@ -38,6 +40,7 @@ import {
 import { PATHS, PageHead, ui } from "./design-shell";
 import { WatchButton, watchingLine } from "./market-watch";
 import { BaseNote } from "./marketplace";
+import { OfferBubble, OfferSheet } from "./trade-offer";
 
 const DISTANCE_KEY = "renuabl.design.trade-distance";
 const STATE: Record<ItemState, { label: string; tone: string }> = {
@@ -233,6 +236,7 @@ export function ItemPage({ id }: { id: string }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [shown, setShown] = useState(0);
   const [thread, setThread] = useState<string | null>(null);
+  const [offering, setOffering] = useState(false);
   const files = useRef<HTMLInputElement>(null);
   useEffect(() => {
     void loadItem(id).then((res) => (res.ok ? setD(res) : setProblem(res.message)));
@@ -416,6 +420,8 @@ export function ItemPage({ id }: { id: string }) {
                   {open && (
                     <Thread
                       messages={open.messages}
+                      seller
+                      onAnswer={async (m, act) => take(await answerItemOffer(id, m, act))}
                       send={async (text) => take(await messageItem(id, text, open.id))}
                       placeholder={`Reply to ${open.with}`}
                     />
@@ -425,9 +431,22 @@ export function ItemPage({ id }: { id: string }) {
             </div>
           ) : (
             <div className={clsx(ui.card, "p-5")}>
-              <p className={ui.eyebrow}>{open ? `Your conversation with ${open.with}` : "Ask the seller"}</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className={ui.eyebrow}>{open ? `Your conversation with ${open.with}` : "Make an offer or ask the seller"}</p>
+                {(i.status === "available" || i.status === "pending") && (
+                  <button
+                    type="button"
+                    onClick={() => setOffering(true)}
+                    className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-[#2f6fe4] px-4 text-sm font-semibold text-white sm:h-9"
+                  >
+                    <Tag className="size-4" aria-hidden /> Make offer
+                  </button>
+                )}
+              </div>
               <Thread
                 messages={open?.messages ?? []}
+                seller={false}
+                onAnswer={async (m, act) => take(await answerItemOffer(id, m, act))}
                 send={async (text) => take(await messageItem(id, text))}
                 placeholder={open ? "Write a message" : "Is it still available? Would you take an offer?"}
               />
@@ -443,6 +462,18 @@ export function ItemPage({ id }: { id: string }) {
           )}
         </section>
       </div>
+      {offering && (
+        <OfferSheet
+          item={i}
+          onClose={() => setOffering(false)}
+          onSend={async (offer, note) => {
+            const res = await offerOnItem(id, offer, note || undefined);
+            if (!res.ok) return res.message;
+            take(res);
+            return null;
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -451,9 +482,13 @@ function Thread({
   messages,
   send,
   placeholder,
+  seller,
+  onAnswer,
 }: {
   messages: ItemDetail["conversations"][number]["messages"];
   send: (text: string) => Promise<void>;
+  seller: boolean;
+  onAnswer: (message: string, act: "accept" | "decline" | "withdraw") => Promise<void>;
   placeholder: string;
 }) {
   const [text, setText] = useState("");
@@ -471,18 +506,22 @@ function Thread({
         <ol className="mb-3 max-h-80 space-y-1.5 overflow-y-auto rounded-lg bg-canvas p-3">
           {messages.map((m) => (
             <li key={m.id} className={clsx("flex", m.own ? "justify-end" : "justify-start")}>
-              <span
-                className={clsx(
-                  "max-w-[80%] rounded-2xl px-3 py-1.5 text-sm",
-                  m.own ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink",
-                )}
-              >
-                <span className="whitespace-pre-line">{m.text}</span>
-                <span className={clsx("mt-0.5 block text-[10px]", m.own ? "text-white/60" : "text-muted")}>
-                  {m.own ? "" : `${m.business} · `}
-                  {when(m.at)}
+              {m.offer ? (
+                <OfferBubble m={{ ...m, offer: m.offer }} seller={seller} onAnswer={(act) => onAnswer(m.id, act)} />
+              ) : (
+                <span
+                  className={clsx(
+                    "max-w-[80%] rounded-2xl px-3 py-1.5 text-sm",
+                    m.own ? "bg-primary text-primary-ink" : "bg-surface-2 text-ink",
+                  )}
+                >
+                  <span className="whitespace-pre-line">{m.text}</span>
+                  <span className={clsx("mt-0.5 block text-[10px]", m.own ? "text-white/60" : "text-muted")}>
+                    {m.own ? "" : `${m.business} · `}
+                    {when(m.at)}
+                  </span>
                 </span>
-              </span>
+              )}
             </li>
           ))}
         </ol>
