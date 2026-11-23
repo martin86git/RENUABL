@@ -352,23 +352,29 @@ export function DealPage({ id }: { id: string }) {
     void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
   }, [id]);
   const business = account?.signedIn ? (account.business?.name ?? "") : "";
-  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): from the pipeline's card
-  // (?tour=1) every time, otherwise the first time it is opened on this device; Show me around starts it again.
+  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): once on this device, the
+  // first time it is opened, from the pipeline or anywhere; Show me around starts it again (23 Nov 2026, Martin: it kept
+  // running each time the sample was opened). It counts as seen the moment it starts, so leaving it half way or
+  // reloading doesn't bring it back.
   const [touring, setTouring] = useState(false);
   // The starter sample only: the example deals a demo is filled with are marked sample too, and aren't a tour each.
   const isSample = Boolean(customer?.sample) && customer?.source !== EXAMPLE_SOURCE;
-  const tourAsked = params.get("tour") === "1";
   useEffect(() => {
     if (!isSample) return;
     let seen = false;
     try {
       seen = window.localStorage.getItem(DEAL_TOUR_KEY) === "1";
     } catch {}
-    if (seen && !tourAsked) return;
+    if (seen) return;
     // A moment for Sol's card and the fields to be on the page, so each has a place to light.
-    const t = window.setTimeout(() => setTouring(true), 900);
+    const t = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(DEAL_TOUR_KEY, "1");
+      } catch {}
+      setTouring(true);
+    }, 900);
     return () => window.clearTimeout(t);
-  }, [isSample, tourAsked]);
+  }, [isSample]);
   const endTour = useCallback(() => {
     setTouring(false);
     try {

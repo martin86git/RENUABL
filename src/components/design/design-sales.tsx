@@ -340,7 +340,7 @@ export function PipelinesPage() {
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
   // The sample deal a new business starts with opens on the tour of a deal (deal-tour.ts).
-  const dealOf = (job: JobLine) => (job.sample ? `${deal(job.id)}?tour=1` : deal(job.id));
+  const dealOf = (job: JobLine) => deal(job.id);
   const choices = stageChoices(own, names);
   const stagePicker = (job: JobLine, className: string) => (
     <select className={className} value={keyOfDeal(job, own)} onChange={(e) => void move(job.id, e.target.value)}>
