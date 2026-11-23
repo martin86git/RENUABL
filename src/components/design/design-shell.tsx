@@ -15,9 +15,8 @@ import {
   ClipboardCheck,
   FileCheck2,
   FileText,
-  HardHat,
   Package,
-  Tag,
+  RefreshCw,
   LayoutDashboard,
   Menu,
   MessagesSquare,
@@ -827,27 +826,10 @@ function Shell({
         )}
       >
         {retail && (
-          // The dock's drum (23 Nov 2026, Martin: the ball in a lip "is not great", the control "up a little higher"): a
-          // small slot-machine window floating above the dock's left end, its reel showing the set the dock is on, a tag
-          // for sales and a hard hat for post sale. A tap rolls it to the other set and the dock's reels follow. On the
-          // left so it never meets the back-to-top round on the right.
-          <button
-            type="button"
-            aria-label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
-            title={DOCK_SET_WORDS[otherDockSet(dock)].turnTo}
-            onClick={() => setDockSet(otherDockSet(dock))}
-            className="dock-drum absolute -top-[52px] left-3 h-10 w-14 overflow-hidden rounded-[14px] border"
-          >
-            <span className="dock-drum-reel flex flex-col" style={{ transform: post ? "translateY(-2.5rem)" : undefined }}>
-              <span className="flex h-10 items-center justify-center">
-                <Tag className="size-[19px] text-sun-line" aria-hidden />
-              </span>
-              <span className="flex h-10 items-center justify-center">
-                <HardHat className="size-[19px] text-[#8fb3d9]" aria-hidden />
-              </span>
-            </span>
-            <span aria-hidden className="dock-drum-shade pointer-events-none absolute inset-0" />
-          </button>
+          // The dock's turn round (23 Nov 2026, Martin: a slot-machine drum read poorly, "maybe it should be an arrow in a
+          // circular motion"): a round floating above the dock's left end with two arrows chasing each other; a tap spins
+          // it a full turn and the dock's reels follow. On the left so it never meets the back-to-top round.
+          <DockTurn post={post} label={DOCK_SET_WORDS[otherDockSet(dock)].turnTo} onTurn={() => setDockSet(otherDockSet(dock))} />
         )}
         {retail
           ? [0, 1, 2, 3].map((i) => [
@@ -1075,4 +1057,28 @@ function useCount(on: boolean, event: string, ask: () => Promise<number | null>)
     };
   }, [on, event]);
   return on ? n : 0;
+}
+
+/** The round that turns the dock between its two sets: a full spin each tap, always the same way round. */
+function DockTurn({ post, label, onTurn }: { post: boolean; label: string; onTurn: () => void }) {
+  const [turns, setTurns] = useState(0);
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={() => {
+        setTurns((t) => t + 1);
+        onTurn();
+      }}
+      className="dock-turn absolute -top-[52px] left-3 grid size-10 place-items-center rounded-full border"
+    >
+      <RefreshCw
+        className={`dock-turn-arrows size-[19px] ${post ? "text-[#8fb3d9]" : "text-sun-line"}`}
+        style={{ transform: `rotate(${turns * 360}deg)` }}
+        strokeWidth={2.25}
+        aria-hidden
+      />
+    </button>
+  );
 }

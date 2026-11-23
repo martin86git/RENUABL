@@ -1952,9 +1952,8 @@ html:has(.sales-snap) {
 .dock-reel {
   transition: transform 620ms cubic-bezier(0.25, 1.55, 0.45, 1);
 }
-/* The drum: a slot-machine window over the dock's left end, its reel rolling between a tag and a hard hat. Shaded at
-   top and bottom so it reads as a turning cylinder. */
-.dock-drum {
+/* The turn round: over the dock's left end, two arrows chasing each other that spin a full turn as the dock turns. */
+.dock-turn {
   background-color: var(--surface);
   border-color: var(--line);
   box-shadow: 0 6px 16px -6px rgb(20 22 26 / 0.35);
@@ -1962,26 +1961,20 @@ html:has(.sales-snap) {
     background-color 450ms ease,
     border-color 450ms ease;
 }
-.phone-tabbar[data-dock="post"] .dock-drum {
+.phone-tabbar[data-dock="post"] .dock-turn {
   background-color: var(--dock-post);
   border-color: rgb(255 255 255 / 0.16);
 }
-.dock-drum-reel {
-  transition: transform 620ms cubic-bezier(0.25, 1.55, 0.45, 1);
+.dock-turn-arrows {
+  transition: transform 700ms cubic-bezier(0.25, 1.35, 0.45, 1);
 }
-.dock-drum-shade {
-  background: linear-gradient(to bottom, rgb(20 22 26 / 0.16), transparent 32%, transparent 68%, rgb(20 22 26 / 0.16));
-}
-.phone-tabbar[data-dock="post"] .dock-drum-shade {
-  background: linear-gradient(to bottom, rgb(0 0 0 / 0.4), transparent 32%, transparent 68%, rgb(0 0 0 / 0.4));
-}
-/* A deal's Sol sheet sits where the drum floats: the drum steps aside while the sheet is open. */
-html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-drum {
+/* A deal's Sol sheet sits where the turn round floats: it steps aside while the sheet is open. */
+html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-turn {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .dock-reel,
-  .dock-drum-reel {
+  .dock-turn-arrows {
     transition: none;
   }
 }
