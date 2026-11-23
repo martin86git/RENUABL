@@ -87,6 +87,7 @@ export const PATHS = {
   feedback: "/design/feedback",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
+  calls: "/design/calls",
   scheduler: "/design/installations",
   orders: "/design/procurement/orders",
   jobMap: "/design/procurement/map",
@@ -98,6 +99,45 @@ export const PATHS = {
   account: "/design/account",
   signIn: "/design/sign-in",
 } as const;
+
+/**
+ * The Deals page's own switch on a phone (23 Nov 2026, Martin: "The deals page should have: Proposals both open and
+ * closed, Pipeline, Calls"): the Sales section's four pages, which a computer shows under the menu, as one segmented
+ * control at the top of the pad; the two proposal pages under one word.
+ */
+const DEALS_SWITCH = [
+  { href: PATHS.pipelines, top: null, label: "Pipeline", full: "Pipeline" },
+  { href: PATHS.proposalsSent, top: "Proposals", label: "Open", full: "Proposals open" },
+  { href: PATHS.proposalsSigned, top: "Proposals", label: "Closed", full: "Proposals closed" },
+  { href: PATHS.calls, top: null, label: "Calls", full: "Calls" },
+] as const;
+
+function PhoneDealsSwitch({ path }: { path: string }) {
+  return (
+    <nav aria-label="Deals" className="-mt-1 mb-4 lg:hidden">
+      <div className="grid grid-cols-4 gap-1 rounded-2xl bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.06)]">
+        {DEALS_SWITCH.map((t) => {
+          const lit = path === t.href || path.startsWith(`${t.href}/`) || (t.href === PATHS.pipelines && path === PATHS.sales);
+          return (
+            <Link
+              key={t.href}
+              href={t.href}
+              aria-label={t.full}
+              aria-current={lit ? "page" : undefined}
+              className={clsx(
+                "flex min-h-11 flex-col items-center justify-center rounded-xl px-1 text-center leading-tight transition-colors",
+                lit ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted active:bg-surface/60",
+              )}
+            >
+              {t.top && <span className="text-[9.5px] font-medium uppercase tracking-[0.08em] opacity-70">{t.top}</span>}
+              <span className="text-[13px] font-medium">{t.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
 
 type PhoneTab = { label: string; href: string; icon: LucideIcon; match: (path: string) => boolean };
 
@@ -136,7 +176,12 @@ const KIND_TABS: Record<Exclude<BusinessKind, "retailer">, PhoneTab[]> = {
 // Designer, Sol raised in the middle (he goes to Today), Voice, More. Voice is a button (`PhoneVoiceTab`), not a link.
 const VOICE_TAB = "Voice";
 const PHONE_TABS: PhoneTab[] = [
-  { label: "Deals", href: PATHS.pipelines, icon: SquareKanban, match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) },
+  {
+    label: "Deals",
+    href: PATHS.pipelines,
+    icon: SquareKanban,
+    match: (p) => p.startsWith(PATHS.sales) || p.startsWith(PATHS.deals) || p.startsWith(PATHS.calls),
+  },
   { label: "Designer", href: PATHS.designer, icon: PenTool, match: (p) => p.startsWith(PATHS.designer) },
   { label: VOICE_TAB, href: PATHS.home, icon: PenTool, match: () => false },
   // Team chat in the foot bar (22 Nov 2026, Martin: "we need to introduce the team chat into the bottom nav"): its own
@@ -865,6 +910,7 @@ function Shell({
             {/* Inside the Marketplace, its own menu at the top of the pad, from its blue home, once it is open; until then
                 the launch page's demo carries it. */}
             {sectionPages && <div className="studio-pages -mt-2 mb-5 hidden lg:block">{sectionPages}</div>}
+            {current.id === "proposals" && <PhoneDealsSwitch path={path} />}
             {current.id === "marketplace" && marketplaceOpen() && (
               <MarketplaceMenu className="-mt-1 mb-6 border-b border-line pb-3" pages={current.pages} lit={here?.page.id} count={count} />
             )}

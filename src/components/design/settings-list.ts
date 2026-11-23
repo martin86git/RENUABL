@@ -12,6 +12,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
       { slug: "lead-inbox", label: "Lead inbox" },
       { slug: "import", label: "Bring in contacts and deals" },
       { slug: "pylon", label: "Bring in from Pylon" },
+      { slug: "hubspot", label: "Bring in from HubSpot" },
     ],
   },
   {

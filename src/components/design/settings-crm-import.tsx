@@ -198,7 +198,11 @@ export function CrmImportSettings() {
           <Link href={`${PATHS.settings}/pylon`} className={ui.link}>
             Bring in from Pylon
           </Link>{" "}
-          carries the signed proposals too.
+          carries the signed proposals too. Coming from HubSpot?{" "}
+          <Link href={`${PATHS.settings}/hubspot`} className={ui.link}>
+            Bring in from HubSpot
+          </Link>{" "}
+          carries the notes, emails and calls too.
         </p>
       </div>
 

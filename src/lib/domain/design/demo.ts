@@ -136,6 +136,7 @@ const BLOCKED: readonly RegExp[] = [
   /^\/api\/design\/lead-inbox$/,
   // Reading another company's account (Pylon) with a key.
   /^\/api\/design\/pylon$/,
+  /^\/api\/design\/hubspot$/,
   // Marketing email to a business's contacts (domain/marketing).
   /^\/api\/design\/marketing(\/|$)/,
   // Other businesses: the feed every business reads, connections, the Marketplace, jobs passed on.
