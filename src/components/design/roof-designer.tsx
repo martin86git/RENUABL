@@ -1082,6 +1082,8 @@ const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: R
  * How far in the designer opens on the roof: the middle of the picture, this many times closer than the whole of it.
  * One press of the zoom button (1.4×) back from 1.6 (3 Nov 2026, Martin: "too zoomed in").
  */
+/** One press of zoom in or out (24 Nov 2026, Martin: 1.4 was too big a step for placing panels). */
+const ZOOM_STEP = 1.2;
 const OPEN_ZOOM = 1.6 / 1.4;
 const OPENED: typeof WHOLE = {
   x: (ROOF_IMAGE.width - ROOF_IMAGE.width / OPEN_ZOOM) / 2,
@@ -2822,11 +2824,13 @@ export function RoofDesigner(props: {
   /** The direction of a point from a centre, in degrees clockwise from straight up. */
   const bearing = (p: Point, centre: Point) => (Math.atan2(p.x - centre.x, -(p.y - centre.y)) * 180) / Math.PI;
 
+  // Zoom works on the kept view (the photo's own shape), never the band shown: on a phone held upright the band is
+  // narrower than the kept view, so sizing from it made Zoom out zoom in (24 Nov 2026, Martin).
   const zoom = (factor: number) => {
-    const w = Math.min(ROOF_IMAGE.width, Math.max(40, view.w * factor));
+    const w = Math.min(ROOF_IMAGE.width, Math.max(40, keptView.w * factor));
     const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
-    const cx = view.x + view.w / 2;
-    const cy = view.y + view.h / 2;
+    const cx = keptView.x + keptView.w / 2;
+    const cy = keptView.y + keptView.h / 2;
     setView({
       x: within(cx - w / 2, w, ROOF_IMAGE.width),
       y: within(cy - h / 2, h, ROOF_IMAGE.height),
@@ -9411,11 +9415,11 @@ export function RoofDesigner(props: {
                     <Search className="size-3.5" aria-hidden />
                   </button>
                   <div className="flex flex-col overflow-hidden rounded-full bg-primary/90 text-primary-ink shadow-lift">
-                    <button type="button" aria-label="Zoom in" onClick={() => zoom(1 / 1.4)} className="grid size-10 place-items-center">
+                    <button type="button" aria-label="Zoom in" onClick={() => zoom(1 / ZOOM_STEP)} className="grid size-10 place-items-center">
                       <Plus className="size-5" aria-hidden />
                     </button>
                     <span className="mx-2.5 h-px bg-primary-ink/25" aria-hidden />
-                    <button type="button" aria-label="Zoom out" onClick={() => zoom(1.4)} className="grid size-10 place-items-center">
+                    <button type="button" aria-label="Zoom out" onClick={() => zoom(ZOOM_STEP)} className="grid size-10 place-items-center">
                       <Minus className="size-5" aria-hidden />
                     </button>
                   </div>
@@ -11837,10 +11841,10 @@ export function RoofDesigner(props: {
                   role="group"
                   aria-label="Getting about"
                 >
-                  <FootRound label="Zoom out" on={false} onClick={() => zoom(1.4)}>
+                  <FootRound label="Zoom out" on={false} onClick={() => zoom(ZOOM_STEP)}>
                     <ZoomOut className="size-5" aria-hidden />
                   </FootRound>
-                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / 1.4)}>
+                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / ZOOM_STEP)}>
                     <ZoomIn className="size-5" aria-hidden />
                   </FootRound>
                   <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
@@ -11865,10 +11869,10 @@ export function RoofDesigner(props: {
                     </span>
                   )}
                 >
-                  <Leg label="Zoom in" onClick={() => zoom(1 / 1.4)}>
+                  <Leg label="Zoom in" onClick={() => zoom(1 / ZOOM_STEP)}>
                     <ZoomIn className="size-5" aria-hidden />
                   </Leg>
-                  <Leg label="Zoom out" onClick={() => zoom(1.4)}>
+                  <Leg label="Zoom out" onClick={() => zoom(ZOOM_STEP)}>
                     <ZoomOut className="size-5" aria-hidden />
                   </Leg>
                   {/* In the pop-up the hand is in the foot row beside Sol. */}
