@@ -43,6 +43,7 @@ import {
   type EmailAction,
   type InboxEmail,
   type InboxFilter,
+  framedEmail,
 } from "@/lib/domain/design/inbox";
 import {
   changeInboxEmail,
@@ -1134,21 +1135,33 @@ function EmailView({
         !problem && <p className="text-sm text-muted">Opening…</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <article className={clsx(ui.card, "min-w-0 p-5")}>
-            <h1 className="text-xl font-semibold tracking-tight text-ink">{email.subject}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" aria-hidden>
+          <article className={clsx(ui.card, "min-w-0 p-4 sm:p-5")}>
+            <h1 className="text-[19px] font-semibold leading-snug tracking-tight text-ink sm:text-xl">{email.subject}</h1>
+            <div className="mt-3 flex items-center gap-3">
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white"
+                aria-hidden
+              >
                 {(email.from.name[0] ?? "?").toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-ink">
-                  <span className="font-medium">{email.from.name}</span> <span className="text-muted">&lt;{email.from.email}&gt;</span>
-                </p>
-                <p className="text-xs text-muted">
-                  {email.copy ? `Shared by ${handle(email.owner)}` : "to me"} ·{" "}
-                  {new Date(email.at).toLocaleString("en-AU", { timeZone: "Australia/Melbourne" })}
+                <p className="truncate text-sm font-medium text-ink">{email.from.name || email.from.email}</p>
+                <p className="truncate text-xs text-muted">
+                  {email.from.name ? `${email.from.email} · ` : ""}
+                  {email.copy ? `shared by ${handle(email.owner)}` : "to me"}
                 </p>
               </div>
+              <time className="shrink-0 text-xs text-muted" dateTime={email.at}>
+                {new Date(email.at).toLocaleString("en-AU", {
+                  timeZone: "Australia/Melbourne",
+                  day: "numeric",
+                  month: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </time>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {email.deal && (
                 <Link
                   href={`${PATHS.deals}/${encodeURIComponent(email.deal.id)}`}
@@ -1158,7 +1171,7 @@ function EmailView({
                 </Link>
               )}
               {email.canChange && (
-                <span className="flex items-center gap-1.5">
+                <>
                   <button
                     type="button"
                     onClick={() => void act("archive")}
@@ -1178,7 +1191,7 @@ function EmailView({
                     {email.unread ? <MailOpen className="size-3.5" aria-hidden /> : <Mail className="size-3.5" aria-hidden />}
                     {email.unread ? "Mark read" : "Mark unread"}
                   </button>
-                </span>
+                </>
               )}
               {!email.copy && (
                 <a
@@ -1187,7 +1200,7 @@ function EmailView({
                   }
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
+                  className="ml-auto inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
                 >
                   Open in {providerOfId(email.id) === "outlook" ? "Outlook" : "Gmail"} <ExternalLink className="size-3" aria-hidden />
                 </a>
@@ -1208,11 +1221,11 @@ function EmailView({
                 <iframe
                   title="The email"
                   sandbox="allow-popups allow-popups-to-escape-sandbox"
-                  srcDoc={email.html}
-                  className="h-[60dvh] w-full rounded-md bg-white"
+                  srcDoc={framedEmail(email.html)}
+                  className="h-[65dvh] w-full rounded-md bg-white"
                 />
               ) : (
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
+                <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
               )}
             </div>
             {email.files.length > 0 && (
