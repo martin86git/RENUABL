@@ -221,7 +221,7 @@ async function keepDeal(
       `update design_jobs set kw = $3,
               won_at = case when $4::text is not null then ($4::date + time '12:00') at time zone 'Australia/Melbourne' else coalesce(won_at, now()) end,
               installed_at = coalesce(installed_at, case when $5::boolean then now() end),
-              owner_email = coalesce((select m.email from business_members m where m.business_id = $1 and lower(m.email) = $6 limit 1), owner_email),
+              owner_email = coalesce((select e from (select m.email as e from business_members m where m.business_id = $1 union all select o.email from design_owner_only o where o.business_id = $1) x where lower(e) = $6 limit 1), owner_email),
               updated_at = now()
         where business_id = $1 and id = $2`,
       [businessId, jobId, deal.job.kw, as.wonOn || null, Boolean(as.installedNow), (as.owner ?? "").toLowerCase()],

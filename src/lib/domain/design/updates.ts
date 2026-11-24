@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
+    area: "Your account",
+    words:
+      "Add a deal owner without inviting them, so past deals can carry a salesperson's name. Invite them later and they keep their deals.",
+  },
+  {
+    day: "2026-11-24",
     area: "Team chat",
     words: "On a phone, direct messages are a row of faces, deal chats are cards with the latest line, and days are marked in a chat.",
   },
