@@ -140,8 +140,9 @@ export function ConfiguratorPage(props: {
     if (!box) return;
     const measure = () => {
       const p = plate.current?.getBoundingClientRect();
-      const b = box.getBoundingClientRect();
-      if (!p || !b.width || !b.height) return setLineTo(null);
+      // The roof's own box: on a phone the plate sits under it, not on it, and then no line is drawn.
+      const b = (box.firstElementChild ?? box).getBoundingClientRect();
+      if (!p || !b.width || !b.height || p.top >= b.bottom - 1) return setLineTo(null);
       setLineTo({ x: Math.max(0, (p.left - b.left - 4) / b.width), y: Math.min(1, (p.top - b.top + p.height * 0.55) / b.height) });
     };
     measure();
@@ -239,11 +240,12 @@ export function ConfiguratorPage(props: {
                     <ShadeSummary shade={shown.roof.shade} dark />
                   </div>
                 )}
-                {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
+                {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. On a phone it is a
+                    strip under the picture instead (24 Nov 2026, Martin: on his iPhone it covered the panels). */}
                 {(battery || mix.ev) && !sunView && (
                   <div
                     ref={plate}
-                    className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4"
+                    className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4 @max-2xl:static @max-2xl:scale-100 @max-2xl:justify-center @max-2xl:rounded-none @max-2xl:px-5 @max-2xl:py-5 @max-2xl:shadow-none @max-2xl:ring-0"
                   >
                     {mix.ev && <ChargerArt />}
                     {battery && (
