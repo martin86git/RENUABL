@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  headerCell,
   cleanBlocks,
   cleanBrand,
   cleanLink,
@@ -198,5 +199,16 @@ describe("sequences", () => {
     expect(stepAction(steps, 0, now).kind).toBe("email");
     expect(stepAction(steps, 1, now)).toMatchObject({ kind: "wait" });
     expect(stepAction(steps, 2, now).kind).toBe("finish");
+  });
+});
+
+describe("the email's top line", () => {
+  it("is the sender's logo when it has a public https one, else its name", () => {
+    expect(headerCell({ ...sender, logo: "https://www.renuabl.com.au/brand/renuabl-logo-email.png" })).toContain(
+      '<img src="https://www.renuabl.com.au/brand/renuabl-logo-email.png" alt="Sunrise Solar"',
+    );
+    expect(headerCell(sender)).toBe("Sunrise Solar");
+    for (const logo of ["http://x.example/l.png", "javascript:alert(1)", 'https://x.example/"onerror=1', null])
+      expect(headerCell({ ...sender, logo })).toBe("Sunrise Solar");
   });
 });

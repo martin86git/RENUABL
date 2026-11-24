@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { askedEmail, browseItems, cleanItemInput, cleanMessage, listedWords, priceWords, type TradeItem } from "./trade";
+import {
+  cleanOffer,
+  offerChoices,
+  offerStateNow,
+  offerWords,
+  askedEmail,
+  browseItems,
+  cleanItemInput,
+  cleanMessage,
+  listedWords,
+  priceWords,
+  type TradeItem,
+} from "./trade";
 
 const item = (id: string, more: Partial<TradeItem> = {}): TradeItem => ({
   id,
@@ -88,5 +100,27 @@ describe("browsing equipment", () => {
     const e = askedEmail({ item: "spare inverter", buyer: "Beta Installs", text: "<b>Still there?</b>", link: "https://x.example/i" });
     expect(e.subject).toBe("Beta Installs asked about your spare inverter");
     expect(e.html).toContain("&lt;b&gt;");
+  });
+});
+
+describe("offers on equipment", () => {
+  it("offers 10% lower, the asking price and 5% higher, and nothing to pick with no asking price", () => {
+    expect(offerChoices(250).map((c) => c.words)).toEqual(["$225 (10% lower)", "$250", "$262.50"]);
+    expect(offerChoices(null)).toEqual([]);
+  });
+  it("takes an amount each and how many, within what is for sale", () => {
+    expect(cleanOffer({ each: "225.456", qty: 2 }, 3)).toEqual({ ok: true, value: { each: 225.46, qty: 2 } });
+    expect(cleanOffer({ each: 0 }, 3)).toMatchObject({ ok: false });
+    expect(cleanOffer({ each: 10, qty: 4 }, 3)).toMatchObject({ ok: false });
+  });
+  it("lapses an open offer after 48 hours, never an answered one", () => {
+    const at = "2026-11-20T00:00:00.000Z";
+    expect(offerStateNow(null, at, new Date("2026-11-21T23:00:00Z"))).toBe("open");
+    expect(offerStateNow("open", at, new Date("2026-11-22T01:00:00Z"))).toBe("lapsed");
+    expect(offerStateNow("accepted", at, new Date("2026-11-30T00:00:00Z"))).toBe("accepted");
+  });
+  it("says the offer in a line", () => {
+    expect(offerWords(225, 1)).toBe("Offered $225 ex GST");
+    expect(offerWords(225, 2)).toBe("Offered $225 each for 2 ($450 ex GST)");
   });
 });

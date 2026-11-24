@@ -80,7 +80,7 @@ export const ACTIVITY_WORD = {
  * (a one-time link by email, the same whether it is someone's first time or
  * not). Signed in, the business's overview inside the app's frame.
  */
-export function DesignHome() {
+export function DesignHome({ only }: { only?: "feed" | "calendar" } = {}) {
   const [account] = useDesignAccount();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (account.signedIn) {
@@ -95,6 +95,7 @@ export function DesignHome() {
             firstName={account.firstName ?? null}
             welcome={Boolean(account.welcome)}
             owner={account.business?.role === "owner"}
+            only={only}
           />
         ) : kind === "installer" ? (
           // An installer's home is My Jobs (my-jobs.ts, 2 Nov 2026, Martin).
@@ -164,12 +165,15 @@ function OverviewPage({
   firstName,
   welcome,
   owner,
+  only,
 }: {
   business: string;
   email: string;
   firstName: string | null;
   welcome: boolean;
   owner: boolean;
+  /** Feed or the calendar, each its own page now (23 Nov 2026, Martin). */
+  only?: "feed" | "calendar";
 }) {
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
@@ -204,7 +208,7 @@ function OverviewPage({
   /** A job changed from one of the lists (its installer or its paperwork), put back in place. */
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
 
-  if (view !== null) {
+  if (view !== null && !only) {
     const label = OVERVIEW_VIEWS.find((v) => v.id === view)?.label ?? "";
     return (
       <div className={ui.page}>
@@ -250,8 +254,9 @@ function OverviewPage({
       business={business}
       name={name}
       email={email}
-      welcome={welcome}
+      welcome={only ? false : welcome}
       owner={owner}
+      only={only}
       mine={data?.mine ?? (problem ? [] : null)}
       problem={problem}
       day={

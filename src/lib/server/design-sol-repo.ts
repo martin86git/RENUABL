@@ -33,7 +33,7 @@ import {
   type BusinessScope,
   type Induction,
 } from "@/lib/domain/design/sol-induction";
-import { cleanPast, fileAway, freshTurns, pastLines, type SolPast, type SolPastLine } from "@/lib/domain/design/sol-history";
+import { chatsSoFar, cleanPast, fileAway, freshTurns, pastLines, type SolPast, type SolPastLine } from "@/lib/domain/design/sol-history";
 import { transaction } from "./db";
 import type { Q } from "./design-crm-repo";
 
@@ -43,13 +43,24 @@ interface Row {
   reminders: SolReminder[];
   seenAt: string | null;
   induction: Induction;
+  /** How many past conversations are filed away (read only, never saved from here). */
+  pastCount: number;
 }
 
 /** The member's row, locked for this transaction (made empty first when there is none), with due reminders said. */
 async function locked(q: Q, businessId: string, email: string, now: Date): Promise<Row> {
   await q(`insert into design_sol (business_id, email) values ($1, $2) on conflict do nothing`, [businessId, email]);
-  const rows = await q<{ turns: unknown; prefs: unknown; reminders: unknown; seen_at: Date | null; induction: unknown }>(
-    `select turns, prefs, reminders, seen_at, induction from design_sol where business_id = $1 and email = $2 for update`,
+  const rows = await q<{
+    turns: unknown;
+    prefs: unknown;
+    reminders: unknown;
+    seen_at: Date | null;
+    induction: unknown;
+    past_count: number | null;
+  }>(
+    `select turns, prefs, reminders, seen_at, induction,
+            case when jsonb_typeof(past) = 'array' then jsonb_array_length(past) else 0 end as past_count
+       from design_sol where business_id = $1 and email = $2 for update`,
     [businessId, email],
   );
   const row: Row = {
@@ -58,6 +69,7 @@ async function locked(q: Q, businessId: string, email: string, now: Date): Promi
     reminders: cleanReminders(rows[0]?.reminders),
     seenAt: rows[0]?.seen_at ? rows[0].seen_at.toISOString() : null,
     induction: cleanInduction(rows[0]?.induction),
+    pastCount: Number(rows[0]?.past_count ?? 0) || 0,
   };
   const due = dueNow(row.reminders, now);
   if (due.length) {
@@ -122,6 +134,7 @@ const stateOf = (row: Row, side: BusinessSide): SolState => ({
   prefs: row.prefs,
   reminders: upcoming(row.reminders),
   unread: unreadOf(row.turns, row.seenAt),
+  chats: chatsSoFar(row.pastCount, row.turns),
   businessPrefs: side.prefs,
   induction: { status: row.induction.status, scope: side.scope, owner: side.owner, firstName: side.firstName, business: side.business },
 });

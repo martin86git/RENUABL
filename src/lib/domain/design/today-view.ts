@@ -5,7 +5,7 @@
  */
 import type { ISODate } from "../types";
 
-export const TODAY_VIEWS = ["chat", "feed"] as const;
+export const TODAY_VIEWS = ["chat", "feed", "calendar"] as const;
 export type TodayView = (typeof TODAY_VIEWS)[number];
 
 /** What the device remembers: the day it was last on Today, and which view it had. */
@@ -16,6 +16,11 @@ export interface TodaySeen {
 
 export const TODAY_VIEW_KEY = "renuabl.design.today-view";
 
+/** Today's calendar shows either the member's own appointments or the business's installs (23 Nov 2026, Martin). */
+export const CALENDAR_SIDES = ["mine", "installs"] as const;
+export type CalendarSide = (typeof CALENDAR_SIDES)[number];
+export const CALENDAR_SIDE_KEY = "renuabl.design.today-calendar";
+
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** What was kept, or null when it isn't a day and a view. */
@@ -23,8 +28,8 @@ export function cleanSeen(raw: unknown): TodaySeen | null {
   if (!raw || typeof raw !== "object") return null;
   const { day, view } = raw as Record<string, unknown>;
   if (typeof day !== "string" || !ISO.test(day)) return null;
-  if (view !== "chat" && view !== "feed") return null;
-  return { day: day as ISODate, view };
+  if (!TODAY_VIEWS.includes(view as TodayView)) return null;
+  return { day: day as ISODate, view: view as TodayView };
 }
 
 /** Chat the first time each day (or on a device that remembers nothing), else the view last had today. */

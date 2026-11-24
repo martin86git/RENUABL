@@ -340,7 +340,7 @@ export function PipelinesPage() {
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
   // The sample deal a new business starts with opens on the tour of a deal (deal-tour.ts).
-  const dealOf = (job: JobLine) => (job.sample ? `${deal(job.id)}?tour=1` : deal(job.id));
+  const dealOf = (job: JobLine) => deal(job.id);
   const choices = stageChoices(own, names);
   const stagePicker = (job: JobLine, className: string) => (
     <select className={className} value={keyOfDeal(job, own)} onChange={(e) => void move(job.id, e.target.value)}>
@@ -625,7 +625,7 @@ export function PipelinesPage() {
                   setColOver(null);
                 }}
                 className={clsx(
-                  "relative flex w-[86%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 max-sm:min-h-0 max-sm:pb-0 sm:w-auto sm:min-w-72 sm:flex-1 sm:shrink sm:basis-72 sm:rounded-lg",
+                  "relative flex w-[64%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 max-sm:min-h-0 max-sm:pb-0 sm:w-auto sm:min-w-72 sm:flex-1 sm:shrink sm:basis-72 sm:rounded-lg",
                   over === stage ? "border-sun-line" : "border-transparent",
                   movingCol === stage && "opacity-50",
                 )}
@@ -711,13 +711,16 @@ export function PipelinesPage() {
                         {job.address ? <KitMarks job={job} /> : null}
                       </p>
                       <PulseMarks
+                        short
                         pulse={pulses[job.id]}
                         end={
                           <span className="flex items-center gap-1.5">
                             {/* On a phone the card's last row folds into this one (23 Nov 2026, Martin: smaller cards). */}
-                            <span className="sm:hidden">
-                              <Owner email={job.owner} />
-                            </span>
+                            {job.owner && (
+                              <span className="sm:hidden">
+                                <Owner email={job.owner} />
+                              </span>
+                            )}
                             {job.sample ? (
                               <span
                                 title={SAMPLE_DEAL_HINT}

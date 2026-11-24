@@ -89,6 +89,24 @@ describe.skipIf(!url)("equipment trading (database)", () => {
     expect(await trade.tradeUnread(b)).toBe(0);
   });
 
+  it("takes an offer from a buyer, replaces its earlier open one, and lets only the seller accept it", async () => {
+    expect(await trade.sendMessage(who(c, "Gamma Electrical", C), itemId, "", null, { each: 400, qty: 1 })).toEqual({ ok: true });
+    expect(await trade.sendMessage(who(c, "Gamma Electrical", C), itemId, "Can collect today", null, { each: 450, qty: 1 })).toEqual({
+      ok: true,
+    });
+    expect(await trade.sendMessage(who(a, "Alpha Solar", A), itemId, "", null, { each: 1, qty: 1 })).toMatchObject({ ok: false });
+    const offers = (await trade.itemDetail(c, itemId))!.conversations[0].messages.filter((m) => m.offer);
+    expect(offers.map((m) => m.offer!.state)).toEqual(["withdrawn", "open"]);
+    expect(offers[1].text).toBe("Offered $450 ex GST\n\nCan collect today");
+    const open = offers[1].id;
+    expect(await trade.answerOffer(who(c, "Gamma Electrical", C), itemId, open, "accept")).toMatchObject({ ok: false, status: 403 });
+    expect(await trade.answerOffer(who(a, "Alpha Solar", A), itemId, open, "accept")).toEqual({ ok: true });
+    expect(await trade.answerOffer(who(a, "Alpha Solar", A), itemId, open, "decline")).toMatchObject({ ok: false, status: 409 });
+    const after = await trade.itemDetail(c, itemId);
+    expect(after!.item.status).toBe("pending");
+    expect(after!.conversations[0].messages.at(-1)!.text).toMatch(/^Accepted your offer of \$450/);
+  });
+
   it("hides a sold item from others but keeps it for a buyer already talking, and serves photos only where it may be seen", async () => {
     const png = await sharp({ create: { width: 40, height: 30, channels: 3, background: "#888" } })
       .png()

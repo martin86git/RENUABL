@@ -219,7 +219,7 @@ function Waitlist({ quick = false }: { quick?: boolean }) {
     // Both boxes on the page show it.
     window.dispatchEvent(new Event("renuabl:market-joined"));
   };
-  if (!state) return <div className={quick ? "h-14" : "h-32"} aria-busy="true" />;
+  if (!state) return <div className={quick ? "h-10 sm:h-14" : "h-32"} aria-busy="true" />;
   if (state.joined)
     return (
       <div className="mx-auto inline-flex max-w-xl items-center gap-3 rounded-2xl bg-surface px-5 py-4 text-left ring-1 ring-line">
@@ -268,7 +268,7 @@ function Waitlist({ quick = false }: { quick?: boolean }) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Your work email"
             aria-label="Your work email"
-            className={clsx(ui.input, "rounded-full px-5 sm:w-72", quick ? "h-14 text-[16px]" : "h-12")}
+            className={clsx(ui.input, "rounded-full px-5 sm:w-72", quick ? "h-11 text-[16px] sm:h-14" : "h-12")}
           />
         )}
         <button
@@ -276,7 +276,7 @@ function Waitlist({ quick = false }: { quick?: boolean }) {
           disabled={busy}
           className={clsx(
             "inline-flex items-center justify-center gap-2 rounded-full bg-sun-line font-medium text-white shadow-[0_8px_24px_-8px_var(--sun-line)] transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted disabled:shadow-none",
-            quick ? "h-14 px-9 text-[17px] font-semibold" : "h-12 px-7 text-[15px]",
+            quick ? "h-10 self-center px-6 text-[14px] font-semibold sm:h-14 sm:px-9 sm:text-[17px]" : "h-12 px-7 text-[15px]",
           )}
         >
           {quick ? LAUNCH.signUp : LAUNCH.save} <ArrowRight className="size-4" aria-hidden />

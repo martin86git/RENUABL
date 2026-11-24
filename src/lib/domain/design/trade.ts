@@ -71,6 +71,8 @@ export interface TradeMessage {
   business: string;
   text: string;
   at: string;
+  /** An offer to buy (23 Nov 2026, Martin, as Facebook Marketplace): each, ex GST, for how many, and where it stands. */
+  offer?: { each: number; qty: number; state: OfferState };
 }
 
 const line = (v: unknown, max: number) =>
@@ -178,3 +180,86 @@ export function askedEmail(input: { item: string; buyer: string; text: string; l
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * Offers on equipment (23 Nov 2026, Martin: "You should be able to send an offer like Facebook marketplace. Or send a
+ * message"). An offer is a line in the buyer's conversation with a price each (ex GST) and how many; the seller has
+ * OFFER_REPLY_HOURS to accept or decline it, after which it lapses. Accepting marks the item pending. It is not a
+ * payment: payment and pickup stay between the two businesses.
+ */
+export const OFFER_REPLY_HOURS = 48;
+export const OFFER_STATES = ["open", "accepted", "declined", "withdrawn", "lapsed"] as const;
+export type OfferState = (typeof OFFER_STATES)[number];
+
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+/** "$225", "$262.50". */
+export const money = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
+/** The quick choices against an asking price: 10% lower, the asking price, 5% higher. None with no asking price. */
+export function offerChoices(price: number | null): { each: number; words: string }[] {
+  if (price === null || !(price > 0)) return [];
+  const lower = cents(price * 0.9);
+  const higher = cents(price * 1.05);
+  return [
+    { each: lower, words: `${money(lower)} (10% lower)` },
+    { each: cents(price), words: money(cents(price)) },
+    { each: higher, words: money(higher) },
+  ];
+}
+
+/** An offer from the browser: a price each above nothing and within bounds, for 1 up to the items listed. */
+export function cleanOffer(
+  raw: unknown,
+  available: number,
+): { ok: true; value: { each: number; qty: number } } | { ok: false; message: string } {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const each = typeof r.each === "number" ? r.each : Number(r.each);
+  if (!Number.isFinite(each) || each <= 0) return { ok: false, message: "Enter what you'd pay for each." };
+  if (each > MAX_PRICE) return { ok: false, message: "That offer is more than an item can be listed for." };
+  const qty = r.qty === undefined ? 1 : Math.floor(Number(r.qty));
+  if (!Number.isFinite(qty) || qty < 1) return { ok: false, message: "Offer for at least one." };
+  if (qty > Math.max(1, available)) return { ok: false, message: `There are only ${available} for sale.` };
+  return { ok: true, value: { each: cents(each), qty } };
+}
+
+/** Where an offer stands now: an open one past OFFER_REPLY_HOURS has lapsed. */
+export function offerStateNow(state: string | null, at: string, now: Date = new Date()): OfferState {
+  const s = OFFER_STATES.find((x) => x === state) ?? "open";
+  return s === "open" && now.getTime() - Date.parse(at) > OFFER_REPLY_HOURS * 3_600_000 ? "lapsed" : s;
+}
+
+/** The offer's line in the conversation: "Offered $225 each for 2 ($450 ex GST)". */
+export function offerWords(each: number, qty: number): string {
+  return qty > 1 ? `Offered ${money(each)} each for ${qty} (${money(cents(each * qty))} ex GST)` : `Offered ${money(each)} ex GST`;
+}
+
+export const OFFER_STATE_WORDS: Record<OfferState, string> = {
+  open: "Waiting for the seller",
+  accepted: "Accepted",
+  declined: "Declined",
+  withdrawn: "Withdrawn",
+  lapsed: "Lapsed: no answer in 48 hours",
+};
+
+export const OFFER_NOTE = `Your offer is not a payment. The seller has ${OFFER_REPLY_HOURS} hours to accept or decline. Payment and pickup are arranged with the seller.`;
+
+/** "Someone made an offer on your item" email to the seller, from RENUABL. */
+export function offerEmail(input: { item: string; buyer: string; each: number; qty: number; link: string }) {
+  const words = offerWords(input.each, input.qty);
+  return {
+    subject: `${input.buyer} made an offer on your ${input.item}`,
+    text: `${input.buyer} on the RENUABL marketplace: ${words}.\n\nYou have ${OFFER_REPLY_HOURS} hours to accept or decline: ${input.link}`,
+    html: `<p>${esc(input.buyer)} on the RENUABL marketplace: ${esc(words)}.</p><p>You have ${OFFER_REPLY_HOURS} hours to accept or decline.</p><p><a href="${esc(input.link)}">Answer the offer</a></p>`,
+  };
+}
+
+/** "Your offer was accepted / declined" email to the buyer. */
+export function offerAnsweredEmail(input: { item: string; seller: string; accepted: boolean; words: string; link: string }) {
+  const how = input.accepted ? "accepted" : "declined";
+  return {
+    subject: `${input.seller} ${how} your offer on ${input.item}`,
+    text: `${input.seller} ${how} your offer on ${input.item} (${input.words}).${input.accepted ? " Arrange payment and pickup with them in your conversation." : ""}\n\n${input.link}`,
+    html: `<p>${esc(input.seller)} ${how} your offer on ${esc(input.item)} (${esc(input.words)}).${input.accepted ? " Arrange payment and pickup with them in your conversation." : ""}</p><p><a href="${esc(input.link)}">Open the conversation</a></p>`,
+  };
+}

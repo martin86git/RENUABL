@@ -14,6 +14,63 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "The example questions in Sol's chat show for your first three chats, then step aside.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat opens fresh each time, with your last chat a press away, a taller box to type in, and a quieter header.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "Every tour has a Skip button, so you can leave it at any step.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Deals",
+    words: "On a phone, the pipeline's columns are narrower so the next one shows, and each card says it in fewer words.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Billing",
+    words: "Top-up packs are clearer cards: the credits large, extra credits in green, the price below, and the best value marked.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketplace",
+    words: "On a phone, the Marketplace dock's icons are plain blue outlines, no dark tiles.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Email",
+    words: "On a phone, Email is tighter: the filters across the width, then search with Compact, Refresh and Compose as rounds.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words:
+      "Today is Sol's screen alone. The deal feed opens Deals, the calendar sits beside email, and Sol's round opens Chat and Feed as a clover.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Chat and Feed's leaves are smaller, rounder, white and joined in the middle, and Proposals closed shows a green ring.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Marketplace",
+    words:
+      "Make an offer on equipment for sale: pick 10% lower, the asking price or your own. The seller accepts or declines within 48 hours.",
+  },
+  {
     day: "2026-11-23",
     area: "Deals",
     words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
@@ -276,6 +333,11 @@ export const UPDATES: readonly Update[] = [
     area: "Deals",
     words:
       "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Sol",
+    words: "Hover over any message in a chat with Sol to copy it, or press the arrow to reply to that message.",
   },
   {
     day: "2026-11-21",

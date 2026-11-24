@@ -36,6 +36,16 @@ export const RETURN_GAP_MINUTES = 15;
 const ZONE = "Australia/Melbourne";
 
 /** A conversation is worth keeping once the member has said something in it (Sol's reminders alone are not). */
+/** The example questions show only for a member's first few chats with Sol (24 Nov 2026, Martin). */
+export const STARTER_CHATS = 3;
+
+/** Chats so far: those filed away, and the one going once something has been asked in it. */
+export const chatsSoFar = (pastCount: number, turns: readonly SolTurn[]) =>
+  Math.max(0, Math.floor(pastCount)) + (worthKeeping(turns) ? 1 : 0);
+
+/** Whether a new chat still offers the example questions (unknown counts as new). */
+export const showStarters = (chats: number | undefined) => (chats ?? 0) < STARTER_CHATS;
+
 export const worthKeeping = (turns: readonly SolTurn[]) => turns.some((t) => t.role === "you" && t.text.trim());
 
 /** What a conversation is called in the list: the member's first question, on one line. */

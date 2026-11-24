@@ -19,7 +19,6 @@ import {
   MessagesSquare,
   Paperclip,
   PenTool,
-  Search,
   Trash2,
   Wrench,
   X,
@@ -83,7 +82,9 @@ import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
 import { NOT_TRACKED, openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { bannerFigures } from "@/lib/domain/design/system-summary";
-import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
+import { loadDealMail, loadOpens, loadPulses } from "@/lib/services/deal-pulse";
+import type { DealMail } from "@/lib/domain/design/deal-mail";
+import { outlookWebLink, providerOfId } from "@/lib/domain/design/outlook-mail";
 import { DealEmails } from "./deal-emails";
 import { CallEntryBy, CallEntryText } from "./call-entry";
 import { CallChoices } from "./call-choice";
@@ -351,30 +352,44 @@ export function DealPage({ id }: { id: string }) {
     void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
   }, [id]);
   const business = account?.signedIn ? (account.business?.name ?? "") : "";
-  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): from the pipeline's card
-  // (?tour=1) every time, otherwise the first time it is opened on this device; Show me around starts it again.
+  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): once on this device, the
+  // first time it is opened, from the pipeline or anywhere; Show me around starts it again (23 Nov 2026, Martin: it kept
+  // running each time the sample was opened). It counts as seen the moment it starts, so leaving it half way or
+  // reloading doesn't bring it back.
   const [touring, setTouring] = useState(false);
   // The starter sample only: the example deals a demo is filled with are marked sample too, and aren't a tour each.
   const isSample = Boolean(customer?.sample) && customer?.source !== EXAMPLE_SOURCE;
-  const tourAsked = params.get("tour") === "1";
   useEffect(() => {
     if (!isSample) return;
     let seen = false;
     try {
       seen = window.localStorage.getItem(DEAL_TOUR_KEY) === "1";
     } catch {}
-    if (seen && !tourAsked) return;
+    if (seen) return;
     // A moment for Sol's card and the fields to be on the page, so each has a place to light.
-    const t = window.setTimeout(() => setTouring(true), 900);
+    const t = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(DEAL_TOUR_KEY, "1");
+      } catch {}
+      setTouring(true);
+    }, 900);
     return () => window.clearTimeout(t);
-  }, [isSample, tourAsked]);
+  }, [isSample]);
   const endTour = useCallback(() => {
     setTouring(false);
     try {
       window.localStorage.setItem(DEAL_TOUR_KEY, "1");
     } catch {}
   }, []);
-  const [find, setFind] = useState("");
+  // The customer's emails in this member's own mailboxes, beside the record on the Notes timeline (23 Nov 2026, Martin).
+  const [mail, setMail] = useState<DealMail[]>([]);
+  useEffect(() => {
+    let gone = false;
+    void loadDealMail(id).then((r) => !gone && r.ok && setMail(r.mail));
+    return () => {
+      gone = true;
+    };
+  }, [id, activity.length]);
   const [kind, setKind] = useState<Written>("note");
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
@@ -468,11 +483,14 @@ export function DealPage({ id }: { id: string }) {
     );
   if (!job || !customer) return <div className={ui.page} aria-busy="true" />;
 
-  const words = find.trim().toLowerCase();
-  const shown = activity.filter((a) => !words || `${a.text} ${a.by}`.toLowerCase().includes(words));
-  // Newest first, under the month they happened in.
-  const months: { month: string; items: Activity[] }[] = [];
-  for (const a of shown) {
+  // Notes are the deal's whole timeline (23 Nov 2026, Martin): the record and the customer's emails to and from them in
+  // this member's own mailboxes, newest first, under the month they happened in.
+  const timeline: Timed[] = [
+    ...activity.map((a): Timed => ({ ...a, mail: null })),
+    ...mail.map((m): Timed => ({ id: `mail:${m.box}:${m.id}`, at: m.at, mail: m })),
+  ].sort((x, y) => y.at.localeCompare(x.at));
+  const months: { month: string; items: Timed[] }[] = [];
+  for (const a of timeline) {
     const month = new Date(a.at).toLocaleDateString("en-AU", { month: "long", year: "numeric" });
     if (months[months.length - 1]?.month === month) months[months.length - 1].items.push(a);
     else months.push({ month, items: [a] });
@@ -966,23 +984,7 @@ export function DealPage({ id }: { id: string }) {
                 <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} statusOnly />
               </section>
               <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="relative block w-64 max-w-full">
-                    <span className="sr-only">Search notes</span>
-                    <input
-                      className={clsx(ui.input, "rounded-full pl-4 pr-9")}
-                      value={find}
-                      onChange={(e) => setFind(e.target.value)}
-                      placeholder="Search notes"
-                    />
-                    <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-                  </label>
-                  <p className="text-xs tabular-nums text-muted">
-                    Showing {shown.length} of {activity.length}
-                  </p>
-                </div>
-
-                <div className={clsx(ui.card, "mt-4 flex flex-wrap gap-2 p-3")}>
+                <div className={clsx(ui.card, "flex flex-wrap gap-2 p-3")}>
                   <select
                     aria-label="What happened"
                     className={clsx(ui.input, "w-28 appearance-auto")}
@@ -1025,54 +1027,60 @@ export function DealPage({ id }: { id: string }) {
                   </button>
                 </div>
 
-                {months.length === 0 && (
-                  <p className="mt-6 text-sm text-ink-2">{activity.length ? "Nothing matches that." : "Nothing yet."}</p>
-                )}
+                {months.length === 0 && <p className="mt-6 text-sm text-ink-2">Nothing yet.</p>}
                 {months.map(({ month, items }) => (
                   <section key={month} className="mt-6">
                     <h2 className="text-[15px] text-ink-2">{month}</h2>
                     <ol className="mt-2.5 space-y-2.5">
-                      {items.map((a) => (
-                        <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="text-sm text-ink">
-                              <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
-                              {a.kind === "call" ? <CallEntryBy by={a.by} /> : <span className="text-ink-2">by {a.by.split("@")[0]}</span>}
-                            </p>
-                            <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
-                              {new Date(a.at).toLocaleString("en-AU", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })}
-                            </time>
-                          </div>
-                          {a.kind === "call" ? (
-                            <CallEntryText text={a.text} jobId={id} at={a.at} by={a.by} />
-                          ) : (
-                            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
-                          )}
-                          {a.kind === "email" &&
-                            opens &&
-                            (opens.times[a.id] ? (
-                              <p
-                                className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
-                                title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
-                              >
-                                {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                      {items.map((a) =>
+                        a.mail ? (
+                          <MailEntry key={a.id} m={a.mail} />
+                        ) : (
+                          <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <p className="text-sm text-ink">
+                                <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
+                                {a.kind === "call" ? (
+                                  <CallEntryBy by={a.by} />
+                                ) : (
+                                  <span className="text-ink-2">by {a.by.split("@")[0]}</span>
+                                )}
                               </p>
+                              <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
+                                {new Date(a.at).toLocaleString("en-AU", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
+                              </time>
+                            </div>
+                            {a.kind === "call" ? (
+                              <CallEntryText text={a.text} jobId={id} at={a.at} by={a.by} />
                             ) : (
-                              <p
-                                className="mt-1.5 text-xs text-muted"
-                                title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
-                              >
-                                {NOT_TRACKED}
-                              </p>
-                            ))}
-                        </li>
-                      ))}
+                              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                            )}
+                            {a.kind === "email" &&
+                              opens &&
+                              (opens.times[a.id] ? (
+                                <p
+                                  className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
+                                  title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
+                                >
+                                  {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                                </p>
+                              ) : (
+                                <p
+                                  className="mt-1.5 text-xs text-muted"
+                                  title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
+                                >
+                                  {NOT_TRACKED}
+                                </p>
+                              ))}
+                          </li>
+                        ),
+                      )}
                     </ol>
                   </section>
                 ))}
@@ -1736,5 +1744,39 @@ function RailRound({
         {label}
       </span>
     </button>
+  );
+}
+
+/** A line of the Notes timeline: the deal's record, or one of the customer's emails in the member's own mailbox. */
+type Timed = { id: string; at: string } & (({ mail: null } & Activity) | { mail: DealMail });
+
+/** One of the customer's emails as read from the member's own mailbox, opening there. */
+function MailEntry({ m }: { m: DealMail }) {
+  const href =
+    providerOfId(m.id) === "outlook"
+      ? outlookWebLink(m.id)
+      : `https://mail.google.com/mail/?authuser=${encodeURIComponent(m.box)}#all/${m.id}`;
+  return (
+    <li className={clsx(ui.card, "px-5 py-4", m.way === "in" && "ring-1 ring-sun-line/40")}>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-ink">
+          <strong className="font-semibold">{m.way === "in" ? "Email from" : "Email to"}</strong>{" "}
+          <span className="text-ink-2">{m.way === "in" ? m.from : "the customer"}</span>
+        </p>
+        <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={m.at}>
+          {new Date(m.at).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+        </time>
+      </div>
+      <p className="mt-1.5 text-sm font-medium text-ink">{m.subject}</p>
+      {m.snippet && <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-ink-2">{m.snippet}</p>}
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-block text-xs text-muted underline underline-offset-4 hover:text-ink"
+      >
+        Open in {providerOfId(m.id) === "outlook" ? "Outlook" : "Gmail"} · {m.box}
+      </a>
+    </li>
   );
 }

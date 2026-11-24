@@ -15,7 +15,6 @@ import {
   Package,
   Phone,
   PhoneCall,
-  Rows3,
   Sparkles,
   Stamp,
   TrendingUp,
@@ -25,7 +24,6 @@ import type { ISODate } from "@/lib/domain/types";
 import type { NextItem } from "@/lib/domain/design/next-up";
 import { ALL_GOOD, type Insight, type InsightsView, type MonthView } from "@/lib/domain/design/insights";
 import type { SolFile } from "@/lib/domain/design/sol";
-import type { TodayView } from "@/lib/domain/design/today-view";
 import { dollars, loadWeather, type JobLine } from "@/lib/services/crm";
 import { loadInsights } from "@/lib/services/insights";
 import { todayHeading } from "@/lib/domain/design/today-view";
@@ -35,7 +33,6 @@ import { loadFeed } from "@/lib/services/deal-feed";
 import type { FeedDeal } from "@/lib/domain/design/deal-feed";
 import { TrayNeeds, dealsNeedingYou } from "./tray-needs";
 import { SolEtch } from "./sol-icon";
-import { UsageButton } from "./usage-pop";
 import { SolBox } from "./today-pad";
 import { PerformancePanel } from "./performance-panel";
 import { loadPerfRows } from "@/lib/services/performance";
@@ -86,8 +83,16 @@ function TodayDate({ today }: { today: ISODate }) {
   }, []);
   return (
     <div className="mt-4 flex flex-col items-center gap-2">
-      <h1 className="text-center text-[20px] sm:text-[clamp(20px,2.2vw,25px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
-        {todayHeading(today)}
+      {/* The date opens the calendar, as the date tile does on a computer (23 Nov 2026, Martin). */}
+      <h1 className="text-center text-[17px] sm:text-[clamp(17px,1.7vw,20px)] font-normal leading-[1.15] tracking-[-0.02em] text-ink">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event(TODAY_CALENDAR))}
+          title="Open the calendar"
+          className="rounded-lg decoration-line underline-offset-4 hover:underline"
+        >
+          {todayHeading(today)}
+        </button>
       </h1>
       <div className="flex items-center gap-2">
         {weather && (weather.sky || weather.degrees !== null) && (
@@ -96,12 +101,13 @@ function TodayDate({ today }: { today: ISODate }) {
             {weather.degrees !== null && <span className="tabular-nums">{Math.round(weather.degrees)}°C</span>}
           </span>
         )}
-        {/* Usage and top-ups, for the owner and admins (usage-pop.tsx; 23 Nov 2026, Martin). */}
-        <UsageButton />
       </div>
     </div>
   );
 }
+
+/** Asks Today to open its calendar (the date heading). */
+export const TODAY_CALENDAR = "renuabl:today-calendar";
 
 /** The first view's name on the switch: Business for the owner and admins, My month for everyone else. */
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
@@ -221,7 +227,7 @@ export function TodayChat(props: {
       <div
         role="tablist"
         aria-label="About the month"
-        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
+        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] max-sm:ml-5 max-sm:w-[calc(100%-1rem)] max-sm:self-start flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
       >
         {tabs.map(({ key, label, icon: Icon, count }) => (
           <button
@@ -423,48 +429,6 @@ function InsightRow({ insight }: { insight: Insight }) {
       >
         {insight.action.label} <ArrowRight className="size-3.5" aria-hidden />
       </Link>
-    </div>
-  );
-}
-
-/** Business (or My month) | Feed, at the top of Today. */
-export function TodaySwitch({ view, onView, first }: { view: TodayView; onView: (v: TodayView) => void; first: string }) {
-  // 22 Nov 2026, Martin: "I don't notice [Feed] sometimes", then "we can do better on the pill shapes". A segmented control: a soft recessed track, two halves of
-  // one width, and a white thumb that slides to the one open, each with its icon.
-  // 23 Nov 2026, Martin: on the dock's post-sale tools, Feed is Jobs (the jobs under way, not the deals).
-  const post = useDockSet() === "post";
-  const tabs = [
-    ["chat", first, TrendingUp],
-    ["feed", DOCK_SET_WORDS[post ? "post" : "sales"].feed, post ? HardHat : Rows3],
-  ] as const;
-  const at = view === "feed" ? 1 : 0;
-  return (
-    <div
-      role="tablist"
-      aria-label="Today"
-      className="relative grid h-10 w-[15rem] grid-cols-2 rounded-full bg-ink/[0.06] p-1 shadow-[inset_0_1px_2px_rgb(20_22_26_/_0.08)] ring-1 ring-inset ring-ink/[0.04] backdrop-blur"
-    >
-      <span
-        aria-hidden
-        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-surface shadow-[0_1px_2px_rgb(20_22_26_/_0.12),0_4px_12px_-4px_rgb(20_22_26_/_0.18)] ring-1 ring-ink/[0.05] transition-transform duration-300 ease-out motion-reduce:transition-none"
-        style={{ transform: `translateX(${at * 100}%)` }}
-      />
-      {tabs.map(([v, label, Icon]) => (
-        <button
-          key={v}
-          type="button"
-          role="tab"
-          aria-selected={view === v}
-          onClick={() => onView(v)}
-          className={clsx(
-            "relative z-[1] flex items-center justify-center gap-1.5 rounded-full text-[13px] font-medium transition-colors",
-            view === v ? "text-ink" : "text-ink/80 hover:text-ink",
-          )}
-        >
-          <Icon className={clsx("size-[15px]", view === v ? "text-sun-line" : "opacity-70")} aria-hidden />
-          {label}
-        </button>
-      ))}
     </div>
   );
 }

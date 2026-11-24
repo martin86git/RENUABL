@@ -141,7 +141,7 @@ export function daysOf(e: MyEvent): { first: ISODate; last: ISODate } {
 }
 
 /** A day's events: all-day ones first, then by start time. */
-export function eventsOn(events: readonly MyEvent[], day: ISODate): MyEvent[] {
+export function eventsOn<E extends MyEvent>(events: readonly E[], day: ISODate): E[] {
   return events
     .filter((e) => {
       const { first, last } = daysOf(e);

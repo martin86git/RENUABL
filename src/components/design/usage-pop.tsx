@@ -15,7 +15,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import { ArrowLeft, CreditCard, Gauge, PencilRuler, Phone, Sparkles, X } from "lucide-react";
 import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
-import { SOL_PACKS } from "@/lib/domain/design/sol-credits";
+import { SOL_PACKS, solPackBonus } from "@/lib/domain/design/sol-credits";
 import { TOKEN_PACKS, dollars, packBonus, packDollars, packPriceCents, type TokenPack } from "@/lib/domain/design/plans";
 import { packCardForm } from "@/lib/services/billing";
 import { mountDepositForm } from "@/lib/services/stripe-form";
@@ -25,7 +25,19 @@ import { settingsPath } from "./settings-list";
 const tone = (p: number) => (p >= 100 ? "var(--danger)" : p >= 80 ? "var(--sun-line)" : "var(--ink)");
 const barTone = (p: number) => (p >= 100 ? "bg-danger" : p >= 80 ? "bg-sun-line" : "bg-primary");
 
-export function UsageButton() {
+/** Opens the box from a menu (the cog's Usage this month, the phone's More sheet's Usage). */
+export const USAGE_OPEN = "renuabl:usage-open";
+let ready = false;
+/** Whether the box can open here (this person may see usage); a menu otherwise goes to the Usage page. */
+export const usagePopReady = () => ready;
+export const openUsagePop = () => window.dispatchEvent(new Event(USAGE_OPEN));
+
+/**
+ * The box, mounted once in the shell. Its round left Today on 23 Nov 2026 (Martin: "Usage icon should be moved out
+ * as it's now in the menu"): `bare` draws no round and the menus open the box, so top-ups still happen in it and
+ * Stripe's return still reopens it.
+ */
+export function UsageButton({ bare }: { bare?: boolean } = {}) {
   const [state, setState] = useState<UsagePop | null>(null);
   const [open, setOpen] = useState(false);
   const [paid, setPaid] = useState(false);
@@ -42,13 +54,18 @@ export function UsageButton() {
     void loadUsagePop().then((s) => {
       if (!on) return;
       setState(s);
+      ready = !!s;
       if (back && s) {
         setPaid(true);
         setOpen(true);
       }
     });
+    const show = () => setOpen(true);
+    window.addEventListener(USAGE_OPEN, show);
     return () => {
       on = false;
+      ready = false;
+      window.removeEventListener(USAGE_OPEN, show);
     };
   }, []);
   // Read again each time it opens, so a pack bought in another tab shows.
@@ -65,31 +82,33 @@ export function UsageButton() {
   const c = 2 * Math.PI * r;
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-label={`Usage this month${state.meters.length ? `, up to ${top}% used` : ""}`}
-        title="Usage and top-ups"
-        className="relative grid size-8 place-items-center rounded-full bg-surface text-ink shadow-sm ring-1 ring-line transition hover:ring-ink/30"
-      >
-        <Gauge className="size-4" aria-hidden />
-        {state.meters.length > 0 && (
-          <svg viewBox="0 0 32 32" className="pointer-events-none absolute inset-0 size-8 -rotate-90" aria-hidden>
-            <circle
-              cx="16"
-              cy="16"
-              r={r}
-              fill="none"
-              stroke={tone(top)}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeDasharray={`${((c * Math.min(100, top)) / 100).toFixed(2)} ${c.toFixed(2)}`}
-            />
-          </svg>
-        )}
-        {top >= 80 && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas" aria-hidden />}
-      </button>
+      {!bare && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={`Usage this month${state.meters.length ? `, up to ${top}% used` : ""}`}
+          title="Usage and top-ups"
+          className="relative grid size-8 place-items-center rounded-full bg-surface text-ink shadow-sm ring-1 ring-line transition hover:ring-ink/30"
+        >
+          <Gauge className="size-4" aria-hidden />
+          {state.meters.length > 0 && (
+            <svg viewBox="0 0 32 32" className="pointer-events-none absolute inset-0 size-8 -rotate-90" aria-hidden>
+              <circle
+                cx="16"
+                cy="16"
+                r={r}
+                fill="none"
+                stroke={tone(top)}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeDasharray={`${((c * Math.min(100, top)) / 100).toFixed(2)} ${c.toFixed(2)}`}
+              />
+            </svg>
+          )}
+          {top >= 80 && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-canvas" aria-hidden />}
+        </button>
+      )}
       {open &&
         typeof document !== "undefined" &&
         createPortal(
@@ -178,7 +197,10 @@ function UsageBox({ s, paid, onClose }: { s: UsagePop; paid: boolean; onClose: (
                         <PackButton
                           key={p.credits}
                           disabled={!mayBuy}
-                          top={`${p.credits.toLocaleString("en-AU")} credits`}
+                          figure={p.credits.toLocaleString("en-AU")}
+                          unit="credits"
+                          best={p === SOL_PACKS[SOL_PACKS.length - 1]}
+                          extra={solPackBonus(p) > 0 ? `+${solPackBonus(p).toLocaleString("en-AU")} free` : undefined}
                           price={dollars(p.cents)}
                           onClick={() =>
                             setPaying({
@@ -206,8 +228,10 @@ function UsageBox({ s, paid, onClose }: { s: UsagePop; paid: boolean; onClose: (
                     <PackButton
                       key={pack}
                       disabled={!mayBuy}
-                      top={`$${packDollars(pack)} credits`}
-                      extra={packBonus(pack) > 0 ? `+${packBonus(pack)} bonus` : undefined}
+                      figure={`$${packDollars(pack)}`}
+                      unit="of design credit"
+                      best={pack === TOKEN_PACKS[TOKEN_PACKS.length - 1]}
+                      extra={packBonus(pack) > 0 ? `+$${packBonus(pack)} free` : undefined}
                       price={dollars(packPriceCents(pack))}
                       onClick={() =>
                         setPaying({
@@ -365,17 +389,48 @@ const Packs = ({ children, three }: { children: React.ReactNode; three?: boolean
   </div>
 );
 
-function PackButton(props: { top: string; extra?: string; price: string; disabled: boolean; onClick: () => void }) {
+/**
+ * One pack to buy (24 Nov 2026, Martin: "can we improve the look"): what it gives large, its bonus as a green pill, the
+ * price as the card's foot, the largest marked Best value. Cards in a row are one height whether or not they have a bonus.
+ */
+function PackButton(props: {
+  figure: string;
+  unit: string;
+  extra?: string;
+  price: string;
+  best?: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={props.onClick}
       disabled={props.disabled}
-      className="flex flex-col items-center rounded-xl border border-line bg-surface px-2 py-2.5 text-center hover:border-ink/40 disabled:cursor-not-allowed disabled:bg-surface-2"
+      className={clsx(
+        "group relative flex flex-col items-center overflow-hidden rounded-2xl bg-surface pt-5 text-center shadow-[0_1px_2px_rgb(0_0_0/0.06)] transition hover:-translate-y-px hover:shadow-[0_6px_16px_-6px_rgb(0_0_0/0.25)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none",
+        props.best ? "ring-2 ring-sun-line" : "ring-1 ring-line",
+      )}
     >
-      <span className="text-sm font-semibold text-ink">{props.top}</span>
-      {props.extra && <span className="text-[11px] font-medium text-positive">{props.extra}</span>}
-      <span className="text-xs tabular-nums text-ink-2">{props.price}</span>
+      {props.best && (
+        <span className="absolute left-1/2 top-0 -translate-x-1/2 rounded-b-md bg-sun-line px-2 py-px text-[9px] font-semibold uppercase tracking-wider whitespace-nowrap text-white">
+          Best value
+        </span>
+      )}
+      <span className="text-xl font-semibold leading-none tabular-nums tracking-tight text-ink">{props.figure}</span>
+      <span className="mt-1 text-[11px] text-muted">{props.unit}</span>
+      <span
+        className={clsx(
+          "mt-2 rounded-full px-2 py-0.5 text-[11px] font-semibold",
+          props.extra ? "bg-positive/12 text-positive" : "invisible",
+        )}
+        aria-hidden={!props.extra}
+      >
+        {props.extra ?? "none"}
+      </span>
+      <span className="mt-3 w-full border-t border-line bg-canvas py-2 text-sm font-semibold tabular-nums text-ink transition group-hover:bg-primary group-hover:text-white group-disabled:bg-canvas group-disabled:text-ink">
+        {props.price}
+      </span>
     </button>
   );
 }

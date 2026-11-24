@@ -1436,6 +1436,10 @@ create table if not exists design_trade_messages (
   read_at timestamptz
 );
 create index if not exists design_trade_messages_thread on design_trade_messages(thread_id, at);
+alter table design_trade_messages add column if not exists offer numeric(12,2);
+alter table design_trade_messages add column if not exists offer_qty integer;
+alter table design_trade_messages add column if not exists offer_state text;
+alter table design_trade_messages add column if not exists offer_answered_at timestamptz;
 create table if not exists design_feedback_comments (
   id text primary key,
   business_id text not null references businesses(id) on delete cascade,

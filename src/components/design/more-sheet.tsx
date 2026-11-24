@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { openUsagePop, usagePopReady } from "./usage-pop";
 import { useEffect, useState } from "react";
 import { ChevronRight, KeyRound, Lock, Camera, Settings2 } from "lucide-react";
 import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
@@ -69,7 +70,17 @@ export function MoreUsage({ billing, onGo }: { billing: boolean; onGo: () => voi
   return (
     <section aria-label="Usage this month" className="mt-2">
       <p className="px-3 pb-1 pt-4 text-[11px] font-medium uppercase tracking-[0.16em] text-muted">Usage this month</p>
-      <Link href="/design/settings/usage" onClick={onGo} className="block rounded-2xl border border-line px-3.5 py-3">
+      <Link
+        href="/design/settings/usage"
+        onClick={(e) => {
+          onGo();
+          // The box with the top-ups when it can open here (usage-pop.tsx), else the Usage page.
+          if (!usagePopReady()) return;
+          e.preventDefault();
+          openUsagePop();
+        }}
+        className="block rounded-2xl border border-line px-3.5 py-3"
+      >
         {meters.map((m) => {
           const tone = m.percent >= 100 ? "bg-danger" : m.percent >= 80 ? "bg-sun-line" : "bg-ink";
           return (
