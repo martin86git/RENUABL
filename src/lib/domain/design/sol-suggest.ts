@@ -5,7 +5,7 @@
  * prompts in the Suggested card's place. Every prompt is a question Sol can answer from what he has (the deals, the
  * calendar, his drafting, the web): nothing promises what he can't do. Pure, tested.
  */
-import { STARTER_QUESTIONS } from "./sol-knowledge";
+import { QUESTION_AREAS, STARTER_QUESTIONS } from "./sol-knowledge";
 
 export type SolTopic = "summarise" | "write" | "find" | "solar";
 
@@ -34,9 +34,10 @@ export const SOL_TOPICS: readonly { id: SolTopic; label: string; prompts: readon
     ],
   },
   {
+    // "Technical" (24 Nov 2026, Martin: in place of "Ask solar"): the technical questions Sol answers from the rules.
     id: "solar",
-    label: "Ask solar",
-    prompts: STARTER_QUESTIONS.slice(0, 3),
+    label: "Technical",
+    prompts: QUESTION_AREAS.find((a) => a.topic === "technical")?.examples.slice(0, 3) ?? STARTER_QUESTIONS.slice(0, 3),
   },
 ];
 

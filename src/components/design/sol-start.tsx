@@ -9,14 +9,14 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { ClipboardList, Forward, Lightbulb, PenLine, Search, Sun, X, type LucideIcon } from "lucide-react";
+import { ClipboardList, Forward, Lightbulb, PenLine, Search, Wrench, X, type LucideIcon } from "lucide-react";
 import { SOL_SUGGESTED, SOL_TOPICS, solGreeting, topicOf, type SolTopic } from "@/lib/domain/design/sol-suggest";
 
 const TOPIC_ICONS: Record<SolTopic, LucideIcon> = {
   summarise: ClipboardList,
   write: PenLine,
   find: Search,
-  solar: Sun,
+  solar: Wrench,
 };
 
 export function SolStart({
