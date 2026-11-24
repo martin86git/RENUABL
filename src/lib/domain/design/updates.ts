@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
     area: "Installations",
+    words: "The job card shows the whole house from above with the panels on it, before the close-up layout, and emails it too.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Installations",
     words: "A tentative install's deal is picked from RENUABL's own searchable list, not the phone's picker, and the dates fit a phone.",
   },
   {
@@ -30,6 +35,11 @@ export const UPDATES: readonly Update[] = [
       "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",
   },
   { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
+  {
+    day: "2026-11-24",
+    area: "Installations",
+    words: "On a phone the figures over Installations, After install and Grid sit three across in one slim band, and long addresses wrap.",
+  },
   {
     day: "2026-11-24",
     area: "Installations",

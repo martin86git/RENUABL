@@ -146,3 +146,21 @@ describe("the card's system in parts", () => {
     expect(cardHeadlineLines({ kw: null, batteryKwh: null })).toEqual([]);
   });
 });
+
+describe("the whole house view", () => {
+  it("frames the home and the panels, wider than the layout, on the picture", async () => {
+    const { wholeHouse } = await import("./job-card");
+    const [x0, y0, x1, y1] = wholeHouse([300, 340], [180, 220], 200);
+    expect(x1 - x0).toBeGreaterThanOrEqual(200);
+    expect(x0).toBeLessThanOrEqual(300 - 28);
+    expect(x0).toBeGreaterThanOrEqual(0);
+    expect(y0).toBeGreaterThanOrEqual(0);
+    expect(x1).toBeLessThanOrEqual(640);
+    expect(y1).toBeLessThanOrEqual(400);
+    expect((x1 - x0) / (y1 - y0)).toBeCloseTo(4 / 3, 1);
+    // Panels at the picture's edge: kept on the picture, the home still in.
+    const edge = wholeHouse([600, 630], [20, 40], 200);
+    expect(edge[2]).toBeLessThanOrEqual(640);
+    expect(edge[0]).toBeLessThanOrEqual(320);
+  });
+});
