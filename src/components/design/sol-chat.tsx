@@ -801,7 +801,7 @@ export function SolChat({
           )}
           {/* Laid out as Claude Code's box (21 Nov 2026, Martin): the words across the top, a + to add a file at the
               left of the row under them, and send then the microphone at the far right. */}
-          <div className="rounded-[20px] bg-surface px-2 pb-2 shadow-[0_2px_10px_rgba(20,22,26,0.06)] ring-1 ring-line focus-within:ring-line-strong">
+          <div className="rounded-[20px] bg-surface px-2 pb-2 shadow-[0_2px_10px_rgba(20,22,26,0.06)] ring-1 ring-line focus-within:ring-sun-line/60">
             <input
               ref={picker}
               type="file"
@@ -1056,8 +1056,8 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? // A soft grey bubble on the right (24 Nov 2026, Martin, after HubSpot's Breeze: a cleaner look).
-              "max-w-[85%] whitespace-pre-wrap rounded-2xl bg-[#ececee] px-4 py-2.5 text-[13.5px] font-normal leading-[1.5] text-ink [font-feature-settings:'cv11','ss03','tnum']"
+            ? // A graphite bubble on the right, RENUABL's own (24 Nov 2026, Martin: Breeze's grey made it look like HubSpot).
+              "max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[13.5px] font-normal leading-[1.5] text-white [font-feature-settings:'cv11','ss03','tnum']"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}

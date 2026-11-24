@@ -11,6 +11,9 @@ import { useState } from "react";
 import clsx from "clsx";
 import { ClipboardList, Forward, Lightbulb, PenLine, Search, Wrench, X, type LucideIcon } from "lucide-react";
 import { SolLibrary } from "./sol-library";
+import { SolEtch } from "./sol-icon";
+import { todayHeading } from "@/lib/domain/design/today-view";
+import { todayInMarket } from "@/lib/domain/market";
 import { SOL_SUGGESTED, SOL_TOPICS, solGreeting, topicOf, type SolTopic } from "@/lib/domain/design/sol-suggest";
 
 const TOPIC_ICONS: Record<SolTopic, LucideIcon> = {
@@ -43,9 +46,15 @@ export function SolStart({
   return (
     <div className="flex min-h-full flex-col">
       <div className={clsx("pt-2", compact ? "pb-6" : "pb-10")}>
-        {/* No sun over it, and the interface's own face set light (24 Nov 2026, Martin: "remove the sol icon… update
-            the font"): Inter at 300 with tight tracking, in place of the serif. */}
-        <h2 className={clsx("font-sans font-light leading-[1.15] tracking-[-0.025em] text-ink", compact ? "text-[26px]" : "text-[32px]")}>
+        {/* RENUABL's own, not Breeze's (24 Nov 2026, Martin: "more native to renuabl"): Sol's etched brain as on
+            Today's heading (no sun), the day in the figures' face, then the greeting set light. */}
+        <SolEtch className={clsx("text-[#c9ccd3]", compact ? "size-10" : "size-12")} width={1.6} />
+        <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-muted" suppressHydrationWarning>
+          {todayHeading(todayInMarket())}
+        </p>
+        <h2
+          className={clsx("mt-1 font-sans font-light leading-[1.15] tracking-[-0.025em] text-ink", compact ? "text-[26px]" : "text-[32px]")}
+        >
           {solGreeting(firstName)}
         </h2>
       </div>
@@ -53,9 +62,11 @@ export function SolStart({
       <div className="mt-auto space-y-3">
         {list && (
           <div className="rounded-2xl bg-white px-4 py-3 ring-1 ring-line" aria-label={topic ? topic.label : "Suggested"}>
-            <div className="mb-1 flex items-center gap-2 text-[13.5px] text-ink">
-              <TopicIcon className="size-4 text-ink-2" strokeWidth={1.6} aria-hidden />
-              <span>{topic ? topic.label : "Suggested"}</span>
+            <div className="mb-1.5 flex items-center gap-2">
+              <span className="inline-flex size-6 items-center justify-center rounded-full bg-primary">
+                <TopicIcon className="size-3.5 text-sun-line" strokeWidth={1.8} aria-hidden />
+              </span>
+              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">{topic ? topic.label : "Suggested"}</span>
               {topic && (
                 <button
                   type="button"
@@ -95,12 +106,17 @@ export function SolStart({
                   type="button"
                   onClick={() => setOpen(t.id)}
                   className={clsx(
-                    "flex flex-col items-start rounded-2xl bg-white text-left text-ink ring-1 ring-line transition hover:ring-line-strong",
-                    compact ? "gap-3 px-3.5 py-3 text-[13px]" : "gap-5 px-4 py-3.5 text-[13.5px]",
+                    "group flex flex-col items-start rounded-2xl bg-white text-left text-ink ring-1 ring-line transition hover:ring-sun-line/60",
+                    compact ? "gap-3 px-3 py-3 text-[13px]" : "gap-4 px-4 py-3.5 text-[13.5px]",
                   )}
                 >
-                  <Icon className="size-[18px] text-sun-line" strokeWidth={1.6} aria-hidden />
-                  {t.label}
+                  <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+                    <Icon className="size-4 text-sun-line" strokeWidth={1.7} aria-hidden />
+                  </span>
+                  <span className="flex w-full items-baseline justify-between gap-2">
+                    <span className="font-medium">{t.label}</span>
+                    <span className="font-mono text-[10.5px] text-muted">{t.prompts.length}</span>
+                  </span>
                 </button>
               );
             })}
