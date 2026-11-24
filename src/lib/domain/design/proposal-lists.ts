@@ -128,3 +128,25 @@ export function byMonthAndWeek<T extends { signedAt: string; youPay: number }>(r
   }
   return months;
 }
+
+/**
+ * Whether a proposal matches what is typed in the lists' search (24 Nov 2026, Martin: "I need a way to search
+ * proposals"): every word typed is found in one of its fields (customer, address, title, reference…), any case. A
+ * phone or reference typed with spaces or dashes still finds it: digits are matched as digits alone.
+ */
+export function matchesProposalSearch(query: string, fields: readonly (string | null | undefined)[]): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const text = fields.filter(Boolean).join(" ").toLowerCase();
+  const digits = text.replace(/\D/g, "");
+  return words.every(
+    (w) => text.includes(w) || (/^[\d\-()+]+$/.test(w) && w.replace(/\D/g, "").length >= 3 && digits.includes(w.replace(/\D/g, ""))),
+  );
+}
+
+/** The latest of the days given, or null: when the last deal was signed. */
+export function latestOf(dates: readonly string[]): string | null {
+  let best: string | null = null;
+  for (const d of dates) if (!best || new Date(d).getTime() > new Date(best).getTime()) best = d;
+  return best;
+}
