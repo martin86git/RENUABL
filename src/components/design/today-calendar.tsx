@@ -35,6 +35,8 @@ import {
   type CalendarProvider,
 } from "@/lib/domain/design/my-calendar";
 import type { JobLine } from "@/lib/services/crm";
+import { monthRowHeight } from "@/lib/domain/design/calendar-size";
+import { ResizeGrip, useCalendarSize } from "./calendar-resize";
 import { connectMyCalendar, disconnectMyCalendar, loadMyCalendar, type CalendarAnswer } from "@/lib/services/my-calendar";
 
 const HOUR_PX = 52;
@@ -125,6 +127,13 @@ export function TodayCalendar({ jobs, today }: { jobs: JobLine[] | null; today: 
 
   // A swipe sideways moves on or back (Google's own way of getting about).
   const touch = useRef<{ x: number; y: number } | null>(null);
+  // On a computer the calendar is sized by dragging its right edge, its foot or the corner (23 Nov 2026, Martin).
+  const frame = useRef<HTMLDivElement>(null);
+  const sized = useCalendarSize("page", () => {
+    const room = frame.current?.parentElement?.clientWidth;
+    return room ? { width: room, height: 2400 } : null;
+  });
+  const size = sized.size;
   const swipe = {
     onTouchStart: (e: React.TouchEvent) => (touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }),
     onTouchEnd: (e: React.TouchEvent) => {
@@ -138,7 +147,11 @@ export function TodayCalendar({ jobs, today }: { jobs: JobLine[] | null; today: 
   };
 
   return (
-    <div className="relative mx-auto w-full max-w-3xl pb-6 pt-2">
+    <div
+      ref={frame}
+      className={clsx("relative mx-auto w-full pb-6 pt-2", !size && "max-w-3xl")}
+      style={size ? { width: size.width, maxWidth: "100%" } : undefined}
+    >
       {/* The bar: the menu, the month with its dropdown, and today's round. */}
       <div className="flex items-center gap-2 px-1">
         <button
@@ -214,21 +227,66 @@ export function TodayCalendar({ jobs, today }: { jobs: JobLine[] | null; today: 
 
       <div className="mt-3" {...swipe}>
         {view === "schedule" ? (
-          <Schedule events={events} from={day} today={today} provider={got?.provider} />
+          <Schedule events={events} from={day} today={today} provider={got?.provider} height={size?.height} />
         ) : view === "month" ? (
           <MonthGrid
             events={events}
             day={day}
             today={today}
+            height={size?.height}
             onPick={(d) => {
               setDay(d);
               keep({ ...kept, view: "day" });
             }}
           />
         ) : (
-          <Hours days={viewDays(view, day)} events={events} today={today} provider={got?.provider} />
+          <Hours days={viewDays(view, day)} events={events} today={today} provider={got?.provider} height={size?.height} />
         )}
       </div>
+
+      {size && (
+        <>
+          {/* Centred on the page, so the right edge grows it both ways; the foot grows it down. */}
+          <ResizeGrip
+            label="Drag to make the calendar wider or narrower"
+            className="absolute -right-3 top-16 z-20 h-[calc(100%-6rem)] w-3 cursor-ew-resize"
+            start={() => size}
+            onDrag={(dx, _dy, s) => sized.keep({ width: s.width + dx * 2, height: s.height })}
+            onReset={sized.reset}
+            keys={(k) =>
+              k === "ArrowRight"
+                ? sized.keep({ ...size, width: size.width + 64 })
+                : k === "ArrowLeft"
+                  ? sized.keep({ ...size, width: size.width - 64 })
+                  : undefined
+            }
+            orientation="vertical"
+          />
+          <ResizeGrip
+            label="Drag to make the calendar taller or shorter"
+            className="absolute -bottom-0.5 left-6 z-20 h-3 w-[calc(100%-3rem)] cursor-ns-resize"
+            start={() => size}
+            onDrag={(_dx, dy, s) => sized.keep({ width: s.width, height: s.height + dy })}
+            onReset={sized.reset}
+            keys={(k) =>
+              k === "ArrowDown"
+                ? sized.keep({ ...size, height: size.height + 48 })
+                : k === "ArrowUp"
+                  ? sized.keep({ ...size, height: size.height - 48 })
+                  : undefined
+            }
+            orientation="horizontal"
+          />
+          <ResizeGrip
+            label="Drag to resize the calendar"
+            className="absolute -bottom-0.5 -right-3 z-30 size-5 cursor-nwse-resize"
+            start={() => size}
+            onDrag={(dx, dy, s) => sized.keep({ width: s.width + dx * 2, height: s.height + dy })}
+            onReset={sized.reset}
+            corner="bottom-right"
+          />
+        </>
+      )}
 
       {drawer && (
         <Drawer
@@ -401,7 +459,7 @@ function EventBox(props: { event: CalEvent; className: string; style?: React.CSS
 }
 
 /** Day: the days' headers, their all-day events, then the hours with each event at its time. */
-function Hours(props: { days: ISODate[]; events: CalEvent[]; today: ISODate; provider?: CalendarProvider }) {
+function Hours(props: { days: ISODate[]; events: CalEvent[]; today: ISODate; provider?: CalendarProvider; height?: number }) {
   const box = useRef<HTMLDivElement>(null);
   const layouts = props.days.map((d) => dayLayout(props.events, d));
   const firstFrom = Math.min(...layouts.map((l) => l[0]?.from ?? 24 * 60));
@@ -455,7 +513,12 @@ function Hours(props: { days: ISODate[]; events: CalEvent[]; today: ISODate; pro
           );
         })}
       </div>
-      <div ref={box} className="relative h-[min(62dvh,36rem)] overflow-y-auto overscroll-contain" aria-label="By the hour">
+      <div
+        ref={box}
+        className={clsx("relative overflow-y-auto overscroll-contain", !props.height && "h-[min(62dvh,36rem)]")}
+        style={props.height ? { height: props.height } : undefined}
+        aria-label="By the hour"
+      >
         <div className="relative grid" style={{ gridTemplateColumns: cols, height: 24 * HOUR_PX }}>
           {Array.from({ length: 24 }, (_, h) => (
             <div key={h} className="pointer-events-none absolute inset-x-0 flex" style={{ top: h * HOUR_PX }}>
@@ -511,10 +574,13 @@ function Hours(props: { days: ISODate[]; events: CalEvent[]; today: ISODate; pro
 }
 
 /** Schedule: each day with something on, its date in a round on the left and its events as blocks beside it. */
-function Schedule(props: { events: CalEvent[]; from: ISODate; today: ISODate; provider?: CalendarProvider }) {
+function Schedule(props: { events: CalEvent[]; from: ISODate; today: ISODate; provider?: CalendarProvider; height?: number }) {
   const list = scheduleList(props.events, props.from, props.today);
   return (
-    <div className="space-y-1">
+    <div
+      className={clsx("space-y-1", props.height && "overflow-y-auto overscroll-contain")}
+      style={props.height ? { maxHeight: props.height } : undefined}
+    >
       {list.map(({ day, events }, i) => {
         const { weekday, date } = dayLabel(day);
         const isToday = day === props.today;
@@ -561,8 +627,10 @@ function Schedule(props: { events: CalEvent[]; from: ISODate; today: ISODate; pr
 }
 
 /** Month: the weeks as a grid, each day with up to three events as small bars; a day opens it by the hour. */
-function MonthGrid(props: { events: CalEvent[]; day: ISODate; today: ISODate; onPick: (d: ISODate) => void }) {
+function MonthGrid(props: { events: CalEvent[]; day: ISODate; today: ISODate; height?: number; onPick: (d: ISODate) => void }) {
   const days = viewDays("month", props.day);
+  const rowH = props.height ? monthRowHeight(props.height, Math.ceil(days.length / 7)) : null;
+  const shows = rowH ? Math.max(3, Math.floor((rowH - 32) / 17)) : 3;
   const month = props.day.slice(0, 7);
   return (
     <div className="overflow-hidden rounded-[22px] bg-surface ring-1 ring-line/70">
@@ -585,6 +653,7 @@ function MonthGrid(props: { events: CalEvent[]; day: ISODate; today: ISODate; on
                 i % 7 > 0 && "border-l",
                 i >= 7 && "border-t",
               )}
+              style={rowH ? { minHeight: rowH } : undefined}
             >
               <span
                 className={clsx(
@@ -594,7 +663,7 @@ function MonthGrid(props: { events: CalEvent[]; day: ISODate; today: ISODate; on
               >
                 {Number(d.slice(8))}
               </span>
-              {on.slice(0, 3).map((e) => (
+              {on.slice(0, shows).map((e) => (
                 <span
                   key={e.id}
                   className={clsx("truncate rounded-[4px] px-1 py-px text-[10px] font-medium leading-tight", COLOUR[e.source])}
@@ -602,7 +671,7 @@ function MonthGrid(props: { events: CalEvent[]; day: ISODate; today: ISODate; on
                   {e.title}
                 </span>
               ))}
-              {on.length > 3 && <span className="px-1 text-[10px] text-muted">+{on.length - 3}</span>}
+              {on.length > shows && <span className="px-1 text-[10px] text-muted">+{on.length - shows}</span>}
             </button>
           );
         })}

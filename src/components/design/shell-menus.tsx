@@ -39,6 +39,7 @@ import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from
 import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
 import { MyCalendar } from "./my-calendar";
+import { ResizeGrip, useCalendarSize } from "./calendar-resize";
 import { loadUsageBrief, type MeterNow } from "@/lib/services/usage";
 import { openUsagePop, usagePopReady } from "./usage-pop";
 import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
@@ -148,6 +149,14 @@ export function DayWeather() {
   const [weather, setWeather] = useState<{ place: string; degrees: number | null; sky: Sky | null } | null>(null);
   const [open, setOpen, box] = useWindow();
   const [note, setNote] = useState<string | null>(null);
+  // On a computer the calendar is sized by dragging its left edge, its foot or the corner (23 Nov 2026, Martin).
+  const sized = useCalendarSize("pop", () => {
+    const tile = box.current?.getBoundingClientRect();
+    // The width it may take: to the screen's left edge less a margin and its padding; the hours' height: the screen
+    // under the tile less the month and the bar above them.
+    return tile ? { width: tile.right - 48, height: window.innerHeight - tile.bottom - 360 } : null;
+  });
+  const size = open ? sized.size : null;
   useEffect(() => {
     // The day is only known once the page is in the browser.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -207,7 +216,50 @@ export function DayWeather() {
       </button>
       {open && (
         <div className="absolute right-0 top-12 z-50 rounded-3xl bg-surface p-4 shadow-2xl ring-1 ring-line">
-          <MyCalendar note={note} />
+          <MyCalendar note={note} size={size} />
+          {size && (
+            <>
+              {/* Held to the tile on its right: the left edge widens it, the foot makes it taller (23 Nov 2026, Martin). */}
+              <ResizeGrip
+                label="Drag to make the calendar wider or narrower"
+                className="absolute left-0 top-8 z-20 h-[calc(100%-4rem)] w-2.5 cursor-ew-resize"
+                start={() => size}
+                onDrag={(dx, _dy, s) => sized.keep({ width: s.width - dx, height: s.height })}
+                onReset={sized.reset}
+                keys={(k) =>
+                  k === "ArrowLeft"
+                    ? sized.keep({ ...size, width: size.width + 48 })
+                    : k === "ArrowRight"
+                      ? sized.keep({ ...size, width: size.width - 48 })
+                      : undefined
+                }
+                orientation="vertical"
+              />
+              <ResizeGrip
+                label="Drag to make the calendar taller or shorter"
+                className="absolute bottom-0 left-8 z-20 h-2.5 w-[calc(100%-4rem)] cursor-ns-resize"
+                start={() => size}
+                onDrag={(_dx, dy, s) => sized.keep({ width: s.width, height: s.height + dy })}
+                onReset={sized.reset}
+                keys={(k) =>
+                  k === "ArrowDown"
+                    ? sized.keep({ ...size, height: size.height + 48 })
+                    : k === "ArrowUp"
+                      ? sized.keep({ ...size, height: size.height - 48 })
+                      : undefined
+                }
+                orientation="horizontal"
+              />
+              <ResizeGrip
+                label="Drag to resize the calendar"
+                className="absolute bottom-0 left-0 z-30 size-5 cursor-nesw-resize"
+                start={() => size}
+                onDrag={(dx, dy, s) => sized.keep({ width: s.width - dx, height: s.height + dy })}
+                onReset={sized.reset}
+                corner="bottom-left"
+              />
+            </>
+          )}
         </div>
       )}
     </div>

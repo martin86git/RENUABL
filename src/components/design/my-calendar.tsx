@@ -38,7 +38,7 @@ const dayTitle = (d: ISODate) => at(d).toLocaleDateString("en-AU", { weekday: "l
  * Google Calendar or Outlook (read only). With none connected, one press on either connects it in a small window over
  * the page, so they never leave what they were doing; the events fill in when it closes.
  */
-export function MyCalendar(props: { note?: string | null; wide?: boolean }) {
+export function MyCalendar(props: { note?: string | null; wide?: boolean; size?: { width: number; height: number } | null }) {
   const path = usePathname();
   const today = todayInMarket();
   const [month, setMonth] = useState<ISODate>(today);
@@ -113,7 +113,10 @@ export function MyCalendar(props: { note?: string | null; wide?: boolean }) {
   };
 
   return (
-    <div className={clsx(props.wide ? "w-full" : "w-[21rem]", "text-ink")}>
+    <div
+      className={clsx(props.wide || props.size ? "w-full" : "w-[21rem]", "text-ink")}
+      style={props.size ? { width: props.size.width } : undefined}
+    >
       <div className="flex items-center justify-between px-1">
         <div className="flex rounded-full bg-canvas p-0.5 text-[12px] font-medium" role="tablist" aria-label="Calendar view">
           {(["month", "day"] as const).map((v) => (
@@ -275,11 +278,14 @@ export function MyCalendar(props: { note?: string | null; wide?: boolean }) {
                 </button>
               </div>
             ) : view === "day" ? (
-              <DayTimeline events={events} day={day} today={today} provider={got.provider ?? "google"} />
+              <DayTimeline events={events} day={day} today={today} provider={got.provider ?? "google"} height={props.size?.height} />
             ) : onDay.length === 0 ? (
               <p className="px-1 py-2 text-[13px] text-muted">{CALENDAR_WORDS.nothing}</p>
             ) : (
-              <ul className="mt-1.5 max-h-60 space-y-1 overflow-y-auto">
+              <ul
+                className={clsx("mt-1.5 space-y-1 overflow-y-auto", !props.size && "max-h-60")}
+                style={props.size ? { maxHeight: Math.max(160, props.size.height - 112) } : undefined}
+              >
                 {onDay.map((e) => (
                   <li key={e.id} className="flex gap-2.5 rounded-xl bg-sun-line/10 px-2.5 py-2 ring-1 ring-inset ring-sun-line/25">
                     <span className="mt-1 w-1 shrink-0 self-stretch rounded-full bg-sun-line" aria-hidden />
@@ -342,7 +348,7 @@ export function MyCalendar(props: { note?: string | null; wide?: boolean }) {
  * each timed event drawn at its time and length, overlapping ones side by side (`dayLayout`), and on today a line at
  * the time now. It opens scrolled to just before the first event, else 7am. An event opens in its calendar.
  */
-function DayTimeline(props: { events: readonly MyEvent[]; day: ISODate; today: ISODate; provider: CalendarProvider }) {
+function DayTimeline(props: { events: readonly MyEvent[]; day: ISODate; today: ISODate; provider: CalendarProvider; height?: number }) {
   const placed = dayLayout(props.events, props.day);
   const allDay = eventsOn(props.events, props.day).filter((e) => !placed.some((p) => p.event.id === e.id));
   const box = useRef<HTMLDivElement>(null);
@@ -377,7 +383,8 @@ function DayTimeline(props: { events: readonly MyEvent[]; day: ISODate; today: I
       )}
       <div
         ref={box}
-        className="relative h-[22rem] overflow-y-auto rounded-xl ring-1 ring-line"
+        className={clsx("relative overflow-y-auto rounded-xl ring-1 ring-line", !props.height && "h-[22rem]")}
+        style={props.height ? { height: props.height } : undefined}
         aria-label={`${dayTitle(props.day)}, by the hour`}
       >
         <div className="relative" style={{ height: 24 * HOUR_PX }}>
