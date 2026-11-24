@@ -277,6 +277,16 @@ export const UPDATES: readonly Update[] = [
     words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
   },
   {
+    day: "2026-11-24",
+    area: "Marketing",
+    words: "Email builder: a Personal letter look that reads like a person's email, for the best odds of Gmail's Primary tab.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketing",
+    words: "Marketing emails are wider, and each email can name its own sender.",
+  },
+  {
     day: "2026-11-22",
     area: "Marketing",
     words: "Email builder: a Video block, the video's picture with a play button that opens it.",
