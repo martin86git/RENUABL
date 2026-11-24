@@ -105,7 +105,7 @@ function SystemMarks({ job, extra }: { job: JobLine; extra?: JobExtra }) {
         <BatteryCharging className={mark(battery > 0)} />
         <Plug className={mark(Boolean(ev))} />
       </span>
-      <span className="text-[12.5px] tabular-nums text-ink-2">{sizes.length ? sizes.join(" · ") : "–"}</span>
+      <span className="whitespace-nowrap text-[12.5px] tabular-nums text-ink-2">{sizes.length ? sizes.join(" · ") : "–"}</span>
     </span>
   );
 }
@@ -126,10 +126,15 @@ const head = "px-3 py-2 text-left text-[10.5px] font-medium uppercase tracking-[
 function JobCell({ job }: { job: JobLine }) {
   return (
     <td className={clsx(cell, "pl-4")}>
-      <Link href={`${PATHS.deals}/${job.id}`} className="block max-w-[16rem] truncate text-[13px] font-medium text-ink hover:underline">
+      <Link
+        href={`${PATHS.deals}/${job.id}`}
+        className="block max-w-[9rem] text-[13px] font-medium leading-snug text-ink [overflow-wrap:anywhere] hover:underline sm:max-w-[16rem] sm:truncate"
+      >
         {(job.address || job.title).split(",")[0]}
       </Link>
-      <span className="block max-w-[16rem] truncate text-[11.5px] text-muted">{job.customerName}</span>
+      <span className="block max-w-[9rem] text-[11.5px] text-muted [overflow-wrap:anywhere] sm:max-w-[16rem] sm:truncate">
+        {job.customerName}
+      </span>
     </td>
   );
 }
