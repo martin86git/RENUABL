@@ -27,6 +27,7 @@ import {
   partsOf,
   withPictures,
   type InboxEmail,
+  framedEmail,
 } from "./inbox";
 
 describe("the inbox", () => {
@@ -275,5 +276,18 @@ describe("several mailboxes", () => {
     const b = [{ at: "2026-11-04T01:00:00Z", box: "b" }];
     expect(mergeInboxes([a, b]).map((e) => e.box)).toEqual(["a", "b", "a"]);
     expect(mergeInboxes([a, b], 2)).toHaveLength(2);
+  });
+});
+
+describe("framedEmail", () => {
+  it("adds our type and the phone's width to an email without a head", () => {
+    const out = framedEmail("<p>Hi Andre,</p>");
+    expect(out).toContain("width=device-width");
+    expect(out).toContain("font-family:Inter");
+    expect(out).toContain("<p>Hi Andre,</p>");
+  });
+  it("puts it first in an email's own head, so its styles still win", () => {
+    const out = framedEmail("<html><head><style>p{color:red}</style></head><body><p>x</p></body></html>");
+    expect(out.indexOf("font-family:Inter")).toBeLessThan(out.indexOf("p{color:red}"));
   });
 });
