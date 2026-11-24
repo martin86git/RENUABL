@@ -37,6 +37,11 @@ export const UPDATES: readonly Update[] = [
   { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
   {
     day: "2026-11-24",
+    area: "Installations",
+    words: "On a phone the figures over Installations, After install and Grid sit three across in one slim band, and long addresses wrap.",
+  },
+  {
+    day: "2026-11-24",
     area: "Orders",
     words: "A job's order is tidier on a phone: the address, signed day and install day each on a line.",
   },
