@@ -1,23 +1,23 @@
 "use client";
 
 /**
- * How Sol's chat opens (24 Nov 2026, Martin, from HubSpot's Breeze): his sun and "Ready when you are, <name>" in
- * large light type, then a Suggested card of a few things to ask, then four topics as tiles. A tile opens that
+ * How Sol's chat opens (24 Nov 2026, Martin, from HubSpot's Breeze): "Ready when you are, <name>" in large light
+ * type, then a Suggested card of a few things to ask, then four topics as tiles. A tile opens that
  * topic's prompts in the Suggested card's place, with a cross back. A prompt is sent as it is pressed.
  * The words are in domain/design/sol-suggest.ts.
  */
 
 import { useState } from "react";
 import clsx from "clsx";
-import { ClipboardList, Forward, Lightbulb, PenLine, Search, Sun, X, type LucideIcon } from "lucide-react";
+import { ClipboardList, Forward, Lightbulb, PenLine, Search, Wrench, X, type LucideIcon } from "lucide-react";
+import { SolLibrary } from "./sol-library";
 import { SOL_SUGGESTED, SOL_TOPICS, solGreeting, topicOf, type SolTopic } from "@/lib/domain/design/sol-suggest";
-import { SolMark } from "./sol-sun";
 
 const TOPIC_ICONS: Record<SolTopic, LucideIcon> = {
   summarise: ClipboardList,
   write: PenLine,
   find: Search,
-  solar: Sun,
+  solar: Wrench,
 };
 
 export function SolStart({
@@ -43,10 +43,9 @@ export function SolStart({
   return (
     <div className="flex min-h-full flex-col">
       <div className={clsx("pt-2", compact ? "pb-6" : "pb-10")}>
-        <SolMark className={clsx(compact ? "size-9" : "size-11")} />
-        <h2
-          className={clsx("mt-3 font-serif font-normal leading-tight tracking-[-0.01em] text-ink", compact ? "text-[24px]" : "text-[30px]")}
-        >
+        {/* No sun over it, and the interface's own face set light (24 Nov 2026, Martin: "remove the sol icon… update
+            the font"): Inter at 300 with tight tracking, in place of the serif. */}
+        <h2 className={clsx("font-sans font-light leading-[1.15] tracking-[-0.025em] text-ink", compact ? "text-[26px]" : "text-[32px]")}>
           {solGreeting(firstName)}
         </h2>
       </div>
@@ -82,6 +81,8 @@ export function SolStart({
                 </li>
               ))}
             </ul>
+            {/* The business's library under Technical (sol-library.tsx). */}
+            {topic?.id === "solar" && <SolLibrary />}
           </div>
         )}
         {!topic && (

@@ -169,7 +169,7 @@ export const STARTER_QUESTIONS: readonly string[] = QUESTION_AREAS.map((a) => a.
 export const SOL_ORACLE = `You are the team's solar, battery and EV oracle: the one they ask instead of searching themselves. Answer what a Victorian solar business asks every day, in these areas, looking in the places named:
 ${QUESTION_AREAS.map((a) => `- ${a.topic}: such as "${a.examples[0]}" Look in ${a.where}.`).join("\n")}
 
-Your memory first: for any question about networks, approvals, rebates, products, wholesalers or technical rules, call recall_knowledge before searching. When it holds an answer that isn't marked to check again, answer from it and say it came from what you've found before. When it is marked to check again, or doesn't settle it, search.
+Your memory first: for any question about networks, approvals, rebates, products, wholesalers or technical rules, call recall_knowledge before searching. When it holds an answer that isn't marked to check again, answer from it (its source shows under your answer, so don't say where it came from). When it is marked to check again, or doesn't settle it, search.
 
 The web: use web_search, and web_fetch to read the page or PDF it found. Prefer, in order: the official body or network, the maker's own Australian documents, the wholesaler's own pages, the Clean Energy Council; a forum post is someone's experience, so say so if you use one, and never take a rule or a figure from it. Give the figure, date, address, phone or email exactly as the page shows it, and when the page is dated, the date. Never fill a gap with a figure you didn't find: say what you couldn't find and where to look. Rebate amounts, approval times and network rules change: say when a page looks old.
 
@@ -372,4 +372,35 @@ export function guessTopic(text: string): KnowledgeTopic {
 /** Memory within its limit: the newest kept, then the most used. */
 export function trimKnowledge<T extends Pick<KnowledgeEntry, "uses" | "savedAt">>(entries: readonly T[], max = MAX_KNOWLEDGE): T[] {
   return [...entries].sort((a, b) => b.savedAt.localeCompare(a.savedAt) || b.uses - a.uses).slice(0, max);
+}
+
+/**
+ * A tip bookmarked by a person (24 Nov 2026, Martin: "Save this a bookmarked tech tip: Inverter to Gas meter
+ * clearance - 1500mm"; "an accruing knowledge library… for future fast retrieval"). Kept in the same memory as Sol's
+ * sourced answers, with no page behind it: a person told it, and it shows as theirs. Sol keeps one only when the
+ * member's own words ask him to (`asksToBookmark`), never from a customer's words or a page.
+ */
+const ASKS_TO_BOOKMARK =
+  /\b(bookmark|book\s*mark|save (this|that|it)|keep (this|that|it)|remember (this|that)|add (this|that|it) to (the|my|our) (library|memory|tips?)|tech tip)\b/i;
+export const asksToBookmark = (text: string) => ASKS_TO_BOOKMARK.test(text);
+
+export const TIP_LIMITS = { title: 160, tip: 1_200 } as const;
+
+/** A tip to keep: its title in a line and the tip itself, the topic technical unless said. */
+export function cleanTipInput(raw: unknown): { ok: true; value: KnowledgeInput } | { ok: false; message: string } {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const title = typeof r.title === "string" ? r.title.replace(/\s+/g, " ").trim().slice(0, TIP_LIMITS.title) : "";
+  const tip = typeof r.tip === "string" ? r.tip.replace(/\r/g, "").trim().slice(0, TIP_LIMITS.tip) : "";
+  if (title.length < 3 || tip.length < 2) return { ok: false, message: "Give the tip a title and the tip itself." };
+  const topic = (KNOWLEDGE_TOPICS as readonly string[]).includes(r.topic as string) ? (r.topic as KnowledgeTopic) : "technical";
+  return { ok: true, value: { topic, question: title, answer: tip, sources: [] } };
+}
+
+/** A tip a person kept: an entry with no page behind it. */
+export const isTip = (e: Pick<KnowledgeEntry, "sources">) => e.sources.length === 0;
+
+/** The library under the Technical tile: technical and standards entries first, the most used and newest first. */
+export function libraryFor(entries: readonly KnowledgeEntry[], max = 30): KnowledgeEntry[] {
+  const rank = (e: KnowledgeEntry) => (e.topic === "technical" || e.topic === "standards" ? 0 : 1);
+  return [...entries].sort((a, b) => rank(a) - rank(b) || b.uses - a.uses || b.savedAt.localeCompare(a.savedAt)).slice(0, max);
 }

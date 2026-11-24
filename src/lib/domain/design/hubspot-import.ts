@@ -44,14 +44,14 @@ export const HUBSPOT_WORDS = {
   intro:
     "Each deal in the HubSpot pipelines you choose comes across as a customer and a deal, at the stage you match it to, with its value, owner, the fields you match, and its notes, emails, calls and meetings on the deal's record. Your HubSpot account isn't changed.",
   keyHow:
-    "In HubSpot, open Settings → Integrations → Private apps, create an app, tick these read scopes, then copy its access token and paste it here:",
+    "In HubSpot, make a service key (or a private app under Settings → Integrations → Private apps) with these read scopes, then copy its key or access token and paste it here:",
   keyKept: "The token is used for this import only. RENUABL doesn't keep it.",
   notCarried:
     "Attachments, tasks, quotes and marketing history stay in HubSpot. A deal's customer is its first contact; someone already in RENUABL (by email, then mobile) gets the deal and isn't changed.",
   again: "Run it again any time: deals already brought in are passed over, so only new ones come across.",
-  badKey: "That doesn't look like a HubSpot private app token. It starts with pat- and is copied whole from the app's Auth tab.",
-  refused: "HubSpot didn't accept that token. Check it was copied whole and the private app hasn't been deleted.",
-  noRead: "That token can't read deals. In HubSpot, give the private app the read scopes listed here and try again.",
+  badKey: "That doesn't look like a HubSpot token or service key. Copy it whole, with no spaces, from HubSpot.",
+  refused: "HubSpot didn't accept that token. Check it was copied whole and the key or private app hasn't been deleted.",
+  noRead: "That token can't read deals. In HubSpot, give the key or private app the read scopes listed here and try again.",
   busy: "HubSpot asked us to slow down. Wait a minute and press Carry on.",
 } as const;
 
@@ -65,7 +65,11 @@ export function hubspotSaid(status: number, message: string): string {
   return `HubSpot turned the request down (${status}${words ? `: ${words}` : ""}).`;
 }
 
-/** A token as pasted: trimmed, quotes and a leading "Bearer " forgiven; null unless it reads as a private app token. */
+/**
+ * A token as pasted: trimmed, quotes and a leading "Bearer " forgiven. A private app token starts "pat-", but a
+ * service key (24 Nov 2026, Martin: a service key with the scopes was turned away here) looks otherwise, so any one
+ * piece of token characters is taken and HubSpot itself says whether it's good.
+ */
 export function cleanHubSpotKey(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const key = raw
@@ -73,7 +77,7 @@ export function cleanHubSpotKey(raw: unknown): string | null {
     .replace(/^["']+|["']+$/g, "")
     .replace(/^bearer\s+/i, "")
     .trim();
-  return /^pat-[a-z0-9]{2,8}-[A-Za-z0-9-]{20,200}$/.test(key) ? key : null;
+  return /^[A-Za-z0-9._~+/=-]{20,600}$/.test(key) ? key : null;
 }
 
 /** A HubSpot record id: digits only. */
