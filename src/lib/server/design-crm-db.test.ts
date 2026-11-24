@@ -5,6 +5,7 @@
  * record of what happened.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { STAGE_NAME_TAKEN } from "@/lib/domain/design/pipeline-stages";
 import { BUSINESS_TERMS_VERSION, cleanRoofWork, type RoofPlace } from "@/lib/domain/design/account";
 import {
   JOB_STAGES,
@@ -208,6 +209,32 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
     expect((await crm.jobById(a, third.id))?.job).toMatchObject({ projectId: null, stage: "proposal" });
   });
 
+  it("joins a deal to a design of the same home drawn a few metres off, never the house next door", async () => {
+    const mine = (await crm.listCustomers(a)).find((c) => c.name === "Morgan Example")!;
+    const HOME: RoofPlace = { address: "12 Sample Street, Rowville VIC 3178", lat: -37.92612, lng: 145.24011 };
+    // Placed by another map about 18 metres away, written another way.
+    const deal = await crm.createJob(a, mine.id, job({ address: "12 Sample St Rowville", lat: -37.92627, lng: 145.24026 }), A);
+    const nextDoor = await crm.createJob(
+      a,
+      mine.id,
+      job({ address: "14 Sample Street, Rowville VIC 3178", lat: -37.92627, lng: 145.24026 }),
+      A,
+    );
+    if (typeof deal === "string" || typeof nextDoor === "string") throw new Error("unexpected");
+    const drawn = await repo.createProject(a, HOME, work(HOME), A);
+    if (drawn === "full") throw new Error("unexpected");
+    // Saving the design joined it, and the deal now sits where the design was drawn.
+    expect((await crm.jobById(a, deal.id))?.job).toMatchObject({ projectId: drawn.project.id, lat: HOME.lat, lng: HOME.lng });
+    expect((await crm.jobById(a, nextDoor.id))?.job.projectId).toBeNull();
+    // Asked again from the deal (as its page does), nothing more happens.
+    await crm.joinNearbyDesign(a, nextDoor.id, A);
+    expect((await crm.jobById(a, nextDoor.id))?.job.projectId).toBeNull();
+    // Gone again, so the counts the tests after this one read are as they were.
+    await crm.deleteJob(a, deal.id);
+    await crm.deleteJob(a, nextDoor.id);
+    await repo.deleteProject(a, drawn.project.id);
+  });
+
   it("writes down each move between stages, and only moves", async () => {
     const mine = (await crm.listCustomers(a)).find((c) => c.name === "Morgan Example")!;
     const first = (await crm.customerDetail(a, mine.id))!.jobs.find((j) => j.title === "Solar" && j.address === ROOF.address)!;
@@ -313,5 +340,51 @@ describe.skipIf(!url)("roof designer CRM (database)", () => {
       const rows = await db.query<{ n: string }>(`select count(*) as n from ${table} where business_id = $1`, [b]);
       expect(Number(rows[0].n)).toBe(0);
     }
+  });
+
+  it("keeps a business's own stages and pipelines to itself, and deals at an added stage at the stage it counts as", async () => {
+    // Added to the Sales pipeline after Designed: the set pipeline is now the business's stand-in.
+    const made = await crm.addOwnStage(a, { name: "Site visit booked", base: "designed" }, { pipelineId: "sales", after: 1 }, A);
+    if ("refused" in made) throw new Error(made.refused);
+    expect(made.pipeline).toMatchObject({ baseId: "sales", stages: ["lead", "designed", made.stage.id, "proposal", "won"] });
+    expect(await crm.addOwnStage(a, { name: "site visit booked", base: "lead" }, null, A)).toEqual({ refused: STAGE_NAME_TAKEN });
+    expect(await crm.listOwnStages(b)).toEqual([]);
+
+    // Renamed: the same row, never a second stand-in.
+    const renamed = await crm.createPipeline(a, { name: "Selling", stages: made.pipeline!.stages, baseId: "sales" }, A);
+    expect(renamed).toMatchObject({ id: made.pipeline!.id, name: "Selling" });
+    expect((await crm.listPipelines(a)).filter((p) => p.baseId === "sales")).toHaveLength(1);
+    expect(await crm.renameOwnStage(b, made.stage.id, "Hijack")).toBeNull();
+    expect(await crm.renameOwnStage(a, made.stage.id, "Site visit")).toMatchObject({ name: "Site visit" });
+
+    // A deal put at it is Designed for every rule, and the move is written by its name.
+    const who = await crm.createCustomer(a, customer({ name: "Stage Example" }), job({ title: "Solar" }), A);
+    if (who === "full") throw new Error("full");
+    const own = await crm.listOwnStages(a);
+    const moved = await crm.updateJob(a, who.job!.id, (cur) => cleanJobInput({ subStage: made.stage.id }, cur, undefined, own), A);
+    expect(moved).toMatchObject({ stage: "designed", subStage: made.stage.id });
+    const record = await db.query<{ text: string }>(`select text from design_activity where business_id = $1 and job_id = $2`, [
+      a,
+      who.job!.id,
+    ]);
+    expect(record.some((r) => r.text === "Moved to Site visit")).toBe(true);
+
+    // Removed: out of every pipeline, and its deal stays at Designed.
+    expect(await crm.deleteOwnStage(b, made.stage.id)).toBe(false);
+    expect(await crm.deleteOwnStage(a, made.stage.id)).toBe(true);
+    expect((await crm.jobById(a, who.job!.id))?.job.subStage).toBeNull();
+    expect((await crm.listPipelines(a)).find((p) => p.baseId === "sales")?.stages).toEqual(["lead", "designed", "proposal", "won"]);
+
+    // One of the twelve renamed for the business alone: the record names it so, and a blank name puts ours back.
+    expect(await crm.renameBuiltinStage(a, "proposal", "Quote sent")).toEqual({ proposal: "Quote sent" });
+    expect(await crm.stageNamesOf(b)).toEqual({});
+    expect(await crm.renameBuiltinStage(a, "won", "quote sent")).toEqual({ refused: STAGE_NAME_TAKEN });
+    await crm.updateJob(a, who.job!.id, (cur) => cleanJobInput({ stage: "proposal" }, cur), A);
+    const later = await db.query<{ text: string }>(`select text from design_activity where business_id = $1 and job_id = $2`, [
+      a,
+      who.job!.id,
+    ]);
+    expect(later.some((r) => r.text === "Moved to Quote sent")).toBe(true);
+    expect(await crm.renameBuiltinStage(a, "proposal", "")).toEqual({});
   });
 });

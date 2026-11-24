@@ -56,6 +56,7 @@ export interface SupplierList {
 
 export const MAX_SUPPLIER_LISTS = 6;
 const MAX_ITEMS = 4000;
+const MAX_PANELS = 80;
 
 /**
  * A supplier price cell: "870", "1755.55", "24.0c/w ($114.00)",
@@ -103,9 +104,44 @@ export function parseSupplierPanels(rows: string[][]): PanelProduct[] {
     const cost = parsePriceCell(priced?.match(/\(\$\s*[\d,]+(?:\.\d+)?\)/)?.[0]);
     if (!sku || !name || !watts || cost === null || panels.some((p) => p.sku === sku)) continue;
     panels.push({ sku, name: name.slice(0, 100), watts: Number(watts[1]), cost });
-    if (panels.length >= 40) break;
+    if (panels.length >= MAX_PANELS) break;
   }
   return panels;
+}
+
+/**
+ * The panels among a list's priced rows (22 Nov 2026, Martin: a list priced per panel, not per watt, showed none, so
+ * the designer offered only RENUABL's one panel): a row whose description reads as a solar panel and gives an output
+ * of 250 to 800 W ("Trina Vertex S+ 440W N-Type Dual Glass"), priced as one panel would be. Racking, inverters,
+ * batteries, optimisers, cables and the like are left out.
+ */
+export function parseItemPanels(items: readonly ListItem[]): PanelProduct[] {
+  const out: PanelProduct[] = [];
+  for (const item of items) {
+    const watts = Number(item.name.match(/\b(\d{3})\s?wp?\b/i)?.[1]);
+    if (!(watts >= 250 && watts <= 800)) continue;
+    if (!/panel|module|mono|n-?type|p-?type|bifacial|glass|half[ -]?cut|topcon|perc|hjt|black|solar/i.test(item.name)) continue;
+    if (
+      /inverter|micro|optimi[sz]er|batter|charger|rail|clamp|kit|bracket|cable|isolator|mount|tilt|label|connector|mc4|hook|splice|feet|foot|tray|cover|monitor|meter|switch/i.test(
+        item.name,
+      )
+    )
+      continue;
+    if (item.cost < 40 || item.cost > 1500 || out.some((p) => p.sku === item.sku)) continue;
+    out.push({ sku: item.sku, name: item.name, watts, cost: item.cost });
+    if (out.length >= MAX_PANELS) break;
+  }
+  return out;
+}
+
+/** A list's panels: those priced per watt first, then those priced per panel, each once. */
+export function panelsOfList(rows: string[][] | null, items: readonly ListItem[], kept: readonly PanelProduct[] = []): PanelProduct[] {
+  const out = [...(rows ? parseSupplierPanels(rows) : kept)];
+  for (const p of parseItemPanels(items)) {
+    if (out.length >= MAX_PANELS) break;
+    if (!out.some((q) => q.sku === p.sku)) out.push(p);
+  }
+  return out;
 }
 
 /** The inverters on a list: rows described as an inverter with a rating in kilowatts and a price. Microinverters are left out. */
@@ -183,7 +219,7 @@ export function readSupplierList(name: string, rows: string[][], uploadedAt: str
     name: name.slice(0, 120),
     uploadedAt,
     items,
-    panels: parseSupplierPanels(rows),
+    panels: panelsOfList(rows, items),
     inverters: parseSupplierInverters(rows),
     batteries: parseSupplierBatteries(rows),
     chargers: parseItemChargers(items),
@@ -201,21 +237,23 @@ export function withSupplierList(lists: readonly SupplierList[], added: Supplier
 
 /**
  * Parts the quote adds by rule. Each has a product code to look up on the uploaded lists, and may have a cost
- * typed in instead (which wins). The codes they start with are common wholesaler codes: change them to your own.
+ * typed in instead (which wins). A business starts with no codes (22 Nov 2026, Martin: "a new user may not use Antai
+ * … we should not assume it before any pricing or products are uploaded"); `example` is a common wholesaler code,
+ * offered to use only once it is found on the business's own lists.
  */
 export const COMPONENTS = [
-  { key: "rail", label: "Rail, 4.8 m length", sku: "ANTRAIL4800/B" },
-  { key: "splice", label: "Rail splice", sku: "ANTSPLICE" },
-  { key: "tileKit", label: "Tile roof kit (per 2 kW)", sku: "ANTTILE20" },
-  { key: "tinKit", label: "Tin roof kit (per 2 kW)", sku: "ANTTIN20" },
-  { key: "kliplok", label: "Kliplok interface (flat roofs)", sku: "CLNER-I-34" },
-  { key: "tiltLow", label: "Tilt kit, 10 to 15 degrees (per 2 kW)", sku: "ANTTILT10/15" },
-  { key: "tiltHigh", label: "Tilt kit, 15 to 30 degrees (per 2 kW)", sku: "ANTTILT15/30" },
-  { key: "meter1ph", label: "Smart meter, single phase", sku: "SGWS100" },
-  { key: "meter3ph", label: "Smart meter, three phase", sku: "SGWDTSU666-20" },
-  { key: "mc4", label: "MC4 connectors (pack)", sku: "MC4GENPR20" },
-  { key: "isolator1ph", label: "AC isolator, single phase", sku: "NHPNL140L" },
-  { key: "isolator3ph", label: "AC isolator, three phase", sku: "NHPNL340L" },
+  { key: "rail", label: "Rail, 4.8 m length", example: "ANTRAIL4800/B" },
+  { key: "splice", label: "Rail splice", example: "ANTSPLICE" },
+  { key: "tileKit", label: "Tile roof kit (per 2 kW)", example: "ANTTILE20" },
+  { key: "tinKit", label: "Tin roof kit (per 2 kW)", example: "ANTTIN20" },
+  { key: "kliplok", label: "Kliplok interface (flat roofs)", example: "CLNER-I-34" },
+  { key: "tiltLow", label: "Tilt kit, 10 to 15 degrees (per 2 kW)", example: "ANTTILT10/15" },
+  { key: "tiltHigh", label: "Tilt kit, 15 to 30 degrees (per 2 kW)", example: "ANTTILT15/30" },
+  { key: "meter1ph", label: "Smart meter, single phase", example: "SGWS100" },
+  { key: "meter3ph", label: "Smart meter, three phase", example: "SGWDTSU666-20" },
+  { key: "mc4", label: "MC4 connectors (pack)", example: "MC4GENPR20" },
+  { key: "isolator1ph", label: "AC isolator, single phase", example: "NHPNL140L" },
+  { key: "isolator3ph", label: "AC isolator, three phase", example: "NHPNL340L" },
 ] as const;
 export type ComponentKey = (typeof COMPONENTS)[number]["key"];
 
@@ -266,6 +304,11 @@ export interface QuoteSettings {
   commission: { perPvKw: number; perBatteryKwh: number };
   /** $ per STC credited to customers (a market price; the clearing house caps it at $40). */
   stcPrice: number;
+  /**
+   * The first install day new quotes are priced for (domain/design/stc-change.ts): STCs go by the day a system is
+   * installed and step down over time. Null, or a day that has passed, is the day the quote is made, as it always was.
+   */
+  stcFrom: string | null;
   /** Cable, conduit, labels and sundries not itemised, $ per job. */
   sundries: number;
   bill: {
@@ -352,7 +395,7 @@ export interface Workspace {
 /** Somewhere to begin. The installation figures are placeholders: a business replaces them with its own. */
 export const DEFAULT_WORKSPACE: Workspace = {
   lists: [],
-  components: Object.fromEntries(COMPONENTS.map((c) => [c.key, { sku: c.sku, cost: null }])) as Record<ComponentKey, ComponentChoice>,
+  components: Object.fromEntries(COMPONENTS.map((c) => [c.key, { sku: "", cost: null }])) as Record<ComponentKey, ComponentChoice>,
   install: {
     pvPerWatt: 0.3,
     doubleStorey: 400,
@@ -377,6 +420,7 @@ export const DEFAULT_WORKSPACE: Workspace = {
     margin: { base: 2000, solarOnlyBase: 1000, baseKw: 6.6, perKwAbove: 100, perBatteryKwh: 60, floor: 0 },
     commission: { perPvKw: 0, perBatteryKwh: 0 },
     stcPrice: 38,
+    stcFrom: null,
     sundries: 120,
     bill: { selfUseShare: 0.35, rate: 0.3, feedIn: 0.04, supplyPerDay: 1 },
   },
@@ -407,6 +451,13 @@ export function withSetting(settings: QuoteSettings, path: string, value: number
   return cleanSettings(next);
 }
 
+/** The installation period setting as kept: a real day, or null for "the day the quote is made". */
+export function cleanStcFrom(v: unknown): string | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v) || v < "2020-01-01" || v > "2040-12-31") return null;
+  const ms = Date.parse(`${v}T00:00:00Z`);
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === v ? v : null;
+}
+
 /** Saved settings read back: every field a number within its bounds, anything missing or wrong replaced by the starting figure. */
 export function cleanSettings(raw: unknown): QuoteSettings {
   const out = structuredClone(DEFAULT_WORKSPACE.settings) as unknown as Bag;
@@ -414,6 +465,7 @@ export function cleanSettings(raw: unknown): QuoteSettings {
     const n = numberIn(read(raw, f.path), f.min, f.max);
     if (n !== null) write(out, f.path, n);
   }
+  out.stcFrom = cleanStcFrom(bag(raw).stcFrom);
   return out as unknown as QuoteSettings;
 }
 
@@ -448,7 +500,8 @@ export function cleanWorkspace(raw: unknown): Workspace {
       name,
       uploadedAt: text(l.uploadedAt, 30),
       items,
-      panels: cleanItems<PanelProduct>(l.panels, 40, sized("watts", 1000)),
+      // A list kept before panels priced per panel were read has them only in its rows (22 Nov 2026).
+      panels: panelsOfList(null, items, cleanItems<PanelProduct>(l.panels, MAX_PANELS, sized("watts", 1000))),
       inverters: cleanItems<InverterProduct>(l.inverters, 150, sized("kw", 500)),
       batteries: cleanItems<BatteryProduct>(l.batteries, 60, sized("kwh", 500)),
       // A list kept before chargers were read has them only in its rows.
@@ -459,7 +512,7 @@ export function cleanWorkspace(raw: unknown): Workspace {
   for (const c of COMPONENTS) {
     const given = bag(bag(r.components)[c.key]);
     const cost = numberIn(given.cost, 0, 100_000);
-    components[c.key] = { sku: typeof given.sku === "string" ? text(given.sku, 60) : c.sku, cost: given.cost === null ? null : cost };
+    components[c.key] = { sku: typeof given.sku === "string" ? text(given.sku, 60) : "", cost: given.cost === null ? null : cost };
   }
   const install = { ...DEFAULT_WORKSPACE.install };
   for (const rate of INSTALL_RATES) {

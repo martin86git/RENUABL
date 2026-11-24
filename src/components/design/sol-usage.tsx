@@ -49,7 +49,7 @@ export function SolUsage() {
         aria-label="Sol's usage this month"
         title="Sol's usage this month"
         className={clsx(
-          "inline-flex h-7 items-center gap-1.5 rounded-full px-2 text-xs tabular-nums transition-colors hover:bg-canvas",
+          "inline-flex h-7 max-lg:h-9 items-center gap-1.5 rounded-full px-2 text-xs tabular-nums transition-colors hover:bg-canvas",
           open ? "text-ink" : "text-muted hover:text-ink",
         )}
       >

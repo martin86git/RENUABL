@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { StageSelect } from "./stage-select";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Check, PenTool, Plus, Rows3, Search, Trash2, UserPlus } from "lucide-react";
 import { INTERESTS, INTEREST_WORDS, interestsOf, toggleInterest } from "@/lib/domain/design/deal-interest";
 import clsx from "clsx";
 import { AddressEntry } from "@/components/consumer/address-entry";
-import { JOB_STAGES, LEAD_SOURCES, STAGE_LABELS, type Activity, type Customer, type Job, type JobStage } from "@/lib/domain/design/crm";
+import { LEAD_SOURCES, type Activity, type Customer, type Job } from "@/lib/domain/design/crm";
 import type { Address } from "@/lib/domain/types";
 import {
   addActivity,
@@ -553,17 +554,7 @@ function JobCard({ job, onChange, onDelete }: { job: Job; onChange: (job: Job) =
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <label className={ui.label}>
           Stage
-          <select
-            className={clsx(ui.input, "mt-1.5 appearance-auto")}
-            value={job.stage}
-            onChange={(e) => void patch({ stage: e.target.value as JobStage })}
-          >
-            {JOB_STAGES.map((s) => (
-              <option key={s} value={s}>
-                {STAGE_LABELS[s]}
-              </option>
-            ))}
-          </select>
+          <StageSelect job={job} className={clsx(ui.input, "mt-1.5 appearance-auto")} onChange={(to) => void patch(to)} />
         </label>
         <label className={ui.label}>
           Quoted price, inc. GST ($)

@@ -16,7 +16,7 @@ import {
 } from "./crm";
 import { todayInMarket } from "../market";
 import type { ISODate } from "../types";
-import { lineKey, type CostGroup, type CostLine, type QuoteForm } from "./quote";
+import { editOf, type CostGroup, type CostLine, type QuoteForm } from "./quote";
 import { arrayCount, designSummary, tiltedPanels, type RoofDesign } from "./roof-design";
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ const ORDERED: readonly CostGroup[] = ["Panels", "Inverters", "Battery", "EV cha
  */
 export function materialsOrder(lines: readonly CostLine[], edits: Record<string, { removed?: boolean }> = {}): MaterialLine[] {
   return lines
-    .filter((l) => ORDERED.includes(l.group) && !edits[lineKey(l)]?.removed)
+    .filter((l) => ORDERED.includes(l.group) && !editOf(edits, l)?.removed)
     .map((l) => ({
       group: l.group,
       item: l.qty && /^\d+ × /.test(l.label) ? l.label.replace(/^\d+ × /, "") : l.label,
@@ -530,6 +530,11 @@ export interface JobExtra {
   depositAsked?: number | null;
   solarVicRebate?: number | null;
   solarVicLoan?: number | null;
+  /** Only for members who see costs (deal-profit.ts). */
+  grossMargin?: number;
+  grossShare?: number | null;
+  commission?: number;
+  afterCommission?: number;
 }
 
 /**

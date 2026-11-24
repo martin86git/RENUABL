@@ -62,7 +62,7 @@ export const packInvoice = (businessId: string): Stripe.Checkout.SessionCreatePa
 /** A pack of Sol credits for a business, paid now. Returns the page's URL. */
 export async function createSolCheckout(
   stripe: Stripe,
-  opts: { businessId: string; email: string; pack: SolPack; customer: string | null; origin: string },
+  opts: { businessId: string; email: string; pack: SolPack; customer: string | null; origin: string; form?: string },
 ): Promise<string> {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
@@ -85,11 +85,20 @@ export async function createSolCheckout(
     ],
     invoice_creation: packInvoice(opts.businessId),
     metadata: { kind: "sol-credits", business: opts.businessId, credits: String(opts.pack.credits), email: opts.email },
-    success_url: `${opts.origin}/design/settings/billing?bought={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${opts.origin}/design/settings/billing`,
+    // Stripe's card form inside the usage box (23 Nov 2026, Martin): it comes back to the page it was opened on.
+    ...(opts.form
+      ? {
+          ui_mode: "form" as const,
+          return_url: `${opts.origin}${opts.form}${opts.form.includes("?") ? "&" : "?"}usage=bought&bought={CHECKOUT_SESSION_ID}`,
+        }
+      : {
+          success_url: `${opts.origin}/design/settings/billing?bought={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${opts.origin}/design/settings/billing`,
+        }),
   });
-  if (!session.url) throw new Error("Stripe returned no checkout URL");
-  return session.url;
+  const answer = opts.form ? session.client_secret : session.url;
+  if (!answer) throw new Error("Stripe returned no checkout to open");
+  return answer;
 }
 
 /**

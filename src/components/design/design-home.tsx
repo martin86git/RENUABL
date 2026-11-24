@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { cleanKind } from "@/lib/domain/design/business-kind";
 import { KindToday } from "./kind-home";
 import { MyJobsPage } from "./my-jobs";
@@ -8,7 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Check, ChevronLeft } from "lucide-react";
 import clsx from "clsx";
-import { STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
+import { WON_STAGES, type JobStage, stageLabel } from "@/lib/domain/design/crm";
 import { OVERVIEW_VIEWS, PIPELINES, VIEW_PIPELINE, dashboard, inTheWorks, power, type OverviewView } from "@/lib/domain/design/deal";
 import { LAUNCH_MARKET, todayInMarket } from "@/lib/domain/market";
 import { journey, type JourneyStop } from "@/lib/domain/design/journey";
@@ -31,7 +32,7 @@ import {
 import { NO_TARGETS, monthPace, monthRings, monthlyHistory, pipelineByStage, type SalesTargets } from "@/lib/domain/design/sales-rings";
 import { GoalLine, MonthCard, MonthBars, Tally, PipelineBar, SunArc } from "./gauges";
 import { newDealPanels } from "@/lib/domain/design/gauges";
-import { useDesignAccount } from "./design-account";
+import { Reconnecting, useDesignAccount } from "./design-account";
 import { DesignShell, PATHS, PageHead, ui } from "./design-shell";
 import { SalesPage } from "./sales-page";
 import { CompletedInstallsView, UpcomingInstallsView } from "./install-lists";
@@ -39,6 +40,8 @@ import { TodayPad } from "./today-pad";
 
 /** A stage as a small tag. Won and installed are the good news; lost is quiet. */
 export function StageTag({ stage, small }: { stage: JobStage; small?: boolean }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   return (
     <span
       className={clsx(
@@ -53,7 +56,7 @@ export function StageTag({ stage, small }: { stage: JobStage; small?: boolean })
               : "bg-surface-2 text-ink-2",
       )}
     >
-      {STAGE_LABELS[stage]}
+      {stageLabel(stage, stageNames)}
     </span>
   );
 }
@@ -77,7 +80,7 @@ export const ACTIVITY_WORD = {
  * (a one-time link by email, the same whether it is someone's first time or
  * not). Signed in, the business's overview inside the app's frame.
  */
-export function DesignHome() {
+export function DesignHome({ only }: { only?: "feed" | "calendar" } = {}) {
   const [account] = useDesignAccount();
   if (!account) return <div className="theme-studio min-h-dvh" aria-busy="true" />;
   if (account.signedIn) {
@@ -92,6 +95,7 @@ export function DesignHome() {
             firstName={account.firstName ?? null}
             welcome={Boolean(account.welcome)}
             owner={account.business?.role === "owner"}
+            only={only}
           />
         ) : kind === "installer" ? (
           // An installer's home is My Jobs (my-jobs.ts, 2 Nov 2026, Martin).
@@ -110,7 +114,9 @@ export function DesignHome() {
  * Signing in is in its top bar, and on /design/sign-in.
  */
 function FrontPage({ unreachable }: { unreachable: boolean }) {
-  return <SalesPage notice={unreachable ? "We couldn't reach your account just now. Try again in a moment." : null} />;
+  // A signed-in device that can't reach its account yet waits to reconnect, never the signed-out page.
+  if (unreachable) return <Reconnecting />;
+  return <SalesPage notice={null} />;
 }
 
 /** A change against an earlier period, as a small signed percentage: green up, red down, quiet when there is nothing to compare. */
@@ -159,12 +165,15 @@ function OverviewPage({
   firstName,
   welcome,
   owner,
+  only,
 }: {
   business: string;
   email: string;
   firstName: string | null;
   welcome: boolean;
   owner: boolean;
+  /** Feed or the calendar, each its own page now (23 Nov 2026, Martin). */
+  only?: "feed" | "calendar";
 }) {
   const [data, setData] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
@@ -199,7 +208,7 @@ function OverviewPage({
   /** A job changed from one of the lists (its installer or its paperwork), put back in place. */
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
 
-  if (view !== null) {
+  if (view !== null && !only) {
     const label = OVERVIEW_VIEWS.find((v) => v.id === view)?.label ?? "";
     return (
       <div className={ui.page}>
@@ -245,8 +254,9 @@ function OverviewPage({
       business={business}
       name={name}
       email={email}
-      welcome={welcome}
+      welcome={only ? false : welcome}
       owner={owner}
+      only={only}
       mine={data?.mine ?? (problem ? [] : null)}
       problem={problem}
       day={
@@ -523,6 +533,8 @@ type ViewProps = { jobs: JobLine[] | null; data: Overview | null; today: ISODate
 
 /** The stages of one pipeline with how many deals are at each. */
 function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const p = PIPELINES.find((x) => x.id === id) ?? PIPELINES[0];
   return (
     <section className="mt-8" aria-labelledby={`pipe-${p.id}`}>
@@ -539,7 +551,7 @@ function PipelineCard({ id, data }: { id: string; data: Overview | null }) {
           <li key={stage} className="flex min-w-[7.5rem] flex-1 items-center gap-2">
             <div className="min-w-0 flex-1 rounded-md bg-surface-2 px-3 py-2.5">
               <p className="text-[17px] font-medium leading-none tabular-nums text-ink">{data ? (data.counts[stage] ?? 0) : "–"}</p>
-              <p className="mt-1.5 truncate text-xs text-ink-2">{STAGE_LABELS[stage]}</p>
+              <p className="mt-1.5 truncate text-xs text-ink-2">{stageLabel(stage, stageNames)}</p>
             </div>
             {i < p.stages.length - 1 && <ArrowRight className="size-3.5 shrink-0 text-muted" aria-hidden />}
           </li>

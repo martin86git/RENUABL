@@ -229,16 +229,24 @@ export function CampaignEditor({ id }: { id: string }) {
   const changed = () => setSaved("unsaved");
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <Link href="/design/marketing/campaigns" className="text-[13px] text-muted hover:text-ink">
-          ← Campaigns
+    <div className="space-y-4">
+      {/* One row: back, the campaign's name, where it stands and what can be done with it. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Link href="/design/marketing/campaigns" className="text-[13px] text-muted hover:text-ink" aria-label="Back to campaigns">
+          ←
         </Link>
+        <input
+          value={name}
+          disabled={!draft}
+          onChange={(e) => (setName(e.target.value), changed())}
+          aria-label="Campaign name"
+          className="min-w-0 flex-1 basis-64 rounded-md bg-transparent px-1 py-0.5 text-[18px] font-semibold tracking-tight outline-none hover:bg-surface focus:bg-surface"
+        />
         <StateBadge state={c.status} />
         {draft && (
           <span className="text-[12px] text-muted">{saved === "saved" ? "Saved" : saved === "saving" ? "Saving…" : "Not saved yet"}</span>
         )}
-        <span className="ml-auto flex gap-2">
+        <span className="flex gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -265,19 +273,16 @@ export function CampaignEditor({ id }: { id: string }) {
         </span>
       </div>
 
-      <input
-        value={name}
-        disabled={!draft}
-        onChange={(e) => (setName(e.target.value), changed())}
-        aria-label="Campaign name"
-        className="w-full bg-transparent text-[22px] font-semibold tracking-tight outline-none"
-      />
-
       {c.status !== "draft" && <ReportStrip counts={c.counts} />}
 
-      <div className={box}>
-        <EdmBuilder content={content} brand={brand} sender={sender} readOnly={!draft} onChange={(next) => (setContent(next), changed())} />
-      </div>
+      <EdmBuilder
+        content={content}
+        brand={brand}
+        onBrand={setBrand}
+        sender={sender}
+        readOnly={!draft}
+        onChange={(next) => (setContent(next), changed())}
+      />
 
       {draft ? (
         <SendPanel
@@ -360,15 +365,21 @@ function SendPanel({
   const [confirmWord, setConfirmWord] = useState("");
   const [busy, setBusy] = useState<"test" | "send" | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const problem = contentProblem(content);
   const list = lists.find((l) => l.id === listId);
   const emailable = reach && list && listId === list.id ? reach.emailable : list?.emailable;
 
   async function test() {
     setBusy("test");
+    setTestMsg(null);
     const r = await campaignAction(id, { do: "test", to: testTo || undefined, content });
     setBusy(null);
-    setMsg(r.ok ? { ok: true, text: `Test sent to ${r.to}.` } : { ok: false, text: r.message });
+    setTestMsg(
+      r.ok
+        ? { ok: true, text: `Test sent to ${r.to}. If it isn't in your inbox in a minute or two, look in Promotions or Spam.` }
+        : { ok: false, text: r.message },
+    );
   }
 
   async function sendIt() {
@@ -395,6 +406,8 @@ function SendPanel({
             {busy === "test" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Test
           </Button>
         </div>
+        {problem && <p className="mt-3 text-[13px] text-danger">{problem}</p>}
+        {testMsg && <p className={cn("mt-3 text-[13px]", testMsg.ok ? "text-positive" : "text-danger")}>{testMsg.text}</p>}
       </div>
 
       <div className={box}>

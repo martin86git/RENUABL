@@ -100,8 +100,8 @@ Button: See RENUABL Business → https://www.renuabl.com.au/business
 **4 · after 5 more working days**
 Subject: One price for {company}
 Preview: $49 a user a month, first month free. Cancel any time.
-Heading: One price. Everything in it.
-Hi {firstName}, every feature for every user: the designer, CRM, proposals, after the sale, service and Sol. $49 a user a month, or $39 a user a month on the 12-month plan. Your first month is free. Prices include GST, and you can cancel any time.
+Heading: One price a user. Then pay as you go.
+Hi {firstName}, every user gets the same CRM, proposals, after the sale, service and Sol, with no feature tiers. The designer is paid for by the site, and voice agents and marketing email are added when you want them. $49 a user a month, or $39 a user a month on the 12-month plan. Your first month is free. Prices include GST, and you can cancel any time.
 Button: Sign up → https://www.renuabl.com.au/business#pricing
 
 ---

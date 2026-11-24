@@ -12,18 +12,34 @@ import { FRAG, VERT, compile } from "./sun-shader";
  * reduced motion it draws one still frame. Where WebGL can't run, the flat drawing stands in.
  */
 
-/** The shared canvas's size in pixels: enough for the largest Sol in the product, a 64 px round at twice the pixels. */
+/** The shared canvas's largest size in pixels: enough for the largest Sol in the product, a 64 px round at twice the pixels. */
 const SHARED_PX = 256;
-const FRAME_MS = 33;
+/**
+ * Each frame is drawn only as large as the largest Sol on screen, in steps of this (22 Nov 2026, Martin: the screens
+ * drew slowly on a phone). A 44 px round needed 88 pixels and was drawn at 256, eight times the work.
+ */
+const SIZE_STEP = 32;
+const SMALLEST_PX = 64;
+/** About 24 frames a second: the sun moves slowly, and each frame costs the page its time. */
+const FRAME_MS = 42;
 
 type Viewer = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; visible: boolean; disc: boolean };
 
-type Renderer = { canvas: HTMLCanvasElement; draw: (seconds: number) => void };
+type Renderer = { canvas: HTMLCanvasElement; size: () => number; resize: (px: number) => void; draw: (seconds: number) => void };
 
 let renderer: Renderer | null | undefined;
 const viewers = new Set<Viewer>();
 let frame = 0;
 let last = 0;
+/** One plain copy of each frame, so the WebGL canvas is read back once a frame however many Sols are on screen. */
+let copy: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
+/**
+ * Until when the sun holds still (22 Nov 2026, Martin: Performance took a second to open on a phone). Each frame
+ * copied to every Sol on screen took about half the main thread's time on a slow phone, so for a moment after a tap or
+ * a key the sun keeps its last frame and the page has the time to answer.
+ */
+let quietUntil = 0;
+const QUIET_MS = 900;
 const begun = typeof performance === "undefined" ? 0 : performance.now();
 
 function still(): boolean {
@@ -56,13 +72,22 @@ function makeRenderer(): Renderer | null {
   const uEnergy = gl.getUniformLocation(prog, "uEnergy");
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  gl.viewport(0, 0, SHARED_PX, SHARED_PX);
+  let px = SHARED_PX;
+  gl.viewport(0, 0, px, px);
   return {
     canvas,
+    size: () => px,
+    resize(to) {
+      if (to === px) return;
+      px = to;
+      canvas.width = px;
+      canvas.height = px;
+      gl.viewport(0, 0, px, px);
+    },
     draw(seconds) {
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.uniform2f(uRes, SHARED_PX, SHARED_PX);
+      gl.uniform2f(uRes, px, px);
       gl.uniform1f(uTime, seconds);
       gl.uniform1f(uEnergy, 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -95,26 +120,64 @@ function paint(v: Viewer, from: HTMLCanvasElement) {
   v.ctx.restore();
 }
 
+function framed(r: Renderer): HTMLCanvasElement {
+  if (!copy) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return r.canvas;
+    copy = { canvas, ctx };
+  }
+  const px = r.size();
+  if (copy.canvas.width !== px) {
+    copy.canvas.width = px;
+    copy.canvas.height = px;
+  } else copy.ctx.clearRect(0, 0, px, px);
+  copy.ctx.drawImage(r.canvas, 0, 0);
+  return copy.canvas;
+}
+
+/** The pixels the largest Sol on screen needs, rounded up a step, never more than the shared canvas's largest. */
+export function framePx(sizes: readonly number[]): number {
+  const most = Math.max(0, ...sizes);
+  return Math.min(SHARED_PX, Math.max(SMALLEST_PX, Math.ceil(most / SIZE_STEP) * SIZE_STEP));
+}
+
 function drawAll(now: number) {
   const r = sharedRenderer();
   if (!r) return;
+  const shown = [...viewers].filter((v) => v.visible || still());
+  if (!shown.length) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  r.resize(framePx(shown.map((v) => Math.max(v.canvas.clientWidth, v.canvas.clientHeight) * dpr)));
   r.draw(still() ? 12 : (now - begun) / 1000 + 12);
-  for (const v of viewers) if (v.visible || still()) paint(v, r.canvas);
+  const from = shown.length > 1 ? framed(r) : r.canvas;
+  for (const v of shown) paint(v, from);
+}
+
+function hush() {
+  quietUntil = performance.now() + QUIET_MS;
 }
 
 function loop(now: number) {
   frame = 0;
   if (viewers.size === 0) return;
   const anyVisible = [...viewers].some((v) => v.visible);
-  if (anyVisible && !document.hidden && now - last >= FRAME_MS) {
+  if (anyVisible && !document.hidden && now >= quietUntil && now - last >= FRAME_MS) {
     last = now;
     drawAll(now);
   }
   frame = requestAnimationFrame(loop);
 }
 
+let listening = false;
+
 function join(v: Viewer): () => void {
   viewers.add(v);
+  if (!listening && typeof window !== "undefined") {
+    listening = true;
+    window.addEventListener("pointerdown", hush, { capture: true, passive: true });
+    window.addEventListener("keydown", hush, { capture: true, passive: true });
+  }
   if (still()) drawAll(performance.now());
   else if (!frame) frame = requestAnimationFrame(loop);
   return () => {
@@ -140,7 +203,7 @@ function LiveCanvas({ disc, className }: { disc: boolean; className?: string }) 
             v.visible = e.isIntersecting;
             if (v.visible && still()) {
               const r = sharedRenderer();
-              if (r) paint(v, r.canvas);
+              if (r) drawAll(performance.now());
             }
           })
         : null;
@@ -153,7 +216,7 @@ function LiveCanvas({ disc, className }: { disc: boolean; className?: string }) 
   }, [disc]);
   return (
     <span className={className} aria-hidden>
-      <canvas ref={ref} className="block size-full" />
+      <canvas ref={ref} className="sol-sun-canvas block size-full" />
       <span className="pointer-events-none absolute inset-1/4">
         <svg viewBox="11 12 78 78" className="absolute inset-[2%] opacity-60 mix-blend-soft-light">
           <SunBrainLines />

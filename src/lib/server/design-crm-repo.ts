@@ -11,6 +11,7 @@ import { isCustomer, jobHas, together, type CustomerHas } from "@/lib/domain/des
 import { leadOwnerFor } from "@/lib/domain/design/deal-feed";
 import { marketDateTime, todayInMarket } from "@/lib/domain/market";
 import { roofKey, type DealViewer } from "@/lib/domain/design/account";
+import { homeFor } from "@/lib/domain/design/same-home";
 import {
   INSTALLED_STAGES,
   JOB_STAGES,
@@ -33,9 +34,28 @@ import {
   type Job,
   type JobInput,
   type JobStage,
-  type SavedPipeline,
 } from "@/lib/domain/design/crm";
 import { newId, query, transaction } from "./db";
+import {
+  MAX_OWN_STAGES,
+  MAX_PIPELINE_STAGES,
+  OWN_STAGES_FULL,
+  PIPELINE_TOO_LONG,
+  STAGE_NAME_MISSING,
+  STAGE_NAME_TAKEN,
+  cleanOwnStageInput,
+  cleanStageName,
+  cleanStageNames,
+  dealStageName,
+  renameBuiltin,
+  insertStage,
+  moveText,
+  nameTaken,
+  pipelinesFor,
+  type KeptPipeline,
+  type OwnStage,
+  type StageNames,
+} from "@/lib/domain/design/pipeline-stages";
 
 export type Q = Parameters<Parameters<typeof transaction>[0]>[0];
 
@@ -50,7 +70,7 @@ const CUSTOMER = `c.id, c.name,
   case when c.first_name = '' and c.last_name = '' then btrim(substr(c.name, length(split_part(c.name, ' ', 1)) + 1)) else c.last_name end as "lastName",
   c.phone, c.email, c.address, c.lat, c.lng, c.source, c.notes, c.sample,
   ${moment("c.created_at")} as "createdAt", ${moment("c.updated_at")} as "updatedAt"`;
-const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.project_id as "projectId",
+const JOB = `j.id, j.customer_id as "customerId", j.title, j.address, j.lat, j.lng, j.stage, j.sub_stage as "subStage", j.project_id as "projectId",
   j.value::float8 as value, to_char(j.install_date, 'YYYY-MM-DD') as "installDate", j.details,
   j.kw::float8 as kw, j.owner_email as owner,
   ${moment(`coalesce(j.won_at, case when j.stage in (${inList(WON_STAGES)}) then j.updated_at end)`)} as "wonAt",
@@ -86,25 +106,80 @@ export async function record(
  * "lead" moves to "designed", which is written down like any other move.
  * Narrowed to one job or one roof. Doing it again changes nothing.
  */
-async function link(q: Q, businessId: string, only: { jobId?: string; roofKey?: string }, by: string): Promise<void> {
-  const jobs = await q<{ id: string; customer_id: string; stage: JobStage; project: string }>(
+async function link(q: Q, businessId: string, only: { jobId?: string; roof?: { lat: number; lng: number } }, by: string): Promise<void> {
+  const names = { got: null as Awaited<ReturnType<typeof stageNamesIn>> | null };
+  const stageNames = async () => (names.got ??= await stageNamesIn(q, businessId));
+  const join = async (job: { id: string; customer_id: string; stage: JobStage }, project: string, moveTo?: ProjectSpot) => {
+    const designed = job.stage === "lead";
+    await q(
+      moveTo
+        ? `update design_jobs set project_id = $3, stage = $4, lat = $5, lng = $6, roof_key = $7, updated_at = now() where business_id = $1 and id = $2`
+        : `update design_jobs set project_id = $3, stage = $4, updated_at = now() where business_id = $1 and id = $2`,
+      [businessId, job.id, project, designed ? "designed" : job.stage, ...(moveTo ? [moveTo.lat, moveTo.lng, roofKey(moveTo)] : [])],
+    );
+    if (moveTo)
+      await record(q, businessId, {
+        customerId: job.customer_id,
+        jobId: job.id,
+        kind: "note",
+        text: `Joined to the roof design drawn at ${moveTo.address || "this address"}`,
+        by,
+      });
+    if (designed)
+      await record(q, businessId, {
+        customerId: job.customer_id,
+        jobId: job.id,
+        kind: "stage",
+        text: stageMoveText("designed", await stageNames()),
+        by,
+      });
+  };
+
+  const key = only.roof ? roofKey(only.roof) : null;
+  const exact = await q<{ id: string; customer_id: string; stage: JobStage; project: string }>(
     `select j.id, j.customer_id, j.stage, p.id as project
        from design_jobs j join design_projects p on p.business_id = j.business_id and p.roof_key = j.roof_key
       where j.business_id = $1 and j.project_id is null
         and ($2::text is null or j.id = $2) and ($3::text is null or j.roof_key = $3)
         for update of j`,
-    [businessId, only.jobId ?? null, only.roofKey ?? null],
+    [businessId, only.jobId ?? null, key],
   );
-  for (const job of jobs) {
-    const designed = job.stage === "lead";
-    await q(`update design_jobs set project_id = $3, stage = $4, updated_at = now() where business_id = $1 and id = $2`, [
-      businessId,
-      job.id,
-      job.project,
-      designed ? "designed" : job.stage,
-    ]);
-    if (designed)
-      await record(q, businessId, { customerId: job.customer_id, jobId: job.id, kind: "stage", text: stageMoveText("designed"), by });
+  for (const job of exact) await join(job, job.project);
+
+  // Then the same home a few metres apart (22 Nov 2026): a deal placed by one map and a design drawn on another.
+  const box = (at: { lat: number; lng: number }) => [at.lat - NEAR_DEG, at.lat + NEAR_DEG, at.lng - NEAR_DEG, at.lng + NEAR_DEG];
+  const loose = await q<{ id: string; customer_id: string; stage: JobStage; address: string; lat: number; lng: number }>(
+    `select j.id, j.customer_id, j.stage, j.address, j.lat, j.lng from design_jobs j
+      where j.business_id = $1 and j.project_id is null and j.lat is not null and j.lng is not null
+        and ($2::text is null or j.id = $2)
+        and ($3::float8 is null or (j.lat between $3 and $4 and j.lng between $5 and $6))
+        for update of j`,
+    [businessId, only.jobId ?? null, ...(only.roof ? box(only.roof) : [null, null, null, null])],
+  );
+  for (const job of loose) {
+    const near = await q<ProjectSpot & { id: string }>(
+      `select id, address, lat, lng from design_projects
+        where business_id = $1 and lat between $2 and $3 and lng between $4 and $5`,
+      [businessId, ...box(job)],
+    );
+    const home = homeFor(job, near);
+    if (home) await join(job, home.id, home);
+  }
+}
+
+type ProjectSpot = { address: string; lat: number; lng: number };
+/** How far round a deal to look for a design of the same home: a little over `SAME_HOME_M` in degrees. */
+const NEAR_DEG = 0.0005;
+
+/**
+ * A deal with no design yet joined to one of the same home drawn a few metres off (an imported deal's place and
+ * the designer's), so its proposal and designer find it. Never a failure for the reader: logged and left.
+ */
+export async function joinNearbyDesign(businessId: string, jobId: string, by: string): Promise<void> {
+  try {
+    await transaction((q) => link(q, businessId, { jobId }, by.toLowerCase()));
+  } catch (e) {
+    console.error("joining a deal to a nearby design failed", e instanceof Error ? e.message : e);
   }
 }
 
@@ -115,7 +190,7 @@ async function link(q: Q, businessId: string, only: { jobId?: string; roofKey?: 
  */
 export async function linkJobsToRoof(businessId: string, roof: { lat: number; lng: number }, by: string): Promise<void> {
   try {
-    await transaction((q) => link(q, businessId, { roofKey: roofKey(roof) }, by.toLowerCase()));
+    await transaction((q) => link(q, businessId, { roof }, by.toLowerCase()));
   } catch (e) {
     console.error("joining jobs to a roof design failed", e instanceof Error ? e.message : e);
   }
@@ -505,6 +580,7 @@ export async function updateJob(
               -- Sold and installed are dated when a job first reaches those stages, and undated if it goes back.
               won_at = case when $15::boolean then coalesce(won_at, now()) else null end,
               installed_at = case when $16::boolean then coalesce(installed_at, now()) else null end,
+              sub_stage = $17,
               updated_at = now()
         where business_id = $1 and id = $2`,
       [
@@ -524,10 +600,20 @@ export async function updateJob(
         next.kw ?? null,
         WON_STAGES.includes(next.stage),
         INSTALLED_STAGES.includes(next.stage),
+        next.subStage ?? null,
       ],
     );
-    if (next.stage !== before.stage)
-      await record(q, businessId, { customerId: before.customerId, jobId: id, kind: "stage", text: stageMoveText(next.stage), by: who });
+    const sub = next.subStage ?? null;
+    if (next.stage !== before.stage || sub !== (before.subStage ?? null)) {
+      const own = sub ? await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1 and id = $2`, [businessId, sub]) : [];
+      const named = await q<{ stage: string; name: string }>(
+        `select stage, name from design_stage_names where business_id = $1 and stage = $2`,
+        [businessId, next.stage],
+      );
+      const names = cleanStageNames(Object.fromEntries(named.map((r) => [r.stage, r.name])));
+      const text = (sub && own[0]) || names[next.stage] ? moveText(next.stage, sub, own, names) : stageMoveText(next.stage);
+      await record(q, businessId, { customerId: before.customerId, jobId: id, kind: "stage", text, by: who });
+    }
     if (moved) await link(q, businessId, { jobId: id }, who);
     const after = await q<Job>(`select ${JOB} from design_jobs j where j.business_id = $1 and j.id = $2`, [businessId, id]);
     return after[0];
@@ -543,23 +629,38 @@ export async function deleteJob(businessId: string, id: string): Promise<boolean
 // Saved pipelines
 // ---------------------------------------------------------------------------
 
-const PIPELINE = `id, name, stages`;
+const PIPELINE = `id, name, stages, base_id as "baseId"`;
+const STAGE = `id, name, base`;
 
-/** The pipelines the business has saved, in the order they were made. */
-export async function listPipelines(businessId: string): Promise<SavedPipeline[]> {
+/** The pipelines the business keeps (its own, and stand-ins for set ones it changed), in the order they were made. */
+export async function listPipelines(businessId: string): Promise<KeptPipeline[]> {
   return query(`select ${PIPELINE} from design_pipelines where business_id = $1 order by created_at, id`, [businessId]);
 }
 
-/** Saves a new pipeline for the business. "full" at the limit. */
+/**
+ * Saves a pipeline for the business: one of its own, or (with `baseId`) a stand-in for a set pipeline, which replaces
+ * any stand-in it had for that one. "full" at the limit.
+ */
 export async function createPipeline(
   businessId: string,
-  input: Pick<SavedPipeline, "name" | "stages">,
+  input: Pick<KeptPipeline, "name" | "stages" | "baseId">,
   by: string,
-): Promise<SavedPipeline | "full"> {
+): Promise<KeptPipeline | "full"> {
   return transaction(async (q) => {
-    const count = await q<{ n: string }>(`select count(*) as n from design_pipelines where business_id = $1`, [businessId]);
+    if (input.baseId) {
+      const rows = await q<KeptPipeline>(
+        `insert into design_pipelines (id, business_id, name, stages, base_id, created_by) values ($2,$1,$3,$4::jsonb,$5,$6)
+           on conflict (business_id, base_id) where base_id is not null do update set name = excluded.name, stages = excluded.stages
+           returning ${PIPELINE}`,
+        [businessId, newId("pipe"), input.name, JSON.stringify(input.stages), input.baseId, by.toLowerCase()],
+      );
+      return rows[0];
+    }
+    const count = await q<{ n: string }>(`select count(*) as n from design_pipelines where business_id = $1 and base_id is null`, [
+      businessId,
+    ]);
     if (Number(count[0]?.n ?? 0) >= MAX_PIPELINES) return "full";
-    const rows = await q<SavedPipeline>(
+    const rows = await q<KeptPipeline>(
       `insert into design_pipelines (id, business_id, name, stages, created_by) values ($2,$1,$3,$4::jsonb,$5) returning ${PIPELINE}`,
       [businessId, newId("pipe"), input.name, JSON.stringify(input.stages), by.toLowerCase()],
     );
@@ -571,18 +672,106 @@ export async function createPipeline(
 export async function updatePipeline(
   businessId: string,
   id: string,
-  input: Pick<SavedPipeline, "name" | "stages">,
-): Promise<SavedPipeline | null> {
-  const rows = await query<SavedPipeline>(
+  input: Pick<KeptPipeline, "name" | "stages">,
+): Promise<KeptPipeline | null> {
+  const rows = await query<KeptPipeline>(
     `update design_pipelines set name = $3, stages = $4::jsonb where business_id = $1 and id = $2 returning ${PIPELINE}`,
     [businessId, id, input.name, JSON.stringify(input.stages)],
   );
   return rows[0] ?? null;
 }
 
+/** Removes one of the business's pipelines (a stand-in: the set pipeline comes back as it was). Its deals are untouched. */
 export async function deletePipeline(businessId: string, id: string): Promise<boolean> {
   const rows = await query(`delete from design_pipelines where business_id = $1 and id = $2 returning id`, [businessId, id]);
   return rows.length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// The business's own stages
+// ---------------------------------------------------------------------------
+
+/** The stages the business added, in the order they were made. */
+export async function listOwnStages(businessId: string): Promise<OwnStage[]> {
+  return query(`select ${STAGE} from design_stages where business_id = $1 order by created_at, id`, [businessId]);
+}
+
+/**
+ * Adds a stage, and with `pipelineId` puts it into that pipeline after position `after` (a set pipeline's id makes
+ * or changes its stand-in). Checked again under a lock: the name not taken, the limit. Answers the stage and the
+ * pipeline as kept, or why not.
+ */
+export async function addOwnStage(
+  businessId: string,
+  raw: unknown,
+  place: { pipelineId: string; after: number } | null,
+  by: string,
+): Promise<{ stage: OwnStage; pipeline: KeptPipeline | null } | { refused: string }> {
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
+    const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
+    if (own.length >= MAX_OWN_STAGES) return { refused: OWN_STAGES_FULL };
+    const input = cleanOwnStageInput(raw, own, await stageNamesIn(q, businessId));
+    if (!input.ok) return { refused: input.message };
+    const made = await q<OwnStage>(
+      `insert into design_stages (id, business_id, name, base, created_by) values ($2,$1,$3,$4,$5) returning ${STAGE}`,
+      [businessId, newId("st", 8), input.value.name, input.value.base, by.toLowerCase()],
+    );
+    const stage = made[0];
+    if (!place) return { stage, pipeline: null };
+    const kept = await q<KeptPipeline>(`select ${PIPELINE} from design_pipelines where business_id = $1`, [businessId]);
+    const shown = pipelinesFor(kept, [...own, stage]).find((p) => p.id === place.pipelineId);
+    if (!shown) return { refused: "That pipeline isn't here." };
+    const stages = insertStage(shown.stages, stage.id, place.after);
+    if (stages.length > MAX_PIPELINE_STAGES) return { refused: PIPELINE_TOO_LONG };
+    const rows = shown.rowId
+      ? await q<KeptPipeline>(`update design_pipelines set stages = $3::jsonb where business_id = $1 and id = $2 returning ${PIPELINE}`, [
+          businessId,
+          shown.rowId,
+          JSON.stringify(stages),
+        ])
+      : await q<KeptPipeline>(
+          `insert into design_pipelines (id, business_id, name, stages, base_id, created_by) values ($2,$1,$3,$4::jsonb,$5,$6) returning ${PIPELINE}`,
+          [businessId, newId("pipe"), shown.name, JSON.stringify(stages), shown.id, by.toLowerCase()],
+        );
+    return { stage, pipeline: rows[0] };
+  });
+}
+
+/** Renames a stage the business added. Null: no such stage. */
+export async function renameOwnStage(businessId: string, id: string, raw: unknown): Promise<OwnStage | { refused: string } | null> {
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
+    const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
+    if (!own.some((s) => s.id === id)) return null;
+    const name = cleanStageName(raw);
+    if (!name) return { refused: STAGE_NAME_MISSING };
+    if (nameTaken(name, own, id, await stageNamesIn(q, businessId))) return { refused: STAGE_NAME_TAKEN };
+    const rows = await q<OwnStage>(`update design_stages set name = $3 where business_id = $1 and id = $2 returning ${STAGE}`, [
+      businessId,
+      id,
+      name,
+    ]);
+    return rows[0];
+  });
+}
+
+/**
+ * Removes a stage the business added: out of every pipeline, and its deals stay at the stage it counted as.
+ * Their records aren't rewritten.
+ */
+export async function deleteOwnStage(businessId: string, id: string): Promise<boolean> {
+  return transaction(async (q) => {
+    const gone = await q(`delete from design_stages where business_id = $1 and id = $2 returning id`, [businessId, id]);
+    if (!gone.length) return false;
+    await q(`update design_jobs set sub_stage = null where business_id = $1 and sub_stage = $2`, [businessId, id]);
+    await q(
+      `update design_pipelines set stages = coalesce((select jsonb_agg(k) from jsonb_array_elements(stages) k where k <> to_jsonb($2::text)), '[]'::jsonb)
+        where business_id = $1 and stages ? $2`,
+      [businessId, id],
+    );
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -642,4 +831,43 @@ export async function overview(businessId: string, viewer?: DealViewer): Promise
     recent,
     mine,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The business's own names for the twelve stages
+// ---------------------------------------------------------------------------
+
+type Ask = typeof query;
+export const stageNamesIn = async (q: Ask, businessId: string): Promise<StageNames> => {
+  const rows = await q<{ stage: string; name: string }>(`select stage, name from design_stage_names where business_id = $1`, [businessId]);
+  return cleanStageNames(Object.fromEntries(rows.map((r) => [r.stage, r.name])));
+};
+
+/**
+ * A deal's stage in the business's own words, for the server to put on what it sends (a feed card, a call list, Sol's
+ * facts): the added stage it sits at, else its name for the stage, else ours.
+ */
+export async function stageWordsOf(businessId: string): Promise<(job: { stage: JobStage; subStage?: string | null }) => string> {
+  const [own, names] = await Promise.all([listOwnStages(businessId), stageNamesIn(query, businessId)]);
+  return (job) => dealStageName(job, own, names);
+}
+
+/** The business's names for the twelve stages (only those it changed). */
+export async function stageNamesOf(businessId: string): Promise<StageNames> {
+  return stageNamesIn(query, businessId);
+}
+
+/** Renames one of the twelve for the business, or puts ours back with a blank name. Answers the names as they now stand. */
+export async function renameBuiltinStage(businessId: string, stage: unknown, raw: unknown): Promise<StageNames | { refused: string }> {
+  return transaction(async (q) => {
+    await q(`select pg_advisory_xact_lock(hashtext('design_stages:' || $1))`, [businessId]);
+    const own = await q<OwnStage>(`select ${STAGE} from design_stages where business_id = $1`, [businessId]);
+    const next = renameBuiltin(stage, raw, own, await stageNamesIn(q, businessId));
+    if (!next.ok) return { refused: next.message };
+    await q(`delete from design_stage_names where business_id = $1`, [businessId]);
+    for (const [k, v] of Object.entries(next.value)) {
+      await q(`insert into design_stage_names (business_id, stage, name) values ($1,$2,$3)`, [businessId, k, v]);
+    }
+    return next.value;
+  });
 }

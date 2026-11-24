@@ -120,6 +120,64 @@ export interface Costing {
 /** Rail comes in these lengths, with this much spare allowed for. */
 const RAIL = { lengthM: 4.8, perPanelExtraM: 0.1, spare: 1.05 } as const;
 
+/** One line of the racking a design takes, by rule: its part's key, the quote's words, how many, and plain words. */
+export interface RackingLine {
+  key: "rail" | "splice" | "tinKit" | "tileKit" | "kliplok" | "tiltLow" | "tiltHigh";
+  label: string;
+  qty: number;
+  /** The part in plain words, for the job card. */
+  name: string;
+}
+
+/**
+ * The racking a design takes (24 Nov 2026, Martin: the job card's racking section): two rails under each portrait
+ * panel, its width and a little more, with some spare, in 4.8 m lengths; a roof kit a 2 kW; on a flat roof Kliplok
+ * interfaces and tilt kits for tilted panels. The quote prices the same lines.
+ */
+export function rackingOf(spec: SystemSpec, form: QuoteForm): RackingLine[] {
+  const panels = Math.max(0, Math.round(spec.panels));
+  if (!panels) return [];
+  const pvKw = Math.round(panels * spec.panel.watts) / 1000;
+  const arrays = Math.max(1, Math.round(spec.arrays));
+  const kits = Math.ceil(pvKw / 2);
+  const railLengths = Math.ceil((panels * (spec.panel.short + RAIL.perPanelExtraM) * 2 * RAIL.spare) / RAIL.lengthM);
+  const out: RackingLine[] = [
+    {
+      key: "rail",
+      label: `Rails (${railLengths} lengths for ${panels} panels)`,
+      qty: railLengths,
+      name: `Rail (${RAIL.lengthM} m lengths)`,
+    },
+    { key: "splice", label: `Rail splices (${railLengths})`, qty: railLengths, name: "Rail splices" },
+  ];
+  if (form.roof === "flat") {
+    out.push({ key: "tinKit", label: `Roof kits (tin, ${kits})`, qty: kits, name: "Tin roof kits" });
+    const klip = panels * 2 + arrays * 2;
+    out.push({ key: "kliplok", label: `Kliplok interfaces (${klip})`, qty: klip, name: "Kliplok interfaces" });
+  } else {
+    const tin = form.roof === "tin";
+    out.push({
+      key: tin ? "tinKit" : "tileKit",
+      label: `Roof kits (${form.roof}, ${kits})`,
+      qty: kits,
+      name: tin ? "Tin roof kits" : "Tile roof kits",
+    });
+  }
+  const tilted = form.roof === "flat" ? Math.min(panels, Math.max(0, Math.round(spec.tiltedPanels))) : 0;
+  if (tilted) {
+    const low = spec.tiltDegrees <= 15;
+    const tiltKits = Math.ceil((tilted * spec.panel.watts) / 2000);
+    const range = low ? "10 to 15" : "15 to 30";
+    out.push({
+      key: low ? "tiltLow" : "tiltHigh",
+      label: `Tilt kits, ${range} degrees (${tiltKits} for ${tilted} tilted panels)`,
+      qty: tiltKits,
+      name: `Tilt kits, ${range}°`,
+    });
+  }
+  return out;
+}
+
 export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspace): Costing {
   const panels = Math.max(0, Math.round(spec.panels));
   const pvKw = Math.round(panels * spec.panel.watts) / 1000;
@@ -127,7 +185,6 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
   const batteryQty = spec.battery ? Math.max(1, Math.round(spec.battery.qty)) : 0;
   const batteryKwh = spec.battery ? Math.round(spec.battery.kwh * batteryQty * 10) / 10 : 0;
   const arrays = Math.max(1, Math.round(spec.arrays));
-  const kits = Math.ceil(pvKw / 2);
   const lines: CostLine[] = [];
 
   /** A line for so many of one product from the price lists. */
@@ -187,24 +244,7 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
 
   if (panels) {
     // Racking: two rails under each portrait panel, its width and a little more, with some spare; kits per 2 kW.
-    const railLengths = Math.ceil((panels * (spec.panel.short + RAIL.perPanelExtraM) * 2 * RAIL.spare) / RAIL.lengthM);
-    part("Racking", "rail", `Rails (${railLengths} lengths for ${panels} panels)`, railLengths);
-    part("Racking", "splice", `Rail splices (${railLengths})`, railLengths);
-    if (form.roof === "flat") {
-      part("Racking", "tinKit", `Roof kits (tin, ${kits})`, kits);
-      part("Racking", "kliplok", `Kliplok interfaces (${panels * 2 + arrays * 2})`, panels * 2 + arrays * 2);
-    } else part("Racking", form.roof === "tin" ? "tinKit" : "tileKit", `Roof kits (${form.roof}, ${kits})`, kits);
-    const tilted = form.roof === "flat" ? Math.min(panels, Math.max(0, Math.round(spec.tiltedPanels))) : 0;
-    if (tilted) {
-      const low = spec.tiltDegrees <= 15;
-      const tiltKits = Math.ceil((tilted * spec.panel.watts) / 2000);
-      part(
-        "Racking",
-        low ? "tiltLow" : "tiltHigh",
-        `Tilt kits, ${low ? "10 to 15" : "15 to 30"} degrees (${tiltKits} for ${tilted} tilted panels)`,
-        tiltKits,
-      );
-    }
+    for (const r of rackingOf(spec, form)) part("Racking", r.key, r.label, r.qty);
     part("Electrical", three ? "meter3ph" : "meter1ph", "Smart meter", 1);
     part("Electrical", "mc4", "MC4 connectors", 1);
     part("Electrical", three ? "isolator3ph" : "isolator1ph", "AC isolator", 1);
@@ -224,6 +264,7 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
       arrays > 2 ? `Split arrays: ${arrays} on the roof, ${arrays - 2} more than the 2 allowed for` : `Arrays: ${arrays} on the roof`,
       Math.max(0, arrays - 2) * r.extraArray,
     );
+    const tilted = form.roof === "flat" ? Math.min(panels, Math.max(0, Math.round(spec.tiltedPanels))) : 0;
     if (tilted) install(`Tilt frames: ${tilted} panels`, tilted * r.tiltPerPanel, tilted);
     if (three) install("Three-phase installation", r.threePhase);
     if (spec.inverters.length > 1)
@@ -287,6 +328,12 @@ export interface LineEdit {
   amount?: number;
   /** How many, typed over the worked-out count: the line is priced again at its cost each, unless a cost is typed too. */
   qty?: number;
+  /**
+   * The cost of one, typed over a counted line (21 Nov 2026, Martin: "the current price field should be for the single
+   * unit qty. then the total should be the qty x by the unit price"): the line is that times how many, so it follows
+   * the count as the design changes. An `amount` typed before this (a whole line's cost) still wins.
+   */
+  each?: number;
   removed?: boolean;
   /** A cost decided on each job (`CostLine.confirm`), included. Left out is `removed`. */
   on?: boolean;
@@ -300,6 +347,12 @@ export interface LineEdit {
    * installation's 30c a watt must be clearly editable): the line is priced again at it, unless a cost is typed too.
    */
   rate?: number;
+  /**
+   * The `amount` is the whole line's cost on a line with no count (22 Nov 2026), so it is the same on every design and is
+   * shared with the roof's other designs (`withHomeOf`). An `amount` without it is a whole line's cost typed on a counted
+   * line before costs were typed each, which belongs to that design's count alone.
+   */
+  whole?: boolean;
   /** A line of the business's own, added by hand (kept under an `addedKey`): its name and group. Its `amount` is the cost each. */
   label?: string;
   group?: CostGroup;
@@ -375,15 +428,45 @@ export function centsWords(perWatt: number): string {
 }
 
 export function lineKey(line: Pick<CostLine, "group" | "label">): string {
+  // An inverter's name keeps its figures: they are its model ("15kW … 3MPPT"), not a count, and two inverters of one
+  // family on a design are two lines (21 Nov 2026: taking one out of the quote took both). Only a count in front goes.
+  if (line.group === "Inverters") return `${line.group}|${line.label.replace(/^\d+ × /, "# × ")}`.slice(0, 160);
+  return legacyLineKey(line);
+}
+
+/** A line's key as it was before inverters kept their figures: edits kept under it are still read (`editOf`). */
+export function legacyLineKey(line: Pick<CostLine, "group" | "label">): string {
   return `${line.group}|${line.label.replace(/[\d.,]+/g, "#")}`.slice(0, 160);
+}
+
+/** The hand change kept for a line: under its key, else under the key it had before. */
+export function editOf(edits: Record<string, LineEdit>, line: Pick<CostLine, "group" | "label">): LineEdit | undefined {
+  return edits[lineKey(line)] ?? edits[legacyLineKey(line)];
+}
+
+/**
+ * Edits with one kept under a line's older key moved to the line's own key, and to each other line that shared it, so
+ * the next change to this line is its own. The edits as given when there is nothing to move.
+ */
+export function withOwnKey(
+  edits: Record<string, LineEdit>,
+  line: Pick<CostLine, "group" | "label">,
+  lines: readonly Pick<CostLine, "group" | "label">[],
+): Record<string, LineEdit> {
+  const old = legacyLineKey(line);
+  if (old === lineKey(line) || !edits[old]) return edits;
+  const next = { ...edits };
+  for (const l of [line, ...lines]) if (legacyLineKey(l) === old && !next[lineKey(l)]) next[lineKey(l)] = next[old]!;
+  delete next[old];
+  return next;
 }
 
 /** The lines as they stand: the worked-out ones with any hand changes laid over them, and those taken out left out. */
 export function editedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
   const worked = lines
-    .filter((l) => !edits[lineKey(l)]?.removed && (!l.confirm || edits[lineKey(l)]?.on))
+    .filter((l) => !editOf(edits, l)?.removed && (!l.confirm || editOf(edits, l)?.on))
     .map((l) => {
-      const edit = edits[lineKey(l)];
+      const edit = editOf(edits, l);
       let line = l;
       // A quantity typed over a counted line prices it again at its cost each (a line with no cost on file stays at $0).
       if (edit?.qty !== undefined && l.qty !== undefined) {
@@ -398,6 +481,9 @@ export function editedLines(lines: readonly CostLine[], edits: Record<string, Li
           label: l.label.replace(/at [\d.]+c a watt/, `at ${centsWords(edit.rate)}c a watt`),
         };
       }
+      // A cost each typed over a counted line: that times how many there are now.
+      if (edit?.each !== undefined && line.qty !== undefined)
+        line = { ...line, amount: Math.round(edit.each * line.qty * 100) / 100, missing: undefined };
       // A cost typed over a line settles it, and wins over the quantity's.
       return edit?.amount === undefined ? line : { ...line, amount: edit.amount, missing: undefined };
     });
@@ -415,6 +501,23 @@ export const DECIDED_LINES: readonly (readonly [CostGroup, string])[] = [
 const DECIDED_KEYS = DECIDED_LINES.map(([group, label]) => lineKey({ group, label }));
 
 /**
+ * The cost typed on a line that holds for the same product on every design (22 Nov 2026, Martin: "when I have applied
+ * prices to one design it should apply those same prices to the same product line items to each other design"): the cost
+ * each, a rate a watt, a whole line's cost on a line with no count, or a line left at $0. Null when there is none to share.
+ */
+export function sharedCost(edit: LineEdit | undefined): Pick<LineEdit, "amount" | "each" | "rate" | "whole"> | null {
+  if (!edit || edit.removed || edit.own) return null;
+  const cost: Pick<LineEdit, "amount" | "each" | "rate" | "whole"> = {};
+  if (edit.each !== undefined) cost.each = edit.each;
+  if (edit.rate !== undefined) cost.rate = edit.rate;
+  if (edit.amount !== undefined && (edit.whole || edit.amount === 0)) {
+    cost.amount = edit.amount;
+    if (edit.whole) cost.whole = true;
+  }
+  return Object.keys(cost).length ? cost : null;
+}
+
+/**
  * One quote given the home of another (8 Nov 2026, Martin: phase, storeys and the roof, and the costs decided on each job,
  * are the home's, set once for every design on the roof; deciding them on one left the others' proposals blocked): the
  * form, and the decision on each cost decided on each job, taken from `from`; its own hand changes to other lines kept.
@@ -426,6 +529,20 @@ export function withHomeOf(from: QuoteFields, to: QuoteFields): QuoteFields {
     if (edits[key]?.own || from.edits[key]?.own) continue;
     if (from.edits[key]) edits[key] = from.edits[key];
     else delete edits[key];
+  }
+  // Prices typed on one design hold for the same lines on the others (22 Nov 2026): the cost replaces theirs, while their
+  // own count, a line taken out, or a cost set for that design alone stays.
+  for (const [key, edit] of Object.entries(from.edits)) {
+    if (key === MARGIN_KEY || isAddedKey(key) || DECIDED_KEYS.includes(key)) continue;
+    const cost = sharedCost(edit);
+    const mine = edits[key];
+    if (!cost || mine?.removed || mine?.own) continue;
+    const rest: LineEdit = { ...mine };
+    delete rest.amount;
+    delete rest.each;
+    delete rest.rate;
+    delete rest.whole;
+    edits[key] = { ...rest, ...cost };
   }
   // A design's shade is its own panels', never the home's.
   return { form: { ...from.form }, edits, ...(to.shade ? { shade: to.shade } : {}) };
@@ -439,7 +556,7 @@ export function sharedHome(quotes: readonly QuoteFields[], from: number): QuoteF
 
 /** The costs decided on each job that haven't been included or left out yet: nothing is published while there are any. */
 export function undecidedLines(lines: readonly CostLine[], edits: Record<string, LineEdit>): CostLine[] {
-  return lines.filter((l) => l.confirm && !edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  return lines.filter((l) => l.confirm && !editOf(edits, l)?.on && !editOf(edits, l)?.removed);
 }
 
 /**
@@ -456,7 +573,7 @@ export const VARIATIONS: [line: RegExp, words: string][] = [
 
 /** The costs decided on each job that were left out, in the customer's words: what a proposal says may apply. */
 export function variationsOf(lines: readonly CostLine[], edits: Record<string, LineEdit>): string[] {
-  const out = lines.filter((l) => l.confirm && edits[lineKey(l)]?.removed);
+  const out = lines.filter((l) => l.confirm && editOf(edits, l)?.removed);
   return VARIATIONS.filter(([line]) => out.some((l) => line.test(l.label))).map(([, words]) => words);
 }
 
@@ -467,11 +584,11 @@ export function variationsOf(lines: readonly CostLine[], edits: Record<string, L
  * Add-ons as included, never switched by the customer. RCBOs say how many.
  */
 export function includedExtrasOf(lines: readonly CostLine[], edits: Record<string, LineEdit>): string[] {
-  const kept = lines.filter((l) => l.confirm && edits[lineKey(l)]?.on && !edits[lineKey(l)]?.removed);
+  const kept = lines.filter((l) => l.confirm && editOf(edits, l)?.on && !editOf(edits, l)?.removed);
   return VARIATIONS.flatMap(([line, words]) => {
     const l = kept.find((x) => line.test(x.label));
     if (!l) return [];
-    const qty = edits[lineKey(l)]?.qty ?? l.qty;
+    const qty = editOf(edits, l)?.qty ?? l.qty;
     return [/^RCBO/i.test(l.label) && qty && qty > 1 ? `${words} (${qty})` : words];
   });
 }
@@ -500,10 +617,33 @@ export function stcValue(
   rates: RebateRates,
   stcPrice: number,
 ): number {
+  return stcSplit(system, postcode, date, rates, stcPrice).total;
+}
+
+/** The STCs split into the panels' (STC) and the battery's (BSTC), each its certificates and dollars; the two add up to `total`. */
+export interface StcSplit {
+  solar: { certificates: number; value: number };
+  battery: { certificates: number; value: number };
+  total: number;
+}
+
+export function stcSplit(
+  system: { pvKw: number; batteryKwh: number },
+  postcode: string | null,
+  date: string,
+  rates: RebateRates,
+  stcPrice: number,
+): StcSplit {
   const rating = (postcode && zoneRating(postcode)?.rating) || DEFAULT_ZONE_RATING;
   const solar = Math.floor(system.pvKw * rating * deemingYears(date, rates));
   const battery = Math.floor(taperedKwh(system.batteryKwh, rates) * batteryFactor(date, rates));
-  return Math.round((solar + battery) * stcPrice);
+  const total = Math.round((solar + battery) * stcPrice);
+  const solarValue = Math.round(solar * stcPrice);
+  return {
+    solar: { certificates: solar, value: solarValue },
+    battery: { certificates: battery, value: total - solarValue },
+    total,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -727,6 +867,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
       if (key.length > 160 || !value || typeof value !== "object") continue;
       const v = value as {
         amount?: unknown;
+        each?: unknown;
         qty?: unknown;
         removed?: unknown;
         on?: unknown;
@@ -734,6 +875,7 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         group?: unknown;
         rate?: unknown;
         own?: unknown;
+        whole?: unknown;
       };
       const money = (x: unknown) =>
         typeof x === "number" && Number.isFinite(x) && x >= 0 && x <= 1_000_000 ? Math.round(x * 100) / 100 : undefined;
@@ -765,13 +907,16 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
         typeof v.rate === "number" && Number.isFinite(v.rate) && v.rate >= 0 && v.rate <= MAX_RATE_PER_WATT
           ? Math.round(v.rate * 10_000) / 10_000
           : undefined;
-      if (amount !== undefined || qty !== undefined || rate !== undefined || on)
+      const each = money(v.each);
+      if (amount !== undefined || each !== undefined || qty !== undefined || rate !== undefined || on)
         edits[key] = {
           ...(amount !== undefined ? { amount } : {}),
+          ...(each !== undefined ? { each } : {}),
           ...(qty !== undefined ? { qty } : {}),
           ...(rate !== undefined ? { rate } : {}),
           ...(on ? { on: true } : {}),
           ...(on && v.own === true ? { own: true } : {}),
+          ...(amount !== undefined && v.whole === true ? { whole: true } : {}),
         };
     }
     quotes.push({

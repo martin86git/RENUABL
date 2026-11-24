@@ -42,6 +42,8 @@ export type DesignAccount =
       needsProfile?: boolean;
       /** The welcome on Today is still to be shown (welcome.ts). */
       welcome?: boolean;
+      /** This person has seen the tour of a deal (deal-tour.ts), on any device. */
+      dealTourSeen?: boolean;
       /** RENUABL staff (Settings → View as), and the sample business kind they are looking through. */
       staff?: boolean;
       staffViewing?: "retailer" | "installer" | "inspector";
@@ -65,20 +67,91 @@ function hint(set?: boolean): boolean {
   }
 }
 
-let asked: Promise<DesignAccount> | null = null;
+/**
+ * Waits between asking again when the server doesn't answer on a device someone has signed in on (23 Nov 2026,
+ * Martin: back to a Safari tab after the phone was locked half an hour, it showed the signed-out page). After a while
+ * away the phone's network and the database both take a moment to wake, so this waits about 40 seconds in all.
+ */
+const RETRY_MS = [800, 1_500, 2_500, 4_000, 6_000, 8_000, 10_000, 10_000];
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Resolves once the page is in view and the device says it is online (a hidden tab or no network: no point asking). */
+function readyToAsk(): Promise<void> {
+  if (typeof document === "undefined") return Promise.resolve();
+  const ready = () => document.visibilityState !== "hidden" && navigator.onLine !== false;
+  if (ready()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const check = () => {
+      if (!ready()) return;
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("online", check);
+      resolve();
+    };
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("online", check);
+  });
+}
 
 async function ask(): Promise<DesignAccount> {
-  try {
-    const res = await fetch("/api/design/me", { cache: "no-store" });
-    if (!res.ok) throw new Error(String(res.status));
-    const account = (await res.json()) as DesignAccount;
-    hint(account.signedIn);
-    return account;
-  } catch {
-    // The server didn't answer. Say so only for a device someone has signed in on.
-    return { signedIn: false, unreachable: hint() };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await readyToAsk();
+      const res = await fetch("/api/design/me", { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const account = (await res.json()) as DesignAccount;
+      hint(account.signedIn);
+      return account;
+    } catch {
+      // The server didn't answer (a database waking up, the phone's network coming back). On a device someone has
+      // signed in on, ask again for a while before saying so, rather than showing the sign-in page to someone who is
+      // signed in. The device's hint is never cleared by a failure: only a real "signed out" answer or signing out.
+      if (hint() && attempt < RETRY_MS.length) {
+        await wait(RETRY_MS[attempt]);
+        continue;
+      }
+      if (hint()) keepTrying();
+      return { signedIn: false, unreachable: hint() };
+    }
   }
 }
+
+let trying = false;
+
+/**
+ * Still couldn't reach the account: keep asking quietly whenever the page comes back into view, the device comes back
+ * online, and every 15 seconds, and tell every screen (ACCOUNT_EVENT) the moment it answers. So a phone left on the
+ * "couldn't reach your account" screen goes back in by itself.
+ */
+function keepTrying() {
+  if (trying || typeof window === "undefined") return;
+  trying = true;
+  const again = async () => {
+    if (document.visibilityState === "hidden" || navigator.onLine === false) return;
+    try {
+      const res = await fetch("/api/design/me", { cache: "no-store" });
+      if (!res.ok) return;
+      const account = (await res.json()) as DesignAccount;
+      stop();
+      hint(account.signedIn);
+      asked = Promise.resolve(account);
+      window.dispatchEvent(new CustomEvent<DesignAccount>(ACCOUNT_EVENT, { detail: account }));
+    } catch {
+      // Not yet: the next look.
+    }
+  };
+  const timer = window.setInterval(again, 15_000);
+  const stop = () => {
+    trying = false;
+    window.clearInterval(timer);
+    document.removeEventListener("visibilitychange", again);
+    window.removeEventListener("online", again);
+  };
+  document.addEventListener("visibilitychange", again);
+  window.addEventListener("online", again);
+}
+
+let asked: Promise<DesignAccount> | null = null;
 
 /** Who is using the designer. Asked once for the page; `fresh` asks again (after signing in, naming a business, signing out). */
 export function designAccount(fresh = false): Promise<DesignAccount> {
@@ -145,6 +218,11 @@ export async function finishWelcome(): Promise<void> {
   await send<Answer>("/api/design/onboarding", "POST", {});
 }
 
+/** The tour of a deal has been seen: it doesn't start by itself again, on any device. */
+export async function finishDealTour(): Promise<void> {
+  await send<Answer>("/api/design/onboarding", "POST", { tour: "deal" });
+}
+
 /** The owner renames the business. Null when done. */
 export async function renameBusiness(name: string): Promise<string | null> {
   const res = await send<Answer>("/api/design/business", "PUT", { name });
@@ -159,12 +237,50 @@ export interface MemberLine {
   /** Whether they have signed in and accepted the terms yet. */
   joined: boolean;
   permissions: MemberPermissions;
+  /** When their profile photo was last changed, when they have one. */
+  photo?: number;
 }
 
-type MembersAnswer = Answer & { members?: MemberLine[] };
+/** Someone kept to own deals without being invited: never a member, never signs in, never a paid user. */
+export interface OwnerOnlyLine {
+  email: string;
+  name: string;
+  deals: number;
+}
+
+type MembersAnswer = Answer & { members?: MemberLine[]; ownerOnly?: OwnerOnlyLine[] };
 
 export async function loadMembers(): Promise<MemberLine[] | null> {
   return (await send<MembersAnswer>("/api/design/members", "GET")).members ?? null;
+}
+
+export interface Team {
+  members: MemberLine[];
+  ownerOnly: OwnerOnlyLine[];
+}
+
+/** The business's people and those who own deals without an invite. */
+export async function loadTeam(): Promise<Team | null> {
+  const res = await send<MembersAnswer>("/api/design/members", "GET");
+  return res.members ? { members: res.members, ownerOnly: res.ownerOnly ?? [] } : null;
+}
+
+const teamOf = (res: MembersAnswer): { team?: Team; problem?: string } =>
+  res.ok && res.members ? { team: { members: res.members, ownerOnly: res.ownerOnly ?? [] } } : { problem: res.message ?? UNREACHABLE };
+
+/** Keeps someone who can own deals without inviting them (24 Nov 2026, Martin: for historical deals). */
+export async function addOwnerOnly(email: string, name: string) {
+  return teamOf(await send<MembersAnswer>("/api/design/members", "POST", { email, name, ownerOnly: true }));
+}
+
+/** Invites someone kept to own deals: they become a member and a paid user, keeping their deals. */
+export async function inviteOwnerOnly(email: string) {
+  return teamOf(await send<MembersAnswer>("/api/design/members", "POST", { email, invite: true }));
+}
+
+/** Takes someone off the list of people who own deals; their deals are left with no owner. */
+export async function removeOwnerOnly(email: string) {
+  return teamOf(await send<MembersAnswer>("/api/design/members", "DELETE", { email, ownerOnly: true }));
 }
 
 export async function addMember(email: string): Promise<{ members?: MemberLine[]; problem?: string }> {
@@ -226,4 +342,38 @@ export async function choosePlan(email: string, seats: number, code?: string): P
   if (!res.ok || !res.url) return res.message ?? UNREACHABLE;
   window.location.assign(res.url);
   return null;
+}
+
+/** A team member's profile photo, by its version so a new one is fetched and an unchanged one stays cached. */
+export const memberPhotoUrl = (email: string, version: number) =>
+  `/api/design/profile/photo?email=${encodeURIComponent(email)}&v=${version}`;
+
+/** Puts the signed-in person's own profile photo in place; answers its new version, or what went wrong. */
+export async function uploadMyPhoto(file: File): Promise<{ photo?: number; problem?: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const res = await fetch("/api/design/profile/photo", { method: "POST", body: form });
+    const body = (await res.json().catch(() => ({}))) as { ok?: boolean; photo?: number; message?: string };
+    return body.ok && body.photo ? { photo: body.photo } : { problem: body.message ?? UNREACHABLE };
+  } catch {
+    return { problem: UNREACHABLE };
+  }
+}
+
+/** Takes the signed-in person's own profile photo away. */
+export async function removeMyPhoto(): Promise<{ problem?: string }> {
+  const res = await send<Answer>("/api/design/profile/photo", "DELETE");
+  return res.ok ? {} : { problem: res.message ?? UNREACHABLE };
+}
+
+/** The business's own sign-in address (sign-in-page.ts), made the first time it is asked for. */
+export async function loadSignInPage(): Promise<string | null> {
+  return (await send<{ ok: boolean; path?: string }>("/api/design/sign-in-page", "GET")).path ?? null;
+}
+
+/** The owner's new sign-in address; the old one stops working. */
+export async function renewSignInPage(): Promise<{ path?: string; problem?: string }> {
+  const res = await send<{ ok: boolean; path?: string; message?: string }>("/api/design/sign-in-page", "POST");
+  return res.ok && res.path ? { path: res.path } : { problem: res.message ?? UNREACHABLE };
 }

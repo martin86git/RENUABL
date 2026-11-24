@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useStageNames } from "./stage-select";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { ArrowUp, MessageSquare, Phone, Search, X } from "lucide-react";
-import { TEXT_MAX, TEXT_WORDS, reachContacts, textParts, type ReachContact } from "@/lib/domain/design/contact-reach";
-import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import { TEXT_MAX, TEXT_WORDS, phoneBook, textParts, type ReachContact } from "@/lib/domain/design/contact-reach";
+import { type JobStage, stageLabel } from "@/lib/domain/design/crm";
 import { PHONE_FROM, digitsOf, looksLikePhone } from "@/lib/domain/design/find";
 import { TEXTS_COPY, signedText, type StrayText, type TextLine } from "@/lib/domain/design/texts";
 import { loadDealTexts, loadStrayTexts, textCustomer, useCallerInfo } from "@/lib/services/caller";
@@ -68,7 +69,11 @@ export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => 
   const typed = q.trim();
   const phone = looksLikePhone(typed);
   const ready = !typed || (phone ? digitsOf(typed).length >= PHONE_FROM : typed.length >= 2);
-  const found = data && ready ? reachContacts(data.customers, data.jobs, typed) : [];
+  // The phone book (23 Nov 2026, Martin): every contact A to Z, filtered as they type.
+  const book = useMemo(() => (data && ready ? phoneBook(data.customers, data.jobs, typed) : []), [data, ready, typed]);
+  const found = book.flatMap((section) => section.contacts);
+  const list = useRef<HTMLDivElement>(null);
+  const jumpTo = (letter: string) => list.current?.querySelector(`[data-letter="${letter}"]`)?.scrollIntoView({ block: "start" });
 
   return (
     <>
@@ -89,8 +94,8 @@ export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => 
             e.stopPropagation();
             close();
           }}
-          placeholder="Search a contact to call or text"
-          aria-label="Search a contact by name, number, email or address, to call or text them"
+          placeholder="Search contacts"
+          aria-label="Search contacts by name, number, email or address, to call or text them"
           className="h-11 min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
         />
         {props.open && (
@@ -107,67 +112,92 @@ export function ContactReach(props: { open: boolean; onOpen: (open: boolean) => 
       </label>
 
       {props.open && (
-        <div className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Contacts found">
-          {!typed && strays.length > 0 && (
-            <section aria-label={TEXTS_COPY.strays} className="mb-2 rounded-xl bg-surface-2 p-2 ring-1 ring-line">
-              <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{TEXTS_COPY.strays}</p>
-              <ul className="space-y-1">
-                {strays.map((t) => (
-                  <li key={t.id} className="rounded-lg bg-surface px-2.5 py-1.5 text-sm text-ink ring-1 ring-line">
-                    <span className="flex items-baseline justify-between gap-2 text-xs text-muted">
-                      <a href={`tel:${t.from.replace(/\s/g, "")}`} className="font-medium tabular-nums text-ink hover:underline">
-                        {t.from}
-                      </a>
-                      {textWhen(t.at)}
-                    </span>
-                    <span className="mt-0.5 block whitespace-pre-wrap break-words">{t.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {!typed && found.length > 0 && (
-            <p className="px-2 pb-1 pt-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">Latest contacts</p>
-          )}
-          {found.length === 0 && (
-            <p className="px-3 py-8 text-center text-sm text-muted">
-              {failed ? (
-                "Your contacts couldn't be read just now. Close this and try again."
-              ) : !data ? (
-                <span className="animate-pulse">Looking up your contacts…</span>
-              ) : !ready ? (
-                phone ? (
-                  "Keep typing the number: it starts matching from the fourth digit."
+        <div className="relative flex min-h-0 flex-1">
+          <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pr-6" aria-label="Contacts">
+            {!typed && strays.length > 0 && (
+              <section aria-label={TEXTS_COPY.strays} className="mb-2 rounded-xl bg-surface-2 p-2 ring-1 ring-line">
+                <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{TEXTS_COPY.strays}</p>
+                <ul className="space-y-1">
+                  {strays.map((t) => (
+                    <li key={t.id} className="rounded-lg bg-surface px-2.5 py-1.5 text-sm text-ink ring-1 ring-line">
+                      <span className="flex items-baseline justify-between gap-2 text-xs text-muted">
+                        <a href={`tel:${t.from.replace(/\s/g, "")}`} className="font-medium tabular-nums text-ink hover:underline">
+                          {t.from}
+                        </a>
+                        {textWhen(t.at)}
+                      </span>
+                      <span className="mt-0.5 block whitespace-pre-wrap break-words">{t.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {found.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-muted">
+                {failed ? (
+                  "Your contacts couldn't be read just now. Close this and try again."
+                ) : !data ? (
+                  <span className="animate-pulse">Looking up your contacts…</span>
+                ) : !ready ? (
+                  phone ? (
+                    "Keep typing the number: it starts matching from the fourth digit."
+                  ) : (
+                    "Keep typing their name, number, email or address."
+                  )
+                ) : typed ? (
+                  "No contact matches that."
                 ) : (
-                  "Keep typing their name, number, email or address."
-                )
-              ) : typed ? (
-                "No contact matches that."
-              ) : (
-                "No contact has a phone number yet."
-              )}
-            </p>
-          )}
-          <ul className="space-y-1">
-            {found.map((c) => (
-              <ContactRow
-                key={c.id}
-                contact={c}
-                assistant={caller.name}
-                textsOn={textsOn}
-                doing={doing?.id === c.id ? doing.what : null}
-                sent={sent?.id === c.id ? sent.message : null}
-                onDo={(what) => {
-                  setSent(null);
-                  setDoing(what ? { id: c.id, what } : null);
-                }}
-                onSent={(message) => {
-                  setDoing(null);
-                  setSent({ id: c.id, message });
-                }}
-              />
+                  "No contact has a phone number yet."
+                )}
+              </p>
+            )}
+            {book.map((section) => (
+              <section key={section.letter} data-letter={section.letter} aria-label={section.letter} className="scroll-mt-0">
+                <h3 className="sticky top-0 z-10 -mx-2 bg-surface/95 px-4 py-1 text-[11px] font-semibold tracking-[0.14em] text-muted backdrop-blur">
+                  {section.letter}
+                </h3>
+                <ul className="space-y-1">
+                  {section.contacts.map((c) => (
+                    <ContactRow
+                      key={c.id}
+                      contact={c}
+                      assistant={caller.name}
+                      textsOn={textsOn}
+                      doing={doing?.id === c.id ? doing.what : null}
+                      sent={sent?.id === c.id ? sent.message : null}
+                      onDo={(what) => {
+                        setSent(null);
+                        setDoing(what ? { id: c.id, what } : null);
+                      }}
+                      onSent={(message) => {
+                        setDoing(null);
+                        setSent({ id: c.id, message });
+                      }}
+                    />
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
+          {book.length > 1 && (
+            <nav
+              aria-label="Jump to a letter"
+              className="absolute inset-y-2 right-0.5 flex w-5 flex-col items-center justify-center gap-px text-[10px] font-semibold text-muted"
+            >
+              {book.map((section) => (
+                <button
+                  key={section.letter}
+                  type="button"
+                  onClick={() => jumpTo(section.letter)}
+                  onPointerMove={(e) => e.buttons === 1 && jumpTo(section.letter)}
+                  className="leading-[1.15] hover:text-ink"
+                  aria-label={`Contacts under ${section.letter}`}
+                >
+                  {section.letter}
+                </button>
+              ))}
+            </nav>
+          )}
         </div>
       )}
     </>
@@ -187,11 +217,13 @@ function ContactRow(props: {
   onDo: (what: "call" | "text" | null) => void;
   onSent: (message: string) => void;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const c = props.contact;
   const who = c.firstName || "them";
   const dial = c.phone.replace(/\s/g, "");
   const noText = !c.job ? `${who} has no deal to keep a text on` : !c.mobile ? TEXT_WORDS.noMobile : null;
-  const line = [c.phone || "No phone number", c.job && `${c.job.title} · ${STAGE_LABELS[c.job.stage as JobStage] ?? c.job.stage}`]
+  const line = [c.phone || "No phone number", c.job && `${c.job.title} · ${stageLabel(c.job.stage as JobStage, stageNames)}`]
     .filter(Boolean)
     .join(" · ");
 

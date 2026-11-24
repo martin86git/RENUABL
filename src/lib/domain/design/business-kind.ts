@@ -69,7 +69,7 @@ const NOT_PAGES: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = 
 
 /** Settings each kind has (by slug, settings-list.ts). */
 const SETTINGS: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
-  installer: ["price-lists", "datasheets", "parts", "installation-rates", "margin", "standards", "users", "billing"],
+  installer: ["price-lists", "datasheets", "parts", "installation-rates", "margin", "standards", "users", "billing", "usage"],
   inspector: ["standards", "users"],
 };
 
@@ -116,6 +116,9 @@ const API: Record<Exclude<BusinessKind, "retailer">, readonly string[]> = {
     "live",
     "import",
     "billing",
+    "usage",
+    // The STC change notice and the installation period new quotes are priced for.
+    "stc",
     "marketplace",
     "trade",
   ],

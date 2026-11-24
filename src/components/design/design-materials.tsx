@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronLeft, Copy, Download, Printer } from "lucide-react";
@@ -12,7 +13,7 @@ import { systemSpecOf } from "@/lib/domain/design/system";
 import { loadDealDesign, loadJob, shortDate } from "@/lib/services/crm";
 import { loadWorkspace } from "@/lib/services/design-store";
 import { useDesignAccount } from "./design-account";
-import { STAGE_LABELS, WON_STAGES } from "@/lib/domain/design/crm";
+import { WON_STAGES, stageLabel } from "@/lib/domain/design/crm";
 import { PATHS, ui } from "./design-shell";
 
 /**
@@ -24,6 +25,8 @@ import { PATHS, ui } from "./design-shell";
  * when it isn't; it is always worked out from the design as it stands now.
  */
 export function DealMaterials({ id }: { id: string }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [account] = useDesignAccount();
   const [job, setJob] = useState<Job | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -103,8 +106,8 @@ export function DealMaterials({ id }: { id: string }) {
 
       {!sold && (
         <p className="mt-4 rounded-md bg-sun px-4 py-3 text-sm text-sun-ink print:hidden" role="status">
-          This deal is at {STAGE_LABELS[job.stage]}, not yet won. The sheet is here to look at, but order from it once the customer has gone
-          ahead.
+          This deal is at {stageLabel(job.stage, stageNames)}, not yet won. The sheet is here to look at, but order from it once the
+          customer has gone ahead.
         </p>
       )}
 

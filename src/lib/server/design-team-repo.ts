@@ -5,7 +5,6 @@
  * direct conversation with another member of the business); a file is served only to someone who may read the room it
  * was sent in, and a deal card only to someone who may see that deal.
  */
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
 import { actionWords, cleanAction, type ChatAction } from "@/lib/domain/design/sol-chat-work";
 import {
   SOL_BY,
@@ -39,7 +38,8 @@ import {
 import type { DealViewer } from "@/lib/domain/design/account";
 import { siteUrl } from "@/lib/domain/sms";
 import { newId, query, randomToken, transaction } from "./db";
-import { jobById, listJobs } from "./design-crm-repo";
+import { memberPhotoVersions } from "./design-member-photos";
+import { jobById, listJobs, stageNamesOf, stageWordsOf } from "./design-crm-repo";
 import { emailProvider, sendEmail } from "./email";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
@@ -198,7 +198,7 @@ async function roomsFor(me: TeamMe, members: string[]) {
   const own = await ownChannels(me.businessId);
   const channels: { id: string; label: string; own?: true }[] = [...TEAM_CHANNELS, ...own.map((c) => ({ ...c, own: true as const }))];
   const rooms = [...channels.map((c) => c.id), ...others.map((o) => `dm:${[self, o].sort().join(",")}`)];
-  const [recent, seenRows] = await Promise.all([
+  const [recent, seenRows, photos] = await Promise.all([
     query<{ room: string; by: string; at: string }>(
       `select room, by_email as by, ${moment("at")} as at from design_team_lines
         where business_id = $1 and room = any($2) and at > now() - interval '30 days' order by at desc limit 2000`,
@@ -208,6 +208,7 @@ async function roomsFor(me: TeamMe, members: string[]) {
       `select room, ${moment("seen_at")} as at from design_team_seen where business_id = $1 and email = $2`,
       [me.businessId, self],
     ),
+    memberPhotoVersions(me.businessId),
   ]);
   const seen = Object.fromEntries(seenRows.map((r) => [r.room, r.at]));
   const unread = unreadByRoom(recent, seen, self, new Date());
@@ -222,6 +223,8 @@ async function roomsFor(me: TeamMe, members: string[]) {
       })
       .sort((a, b) => b.last.localeCompare(a.last) || a.label.localeCompare(b.label)),
     unread: Object.values(unread).reduce((a, b) => a + b, 0),
+    /** Who has a profile photo, by email, with its version (design-member-photos.ts). */
+    photos,
   };
 }
 
@@ -259,6 +262,7 @@ export async function markTeamSeen(me: TeamMe, room: string): Promise<void> {
 /** The deal cards for ids dropped in with #: only deals the writer may see, read from the business's own deals. */
 async function dealCards(me: TeamMe, ids: readonly string[]): Promise<TeamDeal[]> {
   const out: TeamDeal[] = [];
+  const word = ids.length ? await stageWordsOf(me.businessId) : null;
   for (const id of ids) {
     const got = await jobById(me.businessId, id, me.viewer);
     if (got)
@@ -266,7 +270,7 @@ async function dealCards(me: TeamMe, ids: readonly string[]): Promise<TeamDeal[]
         id: got.job.id,
         name: `${got.customer.name} · ${got.job.title}`,
         address: got.job.address,
-        stage: STAGE_LABELS[got.job.stage],
+        stage: word ? word(got.job) : "",
       });
   }
   return out;
@@ -411,12 +415,12 @@ export async function latestFromOthers(me: TeamMe, room: string, n: number): Pro
   );
   // Sol's offers read as the work they offer, and whether it was done: only for a deal this member may see (3 Nov 2026,
   // a bug review: the catch-up named deals the line itself hides from them).
-  const seeDeal = await dealSight(me);
+  const [seeDeal, names] = await Promise.all([dealSight(me), stageNamesOf(me.businessId)]);
   return rows.reverse().map((r) => {
     const offered = r.by === SOL_BY ? cleanAction((r.visuals as { action?: unknown } | null)?.action) : null;
     const action = offered && (!offered.jobId || seeDeal(offered.jobId)) ? offered : null;
     const text = action
-      ? `Offered: ${actionWords(action)} (${action.done ? `done by ${action.done.by}` : action.dismissed ? "set aside" : "not done yet"})`
+      ? `Offered: ${actionWords(action, names)} (${action.done ? `done by ${action.done.by}` : action.dismissed ? "set aside" : "not done yet"})`
       : r.text;
     return { by: r.by, text, at: r.at };
   });

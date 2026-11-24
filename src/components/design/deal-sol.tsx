@@ -10,7 +10,8 @@ import { SolSources } from "./sol-sources";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer } from "./sol-text";
-import { answerFor } from "@/lib/domain/design/sol-format";
+import { replyToSol, type SolReply } from "@/lib/domain/design/sol-format";
+import { MessageTools, QuotedWords, ReplyBanner } from "./message-tools";
 
 /**
  * Sol's thread on one deal (sol-chat-work.ts): the member's questions asked from this deal and his answers, kept
@@ -22,7 +23,7 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
   const [turns, setTurns] = useState<SolTurn[] | null>(null);
   const [text, setText] = useState("");
   // A question of Sol's being answered in the box: named in what goes to him, the chat shows only the answer.
-  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<SolReply | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const [heard, setHeard] = useState("");
   const [busy, setBusy] = useState(false);
@@ -49,13 +50,14 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
     end.current?.scrollIntoView({ block: "end" });
   }, [thread.length]);
 
-  const send = async (words: string, about: string | null = null) => {
+  const send = async (words: string, about: SolReply | null = null) => {
     const typed = words.trim();
     if (!typed || busy) return;
-    const q = about ? answerFor(about, typed) : typed;
+    const replied = replyToSol(about, typed);
+    const q = replied.said || typed;
     setBusy(true);
     setProblem("");
-    const r = await askSol(`${dealTag({ id: jobId, name })}\n${q}`, [], null, false, about ? typed : undefined);
+    const r = await askSol(`${dealTag({ id: jobId, name })}\n${q}`, [], null, false, replied.shown);
     setBusy(false);
     if (!r.ok) return setProblem(r.message);
     setText("");
@@ -66,8 +68,8 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
 
   /** A Yes or No goes straight to Sol; Reply answers the question in the box. */
   const answer: OnAnswer = (question, yes) => {
-    if (yes) return void send(yes, question);
-    setReplyTo(question);
+    if (yes) return void send(yes, { kind: "question", text: question });
+    setReplyTo({ kind: "question", text: question });
     field.current?.focus();
   };
 
@@ -90,16 +92,24 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
         {turns === null && !problem && <p className="text-muted">Opening…</p>}
         {turns && thread.length === 0 && <p className="text-ink-2">Ask Sol anything about {name.split(" · ")[0]}&apos;s deal.</p>}
         {thread.map((t, i) => (
-          <div key={`${t.at}-${i}`} className={t.role === "you" ? "flex justify-end" : "space-y-2"}>
+          <div key={`${t.at}-${i}`} className={t.role === "you" ? "group/turn flex flex-col items-end" : "group/turn space-y-2"}>
             {t.role === "you" ? (
               <p className="max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-sun px-3 py-2 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] [font-feature-settings:'cv11','ss03','tnum'] text-ink ring-1 ring-sun-line/25">
-                {t.shown || t.text}
+                <QuotedWords text={t.shown || t.text} />
               </p>
             ) : (
               <div className="sol-prose max-w-[90%] rounded-2xl bg-canvas px-3 py-2 [overflow-wrap:anywhere]">
                 <SolText text={t.text} onAnswer={busy ? undefined : answer} />
               </div>
             )}
+            <MessageTools
+              text={t.role === "you" ? t.shown || t.text : t.text}
+              onReply={() => {
+                setReplyTo({ kind: "message", from: t.role, text: t.role === "you" ? t.shown || t.text : t.text });
+                field.current?.focus();
+              }}
+              className={t.role === "you" ? "mt-0.5" : "-ml-1.5 !mt-0.5"}
+            />
             {t.role === "sol" && (
               <>
                 {t.diagrams?.map((d, k) => (
@@ -129,16 +139,7 @@ export function DealSol({ jobId, name }: { jobId: string; name: string }) {
         <div ref={end} />
       </div>
       {problem && <p className="px-4 pb-1 text-xs text-danger">{problem}</p>}
-      {replyTo && (
-        <p className="mx-3 mt-1 flex items-start gap-2 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
-          <span className="min-w-0 flex-1">
-            Replying to <span className="font-medium text-ink">{replyTo}</span>
-          </span>
-          <button type="button" onClick={() => setReplyTo(null)} className="shrink-0 hover:text-ink">
-            Cancel
-          </button>
-        </p>
-      )}
+      {replyTo && <ReplyBanner reply={replyTo} onStop={() => setReplyTo(null)} className="mx-3 mt-1 bg-canvas" />}
       <form
         className="flex items-end gap-2 border-t border-line p-3"
         onSubmit={(e) => {

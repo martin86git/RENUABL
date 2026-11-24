@@ -138,6 +138,7 @@ const BLOCKED: readonly RegExp[] = [
   /^\/api\/design\/pylon$/,
   // The business's own books in Xero (xero.ts).
   /^\/api\/design\/xero$/,
+  /^\/api\/design\/hubspot$/,
   // Marketing email to a business's contacts (domain/marketing).
   /^\/api\/design\/marketing(\/|$)/,
   // Other businesses: the feed every business reads, connections, the Marketplace, jobs passed on.

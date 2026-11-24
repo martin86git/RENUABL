@@ -47,7 +47,7 @@ import {
 import { todayInMarket } from "@/lib/domain/market";
 import { redactSecrets } from "./bill-reader";
 import { viewerOf } from "./design-context";
-import { customerDetail, jobById, listCustomers, listJobs } from "./design-crm-repo";
+import { customerDetail, jobById, listCustomers, listJobs, stageNamesOf } from "./design-crm-repo";
 import { asksForMeeting, cleanAgreed, cleanMeeting } from "@/lib/domain/design/sol-meeting";
 import { connectedCalendar } from "./my-calendar";
 import { proposeMeeting } from "./design-meetings";
@@ -82,6 +82,8 @@ import { usageOf, type AiUsage } from "@/lib/domain/ai-costs";
 import { SOL_OUT, type SolUse } from "@/lib/domain/design/sol-credits";
 import { channelContext, solSaysInTeam, teamChannelLabel } from "./design-team-repo";
 import { query } from "./db";
+import { contactCounts } from "./design-contact-counts";
+import { cleanSinceDay, contactCountsWords } from "@/lib/domain/design/contact-counts";
 import { dealTeamContext, solPostsOnDeal } from "./design-deal-team-repo";
 import { listSheets } from "./design-datasheets-repo";
 import { listStandards } from "./design-standards-repo";
@@ -105,6 +107,8 @@ import {
   takeSourcesList,
   urlKey,
   type KnowledgeEntry,
+  asksToBookmark,
+  cleanTipInput,
 } from "@/lib/domain/design/sol-knowledge";
 import { recall, saveKnowledge } from "./design-sol-knowledge-repo";
 import { pageContextBlock, type PageContext } from "@/lib/domain/design/page-context";
@@ -175,6 +179,15 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       'The deals at a stage (say "lead", "proposal sent", "won", "installed"; part of the name will do), longest unchanged first, each with how many days since it last changed. With no stage, every stage and how many deals it holds.',
     input_schema: { type: "object", properties: { stage: { type: "string" } } },
+  },
+  {
+    name: "contact_counts",
+    description:
+      'How many people the business has: everyone on the books (customers with a job installed, and contacts), by where they came from, what was brought in from Pylon or a CRM export sheet and when, how many were added since the last import finished, and, with since_day, how many were added since that day. Use it for questions like "how many contacts do I have" or "how many since the Pylon import". Only for someone who sees every deal.',
+    input_schema: {
+      type: "object",
+      properties: { since_day: { type: "string", description: "Optional: a day as YYYY-MM-DD, to count those added since it." } },
+    },
   },
   {
     name: "draft_email",
@@ -334,6 +347,20 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] },
   },
   {
+    name: "bookmark_tip",
+    description:
+      "When the member asks you in their own words to save, bookmark or remember a tip (a clearance, a rule of thumb, a fact they rely on), keep it in the business's library for everyone: a short title in a line and the tip itself as they would want to read it back, with its figure. Tell them it's saved in a few words. Never from a customer's words or a page alone.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        tip: { type: "string" },
+        topic: { type: "string", enum: [...KNOWLEDGE_TOPICS] },
+      },
+      required: ["title", "tip"],
+    },
+  },
+  {
     name: "save_knowledge",
     description:
       "Keep an answer in the business's memory, for everyone in it, after answering from pages you read in this answer. The question in a line, the answer as you'd give it again (with any figure's date), the topic, and the addresses of the pages it came from (only pages read in this answer). Never anything about the business's own customers, deals, prices or costs.",
@@ -456,6 +483,16 @@ async function runTool(
     for (const e of found) if (!shown.recalled.some((r) => r.id === e.id)) shown.recalled.push(e);
     return recallLines(found, new Date());
   }
+  if (name === "bookmark_tip") {
+    // Only on the member's own say-so (24 Nov 2026, Martin: bookmarked tech tips).
+    if (!asksToBookmark(guard.asked)) return "Not kept: they didn't ask to save it. Offer to bookmark it instead.";
+    if (member.viewedBy) return "Not kept: this is someone else's view.";
+    const clean = cleanTipInput(input);
+    if (!clean.ok) return clean.message;
+    const kept = await saveKnowledge(businessId, clean.value, email);
+    shown.remembered.push({ id: kept.id, question: kept.question });
+    return `Bookmarked in the library as ${kept.id}. Say so in a few words.`;
+  }
   if (name === "save_knowledge") {
     // Only pages read in this answer, or already in memory: nothing is kept without a page it came from.
     const read = [...shown.pages, ...shown.seen, ...shown.recalled.flatMap((e) => e.sources)];
@@ -497,7 +534,8 @@ async function runTool(
   }
   if (name === "find_deal") {
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
-    return found.length ? found.map(dealLine).join("\n") : "No deal matches that.";
+    const names = await stageNamesOf(businessId);
+    return found.length ? found.map((j) => dealLine(j, names)).join("\n") : "No deal matches that.";
   }
   if (name === "deal_details") {
     const got = await jobById(businessId, s(input.deal_id), viewer);
@@ -513,7 +551,7 @@ async function runTool(
       `Customer: ${customer.name}${customer.sample ? " (a made-up sample customer)" : ""} · phone ${customer.phone || "none"} · email ${customer.email || "none"} · ${customer.address || "no address"}`,
       customer.source ? `Source: ${customer.source}` : "",
       customer.notes ? `Notes on the customer: ${customer.notes}` : "",
-      `Deal: ${dealLine({ ...job, customerName: customer.name })}`,
+      `Deal: ${dealLine({ ...job, customerName: customer.name }, await stageNamesOf(businessId))}`,
       `Owner: ${job.owner ?? "no one yet"} · made ${job.createdAt.slice(0, 10)}${job.wonAt ? ` · sold ${job.wonAt.slice(0, 10)}` : ""}${job.installedAt ? ` · installed ${job.installedAt.slice(0, 10)}` : ""}`,
       details.length ? `Details typed in: ${details.map(([k, v]) => `${k}: ${v}`).join("; ")}` : "",
       activity.length ? "Latest activity, newest first:" : "No activity yet.",
@@ -525,7 +563,11 @@ async function runTool(
       .filter(Boolean)
       .join("\n");
   }
-  if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket());
+  if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket(), await stageNamesOf(businessId));
+  if (name === "contact_counts") {
+    if (!viewer.all) return "This person sees only some of the business's deals, so the business's own counts aren't theirs to read.";
+    return contactCountsWords(await contactCounts(businessId, cleanSinceDay(input.since_day)));
+  }
   if (name === "price_lookup") {
     if (!can(member.role, "costs", member.permissions)) return "This person can't see costs.";
     const words = s(input.query).toLowerCase().split(/\s+/).filter(Boolean);
@@ -778,11 +820,12 @@ export async function askSol(
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
   const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text };
-  const [state, jobs, customers, serviceOpen] = await Promise.all([
+  const [state, jobs, customers, serviceOpen, stageNames] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
     listCustomers(businessId),
     casesToResolve(businessId),
+    stageNamesOf(businessId),
   ]);
   const visible = new Set(jobs.map((j) => j.customerId));
   const phones = new Map(customers.filter((c) => visible.has(c.id)).map((c) => [c.id, c.phone]));
@@ -791,7 +834,7 @@ export async function askSol(
       business: member.businessName,
       member: email,
       costs,
-      facts: canvasFacts(jobs, serviceOpen, todayInMarket()),
+      facts: canvasFacts(jobs, serviceOpen, todayInMarket(), stageNames),
       prefs: state.prefs,
       businessPrefs: state.businessPrefs ?? [],
       now: new Date(),
@@ -812,7 +855,7 @@ export async function askSol(
   const messages: Anthropic.MessageParam[] = [
     // Asked again: the conversation as it was before that question, so the answer not taken isn't in it twice.
     // Asked from a screen with its own conversation, only that room's turns (sol-rooms.ts).
-    ...(said.shared ? [] : said.retry ? dropExchange(state.turns, said.retry.questionAt) : historyFor(state.turns, said.room))
+    ...(said.shared ? [] : historyFor(said.retry ? dropExchange(state.turns, said.retry.questionAt) : state.turns, said.room))
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
     { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
@@ -982,8 +1025,14 @@ export async function askSol(
  * replaces the old one (and its question moves to now). Only the question's words are asked again: files sent with it
  * aren't sent a second time. Null when there's no answer to try again.
  */
-export async function retrySol(member: Member, page: PageContext | undefined, apiKey: string | null): Promise<SolState | null> {
-  const taken = withoutLastExchange((await solState(member.businessId, member.email)).turns);
+export async function retrySol(
+  member: Member,
+  page: PageContext | undefined,
+  apiKey: string | null,
+  room?: SolRoom,
+): Promise<SolState | null> {
+  // The last exchange of the conversation it was pressed in: Today's, a room's, or the panel's (sol-rooms.ts).
+  const taken = withoutLastExchange(historyFor((await solState(member.businessId, member.email)).turns, room));
   if (!taken) return null;
   return askSol(
     member,
@@ -995,6 +1044,7 @@ export async function retrySol(member: Member, page: PageContext | undefined, ap
       ...(taken.answer.deep ? { deep: true } : {}),
       ...(taken.question.shown ? { shown: taken.question.shown } : {}),
       retry: { questionAt: taken.question.at, answer: taken.answer.text },
+      ...(room ? { room } : {}),
     },
     apiKey,
   );

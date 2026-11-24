@@ -118,7 +118,9 @@ export function perfPeriod(range: PerfRange, today: ISODate, custom?: { from: IS
   }
 }
 
-type PerfJob = Pick<Job, "stage" | "value" | "kw" | "wonAt" | "installedAt" | "createdAt" | "title" | "details"> & { sample?: boolean };
+export type PerfJob = Pick<Job, "stage" | "value" | "kw" | "wonAt" | "installedAt" | "createdAt" | "title" | "details"> & {
+  sample?: boolean;
+};
 
 export interface PerfFigure {
   metric: PerfMetric;
@@ -131,30 +133,139 @@ export interface PerfFigure {
 }
 
 /** The figures for one period, by metric. */
-function figuresIn(jobs: readonly PerfJob[], from: ISODate, to: ISODate): Record<PerfMetric, number | null> {
-  const day = (when: string | null) => (when ? todayInMarket(new Date(when)) : null);
-  const inside = (when: string | null) => {
-    const d = day(when);
-    return d !== null && d >= from && d <= to;
+/**
+ * A deal's figures worked out once: its days in the market's time and whether it is sold, installed or has a battery.
+ * Turning a time into the market's day goes through Intl, slow enough that doing it for every deal in every bar of the
+ * period made Performance wait seconds on a phone with a few thousand deals (22 Nov 2026, Martin).
+ */
+export interface PerfRow {
+  won: ISODate | null;
+  created: ISODate | null;
+  installed: ISODate | null;
+  sold: boolean;
+  isInstalled: boolean;
+  value: number;
+  kw: number;
+  battery: boolean;
+}
+
+/**
+ * What Performance counts from: the deals themselves, or rows already worked out (the small download Today asks for as
+ * it opens, so Performance needn't wait for the whole deals list: 22 Nov 2026, Martin, it took a second to open).
+ */
+export type PerfSource = readonly PerfJob[] | { rows: readonly PerfRow[] };
+
+function rowsOf(source: PerfSource): readonly PerfRow[] {
+  return "rows" in source ? source.rows : perfRows(source);
+}
+
+/** A row as it travels: [won, created, installed] ("" for none), flags (1 sold, 2 installed, 4 battery), value, kW. */
+export type PackedPerfRow = [string, string, string, number, number, number];
+
+export function packPerfRows(rows: readonly PerfRow[]): PackedPerfRow[] {
+  return rows.map((r) => [
+    r.won ?? "",
+    r.created ?? "",
+    r.installed ?? "",
+    (r.sold ? 1 : 0) | (r.isInstalled ? 2 : 0) | (r.battery ? 4 : 0),
+    Math.round(r.value * 100) / 100,
+    Math.round(r.kw * 1000) / 1000,
+  ]);
+}
+
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const dayOrNull = (x: unknown): ISODate | null => (typeof x === "string" && DAY_RE.test(x) ? x : null);
+const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+
+/** Rows read back from the download; anything not shaped as a row is left out, and anything not a list is null. */
+export function unpackPerfRows(raw: unknown): PerfRow[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: PerfRow[] = [];
+  for (const r of raw) {
+    if (!Array.isArray(r) || r.length < 6) continue;
+    const flags = num(r[3]);
+    out.push({
+      won: dayOrNull(r[0]),
+      created: dayOrNull(r[1]),
+      installed: dayOrNull(r[2]),
+      sold: (flags & 1) !== 0,
+      isInstalled: (flags & 2) !== 0,
+      battery: (flags & 4) !== 0,
+      value: num(r[4]),
+      kw: num(r[5]),
+    });
+  }
+  return out;
+}
+
+const dayedCache = new WeakMap<readonly PerfJob[], PerfRow[]>();
+
+/** Every deal but the samples as the rows Performance counts. */
+export function perfRows(jobs: readonly PerfJob[]): PerfRow[] {
+  const kept = dayedCache.get(jobs);
+  if (kept) return kept;
+  const days = new Map<string, ISODate>();
+  const day = (when: string | null): ISODate | null => {
+    if (!when) return null;
+    let d = days.get(when);
+    if (d === undefined) {
+      d = todayInMarket(new Date(when));
+      days.set(when, d);
+    }
+    return d;
   };
-  const sold = jobs.filter((j) => WON_STAGES.includes(j.stage) && inside(j.wonAt));
-  const sales = sold.reduce((n, j) => n + (j.value ?? 0), 0);
-  const leads = jobs.filter((j) => inside(j.createdAt)).length;
+  const out = jobs
+    .filter((j) => !j.sample)
+    .map((j) => {
+      const sold = WON_STAGES.includes(j.stage);
+      return {
+        won: sold ? day(j.wonAt) : null,
+        created: day(j.createdAt),
+        installed: INSTALLED_STAGES.includes(j.stage) ? day(j.installedAt) : null,
+        sold,
+        isInstalled: INSTALLED_STAGES.includes(j.stage),
+        value: j.value ?? 0,
+        kw: j.kw ?? 0,
+        battery: sold && jobHas(j).battery,
+      };
+    });
+  dayedCache.set(jobs, out);
+  return out;
+}
+
+function figuresIn(jobs: readonly PerfRow[], from: ISODate, to: ISODate): Record<PerfMetric, number | null> {
+  const inside = (d: ISODate | null) => d !== null && d >= from && d <= to;
+  let sold = 0;
+  let sales = 0;
+  let kw = 0;
+  let batteries = 0;
+  let leads = 0;
+  let installs = 0;
+  for (const j of jobs) {
+    if (j.sold && inside(j.won)) {
+      sold++;
+      sales += j.value;
+      kw += j.kw;
+      if (j.battery) batteries++;
+    }
+    if (inside(j.created)) leads++;
+    if (j.isInstalled && inside(j.installed)) installs++;
+  }
   return {
     sales,
-    sold: sold.length,
-    average: sold.length ? Math.round(sales / sold.length) : null,
-    kw: Math.round(sold.reduce((n, j) => n + (j.kw ?? 0), 0) * 100) / 100,
-    batteries: sold.filter((j) => jobHas(j).battery).length,
+    sold,
+    average: sold ? Math.round(sales / sold) : null,
+    kw: Math.round(kw * 100) / 100,
+    batteries,
     leads,
-    conversion: leads ? sold.length / leads : null,
-    installs: jobs.filter((j) => INSTALLED_STAGES.includes(j.stage) && inside(j.installedAt)).length,
+    conversion: leads ? sold / leads : null,
+    installs,
   };
 }
 
 /** Each metric asked for, in the order asked, for the period and the one before it. Sample deals are left out. */
-export function performance(jobs: readonly PerfJob[], period: PerfPeriod, metrics: readonly PerfMetric[]): PerfFigure[] {
-  const real = jobs.filter((j) => !j.sample);
+export function performance(jobs: PerfSource, period: PerfPeriod, metrics: readonly PerfMetric[]): PerfFigure[] {
+  const real = rowsOf(jobs);
   const now = figuresIn(real, period.from, period.to);
   const before = figuresIn(real, period.prevFrom, period.prevTo);
   return metrics.map((metric) => {
@@ -199,8 +310,8 @@ export interface PerfBucket {
  * The period cut into stretches for the small bars under each figure: days up to a month, weeks up to about four
  * months, else calendar months (the first and last cut to the period).
  */
-export function perfSeries(jobs: readonly PerfJob[], period: { from: ISODate; to: ISODate }): PerfBucket[] {
-  const real = jobs.filter((j) => !j.sample);
+export function perfSeries(jobs: PerfSource, period: { from: ISODate; to: ISODate }): PerfBucket[] {
+  const real = rowsOf(jobs);
   const days = Math.round((at(period.to) - at(period.from)) / DAY) + 1;
   const spans: [ISODate, ISODate][] = [];
   if (days <= 31) {

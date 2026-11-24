@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  Gauge,
   Bell,
   CheckCheck,
   Cloud,
@@ -38,6 +39,10 @@ import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from
 import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
 import { MyCalendar } from "./my-calendar";
+import { ResizeGrip, useCalendarSize } from "./calendar-resize";
+import { loadUsageBrief, type MeterNow } from "@/lib/services/usage";
+import { openUsagePop, usagePopReady } from "./usage-pop";
+import { METER_WORDS, percentWords } from "@/lib/domain/design/usage";
 import { CONNECT_RESULTS } from "@/lib/domain/design/my-calendar";
 
 /**
@@ -144,6 +149,14 @@ export function DayWeather() {
   const [weather, setWeather] = useState<{ place: string; degrees: number | null; sky: Sky | null } | null>(null);
   const [open, setOpen, box] = useWindow();
   const [note, setNote] = useState<string | null>(null);
+  // On a computer the calendar is sized by dragging its left edge, its foot or the corner (23 Nov 2026, Martin).
+  const sized = useCalendarSize("pop", () => {
+    const tile = box.current?.getBoundingClientRect();
+    // The width it may take: to the screen's left edge less a margin and its padding; the hours' height: the screen
+    // under the tile less the month and the bar above them.
+    return tile ? { width: tile.right - 48, height: window.innerHeight - tile.bottom - 360 } : null;
+  });
+  const size = open ? sized.size : null;
   useEffect(() => {
     // The day is only known once the page is in the browser.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -203,7 +216,50 @@ export function DayWeather() {
       </button>
       {open && (
         <div className="absolute right-0 top-12 z-50 rounded-3xl bg-surface p-4 shadow-2xl ring-1 ring-line">
-          <MyCalendar note={note} />
+          <MyCalendar note={note} size={size} />
+          {size && (
+            <>
+              {/* Held to the tile on its right: the left edge widens it, the foot makes it taller (23 Nov 2026, Martin). */}
+              <ResizeGrip
+                label="Drag to make the calendar wider or narrower"
+                className="absolute left-0 top-8 z-20 h-[calc(100%-4rem)] w-2.5 cursor-ew-resize"
+                start={() => size}
+                onDrag={(dx, _dy, s) => sized.keep({ width: s.width - dx, height: s.height })}
+                onReset={sized.reset}
+                keys={(k) =>
+                  k === "ArrowLeft"
+                    ? sized.keep({ ...size, width: size.width + 48 })
+                    : k === "ArrowRight"
+                      ? sized.keep({ ...size, width: size.width - 48 })
+                      : undefined
+                }
+                orientation="vertical"
+              />
+              <ResizeGrip
+                label="Drag to make the calendar taller or shorter"
+                className="absolute bottom-0 left-8 z-20 h-2.5 w-[calc(100%-4rem)] cursor-ns-resize"
+                start={() => size}
+                onDrag={(_dx, dy, s) => sized.keep({ width: s.width, height: s.height + dy })}
+                onReset={sized.reset}
+                keys={(k) =>
+                  k === "ArrowDown"
+                    ? sized.keep({ ...size, height: size.height + 48 })
+                    : k === "ArrowUp"
+                      ? sized.keep({ ...size, height: size.height - 48 })
+                      : undefined
+                }
+                orientation="horizontal"
+              />
+              <ResizeGrip
+                label="Drag to resize the calendar"
+                className="absolute bottom-0 left-0 z-30 size-5 cursor-nesw-resize"
+                start={() => size}
+                onDrag={(dx, dy, s) => sized.keep({ width: s.width - dx, height: s.height + dy })}
+                onReset={sized.reset}
+                corner="bottom-left"
+              />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -373,8 +429,20 @@ export function ProfileMenu(props: {
   on: boolean;
   /** Opens Sol's setup wizard (setup-wizard.tsx), where the shell mounts it. */
   onSetup?: () => void;
+  /** The Usage page: this month's allowances, read as the menu opens (only for those who may see them). */
+  usage?: string;
 }) {
   const [open, setOpen, box] = useWindow();
+  const [meters, setMeters] = useState<MeterNow[] | null>(null);
+  const usageHref = props.usage;
+  useEffect(() => {
+    if (!open || !usageHref) return;
+    let gone = false;
+    void loadUsageBrief().then((m) => !gone && setMeters(m));
+    return () => {
+      gone = true;
+    };
+  }, [open, usageHref]);
   const row = (label: string, href: string, Icon: LucideIcon, n = 0) => (
     <Link href={href} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-ink hover:bg-canvas">
       <Icon className="size-4" aria-hidden /> <span className="flex-1">{label}</span>
@@ -407,6 +475,34 @@ export function ProfileMenu(props: {
           <p className="truncate px-3 pb-2 pt-1 text-xs text-muted">{props.email}</p>
           {row("Settings", props.settings, SlidersHorizontal)}
           {row("Your account", props.account, UserRound)}
+          {usageHref && meters && (
+            // Plan usage at a glance (23 Nov 2026, Martin, from instant.one's menu): each allowance and how much is used.
+            <Link
+              href={usageHref}
+              onClick={(e) => {
+                if (!usagePopReady()) return;
+                e.preventDefault();
+                setOpen(false);
+                openUsagePop();
+              }}
+              className="mx-1 my-1 block rounded-xl bg-canvas px-3 py-2.5 hover:bg-line/60"
+            >
+              <span className="flex items-center justify-between text-xs font-medium text-ink">
+                <span className="flex items-center gap-2">
+                  <Gauge className="size-4" aria-hidden /> Usage this month
+                </span>
+                <span className="text-ink-2 underline underline-offset-2">View</span>
+              </span>
+              {meters.map((m) => (
+                <span key={m.key} className="mt-1.5 flex items-center gap-2 text-xs text-ink-2">
+                  <span className="flex-1 truncate">{METER_WORDS[m.key].label}</span>
+                  <span className="tabular-nums text-ink">{percentWords(m)}</span>
+                  <UsageRing percent={m.percent} />
+                </span>
+              ))}
+              {!meters.length && <span className="mt-1 block text-xs text-muted">Sol, design credits and Calls &amp; Texts</span>}
+            </Link>
+          )}
           {props.connections && row("Connections", props.connections.href, Users, props.connections.waiting)}
           {props.onSetup && (
             <button
@@ -431,5 +527,28 @@ export function ProfileMenu(props: {
         </div>
       )}
     </div>
+  );
+}
+
+/** A small ring filling with an allowance's use: graphite, the signal colour from 80%, red once used. */
+function UsageRing({ percent }: { percent: number }) {
+  const r = 6;
+  const c = 2 * Math.PI * r;
+  const share = Math.min(100, Math.max(0, percent)) / 100;
+  const tone = percent >= 100 ? "var(--danger)" : percent >= 80 ? "var(--sun-line)" : "var(--ink)";
+  return (
+    <svg viewBox="0 0 16 16" className="size-4 -rotate-90" aria-hidden>
+      <circle cx="8" cy="8" r={r} fill="none" stroke="var(--line)" strokeWidth="2.5" />
+      <circle
+        cx="8"
+        cy="8"
+        r={r}
+        fill="none"
+        stroke={tone}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={`${(c * share).toFixed(2)} ${c.toFixed(2)}`}
+      />
+    </svg>
   );
 }

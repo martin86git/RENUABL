@@ -43,6 +43,7 @@ import {
   type EmailAction,
   type InboxEmail,
   type InboxFilter,
+  framedEmail,
 } from "@/lib/domain/design/inbox";
 import {
   changeInboxEmail,
@@ -214,7 +215,7 @@ export function InboxPage() {
       />
     );
   return (
-    <div className={clsx(ui.page, "space-y-4")}>
+    <div className={clsx(ui.page, "space-y-4 max-sm:space-y-3")}>
       <PageHead title="Email" />
       {said && GMAIL_SAYS[said] && (
         <p
@@ -315,8 +316,14 @@ export function InboxPage() {
               {rowProblem}
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-3">
-            <div role="radiogroup" aria-label="Show" className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm">
+          {/* On a phone (23 Nov 2026, Martin: "optimise for the space constraint"): the filters run the width, then the
+              search with Compact, Refresh and Compose as rounds beside it on one row. */}
+          <div className="flex flex-wrap items-center gap-3 max-sm:gap-2">
+            <div
+              role="radiogroup"
+              aria-label="Show"
+              className="flex rounded-md border border-line bg-surface-2 p-0.5 text-sm max-sm:grid max-sm:w-full max-sm:grid-cols-4 max-sm:text-[13px]"
+            >
               {INBOX_FILTERS.map((f) => (
                 <button
                   key={f.id}
@@ -324,7 +331,7 @@ export function InboxPage() {
                   aria-checked={filter === f.id}
                   onClick={() => setFilter(f.id)}
                   className={clsx(
-                    "rounded-[5px] px-3 py-1",
+                    "rounded-[5px] px-3 py-1 max-sm:px-1",
                     filter === f.id ? "bg-surface text-ink shadow-[0_1px_3px_rgba(11,11,12,0.12)]" : "text-ink-2",
                   )}
                 >
@@ -332,41 +339,53 @@ export function InboxPage() {
                 </button>
               ))}
             </div>
-            <div className="relative min-w-48 max-w-md flex-1">
+            <div className="relative min-w-48 max-w-md flex-1 max-sm:min-w-0">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search these emails"
+                placeholder="Search emails"
                 className={clsx(ui.input, "h-9 min-h-9 pl-9")}
               />
             </div>
             {/* Refresh and Compose on the same row as the filters and search (8 Nov 2026, Martin). */}
-            <span className="ml-auto flex items-center gap-2">
-              {checkedAt && !refreshing && <CheckedWhen at={checkedAt} />}
+            <span className="ml-auto flex items-center gap-2 max-sm:ml-0 max-sm:gap-1.5">
+              {checkedAt && !refreshing && (
+                <span className="max-sm:hidden">
+                  <CheckedWhen at={checkedAt} />
+                </span>
+              )}
               <button
                 type="button"
                 onClick={toggleCompact}
                 aria-pressed={compact}
                 title={compact ? "Back to the usual view" : "A smaller view, to see more emails at once"}
-                className={clsx(ui.quiet, "h-9 px-3", compact && "border-ink text-ink")}
+                aria-label="Compact"
+                className={clsx(ui.quiet, "h-9 px-3 max-sm:w-9 max-sm:px-0", compact && "border-ink text-ink")}
               >
                 {compact ? <Rows3 className="size-4" aria-hidden /> : <Rows2 className="size-4" aria-hidden />}
-                Compact
+                <span className="max-sm:hidden">Compact</span>
               </button>
               <button
                 type="button"
-                className={clsx(ui.quiet, "h-9 px-3")}
+                className={clsx(ui.quiet, "h-9 px-3 max-sm:w-9 max-sm:px-0")}
+                aria-label={refreshing ? "Checking" : "Refresh"}
                 onClick={refresh}
                 disabled={refreshing}
                 aria-busy={refreshing}
                 title="Check Gmail for new email"
               >
                 <RefreshCw className={clsx("size-4", refreshing && "animate-spin motion-reduce:animate-none")} aria-hidden />
-                {refreshing ? "Checking…" : "Refresh"}
+                <span className="max-sm:hidden">{refreshing ? "Checking…" : "Refresh"}</span>
               </button>
-              <button type="button" className={clsx(ui.primary, "h-9 px-3")} title="Write a new email (c)" onClick={compose}>
-                <Plus className="size-4" aria-hidden /> Compose
+              <button
+                type="button"
+                className={clsx(ui.primary, "h-9 px-3 max-sm:w-9 max-sm:rounded-full max-sm:px-0")}
+                title="Write a new email (c)"
+                aria-label="Compose"
+                onClick={compose}
+              >
+                <Plus className="size-4" aria-hidden /> <span className="max-sm:hidden">Compose</span>
               </button>
             </span>
           </div>
@@ -888,14 +907,17 @@ function Mailboxes({
       on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line hover:text-ink",
     );
   return (
-    <div className="flex flex-wrap items-center gap-2" aria-label="Your mailboxes">
+    <div
+      className="flex flex-wrap items-center gap-2 max-sm:no-scrollbar max-sm:-mx-1 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-1"
+      aria-label="Your mailboxes"
+    >
       {boxes.length > 1 && (
         <button type="button" className={chip(!picked)} onClick={() => onPick(null)} aria-pressed={!picked}>
           All mailboxes
         </button>
       )}
       {boxes.map((b) => (
-        <span key={b} className={clsx(chip(picked === b), "pr-1")}>
+        <span key={b} className={clsx(chip(picked === b), "shrink-0 pr-1")}>
           <button type="button" onClick={() => onPick(picked === b ? null : b)} aria-pressed={picked === b} className="truncate">
             {b}
           </button>
@@ -915,17 +937,17 @@ function Mailboxes({
           <button
             type="button"
             onClick={() => onAdd("google")}
-            className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+            className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
           >
-            <Plus className="size-4" aria-hidden /> Add a Gmail
+            <Plus className="size-4" aria-hidden /> <span className="max-sm:hidden">Add a</span> Gmail
           </button>
           {outlookReady && (
             <button
               type="button"
               onClick={() => onAdd("outlook")}
-              className="inline-flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+              className="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
             >
-              <Plus className="size-4" aria-hidden /> Add an Outlook
+              <Plus className="size-4" aria-hidden /> <span className="max-sm:hidden">Add an</span> Outlook
             </button>
           )}
         </>
@@ -1113,21 +1135,33 @@ function EmailView({
         !problem && <p className="text-sm text-muted">Opening…</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <article className={clsx(ui.card, "min-w-0 p-5")}>
-            <h1 className="text-xl font-semibold tracking-tight text-ink">{email.subject}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" aria-hidden>
+          <article className={clsx(ui.card, "min-w-0 p-4 sm:p-5")}>
+            <h1 className="text-[19px] font-semibold leading-snug tracking-tight text-ink sm:text-xl">{email.subject}</h1>
+            <div className="mt-3 flex items-center gap-3">
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white"
+                aria-hidden
+              >
                 {(email.from.name[0] ?? "?").toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-ink">
-                  <span className="font-medium">{email.from.name}</span> <span className="text-muted">&lt;{email.from.email}&gt;</span>
-                </p>
-                <p className="text-xs text-muted">
-                  {email.copy ? `Shared by ${handle(email.owner)}` : "to me"} ·{" "}
-                  {new Date(email.at).toLocaleString("en-AU", { timeZone: "Australia/Melbourne" })}
+                <p className="truncate text-sm font-medium text-ink">{email.from.name || email.from.email}</p>
+                <p className="truncate text-xs text-muted">
+                  {email.from.name ? `${email.from.email} · ` : ""}
+                  {email.copy ? `shared by ${handle(email.owner)}` : "to me"}
                 </p>
               </div>
+              <time className="shrink-0 text-xs text-muted" dateTime={email.at}>
+                {new Date(email.at).toLocaleString("en-AU", {
+                  timeZone: "Australia/Melbourne",
+                  day: "numeric",
+                  month: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </time>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {email.deal && (
                 <Link
                   href={`${PATHS.deals}/${encodeURIComponent(email.deal.id)}`}
@@ -1137,7 +1171,7 @@ function EmailView({
                 </Link>
               )}
               {email.canChange && (
-                <span className="flex items-center gap-1.5">
+                <>
                   <button
                     type="button"
                     onClick={() => void act("archive")}
@@ -1157,7 +1191,7 @@ function EmailView({
                     {email.unread ? <MailOpen className="size-3.5" aria-hidden /> : <Mail className="size-3.5" aria-hidden />}
                     {email.unread ? "Mark read" : "Mark unread"}
                   </button>
-                </span>
+                </>
               )}
               {!email.copy && (
                 <a
@@ -1166,7 +1200,7 @@ function EmailView({
                   }
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
+                  className="ml-auto inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
                 >
                   Open in {providerOfId(email.id) === "outlook" ? "Outlook" : "Gmail"} <ExternalLink className="size-3" aria-hidden />
                 </a>
@@ -1183,15 +1217,9 @@ function EmailView({
             )}
             <div className="mt-4 border-t border-line pt-4">
               {email.html ? (
-                // The email as sent, in a frame where nothing runs; links open in a new tab.
-                <iframe
-                  title="The email"
-                  sandbox="allow-popups allow-popups-to-escape-sandbox"
-                  srcDoc={email.html}
-                  className="h-[60dvh] w-full rounded-md bg-white"
-                />
+                <EmailFrame html={email.html} />
               ) : (
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
+                <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
               )}
             </div>
             {email.files.length > 0 && (
@@ -1289,5 +1317,50 @@ function EmailView({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The email as sent, in a frame where nothing runs (no scripts; links open in a new tab), scaled down
+ * to the width it has as Gmail's app does, and as tall as the email so the page scrolls, not the frame
+ * (24 Nov 2026, Martin: a 600px-wide email ran off a phone's screen). Same-origin without scripts lets
+ * this page measure it; nothing in the email can run either way.
+ */
+function EmailFrame({ html }: { html: string }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const doc = useMemo(() => framedEmail(html), [html]);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const fit = () => {
+      const d = el.contentDocument;
+      if (!d?.body) return;
+      d.body.style.zoom = "";
+      const room = el.clientWidth;
+      const wide = Math.max(d.documentElement.scrollWidth, d.body.scrollWidth);
+      const scale = wide > room + 1 ? room / wide : 1;
+      if (scale < 1) d.body.style.zoom = String(scale);
+      setHeight(Math.ceil(d.documentElement.scrollHeight) + 2);
+    };
+    el.addEventListener("load", fit);
+    const seen = new ResizeObserver(() => fit());
+    seen.observe(el);
+    fit();
+    return () => {
+      el.removeEventListener("load", fit);
+      seen.disconnect();
+    };
+  }, [doc]);
+  return (
+    <iframe
+      ref={frame}
+      title="The email"
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      srcDoc={doc}
+      scrolling="no"
+      style={{ height: height ?? undefined }}
+      className={clsx("block w-full rounded-md bg-white", height === null && "h-[65dvh]")}
+    />
   );
 }

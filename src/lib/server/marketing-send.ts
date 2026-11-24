@@ -12,6 +12,7 @@
 import { WON_STAGES } from "@/lib/domain/design/crm";
 import { mayEmail, type ConsentKind } from "@/lib/domain/marketing/contacts";
 import {
+  fromNameOf,
   cleanContent,
   edmLinks,
   renderEdm,
@@ -51,6 +52,9 @@ export function linksFor(site: string, sendToken: string, unsubToken: string): R
     unsubscribe: `${site}/m/u/${unsubToken}?s=${sendToken}`,
     oneClick: `${site}/api/m/u/${unsubToken}?s=${sendToken}`,
     image: (id) => `${site}/api/m/i/${id}`,
+    social: (network, colour) => `${site}/api/m/s/${network}.png?c=${colour}`,
+    countdown: (end, colour) => `${site}/api/m/t/${end}.gif?c=${colour}`,
+    video: (key, colour) => `${site}/api/m/v/${key}.jpg?c=${colour}`,
   };
 }
 
@@ -327,7 +331,7 @@ async function deliver(
     subject: r.subject,
     html: r.html,
     text: r.text,
-    fromName: brand.fromName || sender.name,
+    fromName: fromNameOf(content, brand, sender),
     ...(brand.replyTo || sender.email ? { replyTo: (brand.replyTo || sender.email)! } : {}),
     headers: { "List-Unsubscribe": `<${links.oneClick}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
     tags: { renuabl_m: token },
@@ -392,6 +396,9 @@ export async function sendTest(businessId: string, content: EdmContent, to: stri
       pixel: null,
       unsubscribe: `${site}/m/u/test`,
       image: (id) => `${site}/api/m/i/${id}`,
+      social: (network, colour) => `${site}/api/m/s/${network}.png?c=${colour}`,
+      countdown: (end, colour) => `${site}/api/m/t/${end}.gif?c=${colour}`,
+      video: (key, colour) => `${site}/api/m/v/${key}.jpg?c=${colour}`,
     },
   );
   return sendEmail({
@@ -399,7 +406,7 @@ export async function sendTest(businessId: string, content: EdmContent, to: stri
     subject: `[Test] ${r.subject}`,
     html: r.html,
     text: r.text,
-    fromName: brand.fromName || sender.name,
+    fromName: fromNameOf(content, brand, sender),
     ...(brand.replyTo || sender.email ? { replyTo: (brand.replyTo || sender.email)! } : {}),
   });
 }

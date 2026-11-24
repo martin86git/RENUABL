@@ -1,11 +1,14 @@
 "use client";
 
+import { useDealStageLabel } from "./stage-select";
 import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  ArrowLeft,
+  ChevronDown,
   ChevronLeft,
   ClipboardList,
   FileText,
@@ -16,12 +19,11 @@ import {
   MessagesSquare,
   Paperclip,
   PenTool,
-  Search,
   Trash2,
   Wrench,
   X,
 } from "lucide-react";
-import { SolBadge } from "./sol-sun";
+import { SolBadge, SolMark } from "./sol-sun";
 import { JobCardDialog } from "./job-card";
 import { CallNotetaker, type NotetakerHandle } from "./call-notetaker";
 import { ListOnMarketplace } from "./marketplace";
@@ -30,8 +32,6 @@ import { marketplaceOpen } from "@/lib/domain/design/marketplace-launch";
 import clsx from "clsx";
 import { DealTeamChat } from "./deal-team-chat";
 import {
-  JOB_STAGES,
-  STAGE_LABELS,
   type Activity,
   type Customer,
   type CustomerInput,
@@ -58,17 +58,19 @@ import {
   setDealOwner,
   shortDate,
 } from "@/lib/services/crm";
-import { loadMembers } from "@/lib/services/design-account";
+import { finishDealTour, loadTeam } from "@/lib/services/design-account";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD } from "./design-home";
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
+import { StageSelect } from "./stage-select";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
 import { DealBanner } from "./deal-banner";
 import { SolOnDealCard } from "./sol-on-deal";
+import { DEAL_SOL_STATE, DEAL_SOL_TOGGLE } from "@/lib/services/sol";
 import { Spotlight } from "./new-look";
 import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
 import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
@@ -80,13 +82,14 @@ import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
 import { NOT_TRACKED, openedWords } from "@/lib/domain/design/email-opens";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { bannerFigures } from "@/lib/domain/design/system-summary";
-import { loadOpens, loadPulses } from "@/lib/services/deal-pulse";
+import { loadDealMail, loadOpens, loadPulses } from "@/lib/services/deal-pulse";
+import type { DealMail } from "@/lib/domain/design/deal-mail";
+import { outlookWebLink, providerOfId } from "@/lib/domain/design/outlook-mail";
 import { DealEmails } from "./deal-emails";
 import { CallEntryBy, CallEntryText } from "./call-entry";
 import { CallChoices } from "./call-choice";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
-type Written = "note" | "call" | "email";
 type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
 /**
  * The deal's tabs under its banner, in order; Service sits apart after them. Activity is the deal at a glance and its
@@ -233,6 +236,8 @@ function DetailField({ line, onSave }: { line: DealDetail; onSave: (text: string
  * searched and added to.
  */
 export function DealPage({ id }: { id: string }) {
+  // Stages by the business's own names (pipeline-stages.ts).
+  const stageWords = useDealStageLabel();
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -322,6 +327,8 @@ export function DealPage({ id }: { id: string }) {
   const [fieldsConfig, setFieldsConfig] = useState<DealFieldsConfig | null>(null);
   // The business's people: who a deal can be given to, and who can be @mentioned in a note.
   const [members, setMembers] = useState<string[]>([]);
+  // People kept to own deals without being invited (Your account → Deal owners not invited yet): owners only, never mentioned.
+  const [ownerOnly, setOwnerOnly] = useState<{ email: string; name: string }[]>([]);
   // The deal's clock and temperature while it is being sold, and when its emails were opened.
   const [pulse, setPulse] = useState<DealPulse | null>(null);
   const [opens, setOpens] = useState<{ times: Record<string, string[]>; counts: Record<string, number> } | null>(null);
@@ -334,7 +341,11 @@ export function DealPage({ id }: { id: string }) {
     };
   }, [id, activity.length]);
   useEffect(() => {
-    void loadMembers().then((m) => m && setMembers(m.map((x) => x.email.toLowerCase())));
+    void loadTeam().then((t) => {
+      if (!t) return;
+      setMembers(t.members.map((x) => x.email.toLowerCase()));
+      setOwnerOnly(t.ownerOnly);
+    });
     // Opening the deal reads any mention of this member on it.
     void markNotificationsRead({ jobId: id }).then(() => window.dispatchEvent(new Event("renuabl:notifications")));
   }, [id]);
@@ -346,31 +357,51 @@ export function DealPage({ id }: { id: string }) {
     void loadInstallExtras().then((res) => res.ok && setExtra(res.extras.find((e) => e.jobId === id) ?? null));
   }, [id]);
   const business = account?.signedIn ? (account.business?.name ?? "") : "";
-  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): from the pipeline's card
-  // (?tour=1) every time, otherwise the first time it is opened on this device; Show me around starts it again.
+  // The tour of a deal, on the sample deal a new business starts with (20 Nov 2026, Martin): once on this device, the
+  // first time it is opened, from the pipeline or anywhere; Show me around starts it again (23 Nov 2026, Martin: it kept
+  // running each time the sample was opened). It counts as seen the moment it starts, so leaving it half way or
+  // reloading doesn't bring it back.
   const [touring, setTouring] = useState(false);
   // The starter sample only: the example deals a demo is filled with are marked sample too, and aren't a tour each.
   const isSample = Boolean(customer?.sample) && customer?.source !== EXAMPLE_SOURCE;
-  const tourAsked = params.get("tour") === "1";
+  // Seen is also kept on the person's own account (24 Nov 2026, Martin: it started again on his iPhone, whose Safari and
+  // Home Screen app each keep their own storage), so it runs once for them, not once a device. It waits for the account.
+  const tourSeenOnAccount = account?.signedIn ? Boolean(account.dealTourSeen) : null;
   useEffect(() => {
-    if (!isSample) return;
-    let seen = false;
+    if (!isSample || tourSeenOnAccount === null) return;
+    let seen = tourSeenOnAccount;
     try {
-      seen = window.localStorage.getItem(DEAL_TOUR_KEY) === "1";
+      if (window.localStorage.getItem(DEAL_TOUR_KEY) === "1") seen = true;
     } catch {}
-    if (seen && !tourAsked) return;
-    // A moment for Sol's card and the fields to be on the page, so each has a place to light.
-    const t = window.setTimeout(() => setTouring(true), 900);
+    if (seen) return;
+    // A moment for Sol's card and the fields to be on the page, so each has a place to light. Never under a window
+    // already open over the page (an agent's chat on a phone).
+    const t = window.setTimeout(() => {
+      if (document.documentElement.dataset.phoneWindow !== undefined) return;
+      try {
+        window.localStorage.setItem(DEAL_TOUR_KEY, "1");
+      } catch {}
+      void finishDealTour();
+      setTouring(true);
+    }, 900);
     return () => window.clearTimeout(t);
-  }, [isSample, tourAsked]);
+  }, [isSample, tourSeenOnAccount]);
   const endTour = useCallback(() => {
     setTouring(false);
     try {
       window.localStorage.setItem(DEAL_TOUR_KEY, "1");
     } catch {}
+    void finishDealTour();
   }, []);
-  const [find, setFind] = useState("");
-  const [kind, setKind] = useState<Written>("note");
+  // The customer's emails in this member's own mailboxes, beside the record on the Notes timeline (23 Nov 2026, Martin).
+  const [mail, setMail] = useState<DealMail[]>([]);
+  useEffect(() => {
+    let gone = false;
+    void loadDealMail(id).then((r) => !gone && r.ok && setMail(r.mail));
+    return () => {
+      gone = true;
+    };
+  }, [id, activity.length]);
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
 
@@ -427,7 +458,7 @@ export function DealPage({ id }: { id: string }) {
   };
   const say = async () => {
     if (!job || !text.trim()) return;
-    const res = await addActivity(job.customerId, { kind, text: text.trim(), jobId: id });
+    const res = await addActivity(job.customerId, { kind: "note", text: text.trim(), jobId: id });
     if (!res.ok) return setStatus(res.message);
     setActivity([res.activity, ...activity]);
     setText("");
@@ -441,7 +472,7 @@ export function DealPage({ id }: { id: string }) {
     job && customer
       ? [
           `Deal: ${customer.name}, ${job.title} at ${job.address || "no address yet"}.`,
-          `Stage: ${STAGE_LABELS[job.stage]}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
+          `Stage: ${stageWords(job)}${job.kw ? `; ${job.kw} kW` : ""}${job.value != null ? `; value $${Math.round(job.value).toLocaleString("en-AU")}` : ""}${job.installDate ? `; installing ${job.installDate}` : ""}.`,
         ].join("\n")
       : null,
   );
@@ -463,11 +494,14 @@ export function DealPage({ id }: { id: string }) {
     );
   if (!job || !customer) return <div className={ui.page} aria-busy="true" />;
 
-  const words = find.trim().toLowerCase();
-  const shown = activity.filter((a) => !words || `${a.text} ${a.by}`.toLowerCase().includes(words));
-  // Newest first, under the month they happened in.
-  const months: { month: string; items: Activity[] }[] = [];
-  for (const a of shown) {
+  // Notes are the deal's whole timeline (23 Nov 2026, Martin): the record and the customer's emails to and from them in
+  // this member's own mailboxes, newest first, under the month they happened in.
+  const timeline: Timed[] = [
+    ...activity.map((a): Timed => ({ ...a, mail: null })),
+    ...mail.map((m): Timed => ({ id: `mail:${m.box}:${m.id}`, at: m.at, mail: m })),
+  ].sort((x, y) => y.at.localeCompare(x.at));
+  const months: { month: string; items: Timed[] }[] = [];
+  for (const a of timeline) {
     const month = new Date(a.at).toLocaleDateString("en-AU", { month: "long", year: "numeric" });
     if (months[months.length - 1]?.month === month) months[months.length - 1].items.push(a);
     else months.push({ month, items: [a] });
@@ -492,13 +526,17 @@ export function DealPage({ id }: { id: string }) {
           depositReceived: extra.depositReceived,
           solarVicRebate: extra.solarVicRebate ?? null,
           solarVicLoan: extra.solarVicLoan ?? null,
+          grossMargin: extra.grossMargin ?? null,
+          grossShare: extra.grossShare ?? null,
+          commission: extra.commission ?? null,
+          afterCommission: extra.afterCommission ?? null,
         }
       : null,
   };
   const tabFields = shownTab ? shownTab.fields.filter((f) => !f.hidden) : [];
   const tabLines = tabFields.map((f) => fieldLine(f, job.details, ctx));
   const tabFilled = tabLines.filter((l) => l.value).length;
-  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived"];
+  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived", "grossMargin", "afterCommission"];
   const menu = {
     tab,
     onTab: setTab,
@@ -511,6 +549,12 @@ export function DealPage({ id }: { id: string }) {
     phone: customer.phone,
     name: customer.firstName,
     onNotes: () => notetaker.current?.start(),
+  };
+  const deleteDeal = async () => {
+    if (!window.confirm(`Delete this deal for ${customer.name}? Its design and history are kept.`)) return;
+    const res = await deleteJob(id);
+    if (res.ok) router.push(PATHS.pipelines);
+    else setStatus(res.message);
   };
   const setDetail = (key: string, text: string) => {
     const next = { ...job.details };
@@ -527,11 +571,11 @@ export function DealPage({ id }: { id: string }) {
     // the two rails float on the page outside it (10 Nov 2026, Martin).
     <div
       data-rails-out
-      className="mx-auto w-full max-w-[64rem] px-5 py-6 xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
+      className="mx-auto w-full max-w-[64rem] px-5 py-6 max-sm:-mx-3 max-sm:w-auto max-sm:px-0 max-sm:pt-0 max-sm:pb-[var(--deal-sol-h,0px)] xl:grid xl:max-w-[72rem] xl:grid-cols-[4rem_minmax(0,1fr)] xl:items-start xl:gap-6 xl:px-0 xl:py-0"
     >
       {touring && <Spotlight steps={DEAL_TOUR} onEnd={endTour} />}
       <DealMenu vertical {...menu} />
-      <div className="min-w-0 space-y-4 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
+      <div className="min-w-0 space-y-4 max-sm:space-y-3 xl:min-h-[calc(100dvh-10rem)] xl:rounded-[28px] xl:bg-canvas xl:p-6">
         {(job.lat !== null || tool === "proposal") && (
           <DesignDrawer
             src={tool === "proposal" ? proposalHref(job.id) : designHref(job.id)}
@@ -554,11 +598,12 @@ export function DealPage({ id }: { id: string }) {
             back="Back to the deal"
           />
         )}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        {/* On a phone the way back and Delete are on the slim rail, so the deal starts at the top. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 max-sm:gap-y-0">
           <Link
             href={PATHS.pipelines}
             data-tour="deal-back"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-2 hover:text-ink max-sm:hidden"
           >
             <ChevronLeft className="size-4 text-muted" aria-hidden /> Deals
           </Link>
@@ -575,17 +620,12 @@ export function DealPage({ id }: { id: string }) {
               Sample deal · Show me around
             </button>
           )}
-          <p className="min-h-4 flex-1 text-right text-xs text-muted" role="status">
+          <p className="min-h-4 flex-1 text-right text-xs text-muted max-sm:min-h-0" role="status">
             {status}
           </p>
           <button
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger"
-            onClick={async () => {
-              if (!window.confirm(`Delete this deal for ${customer.name}? Its design and history are kept.`)) return;
-              const res = await deleteJob(id);
-              if (res.ok) router.push(PATHS.pipelines);
-              else setStatus(res.message);
-            }}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger max-sm:hidden"
+            onClick={() => void deleteDeal()}
           >
             <Trash2 className="size-3.5" aria-hidden /> Delete
           </button>
@@ -599,11 +639,40 @@ export function DealPage({ id }: { id: string }) {
             customer={customer}
             pulse={pulse && hasPulse(job.stage) ? pulse : null}
             compact={tab !== "activities"}
-            figures={bannerFigures(details, job.kw)}
+            // The system as drawn when it has a design (22 Nov 2026, Martin: an imported 3.8 kW beside two 7 kW designs).
+            figures={bannerFigures(
+              details.map((d) => (d.designed ? { ...d, value: d.designed } : d)),
+              job.kw,
+            )}
             onDesign={job.lat !== null ? () => openTool("design") : null}
             onPlace={() => setAskPlace("place")}
+            actions={
+              // On a phone, ringing and writing to the customer sit in the banner itself (21 Nov 2026, Martin).
+              <div data-tour="deal-reach" className="flex gap-1.5">
+                <CallMenu
+                  round="banner"
+                  jobId={job.id}
+                  phone={customer.phone}
+                  name={customer.firstName}
+                  onNotes={menu.onNotes}
+                  toBook={PRE_INSTALL_STAGES.includes(job.stage)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setTab("email")}
+                  aria-label={`Email ${customer.firstName || "the customer"}`}
+                  className={clsx(
+                    "flex size-9 items-center justify-center rounded-full ring-1 transition",
+                    tab === "email" ? "bg-white text-ink ring-white" : "bg-white/10 text-white ring-white/15",
+                  )}
+                >
+                  <Mail className="size-4" aria-hidden />
+                </button>
+              </div>
+            }
           />
         </div>
+        <DealPills {...menu} onDelete={deleteDeal} />
         {askPlace && (
           <AskPlace
             name={customer.firstName}
@@ -621,7 +690,7 @@ export function DealPage({ id }: { id: string }) {
         )}
 
         {/* Sol's line (16 Nov 2026, Martin): what happened, what he does next, what the deal needs from you. */}
-        <div data-tour="deal-sol" className="empty:hidden">
+        <DealSolSheet name={customer.firstName}>
           <SolOnDealCard
             jobId={job.id}
             phone={customer.phone || null}
@@ -643,7 +712,7 @@ export function DealPage({ id }: { id: string }) {
                           : goTab("team")
             }
           />
-        </div>
+        </DealSolSheet>
 
         <CallNotetaker
           handle={notetaker}
@@ -676,7 +745,7 @@ export function DealPage({ id }: { id: string }) {
                   aria-selected={tab === key}
                   onClick={() => setTab(key)}
                   className={clsx(
-                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors",
+                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors max-sm:px-2.5 max-sm:text-[12px]",
                     tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                   )}
                 >
@@ -736,7 +805,7 @@ export function DealPage({ id }: { id: string }) {
               <div
                 role="tablist"
                 aria-label="Deal details"
-                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1 shadow-[0_0_0_8px_var(--canvas)]"
+                className="sticky top-[var(--studio-head,0px)] z-10 flex flex-wrap gap-1 rounded-xl bg-surface-2 p-1 shadow-[0_0_0_8px_var(--canvas)] max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:[scrollbar-width:none] max-sm:[&::-webkit-scrollbar]:hidden"
               >
                 {[{ id: "deal", label: "The deal" }, ...tabs].map((t) => {
                   const on = t.id === "deal" ? section === "deal" || !shownTab : section !== "deal" && shownTab?.id === t.id;
@@ -747,7 +816,7 @@ export function DealPage({ id }: { id: string }) {
                       aria-selected={on}
                       onClick={() => setSection(t.id)}
                       className={clsx(
-                        "h-8 flex-1 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium",
+                        "h-8 flex-1 shrink-0 whitespace-nowrap rounded-lg px-3 text-[13px] font-medium max-sm:flex-none",
                         on ? "bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "text-ink-2 hover:text-ink",
                       )}
                     >
@@ -756,10 +825,10 @@ export function DealPage({ id }: { id: string }) {
                   );
                 })}
               </div>
-              <section data-tour="deal-fields" className={clsx(ui.card, "p-5")}>
+              <section data-tour="deal-fields" className={clsx(ui.card, "p-5 max-sm:px-3.5 max-sm:py-2")}>
                 {section === "deal" || !shownTab ? (
                   <>
-                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       <EditLine
                         key={`title:${job.title}`}
                         label="Deal name"
@@ -775,17 +844,7 @@ export function DealPage({ id }: { id: string }) {
                       />
                       <label className="block text-xs text-muted">
                         Deal stage
-                        <select
-                          className={clsx(ui.input, "mt-1 appearance-auto")}
-                          value={job.stage}
-                          onChange={(e) => void patch({ stage: e.target.value as JobStage })}
-                        >
-                          {JOB_STAGES.map((s) => (
-                            <option key={s} value={s}>
-                              {STAGE_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                        <StageSelect job={job} className={clsx(ui.input, "mt-1 appearance-auto")} onChange={(to) => void patch(to)} />
                       </label>
                       <label className="block text-xs text-muted">
                         Quoted price, inc. GST ($)
@@ -833,9 +892,16 @@ export function DealPage({ id }: { id: string }) {
                         >
                           <option value="">No one yet</option>
                           {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
-                          {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
+                          {[
+                            ...new Set([...members, ...(job.owner && !ownerOnly.some((o) => o.email === job.owner) ? [job.owner] : [])]),
+                          ].map((m) => (
                             <option key={m} value={m}>
                               {m}
+                            </option>
+                          ))}
+                          {ownerOnly.map((o) => (
+                            <option key={o.email} value={o.email}>
+                              {o.name} (not invited)
                             </option>
                           ))}
                         </select>
@@ -896,7 +962,7 @@ export function DealPage({ id }: { id: string }) {
                         {tabFilled} of {tabLines.length} filled
                       </span>
                     </div>
-                    <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       {tabLines.map((l) => {
                         const d = l.source === "design" ? details.find((x) => x.key === l.key) : null;
                         return (
@@ -940,33 +1006,7 @@ export function DealPage({ id }: { id: string }) {
                 <DealProposal jobId={job.id} hasDesign={Boolean(job.projectId)} statusOnly />
               </section>
               <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="relative block w-64 max-w-full">
-                    <span className="sr-only">Search notes</span>
-                    <input
-                      className={clsx(ui.input, "rounded-full pl-4 pr-9")}
-                      value={find}
-                      onChange={(e) => setFind(e.target.value)}
-                      placeholder="Search notes"
-                    />
-                    <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted" aria-hidden />
-                  </label>
-                  <p className="text-xs tabular-nums text-muted">
-                    Showing {shown.length} of {activity.length}
-                  </p>
-                </div>
-
-                <div className={clsx(ui.card, "mt-4 flex flex-wrap gap-2 p-3")}>
-                  <select
-                    aria-label="What happened"
-                    className={clsx(ui.input, "w-28 appearance-auto")}
-                    value={kind}
-                    onChange={(e) => setKind(e.target.value as Written)}
-                  >
-                    <option value="note">Note</option>
-                    <option value="call">Call</option>
-                    <option value="email">Email</option>
-                  </select>
+                <div className={clsx(ui.card, "flex flex-wrap gap-2 p-3")}>
                   <input
                     aria-label="What was said or done"
                     className={clsx(ui.input, "min-w-0 flex-1")}
@@ -974,7 +1014,7 @@ export function DealPage({ id }: { id: string }) {
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && void say()}
                     maxLength={1000}
-                    placeholder="Write a note, or log a call or an email. Type @ to mention someone"
+                    placeholder="Write a note. Type @ to mention someone"
                   />
                   {members.length > 1 && (
                     <select
@@ -999,54 +1039,60 @@ export function DealPage({ id }: { id: string }) {
                   </button>
                 </div>
 
-                {months.length === 0 && (
-                  <p className="mt-6 text-sm text-ink-2">{activity.length ? "Nothing matches that." : "Nothing yet."}</p>
-                )}
+                {months.length === 0 && <p className="mt-6 text-sm text-ink-2">Nothing yet.</p>}
                 {months.map(({ month, items }) => (
                   <section key={month} className="mt-6">
                     <h2 className="text-[15px] text-ink-2">{month}</h2>
                     <ol className="mt-2.5 space-y-2.5">
-                      {items.map((a) => (
-                        <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
-                          <div className="flex items-baseline justify-between gap-3">
-                            <p className="text-sm text-ink">
-                              <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
-                              {a.kind === "call" ? <CallEntryBy by={a.by} /> : <span className="text-ink-2">by {a.by.split("@")[0]}</span>}
-                            </p>
-                            <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
-                              {new Date(a.at).toLocaleString("en-AU", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })}
-                            </time>
-                          </div>
-                          {a.kind === "call" ? (
-                            <CallEntryText text={a.text} jobId={id} at={a.at} by={a.by} />
-                          ) : (
-                            <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
-                          )}
-                          {a.kind === "email" &&
-                            opens &&
-                            (opens.times[a.id] ? (
-                              <p
-                                className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
-                                title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
-                              >
-                                {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                      {items.map((a) =>
+                        a.mail ? (
+                          <MailEntry key={a.id} m={a.mail} />
+                        ) : (
+                          <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <p className="text-sm text-ink">
+                                <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
+                                {a.kind === "call" ? (
+                                  <CallEntryBy by={a.by} />
+                                ) : (
+                                  <span className="text-ink-2">by {a.by.split("@")[0]}</span>
+                                )}
                               </p>
+                              <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={a.at}>
+                                {new Date(a.at).toLocaleString("en-AU", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
+                              </time>
+                            </div>
+                            {a.kind === "call" ? (
+                              <CallEntryText text={a.text} jobId={id} at={a.at} by={a.by} />
                             ) : (
-                              <p
-                                className="mt-1.5 text-xs text-muted"
-                                title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
-                              >
-                                {NOT_TRACKED}
-                              </p>
-                            ))}
-                        </li>
-                      ))}
+                              <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-ink">{a.text}</p>
+                            )}
+                            {a.kind === "email" &&
+                              opens &&
+                              (opens.times[a.id] ? (
+                                <p
+                                  className={clsx("mt-1.5 text-xs", opens.times[a.id].length ? "font-medium text-positive" : "text-muted")}
+                                  title="Only the customer's copy is counted. Apple Mail can open an email by itself when it arrives, so this is a guide."
+                                >
+                                  {openedWords(opens.times[a.id], LAUNCH_MARKET.timeZone, new Date(), opens.counts[a.id])}
+                                </p>
+                              ) : (
+                                <p
+                                  className="mt-1.5 text-xs text-muted"
+                                  title="Opens are counted for emails sent from this deal while the site's address is set up. This one was sent before, or another way."
+                                >
+                                  {NOT_TRACKED}
+                                </p>
+                              ))}
+                          </li>
+                        ),
+                      )}
                     </ol>
                   </section>
                 ))}
@@ -1072,6 +1118,7 @@ function CallMenu({
   toBook = false,
   rail = false,
   round,
+  mini = false,
 }: {
   jobId: string;
   phone: string;
@@ -1079,10 +1126,13 @@ function CallMenu({
   onNotes: () => void;
   /** Sold and not yet installed: the admin assistant can ring to book the installation. */
   toBook?: boolean;
-  /** A round of the deal's menu: down the left ("rail", its choices to its right) or in the row ("row", below). */
-  round?: "rail" | "row";
+  /** A round of the deal's menu: down the left ("rail", its choices to its right), in the row ("row", below), or on the
+   * phone's banner ("banner": a small light round on the graphite, its choices below). */
+  round?: "rail" | "row" | "banner";
   /** As a line of the rail beside the page (its words shown, the menu opening to its left). */
   rail?: boolean;
+  /** The phone's slim rail: a smaller round. */
+  mini?: boolean;
 }) {
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -1113,35 +1163,45 @@ function CallMenu({
           if (at) return setAt(null);
           const r = e.currentTarget.getBoundingClientRect();
           setAt(
-            round === "rail"
-              ? { top: r.top, left: r.right + 12 }
-              : rail
-                ? { top: r.top, left: Math.max(8, r.left - 296) }
-                : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
+            round === "banner"
+              ? { top: r.bottom + 8, left: Math.max(8, Math.min(r.right - 288, window.innerWidth - 296)) }
+              : round === "rail"
+                ? { top: r.top, left: Math.max(8, Math.min(r.right + 12, window.innerWidth - 296)) }
+                : rail
+                  ? { top: r.top, left: Math.max(8, r.left - 296) }
+                  : { top: r.bottom + 8, left: Math.max(8, Math.min(r.left, window.innerWidth - 296)) },
           );
         }}
         className={
-          round
-            ? "group flex flex-col items-center gap-1 disabled:opacity-100"
-            : clsx(
-                rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
-                at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
-                !phone && "text-muted hover:text-muted",
+          round === "banner"
+            ? clsx(
+                "flex size-9 items-center justify-center rounded-full ring-1 transition disabled:opacity-40",
+                at ? "bg-white text-ink ring-white" : "bg-white/10 text-white ring-white/15",
               )
+            : round
+              ? "group flex flex-col items-center gap-1 disabled:opacity-100"
+              : clsx(
+                  rail ? RAIL_ITEM : "flex h-9 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+                  at ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
+                  !phone && "text-muted hover:text-muted",
+                )
         }
       >
-        {round ? (
+        {round === "banner" ? (
+          <Phone className="size-4" aria-hidden />
+        ) : round ? (
           <>
             <span
               className={clsx(
-                "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+                "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+                mini ? "size-9" : "size-12",
                 at ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
                 !phone && "text-muted group-hover:text-muted",
               )}
             >
-              <Phone className="size-5" aria-hidden />
+              <Phone className={mini ? "size-4" : "size-5"} aria-hidden />
             </span>
-            <span className={clsx("text-[11px] font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
+            <span className={clsx(mini ? "text-[9.5px]" : "text-[11px]", "font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
           </>
         ) : (
           <>
@@ -1213,8 +1273,210 @@ function useCentredRail() {
  * notes and chats; then, only once it matters, the Job card (sold) and Service (installed); then Sol. Down the left on
  * a wide screen, floating in the middle of the window; a row under the banner narrower.
  */
+/**
+ * The deal's tools on a phone (21 Nov 2026, Martin: the rail down the left took a fifth of the screen and cut the words
+ * short): one row of pills under the banner that scrolls sideways. Call and Email are in the banner; Sol is the foot
+ * bar's, so he isn't here twice.
+ */
+/**
+ * Sol's card for the deal. On a wide screen it sits in the page; on a phone (21 Nov 2026, Martin: "sols chat box should
+ * be a pop up which can be collapsed or reintroduced via the centre sol icon at the footer") it is a sheet over the foot
+ * bar, folded away by its handle into the foot bar's Sol round, which brings it back (`DEAL_SOL_TOGGLE`; elsewhere
+ * the round goes to Today). One element either
+ * way, so the card is never mounted twice (it drafts a reply when it opens). Folded or not is kept for the tab.
+ */
+const SOL_TUCKED_KEY = "renuabl.design.deal-sol-tucked";
+function DealSolSheet({ children, name }: { children: React.ReactNode; name: string }) {
+  const [tucked, setTucked] = useState(() => {
+    try {
+      return typeof window !== "undefined" && sessionStorage.getItem(SOL_TUCKED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [height, setHeight] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const set = useCallback((next: boolean) => {
+    setTucked(next);
+    try {
+      sessionStorage.setItem(SOL_TUCKED_KEY, next ? "1" : "0");
+    } catch {}
+  }, []);
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 639px)");
+    const mark = () => {
+      if (phone.matches) document.documentElement.dataset.dealSol = "1";
+      else delete document.documentElement.dataset.dealSol;
+    };
+    mark();
+    phone.addEventListener("change", mark);
+    const toggle = () =>
+      setTucked((was) => {
+        try {
+          sessionStorage.setItem(SOL_TUCKED_KEY, was ? "0" : "1");
+        } catch {}
+        return !was;
+      });
+    window.addEventListener(DEAL_SOL_TOGGLE, toggle);
+    return () => {
+      phone.removeEventListener("change", mark);
+      window.removeEventListener(DEAL_SOL_TOGGLE, toggle);
+      delete document.documentElement.dataset.dealSol;
+    };
+  }, []);
+  // Room at the foot of the page so the sheet never hides its end.
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(() => setHeight(el.offsetHeight));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+  // Folded, he goes into the foot bar's Sol round (22 Nov 2026, Martin: "he should minimise visually onto the centre
+  // sol icon so the user can see that's where they can re-engage Sol on the deal"): the round is told, and lands him.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (tucked) root.dataset.dealSolTucked = "1";
+    else delete root.dataset.dealSolTucked;
+    window.dispatchEvent(new Event(DEAL_SOL_STATE));
+    return () => {
+      delete root.dataset.dealSolTucked;
+      window.dispatchEvent(new Event(DEAL_SOL_STATE));
+    };
+  }, [tucked]);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--deal-sol-h", tucked || !height ? "0px" : `${height + 16}px`);
+    return () => {
+      root.removeProperty("--deal-sol-h");
+    };
+  }, [tucked, height]);
+  return (
+    <>
+      <div
+        ref={box}
+        data-tour="deal-sol"
+        className={clsx(
+          "[&:not(:has(section))]:hidden",
+          "max-sm:fixed max-sm:inset-x-2 max-sm:bottom-[calc(3.75rem+env(safe-area-inset-bottom))] max-sm:z-30",
+          "deal-sol-sheet max-sm:max-h-[58dvh] max-sm:overflow-y-auto max-sm:overscroll-contain max-sm:rounded-2xl max-sm:bg-surface max-sm:ring-1 max-sm:ring-line",
+          "max-sm:shadow-[0_-6px_30px_rgba(11,11,12,0.22)]",
+          tucked && "deal-sol-tucked",
+        )}
+        aria-hidden={tucked || undefined}
+      >
+        {/* On a phone it reads as a chat window (22 Nov 2026, Martin: "sols chat tab doesn't feel like a chat tab"): a
+            header with Sol and who it's about, his line as a bubble, quick replies under it, the box at the foot. */}
+        <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-line bg-surface px-3 pb-2 pt-1.5 sm:hidden">
+          <span className="absolute left-1/2 top-1 h-1 w-9 -translate-x-1/2 rounded-full bg-ink/15" aria-hidden />
+          <SolMark className="mt-1 size-8 shrink-0" />
+          <span className="mt-1 min-w-0 flex-1 leading-tight">
+            <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
+              Sol
+              <span className="rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium text-muted ring-1 ring-line">AI</span>
+            </span>
+            <span className="block truncate text-[11.5px] text-muted">{name ? `On ${name}'s deal` : "On this deal"}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => set(true)}
+            aria-label="Fold Sol into the Sol round below (press it to bring him back)"
+            title="Fold away"
+            className="mt-1 grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface-2"
+          >
+            <ChevronDown className="size-4" aria-hidden />
+          </button>
+        </div>
+        {children}
+      </div>
+    </>
+  );
+}
+
+function DealPills(props: {
+  tab: Tab;
+  onTab: (tab: Tab) => void;
+  stage: JobStage;
+  designable: boolean;
+  onDesign: () => void;
+  onProposal: () => void;
+  onCard: () => void;
+  onDelete: () => void;
+}) {
+  const sold = WON_STAGES.includes(props.stage);
+  const installed = INSTALLED_STAGES.includes(props.stage);
+  const inDetails = NOTES_VIEWS.some(([key]) => key === props.tab);
+  return (
+    <nav
+      aria-label="This deal"
+      className="deal-pills relative z-10 -mt-8 flex justify-between gap-1 overflow-x-auto px-1 pt-1.5 pb-0.5 [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
+    >
+      <PillRound
+        label="Design"
+        icon={PenTool}
+        main
+        tour="deal-design"
+        title={props.designable ? "Design" : "Give the deal an address to design it"}
+        onClick={props.onDesign}
+      />
+      <PillRound label="Proposal" icon={FileText} tour="deal-proposal" onClick={props.onProposal} />
+      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("details")} />
+      <PillRound label="Files" icon={Paperclip} on={props.tab === "files"} onClick={() => props.onTab("files")} />
+      {sold && <PillRound label="Job card" icon={HardHat} onClick={props.onCard} />}
+      {installed && <PillRound label="Service" icon={Wrench} on={props.tab === "service"} onClick={() => props.onTab("service")} />}
+      <PillRound label="Delete" icon={Trash2} title="Delete this deal" onClick={props.onDelete} />
+    </nav>
+  );
+}
+
+// On a phone (21 Nov 2026, Martin): the deal's tools as icon rounds, a small name under each, in one row.
+function PillRound({
+  label,
+  icon: Icon,
+  on = false,
+  main = false,
+  tour,
+  title,
+  onClick,
+}: {
+  label: string;
+  icon: typeof PenTool;
+  on?: boolean;
+  main?: boolean;
+  tour?: string;
+  title?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-tour={tour}
+      onClick={onClick}
+      title={title ?? label}
+      aria-pressed={on || undefined}
+      className="flex w-14 shrink-0 flex-col items-center gap-1"
+    >
+      <span
+        className={clsx(
+          "flex size-10 items-center justify-center rounded-full shadow-[0_2px_8px_rgba(0,0,0,0.28)] ring-1 transition",
+          main
+            ? "bg-sun-line text-white ring-sun-line"
+            : on
+              ? "bg-primary text-primary-ink ring-primary"
+              : "bg-surface text-ink-2 ring-line",
+        )}
+        aria-hidden
+      >
+        <Icon className={clsx("size-[18px]", !main && !on && label === "Proposal" && "text-sun-line")} />
+      </span>
+      <span className={clsx("text-[10px] leading-none", on ? "font-semibold text-ink" : "text-muted")}>{label}</span>
+    </button>
+  );
+}
+
 function DealMenu({
   vertical = false,
+  mini = false,
   tab,
   onTab,
   stage,
@@ -1226,8 +1488,11 @@ function DealMenu({
   phone,
   name,
   onNotes,
+  onDelete,
 }: {
   vertical?: boolean;
+  /** The phone's slim rail (21 Nov 2026, Martin): down the left, hard up to the gutter, the way back to Deals first. */
+  mini?: boolean;
   tab: Tab;
   onTab: (tab: Tab) => void;
   stage: JobStage;
@@ -1239,20 +1504,27 @@ function DealMenu({
   phone: string;
   name: string;
   onNotes: () => void;
+  onDelete?: () => void;
 }) {
   const [railRef, railStyle] = useCentredRail();
   const sold = WON_STAGES.includes(stage);
   const installed = INSTALLED_STAGES.includes(stage);
+  const down = vertical || mini;
+  const size = mini ? "size-9" : "size-12";
+  const icon = mini ? "size-4" : "size-5";
   const round = (on: boolean) =>
     clsx(
-      "flex size-12 items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+      "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
+      size,
       on ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
     );
-  const line = <span className={vertical ? "h-px w-8 shrink-0 bg-line" : "mt-6 h-px w-4 shrink-0 bg-line"} aria-hidden />;
+  const line = (
+    <span className={down ? clsx("h-px shrink-0 bg-line", mini ? "w-6" : "w-8") : "mt-6 h-px w-4 shrink-0 bg-line"} aria-hidden />
+  );
   const page = (key: Tab, label: string, title: string, Icon: typeof Mail) => (
-    <RailRound label={label} title={title} onClick={() => onTab(key)} on={tab === key}>
+    <RailRound mini={mini} label={label} title={title} onClick={() => onTab(key)} on={tab === key}>
       <span className={round(tab === key)}>
-        <Icon className="size-5" aria-hidden />
+        <Icon className={icon} aria-hidden />
       </span>
     </RailRound>
   );
@@ -1262,24 +1534,48 @@ function DealMenu({
       style={vertical ? railStyle : undefined}
       aria-label="This deal"
       className={
-        vertical
-          ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
-          : "-mx-1 flex items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] xl:hidden [&::-webkit-scrollbar]:hidden"
+        mini
+          ? "sticky top-3 z-10 -ml-2.5 flex flex-col items-center gap-2 self-start sm:hidden"
+          : vertical
+            ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+            : "-mx-1 hidden items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex xl:hidden [&::-webkit-scrollbar]:hidden"
       }
     >
+      {mini && (
+        <Link
+          href={PATHS.pipelines}
+          data-tour="deal-back"
+          title="Back to Deals"
+          aria-label="Back to Deals"
+          className="flex size-9 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink"
+        >
+          <ArrowLeft className="size-[18px]" aria-hidden />
+        </Link>
+      )}
       <RailRound
+        mini={mini}
         tour="deal-design"
         label="Design"
         title={designable ? "Design" : "Give the deal an address to design it"}
         onClick={onDesign}
       >
-        <span className="flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105">
-          <PenTool className="size-5" aria-hidden />
+        <span
+          className={clsx(
+            "flex items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.3)] transition group-hover:brightness-105",
+            size,
+          )}
+        >
+          <PenTool className={icon} aria-hidden />
         </span>
       </RailRound>
-      <RailRound tour="deal-proposal" label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
-        <span className="flex size-12 items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition group-hover:text-ink">
-          <FileText className="size-5" aria-hidden />
+      <RailRound mini={mini} tour="deal-proposal" label="Proposal" title="Proposal: what the customer sees" onClick={onProposal}>
+        <span
+          className={clsx(
+            "flex items-center justify-center rounded-full bg-surface text-sun-line shadow-[0_6px_18px_rgba(11,11,12,0.12)] ring-1 ring-line transition group-hover:text-ink",
+            size,
+          )}
+        >
+          <FileText className={icon} aria-hidden />
         </span>
       </RailRound>
       {line}
@@ -1289,12 +1585,17 @@ function DealMenu({
         aria-label="Reach the customer"
         data-tour="deal-reach"
         className={clsx(
-          "flex shrink-0 gap-3 rounded-[2.25rem] bg-surface/60 ring-1 ring-line",
-          vertical ? "flex-col items-center px-2.5 py-3" : "items-start px-3 py-2.5",
+          "flex shrink-0 rounded-[2.25rem] bg-surface/60 ring-1 ring-line",
+          mini
+            ? "flex-col items-center gap-2 px-1 py-1.5"
+            : vertical
+              ? "flex-col items-center gap-3 px-2.5 py-3"
+              : "items-start gap-3 px-3 py-2.5",
         )}
       >
         <CallMenu
-          round={vertical ? "rail" : "row"}
+          round={down ? "rail" : "row"}
+          mini={mini}
           jobId={jobId}
           phone={phone}
           name={name}
@@ -1306,6 +1607,7 @@ function DealMenu({
       </div>
       {line}
       <RailRound
+        mini={mini}
         tour="deal-details"
         label="Details"
         title="Details: the deal's details, with its notes and chats inside"
@@ -1313,29 +1615,41 @@ function DealMenu({
         on={NOTES_VIEWS.some(([key]) => key === tab)}
       >
         <span className={round(NOTES_VIEWS.some(([key]) => key === tab))}>
-          <LayoutList className="size-5" aria-hidden />
+          <LayoutList className={icon} aria-hidden />
         </span>
       </RailRound>
       {(sold || installed) && line}
       {sold && (
-        <RailRound label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
+        <RailRound mini={mini} label="Job card" title="Job card: what the installers take to the job" onClick={onCard}>
           <span className={round(false)}>
-            <HardHat className="size-5" aria-hidden />
+            <HardHat className={icon} aria-hidden />
           </span>
         </RailRound>
       )}
       {installed && page("service", "Service", "Service: something to put right after the install", Wrench)}
       {line}
-      <RailRound label="Sol" title="Sol on this deal" onClick={() => onTab("sol")} on={tab === "sol"}>
+      <RailRound mini={mini} label="Sol" title="Sol on this deal" onClick={() => onTab("sol")} on={tab === "sol"}>
         <span
           className={clsx(
-            "flex size-12 items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition group-hover:bg-forest",
+            "flex items-center justify-center rounded-full bg-primary shadow-[0_6px_18px_rgba(11,11,12,0.18)] transition group-hover:bg-forest",
+            size,
             tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
           )}
         >
-          <SolBadge className="size-[22px]" />
+          <SolBadge className={mini ? "size-[18px]" : "size-[22px]"} />
         </span>
       </RailRound>
+      {mini && onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Delete this deal"
+          aria-label="Delete this deal"
+          className="mt-1 flex size-8 items-center justify-center rounded-full text-muted hover:text-danger"
+        >
+          <Trash2 className="size-3.5" aria-hidden />
+        </button>
+      )}
     </nav>
   );
 }
@@ -1413,6 +1727,7 @@ function RailRound({
   onClick,
   on,
   tour,
+  mini = false,
   children,
 }: {
   label: string;
@@ -1422,6 +1737,8 @@ function RailRound({
   on?: boolean;
   /** Its place in the tour of a deal (deal-tour.ts). */
   tour?: string;
+  /** On the phone's slim rail: smaller words. */
+  mini?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -1432,10 +1749,46 @@ function RailRound({
       title={title}
       aria-label={title}
       aria-pressed={on}
-      className="group flex flex-col items-center gap-1"
+      className={clsx("group flex flex-col items-center", mini ? "gap-0.5" : "gap-1")}
     >
       {children}
-      <span className={clsx("text-[11px] font-medium", on ? "text-ink" : "text-ink-2")}>{label}</span>
+      <span className={clsx(mini ? "text-[9.5px] leading-tight" : "text-[11px]", "font-medium", on ? "text-ink" : "text-ink-2")}>
+        {label}
+      </span>
     </button>
+  );
+}
+
+/** A line of the Notes timeline: the deal's record, or one of the customer's emails in the member's own mailbox. */
+type Timed = { id: string; at: string } & (({ mail: null } & Activity) | { mail: DealMail });
+
+/** One of the customer's emails as read from the member's own mailbox, opening there. */
+function MailEntry({ m }: { m: DealMail }) {
+  const href =
+    providerOfId(m.id) === "outlook"
+      ? outlookWebLink(m.id)
+      : `https://mail.google.com/mail/?authuser=${encodeURIComponent(m.box)}#all/${m.id}`;
+  return (
+    <li className={clsx(ui.card, "px-5 py-4", m.way === "in" && "ring-1 ring-sun-line/40")}>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-ink">
+          <strong className="font-semibold">{m.way === "in" ? "Email from" : "Email to"}</strong>{" "}
+          <span className="text-ink-2">{m.way === "in" ? m.from : "the customer"}</span>
+        </p>
+        <time className="shrink-0 text-xs tabular-nums text-muted" dateTime={m.at}>
+          {new Date(m.at).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+        </time>
+      </div>
+      <p className="mt-1.5 text-sm font-medium text-ink">{m.subject}</p>
+      {m.snippet && <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-ink-2">{m.snippet}</p>}
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-2 inline-block text-xs text-muted underline underline-offset-4 hover:text-ink"
+      >
+        Open in {providerOfId(m.id) === "outlook" ? "Outlook" : "Gmail"} · {m.box}
+      </a>
+    </li>
   );
 }

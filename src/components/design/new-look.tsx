@@ -97,6 +97,15 @@ export function Spotlight({
     // onGo and onEnd are the page's; the step and its place are what start a look.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, measure]);
+  // The step on show is told to the page, so what floats over it (a deal's Sol sheet on a phone) can step aside while
+  // another place is lit (23 Nov 2026, Martin: the Sol sheet covered the Design round the tour was pointing at).
+  useEffect(() => {
+    const root = document.documentElement;
+    if (step) root.dataset.spotlight = step.at;
+    return () => {
+      delete root.dataset.spotlight;
+    };
+  }, [step]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") onEnd();
@@ -146,6 +155,12 @@ export function Spotlight({
             <span className="font-semibold">{step.what}</span> {step.now}
           </p>
           <div className="mt-3 flex items-center gap-2">
+            {/* Skip ends the tour at any step (24 Nov 2026, Martin: "you should be able to exit the tour… by clicking skip"). */}
+            {n + 1 < steps.length && (
+              <button type="button" onClick={onEnd} className="rounded-full px-2 py-1 text-sm text-muted hover:text-ink">
+                Skip
+              </button>
+            )}
             {n > 0 && (
               <button type="button" onClick={() => go(n - 1)} className="rounded-full px-3 py-1 text-sm text-ink-2 hover:text-ink">
                 Back

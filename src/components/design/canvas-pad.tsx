@@ -1,5 +1,6 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -16,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import clsx from "clsx";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { stageLabel } from "@/lib/domain/design/crm";
 import {
   PAD_VIEWS,
   PAD_WORDS,
@@ -53,6 +54,8 @@ export const KIND_ICONS: Record<NextKind, LucideIcon> = {
  * leads today, sales today and this month, installations today, sales closed this month); sales opens first.
  */
 export function Numbers({ jobs, today }: { jobs: JobLine[] | null; today: ISODate }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [open, setOpen] = useState<PadView>("performance");
   const count: Record<PadView, number | null> = jobs
     ? {
@@ -98,7 +101,7 @@ export function Numbers({ jobs, today }: { jobs: JobLine[] | null; today: ISODat
             jobs={newLeadsToday(jobs, today)}
             empty={PAD_WORDS.leads.empty}
             side={(j) =>
-              `${STAGE_LABELS[j.stage]} · ${new Date(j.createdAt).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: LAUNCH_MARKET.timeZone })}`
+              `${stageLabel(j.stage, stageNames)} · ${new Date(j.createdAt).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: LAUNCH_MARKET.timeZone })}`
             }
             more={{ href: PATHS.pipelines, label: "Every deal" }}
           />

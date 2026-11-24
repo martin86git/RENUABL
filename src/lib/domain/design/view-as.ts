@@ -13,6 +13,8 @@ export const VIEWING_REFUSAL = "You're viewing as someone else, so nothing can b
 /** Whether a request may go through while viewing as someone: reading anything, and going back to your own view. */
 export function passesWhileViewing(method: string, path: string): boolean {
   const m = method.toUpperCase();
+  // The screen lock acts on the owner's own session, never on the person viewed, so unlocking still works.
+  if (path === "/api/design/lock" && m === "POST") return true;
   return m === "GET" || m === "HEAD" || m === "OPTIONS" || (m === "DELETE" && path === VIEW_AS_PATH);
 }
 

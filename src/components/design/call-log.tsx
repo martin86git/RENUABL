@@ -16,7 +16,7 @@ import {
   type CallFilter,
   type CallLogEntry,
 } from "@/lib/domain/design/call-log";
-import { loadCallLog } from "@/lib/services/call-log";
+import { keptCallLog, loadCallLog } from "@/lib/services/call-log";
 import { SolBadge } from "./sol-sun";
 import { useCaller } from "@/lib/services/caller";
 import { CallerAvatar } from "./settings-caller";
@@ -31,7 +31,11 @@ const dealHref = (jobId: string) => `/design/deals/${encodeURIComponent(jobId)}`
  * first and grouped by day, with what Sol still has lined up above them.
  */
 export function CallLogPage() {
-  const [data, setData] = useState<{ calls: CallLogEntry[]; coming: CallComing[]; solOn: boolean } | null>(null);
+  // Starts on the call log Today read as it opened, then reads it again behind it.
+  const [data, setData] = useState<{ calls: CallLogEntry[]; coming: CallComing[]; solOn: boolean } | null>(() => {
+    const k = keptCallLog();
+    return k ? { calls: k.calls, coming: k.coming, solOn: k.solOn } : null;
+  });
   const [problem, setProblem] = useState<string | null>(null);
   const [filter, setFilter] = useState<CallFilter>("all");
   const [busy, setBusy] = useState(false);

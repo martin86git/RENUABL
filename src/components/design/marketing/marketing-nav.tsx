@@ -22,7 +22,7 @@ export function MarketingNav() {
   return (
     <nav
       aria-label="Marketing"
-      className="mb-6 flex flex-wrap items-center gap-1 rounded-full bg-surface p-1 shadow-[var(--shadow-soft)] sm:w-fit"
+      className="mb-4 flex flex-wrap items-center gap-1 rounded-full bg-surface p-1 shadow-[var(--shadow-soft)] sm:w-fit"
     >
       {TABS.map((t) => (
         <Link
@@ -30,7 +30,7 @@ export function MarketingNav() {
           href={t.href}
           aria-current={here === t.href ? "page" : undefined}
           className={cn(
-            "rounded-full px-4 py-2 text-[13px] font-medium transition-colors",
+            "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
             here === t.href ? "bg-ink text-canvas" : "text-ink-2 hover:bg-canvas",
           )}
         >

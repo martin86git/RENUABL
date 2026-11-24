@@ -1,5 +1,5 @@
 import { can } from "@/lib/domain/design/account";
-import { cleanCallerName, cleanTint, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
+import { cleanBrain, cleanCallerName, cleanTint, cleanVoice, hideVoice, showVoice, VOICE_BAD } from "@/lib/domain/design/caller";
 import { cleanCallerKey } from "@/lib/domain/install-call";
 import {
   callerOf,
@@ -7,6 +7,7 @@ import {
   moreSalesAgents,
   saveHiddenVoices,
   setCallerName,
+  setCallerBrain,
   setCallerTint,
   setCallerVoice,
 } from "@/lib/server/design-caller-repo";
@@ -14,8 +15,12 @@ import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { query } from "@/lib/server/db";
 import { loadBrand } from "@/lib/server/design-proposal-repo";
 import { textsOnFor } from "@/lib/server/design-texts";
-import { speakingProviders } from "@/lib/server/voice-samples";
+import { after } from "next/server";
+import { speakingProviders, warmClips } from "@/lib/server/voice-samples";
 import { voiceOnFor } from "@/lib/server/voice-calls";
+
+// Time for the voice samples to be made after the answer (warmClips).
+export const maxDuration = 60;
 
 /** GET: the business's phone assistant (its name, whether it has a picture), the name it speaks for, and whether its calls are on. */
 export async function GET() {
@@ -38,6 +43,8 @@ export async function GET() {
     ]);
     // Setting it up is for an admin: whoever may change the business's settings.
     const mayChange = can(who.member.role, "prices", who.member.permissions);
+    // Every voice's solar sample made ahead, so the play button doesn't wait for it.
+    after(() => warmClips());
     return Response.json({
       ok: true,
       caller,
@@ -68,6 +75,13 @@ export async function PUT(request: Request) {
       const was = await hiddenVoicesOf(who.member.businessId);
       const next = v.all === true ? [] : typeof v.hide === "string" ? hideVoice(was, v.hide) : showVoice(was, v.show);
       return Response.json({ ok: true, hiddenVoices: await saveHiddenVoices(who.member.businessId, next) });
+    }
+    if ("brain" in read.body) {
+      // The model it thinks with on calls: quicker or more careful, or null for RENUABL's default (caller.ts).
+      return Response.json({
+        ok: true,
+        caller: await setCallerBrain(who.member.businessId, cleanBrain(read.body.brain), who.member.email, role),
+      });
     }
     if ("tint" in read.body) {
       // The colour of its stand-in picture: one of the six, or null for its name's own.

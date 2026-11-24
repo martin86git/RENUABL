@@ -148,6 +148,9 @@ export async function POST(request: Request) {
     }
 
     const origin = new URL(request.url).origin;
+    // Stripe's card form in the usage box: the page to come back to, only one of ours under /design.
+    const back = typeof read.body.form === "string" ? read.body.form : "";
+    const form = /^\/design(\/[\w\-/]*)?$/.test(back) && !back.includes("//") ? back : undefined;
     // A business with no plan (an installer) has no plan to manage and no Sol to buy for: refused here, not only hidden.
     if (
       (["portal", "commit", "cancel"].includes(String(read.body.do)) && !billsFor(kind, "plan")) ||
@@ -182,12 +185,18 @@ export async function POST(request: Request) {
       if (!pack) return Response.json({ ok: false }, { status: 400 });
       // On the business's own Stripe customer, plan or not, so its invoices show in Billing (3 Nov 2026, a bug review).
       const buyer = customer ?? (await ensureBillingCustomer(stripe, { businessId, email, name: who.member.businessName }));
-      return Response.json({ ok: true, url: await createSolCheckout(stripe, { businessId, email, pack, customer: buyer, origin }) });
+      return Response.json({
+        ok: true,
+        [form ? "secret" : "url"]: await createSolCheckout(stripe, { businessId, email, pack, customer: buyer, origin, form }),
+      });
     }
     const pack = cleanPack(read.body.pack);
     if (read.body.do !== "tokens" || !pack) return Response.json({ ok: false }, { status: 400 });
     // With no plan, packs go on a Stripe customer of the business's own, so its invoices can be listed.
     const buyer = customer ?? (await ensureBillingCustomer(stripe, { businessId, email, name: who.member.businessName }));
-    return Response.json({ ok: true, url: await createTokenCheckout(stripe, { businessId, email, pack, customer: buyer, origin }) });
+    return Response.json({
+      ok: true,
+      [form ? "secret" : "url"]: await createTokenCheckout(stripe, { businessId, email, pack, customer: buyer, origin, form }),
+    });
   });
 }

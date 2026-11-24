@@ -140,8 +140,9 @@ export function ConfiguratorPage(props: {
     if (!box) return;
     const measure = () => {
       const p = plate.current?.getBoundingClientRect();
-      const b = box.getBoundingClientRect();
-      if (!p || !b.width || !b.height) return setLineTo(null);
+      // The roof's own box: on a phone the plate sits under it, not on it, and then no line is drawn.
+      const b = (box.firstElementChild ?? box).getBoundingClientRect();
+      if (!p || !b.width || !b.height || p.top >= b.bottom - 1) return setLineTo(null);
       setLineTo({ x: Math.max(0, (p.left - b.left - 4) / b.width), y: Math.min(1, (p.top - b.top + p.height * 0.55) / b.height) });
     };
     measure();
@@ -220,18 +221,36 @@ export function ConfiguratorPage(props: {
                   line={battery && !sunView ? lineTo : null}
                   shadeView={sunView}
                 />
-                {/* The sun on the panels (19 Nov 2026, Martin): from the design's shade reading, when it has one. */}
+                {/* The sun on the panels (19 Nov 2026, Martin): from the design's shade reading, when it has one. An icon and a
+                    switch, no words (24 Nov 2026, Martin: "Sun on panels" read as a caption, not a control). */}
                 {shown.roof.shade && (
                   <button
                     type="button"
-                    aria-pressed={sunView}
+                    role="switch"
+                    aria-checked={sunView}
+                    aria-label="Show how much sun reaches each panel"
+                    title={sunView ? "Hide the sun on each panel" : "Show how much sun reaches each panel"}
                     onClick={() => setSunView((v) => !v)}
                     className={clsx(
-                      "absolute left-3 top-3 z-20 inline-flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[12.5px] font-medium shadow-[0_6px_18px_rgba(0,0,0,0.3)] backdrop-blur transition-colors",
+                      "absolute left-3 top-3 z-20 inline-flex h-9 items-center gap-2 rounded-full pl-2.5 pr-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.3)] backdrop-blur transition-colors",
                       sunView ? "bg-white text-ink" : "bg-black/60 text-white hover:bg-black/75",
                     )}
                   >
-                    <Sun className="size-4" aria-hidden /> Sun on panels
+                    <Sun className={clsx("size-[18px] transition-colors", sunView && "text-[color:var(--accent)]")} aria-hidden />
+                    <span
+                      aria-hidden
+                      className={clsx(
+                        "relative h-5 w-9 rounded-full transition-colors",
+                        sunView ? "bg-[color:var(--accent)]" : "bg-white/30",
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "absolute top-0.5 size-4 rounded-full bg-white shadow transition-[left] motion-reduce:transition-none",
+                          sunView ? "left-[18px]" : "left-0.5",
+                        )}
+                      />
+                    </span>
                   </button>
                 )}
                 {sunView && shown.roof.shade && (
@@ -239,11 +258,12 @@ export function ConfiguratorPage(props: {
                     <ShadeSummary shade={shown.roof.shade} dark />
                   </div>
                 )}
-                {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. */}
+                {/* What isn't on the roof, drawn on the home's wall in the picture's corner as it is chosen. On a phone it is a
+                    strip under the picture instead (24 Nov 2026, Martin: on his iPhone it covered the panels). */}
                 {(battery || mix.ev) && !sunView && (
                   <div
                     ref={plate}
-                    className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4"
+                    className="pointer-events-none absolute bottom-3 right-3 z-10 flex items-end gap-3 rounded-3xl bg-gradient-to-br from-[#202226] to-[#0d0e10] px-5 py-4 origin-bottom-right scale-[0.66] @3xl:scale-[0.82] @5xl:scale-100 shadow-[0_12px_32px_rgba(0,0,0,0.35)] ring-1 ring-white/10 sm:bottom-4 sm:right-4 @max-2xl:static @max-2xl:scale-100 @max-2xl:justify-center @max-2xl:rounded-none @max-2xl:px-5 @max-2xl:py-5 @max-2xl:shadow-none @max-2xl:ring-0"
                   >
                     {mix.ev && <ChargerArt />}
                     {battery && (

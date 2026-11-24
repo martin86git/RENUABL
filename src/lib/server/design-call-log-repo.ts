@@ -15,13 +15,13 @@ import {
   type AssistantDeal,
   type AssistantDealCall,
 } from "@/lib/domain/design/assistant-deals";
-import { STAGE_LABELS, type JobStage } from "@/lib/domain/design/crm";
+import type { JobStage } from "@/lib/domain/design/crm";
 import { jobHas } from "@/lib/domain/design/customers";
 import { CALL_HEADLINES, type CallOutcome } from "@/lib/domain/voice-agent";
 import { callTranscriptsFor } from "./call-transcripts";
 import { cleanCallerKey, type CallerKey } from "@/lib/domain/install-call";
 import { query } from "./db";
-import { seen, seenParams } from "./design-crm-repo";
+import { seen, seenParams, stageWordsOf } from "./design-crm-repo";
 import { voiceOnFor } from "./voice-calls";
 
 export interface CallLog {
@@ -207,6 +207,7 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
     customer: string;
     deal: string;
     stage: JobStage;
+    sub_stage: string | null;
     address: string | null;
     status: string;
     live_status: string | null;
@@ -220,7 +221,7 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
     kw: string | number | null;
     details: Record<string, string> | null;
   }>(
-    `select j.id as job_id, cu.name as customer, j.title as deal, j.stage, j.address, j.kw, j.details,
+    `select j.id as job_id, cu.name as customer, j.title as deal, j.stage, j.sub_stage, j.address, j.kw, j.details,
             c.status, c.live_status, c.attempts, c.updated_at, c.due_at, e.outcome, e.summary, e.at as ended_at,
             coalesce(n.calls, 0) as calls
        from design_jobs j
@@ -245,6 +246,7 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
       order by c.updated_at desc limit $3`,
     [businessId, ASSISTANT_DEAL_DAYS, ASSISTANT_DEALS_MAX, ...seenParams(viewer)],
   );
+  const word = await stageWordsOf(businessId);
   return dealOrder(
     rows.map((r) => {
       const open = r.status === "waiting" || r.status === "calling";
@@ -256,7 +258,7 @@ export async function assistantDeals(businessId: string, viewer: DealViewer, rol
         jobId: r.job_id,
         customer: r.customer,
         deal: r.deal,
-        stage: STAGE_LABELS[r.stage] ?? r.stage,
+        stage: word({ stage: r.stage, subStage: r.sub_stage }),
         address: r.address ?? "",
         standing,
         headline: headlineOf(standing, outcome, r.attempts),

@@ -103,6 +103,7 @@ import {
   type RoofDesign,
 } from "./roof-design";
 import { NETCC_INFORMATION, STANDARD_TERMS_VERSION, fillTerms, type TermsSection } from "./standard-terms";
+import { stcPricingDate } from "./stc-change";
 import { YIELD_PER_KW_DAY, batteryKwhOf, shiftingKwhOf, systemSpecOf } from "./system";
 import { TILT } from "./tilt";
 
@@ -322,6 +323,8 @@ export interface ProposalInternal {
   projectVersion: number;
   /** Which of the roof's designs it is. */
   design: number;
+  /** The install day its STCs were priced for (stc-change.ts). Versions kept before this have none: the day they were published. */
+  stcDate?: ISODate;
   /** Each option's own side, when the customer chooses between options (`internalForChoice`). */
   options?: { goal: OptionKey; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
   /** The configurator's mixes, the business's side of each, as `options`. */
@@ -386,11 +389,14 @@ export const MAX_PROPOSAL_OPTIONS = 5;
 export function offeredDesigns(
   set: Pick<DesignSet, "designs" | "primary">,
 ): { goal: OptionKey; at: number; name: string; promise: string }[] {
-  if (set.designs.some((d, i) => d.offer && i !== set.primary)) {
+  // Chosen by hand: any design marked offered, the leading (primary) one too, which marks "this one alone" (22 Nov 2026,
+  // Martin: with five designs he might offer one, so taking the last option off mustn't bring the goal designs back).
+  if (set.designs.some((d) => d.offer)) {
     const picked = [set.primary, ...set.designs.flatMap((d, i) => (d.offer && i !== set.primary ? [i] : []))].slice(
       0,
       MAX_PROPOSAL_OPTIONS,
     );
+    if (picked.length < 2) return [];
     return picked.map((at, n) => {
       const goal = set.designs[at].goal;
       return {
@@ -818,6 +824,7 @@ export function buildProposal(given: ProposalInputs): Built {
     lines: internalLines(lines),
     projectVersion: project.version,
     design: index,
+    stcDate: stcPricingDate(input.workspace.settings.stcFrom, input.today),
     ...(worked.length
       ? {
           options: worked.map(({ goal, at, out }) => {
@@ -1006,7 +1013,16 @@ function configuratorFor(
             const extra = withExtra(mix, src.at);
             const out = workOut(extra, at);
             if (!out.ok) continue;
-            const goal = configKey({ size: id, panel: j, inverter: k, battery: bp.id, extra: bp.extra, ev, backup: bp.backup, reserve: Boolean(bp.reserve) });
+            const goal = configKey({
+              size: id,
+              panel: j,
+              inverter: k,
+              battery: bp.id,
+              extra: bp.extra,
+              ev,
+              backup: bp.backup,
+              reserve: Boolean(bp.reserve),
+            });
             const option = optionFrom(extra, mix, at, out, { goal, name: src.name, promise: src.note, recommended: src.pick });
             // The size's roof is sent once, on the size (`variantOf` puts it back).
             variants.push({
@@ -1143,7 +1159,14 @@ function workOut(input: ProposalInputs, at: number) {
   const lines = totals.lines;
   const missing = lines.filter((l) => l.missing).length;
   const postcode = /^\d{4}$/.test(form.postcode) ? form.postcode : null;
-  const stc = stcValue(costing, postcode, input.today, input.rates, workspace.settings.stcPrice);
+  // STCs go by the install day: the business's installation period for new quotes, else the day of publishing.
+  const stc = stcValue(
+    costing,
+    postcode,
+    stcPricingDate(workspace.settings.stcFrom, input.today),
+    input.rates,
+    workspace.settings.stcPrice,
+  );
   const youPay = totals.priceIncGst - stc;
   const solarVic = solarVicFor(form, spec.panels, totals.priceIncGst, stc, input.rates);
 

@@ -6,7 +6,8 @@
  * was asked for, or a plain message to show.
  */
 import { withFiles } from "./form";
-import type { Activity, Customer, Job, JobStage, SavedPipeline } from "@/lib/domain/design/crm";
+import type { Activity, Customer, Job, JobStage } from "@/lib/domain/design/crm";
+import type { KeptPipeline, OwnStage, StageKey, StageNames } from "@/lib/domain/design/pipeline-stages";
 import { cleanExtras, defaultBill, defaultQuote, postcodeIn, type QuoteFields, type QuoteForm } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type RoofDesign } from "@/lib/domain/design/roof-design";
 
@@ -15,6 +16,16 @@ export type Answer<T> = ({ ok: true } & T) | { ok: false; message: string; signe
 const UNREACHABLE = "We couldn't reach your account just now. Try again in a moment.";
 
 export async function ask<T>(path: string, init?: { method: string; body?: unknown }): Promise<Answer<T>> {
+  const first = await askOnce<T>(path, init);
+  // A read that met a busy server is asked once more (22 Nov 2026: a hiccup on the first load left Today's figures out).
+  if (!first.ok && (init?.method ?? "GET") === "GET" && first.retry) {
+    await new Promise((r) => setTimeout(r, 800));
+    return askOnce<T>(path, init);
+  }
+  return first;
+}
+
+async function askOnce<T>(path: string, init?: { method: string; body?: unknown }): Promise<Answer<T> & { retry?: boolean }> {
   try {
     const res = await fetch(path, {
       method: init?.method ?? "GET",
@@ -28,9 +39,14 @@ export async function ask<T>(path: string, init?: { method: string; body?: unkno
     });
     const json = (await res.json().catch(() => null)) as (Record<string, unknown> & { ok?: boolean; message?: string }) | null;
     if (res.ok && json?.ok) return json as { ok: true } & T;
-    return { ok: false, message: json?.message ?? UNREACHABLE, ...(res.status === 401 ? { signedOut: true } : {}) };
+    return {
+      ok: false,
+      message: json?.message ?? UNREACHABLE,
+      ...(res.status === 401 ? { signedOut: true } : {}),
+      ...(res.status >= 502 && res.status <= 504 ? { retry: true } : {}),
+    };
   } catch {
-    return { ok: false, message: UNREACHABLE };
+    return { ok: false, message: UNREACHABLE, retry: true };
   }
 }
 
@@ -103,16 +119,42 @@ export const createJob = (input: {
 export const loadJob = (id: string) => ask<{ job: Job; customer: Customer }>(`/api/design/jobs/${encodeURIComponent(id)}`);
 export const saveJob = (
   id: string,
-  patch: Partial<Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "value" | "installDate" | "details" | "kw">>,
+  patch: Partial<Pick<Job, "title" | "address" | "lat" | "lng" | "stage" | "subStage" | "value" | "installDate" | "details" | "kw">>,
 ) => ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "PUT", body: patch });
 export const deleteJob = (id: string) => ask<object>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
 
-/** The pipelines the business has saved: shared by everyone in it. */
-export const listPipelines = () => ask<{ pipelines: SavedPipeline[] }>("/api/design/pipelines");
-export const createPipeline = (input: { name: string; stages: JobStage[] }) =>
-  ask<{ pipeline: SavedPipeline }>("/api/design/pipelines", { method: "POST", body: input });
-export const savePipeline = (id: string, input: { name: string; stages: JobStage[] }) =>
-  ask<{ pipeline: SavedPipeline }>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "PUT", body: input });
+/** The pipelines the business keeps (its own, and set ones it renamed or changed) and the stages it added: shared by everyone in it. */
+export const listPipelines = () => ask<{ pipelines: KeptPipeline[]; stages: OwnStage[]; names: StageNames }>("/api/design/pipelines");
+/** A new pipeline, or with `baseId` a set pipeline renamed or given other stages. */
+export const createPipeline = (input: { name: string; stages: StageKey[]; baseId?: string | null }) =>
+  ask<{ pipeline: KeptPipeline }>("/api/design/pipelines", { method: "POST", body: input });
+export const savePipeline = (id: string, input: { name: string; stages: StageKey[] }) =>
+  ask<{ pipeline: KeptPipeline }>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "PUT", body: input });
+/** A stage of the business's own, counting as `base`, put into a pipeline after position `after` (-1: first). */
+export const addStage = (input: { name: string; base: JobStage; pipelineId: string; after: number }) =>
+  ask<{ stage: OwnStage; pipeline: KeptPipeline | null }>("/api/design/stages", { method: "POST", body: input });
+export const renameStage = (id: string, name: string) =>
+  ask<{ stage: OwnStage }>(`/api/design/stages/${encodeURIComponent(id)}`, { method: "PUT", body: { name } });
+export const deleteStage = (id: string) => ask<object>(`/api/design/stages/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+/** Renames one of the twelve built-in stages for the business; a blank name puts ours back. */
+export const renameBuiltinStage = (stage: JobStage, name: string) =>
+  ask<{ names: StageNames }>("/api/design/stages", { method: "PUT", body: { stage, name } });
+
+/** The stages the business added and its names for the twelve, read once a visit (stage pickers and labels outside the board). */
+let stageBookAsked: Promise<{ stages: OwnStage[]; names: StageNames }> | null = null;
+export function loadStageBook(fresh = false): Promise<{ stages: OwnStage[]; names: StageNames }> {
+  if (!stageBookAsked || fresh)
+    stageBookAsked = ask<{ stages: OwnStage[]; names: StageNames }>("/api/design/stages").then((res) =>
+      res.ok ? { stages: res.stages, names: res.names ?? {} } : { stages: [], names: {} },
+    );
+  return stageBookAsked;
+}
+/** Tells every place showing stage names that they changed (read again). */
+export const STAGE_BOOK_EVENT = "renuabl:stage-book";
+export function stageBookChanged() {
+  void loadStageBook(true).then(() => window.dispatchEvent(new Event(STAGE_BOOK_EVENT)));
+}
 export const deletePipeline = (id: string) => ask<object>(`/api/design/pipelines/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 /** The temperature now, and where it is for. `degrees` is null when it can't be had. */
@@ -212,6 +254,10 @@ export const markNotificationsRead = (which: { ids?: string[]; jobId?: string; a
 /** Gives a deal to a member of the business (their email), or to no one (null). */
 export const setDealOwner = (jobId: string, owner: string | null) =>
   ask<{ job: Job }>(`/api/design/jobs/${encodeURIComponent(jobId)}`, { method: "PUT", body: { owner } });
+
+/** Gives many deals to one person (a member or a deal owner not invited yet), or to no one (null). */
+export const setDealsOwner = (ids: string[], owner: string | null) =>
+  ask<{ changed: number }>("/api/design/jobs", { method: "PUT", body: { ids, owner } });
 
 /** The business's monthly sales targets (the overview's rings close at them). */
 export const loadTargets = () => ask<{ targets: import("@/lib/domain/design/sales-rings").SalesTargets }>("/api/design/targets");

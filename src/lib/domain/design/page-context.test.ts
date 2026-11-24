@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cleanSolInput, solSystem } from "./sol";
 import { PAGE_LIMITS, cleanPageContext, lookingAt, pageContextBlock, screenWords } from "./page-context";
-import { SOL_PANEL, solPanelWidth } from "./sol-panel";
+import { PAGE_MIN, SOL_PANEL, solPanelWidth } from "./sol-panel";
 
 describe("what Sol sees of the page", () => {
   it("keeps the page's words as plain text, cut to its limits", () => {
@@ -59,9 +59,17 @@ describe("the width of Sol's panel", () => {
   it("stays within its limits and always leaves the page room", () => {
     expect(solPanelWidth(100, 1920)).toBe(SOL_PANEL.min);
     expect(solPanelWidth(5000, 3000)).toBe(SOL_PANEL.max);
-    expect(solPanelWidth(900, 1440)).toBe(Math.floor(1440 * 0.6));
+    expect(solPanelWidth(900, 2400)).toBe(900);
+    expect(solPanelWidth(5000, 1500)).toBe(1500 - PAGE_MIN);
     expect(solPanelWidth(500.4, 1920)).toBe(500);
     expect(solPanelWidth(NaN, 1920)).toBe(SOL_PANEL.standard);
     expect(solPanelWidth(600, 500)).toBe(SOL_PANEL.min);
+  });
+  it("never lies over the page's content where the window has room for both", () => {
+    for (const w of [1280, 1440, 1600, 1920]) expect(w - solPanelWidth(5000, w)).toBeGreaterThanOrEqual(PAGE_MIN);
+    expect(solPanelWidth(5000, 1440)).toBe(576);
+    expect(solPanelWidth(NaN, 1280)).toBe(SOL_PANEL.standard);
+    // A window too small for both: he lies over the page, kept to his share of it.
+    expect(solPanelWidth(5000, 1100)).toBe(Math.floor(1100 * 0.6));
   });
 });

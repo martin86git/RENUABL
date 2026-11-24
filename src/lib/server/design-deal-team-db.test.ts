@@ -78,12 +78,12 @@ describe.skipIf(!url)("the team chat on a deal (database)", () => {
     expect(pads[dealId].openAsks).toHaveLength(1);
     const ask = (await team.dealTeam(owner(), dealId)).lines.find((l) => l.kind === "ask");
     expect(ask?.ask?.why[0].text).toContain("battery for the evenings");
-    expect(ask?.text).toContain("I need a design for Tom");
+    expect(ask?.text).toBe("Tom's enquiry is in. Design required.");
     const record = await db.query<{ text: string; by: string }>(
       `select text, by_email as by from design_activity where business_id = $1 and job_id = $2 and by_email = 'sol'`,
       [a, dealId],
     );
-    expect(record[0]?.text).toMatch(/^Asked the team: I need a design/);
+    expect(record[0]?.text).toMatch(/^Asked the team: Tom's enquiry is in\. Design required\./);
     // The designer's brief, only for someone who may see the deal.
     expect((await team.dealAsk(owner(), dealId, ask!.id))?.ask?.type).toBe("design");
     await expect(team.dealAsk(outsider(), dealId, ask!.id)).rejects.toThrow();

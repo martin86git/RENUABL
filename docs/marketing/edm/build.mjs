@@ -147,7 +147,11 @@ export const EMAILS = [
           "Chart this month's sales.",
         ],
       },
-      { t: "img", name: "sol", alt: "Sol going through the day: overdue installs, leads and proposals waiting, most urgent first, using example data" },
+      {
+        t: "img",
+        name: "sol",
+        alt: "Sol going through the day: overdue installs, leads and proposals waiting, most urgent first, using example data",
+      },
       { t: "lines", v: ["He drafts. You send.", "Sol never sends anything himself.", "He only sees what that team member can see."] },
       { t: "h", v: "And he knows solar" },
       {

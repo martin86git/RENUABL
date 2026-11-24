@@ -68,9 +68,13 @@ export function CallMe({ token, assistant }: { token: string; assistant: string 
   const who = `${assistant} is our AI assistant, not a person.`;
 
   // Floating on the right of the page, always in view (15 Nov 2026, Martin): the button in the business's colour,
-  // with what it does beside it, and how it went once pressed.
+  // with what it does beside it, and how it went once pressed. On a phone it is a slim tab tucked against the screen's
+  // right edge (24 Nov 2026, Martin: it covered "I'd like to go ahead"), saying only Call me and AI assistant.
   return (
-    <div className="fixed right-3 top-1/2 z-40 flex -translate-y-1/2 flex-col items-end gap-2 sm:right-5" aria-live="polite">
+    <div
+      className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-end gap-2 sm:right-5 max-sm:[&>*:not(:last-child)]:mr-3"
+      aria-live="polite"
+    >
       {when && !open && (
         <button
           type="button"
@@ -147,13 +151,14 @@ export function CallMe({ token, assistant }: { token: string; assistant: string 
           disabled={busy !== null}
           title={`Questions? ${assistant}, our AI assistant, can call you on the mobile we have for you to go through it.`}
           aria-label={`Call me: ${assistant}, our AI assistant, rings the mobile we have for you`}
-          className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-3 py-3 text-primary-ink shadow-[0_12px_32px_rgba(11,11,12,0.28)] transition hover:-translate-y-0.5 disabled:bg-surface-2 disabled:text-muted motion-reduce:transition-none"
+          className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-3 py-3 text-primary-ink shadow-[0_12px_32px_rgba(11,11,12,0.28)] transition hover:-translate-y-0.5 disabled:bg-surface-2 disabled:text-muted motion-reduce:transition-none max-sm:gap-0.5 max-sm:rounded-r-none max-sm:rounded-l-xl max-sm:px-1.5 max-sm:py-2 max-sm:shadow-[0_6px_18px_rgba(11,11,12,0.25)] max-sm:hover:translate-y-0"
         >
-          <Phone className="size-5" aria-hidden />
-          <span className="text-[12px] font-semibold leading-tight">{busy === "ask" ? "One moment" : "Call me"}</span>
-          <span className="max-w-[4.5rem] text-center text-[10.5px] leading-tight opacity-80">
+          <Phone className="size-5 max-sm:size-4" aria-hidden />
+          <span className="text-[12px] font-semibold leading-tight max-sm:text-[10.5px]">{busy === "ask" ? "One moment" : "Call me"}</span>
+          <span className="max-w-[4.5rem] text-center text-[10.5px] leading-tight opacity-80 max-sm:hidden">
             {assistant}, our AI assistant, answers your questions
           </span>
+          <span className="text-[9px] leading-tight opacity-80 sm:hidden">AI assistant</span>
         </button>
       )}
     </div>

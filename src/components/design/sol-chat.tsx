@@ -1,34 +1,20 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import {
-  ArrowUpRight,
-  Bell,
-  Copy,
-  CornerUpLeft,
-  Eye,
-  EyeOff,
-  FileText,
-  History,
-  MessageSquarePlus,
-  Minus,
-  Plus,
-  RefreshCw,
-  X,
-  Pin,
-} from "lucide-react";
+import { useNameHintBox } from "./name-hint-box";
+import { Bell, CornerUpLeft, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
-import { lookingAt } from "@/lib/domain/design/page-context";
 import { pageAt } from "@/lib/domain/design/sections";
-import { PAGE_ABOUT_CHANGED, currentPageContext, pageAboutNow } from "@/lib/services/page-context";
-import { STAGE_LABELS } from "@/lib/domain/design/crm";
+import { currentPageContext } from "@/lib/services/page-context";
+import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
+import { panelTurns } from "@/lib/domain/design/sol-rooms";
 import {
-  MAX_FILE_CHARS,
   MAX_FILES,
   MAX_SAID,
   SOL_FILE_TYPES,
@@ -62,37 +48,77 @@ import {
   resumeSolChat,
   rememberAnswer,
   retrySol,
+  type SolDraft,
 } from "@/lib/services/sol";
-import { askToStartAfresh, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
+import { askToStartAfresh, showStarters, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
 import { SolUsage } from "./sol-usage";
 import { SolSources } from "./sol-sources";
 import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
-import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
-import { SolMark } from "./sol-sun";
+import { SolStart } from "./sol-start";
+import { useDesignAccount } from "./design-account";
 import { SolThinking, SolWorking } from "./sol-thinking";
+import { FileTiles, filesFromPaste, fitForSol } from "./sol-attach";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { MeetingCard } from "./meeting-card";
 import { LearnCard, SolInduction } from "./sol-induction";
 import { SolDesignView } from "./sol-design-view";
 import { SolText, type OnAnswer, type OnPick } from "./sol-text";
-import { answerFor, solPlain } from "@/lib/domain/design/sol-format";
+import { answerFor, replyToSol, solPlain, type SolReply } from "@/lib/domain/design/sol-format";
+import { MessageTools, QuotedWords, ReplyBanner } from "./message-tools";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
 
-/** Three to start from (18 Nov 2026, Martin: fewer): two about the business's own work, one of the oracle's (sol-knowledge.ts). */
-const STARTERS = [
-  "Which deals have sat at Proposal sent the longest?",
-  "Write a friendly follow-up email to my newest lead.",
-  STARTER_QUESTIONS[0],
-];
-
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
+
+const timeOnly = (iso: string) => new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+
+/** How far a pull to the left goes, in pixels: room for a time. */
+const PEEK_MOST = 64;
+
+/**
+ * A finger dragged left over the conversation slides every turn over to show its time; let go, it slides back.
+ * Sets `--sol-peek` on the element straight away, so a drag never re-renders the chat.
+ */
+function usePullForTimes() {
+  const start = useRef<{ x: number; y: number; on: boolean | null } | null>(null);
+  const settle = (el: HTMLElement, px: number, eased: boolean) => {
+    el.style.setProperty("--sol-peek-ease", eased ? "transform 0.25s ease, opacity 0.25s ease" : "none");
+    el.style.setProperty("--sol-peek", `${px}px`);
+    el.style.setProperty("--sol-peek-shown", String(px / PEEK_MOST));
+  };
+  return {
+    onTouchStart: (e: React.TouchEvent<HTMLElement>) => {
+      const t = e.touches[0];
+      start.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY, on: null } : null;
+    },
+    onTouchMove: (e: React.TouchEvent<HTMLElement>) => {
+      const s = start.current;
+      if (!s) return;
+      const t = e.touches[0];
+      const dx = t.clientX - s.x;
+      const dy = t.clientY - s.y;
+      if (s.on === null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        s.on = dx < 0 && Math.abs(dx) > Math.abs(dy);
+      }
+      if (s.on) settle(e.currentTarget, Math.min(PEEK_MOST, Math.max(0, -dx)), false);
+    },
+    onTouchEnd: (e: React.TouchEvent<HTMLElement>) => {
+      if (start.current?.on) settle(e.currentTarget, 0, true);
+      start.current = null;
+    },
+    onTouchCancel: (e: React.TouchEvent<HTMLElement>) => {
+      settle(e.currentTarget, 0, true);
+      start.current = null;
+    },
+  };
+}
 
 function base64Of(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -167,22 +193,45 @@ export function SolChat({
   onClose,
   onMinimise,
   question,
+  draft,
 }: {
   side?: boolean;
   onClose?: () => void;
   /** Tucks the panel away to a tab on the screen's edge, the conversation kept (19 Nov 2026, Martin). */
   onMinimise?: () => void;
   question?: { id: number; text: string; shown?: string } | null;
+  /** Words begun in a small Sol box elsewhere (a deal's card, the feed), to finish here: put in the box, not sent. */
+  draft?: (SolDraft & { id: number }) | null;
 }) {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const router = useRouter();
   const { state, problem, run, runFor } = useSol();
+  // Greeted by first name once given (sol-start.tsx).
+  const [account] = useDesignAccount();
+  const firstName = account?.signedIn ? account.firstName : undefined;
   // Try another answer: the conversation from that question on is hidden while he answers it again.
   const [redoFrom, setRedoFrom] = useState<number | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => draft?.text ?? "");
+  // Which deal the carried words are about (22 Nov 2026): named over the box and put in front of what is sent.
+  const [onDealDraft, setOnDealDraft] = useState<{ about: string; label?: string } | null>(() =>
+    draft?.about ? { about: draft.about, label: draft.label } : null,
+  );
+  const [draftSeen, setDraftSeen] = useState(draft?.id ?? 0);
+  if (draft && draft.id !== draftSeen) {
+    // Taken in the same render, so the box holds them as soon as the panel is focused.
+    setDraftSeen(draft.id);
+    setText(draft.text);
+    setOnDealDraft(draft.about ? { about: draft.about, label: draft.label } : null);
+  }
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
-  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<SolReply | null>(null);
   const [heard, setHeard] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const filesNow = useRef<File[]>([]);
+  useEffect(() => {
+    filesNow.current = files;
+  }, [files]);
   const [fileProblem, setFileProblem] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -194,7 +243,12 @@ export function SolChat({
     queuedRef.current = queued;
   }, [queued]);
   const picker = useRef<HTMLInputElement>(null);
+  const pullForTimes = usePullForTimes();
   const box = useRef<HTMLTextAreaElement>(null);
+  // A name's chip opens the deal: on a phone the panel steps aside so it is seen.
+  const names = useNameHintBox(text, setText, box, () => {
+    if (!window.matchMedia("(min-width: 1024px)").matches) onClose?.();
+  });
   const end = useRef<HTMLDivElement>(null);
   // "#" finds a deal: the business's deals are read the first time, then matched here as each letter goes in.
   const [dealAt, setDealAt] = useState<{ start: number; query: string } | null>(null);
@@ -204,21 +258,8 @@ export function SolChat({
   // it, sent with each question unless the member switches it off for this page.
   const path = usePathname();
   const pageName = path === "/design/roof" ? "Design tool" : (pageAt(path)?.page.label ?? "This page");
-  const [about, setAbout] = useState(() => (side ? pageAboutNow() : null));
-  const [seePage, setSeePage] = useState(true);
-  useEffect(() => {
-    if (!side) return;
-    const changed = () => setAbout(pageAboutNow());
-    window.addEventListener(PAGE_ABOUT_CHANGED, changed);
-    changed();
-    return () => window.removeEventListener(PAGE_ABOUT_CHANGED, changed);
-  }, [side]);
-  // A new page is seen again, whatever was switched off on the last.
-  const [seenPath, setSeenPath] = useState(path);
-  if (seenPath !== path) {
-    setSeenPath(path);
-    setSeePage(true);
-  }
+  // Always on (23 Nov 2026, Martin: the eye that switched it off is gone).
+  const seePage = true;
   // While he can see the page beside his chat, one orange frame runs round both (15 Nov 2026, Martin: the "Looking at
   // This page" label didn't say it meant the page beside the chat; "an orange highlight should border the sol chat and
   // that adjacent window"): `html.sol-seeing`, drawn in globals.css only while his panel is open.
@@ -227,13 +268,13 @@ export function SolChat({
     document.documentElement.classList.add("sol-seeing");
     return () => document.documentElement.classList.remove("sol-seeing");
   }, [side, seePage]);
-  const seeing = side ? lookingAt({ title: about?.title || pageName, about: about?.about ?? "" }) : null;
   const hits =
     dealAt && jobs && dealAt.query.trim().length >= 2
       ? jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, dealAt.query)).slice(0, 6)
       : [];
 
-  const turns = state?.turns ?? [];
+  // His panel's and page's own conversation: what was asked on Today stays on Today (sol-rooms.ts).
+  const turns = useMemo(() => panelTurns(state?.turns ?? []), [state]);
   const inducting = state?.induction?.status === "pending";
   const unread = state?.unread ?? 0;
   // Only a real answer (one that took credits) to the latest question can be tried again.
@@ -243,6 +284,9 @@ export function SolChat({
   // the tab, for that last message. Coming back to the tab looks again.
   const [history, setHistory] = useState(false);
   const [opened, setOpened] = useState(() => new Date());
+  // Every time the chat opens it starts clean (23 Nov 2026, Martin: "Chats should start fresh. Not a continuation of
+  // an old thread"): what was said before it opened is a press away under Continue your last chat, or in History.
+  const [mountedAt] = useState(() => new Date());
   useEffect(() => {
     const look = () => {
       if (document.visibilityState === "visible") setOpened(new Date());
@@ -258,7 +302,14 @@ export function SolChat({
     }
   });
   const lastAt = turns[turns.length - 1]?.at ?? null;
-  const resting = Boolean(!history && state && pending === null && lastAt && carried !== lastAt && askToStartAfresh(turns, opened));
+  const resting = Boolean(
+    !history &&
+    state &&
+    pending === null &&
+    lastAt &&
+    carried !== lastAt &&
+    (askToStartAfresh(turns, mountedAt, 0) || askToStartAfresh(turns, opened)),
+  );
   const carryOn = (at: string) => {
     setCarried(at);
     try {
@@ -288,22 +339,23 @@ export function SolChat({
     if (dealAt && jobs === null) void listJobs().then((r) => setJobs(r.ok ? r.jobs : []));
   }, [dealAt, jobs]);
 
-  const addFiles = (list: FileList | null) => {
+  const addFiles = async (list: readonly File[]) => {
     setFileProblem("");
-    const picked = Array.from(list ?? []).filter((f) => (SOL_FILE_TYPES as readonly string[]).includes(f.type));
-    if (list && picked.length < list.length) setFileProblem("Sol reads PDFs and pictures (PNG, JPG, WebP, GIF).");
-    const next = [...files, ...picked].slice(0, MAX_FILES);
-    if (next.reduce((n, f) => n + f.size, 0) * 1.37 > MAX_FILE_CHARS) setFileProblem("Those are too big together: send one at a time.");
-    else setFiles(next);
     if (picker.current) picker.current.value = "";
+    const r = await fitForSol(filesNow.current, list);
+    filesNow.current = r.files;
+    setFiles(r.files);
+    setFileProblem(r.problem);
   };
 
   /** `shown`: the short line the chat shows for a long instruction sent for them; the words still go to Sol. */
   const send = async (over?: string, deep = false, shownAs?: string, followUp = false) => {
     const typed = (over ?? text).trim();
     const answering = !over && replyTo && typed ? replyTo : null;
-    const said = answering ? answerFor(answering, typed) : typed;
-    const shown = shownAs ?? (answering ? typed : undefined);
+    const onDeal = !over && !answering && onDealDraft && typed ? onDealDraft : null;
+    const replied = replyToSol(answering, typed);
+    const said = answering ? replied.said : onDeal ? `${onDeal.about}${typed}` : typed;
+    const shown = shownAs ?? (answering ? replied.shown : onDeal ? typed : undefined);
     const sending = over ? [] : files;
     if (!said && !sending.length) return;
     if (busy) {
@@ -313,6 +365,7 @@ export function SolChat({
       setQueued((q) => [...q, { said, shown }]);
       setText("");
       setReplyTo(null);
+      setOnDealDraft(null);
       setDealAt(null);
       return;
     }
@@ -330,6 +383,7 @@ export function SolChat({
       setFiles([]);
       setFileProblem("");
       setReplyTo(null);
+      setOnDealDraft(null);
     }
     setDealAt(null);
     setBusy(true);
@@ -343,6 +397,7 @@ export function SolChat({
     } else if (!over) {
       setText(typed);
       if (answering) setReplyTo(answering);
+      if (onDeal) setOnDealDraft(onDeal);
       setFiles(sending);
     }
     sendQueued();
@@ -362,7 +417,7 @@ export function SolChat({
   /** A Yes or No goes straight to Sol; Reply puts the question over the box to answer in his own words. */
   const answer: OnAnswer = (question, yes) => {
     if (yes) return void send(answerFor(question, yes), false, yes);
-    setReplyTo(question);
+    setReplyTo({ kind: "question", text: question });
     box.current?.focus();
   };
 
@@ -425,38 +480,12 @@ export function SolChat({
         side ? "h-full" : "h-[calc(100dvh-13rem)] min-h-[28rem] overflow-hidden rounded-2xl",
       )}
     >
-      <div className="flex items-center gap-3 px-5 py-3">
-        {/* Sol large at the head of his chat (16 Nov 2026, Martin: "make sols icon in the chat large like the
-            example"): the lit sun with its glow, and no words beside it (18 Nov 2026, Martin: "we dont need it to say
-            Sol your AI"). */}
-        <span className="sol-orb inline-flex size-14 shrink-0 items-center justify-center rounded-full" title="Sol">
-          <SolMark className="size-14" />
-        </span>
+      <div className="flex items-center gap-3 px-5 py-2">
         {/* The controls in one small group in the top right corner (18 Nov 2026, Martin: "the top bar is far too busy";
             no Full page and no Clear: New chat files the conversation away, and History holds it). */}
         <div className="-mr-2 ml-auto flex items-center gap-0.5 self-start">
           {/* His usage this month, in a window of its own (16 Nov 2026, Martin). */}
           <SolUsage />
-          {seeing && (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={seePage}
-              aria-label="Sol can see the page beside this chat"
-              onClick={() => setSeePage(!seePage)}
-              title={
-                seePage
-                  ? `Sol can see the page beside this chat (${seeing}), shown by the orange frame. Press to ask without it.`
-                  : "Sol can't see the page beside this chat. Press to let him."
-              }
-              className={clsx(
-                "inline-flex size-7 items-center justify-center rounded-full transition-colors hover:bg-canvas",
-                seePage ? "text-sun-line" : "text-muted hover:text-ink",
-              )}
-            >
-              {seePage ? <Eye className="size-3.5" aria-hidden /> : <EyeOff className="size-3.5" aria-hidden />}
-            </button>
-          )}
           {/* A new chat: a speech bubble with a plus (8 Nov 2026; 18 Nov 2026, Martin). The current one is filed away. */}
           <button
             type="button"
@@ -464,9 +493,9 @@ export function SolChat({
             disabled={busy || turns.length === 0}
             aria-label="New chat"
             title="New chat"
-            className="inline-flex size-7 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
+            className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:text-line-strong disabled:hover:bg-transparent"
           >
-            <MessageSquarePlus className="size-3.5" aria-hidden />
+            <MessageSquarePlus className="size-3.5 max-lg:size-[18px]" aria-hidden />
           </button>
           {/* Chat history (1 Nov 2026, Martin): the clock wound back. */}
           <button
@@ -476,11 +505,11 @@ export function SolChat({
             aria-label="Chat history"
             title="Chat history"
             className={clsx(
-              "inline-flex size-7 items-center justify-center rounded-full transition-colors",
+              "inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full transition-colors",
               history ? "bg-ink text-sun-line" : "text-muted hover:bg-canvas hover:text-ink",
             )}
           >
-            <History className="size-3.5" aria-hidden />
+            <History className="size-3.5 max-lg:size-[18px]" aria-hidden />
           </button>
           {onMinimise && (
             <button
@@ -488,9 +517,9 @@ export function SolChat({
               onClick={onMinimise}
               aria-label="Minimise Sol"
               title="Minimise Sol: a tab on the edge brings him back"
-              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
             >
-              <Minus className="size-3.5" aria-hidden />
+              <Minus className="size-3.5 max-lg:size-[18px]" aria-hidden />
             </button>
           )}
           {onClose && (
@@ -499,9 +528,9 @@ export function SolChat({
               onClick={onClose}
               aria-label="Close Sol"
               title="Close Sol (Esc)"
-              className="inline-flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+              className="inline-flex size-7 max-lg:size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
             >
-              <X className="size-3.5" aria-hidden />
+              <X className="size-3.5 max-lg:size-[18px]" aria-hidden />
             </button>
           )}
         </div>
@@ -562,15 +591,25 @@ export function SolChat({
           </ul>
         </div>
       )}
-      <div className={clsx("staff-scroll min-h-0 flex-1 space-y-7 overflow-y-auto px-6 py-6 text-sm", history && "hidden")}>
+      {/* Pulled to the left with a finger, the turns slide over and each shows its time, as iMessage does (22 Nov 2026,
+          Martin: no time under every reply). On a computer the time shows on hover beside Copy and Pin. */}
+      <div
+        {...pullForTimes}
+        className={clsx(
+          "staff-scroll min-h-0 flex-1 touch-pan-y space-y-7 overflow-x-hidden overflow-y-auto px-6 py-6 text-sm",
+          history && "hidden",
+        )}
+      >
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
         {state && !inducting && (turns.length === 0 || resting) && !pending && (
-          <div className="space-y-2 text-ink-2">
+          // Opened as HubSpot's Breeze opens (24 Nov 2026, Martin): a greeting, the Suggested card for the first
+          // chats, and four topics, each opening its own prompts; a prompt is sent as it is pressed.
+          <SolStart firstName={firstName} suggested={showStarters(state.chats)} compact={side} onAsk={(p) => void send(p)}>
             {resting && lastAt && (
               <button
                 type="button"
                 onClick={() => carryOn(lastAt)}
-                className="mb-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-muted ring-1 ring-line transition hover:text-ink hover:ring-sun-line"
+                className="mb-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-muted ring-1 ring-line transition hover:text-ink hover:ring-line-strong"
               >
                 <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1 truncate">
@@ -578,24 +617,15 @@ export function SolChat({
                 </span>
               </button>
             )}
-            <p>I&apos;m Sol. Ask me about your deals, a customer or anything solar. Type # to bring in a deal.</p>
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setText(s);
-                  box.current?.focus();
-                }}
-                className="block w-full rounded-xl bg-surface px-3 py-1.5 text-left text-[13px] text-ink ring-1 ring-line hover:ring-sun-line"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          </SolStart>
         )}
         {(resting ? [] : redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
-          <div key={`${t.at}-${i}`} id={turnId(t)} className="group/turn scroll-mt-3 space-y-2">
+          <div key={`${t.at}-${i}`} id={turnId(t)} className="sol-peek-turn group/turn relative scroll-mt-3 space-y-2">
+            {t.at && (
+              <span className="sol-peek-time" aria-hidden>
+                {timeOnly(t.at)}
+              </span>
+            )}
             <Bubble
               you={t.role === "you"}
               text={t.shown || t.text}
@@ -605,6 +635,10 @@ export function SolChat({
               onPick={t.role === "sol" && !busy ? (item) => void send(`Let's work on this one: ${item}`) : undefined}
               pinned={t.pinned}
               onPin={() => void run(pinTurn(t.at, t.role, !t.pinned))}
+              onReply={() => {
+                setReplyTo({ kind: "message", from: t.role, text: t.shown || t.text });
+                box.current?.focus();
+              }}
             />
             {t.role === "sol" && t.sources?.length ? (
               <SolSources sources={t.sources} remembered={t.remembered} onRemember={() => run(rememberAnswer(t.at))} />
@@ -625,16 +659,6 @@ export function SolChat({
                 }
               />
             ) : null}
-            {/* A page he opened: the chat went there as the answer came in; pressed, it goes again. */}
-            {t.role === "sol" && t.goTo && (
-              <button
-                type="button"
-                onClick={() => openSolPage(t.goTo!, router)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-sun px-3 py-1 text-xs font-medium text-sun-ink ring-1 ring-sun-line/30 transition hover:ring-sun-line"
-              >
-                Opened {t.goTo.label} <ArrowUpRight className="size-3.5" aria-hidden />
-              </button>
-            )}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}
@@ -718,39 +742,18 @@ export function SolChat({
         }}
         className={clsx("px-4 pb-4 pt-2", history && "hidden")}
       >
-        {(files.length > 0 || fileProblem) && (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
-            {files.map((f, i) => (
-              <span
-                key={i}
-                className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-canvas py-1 pl-2.5 pr-1 text-xs text-ink"
-              >
-                <FileText className="size-3.5 shrink-0 text-sun-line" aria-hidden />
-                <span className="truncate">{f.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                  aria-label={`Take off ${f.name}`}
-                  className="inline-flex size-5 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
-                >
-                  <X className="size-3" aria-hidden />
-                </button>
-              </span>
-            ))}
-            {fileProblem && <span className="text-xs text-danger">{fileProblem}</span>}
-          </div>
-        )}
-        {replyTo && (
-          <div className="mb-1.5 flex items-start gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
-            <CornerUpLeft className="mt-px size-3.5 shrink-0 text-sun-line" aria-hidden />
-            <span className="min-w-0 flex-1">
-              Replying to <span className="font-medium text-ink">{replyTo}</span>
+        {onDealDraft && !replyTo && (
+          <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
+            <span className="min-w-0 flex-1 truncate">
+              About <span className="font-medium text-ink">{onDealDraft.label ? `${onDealDraft.label}'s deal` : "this deal"}</span>
             </span>
-            <button type="button" onClick={() => setReplyTo(null)} aria-label="Stop replying" className="shrink-0 hover:text-ink">
+            <button type="button" onClick={() => setOnDealDraft(null)} aria-label="Not about this deal" className="shrink-0 hover:text-ink">
               <X className="size-3.5" aria-hidden />
             </button>
           </div>
         )}
+        {replyTo && <ReplyBanner reply={replyTo} onStop={() => setReplyTo(null)} className="mb-1.5 bg-surface" />}
+        {names.chips}
         <div className="relative">
           {dealAt && dealAt.query.trim().length >= 2 && (
             <div className="absolute bottom-full left-0 right-0 z-20 mb-2 overflow-hidden rounded-2xl bg-surface text-sm text-ink shadow-[0_8px_30px_rgba(20,22,26,0.14)] ring-1 ring-line">
@@ -772,7 +775,7 @@ export function SolChat({
                       {j.customerName} · {j.title}
                     </span>
                     <span className="block truncate text-xs text-muted">
-                      {[STAGE_LABELS[j.stage], j.address].filter(Boolean).join(" · ")}
+                      {[stageLabel(j.stage, stageNames), j.address].filter(Boolean).join(" · ")}
                     </span>
                   </button>
                 ))
@@ -781,23 +784,39 @@ export function SolChat({
           )}
           {/* Laid out as Claude Code's box (21 Nov 2026, Martin): the words across the top, a + to add a file at the
               left of the row under them, and send then the microphone at the far right. */}
-          <div className="rounded-2xl bg-surface px-1.5 pb-1.5 ring-1 ring-line focus-within:ring-sun-line">
+          <div className="rounded-[20px] bg-surface px-2 pb-2 shadow-[0_2px_10px_rgba(20,22,26,0.06)] ring-1 ring-line focus-within:ring-sun-line/60">
             <input
               ref={picker}
               type="file"
               multiple
               accept={SOL_FILE_TYPES.join(",")}
               className="hidden"
-              onChange={(e) => addFiles(e.target.files)}
+              onChange={(e) => void addFiles(Array.from(e.target.files ?? []))}
+            />
+            <FileTiles
+              files={files}
+              problem={fileProblem}
+              onRemove={(i) => setFiles(files.filter((_, j) => j !== i))}
+              className="px-1 pt-2.5"
             />
             <textarea
               ref={box}
+              onPaste={(e) => {
+                // A screenshot pasted with Ctrl V or ⌘ V goes on the message; pasted words carry on as usual.
+                const got = filesFromPaste(e);
+                if (!got.length) return;
+                e.preventDefault();
+                void addFiles(got);
+              }}
               value={heard ? withSpoken(text, heard) : text}
               onChange={(e) => {
                 setHeard("");
                 setText(e.target.value);
-                setDealAt(typingDeal(e.target.value, e.target.selectionStart ?? e.target.value.length));
+                const deal = typingDeal(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                setDealAt(deal);
                 setHi(0);
+                if (deal) names.clear();
+                else names.typed(e.target.value, e.target.selectionStart);
               }}
               onKeyDown={(e) => {
                 if (dealAt && hits.length) {
@@ -812,6 +831,10 @@ export function SolChat({
                     return;
                   }
                 }
+                if (e.key === "Escape" && names.escape()) {
+                  e.stopPropagation();
+                  return;
+                }
                 if (dealAt && e.key === "Escape") {
                   e.stopPropagation();
                   setDealAt(null);
@@ -822,11 +845,11 @@ export function SolChat({
                   void send();
                 }
               }}
-              rows={2}
+              rows={3}
               maxLength={MAX_SAID}
-              placeholder="Message Sol… (# for a deal)"
+              placeholder="Ask Sol, or # for a deal"
               aria-label="Message Sol"
-              className="min-h-[2.75rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
+              className="min-h-[5rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
             />
             <div className="flex items-center gap-1.5">
               <button
@@ -835,7 +858,7 @@ export function SolChat({
                 disabled={files.length >= MAX_FILES}
                 aria-label="Add a file"
                 title="Add a PDF (an electricity bill, a datasheet) or a picture"
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface-2 hover:text-ink disabled:text-muted"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-ink-2 ring-1 ring-line-strong transition hover:bg-surface-2 hover:text-ink disabled:text-muted"
               >
                 <Plus className="size-[18px]" aria-hidden />
               </button>
@@ -845,7 +868,7 @@ export function SolChat({
                   disabled={!text.trim() && !files.length}
                   aria-label="Send to Sol"
                   title={busy ? "Sends as soon as Sol has answered" : "Send to Sol"}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink/85 disabled:bg-surface-2 disabled:text-muted"
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -998,6 +1021,7 @@ function Bubble({
   at,
   pinned,
   onPin,
+  onReply,
   onAnswer,
   onPick,
 }: {
@@ -1006,10 +1030,10 @@ function Bubble({
   at: string;
   pinned?: boolean;
   onPin?: () => void;
+  onReply?: () => void;
   onAnswer?: OnAnswer;
   onPick?: OnPick;
 }) {
-  const [copied, setCopied] = useState(false);
   if (!text) return null;
   return (
     <div className={clsx("flex flex-col", you ? "items-end" : "items-stretch")}>
@@ -1021,51 +1045,45 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? "max-w-[80%] whitespace-pre-wrap border-r border-ink/70 py-0.5 pr-3.5 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] text-ink-2 [font-feature-settings:'cv11','ss03','tnum']"
+            ? // A graphite bubble on the right, RENUABL's own (24 Nov 2026, Martin: Breeze's grey made it look like HubSpot).
+              "max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[13.5px] font-normal leading-[1.5] text-white [font-feature-settings:'cv11','ss03','tnum']"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}
       >
         {/* His answers laid out to read at a glance (sol-text.tsx); the member's own words as typed. */}
-        {you ? text : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
-        {at && <span className={clsx("block text-[10.5px] text-muted", you ? "mt-1" : "mt-3")}>{when(at)}</span>}
+        {you ? <QuotedWords text={text} /> : <SolText text={text} onAnswer={onAnswer} onPick={onPick} threads />}
       </div>
       {at && (
-        <div
-          className={clsx(
-            "mt-0.5 flex gap-2 px-1 text-[11px] text-muted transition-opacity",
-            pinned ? "opacity-100" : "opacity-0 group-hover/turn:opacity-100 focus-within:opacity-100",
-          )}
+        <MessageTools
+          text={text}
+          onReply={onReply}
+          shown={pinned}
+          className="mt-0.5 px-1 text-[11px]"
+          before={<span className="mr-1 max-sm:hidden">{when(at)}</span>}
         >
-          <button
-            type="button"
-            onClick={() => {
-              void navigator.clipboard?.writeText(solPlain(text)).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-            className="inline-flex items-center gap-1 hover:text-ink"
-          >
-            <Copy className="size-3" aria-hidden /> {copied ? "Copied" : "Copy"}
-          </button>
           {onPin && (
             <button
               type="button"
               onClick={onPin}
-              className={clsx("inline-flex items-center gap-1 hover:text-ink", pinned && "text-sun-ink")}
+              title={pinned ? "Unpin" : "Pin"}
+              aria-label={pinned ? "Unpin" : "Pin"}
+              className={clsx(
+                "inline-flex size-7 items-center justify-center rounded-full hover:bg-ink/5 hover:text-ink",
+                pinned && "text-sun-ink",
+              )}
             >
-              <Pin className="size-3" aria-hidden /> {pinned ? "Unpin" : "Pin"}
+              <Pin className="size-3.5" aria-hidden />
             </button>
           )}
-        </div>
+        </MessageTools>
       )}
     </div>
   );
 }
 
 /** A reminder Sol has taken: until a time is chosen, the times on offer and "Another time"; then when it is due. */
-function ReminderCard({
+export function ReminderCard({
   ask,
   busy,
   choose,

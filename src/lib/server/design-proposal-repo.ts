@@ -51,7 +51,7 @@ import { cleanExtras, defaultBill, postcodeIn, type DesignExtras } from "@/lib/d
 import { cleanDesignSet, type DesignSet } from "@/lib/domain/design/roof-design";
 import type { ISODate } from "@/lib/domain/types";
 import { newId, query, transaction } from "./db";
-import { jobById, record, type Q } from "./design-crm-repo";
+import { jobById, joinNearbyDesign, record, stageNamesIn, type Q } from "./design-crm-repo";
 import { connectOf, paymentsOn } from "./design-connect-repo";
 import {
   nextDue,
@@ -179,8 +179,12 @@ export const NO_DESIGN = "This deal has no roof design yet. Open it in the desig
  * design to price.
  */
 export async function savedFor(businessId: string, businessName: string, jobId: string): Promise<Saved | typeof NO_DESIGN | null> {
-  const found = await jobById(businessId, jobId);
+  let found = await jobById(businessId, jobId);
   if (!found) return null;
+  if (!found.job.projectId && found.job.lat !== null) {
+    await joinNearbyDesign(businessId, jobId, "sol");
+    found = (await jobById(businessId, jobId)) ?? found;
+  }
   const row = found.job.projectId ? await projectById(businessId, found.job.projectId) : null;
   const set = row ? cleanDesignSet(row.design) : null;
   if (!row || !set) return NO_DESIGN;
@@ -338,7 +342,7 @@ export async function publishProposal(
     const line = { customerId: job.customer_id, jobId, by: who };
     if (made[0].fresh)
       await record(q, businessId, { ...line, kind: "proposal", text: published(built.view.version, built.view.indicative) });
-    if (moves) await record(q, businessId, { ...line, kind: "stage", text: stageMoveText("proposal") });
+    if (moves) await record(q, businessId, { ...line, kind: "stage", text: stageMoveText("proposal", await stageNamesIn(q, businessId)) });
     return { token: kept[0].token };
   }).catch((e) => {
     if (e instanceof Raced) return "raced" as const;
@@ -685,7 +689,7 @@ export async function acceptProposal(
     if (words) await record(q, row.businessId, { ...line, kind: "proposal", text: words });
     if (jobs[0] && BEFORE_WON.includes(jobs[0].stage)) {
       await q(`update design_jobs set stage = 'won', updated_at = now() where business_id = $1 and id = $2`, [row.businessId, row.jobId]);
-      await record(q, row.businessId, { ...line, kind: "stage", text: stageMoveText("won") });
+      await record(q, row.businessId, { ...line, kind: "stage", text: stageMoveText("won", await stageNamesIn(q, row.businessId)) });
     }
     return "accepted-now";
   });

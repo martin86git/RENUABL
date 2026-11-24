@@ -7,10 +7,10 @@
  * says it, with **Yes / No / Something else**; his draft is already open under it to change; and a violet **Context**
  * line says in one go what lies behind it. Rules in domain/design/sol-on-deal.ts; the deal's card from the deal feed.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import clsx from "clsx";
 import Link from "next/link";
-import { ArrowUp, Handshake, Loader2 } from "lucide-react";
+import { ArrowUp, Handshake, Loader2, Mail } from "lucide-react";
 import type { FeedDeal, MoveKind } from "@/lib/domain/design/deal-feed";
 import { boxMove } from "@/lib/domain/design/deal-box";
 import { callBackAsked } from "@/lib/domain/design/deal-feed";
@@ -23,7 +23,7 @@ import { markPreparedSent } from "@/lib/services/prepared";
 import { sendReply } from "@/lib/services/chat";
 import { WRITE_ASK_MAX } from "@/lib/domain/design/deal-write";
 import { leadPageFor } from "@/lib/services/hello";
-import { askSolInPanel } from "@/lib/services/sol";
+import { askSolInPanel, draftInSolPanel, handsToPanel } from "@/lib/services/sol";
 import { ContextLine } from "./context-line";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolMark } from "./sol-sun";
@@ -264,15 +264,15 @@ export function SolTerminal(props: {
   };
 
   const quiet =
-    "inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted";
+    "inline-flex h-8 items-center rounded-full px-3.5 text-[12.5px] font-medium text-ink ring-1 ring-line hover:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]";
 
   const openDealLink = props.openDeal ? (
     <Link
       href={props.openDeal}
       title={`${deal.customer}'s deal`}
-      className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2"
+      className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium text-ink ring-1 ring-line transition-colors hover:bg-surface-2 max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
     >
-      Open deal
+      <span className="max-sm:sr-only">Open deal</span>
       <Handshake className="size-3.5" aria-hidden />
     </Link>
   ) : null;
@@ -292,12 +292,17 @@ export function SolTerminal(props: {
     />
   );
   const hasDraft = Boolean((!leftIt && p.draft && sol) || (waiting && answer));
-  const words = "block w-full resize-y bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-ink focus:outline-none";
+  const words =
+    "block w-full resize-y bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-ink focus:outline-none max-sm:px-2.5 max-sm:py-1.5 max-sm:text-[12px]";
+  // The head of a draft, small as a mail app's (21 Nov 2026, Martin's reference: a small Mail label over its fields).
+  const draftHead =
+    "flex flex-wrap items-center gap-x-1.5 border-b border-line px-3 py-1.5 text-[11.5px] text-muted max-sm:px-2.5 max-sm:py-1 max-sm:text-[10.5px]";
   const drafts = (
     <>
       {!leftIt && p.draft && sol && (
-        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-          <div className="flex flex-wrap items-center gap-x-2 border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
+        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line max-sm:mt-2.5 max-sm:rounded-lg">
+          <div className={draftHead}>
+            <Mail className="size-3 shrink-0" aria-hidden />
             <span>Email to {name}</span>
             {state === "counting" && <span className="text-sun-ink">· goes {countdownWords(sol.firesAt, now)}</span>}
             {state === "held" && <span>· held</span>}
@@ -308,8 +313,9 @@ export function SolTerminal(props: {
       )}
 
       {waiting && answer && (
-        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line">
-          <div className="border-b border-line px-3 py-1.5 text-[11.5px] text-muted">
+        <div className="mt-3.5 overflow-hidden rounded-xl bg-canvas ring-1 ring-line max-sm:mt-2.5 max-sm:rounded-lg">
+          <div className={draftHead}>
+            <Mail className="size-3 shrink-0" aria-hidden />
             {!byChat ? `Email to ${name}` : asEmail ? `Email to ${name} · also kept in their proposal's chat` : `Reply in ${name}'s chat`}
             {writing && <span className="text-sun-ink"> · writing it again…</span>}
           </div>
@@ -338,8 +344,8 @@ export function SolTerminal(props: {
           onClose={() => setCalling(false)}
         />
       )}
-      <div className="flex gap-3 p-3.5 sm:gap-3.5 sm:p-4">
-        <SolLive />
+      <div className="flex p-3 sm:p-4">
+        {/* No sun beside his words (22 Nov 2026, Martin: "its overkill"): the warm card says it's Sol. */}
         {/* Compact on the deal page too (19 Nov 2026, Martin: "sol is taking up too much space. make smarter design. reduce
             text size"): smaller words, and his draft beside his line and buttons wherever the card is wide enough. */}
         <div
@@ -350,45 +356,56 @@ export function SolTerminal(props: {
         >
           <div>
             <div>
-              <p className="min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink" aria-live="polite">
+              <p
+                className={clsx(
+                  "sol-line min-h-[1.5em] font-normal leading-snug tracking-[-0.01em] text-ink",
+                  props.inCard ? "text-[14.5px] max-sm:text-[13.5px]" : "text-[18px] max-sm:text-[15px]",
+                )}
+                aria-live="polite"
+              >
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>
-              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-1.5" />}
+              {/* Not on a phone: the banner above already says the stage, heat and size (21 Nov 2026, Martin). */}
+              {!props.inCard && <ContextLine text={dealContext(deal, now)} className="mt-1.5 max-sm:hidden" />}
+              {/* The draft before the buttons that send it, so nothing goes unseen; beside them where the card is wide. */}
+              {hasDraft && <div className="@3xl:hidden">{drafts}</div>}
 
               {!leftIt && typed.done && waiting && (answer || unwritten) && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                <div className="sol-replies mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:flex-nowrap max-sm:gap-1.5">
                   {answer && (
                     <button
                       type="button"
                       onClick={() => void sendAnswer()}
                       disabled={busy !== null || writing}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[12.5px] font-medium text-primary-ink hover:opacity-90 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-                      Yes, send it
+                      <span className="max-sm:hidden">Yes, send it</span>
+                      <span className="sm:hidden">Send</span>
+                    </button>
+                  )}
+                  {p.yes && (
+                    <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
+                      <span className="max-sm:hidden">{byChat ? "Write it myself" : `Email ${name} myself`}</span>
+                      <span className="sm:hidden">Write my own</span>
                     </button>
                   )}
                   <button type="button" onClick={() => setLeftIt(true)} disabled={busy !== null} className={quiet}>
                     Not now
                   </button>
-                  {p.yes && (
-                    <button type="button" onClick={yes} disabled={busy !== null} className={quiet}>
-                      {byChat ? "Write it myself" : `Email ${name} myself`}
-                    </button>
-                  )}
                   {openDealLink}
                 </div>
               )}
 
               {!leftIt && typed.done && !waiting && (
-                <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                <div className="sol-replies mt-3.5 flex flex-wrap items-center gap-2 max-sm:mt-2.5 max-sm:gap-1.5">
                   {p.yes && !(p.yes.kind === "call" && !props.phone) && (
                     <button
                       type="button"
                       onClick={yes}
                       disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[12.5px] font-medium text-primary-ink hover:opacity-90 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       {p.yes.label}
@@ -455,9 +472,9 @@ export function SolTerminal(props: {
                   tellSol();
                 }}
                 // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
-                className="mt-3.5 flex items-center gap-1 rounded-lg bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+                className="sol-compose mt-3.5 flex items-center gap-1 rounded-xl bg-surface max-sm:mt-2.5 py-1 pl-3 pr-1 ring-1 ring-line focus-within:ring-ink/40"
               >
-                <span className="font-mono text-[12px] text-sun-line" aria-hidden>
+                <span className="sol-prompt font-mono text-[12px] text-muted" aria-hidden>
                   {">"}
                 </span>
                 <input
@@ -465,6 +482,17 @@ export function SolTerminal(props: {
                   value={heard ? withSpoken(ask, heard) : ask}
                   onChange={(e) => {
                     setHeard("");
+                    // On a phone the box is too small to write in (22 Nov 2026, Martin): the first letter brings up
+                    // Sol's full chat with the words in its box, about this deal. Changing the drafted reply stays here.
+                    if (e.target.value.trim() && handsToPanel() && !(waiting && answer)) {
+                      draftInSolPanel({
+                        text: e.target.value,
+                        about: `On ${deal.customer}'s deal (#${props.jobId}): `,
+                        label: deal.customer,
+                      });
+                      setAsk("");
+                      return;
+                    }
                     setAsk(e.target.value);
                   }}
                   placeholder={
@@ -486,7 +514,7 @@ export function SolTerminal(props: {
                   type="submit"
                   disabled={!ask.trim()}
                   aria-label="Send to Sol"
-                  className="grid size-7 shrink-0 place-items-center rounded-md bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+                  className="sol-send grid size-7 shrink-0 place-items-center rounded-md bg-primary text-primary-ink disabled:bg-surface-2 disabled:text-muted"
                 >
                   <ArrowUp className="size-3.5" aria-hidden />
                 </button>
@@ -494,7 +522,7 @@ export function SolTerminal(props: {
               {said && <p className="mt-2 text-[12.5px] text-warning">{said}</p>}
             </div>
           </div>
-          <div className="@3xl:[&>div:first-child]:mt-0">{drafts}</div>
+          <div className="hidden @3xl:block @3xl:[&>div:first-child]:mt-0">{drafts}</div>
         </div>
       </div>
       {!props.inCard && (deal.stage === "lead" || deal.stage === "designed") && <LeadPage jobId={props.jobId} name={name} />}
@@ -514,30 +542,40 @@ export function SolLive() {
   );
 }
 
-/** Words typed out as Sol says them, as a terminal would (all at once with reduced motion). */
-export function useTyped(text: string): { text: string; done: boolean } {
+/**
+ * Words typed out as Sol says them, as a terminal would (all at once with reduced motion). Only the words re-render as
+ * they type (22 Nov 2026, Martin: the screens drew slowly; each letter re-rendered the whole card, eight cards at once
+ * on Needs you); the card hears once, when the line is whole.
+ */
+export function useTyped(text: string): { text: ReactNode; done: boolean } {
+  const [doneFor, setDoneFor] = useState<string | null>(null);
+  return { text: <Typing key={text} text={text} onDone={setDoneFor} />, done: doneFor === text };
+}
+
+function Typing({ text, onDone }: { text: string; onDone: (text: string) => void }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    /* eslint-disable react-hooks/set-state-in-effect -- the words start again when they change */
-    if (still) {
+    if (still || !text) {
+      /* eslint-disable-next-line react-hooks/set-state-in-effect -- shown whole at once */
       setShown(text.length);
+      onDone(text);
       return;
     }
-    setShown(0);
-    /* eslint-enable react-hooks/set-state-in-effect */
     // How far along is worked out from the time since it started, and the ticking stops only once the line is whole
-    // (18 Nov 2026, Martin: lines stopped part way). It used to count one letter a tick and stop on a timer, so a page
-    // whose ticks ran late (busy, or behind another tab) was cut off before the end.
+    // (18 Nov 2026, Martin: lines stopped part way). Ticked once a frame at most, never faster than the screen draws.
     const started = performance.now();
-    const t = window.setInterval(() => {
+    let frame = 0;
+    const tick = () => {
       const n = Math.min(text.length, Math.floor((performance.now() - started) / TYPE_MS));
       setShown(n);
-      if (n >= text.length) window.clearInterval(t);
-    }, TYPE_MS);
-    return () => window.clearInterval(t);
-  }, [text]);
-  return { text: text.slice(0, shown), done: shown >= text.length };
+      if (n >= text.length) onDone(text);
+      else frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [text, onDone]);
+  return <>{text.slice(0, shown)}</>;
 }
 
 /**
@@ -559,7 +597,7 @@ function LeadPage({ jobId, name }: { jobId: string; name: string }) {
   };
   const link = "font-medium text-ink underline decoration-line underline-offset-2 hover:decoration-ink disabled:text-muted";
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-canvas/60 px-4 py-2 text-[12.5px] sm:px-5">
+    <div className="sol-lead-page flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line bg-canvas/60 px-4 py-2 text-[12.5px] sm:px-5">
       <span className="text-muted">{name}&apos;s page: their home, the design and a chat with Sol</span>
       <span className="ml-auto flex gap-3">
         <button
@@ -613,13 +651,16 @@ function ComposeFields(props: {
   onSubject: (v: string) => void;
 }) {
   const { mail } = props;
-  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1 text-[12px]";
-  const label = "w-[4.5rem] shrink-0 text-[11.5px] text-muted";
-  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[12px] text-ink outline-none placeholder:text-muted";
+  const row = "flex items-center gap-2 border-b border-line bg-surface px-3 py-1 text-[12px] max-sm:px-2.5 max-sm:py-0.5";
+  const label = "w-[4.5rem] shrink-0 text-[11.5px] text-muted max-sm:w-10 max-sm:text-[10.5px]";
+  const box = "min-w-0 flex-1 bg-transparent py-0.5 text-[12px] text-ink outline-none placeholder:text-muted max-sm:text-[11.5px]";
   return (
     <div>
       <label className={row}>
-        <span className={label}>Send from</span>
+        <span className={label}>
+          <span className="max-sm:hidden">Send from</span>
+          <span className="sm:hidden">From</span>
+        </span>
         <select value={props.from} onChange={(e) => props.onFrom(e.target.value)} className={clsx(box, "cursor-pointer")}>
           <option value="">{mail ? `${mail.business} · replies come to ${mail.replyTo}` : "Your business"}</option>
           {(mail?.from ?? []).map((a) => (
@@ -631,7 +672,7 @@ function ComposeFields(props: {
         {mail && mail.from.length === 0 && (
           <Link
             href="/design/inbox"
-            className="shrink-0 text-[12px] text-muted underline hover:text-ink"
+            className="shrink-0 text-[12px] text-muted underline hover:text-ink max-sm:text-[11px]"
             title="Connect your Gmail to send from your own address"
           >
             Use my address
@@ -640,7 +681,7 @@ function ComposeFields(props: {
       </label>
       <div className={row}>
         <span className={label}>To</span>
-        <span className={clsx("min-w-0 flex-1 truncate py-0.5", props.to ? "text-ink" : "text-warning")}>
+        <span className={clsx("min-w-0 flex-1 truncate py-0.5 max-sm:text-[11.5px]", props.to ? "text-ink" : "text-warning")}>
           {props.to ?? `${props.name} has no email on file`}
         </span>
       </div>

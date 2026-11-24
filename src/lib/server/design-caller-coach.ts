@@ -136,7 +136,13 @@ export async function coachAssistant(o: {
   const turns: CoachTurn[] = [
     ...(o.fresh ? [] : coaching.turns),
     { role: "you" as const, text: o.message, at, by: o.by, ...(o.call ? { about: o.call.about } : o.deal ? { about: o.deal.about } : {}) },
-    { role: "assistant" as const, text: answer.reply, at, changes: { ...applied.changes, settings } },
+    {
+      role: "assistant" as const,
+      text: answer.reply,
+      at,
+      changes: { ...applied.changes, settings },
+      ...(answer.ring ? { ring: answer.ring } : {}),
+    },
   ].slice(-MAX_TURNS);
   await saveCoaching(o.businessId, { notes: applied.notes, turns }, o.by, role);
   if (o.fresh) await saveCoachChats(o.businessId, { turns, past }, o.by, role);

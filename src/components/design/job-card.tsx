@@ -7,13 +7,25 @@ import { InspectionStatus } from "./inspections";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { cardHeadline, isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
+import {
+  cardHeadline,
+  cardHeadlineLines,
+  cardSections,
+  isJobPicture,
+  type CardPart,
+  type JobDrawing,
+  type JobNote,
+} from "@/lib/domain/design/job-card";
+import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
+import { Home, LayoutGrid, Wrench } from "lucide-react";
 import { PHOTO_CHECK_BY } from "@/lib/domain/design/photo-check";
 import { SolBadge } from "./sol-sun";
 import {
   asBuiltDifferences,
   asBuiltFrom,
+  asBuiltLines,
   asBuiltMissing,
+  NOTHING_PLANNED,
   serialsOf,
   type AsBuilt,
   type AsBuiltInput,
@@ -78,12 +90,22 @@ function Drawing({ title, drawing, picture }: { title: string; drawing: JobDrawi
  * As built (2 Nov 2026, Martin): what was really installed, with every serial number, started from the design and
  * kept against the job, with how it differs and what is still to record. The job's warranty and service file.
  */
+const addButton =
+  "inline-flex h-8 items-center rounded-full border border-line bg-surface px-3 text-xs font-medium text-ink-2 hover:border-ink hover:text-ink";
+const removeLink = "text-xs font-medium text-muted underline underline-offset-4 hover:text-ink";
+
 function AsBuiltPanel({
   designed,
+  planned,
+  due,
   saved,
   onSave,
 }: {
   designed: Designed;
+  /** Whether there is a plan to hold it against (a design, or the system typed on the deal). */
+  planned: boolean;
+  /** The job is installed and nothing is recorded yet. */
+  due: boolean;
   saved: AsBuilt | null;
   onSave: (input: AsBuiltInput) => Promise<{ ok: true; asBuilt: AsBuilt } | { ok: false; message: string }>;
 }) {
@@ -98,11 +120,14 @@ function AsBuiltPanel({
     panelSerials: serialsOf(panelText),
     battery: form.battery ? { ...form.battery, serials: serialsOf(batteryText) } : null,
   };
-  const differences = asBuiltDifferences(current, designed);
+  const differences = planned ? asBuiltDifferences(current, designed) : [];
   const missing = asBuiltMissing(current);
   const field = "mt-1 block min-h-10 w-full rounded-md border border-line bg-surface px-2.5 text-sm outline-none focus:border-forest";
   return (
-    <section aria-label="As built" className="rounded-lg border border-line bg-surface p-4 lg:col-span-2">
+    <section
+      aria-label="As built"
+      className={clsx("rounded-lg border bg-surface p-4 lg:col-span-2", due ? "border-sun-line ring-1 ring-sun-line/40" : "border-line")}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className={head}>As built</p>
         {kept && (
@@ -112,8 +137,14 @@ function AsBuiltPanel({
         )}
       </div>
       <p className="mt-1 text-xs text-muted">
-        What was really installed, with every serial number: the job&apos;s warranty and service file.
+        What was really installed, with every serial number: the job&apos;s warranty and service file. Kept apart from the design, so
+        changing the design later never changes it.
       </p>
+      {due && (
+        <p className="mt-2 rounded-md bg-sun px-2.5 py-2 text-xs font-medium text-sun-ink">
+          This job is installed: record what went in{planned ? ", starting from the plan below" : ""}.
+        </p>
+      )}
       <div className="mt-3 grid gap-3 text-xs font-medium sm:grid-cols-3">
         <label>
           Installed on
@@ -188,8 +219,79 @@ function AsBuiltPanel({
                 className={field}
               />
             </label>
+            <label>
+              Storage (kWh)
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={form.battery.kwh ?? ""}
+                onChange={(e) => {
+                  const n = Number(e.target.value);
+                  setForm({ ...form, battery: { ...form.battery!, kwh: e.target.value && n > 0 ? Math.round(n * 10) / 10 : null } });
+                }}
+                className={field}
+              />
+            </label>
+            <div className="flex items-end sm:col-span-2">
+              <button type="button" onClick={() => setForm({ ...form, battery: null })} className={removeLink}>
+                No battery was installed
+              </button>
+            </div>
           </>
         )}
+        {form.charger && (
+          <>
+            <label className="sm:col-span-2">
+              EV charger
+              <input
+                value={form.charger.model}
+                onChange={(e) => setForm({ ...form, charger: { ...form.charger!, model: e.target.value } })}
+                className={field}
+              />
+            </label>
+            <label>
+              Its serial
+              <input
+                value={form.charger.serial}
+                onChange={(e) => setForm({ ...form, charger: { ...form.charger!, serial: e.target.value } })}
+                className={clsx(field, "font-mono")}
+              />
+            </label>
+          </>
+        )}
+        <div className="flex flex-wrap gap-2 sm:col-span-3">
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, inverters: [...form.inverters, { model: "", serial: "" }] })}
+            className={addButton}
+          >
+            + Inverter
+          </button>
+          {form.inverters.length > 0 && (
+            <button type="button" onClick={() => setForm({ ...form, inverters: form.inverters.slice(0, -1) })} className={addButton}>
+              − Last inverter
+            </button>
+          )}
+          {!form.battery && (
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, battery: { model: "", modules: 1, serials: [], kwh: null } })}
+              className={addButton}
+            >
+              + Battery
+            </button>
+          )}
+          {form.charger ? (
+            <button type="button" onClick={() => setForm({ ...form, charger: null })} className={addButton}>
+              − EV charger
+            </button>
+          ) : (
+            <button type="button" onClick={() => setForm({ ...form, charger: { model: "", serial: "" } })} className={addButton}>
+              + EV charger
+            </button>
+          )}
+        </div>
         <label className="sm:col-span-3">
           Panel serials, one a line ({serialsOf(panelText).length} of {form.panels.count})
           <textarea value={panelText} onChange={(e) => setPanelText(e.target.value)} rows={4} className={clsx(field, "py-2 font-mono")} />
@@ -232,7 +334,13 @@ function AsBuiltPanel({
             setBusy(false);
             if (res.ok) {
               setKept(res.asBuilt);
-              setNote(differences.length ? "Kept, with how it differs from the design." : "Kept: installed as designed.");
+              setNote(
+                !planned
+                  ? "Kept."
+                  : differences.length
+                    ? `Kept, with how it differs from the ${designed.from === "deal" ? "plan" : "design"}.`
+                    : `Kept: installed as ${designed.from === "deal" ? "planned" : "designed"}.`,
+              );
             } else setNote(res.message);
           }}
           className="inline-flex h-10 items-center rounded-full bg-primary px-4 text-sm font-medium text-primary-ink disabled:bg-surface-2 disabled:text-muted"
@@ -243,6 +351,47 @@ function AsBuiltPanel({
         {note && <span className="text-xs font-medium text-ink">{note}</span>}
       </div>
     </section>
+  );
+}
+
+/** Each part's mark (24 Nov 2026, Martin: an icon beside each). */
+function PartIcon({ part, className }: { part: CardPart; className: string }) {
+  if (part === "solar") return <PanelIcon className={className} />;
+  if (part === "battery") return <BatteryIcon className={className} />;
+  if (part === "inverter") return <InverterIcon className={className} />;
+  if (part === "charger") return <ChargerIcon className={className} />;
+  if (part === "racking") return <LayoutGrid className={className} aria-hidden />;
+  if (part === "home") return <Home className={className} aria-hidden />;
+  return <Wrench className={className} aria-hidden />;
+}
+
+/** The system in parts, each headed by its mark and name, parted by a faint line. */
+function SystemList({
+  details,
+  racking = [],
+}: {
+  details: { key?: string; label: string; value: string }[];
+  racking?: { name: string; qty: number }[];
+}) {
+  return (
+    <div className="mt-1.5 divide-y divide-line">
+      {cardSections(details, racking).map((s) => (
+        <div key={s.part} className="py-2.5 first:pt-1 last:pb-0">
+          <p className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+            <PartIcon part={s.part} className="size-4 text-sun-line" />
+            {s.title}
+          </p>
+          <dl className="mt-1 grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-0.5 pl-[1.375rem] text-sm">
+            {s.rows.map((d) => (
+              <div key={d.label} className="contents">
+                <dt className="text-muted">{d.label}</dt>
+                <dd className="break-words text-ink">{d.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -262,14 +411,31 @@ function CardBody({
   /** Keeps the as-built: the team's own way, or through the installer's link. */
   onAsBuilt?: (input: AsBuiltInput) => Promise<{ ok: true; asBuilt: AsBuilt } | { ok: false; message: string }>;
 }) {
+  // The as-built as last kept here, so the card shows what was installed as soon as it is saved.
+  const [keptHere, setKept] = useState<AsBuilt | null>(null);
+  const asBuilt = keptHere ?? card.asBuilt;
   // The title (10 Nov 2026, Martin): what is being installed in sizes, the address under it; the drawings top right.
   const headline = cardHeadline(card.system) ?? card.job.title;
+  const headLines = cardHeadlineLines(card.system);
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="min-w-0 space-y-5">
           <section>
-            <h3 className="text-2xl font-semibold tracking-tight text-ink">{headline}</h3>
+            {headLines.length > 0 ? (
+              <h3 className="space-y-0.5 text-2xl font-semibold tracking-tight text-ink" aria-label={headline}>
+                {headLines.map((l) => (
+                  <span key={l.part} className="flex items-center gap-2.5">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sun-line/12">
+                      <PartIcon part={l.part} className="size-[18px] text-sun-line" />
+                    </span>
+                    {l.words}
+                  </span>
+                ))}
+              </h3>
+            ) : (
+              <h3 className="text-2xl font-semibold tracking-tight text-ink">{headline}</h3>
+            )}
             <a
               href={mapLink(card.job.address)}
               target="_blank"
@@ -297,18 +463,38 @@ function CardBody({
             )}
           </section>
 
-          {card.details.length > 0 && (
+          {asBuilt ? (
             <section>
-              <p className={head}>System</p>
+              <p className={head}>As installed</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Recorded by {asBuilt.by.split("@")[0]},{" "}
+                {new Date(asBuilt.at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+              </p>
               <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                {card.details.map((d) => (
+                {asBuiltLines(asBuilt).map((d) => (
                   <div key={d.label} className="contents">
                     <dt className="text-muted">{d.label}</dt>
-                    <dd className="text-ink">{d.value}</dd>
+                    <dd className="break-words text-ink">{d.value}</dd>
                   </div>
                 ))}
               </dl>
+              {card.details.length > 0 && (
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">As planned on the deal</summary>
+                  <SystemList details={card.details} />
+                </details>
+              )}
             </section>
+          ) : (
+            (card.details.length > 0 || (card.racking?.length ?? 0) > 0) && (
+              <section>
+                <p className={head}>{card.job.installed ? "System as planned" : "System"}</p>
+                {card.job.installed && (
+                  <p className="mt-0.5 text-xs text-sun-ink">Not yet confirmed as installed: record the as-built below.</p>
+                )}
+                <SystemList details={card.details} racking={card.racking} />
+              </section>
+            )
           )}
 
           {aside && <section className="space-y-5">{aside}</section>}
@@ -316,6 +502,7 @@ function CardBody({
 
         {card.layout || card.strings ? (
           <section className="min-w-0 space-y-3">
+            {card.whole && <Drawing title="The whole house" drawing={card.whole} picture={picture} />}
             {card.layout && <Drawing title="Panel layout" drawing={card.layout} picture={picture} />}
             {card.strings && <Drawing title="String design" drawing={card.strings} picture={picture} />}
             {card.stringWords.length > 0 && (
@@ -334,7 +521,19 @@ function CardBody({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {card.designed && onAsBuilt && <AsBuiltPanel designed={card.designed} saved={card.asBuilt} onSave={onAsBuilt} />}
+        {onAsBuilt && (
+          <AsBuiltPanel
+            designed={card.designed ?? NOTHING_PLANNED}
+            planned={Boolean(card.designed)}
+            due={Boolean(card.job.installed) && !asBuilt}
+            saved={card.asBuilt}
+            onSave={async (input) => {
+              const res = await onAsBuilt(input);
+              if (res.ok) setKept(res.asBuilt);
+              return res;
+            }}
+          />
+        )}
         <section aria-label="Notes and photos" className="min-w-0">
           <p className={head}>Notes and photos</p>
           <div className="mt-2">{composer}</div>

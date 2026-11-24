@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { Maximize2, X } from "lucide-react";
 import type { SolChart } from "@/lib/domain/design/sol-charts";
@@ -125,32 +126,42 @@ export function SolDiagramView({ diagram }: { diagram: SolDiagram }) {
         <img src={src} alt={diagram.title} className="mx-auto block h-auto w-full max-w-[720px]" />
       </button>
       {diagram.caption && <p className="border-t border-line px-4 py-2 text-xs text-muted">{diagram.caption}</p>}
-      {big && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={diagram.title}
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/60 p-4 sm:p-10"
-          onClick={() => setBig(false)}
-          onKeyDown={(e) => e.key === "Escape" && setBig(false)}
-        >
-          <div className="relative max-h-full w-full max-w-5xl overflow-auto rounded-2xl bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              autoFocus
+      {/* Opened over the whole page, not inside Sol's panel (24 Nov 2026, Martin: "the visual should open larger
+          when clicked on"; the panel's own transform had kept it small): drawn on the page body, as large as the
+          screen allows. */}
+      {big &&
+        createPortal(
+          <div className="theme-studio contents">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={diagram.title}
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-ink/70 p-2 sm:p-6"
               onClick={() => setBig(false)}
-              aria-label="Close"
-              className="absolute right-3 top-3 rounded-full p-1.5 text-muted hover:bg-canvas"
+              onKeyDown={(e) => e.key === "Escape" && setBig(false)}
             >
-              <X className="size-4" aria-hidden />
-            </button>
-            <p className="pr-10 text-sm font-semibold text-ink">{diagram.title}</p>
-            {/* eslint-disable-next-line @next/next/no-img-element -- as above */}
-            <img src={src} alt={diagram.title} className="mt-3 block h-auto w-full" />
-            {diagram.caption && <p className="mt-3 text-xs text-muted">{diagram.caption}</p>}
-          </div>
-        </div>
-      )}
+              <div
+                className="relative flex max-h-full w-full max-w-[min(96vw,1400px)] flex-col overflow-auto rounded-2xl bg-white p-3 sm:p-5"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setBig(false)}
+                  aria-label="Close"
+                  className="absolute right-3 top-3 inline-flex size-9 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+                >
+                  <X className="size-5" aria-hidden />
+                </button>
+                <p className="pr-12 text-[15px] font-semibold text-ink">{diagram.title}</p>
+                {/* eslint-disable-next-line @next/next/no-img-element -- as above */}
+                <img src={src} alt={diagram.title} className="mx-auto mt-3 block h-auto max-h-[78dvh] w-full object-contain" />
+                {diagram.caption && <p className="mt-3 text-[13px] text-muted">{diagram.caption}</p>}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </figure>
   );
 }

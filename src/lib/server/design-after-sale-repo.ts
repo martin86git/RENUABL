@@ -8,6 +8,7 @@
  * signed-in member (or, for what a signature sets going, from the proposal's
  * own record).
  */
+import { dealProfit } from "@/lib/domain/design/deal-profit";
 import { randomBytes } from "node:crypto";
 import { INSTALLED_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { materialsOrder } from "@/lib/domain/design/deal";
@@ -760,12 +761,24 @@ export interface InstallExtra {
   depositAsked?: number | null;
   solarVicRebate?: number | null;
   solarVicLoan?: number | null;
+  /** From the signed version's business side (deal-profit.ts): only sent to members who see costs. */
+  grossMargin?: number;
+  grossShare?: number | null;
+  commission?: number;
+  afterCommission?: number;
 }
 
 /** For each signed job: its battery, what is payable, the deposit received and whether its parts are ordered. */
 export async function installExtras(businessId: string): Promise<InstallExtra[]> {
-  const rows = await query<{ jobId: string; view: ProposalView; option: OptionKey | null; received: boolean; status: string | null }>(
-    `select distinct on (p.job_id) p.job_id as "jobId", v.view, v.accepted_option as option,
+  const rows = await query<{
+    jobId: string;
+    view: ProposalView;
+    internal: ProposalInternal | null;
+    option: OptionKey | null;
+    received: boolean;
+    status: string | null;
+  }>(
+    `select distinct on (p.job_id) p.job_id as "jobId", v.view, v.internal, v.accepted_option as option,
             v.deposit_received_at is not null as received, o.status
        from design_proposals p
        join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id and v.accepted_at is not null
@@ -786,6 +799,7 @@ export async function installExtras(businessId: string): Promise<InstallExtra[]>
       depositAsked: agreed.terms?.deposit ?? null,
       solarVicRebate: agreed.price.solarVic?.rebate ?? null,
       solarVicLoan: agreed.price.solarVic?.loan ?? null,
+      ...(r.internal ? dealProfit(internalForChoice(r.internal, r.option)) : {}),
     };
   });
 }

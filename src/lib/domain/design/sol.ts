@@ -10,7 +10,7 @@ import { isMeetingId } from "./sol-meeting";
 import { cleanCharts, MORE_DETAIL, type SolChart } from "./sol-charts";
 import { cleanDiagrams, type SolDiagram } from "./sol-diagrams";
 import { cleanDesignsShown, type SolDesignShown } from "./sol-designs";
-import { STAGE_LABELS, JOB_STAGES, type Job, type JobStage } from "./crm";
+import { STAGE_LABELS, JOB_STAGES, stageLabel, type Job, type JobStage, type StageNames } from "./crm";
 import { matches } from "./find";
 import { SECTIONS } from "./sections";
 import { SOL_MAKER_DOCS } from "./maker-docs";
@@ -19,7 +19,7 @@ import { SOL_REGULATIONS } from "./standards";
 import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
 import { cleanGoTo, type SolGoTo } from "./sol-goto";
-import { cleanNewCase, cleanRoom, type NewCaseAsk, type SolRoom } from "./sol-rooms";
+import { cleanNewCase, cleanRoom, sameTalk, type NewCaseAsk, type SolRoom } from "./sol-rooms";
 import { cleanLearnAsk, prefsBlock, SOL_LEARNING, type BusinessScope, type Induction, type LearnAsk } from "./sol-induction";
 
 export const SOL_NAME = "Sol";
@@ -126,11 +126,14 @@ export function withoutLastExchange(turns: readonly SolTurn[]): { turns: SolTurn
   return { turns: dropExchange(turns, turns[at].at), question: turns[at], answer };
 }
 
-/** The conversation without the question said at `questionAt` and everything not pinned after it. */
+/**
+ * The conversation without the question said at `questionAt` and everything not pinned after it in the same
+ * conversation (sol-rooms.ts: what was said since on Today or in the panel, whichever it wasn't asked in, stays).
+ */
 export function dropExchange(turns: readonly SolTurn[], questionAt: string): SolTurn[] {
   const at = turns.findIndex((t) => t.role === "you" && t.at === questionAt);
   if (at < 0) return [...turns];
-  return [...turns.slice(0, at), ...turns.slice(at + 1).filter((t) => t.pinned)];
+  return [...turns.slice(0, at), ...turns.slice(at + 1).filter((t) => t.pinned || !sameTalk(turns[at], t))];
 }
 
 /** What Sol is told when asked again: the answer they didn't take, and to come at it another way. */
@@ -182,6 +185,8 @@ export interface SolState {
   reminders: SolReminder[];
   prefs: SolPref[];
   unread: number;
+  /** How many chats with Sol this member has had, the one going included (sol-history.ts `chatsSoFar`). */
+  chats?: number;
   /** The owner's preferences for everyone in the business (sol-induction.ts). */
   businessPrefs?: SolPref[];
   /** Where their induction with Sol stands, and whether the owner set the customer questions for everyone. */
@@ -470,12 +475,12 @@ export type SolJob = Job & { customerName: string };
 const money = (n: number | null) => (n == null ? "no value yet" : `$${Math.round(n).toLocaleString("en-AU")}`);
 
 /** One deal in a line, as Sol's tools give it: id, customer, title, stage, value, kW, install date, address. */
-export function dealLine(j: SolJob): string {
+export function dealLine(j: SolJob, names: StageNames = {}): string {
   return [
     `deal ${j.id}`,
     j.customerName,
     j.title,
-    STAGE_LABELS[j.stage],
+    stageLabel(j.stage, names),
     money(j.value),
     j.kw ? `${j.kw} kW` : "",
     j.installDate ? `installs ${j.installDate}` : "",
@@ -493,31 +498,38 @@ export function findDeals(jobs: readonly SolJob[], q: string, phoneOf: (customer
   return jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address], phone: phoneOf(j.customerId) }, typed)).slice(0, 12);
 }
 
-/** The stage a name means: its key or any part of its label ("proposal", "Proposal sent"), or null. */
-export function stageNamed(name: string): JobStage | null {
+/**
+ * The stage a name means: its key, or any part of the business's name for it or ours ("proposal", "Quote sent",
+ * "Proposal sent"), the business's names first; or null.
+ */
+export function stageNamed(name: string, names: StageNames = {}): JobStage | null {
   const n = name.trim().toLowerCase();
   if (!n) return null;
+  const theirs = (s: JobStage) => (names[s] ?? "").toLowerCase();
+  const ours = (s: JobStage) => STAGE_LABELS[s].toLowerCase();
   return (
     JOB_STAGES.find((s) => s === n) ??
-    JOB_STAGES.find((s) => STAGE_LABELS[s].toLowerCase() === n) ??
-    JOB_STAGES.find((s) => STAGE_LABELS[s].toLowerCase().includes(n)) ??
+    JOB_STAGES.find((s) => theirs(s) === n) ??
+    JOB_STAGES.find((s) => ours(s) === n) ??
+    JOB_STAGES.find((s) => theirs(s).includes(n) && theirs(s) !== "") ??
+    JOB_STAGES.find((s) => ours(s).includes(n)) ??
     null
   );
 }
 
 /** The deals at a stage, with how long since each last changed; with no stage, every stage and its count. */
-export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: string): string {
+export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: string, names: StageNames = {}): string {
   if (!stage.trim()) {
-    return JOB_STAGES.map((s) => `${STAGE_LABELS[s]}: ${jobs.filter((j) => j.stage === s).length}`).join("\n");
+    return JOB_STAGES.map((s) => `${stageLabel(s, names)}: ${jobs.filter((j) => j.stage === s).length}`).join("\n");
   }
-  const s = stageNamed(stage);
-  if (!s) return `There's no stage called "${stage}". The stages are: ${JOB_STAGES.map((x) => STAGE_LABELS[x]).join(", ")}.`;
+  const s = stageNamed(stage, names);
+  if (!s) return `There's no stage called "${stage}". The stages are: ${JOB_STAGES.map((x) => stageLabel(x, names)).join(", ")}.`;
   const at = jobs.filter((j) => j.stage === s).sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
-  if (!at.length) return `No deals are at ${STAGE_LABELS[s]}.`;
+  if (!at.length) return `No deals are at ${stageLabel(s, names)}.`;
   const days = (iso: string) => Math.max(0, Math.floor((Date.parse(`${today}T12:00:00Z`) - Date.parse(iso)) / 86_400_000));
   return [
-    `${at.length} at ${STAGE_LABELS[s]}, longest unchanged first:`,
-    ...at.slice(0, 40).map((j) => `- ${dealLine(j)} · unchanged ${days(j.updatedAt)} days`),
+    `${at.length} at ${stageLabel(s, names)}, longest unchanged first:`,
+    ...at.slice(0, 40).map((j) => `- ${dealLine(j, names)} · unchanged ${days(j.updatedAt)} days`),
   ].join("\n");
 }
 
@@ -544,7 +556,7 @@ export function solSystem(input: {
   const prefs = prefsBlock(input.businessPrefs ?? [], input.prefs);
   return `You are ${SOL_NAME}, the assistant in RENUABL, the software ${input.business} runs its solar business on. You are talking with ${input.member}, a member of ${input.business}'s team, in their own conversation (no one else sees it). Help them with their customers and their work: their deals, what to say to a customer, where things are in RENUABL, and general knowledge about solar, batteries and power bills where it helps.
 
-How you answer: the answer first, compressed to what they need, with the key figures, in plain Australian English. Lay it out to be read at a glance (the screen draws these marks): short paragraphs of one to three sentences with a blank line between them, never a wall of text; a list as a paragraph of its own, one "- " line an item (drawn as round bullets); when one point matters most (a deadline, a catch, the answer itself), that point alone on its own line starting "! " (drawn highlighted), at most one; and any question you put to them on its own line starting "? " (drawn highlighted), never tucked inside a paragraph. When they would choose between a few ways forward, put the question on its "? " line and straight under it two to four options, one "- " line each as "Name: one line on what it means" (drawn as a card of numbered choices they press, with room to answer in their own words); a yes or no question needs no options. Plain text otherwise: no headings, asterisks or bold. Leave out the working and the long lists. When there is more worth telling, end with "${MORE_DETAIL}" on its own line, and give the fuller answer only when they say yes. When a picture says it quicker (a comparison, a breakdown, a trend), draw it with show_chart from figures the facts or a tool gave you, and don't repeat its figures in words. For a labelled picture of a real case (a battery's clearances, a roof's setbacks, how strings run), draw it with show_diagram, and say it is an illustration to check against the rules and the site. When they ask to see a deal's roof design, its panel layout or its strings (by name, or "the next install"), find the deal and show it with show_design: it draws the real design over the roof photo under your answer, so never say you can't show a design; a deal with none yet you still show with show_design, which puts a Start the design button under your answer: say it has no design yet and to press that, never send them through the menus.
+How you answer: the answer first, compressed to what they need, with the key figures, in plain Australian English. Be concise: most answers are two to four short lines and under 60 words, unless they ask for more. The first line answers the question itself, with its figure, so it could stand alone (asked "is it 1000 mm or 1500 mm?", say "Both: 1,000 mm round the vent, 1,500 mm in the direction it blows."). Say each fact once: never restate a figure in a key point, a list or a closing line. A follow-up question gets only the new answer, never a recap of the last one. Put the provisos (check the clause in your copy, the electrician confirms on site, ask the network) in one short line at most, and leave out any already said in this conversation. Never say where an answer came from in words ("this is from something I looked up"): the sources under your answer show it. Lay it out to be read at a glance (the screen draws these marks): short paragraphs of one to three sentences with a blank line between them, never a wall of text; a list as a paragraph of its own, one "- " line an item (drawn as round bullets); when one point matters most (a deadline, a catch, the answer itself), that point alone on its own line starting "! " (drawn highlighted), at most one; and any question you put to them on its own line starting "? " (drawn highlighted), never tucked inside a paragraph. When they would choose between a few ways forward, put the question on its "? " line and straight under it two to four options, one "- " line each as "Name: one line on what it means" (drawn as a card of numbered choices they press, with room to answer in their own words); a yes or no question needs no options. Plain text otherwise: no headings, asterisks or bold. Leave out the working and the long lists. When there is more worth telling, end with "${MORE_DETAIL}" on its own line, and give the fuller answer only when they say yes. When a picture says it quicker (a comparison, a breakdown, a trend), draw it with show_chart from figures the facts or a tool gave you, and don't repeat its figures in words. For a labelled picture of a real case (a battery's clearances, a roof's setbacks, how strings run), draw it with show_diagram, and say it is an illustration to check against the rules and the site. A technical answer (a clearance, a distance, a zone, a layout, how something is wired or mounted) always comes with a show_diagram drawing where one can show it, without being asked; keep the words short beside it and let the drawing carry the detail. When they ask to see a deal's roof design, its panel layout or its strings (by name, or "the next install"), find the deal and show it with show_design: it draws the real design over the roof photo under your answer, so never say you can't show a design; a deal with none yet you still show with show_design, which puts a Start the design button under your answer: say it has no design yet and to press that, never send them through the menus.
 
 Deals: find one with find_deal when only a name, address or phone is given; read it with deal_details before advising on or writing to a customer. A deal written as "#Name (deal ID)" was picked from the search: read that deal straight away. For deals at a stage, use deals_at_stage. Never invent deals, customers, figures, dates or prices: use the facts and the tools. ${input.costs ? "price_lookup gives supplier costs from the business's own price lists." : "This person can't see costs or margin: don't give any, and say the owner can change that under Users and permissions if they ask."}
 

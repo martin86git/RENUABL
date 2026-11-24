@@ -3,14 +3,53 @@
 import { SAMPLE_DEAL_HINT } from "@/lib/domain/design/deal-tour";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { LayoutGrid, List, PenTool, Plus, Trash2 } from "lucide-react";
-import clsx from "clsx";
-import { JOB_STAGES, STAGE_LABELS, type JobStage, type SavedPipeline } from "@/lib/domain/design/crm";
-import { DEFAULT_PIPELINE, PIPELINES, cleanPipelineChoice, pipelineOf, type PipelineChoice } from "@/lib/domain/design/deal";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  List,
+  PenTool,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  User,
+  UserX,
+  Users,
+  X,
+} from "lucide-react";
+import clsx from "clsx";
+import { JOB_STAGES, OPEN_STAGES, STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
+import { DEFAULT_PIPELINE, cleanPipelineChoice, type PipelineChoice } from "@/lib/domain/design/deal";
+import {
+  STAGE_NAME_MAX,
+  baseAt,
+  columnOf,
+  isJobStage,
+  keyOfDeal,
+  labelOf,
+  moveStage,
+  moveTo,
+  pipelinesFor,
+  stageChoices,
+  stageName,
+  type KeptPipeline,
+  type OwnStage,
+  type ShownPipeline,
+  type StageKey,
+  type StageNames,
+} from "@/lib/domain/design/pipeline-stages";
+import {
+  addStage,
   createPipeline,
   deletePipeline,
+  deleteStage,
+  renameBuiltinStage,
+  stageBookChanged,
+  renameStage,
   dollars,
   listJobs,
   listPipelines,
@@ -19,30 +58,76 @@ import {
   shortDate,
   type JobLine,
 } from "@/lib/services/crm";
+import { setDealsOwner } from "@/lib/services/crm";
+import { loadTeam, type Team } from "@/lib/services/design-account";
 import { NewDeal } from "./design-customers";
 import { useDesignAccount } from "./design-account";
-import { PATHS, PageHead, ui } from "./design-shell";
-import { PulseMarks } from "./deal-pulse";
+import { PATHS, PageHead, PhoneDealsSwitch, ui } from "./design-shell";
+import { HEAT, PulseMarks } from "./deal-pulse";
+import { BatteryIcon, ChargerIcon, PanelIcon } from "./deal-banner";
+import { jobHas } from "@/lib/domain/design/customers";
 import { loadPulses } from "@/lib/services/deal-pulse";
+import { loadInstallExtras } from "@/lib/services/after-sale";
+import { marginWords, type DealProfit } from "@/lib/domain/design/deal-profit";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 
 /** Where this person's last way of looking at their deals is kept, on their device. */
 const CHOICE = "renuabl.design.pipeline";
+
+/** The pipeline menu's last option: starts a new pipeline. */
+const NEW_PIPELINE = "__new";
+
+/** The fine bar over each column: being sold in the signal orange, won in green, lost in red. */
+const stageBar = (stage: JobStage) =>
+  OPEN_STAGES.includes(stage) ? "bg-sun-line" : WON_STAGES.includes(stage) ? "bg-positive" : "bg-danger";
+
+/** "$48k" for a column's total on a phone, where "$48,120" crowds the stage's name. */
+const shortDollars = (n: number) => (n >= 10000 ? `$${Math.round(n / 1000)}k` : dollars(n));
+
+/**
+ * What a deal is, as icons after its street: a panel, a battery, a charger, only those it has. A deal that is none of
+ * them keeps its name in words.
+ */
+function KitMarks({ job }: { job: JobLine }) {
+  const has = jobHas(job);
+  if (!has.solar && !has.battery && !has.ev) {
+    return job.title ? <span className="min-w-0 shrink truncate text-muted">{job.title}</span> : null;
+  }
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1 text-ink-2" title={job.title} aria-label={job.title} role="img">
+      {has.solar && <PanelIcon className="size-4" />}
+      {has.battery && <BatteryIcon className="size-4" />}
+      {has.ev && <ChargerIcon className="size-4" />}
+    </span>
+  );
+}
+
+/** How long since a deal last changed, short: "Today", "2d ago", "3w ago", else the date. */
+function agoWords(at: string): string {
+  const days = Math.floor((Date.now() - new Date(at).getTime()) / 86_400_000);
+  if (!Number.isFinite(days) || days < 1) return "Today";
+  if (days < 14) return `${days}d ago`;
+  if (days < 60) return `${Math.floor(days / 7)}w ago`;
+  return shortDate(at);
+}
+
+/** A deal's clock in the list, in its band's colour. */
+const CLOCK_TEXT = { green: "text-positive", amber: "text-warning", red: "text-danger", over: "text-danger" } as const;
 
 const stageSelect =
   "block h-8 w-full appearance-auto rounded-md border border-line bg-surface px-2 text-xs text-ink-2 outline-none focus:border-forest";
 
 /**
  * /design/sales/pipelines: the business's deals (its jobs), seen through a
- * pipeline: a run of stages. One of the set pipelines or one the business has
- * saved (kept on the server, shared by everyone in it) can be picked, or any
- * stages ticked on and off, and the deals at those stages show as cards in a
- * column for each stage, or as one list. A deal moves by choosing its stage
- * (or, as a card, by being dragged to another column); the move is saved at
- * once and written to the customer's history. A set of ticked stages can be
- * saved as a pipeline of the business's own, and its own can be renamed,
- * given the stages now ticked, or deleted. Which pipeline and view this
- * person last used are remembered on their device.
+ * pipeline: a run of stages. The set pipelines and the business's own are
+ * picked from one menu (kept on the server, shared by everyone in it). Any
+ * pipeline can be renamed; a new one starts as a copy of the one on show; a
+ * stage of the business's own can be added to any pipeline, counting as one
+ * of the twelve for every rule (pipeline-stages.ts). The deals at a pipeline's
+ * stages show as cards in a column for each stage, or as one list. A deal
+ * moves by choosing its stage (or, as a card, by being dragged to another
+ * column); the move is saved at once and written to the customer's history.
+ * Which pipeline and view this person last used are remembered on their device.
  */
 export function PipelinesPage() {
   const router = useRouter();
@@ -53,15 +138,33 @@ export function PipelinesPage() {
   const me = account?.signedIn ? account.email.toLowerCase() : "";
   const [problem, setProblem] = useState<string | null>(null);
   const [choice, setChoice] = useState<PipelineChoice>(DEFAULT_PIPELINE);
-  // The pipelines the business has saved, and the name being typed for a new one or a renamed one.
-  const [saved, setSaved] = useState<SavedPipeline[]>([]);
-  const [naming, setNaming] = useState<{ id: string | null; name: string } | null>(null);
+  // The pipelines the business keeps and the stages it added; the name being typed for a new or renamed pipeline.
+  const [kept, setKept] = useState<KeptPipeline[]>([]);
+  const [own, setOwn] = useState<OwnStage[]>([]);
+  // The business's own names for the twelve stages (only those it changed).
+  const [names, setNames] = useState<StageNames>({});
+  const [naming, setNaming] = useState<{ mode: "new" | "rename"; name: string } | null>(null);
   // The deal being dragged, and the column it is over.
   const [dragging, setDragging] = useState<string | null>(null);
-  const [over, setOver] = useState<JobStage | null>(null);
+  const [over, setOver] = useState<StageKey | null>(null);
+  // A column being dragged by its head to another place in the pipeline, and the column it is over.
+  const [movingCol, setMovingCol] = useState<StageKey | null>(null);
+  const [colOver, setColOver] = useState<StageKey | null>(null);
+  // The new order shown at once while it saves (put back if the server says no).
+  const [order, setOrder] = useState<{ pipeline: string; stages: StageKey[] } | null>(null);
   const [adding, setAdding] = useState(false);
   // Each open deal's clock and temperature: its marks on the card, and the order to ring in its column.
   const [pulses, setPulses] = useState<Record<string, DealPulse>>({});
+  // Each signed deal's gross margin and commission, from its signed proposal (only sent to members who see costs).
+  const [profits, setProfits] = useState<Record<string, DealProfit>>({});
+  // The list's margin and commission columns, once any signed deal has them (they are sent only to who sees costs).
+  const showProfit = Object.keys(profits).length > 0;
+  // Deals ticked in the list, to be given to one person at once (24 Nov 2026, Martin: historical deals).
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [team, setTeam] = useState<Team | null>(null);
+  const [giveTo, setGiveTo] = useState("");
+  const [giving, setGiving] = useState<string | null>(null);
+  const cols = (showProfit ? 8 : 6) + 1;
 
   useEffect(() => {
     let gone = false;
@@ -78,8 +181,24 @@ export function PipelinesPage() {
       else setProblem(res.message);
     });
     void loadPulses().then((res) => !gone && res.ok && setPulses(res.pulses));
+    void loadInstallExtras().then((res) => {
+      if (gone || !res.ok) return;
+      const out: Record<string, DealProfit> = {};
+      for (const e of res.extras)
+        if (typeof e.grossMargin === "number")
+          out[e.jobId] = {
+            grossMargin: e.grossMargin,
+            grossShare: e.grossShare ?? null,
+            commission: e.commission ?? 0,
+            afterCommission: e.afterCommission ?? 0,
+          };
+      setProfits(out);
+    });
     void listPipelines().then((res) => {
-      if (!gone && res.ok) setSaved(res.pipelines);
+      if (gone || !res.ok) return;
+      setKept(res.pipelines);
+      setOwn(res.stages);
+      setNames(res.names ?? {});
     });
     return () => {
       gone = true;
@@ -94,164 +213,373 @@ export function PipelinesPage() {
       // It still shows as chosen for this visit.
     }
   };
-  const pick = (p: { id: string; stages: readonly JobStage[] }) => {
-    choose({ ...choice, stages: [...p.stages], pipeline: p.id });
-    setNaming(null);
-  };
-  /** Saves the name being typed: a new pipeline of the stages ticked, or a new name for one of the business's own. */
-  const keep = async () => {
-    if (!naming?.name.trim()) return;
-    const old = saved.find((s) => s.id === naming.id);
-    const res = old
-      ? await savePipeline(old.id, { name: naming.name, stages: old.stages })
-      : await createPipeline({ name: naming.name, stages: choice.stages });
-    if (!res.ok) return setProblem(res.message);
-    setProblem(null);
-    setSaved(old ? saved.map((s) => (s.id === old.id ? res.pipeline : s)) : [...saved, res.pipeline]);
-    setNaming(null);
-    if (!old) pick(res.pipeline);
-  };
-  const remove = async (p: SavedPipeline) => {
-    if (!window.confirm(`Delete the pipeline "${p.name}" for everyone in the business? Its deals are untouched.`)) return;
-    const res = await deletePipeline(p.id);
-    if (!res.ok) return setProblem(res.message);
-    setSaved(saved.filter((s) => s.id !== p.id));
-  };
 
-  const move = async (id: string, stage: JobStage) => {
-    const job = jobs?.find((j) => j.id === id);
-    if (!jobs || !job || job.stage === stage) return;
-    // Shown at once, and put back if the server says no.
-    setJobs(jobs.map((j) => (j.id === id ? { ...j, stage } : j)));
-    const res = await saveJob(id, { stage });
+  // Every pipeline the business sees (the set ones as it renamed or changed them, then its own), and the one on show.
+  const all = pipelinesFor(kept, own);
+  const named = all.find((p) => p.id === choice.pipeline) ?? all[0];
+  const stages = order && order.pipeline === named.id ? order.stages : named.stages;
+  // New deals start as leads, so the lead column takes "+ Add new deal" in place of a button up top.
+  const leadAt = stages.findIndex((_, i) => baseAt(stages, i, own) === "lead");
+
+  // The board scrolls inside itself, down to the foot of the window, so each column's head stays in view.
+  const board = useRef<HTMLDivElement>(null);
+  const [boardTop, setBoardTop] = useState<number | null>(null);
+  const showingCards = choice.view === "cards";
+  useLayoutEffect(() => {
+    const el = board.current;
+    if (!el) return;
+    const measure = () => setBoardTop(Math.round(el.getBoundingClientRect().top + window.scrollY));
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [showingCards, problem]);
+
+  const pick = (p: ShownPipeline) => {
+    const fixed = p.stages.filter(isJobStage);
+    choose({ ...choice, stages: fixed.length ? fixed : [...DEFAULT_PIPELINE.stages], pipeline: p.id });
+    setNaming(null);
+  };
+  /** The pipeline kept as it now stands on the server, put in place of its old row (or added). */
+  const keepRow = (row: KeptPipeline) => setKept((now) => [...now.filter((k) => k.id !== row.id), row]);
+
+  /** Saves a pipeline's name and stages: its own row, or for a set one a stand-in for it. */
+  const savePipelineAs = async (p: ShownPipeline, change: { name?: string; stages?: StageKey[] }) => {
+    const body = { name: change.name ?? p.name, stages: change.stages ?? p.stages };
+    const res = p.rowId && !p.set ? await savePipeline(p.rowId, body) : await createPipeline({ ...body, baseId: p.set ? p.id : null });
     if (!res.ok) {
       setProblem(res.message);
-      setJobs((now) => (now ?? []).map((j) => (j.id === id ? { ...j, stage: job.stage } : j)));
+      return false;
+    }
+    setProblem(null);
+    keepRow(res.pipeline);
+    return true;
+  };
+
+  /** Saves the name being typed: a new pipeline (a copy of the stages on show), or the one on show renamed. */
+  const keep = async () => {
+    if (!naming?.name.trim()) return;
+    if (naming.mode === "rename") {
+      if (await savePipelineAs(named, { name: naming.name })) setNaming(null);
+      return;
+    }
+    const res = await createPipeline({ name: naming.name, stages: [...stages] });
+    if (!res.ok) return setProblem(res.message);
+    setProblem(null);
+    keepRow(res.pipeline);
+    setNaming(null);
+    choose({ ...choice, pipeline: res.pipeline.id });
+  };
+  const remove = async (p: ShownPipeline) => {
+    if (!p.rowId) return;
+    const question = p.set
+      ? `Put "${p.name}" back as it came, for everyone in the business? Stages you added stay in the others.`
+      : `Delete the pipeline "${p.name}" for everyone in the business? Its deals are untouched.`;
+    if (!window.confirm(question)) return;
+    const res = await deletePipeline(p.rowId);
+    if (!res.ok) return setProblem(res.message);
+    setKept(kept.filter((k) => k.id !== p.rowId));
+  };
+
+  /** Adds a stage of the business's own to the pipeline on show, after position `after`. */
+  const addOwnStage = async (input: { name: string; base: JobStage; after: number }) => {
+    const res = await addStage({ ...input, pipelineId: named.id });
+    if (!res.ok) {
+      setProblem(res.message);
+      return false;
+    }
+    setProblem(null);
+    setOwn((now) => [...now, res.stage]);
+    if (res.pipeline) keepRow(res.pipeline);
+    stageBookChanged();
+    return true;
+  };
+  /** Renames a stage on the board: one the business added, or one of the twelve (a blank name puts ours back). */
+  const renameAny = async (key: StageKey, name: string) => {
+    if (isJobStage(key)) {
+      const res = await renameBuiltinStage(key, name);
+      if (!res.ok) {
+        setProblem(res.message);
+        return false;
+      }
+      setProblem(null);
+      setNames(res.names);
+      stageBookChanged();
+      return true;
+    }
+    const stage = own.find((s) => s.id === key);
+    if (!stage) return false;
+    const res = await renameStage(stage.id, name);
+    if (!res.ok) {
+      setProblem(res.message);
+      return false;
+    }
+    setProblem(null);
+    setOwn((now) => now.map((s) => (s.id === stage.id ? res.stage : s)));
+    stageBookChanged();
+    return true;
+  };
+  /**
+   * Takes a stage off the pipeline on show. A stage the business added that no other pipeline shows goes altogether
+   * (asked first): its deals go back to the stage it counted as.
+   */
+  const takeOff = async (key: StageKey) => {
+    const added = own.find((s) => s.id === key);
+    const elsewhere = all.some((p) => p.id !== named.id && p.stages.includes(key));
+    if (added && !elsewhere) {
+      const base = labelOf(added.base, names);
+      if (!window.confirm(`Remove the stage "${added.name}" for everyone? Its deals go back to ${base}.`)) return;
+      const res = await deleteStage(added.id);
+      if (!res.ok) return setProblem(res.message);
+      setOwn((now) => now.filter((s) => s.id !== added.id));
+      setKept((now) => now.map((k) => ({ ...k, stages: k.stages.filter((x) => x !== added.id) })));
+      setJobs((now) => (now ?? []).map((j) => (j.subStage === added.id ? { ...j, subStage: null } : j)));
+      stageBookChanged();
+      return;
+    }
+    await savePipelineAs(named, { stages: stages.filter((k) => k !== key) });
+  };
+
+  /** Moves a column to another place in the pipeline on show: shown at once, saved for everyone in the business. */
+  const reorder = async (key: StageKey, to: number) => {
+    const from = stages.indexOf(key);
+    if (from < 0 || from === to) return;
+    const next = moveStage(stages, from, to);
+    setOrder({ pipeline: named.id, stages: next });
+    await savePipelineAs(named, { stages: next });
+    setOrder(null);
+  };
+
+  const move = async (id: string, key: StageKey) => {
+    const job = jobs?.find((j) => j.id === id);
+    const to = moveTo(key, own);
+    if (!jobs || !job || !to || keyOfDeal(job, own) === key) return;
+    // Shown at once, and put back if the server says no.
+    setJobs(jobs.map((j) => (j.id === id ? { ...j, ...to } : j)));
+    const res = await saveJob(id, to);
+    if (!res.ok) {
+      setProblem(res.message);
+      setJobs((now) => (now ?? []).map((j) => (j.id === id ? { ...j, stage: job.stage, subStage: job.subStage ?? null } : j)));
     } else setProblem(null);
   };
 
-  // The pipeline being looked at: the one picked, or the Sales pipeline when what was kept is no longer one of them.
-  const named = pipelineOf(choice.stages, choice.pipeline, saved) ?? PIPELINES[0];
-  const stages = named.stages;
-  const own = saved.find((s) => s.id === named.id) ?? null;
-  const shown = (jobs ?? []).filter((j) => stages.includes(j.stage) && (whose === "all" || (whose === "mine" ? j.owner === me : !j.owner)));
+  const shown = (jobs ?? []).filter(
+    (j) => columnOf(j, stages, own) !== null && (whose === "all" || (whose === "mine" ? j.owner === me : !j.owner)),
+  );
   const worth = shown.reduce((n, j) => n + (j.value ?? 0), 0);
   const deal = (id: string) => `${PATHS.deals}/${id}`;
   // The sample deal a new business starts with opens on the tour of a deal (deal-tour.ts).
-  const dealOf = (job: JobLine) => (job.sample ? `${deal(job.id)}?tour=1` : deal(job.id));
+  const dealOf = (job: JobLine) => deal(job.id);
+  const choices = stageChoices(own, names);
+  const stagePicker = (job: JobLine, className: string) => (
+    <select className={className} value={keyOfDeal(job, own)} onChange={(e) => void move(job.id, e.target.value)}>
+      {choices.map((c) => (
+        <option key={c.key} value={c.key}>
+          {c.added ? `\u00a0\u00a0↳ ${c.name}` : c.name}
+        </option>
+      ))}
+    </select>
+  );
+
+  // "Sales pipeline" reads "Sales" where room is short: the segment already says it is the pipeline.
+  const pipelineSelect = (className: string, withNew: boolean, short = false) => (
+    <select
+      className={className}
+      value={named.id}
+      onChange={(e) => {
+        if (e.target.value === NEW_PIPELINE) return setNaming({ mode: "new", name: "" });
+        const p = all.find((x) => x.id === e.target.value);
+        if (p) pick(p);
+      }}
+    >
+      {all
+        .filter((p) => p.set)
+        .map((p) => (
+          <option key={p.id} value={p.id}>
+            {short ? p.name.replace(/\s+pipeline$/i, "") : p.name}
+          </option>
+        ))}
+      {all.some((p) => !p.set) && (
+        <optgroup label="Your own">
+          {all
+            .filter((p) => !p.set)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {short ? p.name.replace(/\s+pipeline$/i, "") : p.name}
+              </option>
+            ))}
+        </optgroup>
+      )}
+      {withNew && <option value={NEW_PIPELINE}>+ New pipeline…</option>}
+    </select>
+  );
+  const views = (
+    [
+      ["cards", "Cards", LayoutGrid],
+      ["list", "List", List],
+    ] as const
+  ).map(([view, name, Icon]) => ({ view, name, Icon }));
 
   return (
-    <div className="px-5 py-8 lg:px-10">
-      <PageHead eyebrow="CRM · Deals" title={named.name}>
-        <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
-          <Plus className="size-4" aria-hidden /> New deal
-        </button>
-      </PageHead>
-      {adding && <NewDeal onClose={() => setAdding(false)} />}
-
-      <div className={clsx(ui.card, "mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3")}>
-        <label className="inline-flex items-center gap-2">
-          <span className="sr-only">Whose deals</span>
-          <select
-            className={clsx(ui.input, "h-9 min-h-9 w-40 appearance-auto")}
-            value={whose}
-            onChange={(e) => setWhose(e.target.value as typeof whose)}
-          >
-            <option value="all">Everyone&apos;s deals</option>
-            <option value="mine">My deals</option>
-            <option value="none">No owner yet</option>
-          </select>
-        </label>
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
-          <label className="inline-flex items-center gap-2">
-            <span className="sr-only">Pipeline</span>
-            <select
-              className={clsx(ui.input, "h-9 min-h-9 w-64 appearance-auto font-medium")}
-              value={named.id}
-              onChange={(e) => {
-                const p = [...PIPELINES, ...saved].find((x) => x.id === e.target.value);
-                if (p) pick(p);
-              }}
-            >
-              {PIPELINES.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-              {saved.length > 0 && (
-                <optgroup label="Your own">
-                  {saved.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </optgroup>
+    <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10 lg:pt-0">
+      {/* On a phone (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can
+          dock / spawn off of it"): the Deals switch's Pipeline segment is the pipeline picker, its count and worth under
+          the name, and whose deals, cards or list and New deal hang under it as a tray; no card of their own. */}
+      <PhoneDealsSwitch
+        path={PATHS.pipelines}
+        className="-mt-1 mb-1 sm:hidden"
+        pipeline={
+          <>
+            <label className="relative flex min-w-0 items-center justify-center">
+              <span className="sr-only">Pipeline</span>
+              {pipelineSelect(
+                "min-w-0 max-w-full appearance-none truncate bg-transparent pr-4 text-[13px] font-semibold text-ink outline-none [field-sizing:content]",
+                false,
+                true,
               )}
-            </select>
-          </label>
-          {naming ? (
-            <span className="ml-1 inline-flex items-center gap-1.5">
-              <input
-                autoFocus
-                aria-label="Pipeline name"
-                className={clsx(ui.input, "h-9 min-h-9 w-44")}
-                value={naming.name}
-                maxLength={40}
-                placeholder="Pipeline name"
-                onChange={(e) => setNaming({ ...naming, name: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void keep();
-                  if (e.key === "Escape") setNaming(null);
-                }}
-              />
-              <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={keep} disabled={!naming.name.trim()}>
-                Save
-              </button>
-              <button className={clsx(ui.quiet, "h-9 px-3 text-[13px]")} onClick={() => setNaming(null)}>
-                Cancel
-              </button>
+              <ChevronDown className="pointer-events-none absolute right-0 size-3.5 text-muted" aria-hidden />
+            </label>
+            <span className="truncate text-[10.5px] tabular-nums text-muted" title={`${shown.length} deals`}>
+              {jobs ? `${shown.length}${worth ? ` · ${shortDollars(worth)}` : shown.length === 1 ? " deal" : " deals"}` : "\u00a0"}
             </span>
-          ) : (
-            <span className="ml-1 inline-flex items-center gap-3 text-[13px] font-medium">
-              {own && (
-                <>
-                  <button className={ui.link} onClick={() => setNaming({ id: own.id, name: own.name })}>
-                    Rename
-                  </button>
-                  <button className="inline-flex items-center gap-1 text-muted hover:text-danger" onClick={() => void remove(own)}>
-                    <Trash2 className="size-3.5" aria-hidden /> Delete
-                  </button>
-                </>
-              )}
-            </span>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <p className="text-xs tabular-nums text-muted">
-            {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : ""}
-          </p>
-          <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="View">
-            {(
-              [
-                ["cards", "Cards", LayoutGrid],
-                ["list", "List", List],
-              ] as const
-            ).map(([view, name, Icon]) => (
+          </>
+        }
+        tray={
+          <>
+            <WhoseMenu whose={whose} onChange={setWhose} />
+            <span className="h-5 w-px bg-line-strong" aria-hidden />
+            {views.map(({ view, name, Icon }) => (
               <button
                 key={view}
                 aria-pressed={choice.view === view}
+                aria-label={name}
+                title={name}
                 onClick={() => choose({ ...choice, view })}
                 className={clsx(
-                  "inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-[13px] font-medium",
-                  choice.view === view ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
+                  "inline-flex size-8 items-center justify-center rounded-lg",
+                  choice.view === view ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]" : "text-muted",
                 )}
               >
-                <Icon className="size-4" aria-hidden /> {name}
+                <Icon className="size-4" aria-hidden />
               </button>
             ))}
+            {(leadAt < 0 || choice.view === "list") && (
+              <>
+                <span className="h-5 w-px bg-line-strong" aria-hidden />
+                <button
+                  onClick={() => setAdding(true)}
+                  disabled={adding}
+                  aria-label="New deal"
+                  title="New deal"
+                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-sun-line text-white active:opacity-80"
+                >
+                  <Plus className="size-4" aria-hidden />
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
+      <PhoneDealsSwitch path={PATHS.pipelines} className="-mt-1 mb-4 hidden sm:block lg:hidden" />
+
+      <div className="hidden sm:block lg:-mt-2">
+        <PageHead eyebrow="CRM · Deals" title={named.name}>
+          {leadAt < 0 && (
+            <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
+              <Plus className="size-4" aria-hidden /> New deal
+            </button>
+          )}
+        </PageHead>
+
+        <div className={clsx(ui.card, "mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2")}>
+          <label className="inline-flex items-center gap-2">
+            <span className="sr-only">Whose deals</span>
+            <select
+              className={clsx(ui.input, "h-9 min-h-9 w-40 appearance-auto")}
+              value={whose}
+              onChange={(e) => setWhose(e.target.value as typeof whose)}
+            >
+              <option value="all">Everyone&apos;s deals</option>
+              <option value="mine">My deals</option>
+              <option value="none">No owner yet</option>
+            </select>
+          </label>
+          <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Pipeline">
+            <label className="inline-flex items-center gap-2">
+              <span className="sr-only">Pipeline</span>
+              {pipelineSelect(clsx(ui.input, "h-9 min-h-9 w-64 appearance-auto font-medium"), true)}
+            </label>
+            {naming ? (
+              <span className="ml-1 inline-flex flex-wrap items-center gap-1.5">
+                <input
+                  autoFocus
+                  aria-label={naming.mode === "new" ? "New pipeline's name" : "Pipeline name"}
+                  className={clsx(ui.input, "h-9 min-h-9 w-48")}
+                  value={naming.name}
+                  maxLength={40}
+                  placeholder={naming.mode === "new" ? "New pipeline's name" : "Pipeline name"}
+                  onChange={(e) => setNaming({ ...naming, name: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void keep();
+                    if (e.key === "Escape") setNaming(null);
+                  }}
+                />
+                <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={keep} disabled={!naming.name.trim()}>
+                  {naming.mode === "new" ? "Create" : "Save"}
+                </button>
+                <button className={clsx(ui.quiet, "h-9 px-3 text-[13px]")} onClick={() => setNaming(null)}>
+                  Cancel
+                </button>
+                {naming.mode === "new" && (
+                  <span className="text-xs text-muted">Starts with the stages of {named.name}; add or take off stages after.</span>
+                )}
+              </span>
+            ) : (
+              <span className="ml-1 inline-flex items-center gap-3 text-[13px] font-medium">
+                <button
+                  className={clsx(ui.link, "inline-flex items-center gap-1")}
+                  onClick={() => setNaming({ mode: "rename", name: named.name })}
+                >
+                  <Pencil className="size-3.5" aria-hidden /> Rename
+                </button>
+                {named.rowId && (
+                  <button className="inline-flex items-center gap-1 text-muted hover:text-danger" onClick={() => void remove(named)}>
+                    {named.set ? (
+                      <>
+                        <RotateCcw className="size-3.5" aria-hidden /> Put back as it came
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="size-3.5" aria-hidden /> Delete
+                      </>
+                    )}
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <p className="text-xs tabular-nums text-muted">
+              {jobs ? `${shown.length} ${shown.length === 1 ? "deal" : "deals"}${worth ? ` · ${dollars(worth)}` : ""}` : ""}
+            </p>
+            <div className="flex items-center gap-1 rounded-md bg-surface-2 p-0.5" role="group" aria-label="View">
+              {views.map(({ view, name, Icon }) => (
+                <button
+                  key={view}
+                  aria-pressed={choice.view === view}
+                  onClick={() => choose({ ...choice, view })}
+                  className={clsx(
+                    "inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-[13px] font-medium",
+                    choice.view === view ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-ink-2 hover:text-ink",
+                  )}
+                >
+                  <Icon className="size-4" aria-hidden /> {name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
+      {adding && <NewDeal onClose={() => setAdding(false)} />}
 
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
@@ -260,41 +588,96 @@ export function PipelinesPage() {
       )}
 
       {choice.view === "cards" ? (
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-4">
-          {stages.map((stage) => {
+        <div
+          ref={board}
+          style={boardTop === null ? undefined : ({ "--board-top": `${boardTop}px` } as React.CSSProperties)}
+          // On a phone (22 Nov 2026, Martin: cards could be dragged around the page): the board only slides sideways, with
+          // the phone's own momentum and a soft settle on a column, and each column scrolls its cards under a fixed head.
+          className="deal-board -mx-1.5 mt-3 flex snap-x snap-proximity scroll-px-1.5 gap-2.5 px-1.5 pb-4 max-sm:h-[calc(100dvh-var(--board-top)-8.5rem)] max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:overscroll-x-contain sm:mx-0 sm:max-h-[calc(100dvh-var(--board-top)-1rem)] sm:snap-none sm:gap-3 sm:overflow-auto sm:px-0"
+        >
+          {stages.map((stage, at) => {
             // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
             const column = shown
-              .filter((j) => j.stage === stage)
+              .filter((j) => columnOf(j, stages, own) === stage)
               .sort((a, b) => (pulses[b.id]?.priority ?? -Infinity) - (pulses[a.id]?.priority ?? -Infinity));
             const sum = column.reduce((n, j) => n + (j.value ?? 0), 0);
             return (
               <section
                 key={stage}
-                aria-label={STAGE_LABELS[stage]}
+                aria-label={stageName(stage, own, names)}
                 onDragOver={(e) => {
+                  if (movingCol) {
+                    e.preventDefault();
+                    setColOver(stage);
+                    return;
+                  }
                   if (!dragging) return;
                   e.preventDefault();
                   setOver(stage);
                 }}
-                onDragLeave={() => setOver((now) => (now === stage ? null : now))}
+                onDragLeave={() => {
+                  setOver((now) => (now === stage ? null : now));
+                  setColOver((now) => (now === stage ? null : now));
+                }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (dragging) void move(dragging, stage);
+                  if (movingCol) void reorder(movingCol, at);
+                  else if (dragging) void move(dragging, stage);
                   setDragging(null);
                   setOver(null);
+                  setMovingCol(null);
+                  setColOver(null);
                 }}
                 className={clsx(
-                  "flex min-w-72 flex-1 basis-72 snap-start flex-col rounded-lg border bg-surface-2 p-2",
+                  "relative flex w-[64%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 max-sm:min-h-0 max-sm:pb-0 sm:w-[17rem] sm:min-w-[17rem] sm:rounded-lg",
                   over === stage ? "border-sun-line" : "border-transparent",
+                  movingCol === stage && "opacity-50",
                 )}
               >
-                <header className="flex items-baseline justify-between gap-2 px-2 py-1.5">
-                  <h2 className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink">
-                    {STAGE_LABELS[stage]} <span className="tabular-nums text-muted">{jobs ? column.length : ""}</span>
-                  </h2>
-                  <p className="text-xs tabular-nums text-muted">{sum ? dollars(sum) : ""}</p>
-                </header>
-                <ul className="mt-1 flex min-h-24 flex-col gap-2">
+                {movingCol && colOver === stage && movingCol !== stage && (
+                  // Where the column will land: after this one when moving right, before it when moving left.
+                  <span
+                    aria-hidden
+                    className={clsx(
+                      "absolute inset-y-1 w-1 rounded-full bg-sun-line",
+                      stages.indexOf(movingCol) < at ? "-right-2" : "-left-2",
+                    )}
+                  />
+                )}
+                <span
+                  className={clsx("absolute inset-x-0 top-0 h-[3px] rounded-t-[inherit]", stageBar(baseAt(stages, at, own)))}
+                  aria-hidden
+                />
+                <div className="sticky top-0 z-10 -mx-2 -mt-2.5 rounded-t-[inherit] bg-surface-2 px-2 pt-2.5 pb-1">
+                  <StageHead
+                    stage={stage}
+                    own={own}
+                    names={names}
+                    onGrab={() => setMovingCol(stage)}
+                    onLetGo={() => {
+                      setMovingCol(null);
+                      setColOver(null);
+                    }}
+                    onStep={(by) => void reorder(stage, at + by)}
+                    first={at === 0}
+                    last={at === stages.length - 1}
+                    count={jobs ? column.length : null}
+                    sum={sum}
+                    canRemove={stages.length > 1}
+                    onRename={renameAny}
+                    onRemove={() => void takeOff(stage)}
+                  />
+                  {at === leadAt && (
+                    <button
+                      onClick={() => setAdding(true)}
+                      disabled={adding}
+                      className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-line-strong bg-surface/60 py-1.5 text-[13px] font-medium text-ink-2 hover:border-ink-2 hover:text-ink"
+                    >
+                      <Plus className="size-3.5" aria-hidden /> Add new deal
+                    </button>
+                  )}
+                </div>
+                <ul className="no-scrollbar flex min-h-24 flex-col gap-2 max-sm:min-h-0 max-sm:flex-1 max-sm:overflow-y-auto max-sm:overscroll-y-contain max-sm:pb-2">
                   {!jobs && !problem && <li className="px-2 py-3 text-xs text-muted">Loading…</li>}
                   {jobs && column.length === 0 && <li className="px-2 py-3 text-xs text-muted">Nothing here.</li>}
                   {column.map((job) => (
@@ -311,126 +694,534 @@ export function PipelinesPage() {
                       }}
                       onClick={() => router.push(dealOf(job))}
                       className={clsx(
-                        "cursor-pointer rounded-md bg-surface p-3 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
+                        "cursor-pointer rounded-md bg-surface px-2.5 py-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
                         dragging === job.id && "opacity-60",
                       )}
                     >
-                      <Link
-                        href={dealOf(job)}
-                        className="block text-sm font-medium text-ink hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {job.customerName}
-                      </Link>
-                      <p className="mt-0.5 truncate text-xs text-ink-2">
-                        {job.title}
-                        {job.address ? ` · ${job.address.split(",")[0]}` : ""}
-                      </p>
-                      {job.sample && (
-                        <p className="mt-1.5 inline-flex h-6 items-center rounded-full bg-sun px-2.5 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30">
-                          {SAMPLE_DEAL_HINT}
-                        </p>
-                      )}
-                      <PulseMarks pulse={pulses[job.id]} />
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1.5 text-sm tabular-nums text-ink">
-                          <Owner email={job.owner} />
-                          {dollars(job.value)}
+                      <div className="flex items-baseline justify-between gap-3">
+                        <Link
+                          href={dealOf(job)}
+                          className="min-w-0 truncate text-[14px] font-medium text-ink hover:underline sm:text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {job.customerName}
+                        </Link>
+                        <span className="shrink-0 text-[14px] font-semibold tabular-nums text-ink sm:text-sm">
+                          {job.value ? dollars(job.value) : ""}
                         </span>
-                        {job.lat !== null && (
-                          <Link
-                            href={`${PATHS.designer}?job=${job.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
-                          >
-                            <PenTool className="size-3.5" aria-hidden /> {job.projectId ? "Design" : "Design it"}
-                          </Link>
-                        )}
                       </div>
-                      <label className="mt-2 block" onClick={(e) => e.stopPropagation()}>
-                        <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
-                        <select className={stageSelect} value={job.stage} onChange={(e) => void move(job.id, e.target.value as JobStage)}>
-                          {JOB_STAGES.map((s) => (
-                            <option key={s} value={s}>
-                              {STAGE_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <p className="mt-0.5 flex items-center gap-2 text-[12px] text-ink-2 sm:text-xs">
+                        <span className="min-w-0 truncate">{job.address ? job.address.split(",")[0] : job.title}</span>
+                        {job.address ? <KitMarks job={job} /> : null}
+                      </p>
+                      <ProfitLine profit={profits[job.id]} />
+                      <PulseMarks
+                        short
+                        pulse={pulses[job.id]}
+                        end={
+                          <span className="flex items-center gap-1.5">
+                            {/* On a phone the card's last row folds into this one (23 Nov 2026, Martin: smaller cards). */}
+                            {job.owner && <Owner email={job.owner} />}
+                            {job.sample ? (
+                              <span
+                                title={SAMPLE_DEAL_HINT}
+                                className="rounded-full bg-sun px-1.5 py-0.5 font-medium text-sun-ink ring-1 ring-sun-line/30"
+                              >
+                                Tour
+                              </span>
+                            ) : (
+                              <span className="text-muted" title={`Changed ${shortDate(job.updatedAt)}`}>
+                                {agoWords(job.updatedAt)}
+                              </span>
+                            )}
+                            {job.lat !== null && (
+                              <Link
+                                href={`${PATHS.designer}?job=${job.id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label={job.projectId ? `Open ${job.customerName}'s design` : `Design ${job.customerName}'s roof`}
+                                title={job.projectId ? "Open design" : "Design it"}
+                                className="tap-area inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sun-line/12 text-sun-line hover:bg-sun-line hover:text-white"
+                              >
+                                <PenTool className="size-3" aria-hidden />
+                              </Link>
+                            )}
+                          </span>
+                        }
+                      />
                     </li>
                   ))}
                 </ul>
               </section>
             );
           })}
+          <AddStageColumn stages={stages} own={own} names={names} pipelineName={named.name} onAdd={addOwnStage} />
         </div>
       ) : (
-        <div className={clsx(ui.card, "mt-4 overflow-x-auto")}>
-          <table className="w-full min-w-[46rem] text-left text-sm">
-            <thead>
-              <tr className="border-b border-line text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
-                <th className="px-5 py-3 font-medium">Deal</th>
-                <th className="px-3 py-3 font-medium">Address</th>
-                <th className="px-3 py-3 font-medium">Stage</th>
-                <th className="px-3 py-3 text-right font-medium">Value</th>
-                <th className="px-3 py-3 font-medium">Install</th>
-                <th className="px-5 py-3 font-medium">Changed</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!jobs && !problem && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-6 text-muted">
-                    Loading…
-                  </td>
-                </tr>
-              )}
-              {jobs && shown.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-6 text-ink-2">
-                    No deals at {stages.length === 1 ? "this stage" : "these stages"}.
-                  </td>
-                </tr>
-              )}
-              {shown.map((job) => (
-                <tr
-                  key={job.id}
-                  onClick={() => router.push(dealOf(job))}
-                  className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+        <>
+          {/* The list on a phone (23 Nov 2026, Martin: the table showed little and scrolled sideways): every stage down the
+              page, its deals two short lines each, so the list is the overview where the cards are the board. */}
+          <div className="mt-3 space-y-3 sm:hidden">
+            {!jobs && !problem && <p className="px-1 text-[13px] text-muted">Loading…</p>}
+            {jobs && shown.length === 0 && (
+              <p className="px-1 text-[13px] text-ink-2">No deals at {stages.length === 1 ? "this stage" : "these stages"}.</p>
+            )}
+            {stages.map((stage, at) => {
+              const column = shown
+                .filter((j) => columnOf(j, stages, own) === stage)
+                .sort((a, b) => (pulses[b.id]?.priority ?? -Infinity) - (pulses[a.id]?.priority ?? -Infinity));
+              if (column.length === 0) return null;
+              const sum = column.reduce((n, j) => n + (j.value ?? 0), 0);
+              return (
+                <section key={stage} aria-label={stageName(stage, own, names)}>
+                  <h2 className="flex items-center gap-2 px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-2">
+                    <span className={clsx("size-2 rounded-full", stageBar(baseAt(stages, at, own)))} aria-hidden />
+                    <span className="min-w-0 truncate">{stageName(stage, own, names)}</span>
+                    <span className="font-medium text-muted tabular-nums">{column.length}</span>
+                    {sum ? <span className="ml-auto font-medium normal-case tracking-normal tabular-nums">{shortDollars(sum)}</span> : null}
+                  </h2>
+                  <ul className="divide-y divide-line overflow-hidden rounded-xl bg-surface ring-1 ring-line">
+                    {column.map((job) => {
+                      const pulse = pulses[job.id];
+                      return (
+                        <li key={job.id} onClick={() => router.push(dealOf(job))} className="cursor-pointer px-3 py-2 active:bg-surface-2">
+                          <div className="flex items-center gap-2">
+                            {pulse && (
+                              <span
+                                className={clsx("size-1.5 shrink-0 rounded-full", HEAT[pulse.heat.heat].dot)}
+                                title={HEAT[pulse.heat.heat].label}
+                                aria-label={HEAT[pulse.heat.heat].label}
+                                role="img"
+                              />
+                            )}
+                            <Link
+                              href={dealOf(job)}
+                              className="min-w-0 truncate text-[14px] font-medium text-ink"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {job.customerName}
+                            </Link>
+                            {job.address ? <KitMarks job={job} /> : <span className="flex-1" />}
+                            <span className="shrink-0 text-[13.5px] font-semibold tabular-nums text-ink">
+                              {job.value ? dollars(job.value) : ""}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 flex items-center gap-2 text-[11.5px] text-muted">
+                            <span className="min-w-0 flex-1 truncate">{job.address ? job.address.split(",")[0] : job.title}</span>
+                            {pulse && (
+                              <span className={clsx("shrink-0 tabular-nums", CLOCK_TEXT[pulse.clock.band])}>
+                                {pulse.clock.words.replace(/ days?\b/, "d")}
+                              </span>
+                            )}
+                            <span className="shrink-0 tabular-nums text-ink-2" title={`Changed ${shortDate(job.updatedAt)}`}>
+                              {job.sample ? "Tour" : job.installDate ? `Install ${shortDate(job.installDate)}` : agoWords(job.updatedAt)}
+                            </span>
+                            <Owner email={job.owner} />
+                          </p>
+                          <ProfitLine profit={profits[job.id]} />
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
+          {picked.size > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-ink max-sm:hidden">
+              <span className="font-medium">
+                {picked.size} deal{picked.size === 1 ? "" : "s"} picked
+              </span>
+              <label className="flex items-center gap-2">
+                <span>Give to</span>
+                <select
+                  className="h-9 rounded-md bg-surface px-2 text-sm text-ink"
+                  value={giveTo}
+                  onChange={(e) => setGiveTo(e.target.value)}
                 >
-                  <td className="px-5 py-3">
-                    <Link href={dealOf(job)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
-                      {job.customerName}
-                    </Link>
-                    <span className="block text-xs text-muted">{job.title}</span>
-                  </td>
-                  <td className="max-w-[16rem] truncate px-3 py-3 text-ink-2">{job.address || "–"}</td>
-                  <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                    <label>
-                      <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
-                      <select
-                        className={clsx(stageSelect, "w-36")}
-                        value={job.stage}
-                        onChange={(e) => void move(job.id, e.target.value as JobStage)}
-                      >
-                        {JOB_STAGES.map((s) => (
-                          <option key={s} value={s}>
-                            {STAGE_LABELS[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums text-ink">{dollars(job.value)}</td>
-                  <td className="px-3 py-3 tabular-nums text-ink-2">{job.installDate ? shortDate(job.installDate) : "–"}</td>
-                  <td className="px-5 py-3 tabular-nums text-ink-2">{shortDate(job.updatedAt)}</td>
+                  <option value="">Choose someone</option>
+                  {(team?.members ?? []).map((m) => (
+                    <option key={m.email} value={m.email}>
+                      {m.email}
+                    </option>
+                  ))}
+                  {(team?.ownerOnly ?? []).map((o) => (
+                    <option key={o.email} value={o.email}>
+                      {o.name} (not invited)
+                    </option>
+                  ))}
+                  <option value="none">No one</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="h-9 rounded-md bg-sun-line px-3 font-medium text-white disabled:opacity-60"
+                disabled={!giveTo || giving === "busy"}
+                onClick={async () => {
+                  setGiving("busy");
+                  const res = await setDealsOwner([...picked], giveTo === "none" ? null : giveTo);
+                  if (!res.ok) return setGiving(res.message);
+                  setGiving(`${res.changed} deal${res.changed === 1 ? "" : "s"} given.`);
+                  setPicked(new Set());
+                  const again = await listJobs();
+                  if (again.ok) setJobs(again.jobs);
+                }}
+              >
+                {giving === "busy" ? "Giving…" : "Give them"}
+              </button>
+              <button type="button" className="ml-auto text-primary-ink/80 underline" onClick={() => setPicked(new Set())}>
+                Clear
+              </button>
+            </div>
+          )}
+          {giving && giving !== "busy" && picked.size === 0 && (
+            <p className="mt-3 text-sm text-ink-2 max-sm:hidden" role="status">
+              {giving}
+            </p>
+          )}
+          <div className={clsx(ui.card, "mt-4 overflow-x-auto max-sm:hidden")}>
+            <table className="w-full min-w-[46rem] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                  <th className="w-10 py-3 pl-4">
+                    <input
+                      type="checkbox"
+                      aria-label="Pick every deal shown"
+                      className="size-4 accent-[var(--primary)]"
+                      checked={shown.length > 0 && shown.every((j) => picked.has(j.id))}
+                      onChange={(e) => {
+                        if (!team) void loadTeam().then(setTeam);
+                        setGiving(null);
+                        setPicked(e.target.checked ? new Set(shown.map((j) => j.id)) : new Set());
+                      }}
+                    />
+                  </th>
+                  <th className="px-5 py-3 font-medium">Deal</th>
+                  <th className="px-3 py-3 font-medium">Address</th>
+                  <th className="px-3 py-3 font-medium">Stage</th>
+                  <th className="px-3 py-3 text-right font-medium">Value</th>
+                  {showProfit && <th className="px-3 py-3 text-right font-medium">Gross margin</th>}
+                  {showProfit && <th className="px-3 py-3 text-right font-medium">Commission</th>}
+                  <th className="px-3 py-3 font-medium">Install</th>
+                  <th className="px-5 py-3 font-medium">Changed</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {!jobs && !problem && (
+                  <tr>
+                    <td colSpan={cols} className="px-5 py-6 text-muted">
+                      Loading…
+                    </td>
+                  </tr>
+                )}
+                {jobs && shown.length === 0 && (
+                  <tr>
+                    <td colSpan={cols} className="px-5 py-6 text-ink-2">
+                      No deals at {stages.length === 1 ? "this stage" : "these stages"}.
+                    </td>
+                  </tr>
+                )}
+                {shown.map((job) => (
+                  <tr
+                    key={job.id}
+                    onClick={() => router.push(dealOf(job))}
+                    className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
+                  >
+                    <td className="w-10 py-3 pl-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Pick ${job.customerName}'s deal`}
+                        className="size-4 accent-[var(--primary)]"
+                        checked={picked.has(job.id)}
+                        onChange={(e) => {
+                          if (!team) void loadTeam().then(setTeam);
+                          setGiving(null);
+                          setPicked((was) => {
+                            const next = new Set(was);
+                            if (e.target.checked) next.add(job.id);
+                            else next.delete(job.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    </td>
+                    <td className="px-5 py-3">
+                      <Link href={dealOf(job)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {job.customerName}
+                      </Link>
+                      <span className="block text-xs text-muted">{job.title}</span>
+                    </td>
+                    <td className="max-w-[16rem] truncate px-3 py-3 text-ink-2">{job.address || "–"}</td>
+                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                      <label>
+                        <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
+                        {stagePicker(job, clsx(stageSelect, "w-40"))}
+                      </label>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular-nums text-ink">{dollars(job.value)}</td>
+                    {showProfit && (
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {profits[job.id] ? (
+                          <span className="font-medium text-positive">{marginWords(profits[job.id])}</span>
+                        ) : (
+                          <span className="text-muted">–</span>
+                        )}
+                      </td>
+                    )}
+                    {showProfit && (
+                      <td className="px-3 py-3 text-right tabular-nums text-ink-2">
+                        {profits[job.id] ? `$${Math.round(profits[job.id].commission).toLocaleString("en-AU")}` : "–"}
+                      </td>
+                    )}
+                    <td className="px-3 py-3 tabular-nums text-ink-2">{job.installDate ? shortDate(job.installDate) : "–"}</td>
+                    <td className="px-5 py-3 tabular-nums text-ink-2">{shortDate(job.updatedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
+  );
+}
+
+/**
+ * A column's head: the stage's name, its count and value. On hover, any stage can be renamed (one of the twelve for
+ * the whole business, a blank name putting ours back), moved, or taken off the pipeline (while it keeps one). An
+ * added stage says what it counts as; a renamed one of the twelve, what it was.
+ */
+function StageHead({
+  stage,
+  own,
+  names,
+  count,
+  sum,
+  canRemove,
+  onRename,
+  onRemove,
+  onGrab,
+  onLetGo,
+  onStep,
+  first,
+  last,
+}: {
+  stage: StageKey;
+  own: readonly OwnStage[];
+  names: StageNames;
+  /** Dragging the head starts moving the column; letting go ends it. */
+  onGrab: () => void;
+  onLetGo: () => void;
+  /** Moves the column one place left (-1) or right (1), for keyboards and touch. */
+  onStep: (by: -1 | 1) => void;
+  first: boolean;
+  last: boolean;
+  count: number | null;
+  sum: number;
+  canRemove: boolean;
+  onRename: (stage: StageKey, name: string) => Promise<boolean>;
+  onRemove: () => void;
+}) {
+  const added = own.find((s) => s.id === stage) ?? null;
+  // One of the twelve the business has renamed: ours is said under it, and a blank name puts it back.
+  const renamedBuiltin = isJobStage(stage) && names[stage] ? STAGE_LABELS[stage] : null;
+  const shownName = stageName(stage, own, names);
+  const [name, setName] = useState<string | null>(null);
+  const save = async () => {
+    if (name === null) return;
+    const typed = name.trim();
+    // An added stage can't be left nameless; one of the twelve goes back to ours.
+    if (typed === shownName || (!typed && !isJobStage(stage))) return setName(null);
+    if (await onRename(stage, typed)) setName(null);
+  };
+  return (
+    <header
+      className={clsx("group rounded-md px-2 py-1.5", name === null && "cursor-grab active:cursor-grabbing")}
+      draggable={name === null}
+      title={name === null ? "Drag to move this stage" : undefined}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        // Some browsers start a drag only once something is set.
+        e.dataTransfer.setData("text/plain", shownName);
+        onGrab();
+      }}
+      onDragEnd={onLetGo}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        {name !== null ? (
+          <input
+            autoFocus
+            aria-label="Stage name"
+            className={clsx(ui.input, "h-7 min-h-7 w-full text-[12px]")}
+            value={name}
+            maxLength={STAGE_NAME_MAX}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => void save()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void save();
+              if (e.key === "Escape") setName(null);
+            }}
+          />
+        ) : (
+          <h2 className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink">
+            {shownName}{" "}
+            <span className="tabular-nums text-muted">
+              {count ?? ""}
+              {sum ? <span className="normal-case sm:hidden"> · {shortDollars(sum)}</span> : null}
+            </span>
+          </h2>
+        )}
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="hidden text-xs tabular-nums text-muted sm:inline">{sum ? dollars(sum) : ""}</span>
+          {name === null && (
+            <button
+              title="Rename this stage"
+              aria-label={`Rename ${shownName}`}
+              className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
+              onClick={() => setName(shownName)}
+            >
+              <Pencil className="size-3.5" aria-hidden />
+            </button>
+          )}
+          {name === null && !first && (
+            <button
+              title="Move left"
+              aria-label={`Move ${shownName} left`}
+              className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
+              onClick={() => onStep(-1)}
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+            </button>
+          )}
+          {name === null && !last && (
+            <button
+              title="Move right"
+              aria-label={`Move ${shownName} right`}
+              className="rounded p-0.5 text-muted opacity-0 hover:text-ink focus:opacity-100 group-hover:opacity-100"
+              onClick={() => onStep(1)}
+            >
+              <ChevronRight className="size-3.5" aria-hidden />
+            </button>
+          )}
+          {canRemove && name === null && (
+            <button
+              title="Take this stage off the pipeline"
+              aria-label={`Take ${shownName} off this pipeline`}
+              className="rounded p-0.5 text-muted opacity-0 hover:text-danger focus:opacity-100 group-hover:opacity-100"
+              onClick={onRemove}
+            >
+              <X className="size-3.5" aria-hidden />
+            </button>
+          )}
+        </span>
+      </div>
+      {added && <p className="mt-0.5 text-[11px] text-muted">Counts as {labelOf(added.base, names)}</p>}
+      {renamedBuiltin && name === null && <p className="mt-0.5 text-[11px] text-muted">Was {renamedBuiltin}</p>}
+      {name !== null && isJobStage(stage) && (
+        <p className="mt-1 text-[11px] text-muted">Renamed for everyone. Clear it to go back to {STAGE_LABELS[stage]}.</p>
+      )}
+    </header>
+  );
+}
+
+/**
+ * The last column of a pipeline: add a stage of the business's own. Its name, where it goes, and which of the twelve
+ * it counts as (for the figures, Sol and the approvals), set to the stage before it until changed.
+ */
+function AddStageColumn({
+  stages,
+  own,
+  names,
+  pipelineName,
+  onAdd,
+}: {
+  stages: readonly StageKey[];
+  own: readonly OwnStage[];
+  names: StageNames;
+  pipelineName: string;
+  onAdd: (input: { name: string; base: JobStage; after: number }) => Promise<boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [after, setAfter] = useState(stages.length - 1);
+  const [base, setBase] = useState<JobStage | null>(null);
+  const [busy, setBusy] = useState(false);
+  const counts = base ?? baseAt(stages, after, own);
+  const close = () => {
+    setOpen(false);
+    setName("");
+    setBase(null);
+  };
+  const save = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    const ok = await onAdd({ name, base: counts, after });
+    setBusy(false);
+    if (ok) close();
+  };
+  if (!open)
+    return (
+      <button
+        onClick={() => {
+          setAfter(stages.length - 1);
+          setOpen(true);
+        }}
+        className="group flex h-44 w-44 shrink-0 self-start flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sun-line/60 bg-sun-line/[0.06] px-3 py-6 text-[14px] font-semibold text-sun-line transition-colors hover:border-sun-line hover:bg-sun-line/12"
+      >
+        <span className="flex size-11 items-center justify-center rounded-full bg-sun-line text-white shadow-[var(--shadow-soft)] transition-transform group-hover:scale-105">
+          <Plus className="size-6" strokeWidth={2.5} aria-hidden />
+        </span>
+        Add a stage
+      </button>
+    );
+  return (
+    <section aria-label="Add a stage" className="w-72 shrink-0 space-y-3 rounded-lg border border-line bg-surface p-3">
+      <p className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink">New stage in {pipelineName}</p>
+      <label className="block text-xs text-muted">
+        Name
+        <input
+          autoFocus
+          className={clsx(ui.input, "mt-1")}
+          value={name}
+          maxLength={STAGE_NAME_MAX}
+          placeholder="Site visit booked"
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void save();
+            if (e.key === "Escape") close();
+          }}
+        />
+      </label>
+      <label className="block text-xs text-muted">
+        Goes after
+        <select className={clsx(ui.input, "mt-1 appearance-auto")} value={after} onChange={(e) => setAfter(Number(e.target.value))}>
+          <option value={-1}>At the start</option>
+          {stages.map((k, i) => (
+            <option key={k} value={i}>
+              {stageName(k, own, names)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="block text-xs text-muted">
+        Counts as
+        <select className={clsx(ui.input, "mt-1 appearance-auto")} value={counts} onChange={(e) => setBase(e.target.value as JobStage)}>
+          {JOB_STAGES.map((s) => (
+            <option key={s} value={s}>
+              {labelOf(s, names)}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-[11px]">A deal here is {labelOf(counts, names)} for your figures, Sol and approvals.</span>
+      </label>
+      <div className="flex gap-2">
+        <button className={clsx(ui.primary, "h-9 px-3 text-[13px]")} onClick={() => void save()} disabled={!name.trim() || busy}>
+          {busy ? "Adding…" : "Add stage"}
+        </button>
+        <button className={clsx(ui.quiet, "h-9 px-3 text-[13px]")} onClick={close}>
+          Cancel
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -453,5 +1244,97 @@ export function Owner({ email }: { email: string | null }) {
     >
       {email ? initials || "?" : "–"}
     </span>
+  );
+}
+
+/** A signed deal's gross margin and commission, from its signed proposal; nothing for a deal not signed. */
+function ProfitLine({ profit }: { profit: DealProfit | undefined }) {
+  if (!profit) return null;
+  const commission = `$${Math.round(profit.commission).toLocaleString("en-AU")}`;
+  return (
+    <p
+      className="mt-1 flex items-center gap-2 text-[11.5px] tabular-nums text-ink-2 sm:text-[11px]"
+      title={`Gross margin ${marginWords(profit)} · Commission ${commission} · from the signed proposal`}
+    >
+      <span className="rounded bg-positive/10 px-1.5 py-0.5 font-medium text-positive">GM {marginWords(profit)}</span>
+      <span className="text-muted">Comm {commission}</span>
+    </p>
+  );
+}
+
+type Whose = "all" | "mine" | "none";
+const WHOSE: readonly { value: Whose; name: string; Icon: typeof Users }[] = [
+  { value: "all", name: "Everyone's deals", Icon: Users },
+  { value: "mine", name: "My deals", Icon: User },
+  { value: "none", name: "No owner yet", Icon: UserX },
+];
+
+/**
+ * Whose deals on a phone, as RENUABL's own menu (24 Nov 2026, Martin: the phone's own picker "should be native" to
+ * RENUABL): a white card under the round, each choice with its icon and a tick on the one shown.
+ */
+function WhoseMenu({ whose, onChange }: { whose: Whose; onChange: (w: Whose) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+  const Shown = WHOSE.find((w) => w.value === whose)?.Icon ?? Users;
+  return (
+    <div ref={box} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Whose deals"
+        title="Whose deals"
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "inline-flex size-8 items-center justify-center rounded-lg",
+          whose === "all" && !open ? "text-ink-2" : "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]",
+        )}
+      >
+        <Shown className="size-4" aria-hidden />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Whose deals"
+          className="absolute left-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl bg-surface p-1 shadow-[0_12px_32px_rgba(0,0,0,0.18)] ring-1 ring-line"
+        >
+          <p className="px-3 pb-1 pt-2 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted">Show</p>
+          {WHOSE.map(({ value, name, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={whose === value}
+              onClick={() => {
+                onChange(value);
+                setOpen(false);
+              }}
+              className={clsx(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm",
+                whose === value ? "bg-canvas font-medium text-ink" : "text-ink-2 active:bg-canvas",
+              )}
+            >
+              <Icon className={clsx("size-4", whose === value ? "text-sun-line" : "text-muted")} aria-hidden />
+              <span className="flex-1">{name}</span>
+              {whose === value && <Check className="size-4 text-sun-line" aria-hidden />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -34,7 +34,7 @@ import {
 import { createCustomer, loadJob, saveJob } from "@/lib/services/crm";
 import { AddressStrip, type NewDealInput } from "./address-strip";
 import { onStreetWords } from "@/lib/domain/address";
-import { CREDITS_EVENT, DesignCredits } from "./design-credits";
+import { CREDITS_EVENT } from "./design-credits";
 import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
 import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
@@ -467,6 +467,7 @@ export function DesignStudio() {
           onPickAddress={pick}
           onAddressDoubt={setOnStreet}
           onSearchAddress={popped ? () => setSearchAsk((n) => n + 1) : undefined}
+          onOpenDeal={popped && onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
           image={pictureMissing ? "" : image}
           set={work.set}
           extras={work.extras}
@@ -645,8 +646,6 @@ export function DesignStudio() {
                   <AddressEntry compact placeholder="Search another address" onPick={pick} />
                 </div>
               )}
-              {/* The business's design credits (16 Nov 2026, Martin): in the pop-up they sit in the address strip. */}
-              {!popped && signedIn && <DesignCredits className="shrink-0" />}
             </>
           }
         />
@@ -658,7 +657,6 @@ export function DesignStudio() {
             onOpenDeal={onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
             askToCreate={dealAsk}
             askToSearch={searchAsk}
-            extra={signedIn ? <DesignCredits className="h-10 px-3.5 text-[13px]" /> : null}
             onCreate={canMakeDeal && !stray ? createDealHere : undefined}
             attachTo={stray ? { name: stray.name, onAttach: () => putOnDeal() } : undefined}
           />

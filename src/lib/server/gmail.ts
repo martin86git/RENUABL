@@ -26,6 +26,7 @@ import {
   type MailPart,
 } from "@/lib/domain/design/inbox";
 import { providerOfId, type MailProvider } from "@/lib/domain/design/outlook-mail";
+import { gmailQueryFor } from "@/lib/domain/design/deal-mail";
 import { siteUrl } from "@/lib/domain/sms";
 import { query } from "./db";
 import {
@@ -38,6 +39,7 @@ import {
   outlookSend,
   outlookTokensFromCode,
   outlookUnread,
+  outlookWith,
   refreshOutlook,
   type OutlookConfig,
 } from "./outlook-mail";
@@ -186,6 +188,19 @@ export async function changeableAddresses(member: Who): Promise<string[]> {
     [member.businessId, member.email.toLowerCase()],
   );
   return rows.map((r) => r.address);
+}
+
+/**
+ * Every mailbox the business's people have connected that can send (Gmail or Outlook), with whose it is, for choosing
+ * which an automated email goes from (the installation reminder).
+ */
+export async function sendingMailboxes(businessId: string): Promise<{ owner: string; address: string; provider: string }[]> {
+  return query<{ owner: string; address: string; provider: string }>(
+    `select g.email as owner, g.address, g.provider from design_gmail g
+       join business_members m on m.business_id = g.business_id and lower(m.email) = g.email
+      where g.business_id = $1 and g.can_modify order by g.created_at, g.address`,
+    [businessId],
+  );
 }
 
 /** The first mailbox a member connected, or null. */
@@ -386,6 +401,36 @@ export async function searchMessages(member: Who, address: string, q: string, ma
       box,
     })),
   );
+}
+
+/**
+ * Every email to or from one address across the member's own mailboxes (Gmail and Outlook), with headers and a
+ * preview, not the words. A mailbox that doesn't answer is left out.
+ */
+export async function mailWith(member: Who, address: string, max: number): Promise<GmailMessage[]> {
+  const boxes = await gmailAddresses(member);
+  const got = await Promise.allSettled(
+    boxes.map(async (box): Promise<GmailMessage[]> => {
+      const outlook = await viaOutlook(member, box, (token) => outlookWith(token, address, max));
+      if (outlook) return outlook.got.map((m) => ({ ...m, box }));
+      const list = await gmail<{ messages?: { id: string }[] }>(
+        member,
+        box,
+        `messages?q=${encodeURIComponent(gmailQueryFor(address))}&maxResults=${Math.max(1, Math.min(50, max))}`,
+      );
+      return Promise.all(
+        (list.messages ?? []).map(async (m) => ({
+          ...(await gmail<Omit<GmailMessage, "box">>(
+            member,
+            box,
+            `messages/${m.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Subject`,
+          )),
+          box,
+        })),
+      );
+    }),
+  );
+  return got.flatMap((g) => (g.status === "fulfilled" ? g.value : []));
 }
 
 /** Read only: connected before RENUABL could mark read and archive; connecting it again allows it. */

@@ -29,6 +29,7 @@ import {
 } from "@/lib/domain/design/training-call";
 import { FIXED_RULES, lockRule, type CoachNote } from "@/lib/domain/design/coaching";
 import { assistantConfig, toolWords } from "@/lib/domain/voice-agent";
+import { modelOfBrain } from "@/lib/domain/design/caller";
 import { parseApiKey } from "./bill-reader";
 import { readWithClaude } from "./claude-reader";
 import { newNoteId } from "./design-caller-coach";
@@ -105,7 +106,7 @@ export async function startPracticeCall(
       slots: [],
       serverUrl: `${s.site}/api/voice/vapi?ref=${encodeURIComponent(id)}`,
       secret: s.secret,
-      model: s.model,
+      model: modelOfBrain(caller.brain, s.model),
       voice: caller.voice ?? s.voice,
     });
     // Nothing on a practice call reaches a deal: only hanging up is connected, and it's told so.
@@ -164,6 +165,12 @@ export async function startPracticeCall(
 }
 
 /** From the webhook: keeps a practice call's status and what is said. Never throws. */
+/** Whose a practice or training call is, by its reference (for its minutes). */
+export async function practiceBusiness(ref: string): Promise<string | null> {
+  const rows = await query<{ business_id: string }>(`select business_id from design_practice_calls where id = $1`, [ref]);
+  return rows[0]?.business_id ?? null;
+}
+
 export async function keepPracticeLive(ref: string, e: LiveEvent): Promise<void> {
   try {
     if (e.kind === "status") {

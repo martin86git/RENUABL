@@ -1,5 +1,4 @@
-import { agoWords, callBackAsked, needsYou, nextMove, type FeedDeal, type FeedEvent, type NextMove } from "./deal-feed";
-import { STAGE_LABELS } from "./crm";
+import { agoWords, callBackAsked, stageOf, needsYou, nextMove, type FeedDeal, type FeedEvent, type NextMove } from "./deal-feed";
 import { countdownWords, type OutboxState } from "./sol-agents";
 
 /**
@@ -172,7 +171,7 @@ const CONTEXT_QUOTE_MAX = 60;
 
 export function dealContext(d: FeedDeal, now = new Date()): string {
   const days = Math.floor((now.getTime() - Date.parse(d.createdAt)) / 86_400_000);
-  const stage = STAGE_LABELS[d.stage];
+  const stage = stageOf(d);
   // How old the deal is, not how long at its stage (that isn't kept).
   const age = !Number.isFinite(days) || days < 1 ? `${stage} · new today` : `${stage} · ${days} ${days === 1 ? "day" : "days"} old`;
   const heat = d.heat ? d.heat[0].toUpperCase() + d.heat.slice(1) : null;

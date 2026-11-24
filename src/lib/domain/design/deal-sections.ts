@@ -105,6 +105,8 @@ export const BUILTIN_FIELDS: readonly FieldInfo[] = [
   known("financials", "youPay", "Customer pays"),
   known("financials", "depositAsked", "Deposit"),
   known("financials", "depositReceived", "Deposit received"),
+  known("financials", "grossMargin", "Gross margin"),
+  known("financials", "afterCommission", "Margin after commission"),
   typed("financials", "solarVicStatus", "Solar Victoria status", "select", SOLAR_VIC_STATUS),
   typed("financials", "solarVicRebate", "Solar Victoria rebate", "money"),
   typed("financials", "solarVicLoan", "Solar Victoria loan", "money"),
@@ -320,6 +322,11 @@ export interface SignedFigures {
   depositReceived: number | null;
   solarVicRebate: number | null;
   solarVicLoan: number | null;
+  /** From the signed proposal's business side, for members who see costs (deal-profit.ts); else null. */
+  grossMargin?: number | null;
+  grossShare?: number | null;
+  commission?: number | null;
+  afterCommission?: number | null;
 }
 
 export interface SectionLine {
@@ -375,6 +382,11 @@ export function fieldLine(
       youPay: money(s?.youPay ?? null),
       depositAsked: s ? (s.depositAsked ? money(s.depositAsked) : "None asked") : null,
       depositReceived: s ? (s.depositReceived ? money(s.depositReceived) : "Not yet") : null,
+      grossMargin:
+        typeof s?.grossMargin === "number"
+          ? `${money(Math.round(s.grossMargin))}${typeof s.grossShare === "number" ? ` · ${Math.round(s.grossShare * 100)}%` : ""}`
+          : null,
+      afterCommission: typeof s?.afterCommission === "number" ? money(Math.round(s.afterCommission)) : null,
       gridConnection: details.gridConnection ? (PROGRESS_WORDS[details.gridConnection] ?? details.gridConnection) : null,
       customerInvoice: details.customerInvoice ? (PROGRESS_WORDS[details.customerInvoice] ?? details.customerInvoice) : null,
       stcClaim: details.stcClaim ? (PROGRESS_WORDS[details.stcClaim] ?? details.stcClaim) : null,
@@ -390,9 +402,11 @@ export function fieldLine(
         ? money(s.solarVicRebate)
         : f.key === "solarVicLoan" && s?.solarVicLoan
           ? money(s.solarVicLoan)
-          : f.key === "distributor"
-            ? (ctx.distributor ?? null)
-            : null;
+          : f.key === "commission" && typeof s?.commission === "number"
+            ? money(s.commission)
+            : f.key === "distributor"
+              ? (ctx.distributor ?? null)
+              : null;
   const raw = details[f.key];
   const shown = raw ? (f.kind === "money" ? money(Number(raw)) : raw) : null;
   return { key: f.key, label: f.label, source: f.source, value: shown ?? filled, filled, typed: Boolean(raw), field };

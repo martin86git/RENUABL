@@ -19,6 +19,539 @@ export const UPDATES: readonly Update[] = [
     words: "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
   },
   {
+    day: "2026-11-25",
+    area: "Installations",
+    words: "The job card shows the whole house from above with the panels on it, before the close-up layout, and emails it too.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Installations",
+    words: "A tentative install's deal is picked from RENUABL's own searchable list, not the phone's picker, and the dates fit a phone.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Settings",
+    words: "Installation reminders can go from your own Gmail or Outlook: choose it under Sent from, and they come from your address.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Settings",
+    words:
+      "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",
+  },
+  { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
+  {
+    day: "2026-11-24",
+    area: "Installations",
+    words: "On a phone the figures over Installations, After install and Grid sit three across in one slim band, and long addresses wrap.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Installations",
+    words: "The job card lists the system in parts with icons, solar and battery on their own lines, and a Racking part.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Orders",
+    words: "A job's order is tidier on a phone: the address, signed day and install day each on a line.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Deals",
+    words: "On a phone, choosing whose deals to show opens RENUABL's own menu, not the phone's picker.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "On Proposals open and closed, Open the design is now the designer's orange round alone, so the buttons fit a phone.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Deals",
+    words: "The sample deal's tour runs once for you on any device, and Open deal from an agent's chat on a phone tucks the chat away.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "On a phone, the customer's Call me button is a slim tab at the screen's edge, so it no longer covers the page.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "Publishing a proposal now takes you straight down to Send to customer and its links.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "On a phone, the tray under Sol's box sits neatly under it and fades at its edge when it scrolls.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "The tray under Sol's box has a Pipeline shortcut, and its tabs can be dragged into your own order.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Designer",
+    words:
+      "Sol asks about the bill and the system size first, then the battery on its own card, and his box on a phone grows to fit what he says.",
+  },
+  { day: "2026-11-24", area: "Sol", words: "A screenshot pasted into Sol's box now shows as a preview inside the box." },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "With Sol open beside a page, the page refits: nothing sits under him or the floating bar, and Settings keeps a tidy gap.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Today's chat with Sol and his side panel are now two separate conversations: what you ask in one doesn't show in the other.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's sun is softer everywhere: a little on phones, a little more on computers.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "Search your open and closed proposals, and each sale now shows the day it was signed, with when the last one was at the top.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat opens with today's date and his etched brain, and your messages are graphite bubbles.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Your account",
+    words:
+      "Add a deal owner without inviting them, so past deals can carry a salesperson's name. Invite them later and they keep their deals.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Team chat",
+    words: "On a phone, direct messages are a row of faces, deal chats are cards with the latest line, and days are marked in a chat.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol answers shorter, draws technical answers, and keeps a library of tips under Technical.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat is white and cleaner, with a greeting, suggestions and four topics that each open their own prompts.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Calendar",
+    words:
+      "On a computer, drag the calendar's edge or corner to make it wider or taller; it stays that size, and a double click puts it back.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "The example questions in Sol's chat show for your first three chats, then step aside.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat opens fresh each time, with your last chat a press away, a taller box to type in, and a quieter header.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "Every tour has a Skip button, so you can leave it at any step.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Deals",
+    words: "On a phone, the pipeline's columns are narrower so the next one shows, and each card says it in fewer words.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Billing",
+    words: "Top-up packs are clearer cards: the credits large, extra credits in green, the price below, and the best value marked.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketplace",
+    words: "On a phone, the Marketplace dock's icons are plain blue outlines, no dark tiles.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Email",
+    words: "On a phone, Email is tighter: the filters across the width, then search with Compact, Refresh and Compose as rounds.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words:
+      "Today is Sol's screen alone. The deal feed opens Deals, the calendar sits beside email, and Sol's round opens Chat and Feed as a clover.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Usage and top-ups open from the menu now, not Today. Sol shows on the post-sale dock again on iPhones.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Chat and Feed's leaves are smaller, rounder, white and joined in the middle, and Proposals closed shows a green ring.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Marketplace",
+    words:
+      "Make an offer on equipment for sale: pick 10% lower, the asking price or your own. The seller accepts or declines within 48 hours.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the Deals page has Pipeline, Proposals open, Proposals closed and Calls along its top.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Settings",
+    words:
+      "Bring in your HubSpot deals: match its stages and fields to yours, and each comes across with its contact, notes, emails and calls.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On the Marketplace dock, its blue round takes Sol's place, with My listings to its left and Messages to its right.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "The ball on the phone's dock now has a third turn: the Marketplace, with listings, buy and sell, watching and messages.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Designer",
+    words: "On a phone, Select, Add a panel, the hand and Erase always sit either side of Sol at the foot of the roof.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Signing in",
+    words: "Back after the phone was locked, RENUABL waits to reconnect and goes back in by itself, instead of asking you to sign in.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "Topping up from the usage box now pays by card right in the box, without leaving the page.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Today",
+    words: "A usage gauge under the date on Today opens this month's usage, with packs to top up Sol and design credits.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Usage",
+    words:
+      "A Usage page under the settings cog shows this month's allowances and Sol's use by day, and the owner is emailed at 50, 80 and 100%.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Designer",
+    words: "Today warns before STCs change, and you choose the installation period new quotes are priced for.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Proposals",
+    words: "Customer proposals carry a small, quiet Powered by RENUABL in the bottom corner and the footer.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Deals",
+    words: "On a phone, the tour of a deal folds Sol's box away while it points at other buttons, so nothing covers them.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Phone",
+    words: "On a phone, once RENUABL scrolls away a slim bar keeps it small at the top, so screenshots still show it.",
+  },
+  {
+    day: "2026-11-23",
+    area: "On a phone",
+    words: "Scrolled well down a page, a small arrow in the bottom right takes you back to the top in one press.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Your account",
+    words: "Your team's own sign-in page, with your logo and a private code in its address. Copy it from Your account.",
+  },
+  {
+    day: "2026-11-23",
+    area: "Everywhere",
+    words: "When Safari won't take dictation, the microphone says why and the next tap opens your keyboard to use its own.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words:
+      "The Business and Feed switch is a smoother segmented control with icons, and Sol's brain etch is a lighter grey, on phones too.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Quote",
+    words: "Including RCBOs in the quote now asks how many, with a stepper beside it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designs list: the leading quote, what's on the proposal and which is recommended are said in words on each design.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: zoom in and out with the + and − on the map's right; the magnifier beside them turns on pinch zoom.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: drag Sol's box up to read more, or down to fold it to a strip; tap the strip to open it again.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "A brief hiccup reaching your account no longer says you need to sign in; the page tries again by itself.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Today on a phone: the page scrolls down through Needs you and Performance, and their cards fit the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the panel, inverter, battery and charger lists open over the whole screen, easy to browse.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: the map is about a fifth bigger, and Sol's box runs edge to edge under it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Designer on a phone: roomier figures at the top, each named, and Sol's box runs to the foot of the screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Each voice agent can be set to answer quicker or more carefully, under How it speaks in its settings.",
+  },
+  {
+    day: "2026-11-22",
+    area: "CRM",
+    words: "Deals brought in from Pylon's export can be filled in from Pylon: the battery, panels, inverter and place on the map.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Pages answer taps sooner on phones: Sol's sun does less work in the background, and his cards type their lines more lightly.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Today",
+    words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketing",
+    words: "Email builder: a Personal letter look that reads like a person's email, for the best odds of Gmail's Primary tab.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketing",
+    words: "Marketing emails are wider, and each email can name its own sender.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Video block, the video's picture with a play button that opens it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a clear place at the top of the email to drop or upload your business logo.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Countdown block, a timer to the end of an offer that is right each time the email is opened.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Products block, each product with its picture, price, a few words and a button.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Email builder: a Spacer block, and Social links for Facebook, Instagram and more, shown as icons or names.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "A datasheet shared from another business is marked to check until someone in your business confirms it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Product datasheets are shared across RENUABL: one any business adds is there for every business to design with.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Phone assistants",
+    words: "Your voice agents answer quicker on calls.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the strings sit under the map, one line each, so the roof stays clear to tap; Auto and New in their header.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone: slimmer figures, more room for Sol in an outlined box, the eraser beside the hand, and a larger designs round.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, with one panel picked, All picks every panel in its array.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Double tap a 1° button on a phone to turn 5° a press, and again for 1°. Sideways, the controls sit where they do upright.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "Turned sideways in a phone's browser, the designer says how to open RENUABL from your Home Screen for the full screen.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, the pointer is on the map beside Add a panel, and holding a 1° button keeps turning the panels.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol is a little larger with one big + to open his tools.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, picked panels get a controller under the map: turn 1° with either thumb, and Undo appears after a change.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Add a panel sits on the map, and Sol is a round with a tool and a + in place of words.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, Sol's card for picked panels is tidier: turns in one row, portrait or landscape, tilt and delete.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Designer",
+    words: "On a phone, sideways too, Sol holds the tools, and a hand button grabs the map to move it.",
+  },
+  {
+    day: "2026-11-22",
+    area: "Marketing",
+    words: "Emails take a background and text colour of their own, and the editor is clearer with more room.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Marketing",
+    words: "The email editor is drag and drop: drag blocks onto the email or into a new order, type straight into it, and undo any change.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Deals",
+    words:
+      "Pipelines are yours to shape: rename any pipeline or stage, start a new pipeline, add stages of your own, and drag columns into your order.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Sol",
+    words: "Hover over any message in a chat with Sol to copy it, or press the arrow to reply to that message.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Team chat",
+    words: "Add your own photo under Your account, and your team sees it beside your name in team chat.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts beyond the free allowance is 50c a minute and 30c a text, and you're emailed at 80% of your spending cap.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, the figures run across the top of the screen and the panel, inverter and battery buttons are larger.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright, Sol holds the tools: tap him for them, and pick panels to turn them from his card.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The designs menu lists each design's inverter, battery and EV charger, and on a phone it opens over the screen.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The Day button is gone from the designer.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone held upright: a larger roof, smaller buttons, and a magnifier under the roof to pinch and zoom.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone turned sideways, the designer's buttons are smaller, so the roof is in view.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "On a phone, turn it sideways and the designer fills the screen, with the roof as large as it goes.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words:
+      "The designer catches more three-phase inverters on a single-phase home, and taking one inverter off a quote no longer takes two.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Calls & Texts is $49 a month with 30 minutes and 30 texts free, then by use, with a spending cap you set.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Billing",
+    words: "Cancelling Calls & Texts or Growth gives 30 days' notice: it stays on until then, and you can change your mind.",
+  },
+  {
+    day: "2026-11-21",
+    area: "Designer",
+    words: "The quote builder shows a cost each and a total for every line: the total is how many times the cost each.",
+  },
+  {
     day: "2026-11-21",
     area: "CRM",
     words: "Bring in your contacts and deals from any CRM's export sheet, in Settings.",
@@ -47,7 +580,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-21",
     area: "Design tool",
-    words: "Dragging out panels on open roof turns the row to follow your pointer, and panels square to an edge before you let go.",
+    words: "Pull a new panel sideways to add more, or any other way to pivot the row. Drag the + on a picked array to add rows.",
   },
   {
     day: "2026-11-21",

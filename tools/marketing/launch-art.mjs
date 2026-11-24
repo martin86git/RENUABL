@@ -9,20 +9,20 @@
  * screenshots), taken by headless Chrome over the DevTools protocol. Moving ones are taken frame by frame (each page has
  * `window.at(t)`, t from 0 to 1) and written as GIFs, the only animation email apps play; still ones as JPEGs. Sol's
  * own GIF is filmed off the live homepage, so he is the same sun: run the dev server first (port 3100, or the second
- * argument). Everything lands in public/design/launch/, where /api/design/marketing/gtm reads it into RENUABL's
+ * argument). Everything lands in marketing/launch/ (private, never served by the site), where /api/design/marketing/gtm reads it into RENUABL's
  * Marketing pictures. Made-up customers only, no stock photos, nobody else's marks.
  *
  *   node tools/marketing/launch-art.mjs [only-this-one] [port]
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import sharp from "sharp";
 
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const OUT = resolve("public/design/launch");
+const OUT = resolve("marketing/launch");
 const ONLY = process.argv[2] && process.argv[2] !== "all" ? process.argv[2] : null;
 const SITE = `http://localhost:${process.argv[3] ?? "3100"}`;
 const W = 1200;
@@ -34,7 +34,9 @@ const work = mkdtempSync(join(tmpdir(), "renuabl-art-"));
 /** RENUABL's logo as the website has it (public/brand/renuabl-logo-white.png, the wordmark at weight 400, wide spaced). */
 const LOGO_FILE = resolve("public/brand/renuabl-logo-white.png");
 const LOGO = pathToFileURL(LOGO_FILE).href;
-const shot = (f) => pathToFileURL(resolve("public/design/landing", f)).href;
+// RENUABL-only shots live in marketing/launch/source (private); the rest are the sales page's own public screenshots.
+const OWN_SHOTS = resolve("marketing/launch/source");
+const shot = (f) => pathToFileURL(existsSync(resolve(OWN_SHOTS, f)) ? resolve(OWN_SHOTS, f) : resolve("public/design/landing", f)).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- The product's own marks ------------------------------------------------------------------------------------
@@ -127,8 +129,8 @@ const CARDS = [
   { icon: "%%SOL%%", head: "Your emails, written.", sub: "Sol drafts every follow-up in your voice" },
   { icon: NOTEBOOK(56), head: "Your calls, written up.", sub: "The note-taker fills in the deal" },
   { icon: "%%SOL%%", head: "Your super-intelligent advisor.", sub: "Sol knows every deal, and the trade" },
-  { icon: DESIGNER(56), head: "Your roofs, designed.", sub: "Three priced designs in one press" },
-  { icon: AGENT(56, "#2bb5a0"), head: "Your installs, lined up.", sub: "The post-sale agent pencils in the day" },
+  { icon: DESIGNER(56), head: "Your quotes, priced as you draw.", sub: "You lay the panels, the price follows" },
+  { icon: AGENT(56, "#2bb5a0"), head: "Your installs, on one calendar.", sub: "Orders, approvals and job cards together" },
 ];
 
 /**
@@ -149,8 +151,8 @@ const EXPLAINERS = {
   },
   "explain-designer.gif": {
     icon: DESIGNER(88),
-    head: "Your roofs, designed.",
-    says: "One press lays out three designs, each priced as it lands. Your customer chooses one and signs online.",
+    head: "Priced as you draw.",
+    says: "You lay out the panels and the quote builds as you go. Your customer chooses a design and signs online.",
   },
   "explain-crm.gif": {
     icon: NOTEBOOK(88),
@@ -159,8 +161,8 @@ const EXPLAINERS = {
   },
   "explain-runs.gif": {
     icon: CALENDAR(88),
-    head: "Signed. Then it runs itself.",
-    says: "The moment they sign, the order opens, approvals line up and your installer's job card is ready.",
+    head: "After the sale, in one place.",
+    says: "Once they sign, the order, approvals, install calendar and your installer's job card are in one place for your team.",
   },
 };
 
@@ -301,17 +303,17 @@ const ART = {
   /**
    * The designer in every email (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it…
    * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a slim band under the
-   * hook, the new designer pop-up on a real roof (the website's site, under a made-up label; no address shown).
+   * last part of every email but the designer's, the updated designer on a real roof, its dock and Sol in view (the website's site, under a made-up label; no address shown).
    */
   "designer-band.jpg": {
-    clipH: 480,
+    clipH: 560,
     html: page(
       `<div class="glow"></div><div class="frame"><img src="${shot("designer-site-1.webp")}"></div>
-       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:438px;bottom:auto">`,
-      `.glow{position:absolute;left:0;right:0;top:0;height:480px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
-       .frame{position:absolute;left:48px;top:28px;width:1104px;height:388px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
-       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 2%}
-       .tag{position:absolute;left:52px;top:442px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:518px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:560px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:470px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 77%}
+       .tag{position:absolute;left:52px;top:522px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
     ),
   },
 
@@ -400,7 +402,7 @@ const ART = {
         <div class="badge"><b>First month</b><span>free</span></div>
         <h1><span class="box"><i></i></span>Yes. I want my <b>AI sales force.</b></h1>
         <ul><li>Voice agents that ring every new lead</li><li>Sol, the brain of the business</li>
-          <li>The AI designer: roofs priced as they're drawn</li><li>Every feature, for every user</li></ul>
+          <li>The AI designer: roofs priced as they're drawn</li><li>From $39 a user, then pay as you go</li></ul>
         <p class="fine">No contract · Cancel any time · Prices include GST</p></div><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `.sky{position:absolute;inset:0;background:radial-gradient(ellipse at 85% 0%,rgba(255,90,31,.25),transparent 50%)}
        .coupon{position:absolute;left:56px;top:56px;right:56px;bottom:72px;border:2px dashed rgba(255,122,46,.75);border-radius:26px;padding:48px 56px;

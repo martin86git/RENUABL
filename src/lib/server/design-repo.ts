@@ -12,6 +12,7 @@
 import { cleanKind, type BusinessKind } from "@/lib/domain/design/business-kind";
 import {
   MAX_MEMBERS,
+  MAX_OWNER_ONLY,
   MAX_PROJECTS,
   cleanPermissions,
   roofKey,
@@ -27,6 +28,7 @@ import { MAX_SUPPLIER_LISTS, type SupplierList } from "@/lib/domain/design/prici
 import type { DesignExtras } from "@/lib/domain/design/quote";
 import { newId, query, transaction } from "./db";
 import { linkJobsToRoof } from "./design-crm-repo";
+import { memberPhotoVersions } from "./design-member-photos";
 
 // ---------------------------------------------------------------------------
 // Businesses and members
@@ -49,6 +51,8 @@ export interface Member {
   firstName?: string | null;
   /** Whether they have been through the welcome on Today (welcome.ts). */
   welcomed?: boolean;
+  /** They have seen the tour of a deal (deal-tour.ts). */
+  dealTourSeen?: boolean;
 }
 
 /** The business this email belongs to, if any. An email is in one business at most. */
@@ -63,8 +67,10 @@ export async function memberByEmail(email: string): Promise<Member | null> {
     permissions: unknown;
     first_name: string | null;
     welcomed: boolean;
+    deal_tour: boolean;
   }>(
-    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name, m.welcomed_at is not null as welcomed
+    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name, m.welcomed_at is not null as welcomed,
+            m.deal_tour_at is not null as deal_tour
        from business_members m join businesses b on b.id = m.business_id
       where m.email = $1`,
     [email.toLowerCase()],
@@ -81,6 +87,7 @@ export async function memberByEmail(email: string): Promise<Member | null> {
         permissions: cleanPermissions(m.permissions),
         firstName: m.first_name || null,
         welcomed: m.welcomed,
+        dealTourSeen: m.deal_tour,
       }
     : null;
 }
@@ -88,6 +95,14 @@ export async function memberByEmail(email: string): Promise<Member | null> {
 /** This person has been through the welcome on Today (or skipped it): it isn't shown to them again. */
 export async function markWelcomed(businessId: string, email: string): Promise<void> {
   await query(`update business_members set welcomed_at = coalesce(welcomed_at, now()) where business_id = $1 and email = $2`, [
+    businessId,
+    email.toLowerCase(),
+  ]);
+}
+
+/** This person has seen the tour of a deal: it doesn't start by itself for them again, on any device. */
+export async function markDealTourSeen(businessId: string, email: string): Promise<void> {
+  await query(`update business_members set deal_tour_at = coalesce(deal_tour_at, now()) where business_id = $1 and email = $2`, [
     businessId,
     email.toLowerCase(),
   ]);
@@ -146,6 +161,8 @@ export interface MemberLine {
   /** Whether they have signed in and accepted the terms yet. */
   joined: boolean;
   permissions: MemberPermissions;
+  /** When their profile photo was last changed, when they have one (design-member-photos.ts). */
+  photo?: number;
 }
 
 export async function listMembers(businessId: string): Promise<MemberLine[]> {
@@ -154,7 +171,12 @@ export async function listMembers(businessId: string): Promise<MemberLine[]> {
       where business_id = $1 order by (role = 'owner') desc, created_at`,
     [businessId],
   );
-  return rows.map((m) => ({ ...m, permissions: cleanPermissions(m.role === "owner" ? null : m.permissions) }));
+  const photos = await memberPhotoVersions(businessId);
+  return rows.map((m) => ({
+    ...m,
+    permissions: cleanPermissions(m.role === "owner" ? null : m.permissions),
+    ...(photos[m.email] ? { photo: photos[m.email] } : {}),
+  }));
 }
 
 /** Sets what a member may do. Never the owner's (the owner may always do everything). False when there's no such member. */
@@ -184,6 +206,81 @@ export async function addMember(businessId: string, email: string, invitedBy: st
   });
 }
 
+/** Someone who owns deals without being invited: not a member, so never signs in or counts as a paid user. */
+export interface OwnerOnlyLine {
+  email: string;
+  name: string;
+  /** How many of the business's deals they own. */
+  deals: number;
+}
+
+export async function listOwnerOnly(businessId: string): Promise<OwnerOnlyLine[]> {
+  const rows = await query<{ email: string; name: string; deals: string }>(
+    `select o.email, o.name,
+            (select count(*) from design_jobs j where j.business_id = o.business_id and lower(j.owner_email) = o.email) as deals
+       from design_owner_only o where o.business_id = $1 order by o.name, o.email`,
+    [businessId],
+  );
+  return rows.map((r) => ({ email: r.email, name: r.name, deals: Number(r.deals) }));
+}
+
+/**
+ * Keeps someone who can own deals without inviting them. "member" when they're already in this business, "full" at the
+ * limit. Their email isn't held against them anywhere else: they can still join any business later.
+ */
+export async function addOwnerOnly(businessId: string, email: string, name: string, by: string): Promise<"added" | "member" | "full"> {
+  const who = email.toLowerCase();
+  return transaction(async (q) => {
+    const already = await q(`select 1 from business_members where business_id = $1 and email = $2`, [businessId, who]);
+    if (already.length) return "member";
+    const count = await q<{ n: string }>(`select count(*) as n from design_owner_only where business_id = $1`, [businessId]);
+    if (Number(count[0]?.n ?? 0) >= MAX_OWNER_ONLY) return "full";
+    await q(
+      `insert into design_owner_only (business_id, email, name, added_by) values ($1,$2,$3,$4)
+       on conflict (business_id, email) do update set name = excluded.name`,
+      [businessId, who, name, by.toLowerCase()],
+    );
+    return "added";
+  });
+}
+
+/** Takes someone off the list. Their deals are left with no owner, so nothing points at a person nobody can see. */
+export async function removeOwnerOnly(businessId: string, email: string): Promise<boolean> {
+  const who = email.toLowerCase();
+  return transaction(async (q) => {
+    const gone = await q(`delete from design_owner_only where business_id = $1 and email = $2 returning email`, [businessId, who]);
+    if (!gone.length) return false;
+    await q(`update design_jobs set owner_email = null, updated_at = now() where business_id = $1 and lower(owner_email) = $2`, [
+      businessId,
+      who,
+    ]);
+    return true;
+  });
+}
+
+/**
+ * Invites someone who owns deals: they become a member (and a paid user), and keep the deals already theirs.
+ * "missing" when they aren't on the list.
+ */
+export async function inviteOwnerOnly(businessId: string, email: string, by: string): Promise<"added" | "taken" | "full" | "missing"> {
+  const who = email.toLowerCase();
+  const kept = await query(`select 1 from design_owner_only where business_id = $1 and email = $2`, [businessId, who]);
+  if (!kept.length) return "missing";
+  const result = await addMember(businessId, who, by);
+  if (result === "added") await query(`delete from design_owner_only where business_id = $1 and email = $2`, [businessId, who]);
+  return result;
+}
+
+/** Whether this email may own the business's deals: a member, or someone kept to own deals without an invite. */
+export async function mayOwnDeals(businessId: string, email: string): Promise<boolean> {
+  const rows = await query(
+    `select 1 from business_members where business_id = $1 and lower(email) = $2
+     union all select 1 from design_owner_only where business_id = $1 and email = $2 limit 1`,
+    [businessId, email.toLowerCase()],
+  );
+  return rows.length > 0;
+}
+
 /** Gives a member a role (a member or a designer). Never the owner's. False when there's no such member. */
 export async function setRole(businessId: string, email: string, role: Exclude<MemberRole, "owner">): Promise<boolean> {
   const rows = await query(`update business_members set role = $3 where business_id = $1 and email = $2 and role <> 'owner' returning id`, [
@@ -200,7 +297,12 @@ export async function removeMember(businessId: string, email: string): Promise<b
     businessId,
     email.toLowerCase(),
   ]);
-  return rows.length > 0;
+  if (!rows.length) return false;
+  // Signed out of every device at once, and their screen lock's PIN and passkeys for this business go too.
+  await query(`delete from sessions where email = $1`, [email.toLowerCase()]);
+  await query(`delete from design_lock_pins where business_id = $1 and email = $2`, [businessId, email.toLowerCase()]);
+  await query(`delete from design_passkeys where business_id = $1 and email = $2`, [businessId, email.toLowerCase()]);
+  return true;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,11 +1,12 @@
 "use client";
 
+import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, Home, Minus, Navigation, Package, Plus, X } from "lucide-react";
 import clsx from "clsx";
 import { AddressEntry } from "@/components/consumer/address-entry";
-import { PRE_INSTALL_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
+import { PRE_INSTALL_STAGES, stageLabel } from "@/lib/domain/design/crm";
 import { weekOf } from "@/lib/domain/design/deal";
 import {
   MAP_SIZE,
@@ -45,6 +46,8 @@ const day = (iso: string | null) =>
  * the job) with the distances as the crow flies, and a card with directions through every stop and its event card.
  */
 export function JobMapPage() {
+  // The business's own names for the stages (pipeline-stages.ts).
+  const stageNames = useStageNames();
   const [data, setData] = useState<{ jobs: MapJob[]; places: JobPlaces; wholesalers: string[] } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("upcoming");
@@ -235,7 +238,7 @@ export function JobMapPage() {
                   <p className="truncate text-sm font-semibold text-ink">{job.customer}</p>
                   <p className="text-xs text-ink-2">{job.address}</p>
                   <p className="mt-1 text-xs text-muted">
-                    {job.installDate ? shortDate(job.installDate) : "No install date yet"} · {STAGE_LABELS[job.stage]}
+                    {job.installDate ? shortDate(job.installDate) : "No install date yet"} · {stageLabel(job.stage, stageNames)}
                     {job.kw ? ` · ${job.kw} kW` : ""}
                     {job.installer ? ` · ${job.installer}` : ""}
                   </p>

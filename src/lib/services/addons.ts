@@ -7,18 +7,22 @@ import { useCallback, useEffect, useState } from "react";
 import type { AddOnKey, AddOnStanding, VoiceStanding } from "@/lib/domain/design/add-ons";
 
 export interface AddOnsView {
-  addOns: { key: AddOnKey; standing: AddOnStanding; cents: number | null }[];
+  addOns: { key: AddOnKey; standing: AddOnStanding; cents: number | null; endsAt?: string | null }[];
   number: { e164: string; renuabl: boolean } | null;
   voice: VoiceStanding;
   canBuyNumber: boolean;
   /** The plan's next bill day, when it has a live plan. */
   nextBill?: string | null;
   mayAdd: boolean;
+  /** This month's Calls & Texts minutes and texts. */
+  usage?: { minutes: number; texts: number };
+  /** The spending cap beyond the free allowance, in cents. */
+  capCents?: number | null;
 }
 
 export const ADD_ONS_CHANGED = "renuabl:addons";
 
-type Sent = { ok: boolean; message?: string; requested?: boolean; number?: string; numberPending?: boolean };
+type Sent = { ok: boolean; message?: string; requested?: boolean; number?: string; numberPending?: boolean; endsAt?: string | null };
 
 async function send(body: unknown): Promise<Sent> {
   try {
@@ -35,6 +39,7 @@ async function send(body: unknown): Promise<Sent> {
       requested: json.requested,
       number: json.number,
       numberPending: json.numberPending,
+      endsAt: json.endsAt,
     };
   } catch {
     return { ok: false, message: "Couldn't reach RENUABL. Try again." };
@@ -43,7 +48,9 @@ async function send(body: unknown): Promise<Sent> {
 
 export const addAddOn = (key: AddOnKey) => send({ do: "add", key });
 export const removeAddOn = (key: AddOnKey) => send({ do: "remove", key });
+export const keepAddOn = (key: AddOnKey) => send({ do: "keep", key });
 export const getBusinessNumber = () => send({ do: "number" });
+export const setSpendingCap = (dollars: string) => send({ do: "cap", dollars });
 
 let shared: Promise<AddOnsView | null> | null = null;
 

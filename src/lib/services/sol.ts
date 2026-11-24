@@ -29,7 +29,8 @@ export const askSol = (text: string, files: SolFile[], page?: PageContext | null
     ...(room ? { room } : {}),
   });
 /** Try another answer: his last answer replaced by a new one to the same question, a different way. */
-export const retrySol = (page?: PageContext | null) => post({ do: "retry", ...(page ? { page } : {}) });
+export const retrySol = (page?: PageContext | null, room?: SolRoom) =>
+  post({ do: "retry", ...(page ? { page } : {}), ...(room ? { room } : {}) });
 export const solSeen = () => post({ do: "seen" });
 export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });
@@ -43,6 +44,10 @@ export const answerLearn = (at: string, choice: string) => post({ do: "learn", a
 export const forgetBusinessPref = (id: string) => post({ do: "forget-business-pref", id });
 /** Said on the window to open Sol's panel on his introduction (the end of the first visit's tour, Today's card). */
 export const SOL_INDUCTION = "renuabl:sol-induction";
+/** A tip bookmarked by hand into the business's library (sol-knowledge.ts `cleanTipInput`). */
+export const bookmarkTip = (tip: { title: string; tip: string }) =>
+  ask<{ knowledge: KnowledgeEntry[] }>("/api/design/sol", { method: "POST", body: { do: "tip", ...tip } });
+
 /** Sol's memory for the business (domain/design/sol-knowledge.ts). */
 export const listSolKnowledge = () =>
   ask<{ knowledge: KnowledgeEntry[] }>("/api/design/sol", { method: "POST", body: { do: "knowledge" } });
@@ -62,6 +67,17 @@ export const pinTurn = (at: string, role: "you" | "sol", pinned: boolean) => pos
 /** Said on the window to open or shut Sol's panel from anywhere (the rail, a "#" link). */
 export const SOL_TOGGLE = "renuabl:sol-toggle";
 /**
+ * On a phone, a deal page shows Sol's card for that deal as a sheet over the foot (21 Nov 2026, Martin). While one is
+ * on screen it sets `data-deal-sol` on <html>, and the foot bar's Sol round toggles that sheet instead of his panel.
+ */
+export const DEAL_SOL_TOGGLE = "renuabl:deal-sol-toggle";
+/** Said when the deal's Sol sheet folds into the foot bar's round or comes out of it (`data-deal-sol-tucked`). */
+export const DEAL_SOL_STATE = "renuabl:deal-sol-state";
+export function toggleSolHere(phone: boolean) {
+  const deal = phone && typeof document !== "undefined" && document.documentElement.dataset.dealSol === "1";
+  window.dispatchEvent(new Event(deal ? DEAL_SOL_TOGGLE : SOL_TOGGLE));
+}
+/**
  * Said on the window with a question: opens Sol's panel and asks him (the search, "Ask Sol"). `detail` is the words,
  * or `{ text, shown }` when the words are a long instruction and the chat should show a short line for it.
  */
@@ -80,6 +96,18 @@ export const askSolInPanel = (ask: SolAsk) => {
   }
   target.dispatchEvent(new (target as Window & typeof globalThis).CustomEvent<SolAsk>(SOL_ASK, { detail: ask }));
 };
+/**
+ * Words begun in one of Sol's small boxes (a deal's card, the feed), carried into his panel's box to finish there on a
+ * phone (22 Nov 2026, Martin: the small box is too small, so a single letter typed brings up the larger chat). `about`
+ * goes in front of what is sent (which deal it is about), `label` names it over the box. Nothing is sent by this.
+ */
+export const SOL_DRAFT = "renuabl:sol-draft";
+export type SolDraft = { text: string; about?: string; label?: string };
+export const draftInSolPanel = (d: SolDraft) => window.dispatchEvent(new CustomEvent<SolDraft>(SOL_DRAFT, { detail: d }));
+/** The phone's foot bar Sol round takes you to Today's first view (Business, or My month). */
+export const TODAY_FIRST = "renuabl:today-first";
+/** Whether this is a phone-sized screen, where the small Sol boxes hand their words to his panel. */
+export const handsToPanel = () => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
 /** Said back whenever the panel opens or shuts, so the rail can light its button. */
 export const SOL_STATE = "renuabl:sol-state";
 /** Said whenever Sol's conversation changes here, so the rail's count follows. */

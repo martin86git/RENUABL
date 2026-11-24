@@ -4,6 +4,7 @@ import { lineUpHellos } from "@/lib/server/design-hello";
 import { leadInboxBusinesses, syncLeadInbox } from "@/lib/server/design-lead-inbox";
 import { syncXero, xeroBusinessesDue } from "@/lib/server/design-xero";
 import { routineBusinesses, runCustomRoutines } from "@/lib/server/design-custom-routines";
+import { sendDemoReminders } from "@/lib/server/business-leads-repo";
 
 export const maxDuration = 300;
 
@@ -51,5 +52,10 @@ export async function GET(request: Request) {
         return { paid: 0, bills: 0 };
       })
     ).paid;
-  return Response.json({ ok: true, sent, leads, routines, paid });
+  // RENUABL's own booked demos (business-leads.ts): the lead the day before, staff an hour before.
+  const demoReminders = await sendDemoReminders().catch((e) => {
+    console.error("demo reminders couldn't be sent", e instanceof Error ? e.message : e);
+    return 0;
+  });
+  return Response.json({ ok: true, sent, leads, routines, demoReminders, paid });
 }

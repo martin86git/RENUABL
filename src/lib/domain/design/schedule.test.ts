@@ -20,6 +20,14 @@ describe("the Install Scheduler", () => {
     expect(w.prev).toBe("2026-10-05");
   });
 
+  it("shows one day, stepping a day at a time", () => {
+    const d = calendarDays("day", "2026-11-24");
+    expect(d.days).toEqual(["2026-11-24"]);
+    expect(d.prev).toBe("2026-11-23");
+    expect(d.next).toBe("2026-11-25");
+    expect(d.title).toContain("24");
+  });
+
   it("says whether a job is ready", () => {
     expect(readiness({ order: "ordered", depositReceived: true }).state).toBe("ready");
     expect(readiness({ order: "delivered", depositReceived: null }).state).toBe("ready");

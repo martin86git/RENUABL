@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { markHolds, needsYou, nextMove, type FeedDeal } from "@/lib/domain/design/deal-feed";
 import { PATHS } from "./design-shell";
 import { openDesigner } from "./design-drawer";
 import { briefHref } from "@/lib/domain/design/deal-team";
 import { SolTerminal } from "./sol-on-deal";
+
+/** Cards drawn before the tray first shows. */
+const FIRST_CARDS = 2;
 
 /** The deals that need a person now, as the feed's Needs you has them (held by Done or Later left out). */
 export const dealsNeedingYou = (deals: readonly FeedDeal[], now = new Date()) =>
@@ -18,14 +22,27 @@ export const dealsNeedingYou = (deals: readonly FeedDeal[], now = new Date()) =>
  */
 export function TrayNeeds({ deals, onChanged }: { deals: FeedDeal[] | null; onChanged: () => void }) {
   const router = useRouter();
+  const [now] = useState(() => new Date());
+  const shown = useMemo(() => (deals ? dealsNeedingYou(deals, now) : []), [deals, now]);
+  // The first few cards are drawn at once and the rest just after the screen shows them (22 Nov 2026, Martin: the tray
+  // should open at once), so a tap answers before every card is built.
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    let t = 0;
+    const f = requestAnimationFrame(() => {
+      t = window.setTimeout(() => startTransition(() => setAll(true)), 0);
+    });
+    return () => {
+      cancelAnimationFrame(f);
+      window.clearTimeout(t);
+    };
+  }, []);
   if (!deals) return <div className="h-48 animate-pulse rounded-[22px] bg-surface/70 ring-1 ring-line/70" />;
-  const now = new Date();
-  const shown = dealsNeedingYou(deals, now);
   if (!shown.length)
     return <p className="rounded-2xl bg-surface px-5 py-4 text-[13.5px] text-ink-2 ring-1 ring-line/70">Nothing needs you right now.</p>;
   return (
     <div className="space-y-3">
-      {shown.slice(0, 8).map((d) => {
+      {shown.slice(0, all ? 8 : FIRST_CARDS).map((d) => {
         const deal = `${PATHS.deals}/${d.jobId}`;
         return (
           <article key={d.jobId} className="rounded-[22px] bg-surface p-4 ring-1 ring-line/70">

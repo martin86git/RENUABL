@@ -34,6 +34,7 @@ const EXTRA_PLACES: readonly SolPlace[] = [
   { key: "messages", label: "Messages", path: "/design/messages" },
   { key: "notifications", label: "Notifications", path: "/design/notifications" },
   { key: "inbox", label: "Email inbox", path: "/design/inbox" },
+  { key: "my-calendar", label: "Your calendar", path: "/design/calendar" },
   { key: "team", label: "Team chat", path: "/design/team" },
   { key: "sol", label: "Sol's page", path: "/design/sol" },
   { key: "design-home", label: "the design tool", path: "/design/roof" },
