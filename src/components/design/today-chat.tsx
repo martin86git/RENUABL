@@ -224,32 +224,36 @@ export function TodayChat(props: {
         />
       </div>
 
-      <div
-        role="tablist"
-        aria-label="About the month"
-        className="no-scrollbar -mt-5 flex w-[calc(100%-2.5rem)] max-sm:ml-5 max-sm:w-[calc(100%-1rem)] max-sm:self-start flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap rounded-b-[20px] bg-primary px-2 pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)] sm:justify-center"
-      >
-        {tabs.map(({ key, label, icon: Icon, count }) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={shown === key}
-            onClick={() => setTab(shown === key ? null : key)}
-            className={clsx(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition",
-              shown === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
-            )}
-          >
-            <Icon className="size-3.5" aria-hidden />
-            {label}
-            {count ? (
-              <span className="grid min-w-5 place-items-center rounded-full bg-sun-line px-1.5 text-[11px] font-semibold text-white">
-                {count}
-              </span>
-            ) : null}
-          </button>
-        ))}
+      {/* The tray tucks under the box, inset the same on both sides; on a phone its tabs scroll inside it and fade at the
+          right edge, so the last one is never cut off square (24 Nov 2026, Martin: it "finishes oddly at the right"). */}
+      <div className="-mt-5 w-[calc(100%-2.5rem)] overflow-hidden rounded-b-[20px] bg-primary pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)]">
+        <div
+          role="tablist"
+          aria-label="About the month"
+          className="no-scrollbar flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap px-2 max-sm:pr-10 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] sm:justify-center"
+        >
+          {tabs.map(({ key, label, icon: Icon, count }) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={shown === key}
+              onClick={() => setTab(shown === key ? null : key)}
+              className={clsx(
+                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition",
+                shown === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
+              )}
+            >
+              <Icon className="size-3.5" aria-hidden />
+              {label}
+              {count ? (
+                <span className="grid min-w-5 place-items-center rounded-full bg-sun-line px-1.5 text-[11px] font-semibold text-white">
+                  {count}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* STC changes (stc-change.ts): one card under the tray, only for who may change settings, only while there is something to say. */}
