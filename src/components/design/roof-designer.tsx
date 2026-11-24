@@ -1958,6 +1958,11 @@ export function RoofDesigner(props: {
   const [solLift, setSolLift] = useState(0);
   const [solDragging, setSolDragging] = useState(false);
   const solDrag = useRef<{ y: number; from: number; moved: boolean } | null>(null);
+  // The box sizes itself to what Sol says (24 Nov 2026, Martin: "the sol chat window should auto self adjust according
+  // to the amount of room for the text"): it rises over the picture as far as its words need, until slid by hand.
+  const [solUnder, setSolUnder] = useState<HTMLElement | null>(null);
+  const [solNeeds, setSolNeeds] = useState(0);
+  const [solLiftByHand, setSolLiftByHand] = useState(false);
   // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
   const [panelCard, setPanelCard] = useState(false);
   const [phonePitch, setPhonePitch] = useState(false);
@@ -6886,7 +6891,32 @@ export function RoofDesigner(props: {
   }, [growDown]);
   // The box's top edge: the picture's foot, or higher once slid up. Sol and the foot row stand on it.
   const liftMost = stage ? Math.round(stage.photoH * 0.6) : 0;
-  const lift = foldable && !solFolded ? Math.min(solLift, liftMost) : 0;
+  // How much taller than its usual room the box's words are: measured from the words themselves, not the box, so a box
+  // already risen doesn't hold itself up.
+  const restRoom = (stage?.rest ?? 156) - 8;
+  useEffect(() => {
+    const box = solUnder?.querySelector<HTMLElement>("[data-popup]");
+    if (!box) return;
+    const measure = () => {
+      const kids = Array.from(box.children) as HTMLElement[];
+      if (!kids.length) return;
+      const top = box.getBoundingClientRect().top;
+      const bottom = Math.max(...kids.map((k) => k.getBoundingClientRect().bottom));
+      const pad = parseFloat(getComputedStyle(box).paddingBottom) || 0;
+      const words = Math.ceil(bottom - top + box.scrollTop + pad);
+      setSolNeeds(Math.max(0, words - restRoom));
+    };
+    measure();
+    const seen = new ResizeObserver(measure);
+    Array.from(box.children).forEach((k) => seen.observe(k));
+    const changed = new MutationObserver(measure);
+    changed.observe(box, { childList: true, subtree: true, characterData: true });
+    return () => {
+      seen.disconnect();
+      changed.disconnect();
+    };
+  }, [solUnder, restRoom, solSaying]);
+  const lift = foldable && !solFolded ? Math.min(solLiftByHand ? solLift : solNeeds, liftMost) : 0;
   const deckTop = foot === null ? null : foot - lift;
   const restFolded = 48;
   // One handle in the box's top left: pressed, it folds or opens the box; dragged, it slides the box up or down (down
@@ -6910,9 +6940,11 @@ export function RoofDesigner(props: {
         if (v < -40) {
           setSolFolded(true);
           setSolLift(0);
+          setSolLiftByHand(true);
         } else {
           setSolFolded(false);
           setSolLift(Math.max(0, Math.min(liftMost, Math.round(v))));
+          setSolLiftByHand(true);
         }
       }}
       onPointerUp={() => {
@@ -11564,7 +11596,7 @@ export function RoofDesigner(props: {
                           } as React.CSSProperties)
                         : undefined
                   }
-                  ref={sideDeck ? sideDeckRef : undefined}
+                  ref={sideDeck ? sideDeckRef : underUp ? setSolUnder : undefined}
                   onClickCapture={(e) => {
                     // Folded, a press anywhere on the strip opens it again.
                     if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
@@ -11667,7 +11699,7 @@ export function RoofDesigner(props: {
                           } as React.CSSProperties)
                         : undefined
                   }
-                  ref={sideDeck ? sideDeckRef : undefined}
+                  ref={sideDeck ? sideDeckRef : underUp ? setSolUnder : undefined}
                   onClickCapture={(e) => {
                     // Folded, a press anywhere on the strip opens it again.
                     if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
