@@ -19,6 +19,23 @@ export interface SupplierContact {
   email: string;
 }
 
+/** A connected mailbox, by whose it is and its address. */
+export interface MailboxChoice {
+  owner: string;
+  address: string;
+}
+
+const EMAILISH = /^[^\s@<>"]{1,64}@[^\s@<>"]{1,190}$/;
+
+/** A mailbox choice cleaned, or null. Whether it really is connected is the server's to check. */
+export function cleanMailboxChoice(raw: unknown): MailboxChoice | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const owner = typeof r.owner === "string" ? r.owner.trim().toLowerCase() : "";
+  const address = typeof r.address === "string" ? r.address.trim().toLowerCase() : "";
+  return EMAILISH.test(owner) && EMAILISH.test(address) ? { owner, address } : null;
+}
+
 export interface BusinessPrefs {
   /** By price list name. */
   suppliers: Record<string, SupplierContact>;
@@ -32,6 +49,12 @@ export interface BusinessPrefs {
   };
   /** How many days before the installation the reminder goes. */
   reminderDaysBefore: number;
+  /**
+   * The business's own mailbox the reminder is sent from (25 Nov 2026, Martin: "sent from the [business's] email not
+   * from Renuabl"): one a member connected in Email, Gmail or Outlook, kept with whose it is. Null: RENUABL's sender in
+   * the business's name, replies to its company email.
+   */
+  reminderFrom: MailboxChoice | null;
   /** The business's own arrangement of a deal's fields (Settings → Deal fields); null: ours. */
   dealFields: DealFieldsConfig | null;
   /** The month's sales targets the overview's rings close at (Settings → Sales targets); null each: its own 3-month average. */
@@ -54,6 +77,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   invoiceTolerance: 50,
   automations: { installReminders: false },
   reminderDaysBefore: 2,
+  reminderFrom: null,
   dealFields: null,
   targets: NO_TARGETS,
   places: NO_PLACES,
@@ -101,6 +125,7 @@ export function cleanPrefs(raw: unknown, newId?: () => string): BusinessPrefs {
       Number.isFinite(tolerance) && tolerance >= 0 && tolerance <= 2000 ? Math.round(tolerance) : DEFAULT_PREFS.invoiceTolerance,
     automations: { installReminders: auto.installReminders === true },
     reminderDaysBefore: (REMINDER_DAY_CHOICES as readonly number[]).includes(days) ? days : DEFAULT_PREFS.reminderDaysBefore,
+    reminderFrom: cleanMailboxChoice(r.reminderFrom),
     dealFields: r.dealFields && typeof r.dealFields === "object" ? cleanDealFields(r.dealFields) : null,
     targets: cleanTargets(r.targets),
     places: cleanJobPlaces(r.places),

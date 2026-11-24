@@ -16,12 +16,15 @@ export function Segmented<T extends string>({
   onChange,
   label,
   size = "md",
+  iconOnly = false,
 }: {
   options: readonly SegmentOption<T>[];
   value: T;
   onChange: (v: T) => void;
   label: string;
   size?: "md" | "sm";
+  /** Icons alone, each option's name kept for screen readers and as its hover title (24 Nov 2026, Martin). */
+  iconOnly?: boolean;
 }) {
   const at = Math.max(
     0,
@@ -50,14 +53,16 @@ export function Segmented<T extends string>({
             role="radio"
             aria-checked={on}
             onClick={() => onChange(o.value)}
+            title={iconOnly ? o.label : undefined}
+            aria-label={iconOnly ? o.label : undefined}
             className={clsx(
               "relative z-10 flex items-center justify-center gap-1.5 rounded-full font-medium transition-colors",
-              size === "sm" ? "px-3 text-[13px]" : "px-4 text-sm",
+              iconOnly ? "px-2.5" : size === "sm" ? "px-3 text-[13px]" : "px-4 text-sm",
               on ? "text-ink" : "text-muted hover:text-ink-2",
             )}
           >
             {Icon && <Icon className="size-4" aria-hidden />}
-            {o.label}
+            {!iconOnly && o.label}
           </button>
         );
       })}

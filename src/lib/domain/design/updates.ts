@@ -15,6 +15,16 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
+    area: "Installations",
+    words: "A tentative install's deal is picked from RENUABL's own searchable list, not the phone's picker, and the dates fit a phone.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Settings",
+    words: "Installation reminders can go from your own Gmail or Outlook: choose it under Sent from, and they come from your address.",
+  },
+  {
+    day: "2026-11-25",
     area: "Settings",
     words:
       "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",

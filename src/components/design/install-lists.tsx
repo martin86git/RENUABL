@@ -461,6 +461,8 @@ export function InstallViewSwitch({ view, onView }: { view: InstallView; onView:
   return (
     <Segmented
       label="Show installations as"
+      size="sm"
+      iconOnly
       value={view}
       onChange={onView}
       options={[

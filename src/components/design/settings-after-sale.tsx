@@ -7,7 +7,7 @@ import { GET_READY } from "@/lib/domain/design/schedule";
 import { REMINDER_DAY_CHOICES, rankedLists, type BusinessPrefs } from "@/lib/domain/design/prefs";
 import { MAX_WEEKLY_CAPACITY } from "@/lib/domain/design/approvals";
 import { MAX_INSTALLERS } from "@/lib/domain/design/job-card";
-import { loadPrefs, savePrefs } from "@/lib/services/after-sale";
+import { loadPrefs, savePrefs, type SendingMailbox } from "@/lib/services/after-sale";
 import { loadBrand } from "@/lib/services/proposals";
 import { useDesignAccount } from "./design-account";
 import { loadWorkspace } from "@/lib/services/design-store";
@@ -40,6 +40,7 @@ const TITLES: Record<AfterSalePart, { title: string; intro: string }> = {
 export function AfterSaleSettings({ part }: { part: AfterSalePart }) {
   const [prefs, setPrefs] = useState<BusinessPrefs | null>(null);
   const [lists, setLists] = useState<string[]>([]);
+  const [mailboxes, setMailboxes] = useState<SendingMailbox[]>([]);
   const [state, setState] = useState<{ ok: boolean; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -47,8 +48,10 @@ export function AfterSaleSettings({ part }: { part: AfterSalePart }) {
     let gone = false;
     void loadPrefs().then((res) => {
       if (gone) return;
-      if (res.ok) setPrefs(res.prefs);
-      else setState({ ok: false, message: res.message });
+      if (res.ok) {
+        setPrefs(res.prefs);
+        setMailboxes(res.mailboxes ?? []);
+      } else setState({ ok: false, message: res.message });
     });
     if (part === "suppliers") void loadWorkspace().then((w) => !gone && setLists(w.lists.map((l) => l.name)));
     return () => {
@@ -87,7 +90,7 @@ export function AfterSaleSettings({ part }: { part: AfterSalePart }) {
           />
         </label>
       )}
-      {prefs && part === "automations" && <Automations prefs={prefs} onChange={setPrefs} />}
+      {prefs && part === "automations" && <Automations prefs={prefs} mailboxes={mailboxes} onChange={setPrefs} />}
       {prefs && part === "installers" && <Installers prefs={prefs} onChange={setPrefs} />}
       {prefs && (
         <div className="mt-8 flex items-center gap-3">
@@ -249,7 +252,15 @@ function Installers({ prefs, onChange }: { prefs: BusinessPrefs; onChange: (p: B
   );
 }
 
-function Automations({ prefs, onChange }: { prefs: BusinessPrefs; onChange: (p: BusinessPrefs) => void }) {
+function Automations({
+  prefs,
+  mailboxes,
+  onChange,
+}: {
+  prefs: BusinessPrefs;
+  mailboxes: SendingMailbox[];
+  onChange: (p: BusinessPrefs) => void;
+}) {
   const on = prefs.automations.installReminders;
   // The preview is the email as this business's customers get it (25 Nov 2026, Martin: it said "Hi Sarah" and "Your
   // business"): the business's own name and contact from its brand kit, and what changes for each customer marked.
@@ -299,6 +310,7 @@ function Automations({ prefs, onChange }: { prefs: BusinessPrefs; onChange: (p: 
           ))}
         </select>
       </label>
+      <SentFrom prefs={prefs} mailboxes={mailboxes} business={business} onChange={onChange} />
       <details className="mt-4 rounded-md bg-surface-2 px-4 py-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink">See the email</summary>
         <p className="mt-2 text-xs text-muted">The highlighted parts are filled in for each customer.</p>
@@ -326,6 +338,57 @@ function Automations({ prefs, onChange }: { prefs: BusinessPrefs; onChange: (p: 
         Sent once a day, in the morning, to customers whose job has an installation date and an email address.
       </p>
     </section>
+  );
+}
+
+/**
+ * Which mailbox the reminder goes from (25 Nov 2026, Martin: "sent from the [business's] email not from Renuabl"): one
+ * of the mailboxes the business's people connected in Email, so it comes from their address and sits in its Sent, or
+ * RENUABL's sender in the business's name when none is chosen.
+ */
+function SentFrom({
+  prefs,
+  mailboxes,
+  business,
+  onChange,
+}: {
+  prefs: BusinessPrefs;
+  mailboxes: SendingMailbox[];
+  business: string;
+  onChange: (p: BusinessPrefs) => void;
+}) {
+  const chosen = prefs.reminderFrom;
+  const key = (m: { owner: string; address: string }) => `${m.owner}|${m.address}`;
+  const known = chosen ? mailboxes.some((m) => key(m) === key(chosen)) : true;
+  return (
+    <label className={clsx(ui.label, "mt-4 max-w-md")}>
+      Sent from
+      <select
+        className={clsx(ui.input, "mt-1.5")}
+        value={chosen ? key(chosen) : ""}
+        onChange={(e) => {
+          const m = mailboxes.find((b) => key(b) === e.target.value);
+          onChange({ ...prefs, reminderFrom: m ? { owner: m.owner, address: m.address } : null });
+        }}
+      >
+        {mailboxes.map((m) => (
+          <option key={key(m)} value={key(m)}>
+            {m.address} ({m.provider === "outlook" ? "Outlook" : "Gmail"})
+          </option>
+        ))}
+        {chosen && !known && <option value={key(chosen)}>{chosen.address} (not connected)</option>}
+        <option value="">{business} through RENUABL&apos;s sender</option>
+      </select>
+      <span className="mt-1 block text-xs font-normal text-muted">
+        {chosen && known
+          ? `Sent from ${chosen.address}, so it comes from your own address and is kept in its Sent folder. If that mailbox can't send, it goes through RENUABL's sender in your name instead.`
+          : chosen
+            ? `${chosen.address} isn't connected any more, so reminders go through RENUABL's sender in your name until it is connected again in Email.`
+            : mailboxes.length
+              ? "Choose one of your mailboxes to send it from your own address. Through RENUABL's sender it carries your business's name and replies go to your company email."
+              : "To send it from your own address, connect your Gmail or Outlook in Email first. Until then it goes through RENUABL's sender in your name, and replies go to your company email."}
+      </span>
+    </label>
   );
 }
 
