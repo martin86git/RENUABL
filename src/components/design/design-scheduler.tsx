@@ -165,17 +165,35 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
         </p>
       )}
 
-      <div className="mt-3 overflow-x-auto">
-        <div className="grid min-w-[46rem] grid-cols-[3.25rem_repeat(7,minmax(0,1fr))] gap-px overflow-hidden rounded-lg border border-line bg-line">
+      {/* On a phone (24 Nov 2026, Martin: the month ran off the screen, three days showing): the whole week fits the
+          width, each day a letter, a job a short tinted chip; the week view is a list of days down the page. */}
+      {view === "week" && (
+        <PhoneWeek
+          days={cal.days}
+          today={today}
+          jobsOn={on}
+          entries={entries}
+          onJob={setOpen}
+          onEntry={(e) => setEditing({ id: e.id, entry: e })}
+          onAdd={(d) => setEditing({ id: null, entry: blank(d) })}
+        />
+      )}
+      <div className={clsx("mt-3 sm:overflow-x-auto", view === "week" && "max-sm:hidden")}>
+        <div className="grid grid-cols-[1.9rem_repeat(7,minmax(0,1fr))] gap-px overflow-hidden rounded-lg border border-line bg-line sm:min-w-[46rem] sm:grid-cols-[3.25rem_repeat(7,minmax(0,1fr))]">
           <div
-            className="bg-surface px-1.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted"
+            className="bg-surface px-1.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted max-sm:px-0.5 max-sm:text-center max-sm:tracking-normal"
             title="Each week: installations booked against what you can do. Change it in Settings, Installers."
           >
-            Week
+            <span className="max-sm:hidden">Week</span>
+            <span className="sm:hidden">Wk</span>
           </div>
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-            <div key={d} className="bg-surface px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted">
-              {d}
+            <div
+              key={d}
+              className="bg-surface px-2 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted max-sm:px-0 max-sm:text-center max-sm:tracking-normal"
+            >
+              <span className="max-sm:hidden">{d}</span>
+              <span className="sm:hidden">{d[0]}</span>
             </div>
           ))}
           {weeks.map((week) => [
@@ -211,20 +229,20 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
                     }
                   }}
                   className={clsx(
-                    "group relative flex cursor-pointer flex-col gap-0.5 p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun-line",
-                    view === "week" ? "min-h-64" : "min-h-[5.25rem]",
+                    "group relative flex min-w-0 cursor-pointer flex-col gap-0.5 p-1 max-sm:px-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun-line",
+                    view === "week" ? "min-h-64" : "min-h-[5.25rem] max-sm:min-h-[3.75rem]",
                     outside || isWeekend(d) ? "bg-surface-2" : "bg-surface",
                   )}
                 >
                   <p
                     className={clsx(
-                      "pointer-events-none flex items-center text-[11.5px] tabular-nums",
+                      "pointer-events-none flex items-center text-[11.5px] tabular-nums max-sm:justify-center max-sm:text-[11px]",
                       d === today ? "font-semibold text-sun-line" : outside ? "text-muted" : "text-ink-2",
                     )}
                   >
                     {Number(d.slice(8))}
-                    {holiday && <span className="ml-1 truncate text-[10px] font-normal text-muted">{holiday}</span>}
-                    <Plus className="ml-auto size-3.5 text-muted opacity-0 group-hover:opacity-100" aria-hidden />
+                    {holiday && <span className="ml-1 truncate text-[10px] font-normal text-muted max-sm:hidden">{holiday}</span>}
+                    <Plus className="ml-auto size-3.5 max-sm:hidden text-muted opacity-0 group-hover:opacity-100" aria-hidden />
                   </p>
                   {on(d).map((j) => (
                     <button
@@ -232,14 +250,14 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
                       key={j.jobId}
                       onClick={() => setOpen(j.jobId)}
                       className={clsx(
-                        "rounded border-l-[3px] px-1.5 py-0.5 text-left text-[12px] leading-tight hover:brightness-95",
+                        "min-w-0 rounded border-l-[3px] px-1.5 py-0.5 text-left text-[12px] leading-tight hover:brightness-95 max-sm:border-l-2 max-sm:px-0.5 max-sm:text-[9.5px]",
                         TONE[j.state],
                       )}
                       title={j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}
                     >
                       <span className="flex items-center gap-1">
                         <span className="truncate font-medium text-ink">{j.customer}</span>
-                        <span className="ml-auto flex shrink-0 gap-0.5">
+                        <span className="ml-auto flex shrink-0 gap-0.5 max-sm:hidden">
                           {j.checks.map((c) => (
                             <span key={c.key} className={clsx("size-1.5 rounded-full", c.done ? "bg-positive" : "bg-muted")} aria-hidden />
                           ))}
@@ -263,12 +281,12 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
                         key={e.id}
                         onClick={() => setEditing({ id: e.id, entry: e })}
                         className={clsx(
-                          "flex items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight",
+                          "flex min-w-0 items-center gap-1 rounded px-1.5 py-0.5 text-left text-[12px] leading-tight max-sm:px-0.5 max-sm:text-[9.5px]",
                           ENTRY_TONE[e.kind],
                         )}
                         title={`${ENTRY_WORDS[e.kind].label}${e.note ? `: ${e.note}` : ""}`}
                       >
-                        <Icon className={clsx("size-3 shrink-0", e.kind === "tentative" ? "text-sun-line" : "")} aria-hidden />
+                        <Icon className={clsx("size-3 shrink-0 max-sm:hidden", e.kind === "tentative" ? "text-sun-line" : "")} aria-hidden />
                         <span className="truncate">
                           {e.from !== d && "↳ "}
                           {entryLabel(e)}
@@ -295,7 +313,7 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm border border-dashed border-sun-line" /> Tentative
         </span>
-        <span>Click a day to add a tentative install, a day off or a note. Booked dates are set on the deal.</span>
+        <span className="max-sm:basis-full">Tap a day to add a tentative install, a day off or a note. Booked dates are set on the deal.</span>
       </p>
       {editing && (
         <EntryEditor
@@ -535,7 +553,7 @@ function WeekLoad({ booked, tentative, canDo, onOpen }: { booked: number; tentat
       {tentative > 0 && <span className="text-[10.5px] tabular-nums text-sun-ink">+{tentative}</span>}
     </>
   );
-  const box = "flex flex-col items-end justify-start gap-1 bg-surface-2 px-1.5 py-1";
+  const box = "flex min-w-0 flex-col items-end justify-start gap-1 bg-surface-2 px-1.5 py-1 max-sm:items-center max-sm:px-0.5 max-sm:[&>span:first-child]:text-[10px]";
   return onOpen ? (
     <button type="button" onClick={onOpen} title={`${words}. Open this week.`} aria-label={words} className={clsx(box, "hover:bg-surface")}>
       {inner}
@@ -544,5 +562,88 @@ function WeekLoad({ booked, tentative, canDo, onOpen }: { booked: number; tentat
     <div className={box} title={words} aria-label={words}>
       {inner}
     </div>
+  );
+}
+
+/**
+ * The week on a phone: a day a row down the page (24 Nov 2026, Martin: seven columns don't fit), each with its
+ * installs, its entries and a + to add one. The month stays a grid.
+ */
+function PhoneWeek({
+  days,
+  today,
+  jobsOn,
+  entries,
+  onJob,
+  onEntry,
+  onAdd,
+}: {
+  days: ISODate[];
+  today: ISODate;
+  jobsOn: (d: string) => BookedJob[];
+  entries: CalendarEntry[];
+  onJob: (id: string) => void;
+  onEntry: (e: CalendarEntry) => void;
+  onAdd: (d: ISODate) => void;
+}) {
+  return (
+    <ol className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface sm:hidden">
+      {days.map((d) => {
+        const jobs = jobsOn(d);
+        const made = entriesOn(entries, d);
+        const holiday = holidayOn(d);
+        const day = new Date(`${d}T12:00:00`);
+        return (
+          <li key={d} className={clsx("flex gap-3 px-3 py-2.5", isWeekend(d) && "bg-surface-2")}>
+            <div className="w-10 shrink-0 text-center">
+              <p className="text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted">
+                {day.toLocaleDateString("en-AU", { weekday: "short" })}
+              </p>
+              <p className={clsx("text-[18px] tabular-nums leading-tight", d === today ? "font-semibold text-sun-line" : "text-ink")}>
+                {Number(d.slice(8))}
+              </p>
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              {holiday && <p className="text-[11px] text-muted">{holiday}</p>}
+              {jobs.map((j) => (
+                <button
+                  key={j.jobId}
+                  type="button"
+                  onClick={() => onJob(j.jobId)}
+                  className={clsx("block w-full rounded border-l-[3px] px-2 py-1 text-left", TONE[j.state])}
+                >
+                  <span className="block truncate text-[13px] font-medium text-ink">{j.customer}</span>
+                  <span className="block truncate text-[11.5px] text-ink-2">{j.address}</span>
+                  <span className="block text-[10.5px] text-muted">{j.checks.map((c) => `${c.label}: ${c.value}`).join(" · ")}</span>
+                </button>
+              ))}
+              {made.map((e) => {
+                const Icon = KIND_ICON[e.kind];
+                return (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => onEntry(e)}
+                    className={clsx("flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-[12.5px]", ENTRY_TONE[e.kind])}
+                  >
+                    <Icon className={clsx("size-3.5 shrink-0", e.kind === "tentative" ? "text-sun-line" : "")} aria-hidden />
+                    <span className="truncate">{entryLabel(e)}</span>
+                  </button>
+                );
+              })}
+              {jobs.length + made.length === 0 && <p className="pt-1.5 text-[12px] text-muted">Nothing on</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => onAdd(d)}
+              aria-label={`Add to ${d}`}
+              className="inline-flex size-8 shrink-0 items-center justify-center self-start rounded-full text-muted ring-1 ring-line"
+            >
+              <Plus className="size-4" aria-hidden />
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
