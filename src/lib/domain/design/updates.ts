@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
+    area: "Deals",
+    words: "On a phone, choosing whose deals to show opens RENUABL's own menu, not the phone's picker.",
+  },
+  {
+    day: "2026-11-24",
     area: "Proposals",
     words: "On Proposals open and closed, Open the design is now the designer's orange round alone, so the buttons fit a phone.",
   },
