@@ -84,7 +84,6 @@ import {
   FileText,
   Layers,
   SunMedium,
-  Brush,
   House,
   Minus,
   LayoutGrid,
@@ -324,8 +323,6 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
  */
 type SideView = "designer" | "quote" | "proposal";
 const SIDE_KEY = "renuabl.design.side";
-/** Where the device keeps whether the roof is shown drawn (the Drawn view) or as the photo. */
-const ART_KEY = "renuabl.design.drawn-roof";
 const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
   { id: "designer", label: "Designer", hint: "The home's roof, storeys and phase, Sol, and the deal's notes" },
   { id: "quote", label: "Quote", hint: "The quote, worked out as you draw" },
@@ -1590,24 +1587,8 @@ export function RoofDesigner(props: {
   // The Drawn view (10 Nov 2026, Martin): the roof as an illustration in place of the photo, its surroundings a dim
   // ghost of it, panels drawn as panels and the kit on a wall of its own. Made in the browser from what is already
   // loaded (illustrated-roof.tsx). The choice is kept on the device.
-  const [illustrated, setIllustrated] = useState(false);
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (window.localStorage.getItem(ART_KEY) === "1") setIllustrated(true);
-    } catch {
-      // Storage is off: the photo shows.
-    }
-  }, []);
-  const toggleIllustrated = () => {
-    const next = !illustrated;
-    setIllustrated(next);
-    try {
-      window.localStorage.setItem(ART_KEY, next ? "1" : "0");
-    } catch {
-      // Nothing to do: it still changes for this visit.
-    }
-  };
+  // Taken out of the tools (25 Nov 2026, Martin: "it serves no use"): the photo always shows, whatever a device kept.
+  const illustrated = false;
   const ghost = useRoofGhost(props.image, illustrated, ROOF_IMAGE.width, ROOF_IMAGE.height);
   // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
   const [modelFaces, setModelFaces] = useState<DrawnFace[] | "none" | null>(null);
@@ -7080,7 +7061,6 @@ export function RoofDesigner(props: {
           shadeOn={shadeOn}
           onShade={toggleShade}
           drawn={illustrated}
-          onDrawn={toggleIllustrated}
           zooming={zooming}
           {...(solHolds ? { onPitch: () => setPhonePitch((v) => !v) } : {})}
           pitchShown={phonePitch}
@@ -7146,9 +7126,6 @@ export function RoofDesigner(props: {
                   onClick={toggleShade}
                 >
                   <SunMedium className="size-5" aria-hidden />
-                </Leg>
-                <Leg label={illustrated ? "Show the photo" : "Draw the roof"} on={illustrated} onClick={toggleIllustrated}>
-                  <Brush className="size-5" aria-hidden />
                 </Leg>
               </>
             ) : undefined
@@ -9524,7 +9501,7 @@ export function RoofDesigner(props: {
                     )}
                   >
                     <button
-                      onClick={() => illustrated && toggleIllustrated()}
+                      onClick={() => undefined}
                       aria-pressed={!illustrated}
                       aria-label="The roof from above"
                       title="The roof from above"

@@ -13,6 +13,7 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  { day: "2026-11-25", area: "Designer", words: "The Draw the roof view is gone from the designer's tools: the roof is always the photo." },
   {
     day: "2026-11-25",
     area: "Designer",

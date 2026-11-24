@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Columns2,
   LayoutGrid,
-  House,
   Maximize,
   Minus,
   MessageCircle,
@@ -85,7 +84,6 @@ export function SolTray(props: {
   shadeOn: boolean;
   onShade: () => void;
   drawn: boolean;
-  onDrawn: () => void;
   zooming: boolean;
   /** Pinch zoom, on a touch screen only (the desktop has the wheel and its own zoom rounds). */
   onZoom?: () => void;
@@ -182,7 +180,6 @@ export function SolTray(props: {
             </Group>
             <Group title="View">
               <Item icon={<Maximize aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
-              <Item icon={<House aria-hidden />} name={props.drawn ? "Photo" : "Drawn roof"} onClick={then(props.onDrawn)} />
               {props.sides}
               {props.onZoom && <Item icon={<Search aria-hidden />} name="Pinch zoom" on={props.zooming} onClick={then(props.onZoom)} />}
             </Group>
