@@ -154,6 +154,8 @@ export function PipelinesPage() {
   const [pulses, setPulses] = useState<Record<string, DealPulse>>({});
   // Each signed deal's gross margin and commission, from its signed proposal (only sent to members who see costs).
   const [profits, setProfits] = useState<Record<string, DealProfit>>({});
+  // The list's margin and commission columns, once any signed deal has them (they are sent only to who sees costs).
+  const showProfit = Object.keys(profits).length > 0;
 
   useEffect(() => {
     let gone = false;
@@ -847,6 +849,8 @@ export function PipelinesPage() {
                   <th className="px-3 py-3 font-medium">Address</th>
                   <th className="px-3 py-3 font-medium">Stage</th>
                   <th className="px-3 py-3 text-right font-medium">Value</th>
+                  {showProfit && <th className="px-3 py-3 text-right font-medium">Gross margin</th>}
+                  {showProfit && <th className="px-3 py-3 text-right font-medium">Commission</th>}
                   <th className="px-3 py-3 font-medium">Install</th>
                   <th className="px-5 py-3 font-medium">Changed</th>
                 </tr>
@@ -854,14 +858,14 @@ export function PipelinesPage() {
               <tbody>
                 {!jobs && !problem && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-6 text-muted">
+                    <td colSpan={showProfit ? 8 : 6} className="px-5 py-6 text-muted">
                       Loading…
                     </td>
                   </tr>
                 )}
                 {jobs && shown.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-5 py-6 text-ink-2">
+                    <td colSpan={showProfit ? 8 : 6} className="px-5 py-6 text-ink-2">
                       No deals at {stages.length === 1 ? "this stage" : "these stages"}.
                     </td>
                   </tr>
@@ -886,6 +890,20 @@ export function PipelinesPage() {
                       </label>
                     </td>
                     <td className="px-3 py-3 text-right tabular-nums text-ink">{dollars(job.value)}</td>
+                    {showProfit && (
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {profits[job.id] ? (
+                          <span className="font-medium text-positive">{marginWords(profits[job.id])}</span>
+                        ) : (
+                          <span className="text-muted">–</span>
+                        )}
+                      </td>
+                    )}
+                    {showProfit && (
+                      <td className="px-3 py-3 text-right tabular-nums text-ink-2">
+                        {profits[job.id] ? `$${Math.round(profits[job.id].commission).toLocaleString("en-AU")}` : "–"}
+                      </td>
+                    )}
                     <td className="px-3 py-3 tabular-nums text-ink-2">{job.installDate ? shortDate(job.installDate) : "–"}</td>
                     <td className="px-5 py-3 tabular-nums text-ink-2">{shortDate(job.updatedAt)}</td>
                   </tr>
