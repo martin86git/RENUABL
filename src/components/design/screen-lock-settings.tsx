@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LOCK_MINUTES, PIN_MAX, PIN_MIN } from "@/lib/domain/design/screen-lock";
+import { LOCK_MINUTES, PIN_MAX, PIN_MIN, faceIdOn, lockDeviceOf } from "@/lib/domain/design/screen-lock";
 import {
   addPasskey,
   lockNow,
@@ -26,13 +26,16 @@ const day = (iso: string) => new Date(iso).toLocaleDateString("en-AU", { day: "n
 export function ScreenLockSection() {
   const [setup, setSetup] = useState<LockSetup | null>(null);
   const [canFace, setCanFace] = useState(false);
+  const [onComputer, setOnComputer] = useState(false);
   const [pin, setPin] = useState("");
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void lockSetup().then(setSetup);
-    void passkeysWork().then(setCanFace);
+    // Face ID is set up and used on a phone only (24 Nov 2026, Martin); a computer unlocks with the PIN.
+    if (faceIdOn(lockDeviceOf(navigator.userAgent))) void passkeysWork().then(setCanFace);
+    else void Promise.resolve().then(() => setOnComputer(true));
   }, []);
 
   const run = async (work: () => Promise<{ ok: true; setup: LockSetup } | { ok: false; message: string }>, done: string) => {
@@ -66,10 +69,10 @@ export function ScreenLockSection() {
       </h2>
       <p className="mt-1 text-sm text-ink-2">
         You stay signed in, but RENUABL locks after {LOCK_MINUTES.computer} minutes unused on a computer and {LOCK_MINUTES.phone / 60} hours
-        on a phone. Unlock it with Face ID or your PIN instead of signing in again.
+        on a phone. Unlock it with Face ID on your phone, or your PIN on a computer, instead of signing in again.
       </p>
 
-      <h3 className="mt-5 text-[14px] font-medium text-ink">Face ID, Touch ID or Windows Hello</h3>
+      <h3 className="mt-5 text-[14px] font-medium text-ink">Face ID on your phone</h3>
       {setup?.passkeys.length ? (
         <ul className="mt-2 divide-y divide-line rounded-md border border-line">
           {setup.passkeys.map((k) => (
@@ -104,6 +107,10 @@ export function ScreenLockSection() {
         >
           Set up this device
         </button>
+      ) : onComputer ? (
+        <p className="mt-2 text-[13px] text-muted">
+          Set up Face ID from your phone, in Your account there. On this computer, unlock with your PIN.
+        </p>
       ) : (
         <p className="mt-2 text-[13px] text-muted">This browser can&apos;t use Face ID or a passkey. Use a PIN here.</p>
       )}
