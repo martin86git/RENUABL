@@ -21,11 +21,11 @@ import { addEntry, loadEntries, removeEntry, saveEntry } from "@/lib/services/ca
 import { listJobs, type JobLine } from "@/lib/services/crm";
 import { PATHS, ui } from "./design-shell";
 import { EventCard } from "./event-card";
+import { DealPick } from "./deal-pick";
 import { JobCardDialog } from "./job-card";
 import { Segmented } from "./segmented";
 
-const ARROW =
-  "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink";
+const ARROW = "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink";
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
 const KIND_ICON = { tentative: CalendarClock, off: CalendarX, note: StickyNote } as const;
 /** How each kind of entry looks on a day: a tentative install dashed in the signal colour, a day off greyed, a note plain. */
@@ -291,7 +291,10 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
                         )}
                         title={`${ENTRY_WORDS[e.kind].label}${e.note ? `: ${e.note}` : ""}`}
                       >
-                        <Icon className={clsx("size-3 shrink-0 max-sm:hidden", e.kind === "tentative" ? "text-sun-line" : "")} aria-hidden />
+                        <Icon
+                          className={clsx("size-3 shrink-0 max-sm:hidden", e.kind === "tentative" ? "text-sun-line" : "")}
+                          aria-hidden
+                        />
                         <span className="truncate">
                           {e.from !== d && "↳ "}
                           {entryLabel(e)}
@@ -318,7 +321,9 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm border border-dashed border-sun-line" /> Tentative
         </span>
-        <span className="max-sm:basis-full">Tap a day to add a tentative install, a day off or a note. Booked dates are set on the deal.</span>
+        <span className="max-sm:basis-full">
+          Tap a day to add a tentative install, a day off or a note. Booked dates are set on the deal.
+        </span>
       </p>
       {editing && (
         <EntryEditor
@@ -349,7 +354,8 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
   );
 }
 
-const field = "mt-1 w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-ink-2 focus:outline-none";
+const field =
+  "mt-1 w-full min-w-0 appearance-none rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink focus:border-ink-2 focus:outline-none";
 const label = "block text-[12px] font-medium text-ink-2";
 
 /** Making or changing an entry: its kind, its days, a deal for a tentative install, who, words and a note. */
@@ -410,7 +416,7 @@ function EntryEditor({
         role="dialog"
         aria-modal="true"
         aria-label={editing.id ? "Change this entry" : "Add to the calendar"}
-        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-lift ring-1 ring-line"
+        className="max-h-[80dvh] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl bg-surface p-5 shadow-lift ring-1 ring-line"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -438,7 +444,7 @@ function EntryEditor({
           />
           <p className="mt-1.5 text-[12px] text-muted">{ENTRY_WORDS[entry.kind].hint}</p>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-2 gap-3 [&>*]:min-w-0">
           <label className={label}>
             {entry.from === entry.to ? "Day" : "First day"}
             <input
@@ -463,17 +469,10 @@ function EntryEditor({
           </label>
         </div>
         {entry.kind === "tentative" && (
-          <label className={clsx(label, "mt-3")}>
+          <div className={clsx(label, "mt-3")}>
             For a deal (optional)
-            <select value={entry.jobId ?? ""} onChange={(e) => set({ jobId: e.target.value || null })} className={field}>
-              <option value="">{deals ? "No deal yet" : "Loading deals…"}</option>
-              {choices.map((j) => (
-                <option key={j.id} value={j.id}>
-                  {j.customerName} · {(j.address || j.title).split(",")[0]}
-                </option>
-              ))}
-            </select>
-          </label>
+            <DealPick deals={deals ? choices : null} value={entry.jobId ?? null} onChange={(id) => set({ jobId: id })} />
+          </div>
         )}
         <div className="mt-3 grid grid-cols-2 gap-3">
           <label className={label}>
@@ -558,7 +557,8 @@ function WeekLoad({ booked, tentative, canDo, onOpen }: { booked: number; tentat
       {tentative > 0 && <span className="text-[10.5px] tabular-nums text-sun-ink">+{tentative}</span>}
     </>
   );
-  const box = "flex min-w-0 flex-col items-end justify-start gap-1 bg-surface-2 px-1.5 py-1 max-sm:items-center max-sm:px-0.5 max-sm:[&>span:first-child]:text-[10px]";
+  const box =
+    "flex min-w-0 flex-col items-end justify-start gap-1 bg-surface-2 px-1.5 py-1 max-sm:items-center max-sm:px-0.5 max-sm:[&>span:first-child]:text-[10px]";
   return onOpen ? (
     <button type="button" onClick={onOpen} title={`${words}. Open this week.`} aria-label={words} className={clsx(box, "hover:bg-surface")}>
       {inner}
@@ -640,7 +640,9 @@ function PhoneWeek({
                 );
               })}
               {jobs.length + made.length === 0 && (
-                <p className="pt-1.5 text-[12px] text-muted">{always ? "Nothing booked. Tap + to add a tentative install, a day off or a note." : "Nothing on"}</p>
+                <p className="pt-1.5 text-[12px] text-muted">
+                  {always ? "Nothing booked. Tap + to add a tentative install, a day off or a note." : "Nothing on"}
+                </p>
               )}
             </div>
             <button
