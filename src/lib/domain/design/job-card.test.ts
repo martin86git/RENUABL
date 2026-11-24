@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   cardHeadline,
+  cardHeadlineLines,
+  cardSections,
   JOB_FILES_MAX,
   cleanInstallers,
   cleanNoteText,
@@ -115,5 +117,32 @@ describe("cardHeadline", () => {
     expect(cardHeadline({ kw: 6.6, batteryKwh: 10 })).toBe("Solar 6.6 kW & Battery 10 kWh");
     expect(cardHeadline({ kw: null, batteryKwh: 12.8 })).toBe("Battery 12.8 kWh");
     expect(cardHeadline({ kw: 0, batteryKwh: null })).toBeNull();
+  });
+});
+
+describe("the card's system in parts", () => {
+  it("puts each line under its part, racking after the charger, empty parts left out", () => {
+    const s = cardSections(
+      [
+        { key: "battery", label: "Battery", value: "Sigenergy 8 kWh" },
+        { key: "storeys", label: "Property storeys", value: "Single" },
+        { key: "panelQty", label: "Panel qty", value: "22" },
+        { key: "mystery", label: "Other", value: "x" },
+      ],
+      [
+        { name: "Tile roof kits", qty: 6 },
+        { name: "Rail splices", qty: 0 },
+      ],
+    );
+    expect(s.map((x) => x.part)).toEqual(["home", "solar", "battery", "racking", "site"]);
+    expect(s.find((x) => x.part === "racking")!.rows).toEqual([{ label: "Tile roof kits", value: "6" }]);
+  });
+
+  it("makes a line for each of solar and battery", () => {
+    expect(cardHeadlineLines({ kw: 10.45, batteryKwh: 16 })).toEqual([
+      { part: "solar", words: "Solar 10.45 kW" },
+      { part: "battery", words: "Battery 16 kWh" },
+    ]);
+    expect(cardHeadlineLines({ kw: null, batteryKwh: null })).toEqual([]);
   });
 });
