@@ -249,6 +249,12 @@
   .studio-frame .studio-pad:has(> [data-rails-out]) .pad-cap {
     display: none;
   }
+  /* The section's pages stand over the cap (24 Nov 2026, Martin: the feed, now under Sales, carries Today's strip, whose
+     68px cap covered Feed, Pipeline and the proposals). */
+  .studio-frame .studio-pad > .studio-pages {
+    position: relative;
+    z-index: 16;
+  }
   .studio-frame:not(:has([data-rails-out])) .pad-under {
     height: 36px !important;
   }
