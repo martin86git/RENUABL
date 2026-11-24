@@ -15,7 +15,7 @@ describe("the tour of a deal", () => {
   });
   it("covers what a deal's page holds", () => {
     const text = DEAL_TOUR.map((s) => `${s.what} ${s.now}`).join(" ");
-    for (const word of ["Sol", "Design", "Proposal", "Call", "Email", "Files", "Details", "Notes", "stage", "job card", "Service"])
+    for (const word of ["Sol", "Design", "Proposal", "Call", "Email", "Files", "Details", "Timeline", "stage", "job card", "Service"])
       expect(text).toContain(word);
   });
   it("keeps each step short and makes no claims", () => {
