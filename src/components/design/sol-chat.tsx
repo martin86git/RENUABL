@@ -2,7 +2,7 @@
 
 import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useNameHintBox } from "./name-hint-box";
 import { ArrowUpRight, Bell, CornerUpLeft, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
@@ -13,6 +13,7 @@ import { currentPageContext } from "@/lib/services/page-context";
 import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
+import { panelTurns } from "@/lib/domain/design/sol-rooms";
 import {
   MAX_FILES,
   MAX_SAID,
@@ -269,7 +270,8 @@ export function SolChat({
       ? jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, dealAt.query)).slice(0, 6)
       : [];
 
-  const turns = state?.turns ?? [];
+  // His panel's and page's own conversation: what was asked on Today stays on Today (sol-rooms.ts).
+  const turns = useMemo(() => panelTurns(state?.turns ?? []), [state]);
   const inducting = state?.induction?.status === "pending";
   const unread = state?.unread ?? 0;
   // Only a real answer (one that took credits) to the latest question can be tried again.
@@ -1094,7 +1096,7 @@ function Bubble({
 }
 
 /** A reminder Sol has taken: until a time is chosen, the times on offer and "Another time"; then when it is due. */
-function ReminderCard({
+export function ReminderCard({
   ask,
   busy,
   choose,

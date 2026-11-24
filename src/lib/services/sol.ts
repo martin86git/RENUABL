@@ -29,7 +29,8 @@ export const askSol = (text: string, files: SolFile[], page?: PageContext | null
     ...(room ? { room } : {}),
   });
 /** Try another answer: his last answer replaced by a new one to the same question, a different way. */
-export const retrySol = (page?: PageContext | null) => post({ do: "retry", ...(page ? { page } : {}) });
+export const retrySol = (page?: PageContext | null, room?: SolRoom) =>
+  post({ do: "retry", ...(page ? { page } : {}), ...(room ? { room } : {}) });
 export const solSeen = () => post({ do: "seen" });
 export const clearSolChat = () => post({ do: "clear" });
 export const remindAt = (id: string, when: WhenChoice) => post({ do: "remind", id, when });

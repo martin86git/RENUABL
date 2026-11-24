@@ -20,6 +20,7 @@ import {
   type SolState,
   type SolTurn,
 } from "@/lib/domain/design/sol";
+import { panelTurns } from "@/lib/domain/design/sol-rooms";
 import {
   ASK_EACH_TIME,
   cleanInduction,
@@ -133,7 +134,8 @@ const stateOf = (row: Row, side: BusinessSide): SolState => ({
   turns: row.turns,
   prefs: row.prefs,
   reminders: upcoming(row.reminders),
-  unread: unreadOf(row.turns, row.seenAt),
+  // Today's answers are read where they are given: only the panel's own count (sol-rooms.ts).
+  unread: unreadOf(panelTurns(row.turns), row.seenAt),
   chats: chatsSoFar(row.pastCount, row.turns),
   businessPrefs: side.prefs,
   induction: { status: row.induction.status, scope: side.scope, owner: side.owner, firstName: side.firstName, business: side.business },

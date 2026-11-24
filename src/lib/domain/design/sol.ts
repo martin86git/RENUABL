@@ -19,7 +19,7 @@ import { SOL_REGULATIONS } from "./standards";
 import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
 import { cleanGoTo, type SolGoTo } from "./sol-goto";
-import { cleanNewCase, cleanRoom, type NewCaseAsk, type SolRoom } from "./sol-rooms";
+import { cleanNewCase, cleanRoom, sameTalk, type NewCaseAsk, type SolRoom } from "./sol-rooms";
 import { cleanLearnAsk, prefsBlock, SOL_LEARNING, type BusinessScope, type Induction, type LearnAsk } from "./sol-induction";
 
 export const SOL_NAME = "Sol";
@@ -126,11 +126,14 @@ export function withoutLastExchange(turns: readonly SolTurn[]): { turns: SolTurn
   return { turns: dropExchange(turns, turns[at].at), question: turns[at], answer };
 }
 
-/** The conversation without the question said at `questionAt` and everything not pinned after it. */
+/**
+ * The conversation without the question said at `questionAt` and everything not pinned after it in the same
+ * conversation (sol-rooms.ts: what was said since on Today or in the panel, whichever it wasn't asked in, stays).
+ */
 export function dropExchange(turns: readonly SolTurn[], questionAt: string): SolTurn[] {
   const at = turns.findIndex((t) => t.role === "you" && t.at === questionAt);
   if (at < 0) return [...turns];
-  return [...turns.slice(0, at), ...turns.slice(at + 1).filter((t) => t.pinned)];
+  return [...turns.slice(0, at), ...turns.slice(at + 1).filter((t) => t.pinned || !sameTalk(turns[at], t))];
 }
 
 /** What Sol is told when asked again: the answer they didn't take, and to come at it another way. */
