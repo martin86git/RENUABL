@@ -263,9 +263,7 @@ function SentList({ rows, now, days, query }: { rows: ProposalLine[]; now: Date;
                 <SentOn at={r.publishedAt} now={now} />
                 <div className="flex flex-wrap gap-2 sm:flex-col sm:items-stretch">
                   <ProposalLink line={r} />
-                  <Link href={`${PATHS.deals}/${r.jobId}?design=1`} className={clsx(ui.quiet, "h-8 rounded-full px-3 text-xs")}>
-                    <PenTool className="size-3.5" aria-hidden /> Open the design
-                  </Link>
+                  <DesignRound jobId={r.jobId} />
                 </div>
               </div>
             </li>
@@ -776,9 +774,7 @@ function SignedRow({ r, now }: { r: ProposalLine; now: Date }) {
           <Download className="size-3.5" aria-hidden /> Signed PDF
         </a>
         <ProposalLink line={r} />
-        <Link href={`${PATHS.deals}/${r.jobId}?design=1`} className={clsx(ui.quiet, "h-8 rounded-full px-3 text-xs")}>
-          <PenTool className="size-3.5" aria-hidden /> Open the design
-        </Link>
+        <DesignRound jobId={r.jobId} />
       </div>
     </li>
   );
@@ -843,5 +839,19 @@ export function Tile({ label, value, tone }: { label: string; value: string; ton
         {value}
       </p>
     </div>
+  );
+}
+
+/** The designer as an orange round, no words (24 Nov 2026, Martin: "Open the design" didn't fit on a phone). */
+function DesignRound({ jobId }: { jobId: string }) {
+  return (
+    <Link
+      href={`${PATHS.deals}/${jobId}?design=1`}
+      title="Open the design"
+      aria-label="Open the design"
+      className="grid size-8 shrink-0 place-items-center rounded-full bg-sun-line text-white shadow-sm hover:brightness-95"
+    >
+      <PenTool className="size-4" aria-hidden />
+    </Link>
   );
 }
