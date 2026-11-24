@@ -150,7 +150,7 @@ export function HubSpotImportSettings() {
 
       <div className="mt-6 rounded-2xl border border-line bg-surface p-5">
         <p className="flex items-center gap-2 text-[15px] font-medium text-ink">
-          <KeyRound className="size-4 text-muted" aria-hidden /> Your HubSpot private app token
+          <KeyRound className="size-4 text-muted" aria-hidden /> Your HubSpot service key or private app token
         </p>
         <p className="mt-1 text-sm text-ink-2">{HUBSPOT_WORDS.keyHow}</p>
         <ul className="mt-2 flex flex-wrap gap-1.5">
@@ -181,8 +181,8 @@ export function HubSpotImportSettings() {
             spellCheck={false}
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            placeholder="pat-…"
-            aria-label="HubSpot private app token"
+            placeholder="Paste the key"
+            aria-label="HubSpot service key or private app token"
             className={clsx(ui.input, "min-w-0 flex-1 font-mono")}
             disabled={run?.running}
           />

@@ -14,7 +14,6 @@ import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
 import {
-  MAX_FILE_CHARS,
   MAX_FILES,
   MAX_SAID,
   SOL_FILE_TYPES,
@@ -60,6 +59,7 @@ import { SolKnows } from "./sol-knows";
 import { SolStart } from "./sol-start";
 import { useDesignAccount } from "./design-account";
 import { SolThinking, SolWorking } from "./sol-thinking";
+import { filesFromPaste, fitForSol } from "./sol-attach";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { MeetingCard } from "./meeting-card";
@@ -227,6 +227,10 @@ export function SolChat({
   const [replyTo, setReplyTo] = useState<SolReply | null>(null);
   const [heard, setHeard] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const filesNow = useRef<File[]>([]);
+  useEffect(() => {
+    filesNow.current = files;
+  }, [files]);
   const [fileProblem, setFileProblem] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -330,14 +334,13 @@ export function SolChat({
     if (dealAt && jobs === null) void listJobs().then((r) => setJobs(r.ok ? r.jobs : []));
   }, [dealAt, jobs]);
 
-  const addFiles = (list: FileList | null) => {
+  const addFiles = async (list: readonly File[]) => {
     setFileProblem("");
-    const picked = Array.from(list ?? []).filter((f) => (SOL_FILE_TYPES as readonly string[]).includes(f.type));
-    if (list && picked.length < list.length) setFileProblem("Sol reads PDFs and pictures (PNG, JPG, WebP, GIF).");
-    const next = [...files, ...picked].slice(0, MAX_FILES);
-    if (next.reduce((n, f) => n + f.size, 0) * 1.37 > MAX_FILE_CHARS) setFileProblem("Those are too big together: send one at a time.");
-    else setFiles(next);
     if (picker.current) picker.current.value = "";
+    const r = await fitForSol(filesNow.current, list);
+    filesNow.current = r.files;
+    setFiles(r.files);
+    setFileProblem(r.problem);
   };
 
   /** `shown`: the short line the chat shows for a long instruction sent for them; the words still go to Sol. */
@@ -805,10 +808,17 @@ export function SolChat({
               multiple
               accept={SOL_FILE_TYPES.join(",")}
               className="hidden"
-              onChange={(e) => addFiles(e.target.files)}
+              onChange={(e) => void addFiles(Array.from(e.target.files ?? []))}
             />
             <textarea
               ref={box}
+              onPaste={(e) => {
+                // A screenshot pasted with Ctrl V or ⌘ V goes on the message; pasted words carry on as usual.
+                const got = filesFromPaste(e);
+                if (!got.length) return;
+                e.preventDefault();
+                void addFiles(got);
+              }}
               value={heard ? withSpoken(text, heard) : text}
               onChange={(e) => {
                 setHeard("");
