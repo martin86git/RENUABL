@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
   ArrowLeft,
@@ -306,6 +307,16 @@ function CoachWindowFor() {
   // Open full, it tells the phone's header to make its wordmark smaller, and the window stops below that header
   // (22 Nov 2026, Martin: the half-covered RENUABL looked like a mistake; `.coach-window` in globals.css).
   const shown = !!state && !small;
+  // On a phone, going to another page from inside it (Open deal, a contact's deal) folds it to its bar, so the page it
+  // opened is seen and nothing (the deal's tour) starts under it (24 Nov 2026, Martin).
+  const path = usePathname();
+  const lastPath = useRef(path);
+  useEffect(() => {
+    if (lastPath.current === path) return;
+    lastPath.current = path;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect -- folds once when the page changes under it */
+    if (window.matchMedia("(max-width: 1023px)").matches) setSmall(true);
+  }, [path]);
   useEffect(() => {
     if (!shown) return;
     const root = document.documentElement;
