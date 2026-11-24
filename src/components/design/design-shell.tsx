@@ -1004,7 +1004,8 @@ function Shell({
           {children}
         </div>
       ) : (
-        <div className="px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
+        // `studio-room`: beside Sol's panel the pad keeps clear of the floating bar and of the panel (globals.css).
+        <div className="studio-room px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
           <div data-tour="pad" data-sol-page className={PAD}>
             {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad
                 disappeared): its own grey with its rounded corners, drawn on a wide screen only (globals.css .pad-cap). */}

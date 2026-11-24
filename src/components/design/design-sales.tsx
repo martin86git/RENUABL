@@ -392,7 +392,7 @@ export function PipelinesPage() {
   ).map(([view, name, Icon]) => ({ view, name, Icon }));
 
   return (
-    <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10">
+    <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10 lg:pt-0">
       {/* On a phone (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can
           dock / spawn off of it"): the Deals switch's Pipeline segment is the pipeline picker, its count and worth under
           the name, and whose deals, cards or list and New deal hang under it as a tray; no card of their own. */}
@@ -477,7 +477,7 @@ export function PipelinesPage() {
       />
       <PhoneDealsSwitch path={PATHS.pipelines} className="-mt-1 mb-4 hidden sm:block lg:hidden" />
 
-      <div className="hidden sm:block">
+      <div className="hidden sm:block lg:-mt-2">
         <PageHead eyebrow="CRM · Deals" title={named.name}>
           {leadAt < 0 && (
             <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
@@ -589,7 +589,7 @@ export function PipelinesPage() {
           style={boardTop === null ? undefined : ({ "--board-top": `${boardTop}px` } as React.CSSProperties)}
           // On a phone (22 Nov 2026, Martin: cards could be dragged around the page): the board only slides sideways, with
           // the phone's own momentum and a soft settle on a column, and each column scrolls its cards under a fixed head.
-          className="no-scrollbar -mx-1.5 mt-3 flex snap-x snap-proximity scroll-px-1.5 gap-2.5 px-1.5 pb-4 max-sm:h-[calc(100dvh-var(--board-top)-8.5rem)] max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:overscroll-x-contain sm:mx-0 sm:max-h-[calc(100dvh-var(--board-top)-1rem)] sm:snap-none sm:gap-3 sm:overflow-auto sm:px-0"
+          className="deal-board -mx-1.5 mt-3 flex snap-x snap-proximity scroll-px-1.5 gap-2.5 px-1.5 pb-4 max-sm:h-[calc(100dvh-var(--board-top)-8.5rem)] max-sm:overflow-x-auto max-sm:overflow-y-hidden max-sm:overscroll-x-contain sm:mx-0 sm:max-h-[calc(100dvh-var(--board-top)-1rem)] sm:snap-none sm:gap-3 sm:overflow-auto sm:px-0"
         >
           {stages.map((stage, at) => {
             // Deals still being sold in the order to ring (as Primero's): the warmest and nearest their end first.
@@ -625,7 +625,7 @@ export function PipelinesPage() {
                   setColOver(null);
                 }}
                 className={clsx(
-                  "relative flex w-[64%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 max-sm:min-h-0 max-sm:pb-0 sm:w-auto sm:min-w-72 sm:flex-1 sm:shrink sm:basis-72 sm:rounded-lg",
+                  "relative flex w-[64%] shrink-0 snap-start flex-col rounded-xl border bg-surface-2 p-2 pt-2.5 max-sm:min-h-0 max-sm:pb-0 sm:w-[17rem] sm:min-w-[17rem] sm:rounded-lg",
                   over === stage ? "border-sun-line" : "border-transparent",
                   movingCol === stage && "opacity-50",
                 )}
@@ -690,7 +690,7 @@ export function PipelinesPage() {
                       }}
                       onClick={() => router.push(dealOf(job))}
                       className={clsx(
-                        "cursor-pointer rounded-md bg-surface p-2.5 max-sm:px-2.5 max-sm:py-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
+                        "cursor-pointer rounded-md bg-surface px-2.5 py-2 shadow-[var(--shadow-soft)] ring-1 ring-line hover:ring-ink-2 active:cursor-grabbing",
                         dragging === job.id && "opacity-60",
                       )}
                     >
@@ -716,15 +716,11 @@ export function PipelinesPage() {
                         end={
                           <span className="flex items-center gap-1.5">
                             {/* On a phone the card's last row folds into this one (23 Nov 2026, Martin: smaller cards). */}
-                            {job.owner && (
-                              <span className="sm:hidden">
-                                <Owner email={job.owner} />
-                              </span>
-                            )}
+                            {job.owner && <Owner email={job.owner} />}
                             {job.sample ? (
                               <span
                                 title={SAMPLE_DEAL_HINT}
-                                className="rounded-full bg-sun px-1.5 py-0.5 font-medium text-sun-ink ring-1 ring-sun-line/30 sm:hidden"
+                                className="rounded-full bg-sun px-1.5 py-0.5 font-medium text-sun-ink ring-1 ring-sun-line/30"
                               >
                                 Tour
                               </span>
@@ -739,7 +735,7 @@ export function PipelinesPage() {
                                 onClick={(e) => e.stopPropagation()}
                                 aria-label={job.projectId ? `Open ${job.customerName}'s design` : `Design ${job.customerName}'s roof`}
                                 title={job.projectId ? "Open design" : "Design it"}
-                                className="tap-area inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sun-line/12 text-sun-line sm:hidden"
+                                className="tap-area inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sun-line/12 text-sun-line hover:bg-sun-line hover:text-white"
                               >
                                 <PenTool className="size-3" aria-hidden />
                               </Link>
@@ -747,38 +743,6 @@ export function PipelinesPage() {
                           </span>
                         }
                       />
-                      {job.sample && (
-                        <p className="mt-1.5 truncate rounded-full bg-sun px-2.5 py-1 text-[11px] font-medium text-sun-ink ring-1 ring-sun-line/30 max-sm:hidden">
-                          {SAMPLE_DEAL_HINT}
-                        </p>
-                      )}
-                      {/* One row: who owns it, its stage (changed here on a computer) and the designer's round. */}
-                      <div className="mt-2 hidden items-center gap-1.5 sm:flex">
-                        <Owner email={job.owner} />
-                        <label className="hidden min-w-0 flex-1 sm:block" onClick={(e) => e.stopPropagation()}>
-                          <span className="sr-only">Stage of {job.customerName}&apos;s deal</span>
-                          {stagePicker(
-                            job,
-                            stageSelect
-                              .replace("h-8", "h-6")
-                              .replace("px-2", "px-1.5")
-                              .replace("text-xs", "text-[11px]")
-                              .replace("rounded-md", "rounded"),
-                          )}
-                        </label>
-                        <span className="flex-1 sm:hidden" />
-                        {job.lat !== null && (
-                          <Link
-                            href={`${PATHS.designer}?job=${job.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={job.projectId ? `Open ${job.customerName}'s design` : `Design ${job.customerName}'s roof`}
-                            title={job.projectId ? "Open design" : "Design it"}
-                            className="tap-area inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-sun-line/12 text-sun-line hover:bg-sun-line hover:text-white"
-                          >
-                            <PenTool className="size-3.5" aria-hidden />
-                          </Link>
-                        )}
-                      </div>
                     </li>
                   ))}
                 </ul>
@@ -1096,9 +1060,12 @@ function AddStageColumn({
           setAfter(stages.length - 1);
           setOpen(true);
         }}
-        className="flex min-h-24 w-56 shrink-0 items-start justify-center gap-1.5 rounded-lg border border-dashed border-line px-3 py-4 text-[13px] font-medium text-ink-2 hover:border-ink-2 hover:text-ink"
+        className="group flex h-44 w-44 shrink-0 self-start flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sun-line/60 bg-sun-line/[0.06] px-3 py-6 text-[14px] font-semibold text-sun-line transition-colors hover:border-sun-line hover:bg-sun-line/12"
       >
-        <Plus className="size-4" aria-hidden /> Add a stage
+        <span className="flex size-11 items-center justify-center rounded-full bg-sun-line text-white shadow-[var(--shadow-soft)] transition-transform group-hover:scale-105">
+          <Plus className="size-6" strokeWidth={2.5} aria-hidden />
+        </span>
+        Add a stage
       </button>
     );
   return (

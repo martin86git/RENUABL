@@ -3,6 +3,7 @@ import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { askSol, chooseReminderTime, retrySol } from "@/lib/server/design-sol";
 import { cleanPageContext } from "@/lib/domain/design/page-context";
+import { cleanRoom } from "@/lib/domain/design/sol-rooms";
 import { cleanAnswer, cleanScope } from "@/lib/domain/design/sol-induction";
 import {
   answerInduction,
@@ -30,7 +31,7 @@ export const maxDuration = 180;
 /**
  * Sol, the member's own conversation (domain/design/sol.ts). GET → { state }, saying any reminder now due first (the
  * rail asks every minute for its count). POST { do } → { state }: "chat" { text, files } asks Sol; "seen" marks the
- * conversation seen; "retry" { page } asks his last answer's question again, a different way; "clear" clears it (preferences and reminders stay); "remind" { id, when } sets a reminder's time
+ * conversation seen; "retry" { page, room } asks his last answer's question again, a different way; "clear" clears it (preferences and reminders stay); "remind" { id, when } sets a reminder's time
  * from the card; "forget-reminder" { id } and "forget-pref" { id } take one off; "past", "past-open" { id }, "new",
  * "resume" { id } and "forget-past" { id } are the past conversations. Each member reads and changes only their own.
  */
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
         if (!allow(request, "design-sol", 120))
           return Response.json({ ok: false, message: "That's a lot of questions this hour: try again shortly." }, { status: 429 });
         const page = cleanPageContext(body.page) ?? undefined;
-        const state = await retrySol(who.member, page, parseApiKey(process.env.ANTHROPIC_API_KEY));
+        const state = await retrySol(who.member, page, parseApiKey(process.env.ANTHROPIC_API_KEY), cleanRoom(body.room));
         return state ? ok(state) : Response.json({ ok: false, message: "There's no answer of Sol's to try again." }, { status: 422 });
       }
       case "seen":

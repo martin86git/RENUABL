@@ -86,7 +86,10 @@ export function SetupWizard() {
   return (
     <div className="theme-studio contents">
       {!open && setupOffered(view, data.putAway) && (
-        <div className="fixed bottom-4 left-4 z-30 hidden items-center gap-1 rounded-full bg-surface py-1.5 pl-1.5 pr-1 shadow-lift ring-1 ring-line print:hidden sm:flex">
+        <div
+          data-corner-pill
+          className="fixed bottom-4 left-4 z-30 hidden items-center gap-1 rounded-full bg-surface py-1.5 pl-1.5 pr-1 shadow-lift ring-1 ring-line print:hidden sm:flex"
+        >
           <button type="button" onClick={start} className="flex items-center gap-2.5 rounded-full pr-2 text-left">
             <span className="sol-orb flex size-9 shrink-0 items-center justify-center">
               <SolMark className="size-9" />

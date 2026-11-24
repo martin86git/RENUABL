@@ -16,6 +16,16 @@ export const UPDATES: readonly Update[] = [
   { day: "2026-11-24", area: "Sol", words: "A screenshot pasted into Sol's box now shows as a preview inside the box." },
   {
     day: "2026-11-24",
+    area: "Sol",
+    words: "With Sol open beside a page, the page refits: nothing sits under him or the floating bar, and Settings keeps a tidy gap.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Today's chat with Sol and his side panel are now two separate conversations: what you ask in one doesn't show in the other.",
+  },
+  {
+    day: "2026-11-24",
     area: "Proposals",
     words: "Search your open and closed proposals, and each sale now shows the day it was signed, with when the last one was at the top.",
   },

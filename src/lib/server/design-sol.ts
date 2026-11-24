@@ -855,7 +855,7 @@ export async function askSol(
   const messages: Anthropic.MessageParam[] = [
     // Asked again: the conversation as it was before that question, so the answer not taken isn't in it twice.
     // Asked from a screen with its own conversation, only that room's turns (sol-rooms.ts).
-    ...(said.shared ? [] : said.retry ? dropExchange(state.turns, said.retry.questionAt) : historyFor(state.turns, said.room))
+    ...(said.shared ? [] : historyFor(said.retry ? dropExchange(state.turns, said.retry.questionAt) : state.turns, said.room))
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
     { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
@@ -1025,8 +1025,14 @@ export async function askSol(
  * replaces the old one (and its question moves to now). Only the question's words are asked again: files sent with it
  * aren't sent a second time. Null when there's no answer to try again.
  */
-export async function retrySol(member: Member, page: PageContext | undefined, apiKey: string | null): Promise<SolState | null> {
-  const taken = withoutLastExchange((await solState(member.businessId, member.email)).turns);
+export async function retrySol(
+  member: Member,
+  page: PageContext | undefined,
+  apiKey: string | null,
+  room?: SolRoom,
+): Promise<SolState | null> {
+  // The last exchange of the conversation it was pressed in: Today's, a room's, or the panel's (sol-rooms.ts).
+  const taken = withoutLastExchange(historyFor((await solState(member.businessId, member.email)).turns, room));
   if (!taken) return null;
   return askSol(
     member,
@@ -1038,6 +1044,7 @@ export async function retrySol(member: Member, page: PageContext | undefined, ap
       ...(taken.answer.deep ? { deep: true } : {}),
       ...(taken.question.shown ? { shown: taken.question.shown } : {}),
       retry: { questionAt: taken.question.at, answer: taken.answer.text },
+      ...(room ? { room } : {}),
     },
     apiKey,
   );
