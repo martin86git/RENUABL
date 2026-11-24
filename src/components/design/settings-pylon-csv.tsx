@@ -15,7 +15,7 @@ import {
   type PylonOutcome,
 } from "@/lib/domain/design/pylon-import";
 import { todayInMarket } from "@/lib/domain/market";
-import { bringCsvRows, checkPylonCsv } from "@/lib/services/pylon-import";
+import { bringCsvRows, checkPylonCsv, givePylonOwners } from "@/lib/services/pylon-import";
 import { PATHS, ui } from "./design-shell";
 
 type Loaded = { name: string; sold: PylonCsvRow[]; all: number; already: Set<string> };
@@ -131,6 +131,8 @@ export function PylonCsvImport() {
             Of {n(loaded.all)} projects. The {n(loaded.all - loaded.sold.length)} that weren&rsquo;t sold aren&rsquo;t brought in.
           </p>
 
+          {loaded.already.size > 0 && <GiveToSellers rows={loaded.sold.filter((r) => loaded.already.has(r.id))} />}
+
           {toBring.length > 0 && (
             <fieldset className="mt-4" disabled={run?.running}>
               <legend className={ui.label}>Which are still to install?</legend>
@@ -202,6 +204,60 @@ export function PylonCsvImport() {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Deals already brought in, given to whoever sold them in Pylon (24 Nov 2026, Martin: a salesperson added after the
+ * import, as a member or a deal owner not invited yet). Only to someone in Your account; only deals with no owner yet
+ * or still owned by whoever brought them in.
+ */
+function GiveToSellers({ rows }: { rows: PylonCsvRow[] }) {
+  const [state, setState] = useState<{ busy: boolean; said: string | null }>({ busy: false, said: null });
+  const sellers = new Map<string, { name: string; count: number }>();
+  for (const r of rows) {
+    if (!r.ownerEmail) continue;
+    const s = sellers.get(r.ownerEmail) ?? { name: r.owner || r.ownerEmail, count: 0 };
+    sellers.set(r.ownerEmail, { ...s, count: s.count + 1 });
+  }
+  if (!sellers.size) return null;
+  const give = async () => {
+    setState({ busy: true, said: null });
+    const pairs = rows.filter((r) => r.ownerEmail).map((r) => ({ id: r.id, ownerEmail: r.ownerEmail }));
+    let given = 0;
+    for (let i = 0; i < pairs.length; i += 500) {
+      const res = await givePylonOwners(pairs.slice(i, i + 500));
+      if (!res.ok) return setState({ busy: false, said: res.message });
+      given += res.given;
+    }
+    setState({
+      busy: false,
+      said: given
+        ? `${given.toLocaleString("en-AU")} deal${given === 1 ? "" : "s"} given to the people who sold them.`
+        : "No deals changed hands. Add the seller in Your account first (Deal owners not invited yet), with the email Pylon has for them.",
+    });
+  };
+  return (
+    <div className="mt-4 rounded-xl border border-line px-4 py-3">
+      <p className="text-sm font-medium text-ink">Give the deals already brought in to who sold them</p>
+      <p className="mt-1 text-sm text-ink-2">
+        Sold by{" "}
+        {[...sellers.values()]
+          .slice(0, 6)
+          .map((s) => `${s.name} (${s.count})`)
+          .join(", ")}
+        {sellers.size > 6 ? ` and ${sellers.size - 6} more` : ""}. Only to people in Your account, as members or deal owners not invited
+        yet, matched by their Pylon email. A deal someone has already been given is left alone.
+      </p>
+      <button type="button" className={clsx(ui.quiet, "mt-2")} disabled={state.busy} onClick={() => void give()}>
+        {state.busy ? "Giving them out…" : "Give them to their sellers"}
+      </button>
+      {state.said && (
+        <p className="mt-2 text-sm text-ink-2" role="status">
+          {state.said}
+        </p>
       )}
     </div>
   );

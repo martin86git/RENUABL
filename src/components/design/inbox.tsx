@@ -43,6 +43,7 @@ import {
   type EmailAction,
   type InboxEmail,
   type InboxFilter,
+  framedEmail,
 } from "@/lib/domain/design/inbox";
 import {
   changeInboxEmail,
@@ -1134,21 +1135,33 @@ function EmailView({
         !problem && <p className="text-sm text-muted">Opening…</p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <article className={clsx(ui.card, "min-w-0 p-5")}>
-            <h1 className="text-xl font-semibold tracking-tight text-ink">{email.subject}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <span className="flex size-9 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white" aria-hidden>
+          <article className={clsx(ui.card, "min-w-0 p-4 sm:p-5")}>
+            <h1 className="text-[19px] font-semibold leading-snug tracking-tight text-ink sm:text-xl">{email.subject}</h1>
+            <div className="mt-3 flex items-center gap-3">
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-semibold text-white"
+                aria-hidden
+              >
                 {(email.from.name[0] ?? "?").toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-ink">
-                  <span className="font-medium">{email.from.name}</span> <span className="text-muted">&lt;{email.from.email}&gt;</span>
-                </p>
-                <p className="text-xs text-muted">
-                  {email.copy ? `Shared by ${handle(email.owner)}` : "to me"} ·{" "}
-                  {new Date(email.at).toLocaleString("en-AU", { timeZone: "Australia/Melbourne" })}
+                <p className="truncate text-sm font-medium text-ink">{email.from.name || email.from.email}</p>
+                <p className="truncate text-xs text-muted">
+                  {email.from.name ? `${email.from.email} · ` : ""}
+                  {email.copy ? `shared by ${handle(email.owner)}` : "to me"}
                 </p>
               </div>
+              <time className="shrink-0 text-xs text-muted" dateTime={email.at}>
+                {new Date(email.at).toLocaleString("en-AU", {
+                  timeZone: "Australia/Melbourne",
+                  day: "numeric",
+                  month: "short",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </time>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               {email.deal && (
                 <Link
                   href={`${PATHS.deals}/${encodeURIComponent(email.deal.id)}`}
@@ -1158,7 +1171,7 @@ function EmailView({
                 </Link>
               )}
               {email.canChange && (
-                <span className="flex items-center gap-1.5">
+                <>
                   <button
                     type="button"
                     onClick={() => void act("archive")}
@@ -1178,7 +1191,7 @@ function EmailView({
                     {email.unread ? <MailOpen className="size-3.5" aria-hidden /> : <Mail className="size-3.5" aria-hidden />}
                     {email.unread ? "Mark read" : "Mark unread"}
                   </button>
-                </span>
+                </>
               )}
               {!email.copy && (
                 <a
@@ -1187,7 +1200,7 @@ function EmailView({
                   }
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
+                  className="ml-auto inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
                 >
                   Open in {providerOfId(email.id) === "outlook" ? "Outlook" : "Gmail"} <ExternalLink className="size-3" aria-hidden />
                 </a>
@@ -1204,15 +1217,9 @@ function EmailView({
             )}
             <div className="mt-4 border-t border-line pt-4">
               {email.html ? (
-                // The email as sent, in a frame where nothing runs; links open in a new tab.
-                <iframe
-                  title="The email"
-                  sandbox="allow-popups allow-popups-to-escape-sandbox"
-                  srcDoc={email.html}
-                  className="h-[60dvh] w-full rounded-md bg-white"
-                />
+                <EmailFrame html={email.html} />
               ) : (
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
+                <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
               )}
             </div>
             {email.files.length > 0 && (
@@ -1310,5 +1317,50 @@ function EmailView({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The email as sent, in a frame where nothing runs (no scripts; links open in a new tab), scaled down
+ * to the width it has as Gmail's app does, and as tall as the email so the page scrolls, not the frame
+ * (24 Nov 2026, Martin: a 600px-wide email ran off a phone's screen). Same-origin without scripts lets
+ * this page measure it; nothing in the email can run either way.
+ */
+function EmailFrame({ html }: { html: string }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const doc = useMemo(() => framedEmail(html), [html]);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const fit = () => {
+      const d = el.contentDocument;
+      if (!d?.body) return;
+      d.body.style.zoom = "";
+      const room = el.clientWidth;
+      const wide = Math.max(d.documentElement.scrollWidth, d.body.scrollWidth);
+      const scale = wide > room + 1 ? room / wide : 1;
+      if (scale < 1) d.body.style.zoom = String(scale);
+      setHeight(Math.ceil(d.documentElement.scrollHeight) + 2);
+    };
+    el.addEventListener("load", fit);
+    const seen = new ResizeObserver(() => fit());
+    seen.observe(el);
+    fit();
+    return () => {
+      el.removeEventListener("load", fit);
+      seen.disconnect();
+    };
+  }, [doc]);
+  return (
+    <iframe
+      ref={frame}
+      title="The email"
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      srcDoc={doc}
+      scrolling="no"
+      style={{ height: height ?? undefined }}
+      className={clsx("block w-full rounded-md bg-white", height === null && "h-[65dvh]")}
+    />
   );
 }

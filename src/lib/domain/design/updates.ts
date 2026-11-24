@@ -15,8 +15,55 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
+    area: "Today",
+    words: "On a phone, the tray under Sol's box sits neatly under it and fades at its edge when it scrolls.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "The tray under Sol's box has a Pipeline shortcut, and its tabs can be dragged into your own order.",
+  },
+  { day: "2026-11-24", area: "Sol", words: "A screenshot pasted into Sol's box now shows as a preview inside the box." },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "With Sol open beside a page, the page refits: nothing sits under him or the floating bar, and Settings keeps a tidy gap.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Today's chat with Sol and his side panel are now two separate conversations: what you ask in one doesn't show in the other.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's sun is softer everywhere: a little on phones, a little more on computers.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "Search your open and closed proposals, and each sale now shows the day it was signed, with when the last one was at the top.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat opens with today's date and his etched brain, and your messages are graphite bubbles.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Your account",
+    words:
+      "Add a deal owner without inviting them, so past deals can carry a salesperson's name. Invite them later and they keep their deals.",
+  },
+  {
+    day: "2026-11-24",
     area: "Team chat",
     words: "On a phone, direct messages are a row of faces, deal chats are cards with the latest line, and days are marked in a chat.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol answers shorter, draws technical answers, and keeps a library of tips under Technical.",
   },
   {
     day: "2026-11-24",
@@ -238,6 +285,16 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-22",
     area: "Today",
     words: "Performance, Proposals, Calls and Sol's work open straight away, even the moment Today has opened.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketing",
+    words: "Email builder: a Personal letter look that reads like a person's email, for the best odds of Gmail's Primary tab.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Marketing",
+    words: "Marketing emails are wider, and each email can name its own sender.",
   },
   {
     day: "2026-11-22",

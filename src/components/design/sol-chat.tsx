@@ -2,10 +2,10 @@
 
 import { useStageNames } from "./stage-select";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { useNameHintBox } from "./name-hint-box";
-import { ArrowUpRight, Bell, CornerUpLeft, FileText, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
+import { Bell, CornerUpLeft, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import { openDesigner } from "./design-drawer";
 import { pageAt } from "@/lib/domain/design/sections";
@@ -13,6 +13,7 @@ import { currentPageContext } from "@/lib/services/page-context";
 import { stageLabel } from "@/lib/domain/design/crm";
 import { matches } from "@/lib/domain/design/find";
 import { MORE_DETAIL_ASK, offersMore } from "@/lib/domain/design/sol-charts";
+import { panelTurns } from "@/lib/domain/design/sol-rooms";
 import {
   MAX_FILES,
   MAX_SAID,
@@ -59,7 +60,7 @@ import { SolKnows } from "./sol-knows";
 import { SolStart } from "./sol-start";
 import { useDesignAccount } from "./design-account";
 import { SolThinking, SolWorking } from "./sol-thinking";
-import { filesFromPaste, fitForSol } from "./sol-attach";
+import { FileTiles, filesFromPaste, fitForSol } from "./sol-attach";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
 import { MeetingCard } from "./meeting-card";
@@ -269,7 +270,8 @@ export function SolChat({
       ? jobs.filter((j) => matches({ words: [j.customerName, j.title, j.address] }, dealAt.query)).slice(0, 6)
       : [];
 
-  const turns = state?.turns ?? [];
+  // His panel's and page's own conversation: what was asked on Today stays on Today (sol-rooms.ts).
+  const turns = useMemo(() => panelTurns(state?.turns ?? []), [state]);
   const inducting = state?.induction?.status === "pending";
   const unread = state?.unread ?? 0;
   // Only a real answer (one that took credits) to the latest question can be tried again.
@@ -737,28 +739,6 @@ export function SolChat({
         }}
         className={clsx("px-4 pb-4 pt-2", history && "hidden")}
       >
-        {(files.length > 0 || fileProblem) && (
-          <div className="mb-2 flex flex-wrap items-center gap-1.5 px-1">
-            {files.map((f, i) => (
-              <span
-                key={i}
-                className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-canvas py-1 pl-2.5 pr-1 text-xs text-ink"
-              >
-                <FileText className="size-3.5 shrink-0 text-sun-line" aria-hidden />
-                <span className="truncate">{f.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setFiles(files.filter((_, j) => j !== i))}
-                  aria-label={`Take off ${f.name}`}
-                  className="inline-flex size-5 items-center justify-center rounded-full text-muted hover:bg-surface-2 hover:text-ink"
-                >
-                  <X className="size-3" aria-hidden />
-                </button>
-              </span>
-            ))}
-            {fileProblem && <span className="text-xs text-danger">{fileProblem}</span>}
-          </div>
-        )}
         {onDealDraft && !replyTo && (
           <div className="mb-1.5 flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-ink-2 ring-1 ring-sun-line/40">
             <span className="min-w-0 flex-1 truncate">
@@ -801,7 +781,7 @@ export function SolChat({
           )}
           {/* Laid out as Claude Code's box (21 Nov 2026, Martin): the words across the top, a + to add a file at the
               left of the row under them, and send then the microphone at the far right. */}
-          <div className="rounded-[20px] bg-surface px-2 pb-2 shadow-[0_2px_10px_rgba(20,22,26,0.06)] ring-1 ring-line focus-within:ring-line-strong">
+          <div className="rounded-[20px] bg-surface px-2 pb-2 shadow-[0_2px_10px_rgba(20,22,26,0.06)] ring-1 ring-line focus-within:ring-sun-line/60">
             <input
               ref={picker}
               type="file"
@@ -809,6 +789,12 @@ export function SolChat({
               accept={SOL_FILE_TYPES.join(",")}
               className="hidden"
               onChange={(e) => void addFiles(Array.from(e.target.files ?? []))}
+            />
+            <FileTiles
+              files={files}
+              problem={fileProblem}
+              onRemove={(i) => setFiles(files.filter((_, j) => j !== i))}
+              className="px-1 pt-2.5"
             />
             <textarea
               ref={box}
@@ -1056,8 +1042,8 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? // A soft grey bubble on the right (24 Nov 2026, Martin, after HubSpot's Breeze: a cleaner look).
-              "max-w-[85%] whitespace-pre-wrap rounded-2xl bg-[#ececee] px-4 py-2.5 text-[13.5px] font-normal leading-[1.5] text-ink [font-feature-settings:'cv11','ss03','tnum']"
+            ? // A graphite bubble on the right, RENUABL's own (24 Nov 2026, Martin: Breeze's grey made it look like HubSpot).
+              "max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[13.5px] font-normal leading-[1.5] text-white [font-feature-settings:'cv11','ss03','tnum']"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}
@@ -1094,7 +1080,7 @@ function Bubble({
 }
 
 /** A reminder Sol has taken: until a time is chosen, the times on offer and "Another time"; then when it is due. */
-function ReminderCard({
+export function ReminderCard({
   ask,
   busy,
   choose,

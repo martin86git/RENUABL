@@ -19,6 +19,10 @@ export const checkPylonCsv = (ids: string[]) =>
 export const bringCsvRows = (rows: PylonCsvRow[], wonWeeks: number) =>
   ask<{ results: PylonOutcome[] }>("/api/design/pylon", { method: "POST", body: { do: "csv", rows, wonWeeks } });
 
+/** Gives deals already brought in to the seller the export names (a member or someone kept to own deals). */
+export const givePylonOwners = (rows: { id: string; ownerEmail: string }[]) =>
+  ask<{ given: number }>("/api/design/pylon", { method: "POST", body: { do: "csv-owners", rows } });
+
 /** How many deals brought in from Pylon are still to be filled in (`any`: counting their PDFs too). */
 export const pylonFillLeft = (pdfs: boolean) =>
   ask<{ left: number; any: number }>("/api/design/pylon", { method: "POST", body: { do: "fill-left", pdfs } });

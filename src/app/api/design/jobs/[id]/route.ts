@@ -2,7 +2,7 @@ import { cleanJobInput } from "@/lib/domain/design/crm";
 import { typedFields } from "@/lib/domain/design/deal-sections";
 import { loadPrefs } from "@/lib/server/design-after-sale-repo";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
-import { listMembers } from "@/lib/server/design-repo";
+import { mayOwnDeals } from "@/lib/server/design-repo";
 import { deleteJob, jobById, joinNearbyDesign, listOwnStages, setJobOwner, updateJob } from "@/lib/server/design-crm-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
@@ -39,10 +39,10 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/design/jobs/
     const read = await readBody(request, 20_000);
     if ("refuse" in read) return read.refuse;
     if (!validId(id) || !(await jobById(who.member.businessId, id, viewerOf(who.member)))) return notFound();
-    // { owner }: the deal given to a member of the business, or to no one (null). Only an email in the business is kept.
+    // { owner }: the deal given to a member of the business, someone kept to own deals without an invite, or no one (null).
     if ("owner" in read.body) {
       const owner = typeof read.body.owner === "string" ? read.body.owner.trim().toLowerCase() : null;
-      if (owner && !(await listMembers(who.member.businessId)).some((m) => m.email.toLowerCase() === owner))
+      if (owner && !(await mayOwnDeals(who.member.businessId, owner)))
         return Response.json({ ok: false, message: "That person isn't in your business." }, { status: 422 });
       const given = await setJobOwner(who.member.businessId, id, owner || null, who.member.email);
       return given ? Response.json({ ok: true, job: given }) : notFound();

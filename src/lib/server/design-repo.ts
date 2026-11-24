@@ -12,6 +12,7 @@
 import { cleanKind, type BusinessKind } from "@/lib/domain/design/business-kind";
 import {
   MAX_MEMBERS,
+  MAX_OWNER_ONLY,
   MAX_PROJECTS,
   cleanPermissions,
   roofKey,
@@ -190,6 +191,81 @@ export async function addMember(businessId: string, email: string, invitedBy: st
     );
     return made.length ? "added" : "taken";
   });
+}
+
+/** Someone who owns deals without being invited: not a member, so never signs in or counts as a paid user. */
+export interface OwnerOnlyLine {
+  email: string;
+  name: string;
+  /** How many of the business's deals they own. */
+  deals: number;
+}
+
+export async function listOwnerOnly(businessId: string): Promise<OwnerOnlyLine[]> {
+  const rows = await query<{ email: string; name: string; deals: string }>(
+    `select o.email, o.name,
+            (select count(*) from design_jobs j where j.business_id = o.business_id and lower(j.owner_email) = o.email) as deals
+       from design_owner_only o where o.business_id = $1 order by o.name, o.email`,
+    [businessId],
+  );
+  return rows.map((r) => ({ email: r.email, name: r.name, deals: Number(r.deals) }));
+}
+
+/**
+ * Keeps someone who can own deals without inviting them. "member" when they're already in this business, "full" at the
+ * limit. Their email isn't held against them anywhere else: they can still join any business later.
+ */
+export async function addOwnerOnly(businessId: string, email: string, name: string, by: string): Promise<"added" | "member" | "full"> {
+  const who = email.toLowerCase();
+  return transaction(async (q) => {
+    const already = await q(`select 1 from business_members where business_id = $1 and email = $2`, [businessId, who]);
+    if (already.length) return "member";
+    const count = await q<{ n: string }>(`select count(*) as n from design_owner_only where business_id = $1`, [businessId]);
+    if (Number(count[0]?.n ?? 0) >= MAX_OWNER_ONLY) return "full";
+    await q(
+      `insert into design_owner_only (business_id, email, name, added_by) values ($1,$2,$3,$4)
+       on conflict (business_id, email) do update set name = excluded.name`,
+      [businessId, who, name, by.toLowerCase()],
+    );
+    return "added";
+  });
+}
+
+/** Takes someone off the list. Their deals are left with no owner, so nothing points at a person nobody can see. */
+export async function removeOwnerOnly(businessId: string, email: string): Promise<boolean> {
+  const who = email.toLowerCase();
+  return transaction(async (q) => {
+    const gone = await q(`delete from design_owner_only where business_id = $1 and email = $2 returning email`, [businessId, who]);
+    if (!gone.length) return false;
+    await q(`update design_jobs set owner_email = null, updated_at = now() where business_id = $1 and lower(owner_email) = $2`, [
+      businessId,
+      who,
+    ]);
+    return true;
+  });
+}
+
+/**
+ * Invites someone who owns deals: they become a member (and a paid user), and keep the deals already theirs.
+ * "missing" when they aren't on the list.
+ */
+export async function inviteOwnerOnly(businessId: string, email: string, by: string): Promise<"added" | "taken" | "full" | "missing"> {
+  const who = email.toLowerCase();
+  const kept = await query(`select 1 from design_owner_only where business_id = $1 and email = $2`, [businessId, who]);
+  if (!kept.length) return "missing";
+  const result = await addMember(businessId, who, by);
+  if (result === "added") await query(`delete from design_owner_only where business_id = $1 and email = $2`, [businessId, who]);
+  return result;
+}
+
+/** Whether this email may own the business's deals: a member, or someone kept to own deals without an invite. */
+export async function mayOwnDeals(businessId: string, email: string): Promise<boolean> {
+  const rows = await query(
+    `select 1 from business_members where business_id = $1 and lower(email) = $2
+     union all select 1 from design_owner_only where business_id = $1 and email = $2 limit 1`,
+    [businessId, email.toLowerCase()],
+  );
+  return rows.length > 0;
 }
 
 /** Gives a member a role (a member or a designer). Never the owner's. False when there's no such member. */

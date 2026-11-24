@@ -134,7 +134,7 @@ async function keepRow(
         `update design_jobs set kw = coalesce($3, kw),
                 won_at = case when $4::boolean then coalesce(($5::date + time '12:00') at time zone 'Australia/Melbourne', won_at, now()) else won_at end,
                 installed_at = case when $6::boolean then coalesce(installed_at, now()) else installed_at end,
-                owner_email = coalesce((select m.email from business_members m where m.business_id = $1 and lower(m.email) = $7 limit 1), owner_email),
+                owner_email = coalesce((select e from (select m.email as e from business_members m where m.business_id = $1 union all select o.email from design_owner_only o where o.business_id = $1) x where lower(e) = $7 limit 1), owner_email),
                 updated_at = now()
           where business_id = $1 and id = $2`,
         [businessId, jobId, row.kw, won, row.day || null, installed, row.owner],

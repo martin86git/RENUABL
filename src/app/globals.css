@@ -249,6 +249,12 @@
   .studio-frame .studio-pad:has(> [data-rails-out]) .pad-cap {
     display: none;
   }
+  /* The section's pages stand over the cap (24 Nov 2026, Martin: the feed, now under Sales, carries Today's strip, whose
+     68px cap covered Feed, Pipeline and the proposals). */
+  .studio-frame .studio-pad > .studio-pages {
+    position: relative;
+    z-index: 16;
+  }
   .studio-frame:not(:has([data-rails-out])) .pad-under {
     height: 36px !important;
   }
@@ -344,11 +350,55 @@
 body {
   transition: padding-right 300ms ease;
 }
-/* From 1440px the page narrows beside it; below that there isn't room for the top bar beside the panel, so it lies
-   over the page (1 Nov 2026). */
-@media (min-width: 1440px) {
+/* The page narrows beside it, but never to less than 64rem, the least the top bar and a page's own layout need
+   (24 Nov 2026, Martin: "pages need to better optimise when the right hand side sol drawer appears"; it was all or
+   nothing at 1440px, so a panel dragged wide crushed the page, and under 1440px it lay over everything). `--sol-room`
+   is what the page gives up. Where the panel is wider than that, it lies over the page's right edge by `--sol-over`,
+   and the top bar and the pad step in by as much (up to 10rem; past that the panel simply covers), so what's on the
+   page stays clear of him. `--page-w` is the room the page really has: layouts that must follow the page rather
+   than the window (the settings list) size themselves by it. */
+:root {
+  --sol-room: 0px;
+  --sol-over: 0px;
+  --page-w: calc(100vw - var(--sol-room) - var(--sol-over));
+}
+.studio-room {
+  transition: padding-right 300ms ease;
+}
+/* The settings list (settings-nav.tsx) gives way before the page beside it does: 16rem where the page has 80rem or
+   more, down to 12.5rem on a 64rem page (a laptop, or Sol's panel open). While the setup pill floats in the bottom left
+   corner the list stops short of it, so the pill never lies over the list's headings. */
+@media (min-width: 64rem) {
+  .settings-list {
+    width: clamp(12.5rem, var(--page-w) * 0.25 - 4rem, 16rem);
+  }
+  /* Routines: its list of agents beside the flow, 19rem where the page has room, down to 14rem. */
+  .routines-cols {
+    grid-template-columns: clamp(14rem, var(--page-w) * 0.3 - 6rem, 19rem) minmax(0, 1fr);
+  }
+  .studio-frame:has([data-corner-pill]) .settings-list {
+    height: calc(100dvh - 4.5rem);
+  }
+}
+html.sol-resizing .studio-room {
+  transition: none;
+}
+@media (min-width: 64rem) {
+  html.sol-docked {
+    --sol-room: min(var(--sol-w), max(0px, 100vw - 64rem));
+    --sol-over: clamp(0px, var(--sol-w) - (100vw - 64rem), 10rem);
+  }
   html.sol-docked body {
-    padding-right: var(--sol-w);
+    padding-right: var(--sol-room);
+  }
+  /* Beside the panel a page mostly fills its width, so its cards reached under the floating bar (Sol's sun stands
+     6px out of it): the pad keeps 2rem more on that side while he is open, and steps in from under the panel. */
+  html.sol-docked .studio-room {
+    padding-right: calc(5.5rem + var(--sol-over));
+  }
+  /* A page that draws its own ground to the pad's edge (the deal) has no pad padding to stand it off the bar. */
+  html.sol-docked .studio-room:has([data-rails-out]) {
+    padding-right: calc(6.5rem + var(--sol-over));
   }
   /* The rail and the team chat stay in reach beside the panel, not under it. */
   html.sol-docked .sol-rail {
@@ -603,11 +653,6 @@ button.team-flash:not([aria-pressed="true"]) {
     display: flex;
   }
 }
-@media (max-width: 1919px) {
-  html.sol-docked .studio-market-words {
-    display: none;
-  }
-}
 /* Shorter still (a laptop, or Sol's panel open beside the page): the sections closer together and the frame's sides
    narrower; with the panel open the magnifier goes too (Sol is open to ask, and Ctrl K still searches). */
 @media (min-width: 1024px) and (max-width: 1279px) {
@@ -619,16 +664,42 @@ button.team-flash:not([aria-pressed="true"]) {
     font-size: 13px;
   }
 }
-@media (min-width: 1024px) and (max-width: 1919px) {
+/* With Sol's panel open the bar goes by its own width, not the window's (24 Nov 2026): the panel can be any width,
+   so a wide one beside a wide window left the bar as short as a laptop's. 1455px is the bar beside the panel as it
+   opens on a 1919px window, where these used to switch. Under 900px the wordmark gives way to its mark as well. */
+.studio-top {
+  container: studio-top / inline-size;
+}
+@media (min-width: 1024px) {
   html.sol-docked .studio-top {
-    padding-inline: 1.5rem;
+    padding-inline: 1.5rem calc(1.5rem + var(--sol-over));
   }
+}
+@media (min-width: 1920px) {
+  html.sol-docked .studio-top {
+    padding-inline: 3.5rem calc(3.5rem + var(--sol-over));
+  }
+}
+@container studio-top (max-width: 1455px) {
   html.sol-docked .studio-sections > a {
     padding-inline: 0.6rem;
     font-size: 13px;
   }
-  html.sol-docked .studio-search {
+  html.sol-docked .studio-search,
+  html.sol-docked .studio-search-words,
+  html.sol-docked .studio-market-words {
     display: none;
+  }
+  html.sol-docked .studio-day-weather {
+    display: none !important;
+  }
+}
+@container studio-top (max-width: 900px) {
+  html.sol-docked .studio-mark-full {
+    display: none;
+  }
+  html.sol-docked .studio-mark-short {
+    display: flex;
   }
 }
 /* A narrower window (5 Nov 2026, from Primero's): the top bar makes room before anything is covered. The wordmark
@@ -654,20 +725,10 @@ button.team-flash:not([aria-pressed="true"]) {
   }
 }
 /* With Sol's panel open the wordmark stays whole (15 Nov 2026, Martin: "the renuabl logo unnecessarily reduces down"):
-   Search beside it is put away then, which leaves it room. Only the weather gives way. */
-@media (max-width: 1919px) {
-  html.sol-docked .studio-day-weather {
-    display: none !important;
-  }
-}
+   Search beside it is put away then, which leaves it room (the rules by the bar's own width, above). */
 /* Search by the wordmark (8 Nov 2026): its word and Ctrl K go when the wordmark does, leaving the magnifier. */
 @media (max-width: 1535px) {
   .studio-search-words {
-    display: none;
-  }
-}
-@media (max-width: 1919px) {
-  html.sol-docked .studio-search-words {
     display: none;
   }
 }
@@ -1537,21 +1598,20 @@ html:has(.sales-snap) {
    as easily with everything else and the eye gravitates there first… perhaps the charcoal?"): his chat's charcoal ground
    and its light-on-dark tokens (`.sol-ground`), as dark glass with a light top edge and a fine orange rim, lifted off the
    page. The only dark box among white cards, so it is read first. */
-/* A warm wash of his own orange with dark words (20 Nov 2026, Martin: the deep graphite was "too much of a match with
-   the header boxes"): the one warm box on the page. Its cards and fields are white on it, its quiet buttons a warm tint. */
+/* White with hairlines like his drawer, held by one outline of the signal orange (24 Nov 2026, Martin: the peach wash
+   was the wrong shade; of a soft or a full orange outline he chose the full one, so the card isn't lost on the page). */
 .sol-say {
-  --canvas: #fff9f4;
+  --canvas: #f6f6f8;
   --surface: #ffffff;
-  --surface-2: #fde6d6;
-  --line: #f1cdb6;
-  --line-strong: #e6b294;
-  --muted: #7d6a5f;
-  background: linear-gradient(180deg, #fff6ee 0%, #ffefe3 100%);
+  --surface-2: #efeff2;
+  --line: #e3e3e8;
+  --line-strong: #cfcfd6;
+  --muted: #6e6e73;
+  background: #ffffff;
   color: var(--ink);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.9),
-    inset 0 0 0 1px rgb(255 122 61 / 0.5),
-    0 16px 36px -20px rgb(255 90 31 / 0.5);
+    inset 0 0 0 1.5px var(--sun-line),
+    0 10px 28px -22px rgb(20 22 26 / 0.35);
 }
 
 /* Sol's panel on a phone keeps the foot bar under it (22 Nov 2026, Martin: "maintain the bottom nav bar even when in a
@@ -1990,10 +2050,16 @@ html:has(.sales-snap) {
 .phone-tabbar[data-dock="market"] .sol-sun-face {
   display: none;
 }
-/* Sol's sun on the phone's dock, 10% dimmer (24 Nov 2026, Martin): only the sun's canvas, so the brain lines are drawn
-   as they are everywhere else (they blend over it, and show a little more as it dims). */
-.sol-sun-face canvas {
+/* Sol's sun 10% dimmer everywhere (24 Nov 2026, Martin: first on the phone's dock, then "site wide including to desktop
+   also"): only the sun's canvas, so the brain lines drawn over it are unchanged (they show a little more as it dims). */
+.sol-sun-canvas {
   filter: brightness(0.9);
+}
+/* 15% on a computer (24 Nov 2026, Martin: 10% couldn't be seen on a big screen, 20% was too dim); phones keep 10%. */
+@media (min-width: 1024px) {
+  .sol-sun-canvas {
+    filter: brightness(0.85);
+  }
 }
 /* The Marketplace's blue round rising into Sol's place in the middle of the dock. */
 .dock-market-centre {
@@ -2181,5 +2247,35 @@ html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
   .sol-clover-leaf,
   .sol-clover-heart {
     animation: none;
+  }
+}
+
+/* The pipeline board (design-sales.tsx): no bar on a phone (it swipes), a plain sideways bar on a computer
+   (24 Nov 2026, Martin: "missing a bar to scroll horizontally"). */
+@media (max-width: 39.99rem) {
+  .deal-board {
+    scrollbar-width: none;
+  }
+  .deal-board::-webkit-scrollbar {
+    display: none;
+  }
+}
+@media (min-width: 40rem) {
+  /* Chrome and Safari draw a styled bar always (a Mac otherwise hides it until you scroll); setting scrollbar-color
+     would make Chrome ignore these, so it is only for Firefox. */
+  @supports not selector(::-webkit-scrollbar) {
+    .deal-board {
+      scrollbar-color: rgb(11 11 12 / 0.35) rgb(11 11 12 / 0.06);
+    }
+  }
+  .studio-frame .deal-board::-webkit-scrollbar {
+    height: 14px;
+  }
+  .studio-frame .deal-board::-webkit-scrollbar-track {
+    background: rgb(11 11 12 / 0.06);
+    border-radius: 9999px;
+  }
+  .studio-frame .deal-board::-webkit-scrollbar-thumb {
+    background-color: rgb(11 11 12 / 0.35);
   }
 }

@@ -387,7 +387,7 @@ export async function bringInHubSpotDeals(
                             when stage = any($6::text[]) then coalesce(won_at, now()) else won_at end,
               installed_at = case when stage = any($7::text[]) then coalesce(installed_at, ($3::date + time '12:00') at time zone 'Australia/Melbourne', now()) else installed_at end,
               created_at = coalesce($4::timestamptz, created_at),
-              owner_email = coalesce((select m.email from business_members m where m.business_id = $1 and lower(m.email) = $5 limit 1), owner_email),
+              owner_email = coalesce((select e from (select m.email as e from business_members m where m.business_id = $1 union all select o.email from design_owner_only o where o.business_id = $1) x where lower(e) = $5 limit 1), owner_email),
               updated_at = now()
             where business_id = $1 and id = $2`,
           [

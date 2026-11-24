@@ -24,14 +24,28 @@ import {
 } from "@/lib/domain/design/today-pad";
 import type { Activity } from "@/lib/domain/design/crm";
 import { mailMarkWords, type MailMark } from "@/lib/domain/design/email-opens";
-import type { SolFile, SolReminder, SolState } from "@/lib/domain/design/sol";
+import type { SolFile, SolReminder, SolState, SolTurn } from "@/lib/domain/design/sol";
+import { roomTurns } from "@/lib/domain/design/sol-rooms";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
-import { SOL_CHANGED, SOL_INDUCTION, SOL_TOGGLE, askSol, askSolInPanel, handsToPanel, loadSol, retrySol } from "@/lib/services/sol";
-import { goWhereAsked, openSolPage } from "./sol-chat";
+import {
+  DRAFT_KEY,
+  SOL_CHANGED,
+  SOL_INDUCTION,
+  askSol,
+  askSolInPanel,
+  handsToPanel,
+  loadSol,
+  remindAt,
+  retrySol,
+} from "@/lib/services/sol";
+import { ReminderCard, goWhereAsked, openSolPage } from "./sol-chat";
+import { SolChartView, SolDiagramView } from "./sol-visuals";
+import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
+import { MeetingCard } from "./meeting-card";
 import { PATHS } from "./design-shell";
 import { NextCard, Numbers, useNextUp } from "./canvas-pad";
 import { DealFeed } from "./deal-feed";
@@ -91,15 +105,33 @@ const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("
 /** One turn of the conversation on Today: Sol telling the day, or a question and his answer. */
 type Turn = { id: number; kind: "day" } | { id: number; kind: "ask"; q: string; a: TodayAnswer | null };
 
-/** Sol's answer on Today: `again` when it can be tried again (a real answer), `goTo` a page he opened. */
-type TodayAnswer = { text: string; more: boolean; designs?: SolDesignShown[]; again?: boolean; goTo?: SolGoTo };
+/**
+ * Sol's answer on Today: `again` when it can be tried again (a real answer), `goTo` a page he opened. What he drew
+ * or wrote with it (charts, diagrams, draft emails, a meeting, a reminder) is shown here too: Today's conversation is
+ * its own, apart from his side panel's (sol-rooms.ts, 24 Nov 2026, Martin), so nothing of it waits there.
+ */
+type TodayAnswer = {
+  text: string;
+  designs?: SolDesignShown[];
+  again?: boolean;
+  goTo?: SolGoTo;
+  with?: Pick<SolTurn, "charts" | "diagrams" | "drafts" | "meeting" | "reminder">;
+};
 
-/** His latest answer in the conversation, as Today shows it. */
+/** Today's own room in the member's conversation with Sol. */
+const TODAY_ROOM = "today" as const;
+
+/** His latest answer in Today's conversation, as Today shows it. */
 function todayAnswer(state: SolState): TodayAnswer {
-  const last = [...state.turns].reverse().find((t) => t.role === "sol");
+  const last = roomTurns(state.turns, TODAY_ROOM)
+    .reverse()
+    .find((t) => t.role === "sol");
+  const extra = last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.meeting || last?.reminder;
   return {
     text: last?.text ?? "Done.",
-    more: Boolean(last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.reminder),
+    ...(last && extra
+      ? { with: { charts: last.charts, diagrams: last.diagrams, drafts: last.drafts, meeting: last.meeting, reminder: last.reminder } }
+      : {}),
     // A roof design he shows is drawn here, in the conversation itself (3 Nov 2026, Martin).
     ...(last?.designs?.length ? { designs: last.designs } : {}),
     ...(last?.credits ? { again: true } : {}),
@@ -212,16 +244,38 @@ export function TodayPad(props: {
     const shownQ = (replied.shown ?? q) + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
     setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
-    const r = await askSol(replied.said || q, files, null, false, replied.shown);
+    const r = await askSol(replied.said || q, files, null, false, replied.shown, TODAY_ROOM);
     setAsking(false);
     let a: TodayAnswer;
-    if (!r.ok) a = { text: r.message, more: false };
+    if (!r.ok) a = { text: r.message };
     else {
       window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
       a = todayAnswer(r.state);
       goWhereAsked(r.state, router);
     }
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
+  };
+  /** A draft of his handed to the deal's Email tab, as his panel hands it. */
+  const openDraft = (d: DraftAsEdited) => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ jobId: d.jobId, subject: d.subject, body: d.body, cc: d.cc }));
+    } catch {
+      // A private window: the deal's email opens empty, and the card can still be copied.
+    }
+    router.push(`/design/deals/${d.jobId}?tab=email`);
+  };
+  /** A time picked on a reminder's card: set, and the card says when. */
+  const setReminder = async (turnId: number, reminderId: string, when: Parameters<typeof remindAt>[1]) => {
+    const r = await remindAt(reminderId, when);
+    if (!r.ok) return;
+    window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
+    const set = r.state.turns.find((t) => t.reminder?.id === reminderId)?.reminder;
+    if (set)
+      setTurns((all) =>
+        all.map((t) =>
+          t.id === turnId && t.kind === "ask" && t.a?.with ? { ...t, a: { ...t.a, with: { ...t.a.with, reminder: set } } } : t,
+        ),
+      );
   };
   /** A Yes or No goes straight to Sol; Reply answers the question in the box. */
   const answer: OnAnswer = (question, yes) => {
@@ -241,10 +295,10 @@ export function TodayPad(props: {
     const before = turns.find((t) => t.id === id);
     setAsking(true);
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a: null } : t)));
-    const r = await retrySol();
+    const r = await retrySol(null, TODAY_ROOM);
     setAsking(false);
     let a: TodayAnswer;
-    if (!r.ok) a = before?.kind === "ask" && before.a ? { ...before.a, again: false } : { text: r.message, more: false };
+    if (!r.ok) a = before?.kind === "ask" && before.a ? { ...before.a, again: false } : { text: r.message };
     else {
       window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
       a = todayAnswer(r.state);
@@ -356,14 +410,27 @@ export function TodayPad(props: {
                             ))}
                           </div>
                         ) : null}
-                        {t.a.more && (
-                          <button
-                            type="button"
-                            onClick={() => window.dispatchEvent(new Event(SOL_TOGGLE))}
-                            className="mt-2 block text-[13px] text-ink-2 underline underline-offset-4 hover:text-ink"
-                          >
-                            There is more with it in your conversation with Sol. Open it
-                          </button>
+                        {t.a.with && (
+                          <div className="mt-3 max-w-2xl space-y-3">
+                            {t.a.with.charts?.map((c, k) => (
+                              <SolChartView key={k} chart={c} />
+                            ))}
+                            {t.a.with.diagrams?.map((d, k) => (
+                              <SolDiagramView key={k} diagram={d} />
+                            ))}
+                            {t.a.with.drafts?.map((d, k) => (
+                              <SolDraftCard key={k} draft={d} onOpen={openDraft} />
+                            ))}
+                            {t.a.with.meeting && <MeetingCard id={t.a.with.meeting} />}
+                            {t.a.with.reminder && (
+                              <ReminderCard
+                                ask={t.a.with.reminder}
+                                busy={asking}
+                                choose={(c) => void setReminder(t.id, t.a!.with!.reminder!.id, c)}
+                                other={() => document.getElementById("today-ask")?.focus()}
+                              />
+                            )}
+                          </div>
                         )}
                         {(t.a.goTo || (t.a.again && t.id === turns[turns.length - 1]?.id)) && (
                           <div className="mt-3 flex flex-wrap items-center gap-2">

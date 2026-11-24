@@ -234,10 +234,46 @@ export interface MemberLine {
   photo?: number;
 }
 
-type MembersAnswer = Answer & { members?: MemberLine[] };
+/** Someone kept to own deals without being invited: never a member, never signs in, never a paid user. */
+export interface OwnerOnlyLine {
+  email: string;
+  name: string;
+  deals: number;
+}
+
+type MembersAnswer = Answer & { members?: MemberLine[]; ownerOnly?: OwnerOnlyLine[] };
 
 export async function loadMembers(): Promise<MemberLine[] | null> {
   return (await send<MembersAnswer>("/api/design/members", "GET")).members ?? null;
+}
+
+export interface Team {
+  members: MemberLine[];
+  ownerOnly: OwnerOnlyLine[];
+}
+
+/** The business's people and those who own deals without an invite. */
+export async function loadTeam(): Promise<Team | null> {
+  const res = await send<MembersAnswer>("/api/design/members", "GET");
+  return res.members ? { members: res.members, ownerOnly: res.ownerOnly ?? [] } : null;
+}
+
+const teamOf = (res: MembersAnswer): { team?: Team; problem?: string } =>
+  res.ok && res.members ? { team: { members: res.members, ownerOnly: res.ownerOnly ?? [] } } : { problem: res.message ?? UNREACHABLE };
+
+/** Keeps someone who can own deals without inviting them (24 Nov 2026, Martin: for historical deals). */
+export async function addOwnerOnly(email: string, name: string) {
+  return teamOf(await send<MembersAnswer>("/api/design/members", "POST", { email, name, ownerOnly: true }));
+}
+
+/** Invites someone kept to own deals: they become a member and a paid user, keeping their deals. */
+export async function inviteOwnerOnly(email: string) {
+  return teamOf(await send<MembersAnswer>("/api/design/members", "POST", { email, invite: true }));
+}
+
+/** Takes someone off the list of people who own deals; their deals are left with no owner. */
+export async function removeOwnerOnly(email: string) {
+  return teamOf(await send<MembersAnswer>("/api/design/members", "DELETE", { email, ownerOnly: true }));
 }
 
 export async function addMember(email: string): Promise<{ members?: MemberLine[]; problem?: string }> {

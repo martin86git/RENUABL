@@ -365,15 +365,21 @@ function SendPanel({
   const [confirmWord, setConfirmWord] = useState("");
   const [busy, setBusy] = useState<"test" | "send" | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const problem = contentProblem(content);
   const list = lists.find((l) => l.id === listId);
   const emailable = reach && list && listId === list.id ? reach.emailable : list?.emailable;
 
   async function test() {
     setBusy("test");
+    setTestMsg(null);
     const r = await campaignAction(id, { do: "test", to: testTo || undefined, content });
     setBusy(null);
-    setMsg(r.ok ? { ok: true, text: `Test sent to ${r.to}.` } : { ok: false, text: r.message });
+    setTestMsg(
+      r.ok
+        ? { ok: true, text: `Test sent to ${r.to}. If it isn't in your inbox in a minute or two, look in Promotions or Spam.` }
+        : { ok: false, text: r.message },
+    );
   }
 
   async function sendIt() {
@@ -400,6 +406,8 @@ function SendPanel({
             {busy === "test" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Test
           </Button>
         </div>
+        {problem && <p className="mt-3 text-[13px] text-danger">{problem}</p>}
+        {testMsg && <p className={cn("mt-3 text-[13px]", testMsg.ok ? "text-positive" : "text-danger")}>{testMsg.text}</p>}
       </div>
 
       <div className={box}>

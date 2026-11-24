@@ -198,6 +198,17 @@ alter table business_members add column if not exists last_name text;
 alter table business_members add column if not exists mobile text;
 -- The welcome on Today (domain/design/welcome.ts): when this person finished or skipped it; null shows it.
 alter table business_members add column if not exists welcomed_at timestamptz;
+-- People who own deals but haven't been invited (24 Nov 2026, Martin: to give historical deals to a salesperson without
+-- inviting them). Not members: they can't sign in, aren't paid users, and nothing is sent to them. Inviting one adds the
+-- member and takes the row away; their deals already carry the email.
+create table if not exists design_owner_only (
+  business_id text not null references businesses(id) on delete cascade,
+  email text not null,
+  name text not null,
+  added_by text not null,
+  created_at timestamptz not null default now(),
+  primary key (business_id, email)
+);
 create table if not exists design_settings (
   business_id text primary key references businesses(id) on delete cascade,
   settings jsonb not null,

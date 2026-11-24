@@ -58,7 +58,7 @@ import {
   setDealOwner,
   shortDate,
 } from "@/lib/services/crm";
-import { loadMembers } from "@/lib/services/design-account";
+import { loadTeam } from "@/lib/services/design-account";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD } from "./design-home";
 import { DealChat } from "./chat-panel";
@@ -328,6 +328,8 @@ export function DealPage({ id }: { id: string }) {
   const [fieldsConfig, setFieldsConfig] = useState<DealFieldsConfig | null>(null);
   // The business's people: who a deal can be given to, and who can be @mentioned in a note.
   const [members, setMembers] = useState<string[]>([]);
+  // People kept to own deals without being invited (Your account → Deal owners not invited yet): owners only, never mentioned.
+  const [ownerOnly, setOwnerOnly] = useState<{ email: string; name: string }[]>([]);
   // The deal's clock and temperature while it is being sold, and when its emails were opened.
   const [pulse, setPulse] = useState<DealPulse | null>(null);
   const [opens, setOpens] = useState<{ times: Record<string, string[]>; counts: Record<string, number> } | null>(null);
@@ -340,7 +342,11 @@ export function DealPage({ id }: { id: string }) {
     };
   }, [id, activity.length]);
   useEffect(() => {
-    void loadMembers().then((m) => m && setMembers(m.map((x) => x.email.toLowerCase())));
+    void loadTeam().then((t) => {
+      if (!t) return;
+      setMembers(t.members.map((x) => x.email.toLowerCase()));
+      setOwnerOnly(t.ownerOnly);
+    });
     // Opening the deal reads any mention of this member on it.
     void markNotificationsRead({ jobId: id }).then(() => window.dispatchEvent(new Event("renuabl:notifications")));
   }, [id]);
@@ -515,13 +521,17 @@ export function DealPage({ id }: { id: string }) {
           depositReceived: extra.depositReceived,
           solarVicRebate: extra.solarVicRebate ?? null,
           solarVicLoan: extra.solarVicLoan ?? null,
+          grossMargin: extra.grossMargin ?? null,
+          grossShare: extra.grossShare ?? null,
+          commission: extra.commission ?? null,
+          afterCommission: extra.afterCommission ?? null,
         }
       : null,
   };
   const tabFields = shownTab ? shownTab.fields.filter((f) => !f.hidden) : [];
   const tabLines = tabFields.map((f) => fieldLine(f, job.details, ctx));
   const tabFilled = tabLines.filter((l) => l.value).length;
-  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived"];
+  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived", "grossMargin", "afterCommission"];
   const menu = {
     tab,
     onTab: setTab,
@@ -877,9 +887,16 @@ export function DealPage({ id }: { id: string }) {
                         >
                           <option value="">No one yet</option>
                           {/* Someone who has left the business still shows, so the deal isn't silently handed on. */}
-                          {[...new Set([...members, ...(job.owner ? [job.owner] : [])])].map((m) => (
+                          {[
+                            ...new Set([...members, ...(job.owner && !ownerOnly.some((o) => o.email === job.owner) ? [job.owner] : [])]),
+                          ].map((m) => (
                             <option key={m} value={m}>
                               {m}
+                            </option>
+                          ))}
+                          {ownerOnly.map((o) => (
+                            <option key={o.email} value={o.email}>
+                              {o.name} (not invited)
                             </option>
                           ))}
                         </select>
