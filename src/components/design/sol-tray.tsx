@@ -8,6 +8,7 @@
  */
 import { clsx } from "clsx";
 import {
+  Calculator,
   Cable,
   ChevronRight,
   Columns2,
@@ -95,6 +96,9 @@ export function SolTray(props: {
   onUndo: () => void;
   onRedo: () => void;
   onWhole: () => void;
+  /** Sol's size-a-system calculator (25 Nov 2026, Martin: "add the calculator into the phone"). */
+  onCalc?: () => void;
+  calcOn?: boolean;
   /** The house from its sides (Nearmap), when it can be had: its own button and window. */
   sides?: ReactNode;
   /** Which picture is under the design (Google or Nearmap). */
@@ -180,6 +184,7 @@ export function SolTray(props: {
             </Group>
             <Group title="View">
               <Item icon={<Maximize aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
+              {props.onCalc && <Item icon={<Calculator aria-hidden />} name="Calculator" on={props.calcOn} onClick={then(props.onCalc)} />}
               {props.sides}
               {props.onZoom && <Item icon={<Search aria-hidden />} name="Pinch zoom" on={props.zooming} onClick={then(props.onZoom)} />}
             </Group>

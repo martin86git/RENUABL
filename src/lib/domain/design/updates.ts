@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
     area: "Designer",
-    words: "The calculator is now a round in the designer's dock: it opens Sol's size-a-system card.",
+    words: "The calculator is in the designer's dock, and in Sol's tools on a phone: it opens his size-a-system card.",
   },
   { day: "2026-11-25", area: "Designer", words: "The Draw the roof view is gone from the designer's tools: the roof is always the photo." },
   {

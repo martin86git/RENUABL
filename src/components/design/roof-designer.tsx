@@ -7069,6 +7069,7 @@ export function RoofDesigner(props: {
           onUndo={undo}
           onRedo={redo}
           onWhole={() => setView(WHOLE)}
+          {...(costsHidden ? {} : { onCalc: () => setCalcOpen(true), calcOn: calcOpen })}
           {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
           {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
           footRoom={solHolds ? 78 : 0}
