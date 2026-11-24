@@ -2056,10 +2056,10 @@ html:has(.sales-snap) {
 .sol-sun-canvas {
   filter: brightness(0.9);
 }
-/* 20% on a computer (24 Nov 2026, Martin: 10% couldn't be seen on a big screen); phones keep 10%. */
+/* 15% on a computer (24 Nov 2026, Martin: 10% couldn't be seen on a big screen, 20% was too dim); phones keep 10%. */
 @media (min-width: 1024px) {
   .sol-sun-canvas {
-    filter: brightness(0.8);
+    filter: brightness(0.85);
   }
 }
 /* The Marketplace's blue round rising into Sol's place in the middle of the dock. */
