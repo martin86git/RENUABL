@@ -2,6 +2,8 @@
 
 Drafts only. Nothing here has been sent, scheduled or put into the product yet.
 
+> **22 Nov 2026: the emails below are replaced** by the "One giant leap" launch series in [launch-strategy.md](launch-strategy.md), which is what Add the drafts now puts into Marketing. The send checklist and warm-up here still stand.
+
 ## Before anything is sent
 
 1. **Consent of the bought list.** Confirm what consent the list carries. Contacts without express or inferred consent are imported as "Not checked" and are never emailed. Nothing goes out until this is answered.

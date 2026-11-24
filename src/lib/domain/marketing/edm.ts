@@ -569,6 +569,19 @@ export interface EdmSender {
   email: string | null;
   phone: string | null;
   address: string | null;
+  /**
+   * The business's logo for the top of its emails: a public https address, drawn in place of its name in bold (22 Nov
+   * 2026, Martin: RENUABL's own emails carry the website's logo). None, or not https, and the name is written as before.
+   */
+  logo?: string | null;
+}
+
+/** The email's top line: the sender's logo when there is a safe one, else its name. */
+export function headerCell(sender: EdmSender): string {
+  const logo = sender.logo && /^https:\/\/[^\s"'<>]+$/.test(sender.logo) ? sender.logo : null;
+  return logo
+    ? `<img src="${esc(logo)}" alt="${esc(sender.name || "Logo")}" width="132" style="display:block;width:132px;max-width:132px;height:auto;border:0">`
+    : esc(sender.name);
 }
 
 /** Why an email can't name its sender properly yet (Spam Act s 17: who sent it and how to contact them), or null. */
@@ -792,7 +805,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
   }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${
     brand.logoId
       ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
-      : esc(sender.name)
+      : headerCell(sender)
   }</td></tr>${rows.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
