@@ -107,6 +107,7 @@ import {
   ZoomOut,
   type LucideIcon,
   Calculator,
+  ArrowRight,
 } from "lucide-react";
 import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/lib/domain/design/electrical";
 import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
@@ -11932,25 +11933,19 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
-                  {/* Proceed to proposal from the dock (24 Nov 2026, Martin: "There should be a button to proceed to
-                      proposal here"): the quote's own Proceed, so the same checks and saving. */}
-                  {!props.sitesOnly && (
-                    <>
-                      {proceedSaid && (
-                        <p className="max-w-full truncate text-[11.5px] text-white/70" role="status">
-                          {proceedSaid}
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => void toProposal()}
-                        disabled={proceedSaid === SAVING_FOR_PROPOSAL}
-                        className="pointer-events-auto inline-flex h-10 items-center gap-2 rounded-full bg-sun-line px-5 text-[14px] font-semibold text-white shadow-lift disabled:opacity-70"
-                      >
-                        <FileText className="size-4" aria-hidden />
-                        Proceed to proposal
-                      </button>
-                    </>
+                  {/* On to the quote (24 Nov 2026, Martin: in place of Proceed to proposal on the dock, "in the bottom right
+                      corner an arrow pointing right as an indicator to proceed to the next screen, it should take me to the
+                      quote, and I should be able to proceed to the proposal"): the quote sheet carries Proceed to proposal. */}
+                  {!props.sitesOnly && !costsHidden && (
+                    <button
+                      type="button"
+                      onClick={() => showSide("quote")}
+                      aria-label="Next: the quote"
+                      title="Next: the quote"
+                      className="pointer-events-auto absolute bottom-4 right-4 flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.35)] transition active:scale-95"
+                    >
+                      <ArrowRight className="size-6" aria-hidden />
+                    </button>
                   )}
                 </div>
               )}
