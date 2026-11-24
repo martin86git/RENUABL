@@ -62,18 +62,27 @@ function Banner({
 }) {
   return (
     <section
-      className={clsx("mt-6 grid overflow-hidden rounded-lg bg-ink text-white", items.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}
+      className={clsx("mt-4 grid overflow-hidden rounded-lg bg-ink text-white sm:mt-6", items.length === 3 ? "grid-cols-3" : "grid-cols-2")}
     >
       {items.map((item, i) => (
-        <div key={item.label} className={clsx("px-5 py-4", i > 0 && "border-t border-white/15 sm:border-l sm:border-t-0")}>
-          <p className="text-[10.5px] font-medium uppercase tracking-[0.16em] text-white/60">{item.label}</p>
-          <p className={clsx("mt-2 text-[26px] font-medium leading-none tabular-nums tracking-tight", item.signal && "text-sun-line")}>
+        <div key={item.label} className={clsx("min-w-0 px-3 py-3 sm:px-5 sm:py-4", i > 0 && "border-l border-white/15")}>
+          <p className="text-[9px] font-medium uppercase leading-tight tracking-[0.1em] text-white/60 sm:text-[10.5px] sm:tracking-[0.16em]">
+            {item.label}
+          </p>
+          <p
+            className={clsx(
+              "mt-1.5 text-[19px] font-medium leading-none tabular-nums tracking-tight sm:mt-2 sm:text-[26px]",
+              item.signal && "text-sun-line",
+            )}
+          >
             {item.value}
           </p>
-          <p className="mt-2 text-[11.5px] text-white/60">{item.under}</p>
-          {/* One panel a job: lit when it's done, half-lit when partly. */}
+          <p className="mt-1.5 line-clamp-2 text-[10px] leading-snug text-white/60 sm:mt-2 sm:line-clamp-none sm:text-[11.5px]">
+            {item.under}
+          </p>
+          {/* One panel a job: lit when it's done, half-lit when partly. On a phone the figure says it. */}
           {item.tally && (
-            <div className="mt-3">
+            <div className="mt-3 hidden sm:block">
               <Tally states={item.tally.states} tone="dark" label={item.tally.label} />
             </div>
           )}
