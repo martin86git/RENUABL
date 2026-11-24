@@ -16,6 +16,7 @@ import {
   Phone,
   PhoneCall,
   Sparkles,
+  SquareKanban,
   Stamp,
   TrendingUp,
   type LucideIcon,
@@ -48,6 +49,10 @@ import { DOCK_SET_WORDS, installingOn } from "@/lib/domain/design/dock-set";
 import { INSTALLER_KEY } from "@/lib/domain/design/crm";
 import { OrdersPage } from "./design-orders";
 import { AfterInstallPage } from "./install-lists";
+import { TrayTabs, type TrayTabItem } from "./tray-tabs";
+
+/** The pipeline, a shortcut in the tray (24 Nov 2026, Martin). */
+const PIPELINE_PATH = "/design/sales/pipelines";
 
 /**
  * Today's Business and My month (21 Nov 2026, Martin: the Chat page wasn't a plus, chat is everywhere already; what
@@ -113,7 +118,7 @@ export const TODAY_CALENDAR = "renuabl:today-calendar";
 export const firstViewLabel = (views: InsightsView[] | null | "failed") =>
   Array.isArray(views) && views[0]?.scope === "me" ? "My month" : "Business";
 
-type TrayTab = "performance" | "needs" | "proposals" | "calls" | "sol" | "changes" | "installs" | "orders" | "paperwork";
+type TrayTab = "performance" | "pipeline" | "needs" | "proposals" | "calls" | "sol" | "changes" | "installs" | "orders" | "paperwork";
 
 export function TodayChat(props: {
   name: string | null;
@@ -159,14 +164,16 @@ export function TodayChat(props: {
   const dock = useDockSet();
   const post = dock === "post";
   const installsToday = useMemo(() => (props.jobs ? installingOn(props.jobs, props.today).length : undefined), [props.jobs, props.today]);
-  const postTabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
+  const postTabs: TrayTabItem<TrayTab>[] = [
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
+    { key: "pipeline", label: "Pipeline", icon: SquareKanban, href: PIPELINE_PATH },
     { key: "installs", label: "Installs", icon: HardHat, count: installsToday },
     { key: "orders", label: "Orders", icon: Package },
     { key: "paperwork", label: "Paperwork", icon: FileCheck2 },
   ];
-  const salesTabs: { key: TrayTab; label: string; icon: LucideIcon; count?: number }[] = [
+  const salesTabs: TrayTabItem<TrayTab>[] = [
     { key: "performance", label: mine ? "My month" : "Performance", icon: TrendingUp },
+    { key: "pipeline", label: "Pipeline", icon: SquareKanban, href: PIPELINE_PATH },
     { key: "needs", label: "Needs you", icon: CircleAlert, count: needsCount },
     { key: "proposals", label: "Proposals", icon: FileText },
     { key: "calls", label: "Calls", icon: Phone },
@@ -227,33 +234,7 @@ export function TodayChat(props: {
       {/* The tray tucks under the box, inset the same on both sides; on a phone its tabs scroll inside it and fade at the
           right edge, so the last one is never cut off square (24 Nov 2026, Martin: it "finishes oddly at the right"). */}
       <div className="-mt-5 w-[calc(100%-2.5rem)] overflow-hidden rounded-b-[20px] bg-primary pb-2 pt-[28px] shadow-[0_10px_24px_-14px_rgba(0,0,0,0.5)]">
-        <div
-          role="tablist"
-          aria-label="About the month"
-          className="no-scrollbar flex flex-nowrap items-center gap-1 overflow-x-auto whitespace-nowrap px-2 max-sm:pr-10 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] sm:justify-center"
-        >
-          {tabs.map(({ key, label, icon: Icon, count }) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={shown === key}
-              onClick={() => setTab(shown === key ? null : key)}
-              className={clsx(
-                "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] transition",
-                shown === key ? "bg-surface text-ink shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white",
-              )}
-            >
-              <Icon className="size-3.5" aria-hidden />
-              {label}
-              {count ? (
-                <span className="grid min-w-5 place-items-center rounded-full bg-sun-line px-1.5 text-[11px] font-semibold text-white">
-                  {count}
-                </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
+        <TrayTabs set={post ? "post" : "sales"} tabs={tabs} shown={shown} onPick={(key) => setTab(shown === key ? null : key)} />
       </div>
 
       {/* STC changes (stc-change.ts): one card under the tray, only for who may change settings, only while there is something to say. */}
