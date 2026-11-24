@@ -63,6 +63,8 @@ export async function GET() {
       ...(member?.firstName ? { firstName: member.firstName } : {}),
       // The welcome on Today (welcome.ts), until they finish or skip it. Not while viewing as someone.
       ...(member && member.welcomed === false && !member.viewedBy ? { welcome: true } : {}),
+      // The tour of a deal (deal-tour.ts) has been seen by this person, on any device.
+      ...(member?.dealTourSeen || member?.viewedBy ? { dealTourSeen: true } : {}),
       ...(member && !member.firstName && !member.viewedBy && !demo && !sampleByEmail(access.email) ? { needsProfile: true } : {}),
       // The owner viewing as this member: whose own view it really is.
       ...(member?.viewedBy ? { viewedBy: member.viewedBy } : {}),

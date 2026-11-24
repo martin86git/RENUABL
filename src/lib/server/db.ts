@@ -198,6 +198,8 @@ alter table business_members add column if not exists last_name text;
 alter table business_members add column if not exists mobile text;
 -- The welcome on Today (domain/design/welcome.ts): when this person finished or skipped it; null shows it.
 alter table business_members add column if not exists welcomed_at timestamptz;
+-- The tour of a deal (deal-tour.ts): when this person first saw it, kept here so it runs once for them, not once a device.
+alter table business_members add column if not exists deal_tour_at timestamptz;
 -- People who own deals but haven't been invited (24 Nov 2026, Martin: to give historical deals to a salesperson without
 -- inviting them). Not members: they can't sign in, aren't paid users, and nothing is sent to them. Inviting one adds the
 -- member and takes the row away; their deals already carry the email.

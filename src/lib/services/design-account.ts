@@ -42,6 +42,8 @@ export type DesignAccount =
       needsProfile?: boolean;
       /** The welcome on Today is still to be shown (welcome.ts). */
       welcome?: boolean;
+      /** This person has seen the tour of a deal (deal-tour.ts), on any device. */
+      dealTourSeen?: boolean;
       /** RENUABL staff (Settings → View as), and the sample business kind they are looking through. */
       staff?: boolean;
       staffViewing?: "retailer" | "installer" | "inspector";
@@ -214,6 +216,11 @@ export async function saveProfile(o: { firstName: string; lastName: string; mobi
 /** The welcome on Today is done (finished or skipped): it isn't shown again. */
 export async function finishWelcome(): Promise<void> {
   await send<Answer>("/api/design/onboarding", "POST", {});
+}
+
+/** The tour of a deal has been seen: it doesn't start by itself again, on any device. */
+export async function finishDealTour(): Promise<void> {
+  await send<Answer>("/api/design/onboarding", "POST", { tour: "deal" });
 }
 
 /** The owner renames the business. Null when done. */
