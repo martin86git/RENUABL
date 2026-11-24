@@ -64,8 +64,14 @@ export function AddressStrip({
   }, [askToSearch]);
   return (
     <div className="mx-auto mt-1.5 flex w-full max-w-[min(100%,72rem)] flex-wrap items-center gap-2 px-1">
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full bg-surface py-0.5 pl-3.5 pr-1 shadow-sm ring-1 ring-line">
-        <MapPin className="size-4 shrink-0 text-sun-line" aria-hidden />
+      <div
+        className={clsx(
+          "flex min-w-0 items-center gap-2.5 bg-surface py-0.5 pr-1 shadow-sm ring-1 ring-line",
+          // Searching takes the whole row (the deal button steps aside), so the box is never squeezed to nothing.
+          searching ? "w-full basis-full rounded-2xl pl-1.5" : "flex-1 rounded-full pl-3.5",
+        )}
+      >
+        {!searching && <MapPin className="size-4 shrink-0 text-sun-line" aria-hidden />}
         {searching ? (
           <div className="min-w-0 flex-1">
             <AddressEntry
@@ -99,8 +105,8 @@ export function AddressStrip({
           {searching ? <X className="size-4" aria-hidden /> : <Search className="size-4" aria-hidden />}
         </button>
       </div>
-      {extra}
-      {deal ? (
+      {!searching && extra}
+      {searching ? null : deal ? (
         <button
           type="button"
           onClick={onOpenDeal}
