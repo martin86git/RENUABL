@@ -103,7 +103,7 @@ export function RoutinesPage() {
           {problem}
         </p>
       )}
-      <div className="mt-5 grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
+      <div className="routines-cols mt-5 grid gap-5">
         <RoutineList
           routines={routines}
           chosen={picked === NEW ? NEW : chosen.id}
@@ -304,7 +304,7 @@ function FlowCanvas({
       {/* Its header: who, what it does, and its switch. */}
       <header className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
         <Face routine={routine} size={44} />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[12rem] flex-1">
           <p className="text-[15px] font-semibold text-ink">
             {routine.agent} <span className="font-normal text-muted">· {routine.title}</span>
           </p>

@@ -350,11 +350,55 @@
 body {
   transition: padding-right 300ms ease;
 }
-/* From 1440px the page narrows beside it; below that there isn't room for the top bar beside the panel, so it lies
-   over the page (1 Nov 2026). */
-@media (min-width: 1440px) {
+/* The page narrows beside it, but never to less than 64rem, the least the top bar and a page's own layout need
+   (24 Nov 2026, Martin: "pages need to better optimise when the right hand side sol drawer appears"; it was all or
+   nothing at 1440px, so a panel dragged wide crushed the page, and under 1440px it lay over everything). `--sol-room`
+   is what the page gives up. Where the panel is wider than that, it lies over the page's right edge by `--sol-over`,
+   and the top bar and the pad step in by as much (up to 10rem; past that the panel simply covers), so what's on the
+   page stays clear of him. `--page-w` is the room the page really has: layouts that must follow the page rather
+   than the window (the settings list) size themselves by it. */
+:root {
+  --sol-room: 0px;
+  --sol-over: 0px;
+  --page-w: calc(100vw - var(--sol-room) - var(--sol-over));
+}
+.studio-room {
+  transition: padding-right 300ms ease;
+}
+/* The settings list (settings-nav.tsx) gives way before the page beside it does: 16rem where the page has 80rem or
+   more, down to 12.5rem on a 64rem page (a laptop, or Sol's panel open). While the setup pill floats in the bottom left
+   corner the list stops short of it, so the pill never lies over the list's headings. */
+@media (min-width: 64rem) {
+  .settings-list {
+    width: clamp(12.5rem, var(--page-w) * 0.25 - 4rem, 16rem);
+  }
+  /* Routines: its list of agents beside the flow, 19rem where the page has room, down to 14rem. */
+  .routines-cols {
+    grid-template-columns: clamp(14rem, var(--page-w) * 0.3 - 6rem, 19rem) minmax(0, 1fr);
+  }
+  .studio-frame:has([data-corner-pill]) .settings-list {
+    height: calc(100dvh - 4.5rem);
+  }
+}
+html.sol-resizing .studio-room {
+  transition: none;
+}
+@media (min-width: 64rem) {
+  html.sol-docked {
+    --sol-room: min(var(--sol-w), max(0px, 100vw - 64rem));
+    --sol-over: clamp(0px, var(--sol-w) - (100vw - 64rem), 10rem);
+  }
   html.sol-docked body {
-    padding-right: var(--sol-w);
+    padding-right: var(--sol-room);
+  }
+  /* Beside the panel a page mostly fills its width, so its cards reached under the floating bar (Sol's sun stands
+     6px out of it): the pad keeps 2rem more on that side while he is open, and steps in from under the panel. */
+  html.sol-docked .studio-room {
+    padding-right: calc(5.5rem + var(--sol-over));
+  }
+  /* A page that draws its own ground to the pad's edge (the deal) has no pad padding to stand it off the bar. */
+  html.sol-docked .studio-room:has([data-rails-out]) {
+    padding-right: calc(6.5rem + var(--sol-over));
   }
   /* The rail and the team chat stay in reach beside the panel, not under it. */
   html.sol-docked .sol-rail {
@@ -609,11 +653,6 @@ button.team-flash:not([aria-pressed="true"]) {
     display: flex;
   }
 }
-@media (max-width: 1919px) {
-  html.sol-docked .studio-market-words {
-    display: none;
-  }
-}
 /* Shorter still (a laptop, or Sol's panel open beside the page): the sections closer together and the frame's sides
    narrower; with the panel open the magnifier goes too (Sol is open to ask, and Ctrl K still searches). */
 @media (min-width: 1024px) and (max-width: 1279px) {
@@ -625,16 +664,42 @@ button.team-flash:not([aria-pressed="true"]) {
     font-size: 13px;
   }
 }
-@media (min-width: 1024px) and (max-width: 1919px) {
+/* With Sol's panel open the bar goes by its own width, not the window's (24 Nov 2026): the panel can be any width,
+   so a wide one beside a wide window left the bar as short as a laptop's. 1455px is the bar beside the panel as it
+   opens on a 1919px window, where these used to switch. Under 900px the wordmark gives way to its mark as well. */
+.studio-top {
+  container: studio-top / inline-size;
+}
+@media (min-width: 1024px) {
   html.sol-docked .studio-top {
-    padding-inline: 1.5rem;
+    padding-inline: 1.5rem calc(1.5rem + var(--sol-over));
   }
+}
+@media (min-width: 1920px) {
+  html.sol-docked .studio-top {
+    padding-inline: 3.5rem calc(3.5rem + var(--sol-over));
+  }
+}
+@container studio-top (max-width: 1455px) {
   html.sol-docked .studio-sections > a {
     padding-inline: 0.6rem;
     font-size: 13px;
   }
-  html.sol-docked .studio-search {
+  html.sol-docked .studio-search,
+  html.sol-docked .studio-search-words,
+  html.sol-docked .studio-market-words {
     display: none;
+  }
+  html.sol-docked .studio-day-weather {
+    display: none !important;
+  }
+}
+@container studio-top (max-width: 900px) {
+  html.sol-docked .studio-mark-full {
+    display: none;
+  }
+  html.sol-docked .studio-mark-short {
+    display: flex;
   }
 }
 /* A narrower window (5 Nov 2026, from Primero's): the top bar makes room before anything is covered. The wordmark
@@ -660,20 +725,10 @@ button.team-flash:not([aria-pressed="true"]) {
   }
 }
 /* With Sol's panel open the wordmark stays whole (15 Nov 2026, Martin: "the renuabl logo unnecessarily reduces down"):
-   Search beside it is put away then, which leaves it room. Only the weather gives way. */
-@media (max-width: 1919px) {
-  html.sol-docked .studio-day-weather {
-    display: none !important;
-  }
-}
+   Search beside it is put away then, which leaves it room (the rules by the bar's own width, above). */
 /* Search by the wordmark (8 Nov 2026): its word and Ctrl K go when the wordmark does, leaving the magnifier. */
 @media (max-width: 1535px) {
   .studio-search-words {
-    display: none;
-  }
-}
-@media (max-width: 1919px) {
-  html.sol-docked .studio-search-words {
     display: none;
   }
 }
