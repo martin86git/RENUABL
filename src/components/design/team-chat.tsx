@@ -4,12 +4,13 @@ import { useStageNames } from "./stage-select";
 import { CustomerConversations } from "./customer-conversations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
 import {
   AtSign,
   Check,
+  ChevronDown,
   ChevronLeft,
   FileText,
   Hash,
@@ -96,6 +97,16 @@ import { SolThinking, useSolLaunch } from "./sol-thinking";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
+
+/** A conversation's day, between its lines (24 Nov 2026, Martin's mock-up): Today, Yesterday, else the weekday and date. */
+function dayWords(iso: string): string {
+  const d = new Date(iso);
+  const day = (x: Date) => x.toLocaleDateString("en-CA");
+  const now = new Date();
+  if (day(d) === day(now)) return "Today";
+  if (day(d) === day(new Date(now.getTime() - 86_400_000))) return "Yesterday";
+  return d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+}
 
 /** How long the chat waits for Sol's answer in a channel before it stops showing that he is answering. */
 const SOL_WAIT_MS = 120_000;
@@ -505,14 +516,37 @@ export function TeamChatPanel({
             />
           )}
           <div className="px-2 pt-3">{sides}</div>
-          <DealChatsList
-            deals={view?.dealChats ?? []}
-            room={room}
-            onPick={(id) => setRoom(dealRoom(id))}
-            onStart={(id) => void openDeal(id)}
-            jobs={jobs}
-            needJobs={() => jobs === null && void listJobs().then((r) => setJobs(r.ok ? r.jobs : []))}
-          />
+          {narrow && (
+            <>
+              <DmStrip
+                people={view?.people ?? []}
+                room={room}
+                onPick={(r) => setRoom(r)}
+                onNew={() => setAdding((a) => (a === "person" ? null : "person"))}
+              />
+              {adding === "person" && (
+                <PickPerson
+                  people={view?.people ?? []}
+                  onPick={(r) => {
+                    setAdding(null);
+                    setRoom(r);
+                  }}
+                  onClose={() => setAdding(null)}
+                />
+              )}
+              <DealCards deals={view?.dealChats ?? []} room={room} onPick={(id) => setRoom(dealRoom(id))} />
+            </>
+          )}
+          {!narrow && (
+            <DealChatsList
+              deals={view?.dealChats ?? []}
+              room={room}
+              onPick={(id) => setRoom(dealRoom(id))}
+              onStart={(id) => void openDeal(id)}
+              jobs={jobs}
+              needJobs={() => jobs === null && void listJobs().then((r) => setJobs(r.ok ? r.jobs : []))}
+            />
+          )}
           <ListHead
             label="Channels"
             plus="Add a channel"
@@ -554,33 +588,38 @@ export function TeamChatPanel({
               )}
             </div>
           ))}
-          <ListHead
-            label="Direct messages"
-            plus="Message someone"
-            on={adding === "person"}
-            onPlus={() => setAdding((a) => (a === "person" ? null : "person"))}
-          />
-          {adding === "person" && (
-            <PickPerson
-              people={view?.people ?? []}
-              onPick={(r) => {
-                setAdding(null);
-                setRoom(r);
-              }}
-              onClose={() => setAdding(null)}
-            />
+          {!narrow && (
+            <>
+              <ListHead
+                label="Direct messages"
+                plus="Message someone"
+                on={adding === "person"}
+                onPlus={() => setAdding((a) => (a === "person" ? null : "person"))}
+              />
+              {adding === "person" && (
+                <PickPerson
+                  people={view?.people ?? []}
+                  onPick={(r) => {
+                    setAdding(null);
+                    setRoom(r);
+                  }}
+                  onClose={() => setAdding(null)}
+                />
+              )}
+              <div className={narrow ? "flex-1 pb-2" : "staff-scroll min-h-0 flex-1 overflow-y-auto pb-2"}>
+                {view && view.people.length === 0 && adding !== "person" && (
+                  <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Settings → Users.</p>
+                )}
+                {view?.people.map((p) => (
+                  <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
+                    <Round email={p.email} tinted />
+                    <span className="truncate">{p.label}</span>
+                  </RoomButton>
+                ))}
+              </div>
+            </>
           )}
-          <div className={narrow ? "flex-1 pb-2" : "staff-scroll min-h-0 flex-1 overflow-y-auto pb-2"}>
-            {view && view.people.length === 0 && adding !== "person" && (
-              <p className="px-3 pt-1 text-xs text-muted">No one else is in the business yet. Add people under Settings → Users.</p>
-            )}
-            {view?.people.map((p) => (
-              <RoomButton key={p.room} on={room === p.room} unread={p.unread} onClick={() => setRoom(p.room)} title={p.email}>
-                <Round email={p.email} tinted />
-                <span className="truncate">{p.label}</span>
-              </RoomButton>
-            ))}
-          </div>
+          {narrow && <div className="flex-1 pb-2" />}
           <div className={clsx(narrow && "pointer-events-none sticky bottom-0 [&>*]:pointer-events-auto")}>
             <NewChatButton
               sol={hasSol}
@@ -743,176 +782,184 @@ export function TeamChatPanel({
               const mine = l.by === me.toLowerCase();
               const head = lines[i - 1]?.by !== l.by || Date.parse(l.at) - Date.parse(lines[i - 1]?.at ?? "") > 15 * 60_000;
               const isEditing = editing?.id === l.id;
+              const day = dayWords(l.at);
+              const newDay = i === 0 || dayWords(lines[i - 1].at) !== day;
               return (
-                <div
-                  key={l.id}
-                  id={`tl-${l.id}`}
-                  className={clsx(
-                    "group/line relative flex scroll-my-6 flex-col rounded-2xl transition-colors duration-700",
-                    mine ? "items-end" : "items-start",
-                    flash === l.id && "bg-sun/70",
-                  )}
-                >
-                  {head && (
-                    <p className={clsx("mb-0.5 mt-2 flex items-center gap-1.5 px-1 text-[11px] text-muted", mine && "flex-row-reverse")}>
-                      {!mine && <Round email={l.by} small />}
-                      <span className="font-medium text-ink-2">{mine ? "You" : nameOf(l.by)}</span> · {when(l.at)}
+                <Fragment key={l.id}>
+                  {newDay && (
+                    <p className="flex justify-center pb-1 pt-3">
+                      <span className="rounded-full bg-canvas px-3 py-0.5 text-[11px] font-medium text-muted ring-1 ring-line">{day}</span>
                     </p>
                   )}
-                  {l.replyTo && <Quoted reply={l.replyTo} mine={mine} me={me} onShow={showLine} />}
-                  {l.files?.length ? <Files files={l.files} mine={mine} /> : null}
-                  {isEditing ? (
-                    <div className="flex w-[85%] flex-col items-end gap-1">
-                      <textarea
-                        autoFocus
-                        value={editing.text}
-                        onChange={(e) => setEditing({ id: l.id, text: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            void saveEdit();
-                          }
-                          if (e.key === "Escape") setEditing(null);
-                        }}
-                        aria-label="Change your message"
-                        className="max-h-40 min-h-9 w-full resize-none rounded-2xl border border-ink bg-surface px-3 py-1.5 text-sm outline-none [field-sizing:content]"
-                      />
-                      <p className="text-[11px] text-muted">
-                        Enter to save · Esc to cancel ·{" "}
-                        <button type="button" onClick={() => void saveEdit()} className="font-semibold text-ink underline">
-                          Save
-                        </button>
+                  <div
+                    id={`tl-${l.id}`}
+                    className={clsx(
+                      "group/line relative flex scroll-my-6 flex-col rounded-2xl transition-colors duration-700",
+                      mine ? "items-end" : "items-start",
+                      flash === l.id && "bg-sun/70",
+                    )}
+                  >
+                    {head && (
+                      <p className={clsx("mb-0.5 mt-2 flex items-center gap-1.5 px-1 text-[11px] text-muted", mine && "flex-row-reverse")}>
+                        {!mine && <Round email={l.by} small />}
+                        <span className="font-medium text-ink-2">{mine ? "You" : nameOf(l.by)}</span> · {when(l.at)}
                       </p>
-                    </div>
-                  ) : (
-                    l.text && (
-                      <p
-                        title={when(l.at)}
-                        className={clsx(
-                          "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm",
-                          mine ? "bg-primary text-white" : l.by === SOL_BY ? "bg-sun text-ink" : "bg-canvas text-ink",
-                        )}
-                      >
-                        {l.by === SOL_BY && <SolBadge className="mr-1 inline size-3.5 -translate-y-px" />}
-                        <Tagged text={l.text} members={members} dark={mine} />
-                      </p>
-                    )
-                  )}
-                  {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
-                  {l.action && (
-                    <ActionCard
-                      lineId={l.id}
-                      action={l.action}
-                      me={me}
-                      seesCosts={view?.seesCosts !== false}
-                      onDone={() => void load()}
-                      onError={setError}
-                    />
-                  )}
-                  {(l.diagrams?.length || l.charts?.length) && (
-                    <div className="mt-1 w-full max-w-[85%] space-y-2">
-                      {l.diagrams?.map((d, k) => (
-                        <SolDiagramView key={`d${k}`} diagram={d} />
-                      ))}
-                      {l.charts?.map((c, k) => (
-                        <SolChartView key={`c${k}`} chart={c} />
-                      ))}
-                    </div>
-                  )}
-                  {l.deals?.length ? <Deals deals={l.deals} onOpenChat={(id) => void openDeal(id)} /> : null}
-                  {l.reactions && (
-                    <div className={clsx("mt-1 flex max-w-[85%] flex-wrap gap-1", mine && "justify-end")}>
-                      {Object.entries(l.reactions).map(([emoji, who]) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => void react(l.id, emoji)}
-                          title={`${who.map(nameOf).join(", ")} reacted with ${emoji}`}
-                          aria-pressed={who.includes(me.toLowerCase())}
+                    )}
+                    {l.replyTo && <Quoted reply={l.replyTo} mine={mine} me={me} onShow={showLine} />}
+                    {l.files?.length ? <Files files={l.files} mine={mine} /> : null}
+                    {isEditing ? (
+                      <div className="flex w-[85%] flex-col items-end gap-1">
+                        <textarea
+                          autoFocus
+                          value={editing.text}
+                          onChange={(e) => setEditing({ id: l.id, text: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              void saveEdit();
+                            }
+                            if (e.key === "Escape") setEditing(null);
+                          }}
+                          aria-label="Change your message"
+                          className="max-h-40 min-h-9 w-full resize-none rounded-2xl border border-ink bg-surface px-3 py-1.5 text-sm outline-none [field-sizing:content]"
+                        />
+                        <p className="text-[11px] text-muted">
+                          Enter to save · Esc to cancel ·{" "}
+                          <button type="button" onClick={() => void saveEdit()} className="font-semibold text-ink underline">
+                            Save
+                          </button>
+                        </p>
+                      </div>
+                    ) : (
+                      l.text && (
+                        <p
+                          title={when(l.at)}
                           className={clsx(
-                            "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ring-1",
-                            who.includes(me.toLowerCase()) ? "bg-sun ring-sun-line" : "bg-surface ring-line hover:ring-ink",
+                            "max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-3 py-1.5 text-sm",
+                            mine ? "bg-primary text-white" : l.by === SOL_BY ? "bg-sun text-ink" : "bg-canvas text-ink",
                           )}
                         >
-                          <span>{emoji}</span>
-                          <span className="font-semibold text-ink-2">{who.length}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {!isEditing && (
-                    <div
-                      className={clsx(
-                        "absolute -top-3 z-10 flex items-center gap-0.5 rounded-full bg-surface p-0.5 shadow-md ring-1 ring-line transition-opacity",
-                        mine ? "right-0" : "left-0",
-                        reacting === l.id
-                          ? "opacity-100"
-                          : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/line:pointer-events-auto group-hover/line:opacity-100",
-                      )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => replyTo(l)}
-                        aria-label="Reply"
-                        title="Reply"
-                        className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-canvas hover:text-ink"
+                          {l.by === SOL_BY && <SolBadge className="mr-1 inline size-3.5 -translate-y-px" />}
+                          <Tagged text={l.text} members={members} dark={mine} />
+                        </p>
+                      )
+                    )}
+                    {l.edited && !isEditing && <p className="px-1 text-[10px] text-muted">edited</p>}
+                    {l.action && (
+                      <ActionCard
+                        lineId={l.id}
+                        action={l.action}
+                        me={me}
+                        seesCosts={view?.seesCosts !== false}
+                        onDone={() => void load()}
+                        onError={setError}
+                      />
+                    )}
+                    {(l.diagrams?.length || l.charts?.length) && (
+                      <div className="mt-1 w-full max-w-[85%] space-y-2">
+                        {l.diagrams?.map((d, k) => (
+                          <SolDiagramView key={`d${k}`} diagram={d} />
+                        ))}
+                        {l.charts?.map((c, k) => (
+                          <SolChartView key={`c${k}`} chart={c} />
+                        ))}
+                      </div>
+                    )}
+                    {l.deals?.length ? <Deals deals={l.deals} onOpenChat={(id) => void openDeal(id)} /> : null}
+                    {l.reactions && (
+                      <div className={clsx("mt-1 flex max-w-[85%] flex-wrap gap-1", mine && "justify-end")}>
+                        {Object.entries(l.reactions).map(([emoji, who]) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => void react(l.id, emoji)}
+                            title={`${who.map(nameOf).join(", ")} reacted with ${emoji}`}
+                            aria-pressed={who.includes(me.toLowerCase())}
+                            className={clsx(
+                              "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ring-1",
+                              who.includes(me.toLowerCase()) ? "bg-sun ring-sun-line" : "bg-surface ring-line hover:ring-ink",
+                            )}
+                          >
+                            <span>{emoji}</span>
+                            <span className="font-semibold text-ink-2">{who.length}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {!isEditing && (
+                      <div
+                        className={clsx(
+                          "absolute -top-3 z-10 flex items-center gap-0.5 rounded-full bg-surface p-0.5 shadow-md ring-1 ring-line transition-opacity",
+                          mine ? "right-0" : "left-0",
+                          reacting === l.id
+                            ? "opacity-100"
+                            : "pointer-events-none opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/line:pointer-events-auto group-hover/line:opacity-100",
+                        )}
                       >
-                        <Reply className="size-3.5" aria-hidden />
-                      </button>
-                      <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
-                      {TEAM_QUICK_REACTIONS.map((e) => (
                         <button
-                          key={e}
                           type="button"
-                          onClick={() => void react(l.id, e)}
-                          aria-label={`React with ${e}`}
-                          className="flex size-7 items-center justify-center rounded-full text-sm hover:bg-canvas"
+                          onClick={() => replyTo(l)}
+                          aria-label="Reply"
+                          title="Reply"
+                          className="flex size-7 items-center justify-center rounded-full text-ink-2 hover:bg-canvas hover:text-ink"
                         >
-                          {e}
+                          <Reply className="size-3.5" aria-hidden />
                         </button>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setReacting(reacting === l.id ? null : l.id)}
-                        aria-label="More reactions"
-                        title="More reactions"
-                        className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
-                      >
-                        <SmilePlus className="size-3.5" aria-hidden />
-                      </button>
-                      {mine && l.text && (
+                        <span className="mx-0.5 h-4 w-px bg-line" aria-hidden />
+                        {TEAM_QUICK_REACTIONS.map((e) => (
+                          <button
+                            key={e}
+                            type="button"
+                            onClick={() => void react(l.id, e)}
+                            aria-label={`React with ${e}`}
+                            className="flex size-7 items-center justify-center rounded-full text-sm hover:bg-canvas"
+                          >
+                            {e}
+                          </button>
+                        ))}
                         <button
                           type="button"
-                          onClick={() => {
-                            setReacting(null);
-                            setEditing({ id: l.id, text: l.text });
-                          }}
-                          aria-label="Edit"
-                          title="Edit"
+                          onClick={() => setReacting(reacting === l.id ? null : l.id)}
+                          aria-label="More reactions"
+                          title="More reactions"
                           className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
                         >
-                          <Pencil className="size-3.5" aria-hidden />
+                          <SmilePlus className="size-3.5" aria-hidden />
                         </button>
-                      )}
-                      {mine && (
-                        <button
-                          type="button"
-                          onClick={() => void remove(l)}
-                          aria-label="Delete"
-                          title="Delete"
-                          className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-danger"
-                        >
-                          <Trash2 className="size-3.5" aria-hidden />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  {reacting === l.id && (
-                    <div className={clsx("absolute top-6 z-20", mine ? "right-0" : "left-0")}>
-                      <EmojiGrid onPick={(e) => void react(l.id, e)} onClose={() => setReacting(null)} />
-                    </div>
-                  )}
-                </div>
+                        {mine && l.text && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReacting(null);
+                              setEditing({ id: l.id, text: l.text });
+                            }}
+                            aria-label="Edit"
+                            title="Edit"
+                            className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                        {mine && (
+                          <button
+                            type="button"
+                            onClick={() => void remove(l)}
+                            aria-label="Delete"
+                            title="Delete"
+                            className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-canvas hover:text-danger"
+                          >
+                            <Trash2 className="size-3.5" aria-hidden />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {reacting === l.id && (
+                      <div className={clsx("absolute top-6 z-20", mine ? "right-0" : "left-0")}>
+                        <EmojiGrid onPick={(e) => void react(l.id, e)} onClose={() => setReacting(null)} />
+                      </div>
+                    )}
+                  </div>
+                </Fragment>
               );
             })}
             <div ref={end} />
@@ -2195,5 +2242,138 @@ function Grip(props: {
         )}
       />
     </div>
+  );
+}
+
+/**
+ * Direct messages on a phone as a row of faces (24 Nov 2026, Martin's mock-up): New DM first as a dashed round, then
+ * each person in the business with their unread count on their corner, scrolling sideways; Invite team to Settings.
+ */
+function DmStrip(props: {
+  people: { room: string; label: string; email: string; unread: number }[];
+  room: string;
+  onPick: (room: string) => void;
+  onNew: () => void;
+}) {
+  return (
+    <section className="mx-2 mt-3 rounded-2xl bg-surface py-3 shadow-[0_1px_3px_rgba(11,11,12,0.06)] ring-1 ring-line">
+      <p className="flex items-center justify-between px-4 text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">
+        Direct messages
+        <Link href="/design/settings/users" className="text-[13px] font-medium normal-case tracking-normal text-sun-line">
+          + Invite team
+        </Link>
+      </p>
+      <div className="no-scrollbar mt-3 flex gap-3 overflow-x-auto px-4">
+        <button type="button" onClick={props.onNew} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+          <span className="grid size-14 place-items-center rounded-full border-2 border-dashed border-line text-muted">
+            <Plus className="size-6" aria-hidden />
+          </span>
+          <span className="text-[12px] text-muted">New DM</span>
+        </button>
+        {props.people.map((p) => (
+          <button
+            key={p.room}
+            type="button"
+            title={p.email}
+            onClick={() => props.onPick(p.room)}
+            className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+          >
+            <span className="relative">
+              <MemberAvatar
+                email={p.email}
+                className={clsx("size-14 text-[17px] ring-2", props.room === p.room ? "ring-sun-line" : "ring-surface")}
+              />
+              {p.unread > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 grid min-w-5 place-items-center rounded-full bg-sun-line px-1 text-[10px] font-semibold text-white ring-2 ring-surface">
+                  {p.unread}
+                </span>
+              )}
+            </span>
+            <span className={clsx("w-full truncate text-center text-[12px]", p.unread ? "font-semibold text-ink" : "text-ink-2")}>
+              {p.label.split(" ")[0]}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The deal chats this person follows, on a phone, as cards (24 Nov 2026, Martin's mock-up): the deal mark, the customer
+ * and when it last spoke, the address, and the latest line in a pill (Sol's with his spark); the section folds.
+ */
+function DealCards(props: { deals: DealChatLine[]; room: string; onPick: (jobId: string) => void }) {
+  const [open, setOpen] = useState(true);
+  const time = (iso: string) => {
+    const d = new Date(iso);
+    return dayWords(iso) === "Today"
+      ? d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" })
+      : d.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+  };
+  return (
+    <section className="mx-2 mt-3 rounded-2xl bg-ink/[0.045] p-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-2 py-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-muted"
+      >
+        Deal chats
+        <span className="rounded-md bg-surface px-1.5 text-[11px] tracking-normal text-ink ring-1 ring-line">{props.deals.length}</span>
+        <span className="ml-auto flex items-center gap-1 text-[13px] font-normal normal-case tracking-normal">
+          {open ? "Collapse" : "Show"}
+          <ChevronDown className={clsx("size-4 transition", !open && "-rotate-90")} aria-hidden />
+        </span>
+      </button>
+      {open && props.deals.length === 0 && (
+        <p className="px-2 pb-2 text-[12.5px] leading-snug text-muted">Deal chats you take part in show here.</p>
+      )}
+      {open && (
+        <div className="space-y-2 pt-1">
+          {props.deals.map((d) => {
+            const fromSol = d.last?.by === SOL_BY;
+            return (
+              <button
+                key={d.jobId}
+                type="button"
+                onClick={() => props.onPick(d.jobId)}
+                className={clsx(
+                  "flex w-full gap-3 rounded-2xl bg-surface p-3 text-left ring-1",
+                  d.unread || props.room === dealRoom(d.jobId) ? "ring-sun-line/50" : "ring-line",
+                )}
+              >
+                <span
+                  className="grid size-10 shrink-0 place-items-center rounded-xl bg-sun/60 text-sun-line ring-1 ring-sun-line/25"
+                  aria-hidden
+                >
+                  <SquareKanban className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline gap-2">
+                    <span className={clsx("min-w-0 flex-1 truncate text-[15px]", d.unread ? "font-semibold" : "font-medium")}>
+                      {d.customer}
+                    </span>
+                    {d.last && <span className="shrink-0 text-[11.5px] text-muted">{time(d.last.at)}</span>}
+                    {d.unread > 0 && (
+                      <span className="shrink-0 rounded-full bg-sun-line px-1.5 text-[10px] font-semibold text-white">{d.unread}</span>
+                    )}
+                  </span>
+                  <span className="block truncate text-[12.5px] text-ink-2">{d.address || d.title}</span>
+                  {d.last && (
+                    <span className="mt-1.5 flex items-center gap-1.5 truncate rounded-lg bg-canvas px-2 py-1 text-[12px] text-ink-2 ring-1 ring-line">
+                      {fromSol && <SolBadge className="size-3.5 shrink-0" />}
+                      <span className="truncate">
+                        <span className="font-medium text-ink">{writerName(d.last.by, d.customer)}:</span> {d.last.text}
+                      </span>
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
