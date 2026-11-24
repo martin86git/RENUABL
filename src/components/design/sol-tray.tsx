@@ -441,14 +441,40 @@ export function SolController(props: {
             {done}
           </div>
         </div>
+        {/* Picking more, given its own row under the header (24 Nov 2026, Martin: All "would be a highly sought after and
+            used function"): the panel's line and the whole array, All filled as the one most reached for. */}
+        {(props.wholeLine || props.wholeArray) && (
+          <div className="absolute inset-x-3 top-[2.1rem] flex justify-center gap-2">
+            {props.wholeLine && props.onWholeLine && (
+              <button
+                type="button"
+                onClick={props.onWholeLine}
+                aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+                className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+              >
+                <Columns2 className="size-3.5 text-sun-line" aria-hidden />
+                Line {props.wholeLine}
+              </button>
+            )}
+            {props.wholeArray && props.onWholeArray && (
+              <button
+                type="button"
+                onClick={props.onWholeArray}
+                aria-label={`Pick the whole array: ${props.wholeArray} panels`}
+                className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
+              >
+                <LayoutGrid className="size-3.5" aria-hidden />
+                Select all {props.wholeArray}
+              </button>
+            )}
+          </div>
+        )}
         {/* The thumbs, in the two bottom corners; between them portrait or landscape, the tilt and delete. */}
         <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
           {props.panels > 0 ? thumb(-1) : <span />}
           <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
             <div className="flex items-center gap-1.5">
               {orient}
-              {line}
-              {whole}
               {remove}
             </div>
             {tilt}
