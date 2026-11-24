@@ -11929,10 +11929,30 @@ export function RoofDesigner(props: {
                   this light grey"): the same graphite plate notched round him, so Sol and the foot row always stand on it. */}
               {underUp && !deckUp && stage && (
                 <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 z-[29] rounded-t-[26px] bg-[#26282c] shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
+                  className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
-                />
+                >
+                  {/* Proceed to proposal from the dock (24 Nov 2026, Martin: "There should be a button to proceed to
+                      proposal here"): the quote's own Proceed, so the same checks and saving. */}
+                  {!props.sitesOnly && (
+                    <>
+                      {proceedSaid && (
+                        <p className="max-w-full truncate text-[11.5px] text-white/70" role="status">
+                          {proceedSaid}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void toProposal()}
+                        disabled={proceedSaid === SAVING_FOR_PROPOSAL}
+                        className="pointer-events-auto inline-flex h-10 items-center gap-2 rounded-full bg-sun-line px-5 text-[14px] font-semibold text-white shadow-lift disabled:opacity-70"
+                      >
+                        <FileText className="size-4" aria-hidden />
+                        Proceed to proposal
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
               {/* Sol's controller for what is picked (22 Nov 2026, Martin): upright a plate under the picture moulded round
                   him, sideways the two thumbs in the picture's bottom corners and a slim pill round him. */}
