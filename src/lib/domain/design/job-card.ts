@@ -299,3 +299,69 @@ export function cardHeadline(system: { kw: number | null; batteryKwh: number | n
   const battery = system.batteryKwh && system.batteryKwh > 0 ? `Battery ${figure(system.batteryKwh)} kWh` : null;
   return solar && battery ? `${solar} & ${battery}` : (solar ?? battery);
 }
+
+/** What a part of the card's system is, for its icon. */
+export type CardPart = "home" | "solar" | "inverter" | "battery" | "charger" | "racking" | "site";
+
+/** The title as lines, one a part of the system, each with its icon (24 Nov 2026, Martin). */
+export function cardHeadlineLines(system: { kw: number | null; batteryKwh: number | null }): { part: CardPart; words: string }[] {
+  const out: { part: CardPart; words: string }[] = [];
+  if (system.kw && system.kw > 0) out.push({ part: "solar", words: `Solar ${figure(system.kw)} kW` });
+  if (system.batteryKwh && system.batteryKwh > 0) out.push({ part: "battery", words: `Battery ${figure(system.batteryKwh)} kWh` });
+  return out;
+}
+
+const PART_OF: Record<string, CardPart> = {
+  systemType: "home",
+  systemSize: "home",
+  propertyType: "home",
+  storeys: "home",
+  roofType: "home",
+  phases: "home",
+  panel: "solar",
+  panelQty: "solar",
+  arrays: "solar",
+  strings: "solar",
+  tiltFrames: "solar",
+  optimisers: "solar",
+  inverter: "inverter",
+  inverterQty: "inverter",
+  additionalInverter: "inverter",
+  inverterCapacity: "inverter",
+  battery: "battery",
+  batteryQty: "battery",
+  batteryStorage: "battery",
+  evCharger: "charger",
+  switchboard: "site",
+  distributor: "site",
+  nmi: "site",
+  siteAccess: "site",
+};
+
+export const PART_TITLES: Record<CardPart, string> = {
+  home: "Home",
+  solar: "Solar panels",
+  inverter: "Inverter",
+  battery: "Battery",
+  charger: "EV charger",
+  racking: "Racking",
+  site: "Site",
+};
+
+const PART_ORDER: readonly CardPart[] = ["home", "solar", "inverter", "battery", "charger", "racking", "site"];
+
+/**
+ * The card's system in parts (24 Nov 2026, Martin: "a feint dividing line to compartmentalise the panel information
+ * from the battery information"; "a racking section"): each line under its part, in the card's order, the racking
+ * after the EV charger; a part with nothing in it is left out. A line of a key not known goes under Site.
+ */
+export function cardSections(
+  details: readonly { key?: string; label: string; value: string }[],
+  racking: readonly { name: string; qty: number }[] = [],
+): { part: CardPart; title: string; rows: { label: string; value: string }[] }[] {
+  const rows = new Map<CardPart, { label: string; value: string }[]>();
+  const add = (part: CardPart, row: { label: string; value: string }) => rows.set(part, [...(rows.get(part) ?? []), row]);
+  for (const d of details) add((d.key && PART_OF[d.key]) || "site", { label: d.label, value: d.value });
+  for (const r of racking) if (r.qty > 0) add("racking", { label: r.name, value: String(r.qty) });
+  return PART_ORDER.filter((p) => rows.get(p)?.length).map((p) => ({ part: p, title: PART_TITLES[p], rows: rows.get(p)! }));
+}

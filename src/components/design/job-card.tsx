@@ -7,7 +7,17 @@ import { InspectionStatus } from "./inspections";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { cardHeadline, isJobPicture, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
+import {
+  cardHeadline,
+  cardHeadlineLines,
+  cardSections,
+  isJobPicture,
+  type CardPart,
+  type JobDrawing,
+  type JobNote,
+} from "@/lib/domain/design/job-card";
+import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
+import { Home, LayoutGrid, Wrench } from "lucide-react";
 import { PHOTO_CHECK_BY } from "@/lib/domain/design/photo-check";
 import { SolBadge } from "./sol-sun";
 import {
@@ -344,16 +354,44 @@ function AsBuiltPanel({
   );
 }
 
-function SystemList({ details }: { details: { label: string; value: string }[] }) {
+/** Each part's mark (24 Nov 2026, Martin: an icon beside each). */
+function PartIcon({ part, className }: { part: CardPart; className: string }) {
+  if (part === "solar") return <PanelIcon className={className} />;
+  if (part === "battery") return <BatteryIcon className={className} />;
+  if (part === "inverter") return <InverterIcon className={className} />;
+  if (part === "charger") return <ChargerIcon className={className} />;
+  if (part === "racking") return <LayoutGrid className={className} aria-hidden />;
+  if (part === "home") return <Home className={className} aria-hidden />;
+  return <Wrench className={className} aria-hidden />;
+}
+
+/** The system in parts, each headed by its mark and name, parted by a faint line. */
+function SystemList({
+  details,
+  racking = [],
+}: {
+  details: { key?: string; label: string; value: string }[];
+  racking?: { name: string; qty: number }[];
+}) {
   return (
-    <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-      {details.map((d) => (
-        <div key={d.label} className="contents">
-          <dt className="text-muted">{d.label}</dt>
-          <dd className="text-ink">{d.value}</dd>
+    <div className="mt-1.5 divide-y divide-line">
+      {cardSections(details, racking).map((s) => (
+        <div key={s.part} className="py-2.5 first:pt-1 last:pb-0">
+          <p className="flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+            <PartIcon part={s.part} className="size-4 text-sun-line" />
+            {s.title}
+          </p>
+          <dl className="mt-1 grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-0.5 pl-[1.375rem] text-sm">
+            {s.rows.map((d) => (
+              <div key={d.label} className="contents">
+                <dt className="text-muted">{d.label}</dt>
+                <dd className="break-words text-ink">{d.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       ))}
-    </dl>
+    </div>
   );
 }
 
@@ -378,12 +416,26 @@ function CardBody({
   const asBuilt = keptHere ?? card.asBuilt;
   // The title (10 Nov 2026, Martin): what is being installed in sizes, the address under it; the drawings top right.
   const headline = cardHeadline(card.system) ?? card.job.title;
+  const headLines = cardHeadlineLines(card.system);
   return (
     <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="min-w-0 space-y-5">
           <section>
-            <h3 className="text-2xl font-semibold tracking-tight text-ink">{headline}</h3>
+            {headLines.length > 0 ? (
+              <h3 className="space-y-0.5 text-2xl font-semibold tracking-tight text-ink" aria-label={headline}>
+                {headLines.map((l) => (
+                  <span key={l.part} className="flex items-center gap-2.5">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-sun-line/12">
+                      <PartIcon part={l.part} className="size-[18px] text-sun-line" />
+                    </span>
+                    {l.words}
+                  </span>
+                ))}
+              </h3>
+            ) : (
+              <h3 className="text-2xl font-semibold tracking-tight text-ink">{headline}</h3>
+            )}
             <a
               href={mapLink(card.job.address)}
               target="_blank"
@@ -434,13 +486,13 @@ function CardBody({
               )}
             </section>
           ) : (
-            card.details.length > 0 && (
+            (card.details.length > 0 || (card.racking?.length ?? 0) > 0) && (
               <section>
                 <p className={head}>{card.job.installed ? "System as planned" : "System"}</p>
                 {card.job.installed && (
                   <p className="mt-0.5 text-xs text-sun-ink">Not yet confirmed as installed: record the as-built below.</p>
                 )}
-                <SystemList details={card.details} />
+                <SystemList details={card.details} racking={card.racking} />
               </section>
             )
           )}
