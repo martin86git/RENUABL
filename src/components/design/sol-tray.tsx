@@ -10,7 +10,7 @@ import { clsx } from "clsx";
 import {
   Cable,
   ChevronRight,
-  Hand,
+  Columns2,
   LayoutGrid,
   House,
   Maximize,
@@ -37,23 +37,13 @@ import { SolMark } from "./sol-sun";
 
 type TrayTool = "select" | "panel" | "erase" | "trace" | "string" | "rule" | "label" | "comment" | "pan";
 
-const GROUPS: { title: string; items: { tool: TrayTool; icon: LucideIcon; name: string }[] }[] = [
-  {
-    title: "Draw",
-    items: [
-      // Erase is on the map beside the hand (22 Nov 2026, Martin).
-      { tool: "trace", icon: PenTool, name: "Trace roof" },
-    ],
-  },
-  {
-    title: "Wire and mark",
-    items: [
-      { tool: "string", icon: Cable, name: "Strings" },
-      { tool: "rule", icon: Ruler, name: "Guide line" },
-      { tool: "label", icon: Tag, name: "Label" },
-      { tool: "comment", icon: MessageCircle, name: "Comment" },
-    ],
-  },
+// Three rows of four (24 Nov 2026, Martin: "revamp and clean up this menu"): what you draw, what you check, how you look.
+// Erase, Select, Add a panel, the hand and zoom are on the map itself, so they aren't repeated here.
+const DRAW: { tool: TrayTool; icon: LucideIcon; name: string }[] = [
+  { tool: "trace", icon: PenTool, name: "Trace roof" },
+  { tool: "string", icon: Cable, name: "Strings" },
+  { tool: "rule", icon: Ruler, name: "Guide line" },
+  { tool: "label", icon: Tag, name: "Label" },
 ];
 
 function Item(props: { icon: ReactNode; name: string; on?: boolean; onClick: () => void; disabled?: boolean }) {
@@ -63,20 +53,28 @@ function Item(props: { icon: ReactNode; name: string; on?: boolean; onClick: () 
       onClick={props.onClick}
       disabled={props.disabled}
       aria-pressed={props.on}
-      className="flex w-[4.25rem] flex-col items-center gap-1 text-[10.5px] leading-tight text-white/80 disabled:opacity-40"
+      title={props.name}
+      className={clsx(
+        "flex h-[4.25rem] w-full min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl px-1 text-[11px] font-medium transition-colors disabled:opacity-35",
+        props.on ? "bg-sun-line text-white" : "bg-white/[0.07] text-white/85 active:bg-white/15",
+      )}
     >
-      <span
-        className={clsx(
-          "flex size-10 items-center justify-center rounded-full",
-          props.on ? "bg-sun-line text-white" : "bg-white/10 text-white",
-        )}
-      >
-        {props.icon}
-      </span>
-      {props.name}
+      <span className="text-white [&>svg]:size-5">{props.icon}</span>
+      <span className="max-w-full truncate">{props.name}</span>
     </button>
   );
 }
+
+function Group(props: { title: string; children: ReactNode }) {
+  return (
+    <section className="mt-3">
+      <h4 className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">{props.title}</h4>
+      <div className="grid grid-cols-4 gap-2">{props.children}</div>
+    </section>
+  );
+}
+
+const roundBtn = "flex size-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white active:bg-white/20";
 
 export function SolTray(props: {
   open: boolean;
@@ -143,97 +141,57 @@ export function SolTray(props: {
                 props.onClose();
                 props.onAsk();
               }}
-              className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-white/10 pl-1.5 pr-4 text-left text-[13px] text-white/70"
+              className="flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-white/10 pl-1.5 pr-4 text-left text-[13px] text-white/75"
             >
               <span className="sol-orb flex size-8 shrink-0 items-center justify-center rounded-full">
                 <SolMark className="size-[26px]" />
               </span>
-              <span className="min-w-0 flex-1 truncate">Ask Sol to change the design</span>
+              <span className="min-w-0 flex-1 truncate">Ask Sol to change it</span>
               <ChevronRight className="size-4 shrink-0" aria-hidden />
             </button>
-            <button
-              type="button"
-              onClick={props.onClose}
-              aria-label="Put Sol's tools away"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10"
-            >
-              <X className="size-4" aria-hidden />
+            {/* Undo and redo stay put in the head (they don't close the tray), beside close. */}
+            <button type="button" onClick={props.onUndo} aria-label="Undo" title="Undo" className={roundBtn}>
+              <Undo2 className="size-[18px]" aria-hidden />
+            </button>
+            <button type="button" onClick={props.onRedo} aria-label="Redo" title="Redo" className={roundBtn}>
+              <Redo2 className="size-[18px]" aria-hidden />
+            </button>
+            <button type="button" onClick={props.onClose} aria-label="Put Sol's tools away" className={roundBtn}>
+              <X className="size-[18px]" aria-hidden />
             </button>
           </div>
           {/* Sideways (a wide, short screen) the groups sit two across, so more of them fit before it scrolls. */}
           <div className="sm:grid sm:grid-cols-2 sm:gap-x-6">
-            {GROUPS.map((group) => (
-              <section key={group.title} className="mt-2.5">
-                <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">{group.title}</h4>
-                <div className="grid grid-cols-4 justify-items-center gap-y-2">
-                  {group.items.map(({ tool, icon: Icon, name }) => (
-                    <Item
-                      key={tool}
-                      icon={<Icon className="size-[18px]" aria-hidden />}
-                      name={name}
-                      on={props.tool === tool}
-                      onClick={() => pick(tool)}
-                    />
-                  ))}
-                </div>
+            <Group title="Draw">
+              {DRAW.map(({ tool, icon: Icon, name }) => (
+                <Item key={tool} icon={<Icon aria-hidden />} name={name} on={props.tool === tool} onClick={() => pick(tool)} />
+              ))}
+            </Group>
+            <Group title="Check">
+              <Item icon={<SunMedium aria-hidden />} name="Shade" on={props.shadeOn} onClick={then(props.onShade)} />
+              {props.onPitch && (
+                <Item icon={<TriangleRight aria-hidden />} name={props.pitchWords} on={props.pitchShown} onClick={then(props.onPitch)} />
+              )}
+              <Item icon={<MessageCircle aria-hidden />} name="Comment" on={props.tool === "comment"} onClick={() => pick("comment")} />
+              <Item
+                icon={<WandSparkles aria-hidden />}
+                name="Auto design"
+                onClick={then(() => props.onDesignForMe?.())}
+                disabled={!props.onDesignForMe}
+              />
+            </Group>
+            <Group title="View">
+              <Item icon={<Maximize aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
+              <Item icon={<House aria-hidden />} name={props.drawn ? "Photo" : "Drawn roof"} onClick={then(props.onDrawn)} />
+              {props.sides}
+              {props.onZoom && <Item icon={<Search aria-hidden />} name="Pinch zoom" on={props.zooming} onClick={then(props.onZoom)} />}
+            </Group>
+            {props.pictureMenu && (
+              <section className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-white/[0.07] py-1.5 pl-3.5 pr-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">Picture</span>
+                {props.pictureMenu}
               </section>
-            ))}
-            <section className="mt-2.5">
-              <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">Check</h4>
-              <div className="grid grid-cols-4 justify-items-center gap-y-2">
-                <Item
-                  icon={<SunMedium className="size-[18px]" aria-hidden />}
-                  name="Shade"
-                  on={props.shadeOn}
-                  onClick={then(props.onShade)}
-                />
-                {props.onPitch && (
-                  <Item
-                    icon={<TriangleRight className="size-[18px]" aria-hidden />}
-                    name={props.pitchWords}
-                    on={props.pitchShown}
-                    onClick={then(props.onPitch)}
-                  />
-                )}
-                <Item
-                  icon={<WandSparkles className="size-[18px]" aria-hidden />}
-                  name="Design it for me"
-                  onClick={then(() => props.onDesignForMe?.())}
-                  disabled={!props.onDesignForMe}
-                />
-              </div>
-            </section>
-            <section className="mt-2.5">
-              <h4 className="mb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-white/50">View</h4>
-              <div className="grid grid-cols-4 justify-items-center gap-y-2">
-                {props.onZoom && (
-                  <Item
-                    icon={<Search className="size-[18px]" aria-hidden />}
-                    name="Pinch zoom"
-                    on={props.zooming}
-                    onClick={then(props.onZoom)}
-                  />
-                )}
-                <Item
-                  icon={<Hand className="size-[18px]" aria-hidden />}
-                  name="Move map"
-                  on={props.tool === "pan"}
-                  onClick={() => pick("pan")}
-                />
-                <Item icon={<Maximize className="size-[18px]" aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
-                <Item
-                  icon={<House className="size-[18px]" aria-hidden />}
-                  name={props.drawn ? "Photo" : "Drawn roof"}
-                  onClick={then(props.onDrawn)}
-                />
-              </div>
-              <div className="mt-2.5 flex items-center gap-2">
-                <Item icon={<Undo2 className="size-[18px]" aria-hidden />} name="Undo" onClick={props.onUndo} />
-                <Item icon={<Redo2 className="size-[18px]" aria-hidden />} name="Redo" onClick={props.onRedo} />
-                {props.sides && <div className="rounded-full bg-white/10 p-0.5">{props.sides}</div>}
-                {props.pictureMenu && <div className="ml-auto">{props.pictureMenu}</div>}
-              </div>
-            </section>
+            )}
           </div>
         </div>
         {/* The designer's own row (save, ready to install, strings, shade, record and the rest) stands in this strip. */}
@@ -281,6 +239,9 @@ export function SolController(props: {
   /** How many panels are in the array(s) of what is picked, when more than are picked: the button picks them all. */
   wholeArray?: number | null;
   onWholeArray?: () => void;
+  /** How many panels the picked one's own line (column or row) holds, when that is less than the whole array. */
+  wholeLine?: number | null;
+  onWholeLine?: () => void;
   /** A double tap's first tap turned the panels this far: turn them back, leaving nothing to undo. */
   onTakeBack: (degrees: number) => void;
   /** A press and hold on a 1° button begins (true) and ends (false): its turns are one step to undo. */
@@ -382,6 +343,19 @@ export function SolController(props: {
       All {props.wholeArray}
     </button>
   );
+  // Its column or row alone (24 Nov 2026, Martin: "without selecting the row of panels above it").
+  const line = Boolean(props.wholeLine && props.onWholeLine) && (
+    <button
+      type="button"
+      onClick={props.onWholeLine}
+      aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+      title="Pick the column or row this panel is in"
+      className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-xl bg-white/[0.08] px-2.5 text-[12px] font-semibold text-white hover:bg-white/15"
+    >
+      <Columns2 className="size-4 text-sun-line" aria-hidden />
+      Line {props.wholeLine}
+    </button>
+  );
   const undo = props.canUndo && (
     <button
       type="button"
@@ -424,13 +398,40 @@ export function SolController(props: {
             {done}
           </div>
         </div>
+        {/* Picking more, given its own row under the header (24 Nov 2026, Martin: All "would be a highly sought after and
+            used function"): the panel's line and the whole array, All filled as the one most reached for. */}
+        {(props.wholeLine || props.wholeArray) && (
+          <div className="absolute inset-x-3 top-[2.1rem] flex justify-center gap-2">
+            {props.wholeLine && props.onWholeLine && (
+              <button
+                type="button"
+                onClick={props.onWholeLine}
+                aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+                className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+              >
+                <Columns2 className="size-3.5 text-sun-line" aria-hidden />
+                Line {props.wholeLine}
+              </button>
+            )}
+            {props.wholeArray && props.onWholeArray && (
+              <button
+                type="button"
+                onClick={props.onWholeArray}
+                aria-label={`Pick the whole array: ${props.wholeArray} panels`}
+                className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
+              >
+                <LayoutGrid className="size-3.5" aria-hidden />
+                Select all {props.wholeArray}
+              </button>
+            )}
+          </div>
+        )}
         {/* The thumbs, in the two bottom corners; between them portrait or landscape, the tilt and delete. */}
         <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
           {props.panels > 0 ? thumb(-1) : <span />}
           <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
             <div className="flex items-center gap-1.5">
               {orient}
-              {whole}
               {remove}
             </div>
             {tilt}
@@ -459,6 +460,7 @@ export function SolController(props: {
         </div>
         <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
+          {line}
           {whole}
           {remove}
           {undo}

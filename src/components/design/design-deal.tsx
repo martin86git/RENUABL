@@ -58,7 +58,7 @@ import {
   setDealOwner,
   shortDate,
 } from "@/lib/services/crm";
-import { loadTeam } from "@/lib/services/design-account";
+import { finishDealTour, loadTeam } from "@/lib/services/design-account";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD } from "./design-home";
 import { DealChat } from "./chat-panel";
@@ -90,7 +90,6 @@ import { CallEntryBy, CallEntryText } from "./call-entry";
 import { CallChoices } from "./call-choice";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
-type Written = "note" | "call" | "email";
 type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
 /**
  * The deal's tabs under its banner, in order; Service sits apart after them. Activity is the deal at a glance and its
@@ -365,27 +364,34 @@ export function DealPage({ id }: { id: string }) {
   const [touring, setTouring] = useState(false);
   // The starter sample only: the example deals a demo is filled with are marked sample too, and aren't a tour each.
   const isSample = Boolean(customer?.sample) && customer?.source !== EXAMPLE_SOURCE;
+  // Seen is also kept on the person's own account (24 Nov 2026, Martin: it started again on his iPhone, whose Safari and
+  // Home Screen app each keep their own storage), so it runs once for them, not once a device. It waits for the account.
+  const tourSeenOnAccount = account?.signedIn ? Boolean(account.dealTourSeen) : null;
   useEffect(() => {
-    if (!isSample) return;
-    let seen = false;
+    if (!isSample || tourSeenOnAccount === null) return;
+    let seen = tourSeenOnAccount;
     try {
-      seen = window.localStorage.getItem(DEAL_TOUR_KEY) === "1";
+      if (window.localStorage.getItem(DEAL_TOUR_KEY) === "1") seen = true;
     } catch {}
     if (seen) return;
-    // A moment for Sol's card and the fields to be on the page, so each has a place to light.
+    // A moment for Sol's card and the fields to be on the page, so each has a place to light. Never under a window
+    // already open over the page (an agent's chat on a phone).
     const t = window.setTimeout(() => {
+      if (document.documentElement.dataset.phoneWindow !== undefined) return;
       try {
         window.localStorage.setItem(DEAL_TOUR_KEY, "1");
       } catch {}
+      void finishDealTour();
       setTouring(true);
     }, 900);
     return () => window.clearTimeout(t);
-  }, [isSample]);
+  }, [isSample, tourSeenOnAccount]);
   const endTour = useCallback(() => {
     setTouring(false);
     try {
       window.localStorage.setItem(DEAL_TOUR_KEY, "1");
     } catch {}
+    void finishDealTour();
   }, []);
   // The customer's emails in this member's own mailboxes, beside the record on the Notes timeline (23 Nov 2026, Martin).
   const [mail, setMail] = useState<DealMail[]>([]);
@@ -396,7 +402,6 @@ export function DealPage({ id }: { id: string }) {
       gone = true;
     };
   }, [id, activity.length]);
-  const [kind, setKind] = useState<Written>("note");
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
 
@@ -453,7 +458,7 @@ export function DealPage({ id }: { id: string }) {
   };
   const say = async () => {
     if (!job || !text.trim()) return;
-    const res = await addActivity(job.customerId, { kind, text: text.trim(), jobId: id });
+    const res = await addActivity(job.customerId, { kind: "note", text: text.trim(), jobId: id });
     if (!res.ok) return setStatus(res.message);
     setActivity([res.activity, ...activity]);
     setText("");
@@ -1002,16 +1007,6 @@ export function DealPage({ id }: { id: string }) {
               </section>
               <div>
                 <div className={clsx(ui.card, "flex flex-wrap gap-2 p-3")}>
-                  <select
-                    aria-label="What happened"
-                    className={clsx(ui.input, "w-28 appearance-auto")}
-                    value={kind}
-                    onChange={(e) => setKind(e.target.value as Written)}
-                  >
-                    <option value="note">Note</option>
-                    <option value="call">Call</option>
-                    <option value="email">Email</option>
-                  </select>
                   <input
                     aria-label="What was said or done"
                     className={clsx(ui.input, "min-w-0 flex-1")}
@@ -1019,7 +1014,7 @@ export function DealPage({ id }: { id: string }) {
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && void say()}
                     maxLength={1000}
-                    placeholder="Write a note, or log a call or an email. Type @ to mention someone"
+                    placeholder="Write a note. Type @ to mention someone"
                   />
                   {members.length > 1 && (
                     <select

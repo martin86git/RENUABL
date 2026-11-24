@@ -19,7 +19,20 @@ const VIEWS = [
  * what stands on it and the walls. Opened from the picture's corner; each side asked for only when shown, through
  * RENUABL's server so Nearmap's key never reaches the browser.
  */
-export function SideViewsButton({ lat, lng, tab, icon }: { lat: number; lng: number; tab?: boolean; icon?: boolean }) {
+export function SideViewsButton({
+  lat,
+  lng,
+  tab,
+  icon,
+  tray,
+}: {
+  lat: number;
+  lng: number;
+  tab?: boolean;
+  icon?: boolean;
+  /** As a tile in Sol's tray on a phone: the icon over its name. */
+  tray?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -29,14 +42,16 @@ export function SideViewsButton({ lat, lng, tab, icon }: { lat: number; lng: num
         title="See the house from its four sides (Nearmap's angled photos)"
         aria-label={icon ? "Sides: the house from its four sides" : undefined}
         className={
-          icon
-            ? "flex size-9 items-center justify-center rounded-full text-ink hover:bg-canvas"
-            : tab
-              ? "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-ink hover:bg-canvas"
-              : "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
+          tray
+            ? "flex h-[4.25rem] w-full flex-col items-center justify-center gap-1.5 rounded-2xl bg-white/[0.07] text-[11px] font-medium text-white/85 active:bg-white/15"
+            : icon
+              ? "flex size-9 items-center justify-center rounded-full text-ink hover:bg-canvas"
+              : tab
+                ? "flex h-9 items-center gap-1.5 rounded-full px-3.5 text-ink hover:bg-canvas"
+                : "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
         }
       >
-        <Rotate3d className={tab || icon ? "size-4" : "size-3.5"} aria-hidden />
+        <Rotate3d className={tray ? "size-5 text-white" : tab || icon ? "size-4" : "size-3.5"} aria-hidden />
         {!icon && "Sides"}
       </button>
       {/* On the page body: the picture's corner sits in a moved (transformed) part of the page. */}

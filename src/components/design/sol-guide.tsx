@@ -100,10 +100,14 @@ export function SolGuide(props: {
   const [kliplok, setKliplok] = useState<boolean | null>(null);
   // Next stays pressable (18 Nov 2026, Martin: a greyed Next didn't say a row was still unpicked); pressed early, it says what.
   const [tried, setTried] = useState(false);
+  // The target step in two parts (24 Nov 2026, Martin, from his iPhone: the bill and the battery in one card was "too
+  // much in one instance"): first the bill and the size, then the battery.
+  const [targetPart, setTargetPart] = useState<"size" | "battery">("size");
   const [triedStep, setTriedStep] = useState(props.step);
   if (triedStep !== props.step) {
     setTriedStep(props.step);
     setTried(false);
+    setTargetPart("size");
   }
   const [tilt, setTilt] = useState<number | null | undefined>(undefined);
   // "No, it isn't": the homes round about, a search, or finding it themselves.
@@ -304,6 +308,43 @@ export function SolGuide(props: {
           if (battPick === "both" && !one) return props.onTarget({ kw: k, kwh: batt.solarKwh, freeKwh: batt.freeKwh });
           return props.onTarget({ kw: k, kwh: batt.solarKwh });
         };
+        if (targetPart === "battery" && batt && kwNow > 0)
+          return (
+            <>
+              <p>
+                {Math.round(kwNow * 100) / 100} kW of panels. Now the battery: {batteryWords(batt)}
+              </p>
+              <div className="mt-2 grid gap-2">
+                <Choice
+                  options={[
+                    ["none", "No battery"],
+                    ["solar", `${batt.solarKwh} kWh battery`],
+                    ...(one
+                      ? []
+                      : ([
+                          ["free", `${batt.freeKwh} kWh with the ${FREE_HOURS} free hours`],
+                          ["both", "Both, as two options"],
+                        ] as [string, string][])),
+                    ["other", "Another size"],
+                  ]}
+                  value={battPick}
+                  onPick={(v) => setBattPick(v as typeof battPick)}
+                />
+                {battPick === "other" && <Field label="kWh battery" value={otherKwh} onChange={setOtherKwh} />}
+                <p className="text-[12px] text-white/55">
+                  {one
+                    ? `The ${FREE_HOURS} free hours wouldn't change it: this battery already holds their evenings.`
+                    : `${freeHoursWords(batt)} Both makes an option of each, with its own price.`}
+                </p>
+              </div>
+              <Actions>
+                <Main disabled={!battPick || (battPick === "other" && !(Number(otherKwh) > 0))} onClick={aim}>
+                  Aim for this
+                </Main>
+                <Quiet onClick={() => setTargetPart("size")}>Back</Quiet>
+              </Actions>
+            </>
+          );
         return (
           <>
             <p>{targetWords(props.first, props.suggested)}</p>
@@ -386,36 +427,14 @@ export function SolGuide(props: {
                 </>
               )}
               {(mode === "size" || props.suggested) && <Field label="kW of panels" value={kw} onChange={setKw} />}
-              {batt && (
-                <>
-                  <p className="text-[12.5px] text-white/70">{batteryWords(batt)}</p>
-                  <Choice
-                    options={[
-                      ["none", "No battery"],
-                      ["solar", `${batt.solarKwh} kWh battery`],
-                      ...(one
-                        ? []
-                        : ([
-                            ["free", `${batt.freeKwh} kWh with the ${FREE_HOURS} free hours`],
-                            ["both", "Both, as two options"],
-                          ] as [string, string][])),
-                      ["other", "Another size"],
-                    ]}
-                    value={battPick}
-                    onPick={(v) => setBattPick(v as typeof battPick)}
-                  />
-                  {battPick === "other" && <Field label="kWh battery" value={otherKwh} onChange={setOtherKwh} />}
-                  <p className="text-[12px] text-white/55">
-                    {one
-                      ? `The ${FREE_HOURS} free hours wouldn't change it: this battery already holds their evenings.`
-                      : `${freeHoursWords(batt)} Both makes an option of each, with its own price.`}
-                  </p>
-                </>
-              )}
             </div>
             <Actions>
-              <Main disabled={!(kwNow > 0) || !battPick || (battPick === "other" && !(Number(otherKwh) > 0))} onClick={aim}>
-                Aim for this
+              {/* With no battery to offer (no use known for the size), the size alone is the target. */}
+              <Main
+                disabled={!(kwNow > 0)}
+                onClick={() => (batt ? setTargetPart("battery") : props.onTarget({ kw: Math.round(kwNow * 100) / 100, kwh: 0 }))}
+              >
+                {batt ? "Next: the battery" : "Aim for this"}
               </Main>
               <Quiet onClick={() => props.onTarget(null)}>No target</Quiet>
             </Actions>

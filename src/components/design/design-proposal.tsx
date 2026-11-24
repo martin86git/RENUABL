@@ -235,6 +235,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [account] = useDesignAccount();
   const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
   const [sending, setSending] = useState(false);
+  // After publishing, the screen goes down to the Sent part (24 Nov 2026, Martin: on a phone it stayed on the button).
+  const sentRef = useRef<HTMLDivElement>(null);
+  const [justPublished, setJustPublished] = useState(false);
   const [assistant, setAssistant] = useState(false);
   // The builder (15 Nov 2026, Martin): off until turned on, since a proposal is usually sent as it is.
   const [building, setBuilding] = useState(false);
@@ -290,13 +293,20 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
     setBusy(false);
     if (!res.ok) return setStatus({ text: res.message, error: true });
     setVersions(res.versions);
-    setStatus({ text: "Published. Now send it to your customer, with a message." });
+    setStatus(null);
+    setJustPublished(true);
+    // Once the Sent part is drawn with the new version, bring it into view.
+    window.setTimeout(() => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      sentRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    }, 60);
   };
   const withdraw = async () => {
     if (!window.confirm("Take this proposal back? Its link will then show only how to reach you.")) return;
     const res = await withdrawProposal(jobId);
     if (!res.ok) return setStatus({ text: res.message, error: true });
     setVersions(res.versions);
+    setJustPublished(false);
     setStatus({ text: "Withdrawn." });
   };
   const out = latest && latest.state !== "withdrawn";
@@ -503,8 +513,13 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
           )}
 
           {latest && (
-            <div className="space-y-2.5 border-t border-line pt-4">
+            <div ref={sentRef} className="scroll-mt-4 space-y-2.5 border-t border-line pt-4">
               <p className={ui.eyebrow}>Sent</p>
+              {justPublished && (
+                <p className="text-sm font-medium text-positive" role="status">
+                  Published. Now send it to your customer, with a message.
+                </p>
+              )}
               <p className="text-sm text-ink">
                 {STATE_WORDS[latest.state]} <span className="tabular-nums text-ink-2">· {dollars(latest.youPay)}</span>
               </p>

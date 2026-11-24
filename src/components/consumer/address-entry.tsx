@@ -108,6 +108,8 @@ export function AddressEntry({
     // Previews without Google keep working with typed addresses.
     const parsed = source === "sample" ? parseAddress(query) : null;
     if (parsed) return go(parsed);
+    // Nothing typed yet: put them in the box rather than tell them off.
+    if (!query.trim()) return void document.getElementById(`${listId}-input`)?.focus();
     setError("Start typing your street address, then pick it from the list.");
   }
 

@@ -51,6 +51,8 @@ export interface Member {
   firstName?: string | null;
   /** Whether they have been through the welcome on Today (welcome.ts). */
   welcomed?: boolean;
+  /** They have seen the tour of a deal (deal-tour.ts). */
+  dealTourSeen?: boolean;
 }
 
 /** The business this email belongs to, if any. An email is in one business at most. */
@@ -65,8 +67,10 @@ export async function memberByEmail(email: string): Promise<Member | null> {
     permissions: unknown;
     first_name: string | null;
     welcomed: boolean;
+    deal_tour: boolean;
   }>(
-    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name, m.welcomed_at is not null as welcomed
+    `select m.business_id, b.name, b.kind, m.email, m.role, m.terms_version, m.permissions, m.first_name, m.welcomed_at is not null as welcomed,
+            m.deal_tour_at is not null as deal_tour
        from business_members m join businesses b on b.id = m.business_id
       where m.email = $1`,
     [email.toLowerCase()],
@@ -83,6 +87,7 @@ export async function memberByEmail(email: string): Promise<Member | null> {
         permissions: cleanPermissions(m.permissions),
         firstName: m.first_name || null,
         welcomed: m.welcomed,
+        dealTourSeen: m.deal_tour,
       }
     : null;
 }
@@ -90,6 +95,14 @@ export async function memberByEmail(email: string): Promise<Member | null> {
 /** This person has been through the welcome on Today (or skipped it): it isn't shown to them again. */
 export async function markWelcomed(businessId: string, email: string): Promise<void> {
   await query(`update business_members set welcomed_at = coalesce(welcomed_at, now()) where business_id = $1 and email = $2`, [
+    businessId,
+    email.toLowerCase(),
+  ]);
+}
+
+/** This person has seen the tour of a deal: it doesn't start by itself for them again, on any device. */
+export async function markDealTourSeen(businessId: string, email: string): Promise<void> {
+  await query(`update business_members set deal_tour_at = coalesce(deal_tour_at, now()) where business_id = $1 and email = $2`, [
     businessId,
     email.toLowerCase(),
   ]);

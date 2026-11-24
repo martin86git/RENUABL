@@ -14,6 +14,42 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "On Proposals open and closed, Open the design is now the designer's orange round alone, so the buttons fit a phone.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Deals",
+    words: "The sample deal's tour runs once for you on any device, and Open deal from an agent's chat on a phone tucks the chat away.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "On a phone, the customer's Call me button is a slim tab at the screen's edge, so it no longer covers the page.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
+    words: "Publishing a proposal now takes you straight down to Send to customer and its links.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "On a phone, the tray under Sol's box sits neatly under it and fades at its edge when it scrolls.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "The tray under Sol's box has a Pipeline shortcut, and its tabs can be dragged into your own order.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Designer",
+    words:
+      "Sol asks about the bill and the system size first, then the battery on its own card, and his box on a phone grows to fit what he says.",
+  },
   { day: "2026-11-24", area: "Sol", words: "A screenshot pasted into Sol's box now shows as a preview inside the box." },
   {
     day: "2026-11-24",

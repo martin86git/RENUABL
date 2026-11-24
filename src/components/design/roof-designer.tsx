@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { lineOf } from "@/lib/domain/design/array-line";
 import { shadeFromReport, type DesignShade } from "@/lib/domain/design/design-shade";
 import { useRouter } from "next/navigation";
 import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
@@ -106,6 +107,7 @@ import {
   ZoomOut,
   type LucideIcon,
   Calculator,
+  SquareKanban,
 } from "lucide-react";
 import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/lib/domain/design/electrical";
 import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
@@ -1081,6 +1083,8 @@ const WHOLE: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: R
  * How far in the designer opens on the roof: the middle of the picture, this many times closer than the whole of it.
  * One press of the zoom button (1.4×) back from 1.6 (3 Nov 2026, Martin: "too zoomed in").
  */
+/** One press of zoom in or out (24 Nov 2026, Martin: 1.4 was too big a step for placing panels). */
+const ZOOM_STEP = 1.2;
 const OPEN_ZOOM = 1.6 / 1.4;
 const OPENED: typeof WHOLE = {
   x: (ROOF_IMAGE.width - ROOF_IMAGE.width / OPEN_ZOOM) / 2,
@@ -1186,6 +1190,8 @@ export function RoofDesigner(props: {
   noDeal?: React.ReactNode;
   /** Who the note goes to, for the box's wording. */
   customerName?: string;
+  /** Back to the deal this roof is on: on a phone held upright, a deal mark in the dock under the map. */
+  onOpenDeal?: () => void;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
   /**
@@ -1957,6 +1963,11 @@ export function RoofDesigner(props: {
   const [solLift, setSolLift] = useState(0);
   const [solDragging, setSolDragging] = useState(false);
   const solDrag = useRef<{ y: number; from: number; moved: boolean } | null>(null);
+  // The box sizes itself to what Sol says (24 Nov 2026, Martin: "the sol chat window should auto self adjust according
+  // to the amount of room for the text"): it rises over the picture as far as its words need, until slid by hand.
+  const [solUnder, setSolUnder] = useState<HTMLElement | null>(null);
+  const [solNeeds, setSolNeeds] = useState(0);
+  const [solLiftByHand, setSolLiftByHand] = useState(false);
   // On a phone, the panel round's card at the foot of the map: portrait, landscape or follow the roof.
   const [panelCard, setPanelCard] = useState(false);
   const [phonePitch, setPhonePitch] = useState(false);
@@ -2821,11 +2832,13 @@ export function RoofDesigner(props: {
   /** The direction of a point from a centre, in degrees clockwise from straight up. */
   const bearing = (p: Point, centre: Point) => (Math.atan2(p.x - centre.x, -(p.y - centre.y)) * 180) / Math.PI;
 
+  // Zoom works on the kept view (the photo's own shape), never the band shown: on a phone held upright the band is
+  // narrower than the kept view, so sizing from it made Zoom out zoom in (24 Nov 2026, Martin).
   const zoom = (factor: number) => {
-    const w = Math.min(ROOF_IMAGE.width, Math.max(40, view.w * factor));
+    const w = Math.min(ROOF_IMAGE.width, Math.max(40, keptView.w * factor));
     const h = (w * ROOF_IMAGE.height) / ROOF_IMAGE.width;
-    const cx = view.x + view.w / 2;
-    const cy = view.y + view.h / 2;
+    const cx = keptView.x + keptView.w / 2;
+    const cy = keptView.y + keptView.h / 2;
     setView({
       x: within(cx - w / 2, w, ROOF_IMAGE.width),
       y: within(cy - h / 2, h, ROOF_IMAGE.height),
@@ -3218,15 +3231,28 @@ export function RoofDesigner(props: {
    * The array a panel belongs to: it and every panel that touches it, or as good as (`ARRAY_GAP`), and so on outwards.
    * With where the small round that picks them all goes (just off the array's top right corner) and the box they fill.
    */
+  const placedPanels = () => [
+    ...loose.map((panel) => ({ pick: { kind: "loose", id: panel.id } as Pick, corners: looseCorners(panel, size) })),
+    ...faces.flatMap((f) =>
+      panelPlaces(f, size)
+        .filter((place) => !f.off.includes(place.index))
+        .map((place) => ({ pick: { kind: "grid", face: f.id, index: place.index } as Pick, corners: place.corners })),
+    ),
+  ];
+  /** The straight line of joined panels a panel sits in: its column or its row, the longer (`lineOf`). */
+  const lineOfPick = (start: Pick): Pick[] | null => {
+    const all = placedPanels();
+    const first = all.findIndex((x) => same(x.pick, start));
+    if (first < 0) return null;
+    const line = lineOf(
+      all.map((x) => x.corners),
+      first,
+      ARRAY_GAP,
+    );
+    return line ? line.map((i) => all[i].pick) : null;
+  };
   const arrayOf = (start: Pick): NonNullable<typeof arrayHint> | null => {
-    const all = [
-      ...loose.map((panel) => ({ pick: { kind: "loose", id: panel.id } as Pick, corners: looseCorners(panel, size) })),
-      ...faces.flatMap((f) =>
-        panelPlaces(f, size)
-          .filter((place) => !f.off.includes(place.index))
-          .map((place) => ({ pick: { kind: "grid", face: f.id, index: place.index } as Pick, corners: place.corners })),
-      ),
-    ];
+    const all = placedPanels();
     const first = all.findIndex((x) => same(x.pick, start));
     if (first < 0) return null;
     const inGroup = new Set([first]);
@@ -6303,6 +6329,18 @@ export function RoofDesigner(props: {
                   With a note to {props.customerName ?? "the customer"}
                 </button>
               )}
+              {props.proposalHref && (
+                <Link
+                  href={props.proposalHref}
+                  onClick={() => {
+                    openMenu(false);
+                    if (saved === "changed") void save();
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm font-medium text-ink ring-1 ring-line hover:bg-canvas"
+                >
+                  <FileText className="size-4" aria-hidden /> View proposal
+                </Link>
+              )}
             </>
           )}
           {sent && !sending && (
@@ -6860,7 +6898,32 @@ export function RoofDesigner(props: {
   }, [growDown]);
   // The box's top edge: the picture's foot, or higher once slid up. Sol and the foot row stand on it.
   const liftMost = stage ? Math.round(stage.photoH * 0.6) : 0;
-  const lift = foldable && !solFolded ? Math.min(solLift, liftMost) : 0;
+  // How much taller than its usual room the box's words are: measured from the words themselves, not the box, so a box
+  // already risen doesn't hold itself up.
+  const restRoom = (stage?.rest ?? 156) - 8;
+  useEffect(() => {
+    const box = solUnder?.querySelector<HTMLElement>("[data-popup]");
+    if (!box) return;
+    const measure = () => {
+      const kids = Array.from(box.children) as HTMLElement[];
+      if (!kids.length) return;
+      const top = box.getBoundingClientRect().top;
+      const bottom = Math.max(...kids.map((k) => k.getBoundingClientRect().bottom));
+      const pad = parseFloat(getComputedStyle(box).paddingBottom) || 0;
+      const words = Math.ceil(bottom - top + box.scrollTop + pad);
+      setSolNeeds(Math.max(0, words - restRoom));
+    };
+    measure();
+    const seen = new ResizeObserver(measure);
+    Array.from(box.children).forEach((k) => seen.observe(k));
+    const changed = new MutationObserver(measure);
+    changed.observe(box, { childList: true, subtree: true, characterData: true });
+    return () => {
+      seen.disconnect();
+      changed.disconnect();
+    };
+  }, [solUnder, restRoom, solSaying]);
+  const lift = foldable && !solFolded ? Math.min(solLiftByHand ? solLift : solNeeds, liftMost) : 0;
   const deckTop = foot === null ? null : foot - lift;
   const restFolded = 48;
   // One handle in the box's top left: pressed, it folds or opens the box; dragged, it slides the box up or down (down
@@ -6884,9 +6947,11 @@ export function RoofDesigner(props: {
         if (v < -40) {
           setSolFolded(true);
           setSolLift(0);
+          setSolLiftByHand(true);
         } else {
           setSolFolded(false);
           setSolLift(Math.max(0, Math.min(liftMost, Math.round(v))));
+          setSolLiftByHand(true);
         }
       }}
       onPointerUp={() => {
@@ -6935,6 +7000,21 @@ export function RoofDesigner(props: {
       }
     }
     return all.length > picks.length ? all : null;
+  })();
+  // The line (column or row) each picked panel sits in, when that is more than is picked and less than the whole array
+  // (24 Nov 2026, Martin: the column a panel is in "without selecting the row of panels above it").
+  const wholeLine = (() => {
+    if (!wholeArray || picks.length > 40) return null;
+    const keys = new Set<string>();
+    const all: Pick[] = [];
+    for (const pick of picks)
+      for (const one of lineOfPick(pick) ?? [pick]) {
+        const key = keyOf(one);
+        if (keys.has(key)) continue;
+        keys.add(key);
+        all.push(one);
+      }
+    return all.length > picks.length && all.length < wholeArray.length ? all : null;
   })();
   // Which way new panels go down, opened from the foot's Add a panel round (phone and computer alike).
   const panelWayCard = (
@@ -7009,7 +7089,7 @@ export function RoofDesigner(props: {
           onUndo={undo}
           onRedo={redo}
           onWhole={() => setView(WHOLE)}
-          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} icon /> } : {})}
+          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
           {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
           footRoom={solHolds ? 78 : 0}
         />
@@ -7388,10 +7468,10 @@ export function RoofDesigner(props: {
                 // round on the right. Roomier (22 Nov 2026, Martin: "they do not need to be so skinny").
                 <div
                   className={clsx(
-                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-2 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
+                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-3 pl-4 pr-16 tabular-nums leading-tight transition-colors duration-300",
                     growing ? "bg-sun-line" : "",
                   )}
-                  style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+                  style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
                 >
                   <div className="min-w-0" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
                     <p className={clsx("text-[9px] font-medium uppercase tracking-[0.16em]", growing ? "text-white" : "text-sun-bright")}>
@@ -7545,7 +7625,7 @@ export function RoofDesigner(props: {
                     // Clipped, so a figure that runs long never paints under the shade widget beside it.
                     "min-w-0 flex-1 cursor-pointer overflow-hidden",
                     (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
-                    phone ? "flex items-center px-4 py-2" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    phone ? "flex items-center py-2 pl-4 pr-16" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -7583,7 +7663,7 @@ export function RoofDesigner(props: {
                         ] as const
                       ).map(([name, value, gold], i) => (
                         <div key={i} className="min-w-0">
-                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.12em] text-muted">{name}</dt>
+                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.16em] text-muted">{name}</dt>
                           <dd className={clsx("truncate text-[16px] font-semibold tracking-[-0.01em]", gold && "text-positive")}>
                             {value}
                           </dd>
@@ -9370,11 +9450,16 @@ export function RoofDesigner(props: {
                     <Search className="size-3.5" aria-hidden />
                   </button>
                   <div className="flex flex-col overflow-hidden rounded-full bg-primary/90 text-primary-ink shadow-lift">
-                    <button type="button" aria-label="Zoom in" onClick={() => zoom(1 / 1.4)} className="grid size-10 place-items-center">
+                    <button
+                      type="button"
+                      aria-label="Zoom in"
+                      onClick={() => zoom(1 / ZOOM_STEP)}
+                      className="grid size-10 place-items-center"
+                    >
                       <Plus className="size-5" aria-hidden />
                     </button>
                     <span className="mx-2.5 h-px bg-primary-ink/25" aria-hidden />
-                    <button type="button" aria-label="Zoom out" onClick={() => zoom(1.4)} className="grid size-10 place-items-center">
+                    <button type="button" aria-label="Zoom out" onClick={() => zoom(ZOOM_STEP)} className="grid size-10 place-items-center">
                       <Minus className="size-5" aria-hidden />
                     </button>
                   </div>
@@ -11523,7 +11608,7 @@ export function RoofDesigner(props: {
                           } as React.CSSProperties)
                         : undefined
                   }
-                  ref={sideDeck ? sideDeckRef : undefined}
+                  ref={sideDeck ? sideDeckRef : underUp ? setSolUnder : undefined}
                   onClickCapture={(e) => {
                     // Folded, a press anywhere on the strip opens it again.
                     if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
@@ -11626,7 +11711,7 @@ export function RoofDesigner(props: {
                           } as React.CSSProperties)
                         : undefined
                   }
-                  ref={sideDeck ? sideDeckRef : undefined}
+                  ref={sideDeck ? sideDeckRef : underUp ? setSolUnder : undefined}
                   onClickCapture={(e) => {
                     // Folded, a press anywhere on the strip opens it again.
                     if (foldable && solFolded && !(e.target as HTMLElement).closest("button[aria-expanded]")) {
@@ -11796,10 +11881,10 @@ export function RoofDesigner(props: {
                   role="group"
                   aria-label="Getting about"
                 >
-                  <FootRound label="Zoom out" on={false} onClick={() => zoom(1.4)}>
+                  <FootRound label="Zoom out" on={false} onClick={() => zoom(ZOOM_STEP)}>
                     <ZoomOut className="size-5" aria-hidden />
                   </FootRound>
-                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / 1.4)}>
+                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / ZOOM_STEP)}>
                     <ZoomIn className="size-5" aria-hidden />
                   </FootRound>
                   <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
@@ -11824,10 +11909,10 @@ export function RoofDesigner(props: {
                     </span>
                   )}
                 >
-                  <Leg label="Zoom in" onClick={() => zoom(1 / 1.4)}>
+                  <Leg label="Zoom in" onClick={() => zoom(1 / ZOOM_STEP)}>
                     <ZoomIn className="size-5" aria-hidden />
                   </Leg>
-                  <Leg label="Zoom out" onClick={() => zoom(1.4)}>
+                  <Leg label="Zoom out" onClick={() => zoom(ZOOM_STEP)}>
                     <ZoomOut className="size-5" aria-hidden />
                   </Leg>
                   {/* In the pop-up the hand is in the foot row beside Sol. */}
@@ -11842,6 +11927,53 @@ export function RoofDesigner(props: {
                 <p className="absolute left-1/2 top-[6.25rem] z-10 w-[22rem] max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg border border-line bg-surface/95 px-3 py-2 text-center text-[13px] text-ink-2 shadow-lift">
                   There&apos;s no roof data for this address to draw from. Trace the roof faces (top right) and they are drawn here.
                 </p>
+              )}
+              {/* The dock under the picture while Sol has nothing to say (24 Nov 2026, Martin: the band "is defaulting to
+                  this light grey"): the same graphite plate notched round him, so Sol and the foot row always stand on it. */}
+              {underUp && !deckUp && stage && (
+                <div
+                  className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
+                  style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
+                >
+                  {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
+                      mark in the dock's bottom left, the way back that sat beside the address under the map. */}
+                  {props.onOpenDeal && (
+                    <button
+                      type="button"
+                      onClick={props.onOpenDeal}
+                      aria-label={props.customerName ? `Open ${props.customerName}'s deal` : "Open the deal"}
+                      title={props.customerName ? `${props.customerName}: open the deal` : "Open the deal"}
+                      className="pointer-events-auto absolute bottom-4 left-4 flex size-12 items-center justify-center text-white/85 transition active:scale-95"
+                    >
+                      <SquareKanban className="size-7" strokeWidth={1.75} aria-hidden />
+                    </button>
+                  )}
+                  {/* On to the quote (24 Nov 2026, Martin: "in the bottom right corner an arrow pointing right… it should take
+                      me to the quote"; then "just the arrow, not with a circle around it… give the length of the horizontal
+                      arrow line a little more"): a long orange arrow, no round; the quote sheet carries Proceed to proposal. */}
+                  {!props.sitesOnly && !costsHidden && (
+                    <button
+                      type="button"
+                      onClick={() => showSide("quote")}
+                      aria-label="Next: the quote"
+                      title="Next: the quote"
+                      className="pointer-events-auto absolute bottom-4 right-3 flex h-12 w-20 items-center justify-center text-sun-line transition active:translate-x-0.5"
+                    >
+                      <svg
+                        viewBox="0 0 64 24"
+                        className="h-6 w-16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M3 12h56M49 3l10 9-10 9" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               )}
               {/* Sol's controller for what is picked (22 Nov 2026, Martin): upright a plate under the picture moulded round
                   him, sideways the two thumbs in the picture's bottom corners and a slim pill round him. */}
@@ -11867,6 +11999,8 @@ export function RoofDesigner(props: {
                     onDone={() => setPicks([])}
                     wholeArray={wholeArray?.length ?? null}
                     onWholeArray={() => wholeArray && setPicks(wholeArray)}
+                    wholeLine={wholeLine?.length ?? null}
+                    onWholeLine={() => wholeLine && setPicks(wholeLine)}
                     onTakeBack={(degrees) => {
                       const mark = thumbMark.current;
                       if (mark) history.current.takeBack = { len: mark.len };
