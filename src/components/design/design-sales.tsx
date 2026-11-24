@@ -64,6 +64,8 @@ import { HEAT, PulseMarks } from "./deal-pulse";
 import { BatteryIcon, ChargerIcon, PanelIcon } from "./deal-banner";
 import { jobHas } from "@/lib/domain/design/customers";
 import { loadPulses } from "@/lib/services/deal-pulse";
+import { loadInstallExtras } from "@/lib/services/after-sale";
+import { marginWords, type DealProfit } from "@/lib/domain/design/deal-profit";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 
 /** Where this person's last way of looking at their deals is kept, on their device. */
@@ -150,6 +152,8 @@ export function PipelinesPage() {
   const [adding, setAdding] = useState(false);
   // Each open deal's clock and temperature: its marks on the card, and the order to ring in its column.
   const [pulses, setPulses] = useState<Record<string, DealPulse>>({});
+  // Each signed deal's gross margin and commission, from its signed proposal (only sent to members who see costs).
+  const [profits, setProfits] = useState<Record<string, DealProfit>>({});
 
   useEffect(() => {
     let gone = false;
@@ -166,6 +170,19 @@ export function PipelinesPage() {
       else setProblem(res.message);
     });
     void loadPulses().then((res) => !gone && res.ok && setPulses(res.pulses));
+    void loadInstallExtras().then((res) => {
+      if (gone || !res.ok) return;
+      const out: Record<string, DealProfit> = {};
+      for (const e of res.extras)
+        if (typeof e.grossMargin === "number")
+          out[e.jobId] = {
+            grossMargin: e.grossMargin,
+            grossShare: e.grossShare ?? null,
+            commission: e.commission ?? 0,
+            afterCommission: e.afterCommission ?? 0,
+          };
+      setProfits(out);
+    });
     void listPipelines().then((res) => {
       if (gone || !res.ok) return;
       setKept(res.pipelines);
@@ -710,6 +727,7 @@ export function PipelinesPage() {
                         <span className="min-w-0 truncate">{job.address ? job.address.split(",")[0] : job.title}</span>
                         {job.address ? <KitMarks job={job} /> : null}
                       </p>
+                      <ProfitLine profit={profits[job.id]} />
                       <PulseMarks
                         short
                         pulse={pulses[job.id]}
@@ -812,6 +830,7 @@ export function PipelinesPage() {
                             </span>
                             <Owner email={job.owner} />
                           </p>
+                          <ProfitLine profit={profits[job.id]} />
                         </li>
                       );
                     })}
@@ -1139,5 +1158,20 @@ export function Owner({ email }: { email: string | null }) {
     >
       {email ? initials || "?" : "–"}
     </span>
+  );
+}
+
+/** A signed deal's gross margin and commission, from its signed proposal; nothing for a deal not signed. */
+function ProfitLine({ profit }: { profit: DealProfit | undefined }) {
+  if (!profit) return null;
+  const commission = `$${Math.round(profit.commission).toLocaleString("en-AU")}`;
+  return (
+    <p
+      className="mt-1 flex items-center gap-2 text-[11.5px] tabular-nums text-ink-2 sm:text-[11px]"
+      title={`Gross margin ${marginWords(profit)} · Commission ${commission} · from the signed proposal`}
+    >
+      <span className="rounded bg-positive/10 px-1.5 py-0.5 font-medium text-positive">GM {marginWords(profit)}</span>
+      <span className="text-muted">Comm {commission}</span>
+    </p>
   );
 }
