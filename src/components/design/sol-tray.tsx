@@ -11,6 +11,7 @@ import {
   Cable,
   ChevronRight,
   Hand,
+  Columns2,
   LayoutGrid,
   House,
   Maximize,
@@ -281,6 +282,9 @@ export function SolController(props: {
   /** How many panels are in the array(s) of what is picked, when more than are picked: the button picks them all. */
   wholeArray?: number | null;
   onWholeArray?: () => void;
+  /** How many panels the picked one's own line (column or row) holds, when that is less than the whole array. */
+  wholeLine?: number | null;
+  onWholeLine?: () => void;
   /** A double tap's first tap turned the panels this far: turn them back, leaving nothing to undo. */
   onTakeBack: (degrees: number) => void;
   /** A press and hold on a 1° button begins (true) and ends (false): its turns are one step to undo. */
@@ -382,6 +386,19 @@ export function SolController(props: {
       All {props.wholeArray}
     </button>
   );
+  // Its column or row alone (24 Nov 2026, Martin: "without selecting the row of panels above it").
+  const line = Boolean(props.wholeLine && props.onWholeLine) && (
+    <button
+      type="button"
+      onClick={props.onWholeLine}
+      aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+      title="Pick the column or row this panel is in"
+      className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-xl bg-white/[0.08] px-2.5 text-[12px] font-semibold text-white hover:bg-white/15"
+    >
+      <Columns2 className="size-4 text-sun-line" aria-hidden />
+      Line {props.wholeLine}
+    </button>
+  );
   const undo = props.canUndo && (
     <button
       type="button"
@@ -430,6 +447,7 @@ export function SolController(props: {
           <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
             <div className="flex items-center gap-1.5">
               {orient}
+              {line}
               {whole}
               {remove}
             </div>
@@ -459,6 +477,7 @@ export function SolController(props: {
         </div>
         <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
+          {line}
           {whole}
           {remove}
           {undo}

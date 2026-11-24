@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { lineOf } from "@/lib/domain/design/array-line";
 import { shadeFromReport, type DesignShade } from "@/lib/domain/design/design-shade";
 import { useRouter } from "next/navigation";
 import { accessColour, shadeHint, shadeReport, type ShadeReport } from "@/lib/domain/design/shade";
@@ -3218,15 +3219,28 @@ export function RoofDesigner(props: {
    * The array a panel belongs to: it and every panel that touches it, or as good as (`ARRAY_GAP`), and so on outwards.
    * With where the small round that picks them all goes (just off the array's top right corner) and the box they fill.
    */
+  const placedPanels = () => [
+    ...loose.map((panel) => ({ pick: { kind: "loose", id: panel.id } as Pick, corners: looseCorners(panel, size) })),
+    ...faces.flatMap((f) =>
+      panelPlaces(f, size)
+        .filter((place) => !f.off.includes(place.index))
+        .map((place) => ({ pick: { kind: "grid", face: f.id, index: place.index } as Pick, corners: place.corners })),
+    ),
+  ];
+  /** The straight line of joined panels a panel sits in: its column or its row, the longer (`lineOf`). */
+  const lineOfPick = (start: Pick): Pick[] | null => {
+    const all = placedPanels();
+    const first = all.findIndex((x) => same(x.pick, start));
+    if (first < 0) return null;
+    const line = lineOf(
+      all.map((x) => x.corners),
+      first,
+      ARRAY_GAP,
+    );
+    return line ? line.map((i) => all[i].pick) : null;
+  };
   const arrayOf = (start: Pick): NonNullable<typeof arrayHint> | null => {
-    const all = [
-      ...loose.map((panel) => ({ pick: { kind: "loose", id: panel.id } as Pick, corners: looseCorners(panel, size) })),
-      ...faces.flatMap((f) =>
-        panelPlaces(f, size)
-          .filter((place) => !f.off.includes(place.index))
-          .map((place) => ({ pick: { kind: "grid", face: f.id, index: place.index } as Pick, corners: place.corners })),
-      ),
-    ];
+    const all = placedPanels();
     const first = all.findIndex((x) => same(x.pick, start));
     if (first < 0) return null;
     const inGroup = new Set([first]);
@@ -6935,6 +6949,21 @@ export function RoofDesigner(props: {
       }
     }
     return all.length > picks.length ? all : null;
+  })();
+  // The line (column or row) each picked panel sits in, when that is more than is picked and less than the whole array
+  // (24 Nov 2026, Martin: the column a panel is in "without selecting the row of panels above it").
+  const wholeLine = (() => {
+    if (!wholeArray || picks.length > 40) return null;
+    const keys = new Set<string>();
+    const all: Pick[] = [];
+    for (const pick of picks)
+      for (const one of lineOfPick(pick) ?? [pick]) {
+        const key = keyOf(one);
+        if (keys.has(key)) continue;
+        keys.add(key);
+        all.push(one);
+      }
+    return all.length > picks.length && all.length < wholeArray.length ? all : null;
   })();
   // Which way new panels go down, opened from the foot's Add a panel round (phone and computer alike).
   const panelWayCard = (
@@ -11867,6 +11896,8 @@ export function RoofDesigner(props: {
                     onDone={() => setPicks([])}
                     wholeArray={wholeArray?.length ?? null}
                     onWholeArray={() => wholeArray && setPicks(wholeArray)}
+                    wholeLine={wholeLine?.length ?? null}
+                    onWholeLine={() => wholeLine && setPicks(wholeLine)}
                     onTakeBack={(degrees) => {
                       const mark = thumbMark.current;
                       if (mark) history.current.takeBack = { len: mark.len };
