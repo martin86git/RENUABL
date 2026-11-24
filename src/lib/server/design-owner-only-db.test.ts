@@ -76,4 +76,30 @@ describe.skipIf(!url)("deal owners not invited yet (database)", () => {
     expect((await crm.jobById(a, id))?.job.owner).toBeNull();
     expect(await repo.addMember(b, KIM, OTHER)).toBe("added");
   });
+
+  it("gives deals already imported to the seller, leaving one someone was given", async () => {
+    const pylon = await import("./pylon-import");
+    expect(await repo.addOwnerOnly(a, "ash.sales@alpha-owners.test", "Ash", OWNER)).toBe("added");
+    const mineToGive = await deal("Rae Imported");
+    const givenAlready = await deal("Sky Imported");
+    await crm.setJobOwner(a, givenAlready, JO, OWNER);
+    await pylon.giveImportedDeals(a, "pylon", [], OWNER);
+    await db.query(
+      `insert into design_imports (business_id, source, ref, job_id, by_email) values ($1,'pylon','p1',$2,$4), ($1,'pylon','p2',$3,$4)`,
+      [a, mineToGive, givenAlready, OWNER],
+    );
+    const given = await pylon.giveImportedDeals(
+      a,
+      "pylon",
+      [
+        { ref: "p1", email: "Ash.Sales@alpha-owners.test" },
+        { ref: "p2", email: "ash.sales@alpha-owners.test" },
+        { ref: "p3", email: "nobody@alpha-owners.test" },
+      ],
+      OWNER,
+    );
+    expect(given).toBe(1);
+    expect((await crm.jobById(a, mineToGive))?.job.owner).toBe("ash.sales@alpha-owners.test");
+    expect((await crm.jobById(a, givenAlready))?.job.owner).toBe(JO);
+  });
 });

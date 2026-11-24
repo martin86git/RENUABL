@@ -555,3 +555,48 @@ export async function importedSales(businessId: string): Promise<ImportedSale[]>
     pdf: r.file_id ? `/api/design/jobs/${encodeURIComponent(r.job_id)}/files/${encodeURIComponent(r.file_id)}` : null,
   }));
 }
+
+/**
+ * Gives deals already brought in to whoever sold them (24 Nov 2026, Martin: deals imported before their salesperson
+ * was added, members or people kept to own deals without an invite). Each pair is a project's id in the import and its
+ * seller's email, read from the export again. A deal changes hands only while it has no owner, or is still owned by
+ * whoever brought it in (an import's deals default to them), and only to someone the business has: a member or one
+ * kept to own deals. Written on each deal's record. Answers how many deals changed hands.
+ */
+export async function giveImportedDeals(
+  businessId: string,
+  source: "pylon" | "hubspot" | "sheet",
+  pairs: readonly { ref: string; email: string }[],
+  by: string,
+): Promise<number> {
+  await ensureTable();
+  const wanted = pairs.filter((p) => p.ref && p.email).slice(0, 2_000);
+  if (!wanted.length) return 0;
+  return transaction(async (q) => {
+    const changed = await q<{ id: string; customerId: string; owner: string }>(
+      `with pairs as (select * from unnest($3::text[], $4::text[]) as p(ref, email)),
+            people as (
+              select lower(email) as email from business_members where business_id = $1
+              union select email from design_owner_only where business_id = $1
+            )
+       update design_jobs j set owner_email = people.email, updated_at = now()
+         from design_imports i
+         join pairs on pairs.ref = i.ref
+         join people on people.email = lower(pairs.email)
+        where i.business_id = $1 and i.source = $2 and j.business_id = $1 and j.id = i.job_id
+          and (j.owner_email is null or lower(j.owner_email) = lower(i.by_email))
+          and lower(coalesce(j.owner_email, '')) <> people.email
+       returning j.id, j.customer_id as "customerId", j.owner_email as owner`,
+      [businessId, source, wanted.map((p) => p.ref), wanted.map((p) => p.email.toLowerCase())],
+    );
+    for (const c of changed)
+      await record(q, businessId, {
+        customerId: c.customerId,
+        jobId: c.id,
+        kind: "note",
+        text: `Deal given to ${c.owner.split("@")[0]}, who sold it`,
+        by: by.toLowerCase(),
+      });
+    return changed.length;
+  });
+}
