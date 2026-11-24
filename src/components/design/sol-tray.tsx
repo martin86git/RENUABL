@@ -99,6 +99,8 @@ export function SolTray(props: {
   /** Sol's size-a-system calculator (25 Nov 2026, Martin: "add the calculator into the phone"). */
   onCalc?: () => void;
   calcOn?: boolean;
+  /** The main switchboard's mark (25 Nov 2026, Martin: off the map's kit, into Sol's tools). */
+  msb?: { on: boolean; icon: ReactNode; onClick: () => void };
   /** The house from its sides (Nearmap), when it can be had: its own button and window. */
   sides?: ReactNode;
   /** Which picture is under the design (Google or Nearmap). */
@@ -168,6 +170,7 @@ export function SolTray(props: {
               {DRAW.map(({ tool, icon: Icon, name }) => (
                 <Item key={tool} icon={<Icon aria-hidden />} name={name} on={props.tool === tool} onClick={() => pick(tool)} />
               ))}
+              {props.msb && <Item icon={props.msb.icon} name="Switchboard" on={props.msb.on} onClick={then(props.msb.onClick)} />}
             </Group>
             <Group title="Check">
               <Item icon={<SunMedium aria-hidden />} name="Shade" on={props.shadeOn} onClick={then(props.onShade)} />
@@ -481,20 +484,61 @@ export function SolController(props: {
  * tools. With a tool in hand, that tool's mark rides on his upper left so it is plain what is in hand. With his tray up
  * the + turns to a cross.
  */
-export function SolEmerging({ tray, held, small = false }: { tray: boolean; held: LucideIcon | null; small?: boolean }) {
+export function SolEmerging({
+  tray,
+  held,
+  small = false,
+  onPlus,
+}: {
+  tray: boolean;
+  held: LucideIcon | null;
+  small?: boolean;
+  /** A press on the + alone (25 Nov 2026, Martin: Sol opens his chat, the + his tools). */
+  onPlus?: () => void;
+}) {
   const Held = held;
   return (
-    <span aria-hidden className="pointer-events-none absolute inset-0">
-      <span className="absolute -right-[9px] -top-[7px] h-[3px] w-5 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70" />
+    <span className="pointer-events-none absolute inset-0">
+      <span
+        aria-hidden
+        className="absolute -right-[9px] -top-[7px] h-[3px] w-5 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70"
+      />
       {Held && (
-        <span className="sol-emerge absolute -left-[12px] -top-[12px] flex size-7 items-center justify-center rounded-full bg-sun-line text-white ring-2 ring-[#26282c] [--emerge-x:12px]">
+        <span
+          aria-hidden
+          className="sol-emerge absolute -left-[12px] -top-[12px] flex size-7 items-center justify-center rounded-full bg-sun-line text-white ring-2 ring-[#26282c] [--emerge-x:12px]"
+        >
           <Held className="size-4" strokeWidth={2.4} />
         </span>
       )}
       {/* Pressable as part of Sol's button (its own pointer events, so a press on it isn't passed to the map). */}
       <span
+        role={onPlus ? "button" : undefined}
+        aria-hidden={onPlus ? undefined : true}
+        aria-label={onPlus ? (tray ? "Put Sol's tools away" : "Sol's tools") : undefined}
+        title={onPlus ? (tray ? "Put Sol's tools away" : "Sol's tools") : undefined}
+        onClick={
+          onPlus
+            ? (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onPlus();
+              }
+            : undefined
+        }
+        tabIndex={onPlus ? 0 : undefined}
+        onKeyDown={
+          onPlus
+            ? (e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.stopPropagation();
+                e.preventDefault();
+                onPlus();
+              }
+            : undefined
+        }
         className={clsx(
-          "sol-emerge pointer-events-auto absolute flex items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 motion-reduce:transition-none",
+          "sol-emerge pointer-events-auto absolute flex cursor-pointer items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 motion-reduce:transition-none",
           // On a computer, drawn at full size, a smaller + (the phone's controls are drawn at 0.68).
           small ? "-right-[12px] -top-[12px] size-8 [--emerge-x:-12px]" : "-right-[22px] -top-[22px] size-11 [--emerge-x:-22px]",
           tray && "rotate-45",

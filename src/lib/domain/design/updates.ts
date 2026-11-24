@@ -13,6 +13,13 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
+  { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "Bigger kit icons, the EV charger on the battery's end, and the switchboard in Sol's tools.",
+  },
   {
     day: "2026-11-25",
     area: "Designer",
