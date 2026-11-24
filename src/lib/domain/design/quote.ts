@@ -37,6 +37,7 @@ export const COST_GROUPS = [
   "Switchboard",
   "Installation",
   "Commission",
+  "Card fees",
 ] as const;
 export type CostGroup = (typeof COST_GROUPS)[number];
 
@@ -263,8 +264,13 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     Math.round(rounded.filter((l) => groups.includes(l.group) && !l.confirm).reduce((s, l) => s + l.amount, 0));
   const hardware = sum(["Panels", "Inverters", "Battery", "EV charger", "Racking", "Electrical"]);
   const install = sum(["Switchboard", "Installation"]);
-  const cost = hardware + install + commission;
   const margin = panels ? marginFor(pvKw, batteryKwh, workspace.settings.margin) : 0;
+  // Card payment fees recovered through the price (as Pylon's Administration line): the share of the fee on the price
+  // the line itself makes, so it holds on what the customer pays: x = r × (cost + margin + x).
+  const recover = panels ? cardRecoverShare(workspace.settings.cardRecover) : 0;
+  const cardFees = recover ? Math.round(((hardware + install + commission + margin) * recover) / (1 - recover)) : 0;
+  if (cardFees) rounded.push({ group: "Card fees", label: `Card payment fees (${percentWords(recover)} recovered)`, amount: cardFees });
+  const cost = hardware + install + commission + cardFees;
   const priceExGst = cost + margin;
   return {
     panels,
@@ -281,6 +287,11 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
     missing: rounded.filter((l) => l.missing).length,
   };
 }
+
+/** The card fee share recovered, held to what RENUABL charges. */
+export const cardRecoverShare = (r: number | undefined) =>
+  typeof r === "number" && Number.isFinite(r) ? Math.min(0.025, Math.max(0, r)) : 0;
+const percentWords = (r: number) => `${Math.round(r * 10000) / 100}%`;
 
 /** A quote line changed by hand: a quantity or a cost typed over the worked-out one, or the line taken out. */
 export interface LineEdit {

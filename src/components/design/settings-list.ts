@@ -62,7 +62,7 @@ export const SETTINGS: { title: string; items: { slug: string; label: string; so
       { slug: "calls", label: "Phone assistant" },
       { slug: "usage", label: "Usage" },
       { slug: "billing", label: "Billing" },
-      { slug: "card-payments", label: "Card payments from customers" },
+      { slug: "card-payments", label: "Payment gateway" },
     ],
   },
   {
