@@ -13,6 +13,7 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  { day: "2026-11-24", area: "Sol", words: "A screenshot pasted into Sol's box now shows as a preview inside the box." },
   {
     day: "2026-11-24",
     area: "Proposals",

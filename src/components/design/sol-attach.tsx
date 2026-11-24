@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ClipboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ClipboardEvent } from "react";
 import { FileText, Paperclip, Plus, X } from "lucide-react";
 import { MAX_FILE_CHARS, MAX_FILES, SOL_FILE_TYPES, type SolFile } from "@/lib/domain/design/sol";
 
@@ -149,29 +149,75 @@ export function AttachButton({ attach, size = "size-9", plus = false }: { attach
   );
 }
 
-/** The files on the message, each with a cross to take it off, and any problem with them. */
-export function AttachedFiles({ attach }: { attach: SolAttach }) {
-  if (!attach.files.length && !attach.problem) return null;
+/** A picture's preview address while it is on the box, let go once it comes off. */
+function usePreview(file: File): string | null {
+  const url = useMemo(() => (file.type.startsWith("image/") ? URL.createObjectURL(file) : null), [file]);
+  useEffect(
+    () => () => {
+      if (url) URL.revokeObjectURL(url);
+    },
+    [url],
+  );
+  return url;
+}
+
+function FileTile({ file, onRemove }: { file: File; onRemove: () => void }) {
+  const url = usePreview(file);
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-2 pb-1 text-xs">
-      {attach.files.map((f, i) => (
-        <span
-          key={`${f.name}-${i}`}
-          className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-canvas px-2 py-1 text-ink-2 ring-1 ring-line"
-        >
-          <FileText className="size-3.5 shrink-0" aria-hidden />
-          <span className="truncate">{f.name}</span>
-          <button
-            type="button"
-            onClick={() => attach.remove(i)}
-            aria-label={`Take off ${f.name}`}
-            className="rounded-full p-0.5 hover:text-ink"
-          >
-            <X className="size-3" aria-hidden />
-          </button>
+    <span className="group relative inline-flex shrink-0" title={file.name}>
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- a local preview of a pasted picture, never from the web
+        <img src={url} alt={file.name} className="size-16 rounded-xl object-cover ring-1 ring-line" />
+      ) : (
+        <span className="flex h-16 w-36 items-center gap-2 rounded-xl bg-canvas px-2.5 text-xs text-ink ring-1 ring-line">
+          <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sun-line">
+            <FileText className="size-4" aria-hidden />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-medium">{file.name}</span>
+            <span className="block text-[10px] uppercase tracking-[0.1em] text-muted">{file.type.split("/")[1] ?? "file"}</span>
+          </span>
         </span>
+      )}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Take off ${file.name}`}
+        className="absolute -right-1.5 -top-1.5 inline-flex size-5 items-center justify-center rounded-full bg-ink text-white shadow ring-2 ring-surface transition hover:bg-ink/80"
+      >
+        <X className="size-3" aria-hidden />
+      </button>
+    </span>
+  );
+}
+
+/**
+ * The files on a message to Sol, shown inside the box as Claude's box shows them (24 Nov 2026, Martin): a picture as
+ * its own small preview, a PDF as a tile with its name, each with a cross on its corner; then any problem with them.
+ */
+export function FileTiles({
+  files,
+  problem,
+  onRemove,
+  className = "",
+}: {
+  files: readonly File[];
+  problem?: string;
+  onRemove: (i: number) => void;
+  className?: string;
+}) {
+  if (!files.length && !problem) return null;
+  return (
+    <div className={`flex flex-wrap items-center gap-2.5 pt-1.5 ${className}`}>
+      {files.map((f, i) => (
+        <FileTile key={`${f.name}-${f.size}-${i}`} file={f} onRemove={() => onRemove(i)} />
       ))}
-      {attach.problem && <span className="text-danger">{attach.problem}</span>}
+      {problem && <span className="text-xs text-danger">{problem}</span>}
     </div>
   );
+}
+
+/** The files on the message, each with a cross to take it off, and any problem with them. */
+export function AttachedFiles({ attach }: { attach: SolAttach }) {
+  return <FileTiles files={attach.files} problem={attach.problem} onRemove={attach.remove} className="pb-1.5 pr-2" />;
 }
