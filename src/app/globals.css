@@ -2189,3 +2189,33 @@ html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
     animation: none;
   }
 }
+
+/* The pipeline board (design-sales.tsx): no bar on a phone (it swipes), a plain sideways bar on a computer
+   (24 Nov 2026, Martin: "missing a bar to scroll horizontally"). */
+@media (max-width: 39.99rem) {
+  .deal-board {
+    scrollbar-width: none;
+  }
+  .deal-board::-webkit-scrollbar {
+    display: none;
+  }
+}
+@media (min-width: 40rem) {
+  /* Chrome and Safari draw a styled bar always (a Mac otherwise hides it until you scroll); setting scrollbar-color
+     would make Chrome ignore these, so it is only for Firefox. */
+  @supports not selector(::-webkit-scrollbar) {
+    .deal-board {
+      scrollbar-color: rgb(11 11 12 / 0.35) rgb(11 11 12 / 0.06);
+    }
+  }
+  .studio-frame .deal-board::-webkit-scrollbar {
+    height: 14px;
+  }
+  .studio-frame .deal-board::-webkit-scrollbar-track {
+    background: rgb(11 11 12 / 0.06);
+    border-radius: 9999px;
+  }
+  .studio-frame .deal-board::-webkit-scrollbar-thumb {
+    background-color: rgb(11 11 12 / 0.35);
+  }
+}
