@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
     area: "Installations",
+    words: "The job card shows the whole house from above with the panels on it, before the close-up layout, and emails it too.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Installations",
     words: "A tentative install's deal is picked from RENUABL's own searchable list, not the phone's picker, and the dates fit a phone.",
   },
   {

@@ -31,6 +31,8 @@ export interface JobCardView {
   /** The roof picture's place, for the drawings' backdrop. Null without a design. */
   roof: { lat: number; lng: number } | null;
   layout: JobDrawing | null;
+  /** The layout across the whole house (25 Nov 2026, Martin). Optional: older callers and copies have none. */
+  whole?: JobDrawing | null;
   strings: JobDrawing | null;
   stringWords: string[];
   notes: JobNote[];
@@ -117,6 +119,7 @@ export async function jobCard(
     },
     roof: design && saved !== NO_DESIGN ? { lat: saved.project.lat, lng: saved.project.lng } : null,
     layout: design ? jobDrawing(design, "layout") : null,
+    whole: design ? jobDrawing(design, "whole") : null,
     strings: design && (design.strings ?? []).some((s) => s.panels.length) ? jobDrawing(design, "strings") : null,
     stringWords: design ? stringsInWords(design) : [],
     notes,

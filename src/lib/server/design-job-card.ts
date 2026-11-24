@@ -93,6 +93,7 @@ export async function sendJobCard(
   const picture = card.roof && (card.layout || card.strings) ? await roofPicture(card.roof, card.job.address) : null;
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
   for (const [name, d] of [
+    ["whole-house.png", card.whole ?? null],
     ["panel-layout.png", card.layout],
     ["string-design.png", card.strings],
   ] as const) {

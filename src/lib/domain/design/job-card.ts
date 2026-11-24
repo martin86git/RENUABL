@@ -130,14 +130,20 @@ export interface JobDrawing {
 }
 
 const PAD = 28;
+/** The whole house view's least width on the ground, in metres: a house and its yard (25 Nov 2026, Martin). */
+export const WHOLE_HOUSE_M = 34;
+/** Its shape, width over height. */
+const WHOLE_ASPECT = 4 / 3;
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * One drawing of a design over its roof picture: "layout" draws the panels and where the inverter, battery and main
  * switchboard go; "strings" fills each string's panels in its colour, letters it A, B, C at its first panel and traces
- * its wiring panel to panel. Null when nothing is drawn.
+ * its wiring panel to panel. Null when nothing is drawn. "whole" is the layout seen across the whole house (25 Nov 2026,
+ * Martin: "a rooftop full house view"): framed on the home (the picture's middle, where the address is) and the panels,
+ * at least `WHOLE_HOUSE_M` across, so the installer sees where the array sits on the roof.
  */
-export function jobDrawing(design: RoofDesign, mode: "layout" | "strings"): JobDrawing | null {
+export function jobDrawing(design: RoofDesign, mode: "layout" | "strings" | "whole"): JobDrawing | null {
   const panels = designPanels(design);
   if (!panels.length) return null;
   const scale = metresPerPixel(design.lat);
@@ -150,16 +156,17 @@ export function jobDrawing(design: RoofDesign, mode: "layout" | "strings"): JobD
   const all = shapes.flatMap((s) => s.pts);
   const xs = all.map((p) => p.x);
   const ys = all.map((p) => p.y);
-  const x0 = Math.max(0, Math.min(...xs) - PAD);
-  const y0 = Math.max(0, Math.min(...ys) - PAD);
-  const x1 = Math.min(ROOF_IMAGE.width, Math.max(...xs) + PAD);
-  const y1 = Math.min(ROOF_IMAGE.height, Math.max(...ys) + PAD);
+  let x0 = Math.max(0, Math.min(...xs) - PAD);
+  let y0 = Math.max(0, Math.min(...ys) - PAD);
+  let x1 = Math.min(ROOF_IMAGE.width, Math.max(...xs) + PAD);
+  let y1 = Math.min(ROOF_IMAGE.height, Math.max(...ys) + PAD);
+  if (mode === "whole") [x0, y0, x1, y1] = wholeHouse(xs, ys, WHOLE_HOUSE_M / scale);
   const poly = (pts: { x: number; y: number }[], fill: string, stroke: string) =>
     `<polygon points="${pts.map((p) => `${r1(p.x)},${r1(p.y)}`).join(" ")}" fill="${fill}" stroke="${stroke}" stroke-width="0.8"/>`;
   const label = (x: number, y: number, text: string, size = 7) =>
     `<text x="${r1(x)}" y="${r1(y)}" font-family="Helvetica, Arial, sans-serif" font-size="${size}" font-weight="700" text-anchor="middle" dominant-baseline="central" fill="#111" stroke="#fff" stroke-width="2" paint-order="stroke">${text}</text>`;
   const out: string[] = [];
-  if (mode === "layout") {
+  if (mode !== "strings") {
     for (const s of shapes) out.push(poly(s.pts, "rgba(17,24,39,0.82)", "rgba(255,255,255,0.9)"));
     const mark = (p: Point | undefined, text: string) => {
       if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
@@ -198,6 +205,35 @@ export function jobDrawing(design: RoofDesign, mode: "layout" | "strings"): JobD
     });
   }
   return { viewBox: `${r1(x0)} ${r1(y0)} ${r1(x1 - x0)} ${r1(y1 - y0)}`, marks: out.join("") };
+}
+
+/**
+ * The whole house frame on the 640 × 400 picture: the panels and the picture's middle (the address), with room round
+ * them, at least `least` pixels across, widened to `WHOLE_ASPECT`, and kept on the picture.
+ */
+export function wholeHouse(xs: number[], ys: number[], least: number): [number, number, number, number] {
+  const W = ROOF_IMAGE.width;
+  const H = ROOF_IMAGE.height;
+  let x0 = Math.min(W / 2, ...xs) - PAD;
+  let x1 = Math.max(W / 2, ...xs) + PAD;
+  let y0 = Math.min(H / 2, ...ys) - PAD;
+  let y1 = Math.max(H / 2, ...ys) + PAD;
+  const grow = (a: number, b: number, to: number): [number, number] => {
+    const add = Math.max(0, to - (b - a)) / 2;
+    return [a - add, b + add];
+  };
+  [x0, x1] = grow(x0, x1, least);
+  [y0, y1] = grow(y0, y1, (x1 - x0) / WHOLE_ASPECT);
+  [x0, x1] = grow(x0, x1, (y1 - y0) * WHOLE_ASPECT);
+  // On the picture: shifted back inside it, then cut to it if still larger.
+  const fit = (a: number, b: number, max: number): [number, number] => {
+    const w = Math.min(b - a, max);
+    const start = Math.min(Math.max(0, a), max - w);
+    return [start, start + w];
+  };
+  [x0, x1] = fit(x0, x1, W);
+  [y0, y1] = fit(y0, y1, H);
+  return [x0, y0, x1, y1];
 }
 
 /** The strings in words: "A: 10 panels on inverter 1, input 1". */
@@ -255,7 +291,7 @@ export function jobCardEmail(input: {
     ["Customer", [input.customer.name, input.customer.phone].filter(Boolean).join(" · ")],
     ...input.details.map((d) => [d.label, d.value]),
   ];
-  const pictures = input.drawings ? "The panel layout and the string design are attached." : "No design is drawn for this job yet.";
+  const pictures = input.drawings ? "The whole house from above, the panel layout and the string design are attached." : "No design is drawn for this job yet.";
   const text = [
     `Hi ${input.installer},`,
     "",

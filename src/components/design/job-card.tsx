@@ -450,6 +450,7 @@ function CardBody({
 
         {card.layout || card.strings ? (
           <section className="min-w-0 space-y-3">
+            {card.whole && <Drawing title="The whole house" drawing={card.whole} picture={picture} />}
             {card.layout && <Drawing title="Panel layout" drawing={card.layout} picture={picture} />}
             {card.strings && <Drawing title="String design" drawing={card.strings} picture={picture} />}
             {card.stringWords.length > 0 && (
