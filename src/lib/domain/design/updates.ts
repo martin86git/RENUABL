@@ -16,7 +16,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
     area: "Settings",
-    words: "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",
+    words:
+      "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",
   },
   { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
   {
