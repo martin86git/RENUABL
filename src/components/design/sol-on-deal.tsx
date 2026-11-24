@@ -356,7 +356,13 @@ export function SolTerminal(props: {
         >
           <div>
             <div>
-              <p className="sol-line min-h-[1.5em] text-[13.5px] font-medium leading-snug text-ink max-sm:text-[13px]" aria-live="polite">
+              <p
+                className={clsx(
+                  "sol-line min-h-[1.5em] font-normal leading-snug tracking-[-0.01em] text-ink",
+                  props.inCard ? "text-[14.5px] max-sm:text-[13.5px]" : "text-[18px] max-sm:text-[15px]",
+                )}
+                aria-live="polite"
+              >
                 {typed.text}
                 <span className="sol-caret ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[2px] bg-sun-line" aria-hidden />
               </p>
@@ -372,7 +378,7 @@ export function SolTerminal(props: {
                       type="button"
                       onClick={() => void sendAnswer()}
                       disabled={busy !== null || writing}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[12.5px] font-medium text-primary-ink hover:opacity-90 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       <span className="max-sm:hidden">Yes, send it</span>
@@ -399,7 +405,7 @@ export function SolTerminal(props: {
                       type="button"
                       onClick={yes}
                       disabled={busy !== null || (p.yes.kind === "send" && !sol?.to)}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12.5px] font-semibold text-white hover:brightness-105 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[12.5px] font-medium text-primary-ink hover:opacity-90 disabled:bg-surface-2 disabled:text-muted max-sm:h-7 max-sm:px-3 max-sm:text-[12px]"
                     >
                       {busy === "yes" && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
                       {p.yes.label}
@@ -466,9 +472,9 @@ export function SolTerminal(props: {
                   tellSol();
                 }}
                 // Squarer, smaller and a little lower, like a terminal prompt (18 Nov 2026, Martin: "more like claude code's").
-                className="sol-compose mt-3.5 flex items-center gap-1 rounded-lg bg-canvas max-sm:mt-2.5 py-0.5 pl-3 pr-0.5 ring-1 ring-line focus-within:ring-sun-line"
+                className="sol-compose mt-3.5 flex items-center gap-1 rounded-xl bg-surface max-sm:mt-2.5 py-1 pl-3 pr-1 ring-1 ring-line focus-within:ring-ink/40"
               >
-                <span className="sol-prompt font-mono text-[12px] text-sun-line" aria-hidden>
+                <span className="sol-prompt font-mono text-[12px] text-muted" aria-hidden>
                   {">"}
                 </span>
                 <input
