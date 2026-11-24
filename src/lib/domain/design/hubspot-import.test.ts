@@ -69,6 +69,8 @@ describe("the token", () => {
   });
   it("refuses anything else", () => {
     expect(cleanHubSpotKey("hapikey-123")).toBeNull();
+    expect(cleanHubSpotKey("a made up key with spaces in it")).toBeNull();
+    expect(cleanHubSpotKey("na1-ab12cd34-5678-90ef-test-service-key")).toBe("na1-ab12cd34-5678-90ef-test-service-key");
     expect(cleanHubSpotKey("pat-ap1-short")).toBeNull();
     expect(cleanHubSpotKey(42)).toBeNull();
   });
