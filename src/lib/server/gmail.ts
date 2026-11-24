@@ -190,6 +190,19 @@ export async function changeableAddresses(member: Who): Promise<string[]> {
   return rows.map((r) => r.address);
 }
 
+/**
+ * Every mailbox the business's people have connected that can send (Gmail or Outlook), with whose it is, for choosing
+ * which an automated email goes from (the installation reminder).
+ */
+export async function sendingMailboxes(businessId: string): Promise<{ owner: string; address: string; provider: string }[]> {
+  return query<{ owner: string; address: string; provider: string }>(
+    `select g.email as owner, g.address, g.provider from design_gmail g
+       join business_members m on m.business_id = g.business_id and lower(m.email) = g.email
+      where g.business_id = $1 and g.can_modify order by g.created_at, g.address`,
+    [businessId],
+  );
+}
+
 /** The first mailbox a member connected, or null. */
 export const gmailAddress = async (member: Who): Promise<string | null> => (await gmailAddresses(member))[0] ?? null;
 
