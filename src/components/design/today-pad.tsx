@@ -524,6 +524,7 @@ export function SolBox({
           </label>
           <textarea
             ref={field}
+            onPaste={attach.onPaste}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
@@ -576,6 +577,7 @@ export function SolBox({
           </label>
           <input
             ref={field}
+            onPaste={attach.onPaste}
             id={id}
             value={heard ? withSpoken(text, heard) : text}
             onChange={(e) => {
