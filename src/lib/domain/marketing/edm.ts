@@ -8,6 +8,13 @@
 import { VIDEO_LINE, videoStillKey } from "./edm-video";
 import { COUNTDOWN_HEIGHT, COUNTDOWN_UNITS, COUNTDOWN_WIDTH, cleanEndsAt, endsAtMs, endsWords } from "./countdown";
 
+/**
+ * How wide an email is drawn, and the room inside its margins (24 Nov 2026, Martin: the email "is too narrow"; it was
+ * 600 and 536 inside, the old newsletter width).
+ */
+export const EDM_WIDTH = 680;
+export const EDM_INNER = EDM_WIDTH - 64;
+
 /** How tall the logo stands at the top of an email. */
 export const LOGO_HEIGHT = 44;
 
@@ -146,6 +153,51 @@ export interface EdmContent {
   blocks: EdmBlock[];
   /** The email's own colours; left out while they are ours. */
   style?: EdmStyle;
+  /** How it is drawn: designed (the card, logo and buttons) unless "letter"; left out while designed. */
+  look?: EdmLook;
+  /** Who this email is from, e.g. "Martin Smith", in place of the From name in Settings; left out when not given. */
+  fromName?: string;
+}
+
+/**
+ * How an email is drawn (24 Nov 2026, Martin: "build the personal letter style", so marketing emails stop landing in
+ * Gmail's Promotions tab). Designed is the card with the logo, colours and buttons. A personal letter is drawn as a
+ * person's email is: plain words on white, links as links, pictures as they are, no card, logo, coloured buttons or
+ * countdown picture, and the footer in small grey type under it. Gmail files mail by how it looks and how people
+ * treat it, so nothing promises the Primary tab; a letter only gives it the best odds.
+ */
+export const EDM_LOOKS = ["designed", "letter"] as const;
+export type EdmLook = (typeof EDM_LOOKS)[number];
+export const EDM_LOOK_WORDS: Record<EdmLook, string> = { designed: "Designed", letter: "Personal letter" };
+
+/** The look an email is drawn in. */
+export const lookOf = (c: Pick<EdmContent, "look">): EdmLook => (c.look === "letter" ? "letter" : "designed");
+
+/** A sender's name as an inbox shows it: one line, no address marks. */
+export const cleanFromName = (raw: unknown): string => line(raw, 60).replace(/[<>"@]/g, "");
+
+/** Who the email says it is from: its own name, else the From name in Settings, else the business. */
+export const fromNameOf = (c: Pick<EdmContent, "fromName">, brand: Pick<EdmBrand, "fromName">, sender: Pick<EdmSender, "name">): string =>
+  c.fromName || brand.fromName || sender.name;
+
+/** What in a letter makes it read as a newsletter, so Gmail is likelier to file it under Promotions; empty when nothing. */
+export function letterWarnings(c: EdmContent): string[] {
+  const pictures = c.blocks.reduce(
+    (n, b) =>
+      n +
+      (b.kind === "image" && b.imageId ? 1 : 0) +
+      (b.kind === "video" && b.url ? 1 : 0) +
+      filledTiles(b).length +
+      filledProducts(b).filter((p) => p.imageId).length,
+    0,
+  );
+  const links = edmLinks(c.blocks).length;
+  const out: string[] = [];
+  if (pictures > 1) out.push(`${pictures} pictures: a letter reads most like a person's email with one at most.`);
+  if (c.blocks.some((b) => b.kind === "products" && filledProducts(b).length)) out.push("Product cards read as an advert.");
+  if (links > 3) out.push(`${links} links: one or two read more like a person's email.`);
+  if (!c.fromName) out.push('Give it a person\'s name as the sender, e.g. "Martin Smith".');
+  return out;
 }
 
 /**
@@ -380,6 +432,8 @@ export function cleanContent(raw: unknown): EdmContent {
     preview: line(r.preview, EDM_LIMITS.preview),
     blocks: cleanBlocks(r.blocks),
     ...(isDefaultStyle(style) ? {} : { style }),
+    ...(r.look === "letter" ? { look: "letter" as const } : {}),
+    ...(cleanFromName(r.fromName) ? { fromName: cleanFromName(r.fromName) } : {}),
   };
 }
 
@@ -425,7 +479,7 @@ export function cleanBrand(raw: unknown): EdmBrand {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const replyTo = line(r.replyTo, 200).toLowerCase();
   return {
-    fromName: line(r.fromName, 60).replace(/[<>"@]/g, ""),
+    fromName: cleanFromName(r.fromName),
     replyTo: /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(replyTo) ? replyTo : null,
     colour: cleanColour(r.colour),
     reason: line(r.reason, 240) || DEFAULT_BRAND.reason,
@@ -606,6 +660,85 @@ export function footerLines(brand: EdmBrand, sender: EdmSender): string[] {
 
 /** One email for one contact. Merge fields are filled before escaping, so a name can't add markup. */
 export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSender, fields: MergeFields, links: RenderLinks): RenderedEdm {
+  const designed = renderDesigned(content, brand, sender, fields, links);
+  return lookOf(content) === "letter" ? { ...designed, html: renderLetter(content, brand, sender, fields, links) } : designed;
+}
+
+/** A personal letter's HTML: a person's email, plain words on white, the footer small under it. Its text is the designed one's. */
+function renderLetter(content: EdmContent, brand: EdmBrand, sender: EdmSender, fields: MergeFields, links: RenderLinks): string {
+  const linkList = edmLinks(content.blocks);
+  let linkAt = 0;
+  const next = () => esc(links.click(linkAt, linkList[linkAt++]));
+  const a = (href: string, words: string) => `<a href="${href}" target="_blank" style="color:#1155cc">${words}</a>`;
+  const img = (src: string, alt: string) =>
+    `<img src="${esc(src)}" alt="${esc(alt)}" width="${EDM_INNER}" style="display:block;width:100%;max-width:${EDM_INNER}px;height:auto;border:0">`;
+  const p = (inner: string) => `<p style="margin:0 0 14px">${inner}</p>`;
+  const parts: string[] = [];
+  for (const b of content.blocks) {
+    if (b.kind === "heading" && b.text) parts.push(p(`<strong>${esc(merge(b.text, fields))}</strong>`));
+    else if (b.kind === "text" && b.text)
+      parts.push(
+        merge(b.text, fields)
+          .split(/\n{2,}/)
+          .map((t) => p(esc(t).replace(/\n/g, "<br>")))
+          .join(""),
+      );
+    else if (b.kind === "button" && b.text && b.url) parts.push(p(a(next(), esc(merge(b.text, fields)))));
+    else if (b.kind === "image" && b.imageId) {
+      const pic = img(links.image(b.imageId), merge(b.text, fields));
+      parts.push(`<div style="margin:0 0 14px">${b.url ? a(next(), pic) : pic}</div>`);
+    } else if (b.kind === "tiles")
+      for (const t of filledTiles(b)) {
+        const caption = merge(t.text, fields);
+        const pic = img(links.image(t.imageId!), caption);
+        parts.push(
+          `<div style="margin:0 0 14px">${t.url ? a(next(), pic) : pic}${caption ? `<div style="padding-top:4px;font-size:13px;color:#5f6368">${esc(caption)}</div>` : ""}</div>`,
+        );
+      }
+    else if (b.kind === "products")
+      for (const pr of filledProducts(b)) {
+        const name = merge(pr.name, fields);
+        const href = pr.url ? next() : null;
+        const pic = pr.imageId ? img(links.image(pr.imageId), name) : "";
+        const lines = [
+          `<strong>${esc(name)}</strong>${pr.price ? ` · ${esc(merge(pr.price, fields))}` : ""}`,
+          pr.text ? esc(merge(pr.text, fields)) : "",
+          href ? a(href, esc(merge(pr.label, fields) || PRODUCT_BUTTON)) : "",
+        ].filter(Boolean);
+        parts.push(`${pic ? `<div style="margin:0 0 8px">${href ? a(href, pic) : pic}</div>` : ""}${p(lines.join("<br>"))}`);
+      }
+    else if (b.kind === "divider") parts.push(`<hr style="border:0;border-top:1px solid #dadce0;margin:18px 0">`);
+    else if (b.kind === "spacer") parts.push(`<div style="height:${SPACER_SIZES[cleanSpace(b.space)]}px"></div>`);
+    else if (b.kind === "video" && b.url) {
+      const line = merge(b.text, fields) || VIDEO_LINE;
+      const href = next();
+      const key = videoStillKey(b.imageId, b.url);
+      const src =
+        key && links.video ? links.video(key, cleanColour(brand.colour).replace("#", "")) : b.imageId ? links.image(b.imageId) : null;
+      parts.push(`${src ? `<div style="margin:0 0 6px">${a(href, img(src, `Play: ${line}`))}</div>` : ""}${p(a(href, esc(line)))}`);
+    } else if (b.kind === "countdown" && b.endsAt) {
+      const label = merge(b.text, fields);
+      parts.push(p(`${label ? `<strong>${esc(label)}</strong><br>` : ""}${esc(endsWords(b.endsAt))}`));
+    } else if (b.kind === "social") {
+      const socials = filledSocials(b);
+      if (socials.length) parts.push(p(socials.map((so) => a(next(), esc(SOCIAL_WORDS[so.network]))).join(" &middot; ")));
+    }
+  }
+  const foot = footerLines(brand, sender);
+  const preview = content.preview ? merge(content.preview, fields) : "";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(merge(content.subject, fields))}</title></head><body style="margin:0;padding:0;background:#ffffff">${
+    preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
+  }<div style="max-width:${EDM_WIDTH}px;padding:16px 20px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#202124">${parts.join(
+    "",
+  )}<div style="margin-top:28px;padding-top:12px;border-top:1px solid #e8eaed;font-size:12px;line-height:1.5;color:#80868b">${foot
+    .map((l) => esc(l))
+    .join("<br>")}<br><a href="${esc(links.unsubscribe)}" style="color:#80868b">Unsubscribe</a> from these emails.</div>${
+    links.pixel ? `<img src="${esc(links.pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""
+  }</div></body></html>`;
+}
+
+/** A designed email: the card on grey, the logo, headings, buttons in the brand colour. */
+function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender, fields: MergeFields, links: RenderLinks): RenderedEdm {
   const colour = cleanColour(brand.colour);
   const style = styleOf(content);
   const ink = inksOf(style);
@@ -632,7 +765,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       );
       textParts.push(t);
     } else if (b.kind === "image" && b.imageId) {
-      const img = `<img src="${esc(links.image(b.imageId))}" alt="${esc(merge(b.text, fields))}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:8px">`;
+      const img = `<img src="${esc(links.image(b.imageId))}" alt="${esc(merge(b.text, fields))}" width="${EDM_INNER}" style="display:block;width:100%;max-width:${EDM_INNER}px;height:auto;border:0;border-radius:8px">`;
       let cell = img;
       if (b.url) {
         cell = `<a href="${esc(links.click(linkAt, linkList[linkAt]))}" target="_blank">${img}</a>`;
@@ -646,7 +779,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       if (!tiles.length) continue;
       const cols = Math.min(cleanColumns(b.columns), tiles.length) as TileColumns;
       const gap = 12;
-      const width = Math.floor((536 - gap * (cols - 1)) / cols);
+      const width = Math.floor((EDM_INNER - gap * (cols - 1)) / cols);
       const cells = tiles.map((t) => {
         const caption = merge(t.text, fields);
         const img = `<img src="${esc(links.image(t.imageId!))}" alt="${esc(caption)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border:0;border-radius:8px">`;
@@ -683,7 +816,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       if (!products.length) continue;
       const cols = Math.min(cleanColumns(b.columns), products.length) as TileColumns;
       const gap = 16;
-      const width = Math.floor((536 - gap * (cols - 1)) / cols);
+      const width = Math.floor((EDM_INNER - gap * (cols - 1)) / cols);
       const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
       const cells = products.map((p) => {
         const name = merge(p.name, fields);
@@ -748,7 +881,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
       const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
       const src = key && links.video ? links.video(key, colour.replace("#", "")) : b.imageId ? links.image(b.imageId) : null;
       let inner = src
-        ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none"><img src="${esc(src)}" alt="${esc(`Play: ${line}`)}" width="536" style="display:block;width:100%;max-width:536px;height:auto;border:0;border-radius:8px"></a>`
+        ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none"><img src="${esc(src)}" alt="${esc(`Play: ${line}`)}" width="${EDM_INNER}" style="display:block;width:100%;max-width:${EDM_INNER}px;height:auto;border:0;border-radius:8px"></a>`
         : "";
       inner += `<div style="padding:${src ? 10 : 0}px 0 0;text-align:${align}"><a href="${esc(href)}" target="_blank" style="${font};font-size:14px;font-weight:600;color:${colour};text-decoration:none">&#9654;&nbsp;${esc(line)}</a></div>`;
       rows.push(`<tr><td style="padding:12px 32px">${inner}</td></tr>`);
@@ -764,7 +897,7 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
         inner += `<div style="padding:0 0 10px;${font};font-size:17px;line-height:1.35;font-weight:600;color:${ink.heading};text-align:${align}">${esc(label)}</div>`;
       if (links.countdown) {
         const src = links.countdown(Math.round(endsAtMs(b.endsAt) / 1000), colour.replace("#", ""));
-        inner += `<img src="${esc(src)}" alt="${esc(when)}" width="${COUNTDOWN_WIDTH}" height="${COUNTDOWN_HEIGHT}" style="display:block;width:100%;max-width:${COUNTDOWN_WIDTH}px;height:auto;border:0">`;
+        inner += `<img src="${esc(src)}" alt="${esc(when)}" width="${EDM_INNER}" height="${Math.round((COUNTDOWN_HEIGHT * EDM_INNER) / COUNTDOWN_WIDTH)}" style="display:block;width:100%;max-width:${EDM_INNER}px;height:auto;border:0">`;
         inner += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${COUNTDOWN_UNITS.map(
           (u) =>
             `<td width="25%" style="padding:6px 0 0;${font};font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:${ink.words};text-align:center">${u}</td>`,
@@ -802,13 +935,13 @@ export function renderEdm(content: EdmContent, brand: EdmBrand, sender: EdmSende
   const preview = content.preview ? merge(content.preview, fields) : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(merge(content.subject, fields))}</title></head><body style="margin:0;padding:0;background:#f4f4f5">${
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
-  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${
+  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${
     brand.logoId
       ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
       : headerCell(sender)
   }</td></tr>${rows.join(
     "",
-  )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
+  )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
     links.pixel ? `<img src="${esc(links.pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""
   }</td></tr></table></body></html>`;
   const text = [...textParts, "", "—", ...foot, `Unsubscribe: ${links.unsubscribe}`].join("\n\n").replace(/\n{3,}/g, "\n\n");
