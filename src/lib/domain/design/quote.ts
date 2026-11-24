@@ -120,6 +120,64 @@ export interface Costing {
 /** Rail comes in these lengths, with this much spare allowed for. */
 const RAIL = { lengthM: 4.8, perPanelExtraM: 0.1, spare: 1.05 } as const;
 
+/** One line of the racking a design takes, by rule: its part's key, the quote's words, how many, and plain words. */
+export interface RackingLine {
+  key: "rail" | "splice" | "tinKit" | "tileKit" | "kliplok" | "tiltLow" | "tiltHigh";
+  label: string;
+  qty: number;
+  /** The part in plain words, for the job card. */
+  name: string;
+}
+
+/**
+ * The racking a design takes (24 Nov 2026, Martin: the job card's racking section): two rails under each portrait
+ * panel, its width and a little more, with some spare, in 4.8 m lengths; a roof kit a 2 kW; on a flat roof Kliplok
+ * interfaces and tilt kits for tilted panels. The quote prices the same lines.
+ */
+export function rackingOf(spec: SystemSpec, form: QuoteForm): RackingLine[] {
+  const panels = Math.max(0, Math.round(spec.panels));
+  if (!panels) return [];
+  const pvKw = Math.round(panels * spec.panel.watts) / 1000;
+  const arrays = Math.max(1, Math.round(spec.arrays));
+  const kits = Math.ceil(pvKw / 2);
+  const railLengths = Math.ceil((panels * (spec.panel.short + RAIL.perPanelExtraM) * 2 * RAIL.spare) / RAIL.lengthM);
+  const out: RackingLine[] = [
+    {
+      key: "rail",
+      label: `Rails (${railLengths} lengths for ${panels} panels)`,
+      qty: railLengths,
+      name: `Rail (${RAIL.lengthM} m lengths)`,
+    },
+    { key: "splice", label: `Rail splices (${railLengths})`, qty: railLengths, name: "Rail splices" },
+  ];
+  if (form.roof === "flat") {
+    out.push({ key: "tinKit", label: `Roof kits (tin, ${kits})`, qty: kits, name: "Tin roof kits" });
+    const klip = panels * 2 + arrays * 2;
+    out.push({ key: "kliplok", label: `Kliplok interfaces (${klip})`, qty: klip, name: "Kliplok interfaces" });
+  } else {
+    const tin = form.roof === "tin";
+    out.push({
+      key: tin ? "tinKit" : "tileKit",
+      label: `Roof kits (${form.roof}, ${kits})`,
+      qty: kits,
+      name: tin ? "Tin roof kits" : "Tile roof kits",
+    });
+  }
+  const tilted = form.roof === "flat" ? Math.min(panels, Math.max(0, Math.round(spec.tiltedPanels))) : 0;
+  if (tilted) {
+    const low = spec.tiltDegrees <= 15;
+    const tiltKits = Math.ceil((tilted * spec.panel.watts) / 2000);
+    const range = low ? "10 to 15" : "15 to 30";
+    out.push({
+      key: low ? "tiltLow" : "tiltHigh",
+      label: `Tilt kits, ${range} degrees (${tiltKits} for ${tilted} tilted panels)`,
+      qty: tiltKits,
+      name: `Tilt kits, ${range}°`,
+    });
+  }
+  return out;
+}
+
 export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspace): Costing {
   const panels = Math.max(0, Math.round(spec.panels));
   const pvKw = Math.round(panels * spec.panel.watts) / 1000;
@@ -127,7 +185,6 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
   const batteryQty = spec.battery ? Math.max(1, Math.round(spec.battery.qty)) : 0;
   const batteryKwh = spec.battery ? Math.round(spec.battery.kwh * batteryQty * 10) / 10 : 0;
   const arrays = Math.max(1, Math.round(spec.arrays));
-  const kits = Math.ceil(pvKw / 2);
   const lines: CostLine[] = [];
 
   /** A line for so many of one product from the price lists. */
@@ -187,24 +244,7 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
 
   if (panels) {
     // Racking: two rails under each portrait panel, its width and a little more, with some spare; kits per 2 kW.
-    const railLengths = Math.ceil((panels * (spec.panel.short + RAIL.perPanelExtraM) * 2 * RAIL.spare) / RAIL.lengthM);
-    part("Racking", "rail", `Rails (${railLengths} lengths for ${panels} panels)`, railLengths);
-    part("Racking", "splice", `Rail splices (${railLengths})`, railLengths);
-    if (form.roof === "flat") {
-      part("Racking", "tinKit", `Roof kits (tin, ${kits})`, kits);
-      part("Racking", "kliplok", `Kliplok interfaces (${panels * 2 + arrays * 2})`, panels * 2 + arrays * 2);
-    } else part("Racking", form.roof === "tin" ? "tinKit" : "tileKit", `Roof kits (${form.roof}, ${kits})`, kits);
-    const tilted = form.roof === "flat" ? Math.min(panels, Math.max(0, Math.round(spec.tiltedPanels))) : 0;
-    if (tilted) {
-      const low = spec.tiltDegrees <= 15;
-      const tiltKits = Math.ceil((tilted * spec.panel.watts) / 2000);
-      part(
-        "Racking",
-        low ? "tiltLow" : "tiltHigh",
-        `Tilt kits, ${low ? "10 to 15" : "15 to 30"} degrees (${tiltKits} for ${tilted} tilted panels)`,
-        tiltKits,
-      );
-    }
+    for (const r of rackingOf(spec, form)) part("Racking", r.key, r.label, r.qty);
     part("Electrical", three ? "meter3ph" : "meter1ph", "Smart meter", 1);
     part("Electrical", "mc4", "MC4 connectors", 1);
     part("Electrical", three ? "isolator3ph" : "isolator1ph", "AC isolator", 1);
@@ -224,6 +264,7 @@ export function costSystem(spec: SystemSpec, form: QuoteForm, workspace: Workspa
       arrays > 2 ? `Split arrays: ${arrays} on the roof, ${arrays - 2} more than the 2 allowed for` : `Arrays: ${arrays} on the roof`,
       Math.max(0, arrays - 2) * r.extraArray,
     );
+    const tilted = form.roof === "flat" ? Math.min(panels, Math.max(0, Math.round(spec.tiltedPanels))) : 0;
     if (tilted) install(`Tilt frames: ${tilted} panels`, tilted * r.tiltPerPanel, tilted);
     if (three) install("Three-phase installation", r.threePhase);
     if (spec.inverters.length > 1)
