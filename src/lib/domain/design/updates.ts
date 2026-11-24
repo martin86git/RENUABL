@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
     area: "Proposals",
+    words: "On a phone, the customer's Call me button is a slim tab at the screen's edge, so it no longer covers the page.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Proposals",
     words: "Publishing a proposal now takes you straight down to Send to customer and its links.",
   },
   {
