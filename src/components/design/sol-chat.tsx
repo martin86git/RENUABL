@@ -245,7 +245,10 @@ export function SolChat({
   const picker = useRef<HTMLInputElement>(null);
   const pullForTimes = usePullForTimes();
   const box = useRef<HTMLTextAreaElement>(null);
-  const names = useNameHintBox(text, setText, box);
+  // A name's chip opens the deal: on a phone the panel steps aside so it is seen.
+  const names = useNameHintBox(text, setText, box, () => {
+    if (!window.matchMedia("(min-width: 1024px)").matches) onClose?.();
+  });
   const end = useRef<HTMLDivElement>(null);
   // "#" finds a deal: the business's deals are read the first time, then matched here as each letter goes in.
   const [dealAt, setDealAt] = useState<{ start: number; query: string } | null>(null);
