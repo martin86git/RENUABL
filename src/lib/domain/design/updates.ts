@@ -23,7 +23,12 @@ export const UPDATES: readonly Update[] = [
     area: "Today",
     words: "The tray under Sol's box has a Pipeline shortcut, and its tabs can be dragged into your own order.",
   },
-  { day: "2026-11-24", area: "Designer", words: "Sol asks about the bill and the system size first, then the battery on its own card." },
+  {
+    day: "2026-11-24",
+    area: "Designer",
+    words:
+      "Sol asks about the bill and the system size first, then the battery on its own card, and his box on a phone grows to fit what he says.",
+  },
   { day: "2026-11-24", area: "Sol", words: "A screenshot pasted into Sol's box now shows as a preview inside the box." },
   {
     day: "2026-11-24",
