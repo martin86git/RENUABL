@@ -7466,10 +7466,10 @@ export function RoofDesigner(props: {
                 // round on the right. Roomier (22 Nov 2026, Martin: "they do not need to be so skinny").
                 <div
                   className={clsx(
-                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-2 pl-4 pr-16 tabular-nums leading-tight transition-colors duration-300",
+                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-3 pl-4 pr-16 tabular-nums leading-tight transition-colors duration-300",
                     growing ? "bg-sun-line" : "",
                   )}
-                  style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+                  style={{ paddingTop: "calc(0.875rem + env(safe-area-inset-top))" }}
                 >
                   <div className="min-w-0" title={`${livePanels} panels of ${panelOf(design).watts} W`}>
                     <p className={clsx("text-[9px] font-medium uppercase tracking-[0.16em]", growing ? "text-white" : "text-sun-bright")}>
