@@ -726,35 +726,34 @@ button.team-flash:not([aria-pressed="true"]) {
    Mist blue since 21 Nov 2026 (Martin: "feeling too harsh in the graphite"; his pick, #E7EBF0): the same layout on a
    pale blue-grey ground with dark type, cards a step lighter than the ground, fields white. */
 .sol-ground {
-  --canvas: #dde2e9;
+  --canvas: #f3f3f5;
   /* Cards (a draft email, a question, a choice, a design, sources) are lifted off the charcoal in a lighter one, so
      they read as things to act on (17 Nov 2026, Martin: "really hard to tell these cards when all the background is
      the same without contrast"). Words still sit straight on the ground. */
-  --surface: #f4f6f9;
-  --surface-2: rgb(30 40 56 / 0.06);
+  --surface: #ffffff;
+  --surface-2: rgb(20 22 26 / 0.05);
   --ink: #1d1d1f;
   --ink-2: #3a3d43;
-  --muted: #68707c;
-  --line: rgb(30 40 56 / 0.12);
-  --line-strong: rgb(30 40 56 / 0.24);
+  --muted: #6e6e73;
+  --line: rgb(20 22 26 / 0.12);
+  --line-strong: rgb(20 22 26 / 0.24);
   --primary: #3a3d43;
   --primary-ink: #ffffff;
   --sun: rgb(255 90 31 / 0.12);
   --sun-ink: #b23f0c;
-  background: #e7ebf0;
+  /* White and clean (24 Nov 2026, Martin, after HubSpot's Breeze: "refer to the clean aesthetic"), over the mist blue. */
+  background: #ffffff;
   color: var(--ink);
 }
 /* A lifted card sits on the mist with a soft shadow and a faint light top edge. */
 .sol-ground .rounded-2xl.bg-surface,
 .sol-ground .rounded-xl.bg-surface {
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.8),
-    0 6px 18px -10px rgb(30 40 56 / 0.28);
+  box-shadow: 0 1px 2px rgb(20 22 26 / 0.04);
 }
 /* A choice inside a card (Sol's induction and learning cards) is a darker well, not the card's own grey (20 Nov 2026,
    Martin: "the card and options shouldnt all be the same graphite color"); lit orange on hover. */
 .sol-ground .sol-choice {
-  background-color: #e1e6ed;
+  background-color: #f3f3f5;
 }
 .sol-ground .sol-choice.sol-choice-on {
   background-color: rgb(255 90 31 / 0.16);
@@ -785,7 +784,8 @@ button.team-flash:not([aria-pressed="true"]) {
   -webkit-font-smoothing: antialiased;
 }
 .sol-ground .sol-prose {
-  color: #2e3138;
+  color: #26282d;
+  font-size: 13.5px;
 }
 /* The key point: the conversation's one highlight and its only pad (no italics: Martin, 15 Nov 2026). A wash of the
    signal colour; on the charcoal it is a tint with a fine orange edge. */
