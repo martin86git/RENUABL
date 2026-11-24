@@ -392,7 +392,7 @@ export function PipelinesPage() {
   ).map(([view, name, Icon]) => ({ view, name, Icon }));
 
   return (
-    <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10">
+    <div className="px-1.5 py-2 sm:px-5 sm:py-5 lg:px-10 lg:pt-0">
       {/* On a phone (23 Nov 2026, Martin: "make the pipeline toggle also be the drop down pipeline menu… the icons can
           dock / spawn off of it"): the Deals switch's Pipeline segment is the pipeline picker, its count and worth under
           the name, and whose deals, cards or list and New deal hang under it as a tray; no card of their own. */}
@@ -477,7 +477,7 @@ export function PipelinesPage() {
       />
       <PhoneDealsSwitch path={PATHS.pipelines} className="-mt-1 mb-4 hidden sm:block lg:hidden" />
 
-      <div className="hidden sm:block">
+      <div className="hidden sm:block lg:-mt-2">
         <PageHead eyebrow="CRM · Deals" title={named.name}>
           {leadAt < 0 && (
             <button className={ui.primary} onClick={() => setAdding(true)} disabled={adding}>
