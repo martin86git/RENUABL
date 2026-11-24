@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { assignInvoice, deleteInvoice } from "@/lib/server/design-after-sale-repo";
+import { sendBillsDue } from "@/lib/server/design-xero";
 
 const validId = (id: string) => /^inv_[a-f0-9]{8,64}$/.test(id);
 
@@ -14,6 +16,7 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/design/inv
     const jobId = typeof read.body.jobId === "string" && /^job_[a-f0-9]{8,64}$/.test(read.body.jobId) ? read.body.jobId : null;
     if (read.body.jobId && !jobId) return Response.json({ ok: false, message: "There's no such job." }, { status: 404 });
     const ok = validId(id) && (await assignInvoice(who.member.businessId, id, jobId, who.member.email));
+    if (ok && jobId) after(() => sendBillsDue(who.member.businessId).catch(() => 0));
     return ok ? Response.json({ ok: true }) : Response.json({ ok: false, message: "There's no such invoice." }, { status: 404 });
   });
 }

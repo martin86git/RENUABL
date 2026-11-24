@@ -13,6 +13,7 @@ import { CrmImportSettings } from "@/components/design/settings-crm-import";
 import { PylonImportSettings } from "@/components/design/settings-pylon";
 import { LeadInboxSettings } from "@/components/design/settings-lead-inbox";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
+import { XeroSettings } from "@/components/design/settings-xero";
 import { CallerSettings } from "@/components/design/settings-caller";
 import { StaffViewAs } from "@/components/design/staff-view-as";
 import { settingBySlug } from "@/components/design/settings-list";
@@ -90,6 +91,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <CallerSettings />
         ) : section === "card-payments" ? (
           <CardPaymentsSettings />
+        ) : section === "xero" ? (
+          <XeroSettings />
         ) : section === "view-as" ? (
           <StaffViewAs />
         ) : (

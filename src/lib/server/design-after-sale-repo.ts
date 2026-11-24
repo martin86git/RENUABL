@@ -204,7 +204,7 @@ export async function listProposals(businessId: string, today: ISODate): Promise
 }
 
 /** "8.55 kW + 16 kWh". */
-function systemLine(view: ProposalView): string {
+export function systemLine(view: ProposalView): string {
   const { kw, batteryKwh } = view.system;
   return [`${kw.toFixed(2)} kW`, batteryKwh > 0 ? `${batteryKwh} kWh` : ""].filter(Boolean).join(" + ");
 }
@@ -213,7 +213,7 @@ function systemLine(view: ProposalView): string {
 // The version a customer signed
 // ---------------------------------------------------------------------------
 
-interface Signed {
+export interface Signed {
   internal: ProposalInternal;
   view: ProposalView;
   acceptedAt: string;
@@ -222,7 +222,7 @@ interface Signed {
 }
 
 /** A job's newest accepted version, or null when none has been signed. */
-async function signedVersion(businessId: string, jobId: string): Promise<Signed | null> {
+export async function signedVersion(businessId: string, jobId: string): Promise<Signed | null> {
   const rows = await query<{
     internal: ProposalInternal;
     view: ProposalView;
@@ -266,6 +266,10 @@ export async function afterSigning(businessId: string, jobId: string): Promise<v
   await keepInstallCost(businessId, jobId, "signing").catch((e) =>
     console.error("an installation allowance couldn't be kept", e instanceof Error ? e.message : e),
   );
+  // The customer's invoice in the business's Xero, when it has Xero connected (domain/design/xero.ts).
+  await import("./design-xero")
+    .then((x) => x.invoiceOnSigning(businessId, jobId))
+    .catch((e) => console.error("the Xero invoice couldn't be raised", e instanceof Error ? e.message : e));
 }
 
 async function openOrder(businessId: string, jobId: string, by: string): Promise<boolean> {

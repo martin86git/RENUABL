@@ -2,6 +2,7 @@ import { dbConfigured } from "@/lib/server/db";
 import { fireDue, sendingBusinesses } from "@/lib/server/design-sol-agents";
 import { lineUpHellos } from "@/lib/server/design-hello";
 import { leadInboxBusinesses, syncLeadInbox } from "@/lib/server/design-lead-inbox";
+import { syncXero, xeroBusinessesDue } from "@/lib/server/design-xero";
 import { routineBusinesses, runCustomRoutines } from "@/lib/server/design-custom-routines";
 
 export const maxDuration = 300;
@@ -41,5 +42,14 @@ export async function GET(request: Request) {
       console.error("a business's routines couldn't run", e instanceof Error ? e.message : e);
       return 0;
     });
-  return Response.json({ ok: true, sent, leads, routines });
+  // Xero (domain/design/xero.ts): invoices paid there marked paid here, matching installer invoices sent as bills; each business once an hour.
+  let paid = 0;
+  for (const business of await xeroBusinessesDue().catch(() => [] as string[]))
+    paid += (
+      await syncXero(business).catch((e) => {
+        console.error("a business couldn't be brought up to date with Xero", e instanceof Error ? e.message : e);
+        return { paid: 0, bills: 0 };
+      })
+    ).paid;
+  return Response.json({ ok: true, sent, leads, routines, paid });
 }
