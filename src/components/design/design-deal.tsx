@@ -90,7 +90,6 @@ import { CallEntryBy, CallEntryText } from "./call-entry";
 import { CallChoices } from "./call-choice";
 import { setFrameInFront, usePageAbout } from "@/lib/services/page-context";
 
-type Written = "note" | "call" | "email";
 type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service" | "details";
 /**
  * The deal's tabs under its banner, in order; Service sits apart after them. Activity is the deal at a glance and its
@@ -396,7 +395,6 @@ export function DealPage({ id }: { id: string }) {
       gone = true;
     };
   }, [id, activity.length]);
-  const [kind, setKind] = useState<Written>("note");
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
 
@@ -453,7 +451,7 @@ export function DealPage({ id }: { id: string }) {
   };
   const say = async () => {
     if (!job || !text.trim()) return;
-    const res = await addActivity(job.customerId, { kind, text: text.trim(), jobId: id });
+    const res = await addActivity(job.customerId, { kind: "note", text: text.trim(), jobId: id });
     if (!res.ok) return setStatus(res.message);
     setActivity([res.activity, ...activity]);
     setText("");
@@ -1002,16 +1000,6 @@ export function DealPage({ id }: { id: string }) {
               </section>
               <div>
                 <div className={clsx(ui.card, "flex flex-wrap gap-2 p-3")}>
-                  <select
-                    aria-label="What happened"
-                    className={clsx(ui.input, "w-28 appearance-auto")}
-                    value={kind}
-                    onChange={(e) => setKind(e.target.value as Written)}
-                  >
-                    <option value="note">Note</option>
-                    <option value="call">Call</option>
-                    <option value="email">Email</option>
-                  </select>
                   <input
                     aria-label="What was said or done"
                     className={clsx(ui.input, "min-w-0 flex-1")}
@@ -1019,7 +1007,7 @@ export function DealPage({ id }: { id: string }) {
                     onChange={(e) => setText(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && void say()}
                     maxLength={1000}
-                    placeholder="Write a note, or log a call or an email. Type @ to mention someone"
+                    placeholder="Write a note. Type @ to mention someone"
                   />
                   {members.length > 1 && (
                     <select
