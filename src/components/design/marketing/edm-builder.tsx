@@ -1279,7 +1279,12 @@ function ImageFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch
         <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-line-strong px-3 text-[13px] hover:border-ink/40">
           {busy && <Loader2 className="size-4 animate-spin" />}
           {b.imageId ? "Change picture" : "Choose a picture"}
-          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => pick(e.target.files?.[0])} />
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="sr-only"
+            onChange={(e) => pick(e.target.files?.[0])}
+          />
         </label>
         <span className="text-[12px] text-muted">or drop one here</span>
       </div>
@@ -1405,7 +1410,7 @@ function TilesFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch
                 )}
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   className="sr-only"
                   onChange={(e) => {
                     void add([...(e.target.files ?? [])], i);

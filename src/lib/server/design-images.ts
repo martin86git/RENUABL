@@ -90,3 +90,36 @@ export function termsResponse(file: { bytes: Buffer }, name: string): Response {
     },
   });
 }
+
+/** A marketing email's picture: a photo kept as any other, or an animated GIF kept moving. */
+export interface MarketingImage {
+  bytes: Buffer;
+  contentType: "image/png" | "image/jpeg" | "image/gif";
+  width: number;
+  height: number;
+}
+
+/** GIF's own first bytes: "GIF87a" or "GIF89a". */
+export const isGif = (b: Uint8Array) =>
+  b.length >= 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38 && (b[4] === 0x37 || b[4] === 0x39) && b[5] === 0x61;
+
+/**
+ * A picture for a marketing email (22 Nov 2026, Martin: emails with animations, like the website's). A GIF, the one
+ * animation email apps play, is drawn again frame by frame (its timing kept, anything else in the file dropped), no wider
+ * than `MARKETING_GIF_SIDE`; anything else goes through `safeImage` as a photo.
+ */
+export const MARKETING_GIF_SIDE = 1200;
+
+export async function marketingImage(file: Uint8Array): Promise<MarketingImage | { problem: string }> {
+  if (!isGif(file)) return safeImage(file, "photo");
+  if (file.length > IMAGE_LIMITS.uploadBytes) return { problem: IMAGE_TOO_BIG };
+  try {
+    const { data, info } = await sharp(file, { animated: true, limitInputPixels: 60_000_000 })
+      .resize({ width: MARKETING_GIF_SIDE, withoutEnlargement: true })
+      .gif({ effort: 7 })
+      .toBuffer({ resolveWithObject: true });
+    return { bytes: data, contentType: "image/gif", width: info.width, height: info.pageHeight ?? info.height };
+  } catch {
+    return { problem: IMAGE_WRONG };
+  }
+}

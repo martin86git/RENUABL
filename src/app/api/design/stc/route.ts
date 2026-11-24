@@ -5,13 +5,15 @@ const PRIVATE = { "cache-control": "private, no-store" };
 
 /**
  * GET → the STC change notice for this person (domain/design/stc-change.ts): only for someone who may change
- * settings, and not while they have put it away. Null when there is nothing to say.
+ * settings, with `later` true while they have put it away (Today shows it as a lightbulb on Sol's box). Null when
+ * there is nothing to say.
  */
 export async function GET() {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    return Response.json({ ok: true, notice: await stcNoticeFor(who.member) }, { headers: PRIVATE });
+    const said = await stcNoticeFor(who.member);
+    return Response.json({ ok: true, notice: said?.notice ?? null, later: said?.later ?? false }, { headers: PRIVATE });
   });
 }
 
@@ -27,12 +29,14 @@ export async function POST(request: Request) {
     if ("refuse" in read) return read.refuse;
     if (read.body.do === "later") {
       await stcNoticeLater(who.member);
-      return Response.json({ ok: true, notice: null }, { headers: PRIVATE });
+      const said = await stcNoticeFor(who.member);
+      return Response.json({ ok: true, notice: said?.notice ?? null, later: true }, { headers: PRIVATE });
     }
     if (read.body.do === "apply") {
       const stcFrom = await applyStcPeriod(who.member);
       if (!stcFrom) return Response.json({ ok: false, message: "There is no change to price for just now." }, { status: 409 });
-      return Response.json({ ok: true, stcFrom, notice: await stcNoticeFor(who.member) }, { headers: PRIVATE });
+      const said = await stcNoticeFor(who.member);
+      return Response.json({ ok: true, stcFrom, notice: said?.notice ?? null, later: said?.later ?? false }, { headers: PRIVATE });
     }
     return Response.json({ ok: false, message: "Unknown request." }, { status: 400 });
   });

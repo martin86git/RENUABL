@@ -2124,6 +2124,30 @@ html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
   }
 }
 
+/* A notice minimised to a lightbulb on Sol's box (23 Nov 2026, Martin): it pops in, then glows once. */
+.notice-bulb {
+  animation: notice-bulb-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes notice-bulb-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    box-shadow: 0 0 0 8px rgb(255 90 31 / 0.18);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-bulb {
+    animation: none;
+  }
+}
+
 /* Chat and Feed coming out of Sol on the phone's dock like a three-leaf clover (23 Nov 2026, Martin): each leaf
    unfurls from its point at the clover's centre, Sol below being the third leaf. */
 .sol-clover-leaf {

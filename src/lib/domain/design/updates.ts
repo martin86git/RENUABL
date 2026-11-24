@@ -15,6 +15,27 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-24",
+    area: "Calendar",
+    words:
+      "On a computer, drag the calendar's edge or corner to make it wider or taller; it stays that size, and a double click puts it back.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "The example questions in Sol's chat show for your first three chats, then step aside.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Sol",
+    words: "Sol's chat opens fresh each time, with your last chat a press away, a taller box to type in, and a quieter header.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Today",
+    words: "Every tour has a Skip button, so you can leave it at any step.",
+  },
+  {
+    day: "2026-11-24",
     area: "Deals",
     words: "On a phone, the pipeline's columns are narrower so the next one shows, and each card says it in fewer words.",
   },

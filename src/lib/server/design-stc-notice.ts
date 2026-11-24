@@ -58,8 +58,12 @@ async function work(member: Member): Promise<{ notice: StcNotice | null; today: 
   return { notice: stcNotice({ today, rates, stcFrom: settings.stcFrom, stcPrice: settings.stcPrice, unsigned }), today };
 }
 
-/** The notice for someone who may change settings, unless they put it away for now. Null for everyone else. */
-export async function stcNoticeFor(member: Member): Promise<StcNotice | null> {
+/**
+ * The notice for someone who may change settings, and whether they put it away for now ("Later"): a notice put away
+ * is still answered, so Today can keep it as a lightbulb on Sol's box (23 Nov 2026, Martin) rather than lose it.
+ * Null for everyone else.
+ */
+export async function stcNoticeFor(member: Member): Promise<{ notice: StcNotice; later: boolean } | null> {
   if (!can(member.role, "prices", member.permissions)) return null;
   const { notice, today } = await work(member);
   if (!notice) return null;
@@ -69,7 +73,7 @@ export async function stcNoticeFor(member: Member): Promise<StcNotice | null> {
       where business_id = $1 and lower(email) = lower($2)`,
     [member.businessId, member.email],
   );
-  return putAway(notice.key, rows[0] ?? null, today) ? null : notice;
+  return { notice, later: putAway(notice.key, rows[0] ?? null, today) };
 }
 
 /** "Later": this notice put away for this person, for a week or until the change, whichever is sooner. */

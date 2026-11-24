@@ -182,6 +182,8 @@ export interface SolState {
   reminders: SolReminder[];
   prefs: SolPref[];
   unread: number;
+  /** How many chats with Sol this member has had, the one going included (sol-history.ts `chatsSoFar`). */
+  chats?: number;
   /** The owner's preferences for everyone in the business (sol-induction.ts). */
   businessPrefs?: SolPref[];
   /** Where their induction with Sol stands, and whether the owner set the customer questions for everyone. */

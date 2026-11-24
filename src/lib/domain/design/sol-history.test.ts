@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { SolTurn } from "./sol";
-import { MAX_PAST, askToStartAfresh, cleanPast, fileAway, freshTurns, pastGroup, titleOf, worthKeeping, type SolPast } from "./sol-history";
+import {
+  MAX_PAST,
+  STARTER_CHATS,
+  askToStartAfresh,
+  chatsSoFar,
+  showStarters,
+  cleanPast,
+  fileAway,
+  freshTurns,
+  pastGroup,
+  titleOf,
+  worthKeeping,
+  type SolPast,
+} from "./sol-history";
 
 const you = (text: string, at: string, pinned = false): SolTurn => ({ role: "you", text, at, ...(pinned ? { pinned } : {}) });
 const sol = (text: string, at: string): SolTurn => ({ role: "sol", text, at });
@@ -53,5 +66,19 @@ describe("Sol's past conversations", () => {
 
   it("reads back only well-formed conversations", () => {
     expect(cleanPast([{ id: "a", turns: talk }, { id: "", turns: talk }, { id: "b", turns: [] }, "junk"]).map((p) => p.id)).toEqual(["a"]);
+  });
+});
+
+describe("example questions for the first chats only", () => {
+  const asked = [{ role: "you" as const, text: "hi", at: "2026-11-24T00:00:00.000Z" }];
+  it("counts the chats filed away and the one going once asked in", () => {
+    expect(chatsSoFar(0, [])).toBe(0);
+    expect(chatsSoFar(0, asked)).toBe(1);
+    expect(chatsSoFar(2, asked)).toBe(3);
+  });
+  it("shows the examples for the first three chats, then not", () => {
+    expect(showStarters(undefined)).toBe(true);
+    expect(showStarters(STARTER_CHATS - 1)).toBe(true);
+    expect(showStarters(STARTER_CHATS)).toBe(false);
   });
 });

@@ -9,7 +9,11 @@ import type { EdmSender } from "@/lib/domain/marketing/edm";
 import { dbConfigured, query } from "./db";
 import { standingOf } from "./design-addons";
 import { loadBrand } from "./design-proposal-repo";
+import { publicSiteUrl } from "@/lib/domain/site";
 import { renuablCrm } from "./renuabl-crm";
+
+/** RENUABL's own wordmark as the website shows it, sized for the top of an email (public/brand/renuabl-logo-email.png, 2x). */
+export const RENUABL_EMAIL_LOGO = `${publicSiteUrl()}/brand/renuabl-logo-email.png`;
 
 export async function marketingOn(businessId: string): Promise<boolean> {
   if (!dbConfigured()) return false;
@@ -34,12 +38,14 @@ export async function senderFor(businessId: string): Promise<EdmSender> {
     [businessId],
   );
   const name = rows[0]?.name ?? "";
-  const kit = await loadBrand(businessId, name);
+  const [kit, own] = await Promise.all([loadBrand(businessId, name), isRenuablBusiness(businessId)]);
   return {
     name: (kit.name || name).trim(),
     abn: /^\d{11}$/.test(kit.abn) ? kit.abn : null,
     email: kit.email.trim() || rows[0]?.owner || null,
     phone: kit.phone.trim() || null,
     address: kit.address.trim() || null,
+    // RENUABL's own emails carry its logo; another business's still name it in words (its logo isn't served publicly yet).
+    logo: own ? RENUABL_EMAIL_LOGO : null,
   };
 }
