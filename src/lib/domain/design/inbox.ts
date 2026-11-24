@@ -478,7 +478,7 @@ export const isMessageId = (v: unknown): v is string => typeof v === "string" &&
  * and pictures and long lines kept inside the screen. Nothing is taken out of the email.
  */
 export const EMAIL_FRAME_STYLE = [
-  "html{-webkit-text-size-adjust:100%;text-size-adjust:100%}",
+  "html{-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow:hidden}",
   "body{margin:0;padding:4px 2px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1d1d1f;overflow-wrap:anywhere;word-break:break-word}",
   "img,video{max-width:100%!important;height:auto!important}",
   "table{max-width:100%!important}",
