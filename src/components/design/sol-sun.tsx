@@ -216,7 +216,7 @@ function LiveCanvas({ disc, className }: { disc: boolean; className?: string }) 
   }, [disc]);
   return (
     <span className={className} aria-hidden>
-      <canvas ref={ref} className="block size-full" />
+      <canvas ref={ref} className="sol-sun-canvas block size-full" />
       <span className="pointer-events-none absolute inset-1/4">
         <svg viewBox="11 12 78 78" className="absolute inset-[2%] opacity-60 mix-blend-soft-light">
           <SunBrainLines />

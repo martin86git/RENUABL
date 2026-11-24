@@ -112,7 +112,7 @@ export function LiveSun({ className, energy = 0, live = true }: { className?: st
   // The disc is half the canvas across, in its middle.
   return (
     <span className="relative block size-full" aria-hidden>
-      <canvas ref={canvas} className={clsx("block size-full", className)} />
+      <canvas ref={canvas} className={clsx("sol-sun-canvas block size-full", className)} />
       <span className="pointer-events-none absolute inset-1/4">
         <SunBrain lit={energy > 0.5} />
       </span>
