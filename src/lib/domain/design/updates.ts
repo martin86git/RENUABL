@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-25",
+    area: "Designer",
+    words: "The Google | Nearmap switch is one round, G or N; pressing it shows G and N to pick, and N opens Nearmap's pictures.",
+  },
+  {
+    day: "2026-11-25",
     area: "Installations",
     words: "The job card shows the whole house from above with the panels on it, before the close-up layout, and emails it too.",
   },
