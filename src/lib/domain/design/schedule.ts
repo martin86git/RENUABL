@@ -9,7 +9,7 @@ import { addDaysISO, VIC_PUBLIC_HOLIDAYS } from "../scheduling";
 import type { ISODate } from "../types";
 import type { OrderStatus } from "./orders";
 
-export type CalendarView = "month" | "week";
+export type CalendarView = "month" | "week" | "day";
 
 const DAY_MS = 86_400_000;
 const at = (d: ISODate) => Date.parse(`${d}T00:00:00Z`);
@@ -25,6 +25,10 @@ const monday = (d: ISODate) => addDaysISO(d, -weekday(d));
  */
 export function calendarDays(view: CalendarView, date: ISODate): { days: ISODate[]; prev: ISODate; next: ISODate; title: string } {
   const month = (d: ISODate) => new Date(at(d)).toLocaleDateString("en-AU", { month: "long", year: "numeric", timeZone: "UTC" });
+  if (view === "day") {
+    const title = new Date(at(date)).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+    return { days: [date], prev: addDaysISO(date, -1), next: addDaysISO(date, 1), title };
+  }
   if (view === "week") {
     const start = monday(date);
     const days = Array.from({ length: 7 }, (_, i) => addDaysISO(start, i));
