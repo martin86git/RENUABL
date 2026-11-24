@@ -242,7 +242,10 @@ export function nudgesFor(s: NudgeState): Nudge[] {
       kind: "next",
       words: "The design is ready. Let's finalise the quote.",
       why: "Check the lines and decide what's still open, then on to the proposal.",
-      actions: [{ label: "Finalise the quote", act: "finalise" }],
+      actions: [
+        { label: "Finalise the quote", act: "finalise" },
+        { label: "Not now", act: "ok" },
+      ],
     });
   return out;
 }

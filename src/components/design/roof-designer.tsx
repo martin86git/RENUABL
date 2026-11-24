@@ -7077,8 +7077,6 @@ export function RoofDesigner(props: {
             setPhonePitch(false);
             pickTool(t);
           }}
-          shadeOn={shadeOn}
-          onShade={toggleShade}
           drawn={illustrated}
           onDrawn={toggleIllustrated}
           zooming={zooming}
@@ -7088,7 +7086,6 @@ export function RoofDesigner(props: {
           {...(costsHidden ? {} : { onDesignForMe: () => setMineIntro(true) })}
           onUndo={undo}
           onRedo={redo}
-          onWhole={() => setView(WHOLE)}
           {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
           {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
           footRoom={solHolds ? 78 : 0}
