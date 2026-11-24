@@ -84,7 +84,6 @@ import {
   FileText,
   Layers,
   SunMedium,
-  Brush,
   House,
   Minus,
   LayoutGrid,
@@ -324,8 +323,6 @@ const TOOLS: { tool: Tool; icon: LucideIcon; name: string; hint: string }[] = [
  */
 type SideView = "designer" | "quote" | "proposal";
 const SIDE_KEY = "renuabl.design.side";
-/** Where the device keeps whether the roof is shown drawn (the Drawn view) or as the photo. */
-const ART_KEY = "renuabl.design.drawn-roof";
 const SIDE_VIEWS: { id: SideView; label: string; hint: string }[] = [
   { id: "designer", label: "Designer", hint: "The home's roof, storeys and phase, Sol, and the deal's notes" },
   { id: "quote", label: "Quote", hint: "The quote, worked out as you draw" },
@@ -424,6 +421,12 @@ const isSideways = () => window.innerHeight > 0 && window.innerHeight <= SIDEWAY
 const DESK_SOL_MIDDLE = 64;
 /** The graphite tray along the pop-up's foot on a computer (22 Nov 2026, Martin: "graphite tray end to end"), px tall. */
 const DESK_TRAY = 72;
+
+/** The notch in the Roof pill's left end that the picture's G round sits in, half in and half out (25 Nov 2026, Martin). */
+const PICTURE_NOTCH: React.CSSProperties = {
+  WebkitMaskImage: "radial-gradient(circle 25px at -8px 50%, transparent 24.5px, #000 25.5px)",
+  maskImage: "radial-gradient(circle 25px at -8px 50%, transparent 24.5px, #000 25.5px)",
+};
 
 /** A round in the desktop pop-up's foot row (Select, Add a panel, the hand, Erase), lit while its tool is in hand. */
 function FootRound(props: { label: string; on: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -1590,24 +1593,8 @@ export function RoofDesigner(props: {
   // The Drawn view (10 Nov 2026, Martin): the roof as an illustration in place of the photo, its surroundings a dim
   // ghost of it, panels drawn as panels and the kit on a wall of its own. Made in the browser from what is already
   // loaded (illustrated-roof.tsx). The choice is kept on the device.
-  const [illustrated, setIllustrated] = useState(false);
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (window.localStorage.getItem(ART_KEY) === "1") setIllustrated(true);
-    } catch {
-      // Storage is off: the photo shows.
-    }
-  }, []);
-  const toggleIllustrated = () => {
-    const next = !illustrated;
-    setIllustrated(next);
-    try {
-      window.localStorage.setItem(ART_KEY, next ? "1" : "0");
-    } catch {
-      // Nothing to do: it still changes for this visit.
-    }
-  };
+  // Taken out of the tools (25 Nov 2026, Martin: "it serves no use"): the photo always shows, whatever a device kept.
+  const illustrated = false;
   const ghost = useRoofGhost(props.image, illustrated, ROOF_IMAGE.width, ROOF_IMAGE.height);
   // The roof's faces from Google's roof model, for the drawing: null until asked for, "none" when there is no data.
   const [modelFaces, setModelFaces] = useState<DrawnFace[] | "none" | null>(null);
@@ -2039,15 +2026,6 @@ export function RoofDesigner(props: {
   }, [fills, fitPx, phoneAcross]);
   // Sol's cards stand over the foot of the picture on a phone upright, above his round, so the band below never grows.
   const phoneBelow = stage ? stage.pb : 0;
-  // What Sol's round says on a phone upright: what is picked, else the tool in hand, else that he holds the tools.
-  const phoneSolWords =
-    picks.length > 0
-      ? `Sol · ${picks.length} picked`
-      : phonePitch
-        ? "Sol · Pitch"
-        : tool !== "select" && tool !== "panel"
-          ? `Sol · ${TOOLS.find((x) => x.tool === tool)?.name ?? "tools"}`
-          : "Sol · tools";
   // The dial for what is picked, on a phone upright: about three fifths of the picture's height, its middle the picture's.
   const dialFit =
     phone && stage ? { scale: Math.min(0.7, (stage.photoH * 0.6) / (25 * 16)), top: `${stage.pt + stage.photoH / 2}px` } : null;
@@ -2107,6 +2085,43 @@ export function RoofDesigner(props: {
   if (picks.length && (pickBase === null || pastLen < pickBase)) setPickBase(pastLen);
   if (!picks.length && pickBase !== null) setPickBase(null);
   const changedSincePicked = pickBase !== null && pastLen > pickBase;
+  // Undo in sight after a change on a computer's pop-up, beside where it was made (25 Nov 2026, Martin: "upon moving a
+  // panel, deleting anything… the undo button should appear (like mobile)… convenient… relative to the change").
+  const lastPress = useRef<{ x: number; y: number; at: number } | null>(null);
+  const lastTouch = useRef(0);
+  const seenPast = useRef(0);
+  const [undoAt, setUndoAt] = useState<{ x: number; y: number; n: number } | null>(null);
+  useEffect(() => {
+    const touched = () => {
+      lastTouch.current = Date.now();
+    };
+    window.addEventListener("pointerdown", touched, true);
+    window.addEventListener("keydown", touched, true);
+    return () => {
+      window.removeEventListener("pointerdown", touched, true);
+      window.removeEventListener("keydown", touched, true);
+    };
+  }, []);
+  useEffect(() => {
+    const was = seenPast.current;
+    seenPast.current = pastLen;
+    if (pastLen === was) return;
+    if (pastLen < was) {
+      // An undo: keep it in sight while there is more to undo.
+      setUndoAt((u) => (u && pastLen > 0 ? { ...u, n: Date.now() } : null));
+      return;
+    }
+    // Only a change a person just made (not a design opening): something pressed or typed a moment ago.
+    if (Date.now() - lastTouch.current > 2500) return;
+    const p = lastPress.current;
+    const near = p && Date.now() - p.at < 2500 ? p : { x: 50, y: 74 };
+    setUndoAt({ x: near.x, y: near.y, n: Date.now() });
+  }, [pastLen]);
+  useEffect(() => {
+    if (!undoAt) return;
+    const t = window.setTimeout(() => setUndoAt(null), 9000);
+    return () => window.clearTimeout(t);
+  }, [undoAt]);
   // Bumped when a drag ends, so the drawing is looked at again once the pointer has let go.
   const [settled, setSettled] = useState(0);
   // A slider being dragged changes the drawing at every notch: it is one step too.
@@ -7080,7 +7095,6 @@ export function RoofDesigner(props: {
           shadeOn={shadeOn}
           onShade={toggleShade}
           drawn={illustrated}
-          onDrawn={toggleIllustrated}
           zooming={zooming}
           {...(solHolds ? { onPitch: () => setPhonePitch((v) => !v) } : {})}
           pitchShown={phonePitch}
@@ -7089,6 +7103,8 @@ export function RoofDesigner(props: {
           onUndo={undo}
           onRedo={redo}
           onWhole={() => setView(WHOLE)}
+          {...(costsHidden ? {} : { onCalc: () => setCalcOpen(true), calcOn: calcOpen })}
+          msb={{ on: msb !== null, icon: <SwitchboardGlyph />, onClick: toggleMsb }}
           {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
           {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
           footRoom={solHolds ? 78 : 0}
@@ -7146,9 +7162,6 @@ export function RoofDesigner(props: {
                   onClick={toggleShade}
                 >
                   <SunMedium className="size-5" aria-hidden />
-                </Leg>
-                <Leg label={illustrated ? "Show the photo" : "Draw the roof"} on={illustrated} onClick={toggleIllustrated}>
-                  <Brush className="size-5" aria-hidden />
                 </Leg>
               </>
             ) : undefined
@@ -8482,7 +8495,15 @@ export function RoofDesigner(props: {
                   }}
                   onPointerDown={onPointerDown}
                   onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
+                  onPointerUp={(e) => {
+                    const box = e.currentTarget.getBoundingClientRect();
+                    lastPress.current = {
+                      x: ((e.clientX - box.left) / box.width) * 100,
+                      y: ((e.clientY - box.top) / box.height) * 100,
+                      at: Date.now(),
+                    };
+                    onPointerUp(e);
+                  }}
                   onPointerCancel={onPointerUp}
                   onPointerLeave={() => {
                     pointer.current = null;
@@ -9499,7 +9520,8 @@ export function RoofDesigner(props: {
                 {...(deskFoot ? {} : { "data-lift": true })}
                 style={deskFoot ? trayRow : undefined}
                 className={clsx(
-                  "pointer-events-auto absolute right-4 flex gap-2",
+                  "pointer-events-auto absolute right-4 flex",
+                  deskFoot && props.pictureMenu ? "gap-0" : "gap-2",
                   // On a computer's pop-up they stand in the graphite tray's right end, level with the foot row (22 Nov 2026,
                   // Martin: the dock should take in the other tools, not leave them floating over the roof).
                   deskFoot
@@ -9521,10 +9543,13 @@ export function RoofDesigner(props: {
                     className={clsx(
                       "flex items-center border border-line bg-surface p-1 text-[13px] font-semibold shadow-lift",
                       sideways ? "flex-col gap-1 rounded-[1.4rem]" : "rounded-full",
+                      deskFoot && props.pictureMenu && "pl-4",
                     )}
+                    // The G round set into the pill's left end (25 Nov 2026, Martin): a notch cut round it.
+                    style={deskFoot && props.pictureMenu ? PICTURE_NOTCH : undefined}
                   >
                     <button
-                      onClick={() => illustrated && toggleIllustrated()}
+                      onClick={() => undefined}
                       aria-pressed={!illustrated}
                       aria-label="The roof from above"
                       title="The roof from above"
@@ -9545,7 +9570,7 @@ export function RoofDesigner(props: {
                       ))}
                   </div>
                 </div>
-                {props.pictureMenu}
+                {deskFoot && props.pictureMenu ? <div className="relative z-10 -mr-3.5">{props.pictureMenu}</div> : props.pictureMenu}
               </div>
               {/* Drawn, with no face traced and none from Google: there is nothing to draw the roof from yet. */}
               {illustrated && !art && modelFaces === "none" && (
@@ -9624,6 +9649,22 @@ export function RoofDesigner(props: {
               )}
 
               {/* The tools, where the right click was. */}
+              {deskFoot && undoAt && pastLen > 0 && !toolMenu && (
+                <button
+                  key={undoAt.n}
+                  type="button"
+                  onClick={undo}
+                  title="Undo (Ctrl+Z)"
+                  className="sol-emerge pointer-events-auto absolute z-[45] flex h-9 items-center gap-1.5 rounded-full bg-[#26282c] pl-2.5 pr-3.5 text-[13px] font-semibold text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)] ring-1 ring-white/15 hover:bg-[#33363b]"
+                  style={{
+                    left: `clamp(0.75rem, calc(${undoAt.x}% + 1.75rem), calc(100% - 6.5rem))`,
+                    top: `clamp(5.5rem, calc(${picY(undoAt.y)} - 3.25rem), calc(100% - ${DESK_TRAY + 64}px))`,
+                  }}
+                >
+                  <Undo2 className="size-4 text-sun-line" aria-hidden />
+                  Undo
+                </button>
+              )}
               {toolMenu && (
                 <>
                   <div
@@ -10559,7 +10600,7 @@ export function RoofDesigner(props: {
                       title={`Panels: ${summary.panels} × ${panel?.name ?? chosenPanel?.name ?? "panel"}`}
                       aria-label="The panel this design is drawn with"
                       className={clsx(
-                        "relative z-10 flex size-[3.75rem] flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
+                        "relative z-10 flex size-[4.25rem] flex-col items-center justify-center rounded-full border shadow-lift tabular-nums",
                         menu === "panels"
                           ? "border-primary bg-primary text-primary-ink"
                           : summary.panels > 0
@@ -10570,7 +10611,7 @@ export function RoofDesigner(props: {
                       {/* A solar panel, leaning as it does on a roof: frame, cells, and a stand. */}
                       <svg
                         viewBox="0 0 24 24"
-                        className="size-7"
+                        className="size-8"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="1.7"
@@ -10581,7 +10622,7 @@ export function RoofDesigner(props: {
                         <path d="M3.9 10h16.2M9.4 4 8 16M14.6 4 16 16" strokeWidth="1.2" />
                         <path d="M12 16v4M8.5 20h7" strokeLinecap="round" />
                       </svg>
-                      <span className="mt-0.5 text-[11px] font-medium leading-none">{summary.panels}</span>
+                      <span className="mt-0.5 text-xs font-medium leading-none">{summary.panels}</span>
                     </button>
                     {menu === "panels" && (
                       <div
@@ -10647,9 +10688,9 @@ export function RoofDesigner(props: {
                       </div>
                     )}
                   </div>
-                  {/* The EV charger (5 Nov 2026), beside the inverter as the switchboard is beside the battery: its list is the
+                  {/* The EV charger (5 Nov 2026), on the outside of the battery since 25 Nov 2026 (Martin): its list is the
                     chargers on the business's own price lists; chosen, its mark goes on the picture to be dragged to its wall. */}
-                  <div className="order-1 mr-1.5">
+                  <div className="relative z-10 order-5 -ml-3">
                     <button
                       onClick={() => openMenu(menu === "chargers" ? false : "chargers")}
                       aria-expanded={menu === "chargers"}
@@ -10657,7 +10698,7 @@ export function RoofDesigner(props: {
                       title={charger ? `EV charger: ${charger.name}` : "EV charger: add one"}
                       aria-label="The EV charger on this design"
                       className={clsx(
-                        "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
+                        "flex size-11 items-center justify-center rounded-full border shadow-lift ring-[3px] ring-[#26282c]/70",
                         menu === "chargers"
                           ? "border-line bg-primary text-primary-ink"
                           : charger
@@ -10665,7 +10706,7 @@ export function RoofDesigner(props: {
                             : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
-                      <PlugZap className="size-5" aria-hidden />
+                      <PlugZap className="size-[22px]" aria-hidden />
                     </button>
                     {menu === "chargers" && (
                       <div
@@ -10751,7 +10792,7 @@ export function RoofDesigner(props: {
                       </div>
                     )}
                   </div>
-                  <div className="order-2 -mr-7">
+                  <div className="order-2 -mr-8">
                     <button
                       onClick={() => openMenu(menu === "inverters" ? false : "inverters")}
                       aria-expanded={menu === "inverters"}
@@ -10759,7 +10800,7 @@ export function RoofDesigner(props: {
                       title={fitted.length ? `Inverter: ${fitted.map((i) => i.name).join(" + ")}` : "Inverter: choose one"}
                       aria-label="The inverters this design is drawn for"
                       className={clsx(
-                        "flex h-[2.625rem] w-[5.75rem] whitespace-nowrap flex-col items-start justify-center rounded-l-full border pl-3 shadow-lift backdrop-blur-md",
+                        "flex h-12 w-[6.5rem] whitespace-nowrap flex-col items-start justify-center rounded-l-full border pl-3.5 shadow-lift backdrop-blur-md",
                         menu === "inverters"
                           ? "border-line bg-primary text-primary-ink"
                           : fitted.length
@@ -10767,9 +10808,9 @@ export function RoofDesigner(props: {
                             : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
-                      <Zap className={fitted.length ? "size-4" : "size-5"} aria-hidden />
+                      <Zap className={fitted.length ? "size-[18px]" : "size-[22px]"} aria-hidden />
                       {fitted.length > 0 && (
-                        <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{fittedKw} kW</span>
+                        <span className="mt-px text-[11px] font-semibold leading-none tabular-nums">{fittedKw} kW</span>
                       )}
                     </button>
                     {menu === "inverters" && (
@@ -10959,27 +11000,7 @@ export function RoofDesigner(props: {
                       </div>
                     )}
                   </div>
-                  {/* The main switchboard (MSB), beside the battery (Martin): pressed, its mark goes on the picture to be dragged
-                    to where the board is; pressed again (or erased), it comes off. */}
-                  <div className="order-5 ml-1.5">
-                    <button
-                      onClick={toggleMsb}
-                      title={
-                        msb
-                          ? "Main switchboard: drag its mark on the picture. Press again to take it off."
-                          : "Main switchboard: mark where it is"
-                      }
-                      aria-label={msb ? "Take the main switchboard off" : "Mark the main switchboard"}
-                      aria-pressed={msb !== null}
-                      className={clsx(
-                        "flex size-[2.625rem] items-center justify-center rounded-full border shadow-lift backdrop-blur-md",
-                        msb ? KIT_LIT : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
-                      )}
-                    >
-                      <SwitchboardGlyph />
-                    </button>
-                  </div>
-                  <div className="order-4 -ml-7">
+                  <div className="order-4 -ml-8">
                     <button
                       onClick={() => openMenu(menu === "batteries" ? false : "batteries")}
                       aria-expanded={menu === "batteries"}
@@ -10987,7 +11008,7 @@ export function RoofDesigner(props: {
                       title={battery ? `Battery: ${battery.qty} × ${battery.name}` : "Battery: add one"}
                       aria-label="The battery on this design"
                       className={clsx(
-                        "flex h-[2.625rem] w-[5.75rem] whitespace-nowrap flex-col items-end justify-center rounded-r-full border pr-3 shadow-lift backdrop-blur-md",
+                        "flex h-12 w-[6.5rem] whitespace-nowrap flex-col items-end justify-center rounded-r-full border pr-3.5 shadow-lift backdrop-blur-md",
                         menu === "batteries"
                           ? "border-line bg-primary text-primary-ink"
                           : battery
@@ -10995,8 +11016,8 @@ export function RoofDesigner(props: {
                             : "border-line bg-surface/90 text-muted hover:bg-surface hover:text-ink",
                       )}
                     >
-                      <BatteryCharging className={battery ? "size-5" : "size-6"} aria-hidden />
-                      {battery && <span className="mt-px text-[10px] font-semibold leading-none tabular-nums">{batteryKwh} kWh</span>}
+                      <BatteryCharging className={battery ? "size-[22px]" : "size-[26px]"} aria-hidden />
+                      {battery && <span className="mt-px text-[11px] font-semibold leading-none tabular-nums">{batteryKwh} kWh</span>}
                     </button>
                     {menu === "batteries" && (
                       <div
@@ -11520,7 +11541,7 @@ export function RoofDesigner(props: {
               {!(solHolds && picks.length > 0) &&
                 (deskFoot
                   ? tips.cornerAt({
-                      className: "bottom-[18px] left-[10.75rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
+                      className: "bottom-[18px] left-[7.25rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
                       style: trayRow,
                     })
                   : tips.corner)}
@@ -11881,15 +11902,16 @@ export function RoofDesigner(props: {
                   role="group"
                   aria-label="Getting about"
                 >
-                  <FootRound label="Zoom out" on={false} onClick={() => zoom(ZOOM_STEP)}>
-                    <ZoomOut className="size-5" aria-hidden />
-                  </FootRound>
-                  <FootRound label="Zoom in" on={false} onClick={() => zoom(1 / ZOOM_STEP)}>
-                    <ZoomIn className="size-5" aria-hidden />
-                  </FootRound>
                   <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
                     <Maximize className="size-5" aria-hidden />
                   </FootRound>
+                  {/* The calculator in the dock (25 Nov 2026, Martin: "another way of providing sol instructions for
+                      design"): it opens Sol's size-a-system card, whose Design this lays it out. */}
+                  {!costsHidden && (
+                    <FootRound label="Size a system with the calculator" on={calcOpen} onClick={() => setCalcOpen((o) => !o)}>
+                      <Calculator className="size-5" aria-hidden />
+                    </FootRound>
+                  )}
                 </div>
               )}
               <div data-lift className={clsx("absolute bottom-8 left-4 z-10", (solHolds || deskFoot) && "hidden")}>
@@ -12103,6 +12125,26 @@ export function RoofDesigner(props: {
                         </FootRound>
                       </div>
                     </div>
+                    {/* Zoom out and in as rounds coming out of Sol either side (25 Nov 2026, Martin): above the foot row,
+                        each centred over the pair under it. */}
+                    <button
+                      type="button"
+                      onClick={() => zoom(ZOOM_STEP)}
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                      className="sol-emerge pointer-events-auto absolute bottom-[3.5rem] left-[calc(50%-94px)] flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-[#26282c] text-white shadow-lift hover:bg-[#33363b] [--emerge-x:58px]"
+                    >
+                      <Minus className="size-5" strokeWidth={2.6} aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => zoom(1 / ZOOM_STEP)}
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                      className="sol-emerge pointer-events-auto absolute bottom-[3.5rem] left-[calc(50%+94px)] flex size-9 -translate-x-1/2 items-center justify-center rounded-full border border-white/15 bg-[#26282c] text-white shadow-lift hover:bg-[#33363b] [--emerge-x:-58px]"
+                    >
+                      <Plus className="size-5" strokeWidth={2.6} aria-hidden />
+                    </button>
                     <div className="pointer-events-auto absolute bottom-0 left-[calc(50%+2.875rem)] flex items-end gap-2">
                       <FootRound
                         label={tool === "pan" ? "Put the hand down" : "Grab the map: drag to move it (H)"}
@@ -12130,8 +12172,8 @@ export function RoofDesigner(props: {
                       // Open: put away. Away (or never opened): the same panel back, his last answer in it, the box ready.
                       const shown = !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen);
                       if (shown) return putSolAway();
-                      // On a phone upright Sol holds the tools: his tray, with the way to ask him at its top.
-                      if (props.tight) return setSolTray((open) => !open);
+                      // Sol himself opens his chat; the + coming out of him opens his tools (25 Nov 2026, Martin).
+                      setSolTray(false);
                       tips.nudge("sol-pressed");
                       setAwayFrom(null);
                       setCommandOpen(true);
@@ -12155,7 +12197,7 @@ export function RoofDesigner(props: {
                     }
                     title={
                       props.tight
-                        ? "Sol's tools, and asking him to change the design (/)"
+                        ? "Ask Sol to change the design (/). The + opens his tools."
                         : "Tell Sol what to change: “fit 8 kW on the north face”, “use the Sigenergy battery”, “why is string B failing?”"
                     }
                     className={clsx(
@@ -12166,7 +12208,7 @@ export function RoofDesigner(props: {
                       // In the pop-up (phone and computer alike) Sol is a round of his own, a + coming out of him: no words.
                       "!size-[4.5rem] !gap-0 !p-0 justify-center",
                     )}
-                    aria-label={props.tight ? (solTray ? "Put Sol's tools away" : `Sol's tools: ${phoneSolWords}`) : undefined}
+                    aria-label={props.tight ? "Ask Sol to change the design" : undefined}
                   >
                     {/* Sol as he is in the menu (8 Nov 2026, Martin: keep Sol consistent): his lit sun in the graphite round, the stars above. */}
                     <span className={clsx("sol-orb relative flex items-center justify-center rounded-full", "size-[3.75rem]")}>
@@ -12177,6 +12219,7 @@ export function RoofDesigner(props: {
                         <SolEmerging
                           small={deskFoot}
                           tray={solTray}
+                          onPlus={() => setSolTray((open) => !open)}
                           held={tool !== "select" && tool !== "panel" ? (TOOLS.find((x) => x.tool === tool)?.icon ?? null) : null}
                         />
                       ) : (

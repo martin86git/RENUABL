@@ -13,10 +13,24 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
+  { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "Bigger kit icons, the EV charger on the battery's end, and the switchboard in Sol's tools.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "The calculator is in the designer's dock, and in Sol's tools on a phone: it opens his size-a-system card.",
+  },
+  { day: "2026-11-25", area: "Designer", words: "The Draw the roof view is gone from the designer's tools: the roof is always the photo." },
   {
     day: "2026-11-25",
     area: "Settings",
-    words: "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
+    words:
+      "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
   },
   {
     day: "2026-11-25",
