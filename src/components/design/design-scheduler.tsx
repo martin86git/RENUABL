@@ -25,7 +25,7 @@ import { JobCardDialog } from "./job-card";
 import { Segmented } from "./segmented";
 
 const ARROW =
-  "inline-flex size-8 items-center justify-center rounded-full border border-line bg-surface text-ink hover:border-ink-2 hover:bg-surface-2";
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-ink-2 hover:bg-surface hover:text-ink";
 const TONE = { ready: "border-positive bg-positive-soft", partly: "border-sun-line bg-sun", not: "border-line bg-surface-2" } as const;
 const KIND_ICON = { tentative: CalendarClock, off: CalendarX, note: StickyNote } as const;
 /** How each kind of entry looks on a day: a tentative install dashed in the signal colour, a day off greyed, a note plain. */
@@ -98,9 +98,23 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
       {/* The title with the switches on the right; the month and its arrows under it (10 Nov 2026, Martin: room for the
           calendar to breathe). Capacity sits in each week's row, reminders behind the bell, and a day is added to by
           clicking it. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink">Installations</h1>
-        <div className="flex flex-wrap items-center gap-2">
+      {/* One row of controls (24 Nov 2026, Martin): Day | Week | Month on the left; Calendar | List as icons and the
+          reminders bell on the right, the bell farthest right. Under it a slim month or week picker and the count. */}
+      <h1 className="text-xl font-semibold leading-tight tracking-[-0.02em] text-ink">Installations</h1>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <Segmented
+          label="Show a day, a week or a month"
+          size="sm"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "day", label: "Day" },
+            { value: "week", label: "Week" },
+            { value: "month", label: "Month" },
+          ]}
+        />
+        <div className="flex items-center gap-2">
+          {switcher}
           {reminders && (
             <Link
               href={`${PATHS.settings}/automations`}
@@ -112,7 +126,7 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
                   ? `Customers are emailed ${reminders.days} ${reminders.days === 1 ? "day" : "days"} before their installation. Change it in Settings.`
                   : "Customers aren't reminded before their installation. Switch reminders on in Settings."
               }
-              className="relative inline-flex size-9 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2"
+              className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-surface text-ink-2 ring-1 ring-line hover:text-ink hover:ring-ink-2"
             >
               <Bell className="size-4" aria-hidden />
               {!reminders.on && (
@@ -120,25 +134,14 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
               )}
             </Link>
           )}
-          <Segmented
-            label="Show a month or a week"
-            size="sm"
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "month", label: "Month" },
-              { value: "week", label: "Week" },
-            ]}
-          />
-          {switcher}
         </div>
       </div>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex items-center gap-1.5">
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-0.5">
           <button type="button" className={ARROW} onClick={() => setDate(cal.prev)} aria-label={`Earlier ${view}`}>
             <ChevronLeft className="size-4" />
           </button>
-          <p className="min-w-[9.5rem] text-center text-[17px] tracking-tight text-ink" aria-live="polite">
+          <p className="min-w-0 truncate px-1 text-center text-[15px] font-medium tracking-tight text-ink" aria-live="polite">
             {cal.title}
           </p>
           <button type="button" className={ARROW} onClick={() => setDate(cal.next)} aria-label={`Later ${view}`}>
@@ -148,15 +151,16 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setDate(today)}
-              className="ml-1 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-sun-ink ring-1 ring-sun-line hover:bg-sun"
+              title="Back to today"
+              className="ml-1 inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium text-sun-ink ring-1 ring-sun-line hover:bg-sun"
             >
               <CalendarCheck className="size-3.5" aria-hidden />
-              Back to today
+              Today
             </button>
           )}
         </div>
-        <p className="text-[12.5px] text-muted">
-          {jobs ? `${inView} booked, ${ready} ready${tentatives ? `, ${tentatives} tentative` : ""}` : "Loading…"}
+        <p className="shrink-0 text-right text-[12px] text-muted">
+          {jobs ? `${inView} booked · ${ready} ready${tentatives ? ` · ${tentatives} tentative` : ""}` : "Loading…"}
         </p>
       </div>
       {problem && (
@@ -167,8 +171,9 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
 
       {/* On a phone (24 Nov 2026, Martin: the month ran off the screen, three days showing): the whole week fits the
           width, each day a letter, a job a short tinted chip; the week view is a list of days down the page. */}
-      {view === "week" && (
+      {view !== "month" && (
         <PhoneWeek
+          always={view === "day"}
           days={cal.days}
           today={today}
           jobsOn={on}
@@ -178,7 +183,7 @@ export function SchedulerPage({ switcher }: { switcher?: React.ReactNode }) {
           onAdd={(d) => setEditing({ id: null, entry: blank(d) })}
         />
       )}
-      <div className={clsx("mt-3 sm:overflow-x-auto", view === "week" && "max-sm:hidden")}>
+      <div className={clsx("mt-3 sm:overflow-x-auto", view === "week" && "max-sm:hidden", view === "day" && "hidden")}>
         <div className="grid grid-cols-[1.9rem_repeat(7,minmax(0,1fr))] gap-px overflow-hidden rounded-lg border border-line bg-line sm:min-w-[46rem] sm:grid-cols-[3.25rem_repeat(7,minmax(0,1fr))]">
           <div
             className="bg-surface px-1.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted max-sm:px-0.5 max-sm:text-center max-sm:tracking-normal"
@@ -570,6 +575,7 @@ function WeekLoad({ booked, tentative, canDo, onOpen }: { booked: number; tentat
  * installs, its entries and a + to add one. The month stays a grid.
  */
 function PhoneWeek({
+  always,
   days,
   today,
   jobsOn,
@@ -578,6 +584,8 @@ function PhoneWeek({
   onEntry,
   onAdd,
 }: {
+  /** The day view: shown at every width, not only on a phone. */
+  always: boolean;
   days: ISODate[];
   today: ISODate;
   jobsOn: (d: string) => BookedJob[];
@@ -587,7 +595,7 @@ function PhoneWeek({
   onAdd: (d: ISODate) => void;
 }) {
   return (
-    <ol className="mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface sm:hidden">
+    <ol className={clsx("mt-3 divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface", !always && "sm:hidden")}>
       {days.map((d) => {
         const jobs = jobsOn(d);
         const made = entriesOn(entries, d);
@@ -631,7 +639,9 @@ function PhoneWeek({
                   </button>
                 );
               })}
-              {jobs.length + made.length === 0 && <p className="pt-1.5 text-[12px] text-muted">Nothing on</p>}
+              {jobs.length + made.length === 0 && (
+                <p className="pt-1.5 text-[12px] text-muted">{always ? "Nothing booked. Tap + to add a tentative install, a day off or a note." : "Nothing on"}</p>
+              )}
             </div>
             <button
               type="button"
