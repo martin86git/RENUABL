@@ -138,6 +138,11 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                 <Download className="size-4" aria-hidden /> .ics file
               </button>
               {/* What the installer shows at each wholesaler's counter: our PO, their SO and what was ordered. */}
+              {data.event.sitePage && (
+                <a href={data.event.sitePage} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "h-9")}>
+                  <Images className="size-4" aria-hidden /> Layout and photos
+                </a>
+              )}
               {data.event.slip && (
                 <a href={data.event.slip} target="_blank" rel="noreferrer" className={clsx(ui.quiet, "h-9")}>
                   <ClipboardList className="size-4" aria-hidden /> Pickup slip
@@ -241,7 +246,8 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                     </>
                   )}
                   {fileProblem && <p className="mt-1.5 text-[12px] text-warning">{fileProblem}</p>}
-                  <p className="mt-1.5 text-[11.5px] text-muted">Kept on the deal&apos;s Files. A calendar can&apos;t carry photos: open them here.</p>
+                  <p className="mt-1.5 text-[11.5px] text-muted">Kept on the deal&apos;s Files. The calendar event carries a private link to the layout and these photos, opened
+                    with no sign-in, so share the event only with your crew.</p>
                 </div>
               </div>
               <div className={row}>

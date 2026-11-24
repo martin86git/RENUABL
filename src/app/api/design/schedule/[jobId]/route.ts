@@ -6,6 +6,7 @@ import { answer, requireMember } from "@/lib/server/design-context";
 import { installExtras, jobOrder } from "@/lib/server/design-after-sale-repo";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { pickupToken } from "@/lib/server/design-pickup-repo";
+import { siteToken } from "@/lib/server/design-site-link";
 import { NO_DESIGN, savedFor } from "@/lib/server/design-proposal-repo";
 
 const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
@@ -63,6 +64,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/design/sched
       site: details.filter((d) => SITE_KEYS.includes(d.key)).map((d) => ({ label: d.label, value: d.value! })),
       reference: typeof order === "string" ? "" : order.order.reference,
       slip,
+      // The layout and the deal's photos, which no calendar can carry, by their own private link.
+      sitePage: `${site}/site/${await siteToken(who.member.businessId, jobId)}`,
     });
     // Never the customer's email: this is the installer's sheet, and no one is invited by it.
     return Response.json({ ok: true, event, customer: { name: customer.name, phone: customer.phone } });
