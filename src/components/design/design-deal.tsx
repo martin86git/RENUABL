@@ -58,7 +58,7 @@ import {
   setDealOwner,
   shortDate,
 } from "@/lib/services/crm";
-import { loadTeam } from "@/lib/services/design-account";
+import { finishDealTour, loadTeam } from "@/lib/services/design-account";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD } from "./design-home";
 import { DealChat } from "./chat-panel";
@@ -365,27 +365,34 @@ export function DealPage({ id }: { id: string }) {
   const [touring, setTouring] = useState(false);
   // The starter sample only: the example deals a demo is filled with are marked sample too, and aren't a tour each.
   const isSample = Boolean(customer?.sample) && customer?.source !== EXAMPLE_SOURCE;
+  // Seen is also kept on the person's own account (24 Nov 2026, Martin: it started again on his iPhone, whose Safari and
+  // Home Screen app each keep their own storage), so it runs once for them, not once a device. It waits for the account.
+  const tourSeenOnAccount = account?.signedIn ? Boolean(account.dealTourSeen) : null;
   useEffect(() => {
-    if (!isSample) return;
-    let seen = false;
+    if (!isSample || tourSeenOnAccount === null) return;
+    let seen = tourSeenOnAccount;
     try {
-      seen = window.localStorage.getItem(DEAL_TOUR_KEY) === "1";
+      if (window.localStorage.getItem(DEAL_TOUR_KEY) === "1") seen = true;
     } catch {}
     if (seen) return;
-    // A moment for Sol's card and the fields to be on the page, so each has a place to light.
+    // A moment for Sol's card and the fields to be on the page, so each has a place to light. Never under a window
+    // already open over the page (an agent's chat on a phone).
     const t = window.setTimeout(() => {
+      if (document.documentElement.dataset.phoneWindow !== undefined) return;
       try {
         window.localStorage.setItem(DEAL_TOUR_KEY, "1");
       } catch {}
+      void finishDealTour();
       setTouring(true);
     }, 900);
     return () => window.clearTimeout(t);
-  }, [isSample]);
+  }, [isSample, tourSeenOnAccount]);
   const endTour = useCallback(() => {
     setTouring(false);
     try {
       window.localStorage.setItem(DEAL_TOUR_KEY, "1");
     } catch {}
+    void finishDealTour();
   }, []);
   // The customer's emails in this member's own mailboxes, beside the record on the Notes timeline (23 Nov 2026, Martin).
   const [mail, setMail] = useState<DealMail[]>([]);
