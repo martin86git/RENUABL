@@ -221,18 +221,36 @@ export function ConfiguratorPage(props: {
                   line={battery && !sunView ? lineTo : null}
                   shadeView={sunView}
                 />
-                {/* The sun on the panels (19 Nov 2026, Martin): from the design's shade reading, when it has one. */}
+                {/* The sun on the panels (19 Nov 2026, Martin): from the design's shade reading, when it has one. An icon and a
+                    switch, no words (24 Nov 2026, Martin: "Sun on panels" read as a caption, not a control). */}
                 {shown.roof.shade && (
                   <button
                     type="button"
-                    aria-pressed={sunView}
+                    role="switch"
+                    aria-checked={sunView}
+                    aria-label="Show how much sun reaches each panel"
+                    title={sunView ? "Hide the sun on each panel" : "Show how much sun reaches each panel"}
                     onClick={() => setSunView((v) => !v)}
                     className={clsx(
-                      "absolute left-3 top-3 z-20 inline-flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[12.5px] font-medium shadow-[0_6px_18px_rgba(0,0,0,0.3)] backdrop-blur transition-colors",
+                      "absolute left-3 top-3 z-20 inline-flex h-9 items-center gap-2 rounded-full pl-2.5 pr-1.5 shadow-[0_6px_18px_rgba(0,0,0,0.3)] backdrop-blur transition-colors",
                       sunView ? "bg-white text-ink" : "bg-black/60 text-white hover:bg-black/75",
                     )}
                   >
-                    <Sun className="size-4" aria-hidden /> Sun on panels
+                    <Sun className={clsx("size-[18px] transition-colors", sunView && "text-[color:var(--accent)]")} aria-hidden />
+                    <span
+                      aria-hidden
+                      className={clsx(
+                        "relative h-5 w-9 rounded-full transition-colors",
+                        sunView ? "bg-[color:var(--accent)]" : "bg-white/30",
+                      )}
+                    >
+                      <span
+                        className={clsx(
+                          "absolute top-0.5 size-4 rounded-full bg-white shadow transition-[left] motion-reduce:transition-none",
+                          sunView ? "left-[18px]" : "left-0.5",
+                        )}
+                      />
+                    </span>
                   </button>
                 )}
                 {sunView && shown.roof.shade && (
