@@ -451,22 +451,22 @@ function SupplierCard({
         <SendOrder data={data} list={group.list} supplier={group.supplier ?? group.list} onClose={() => setSending(false)} />
       )}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[44rem] text-sm">
+        <table className="w-full min-w-[30rem] text-xs sm:min-w-[44rem] sm:text-sm">
           <thead>
-            <tr className="border-b border-line text-left text-[11px] uppercase tracking-[0.12em] text-muted">
-              <th className="w-12 px-5 py-2 font-medium">Done</th>
-              <th className="px-3 py-2 font-medium">Code</th>
-              <th className="px-3 py-2 font-medium">Product</th>
-              <th className="px-3 py-2 text-right font-medium">Qty</th>
-              <th className="px-3 py-2 text-right font-medium">Each</th>
-              <th className="px-3 py-2 text-right font-medium">Total</th>
-              <th className="w-10 px-3 py-2 print:hidden" />
+            <tr className="border-b border-line text-left text-[10px] uppercase tracking-[0.12em] text-muted sm:text-[11px]">
+              <th className="w-9 px-2 py-1.5 sm:px-3 sm:py-2 sm:w-12 sm:px-5 font-medium">Done</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 font-medium">Code</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 font-medium">Product</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-medium">Qty</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-medium">Each</th>
+              <th className="px-2 py-1.5 sm:px-3 sm:py-2 text-right font-medium">Total</th>
+              <th className="w-10 px-2 py-1.5 sm:px-3 sm:py-2 print:hidden" />
             </tr>
           </thead>
           <tbody>
             {group.items.map((i) => (
               <tr key={i.key} className={clsx("border-b border-line last:border-0", i.ticked && "bg-positive-soft/40")}>
-                <td className="px-5 py-2">
+                <td className="px-3 py-1.5 sm:px-5 sm:py-2">
                   <input
                     type="checkbox"
                     className="size-4 accent-[var(--sun-line)]"
@@ -475,8 +475,8 @@ function SupplierCard({
                     aria-label={`${i.item} ordered`}
                   />
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-ink-2">{i.sku || "–"}</td>
-                <td className="px-3 py-2 text-ink">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 font-mono text-[11px] text-ink-2 break-all sm:text-xs">{i.sku || "–"}</td>
+                <td className="px-2 py-1.5 text-[12px] leading-snug text-ink sm:px-3 sm:py-2 sm:text-sm">
                   {i.item}
                   {i.offers.length > 1 && (
                     <select
@@ -494,11 +494,11 @@ function SupplierCard({
                     </select>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right">
                   <input
                     type="number"
                     min={0}
-                    className="w-20 rounded border border-line bg-surface px-2 py-1 text-right tabular-nums print:border-0"
+                    className="w-14 rounded border border-line bg-surface px-1.5 py-1 text-right text-[13px] sm:w-20 sm:px-2 sm:text-sm tabular-nums print:border-0"
                     value={i.qty}
                     onChange={(e) => onQty(i, e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value))))}
                     aria-label={`How many ${i.item}`}
@@ -513,9 +513,11 @@ function SupplierCard({
                     </button>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink-2">{money2(i.each)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-ink">{i.each === null ? "–" : money2(i.each * i.qty)}</td>
-                <td className="px-3 py-2 print:hidden">
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right tabular-nums text-ink-2">{money2(i.each)}</td>
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 text-right tabular-nums text-ink">
+                  {i.each === null ? "–" : money2(i.each * i.qty)}
+                </td>
+                <td className="px-2 py-1.5 sm:px-3 sm:py-2 print:hidden">
                   <button
                     type="button"
                     className="text-muted hover:text-danger"
