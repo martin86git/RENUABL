@@ -1990,9 +1990,9 @@ html:has(.sales-snap) {
 .phone-tabbar[data-dock="market"] .sol-sun-face {
   display: none;
 }
-/* Sol's sun on the phone's dock, 10% dimmer (24 Nov 2026, Martin): only the sun's canvas, so the brain lines are drawn
-   as they are everywhere else (they blend over it, and show a little more as it dims). */
-.sol-sun-face canvas {
+/* Sol's sun 10% dimmer everywhere (24 Nov 2026, Martin: first on the phone's dock, then "site wide including to desktop
+   also"): only the sun's canvas, so the brain lines drawn over it are unchanged (they show a little more as it dims). */
+.sol-sun-canvas {
   filter: brightness(0.9);
 }
 /* The Marketplace's blue round rising into Sol's place in the middle of the dock. */
