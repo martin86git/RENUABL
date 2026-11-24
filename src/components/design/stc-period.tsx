@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { CalendarClock } from "lucide-react";
+import { CalendarClock, Lightbulb } from "lucide-react";
 import type { Workspace } from "@/lib/domain/design/pricing";
 import {
   changeWords,
@@ -28,28 +28,33 @@ import { loadRebateRates, loadStcNotice, stcApply, stcLater } from "@/lib/servic
 const SETTINGS_HREF = "/design/settings/margin#stc-period";
 
 /**
- * Today's notice, for someone who may change settings: what changes and when, what new quotes are priced for now,
- * how many proposals out are on the earlier figures, and one press to price new quotes for the new period. "Later"
- * puts it away for that person for a week. Nothing is drawn when there is nothing to say.
+ * Today's notice, read once for the page: the notice, whether it is minimised ("Later", kept a week on the server, or
+ * the bulb pressed to fold it), and a line said after a press. Shared by the card and the lightbulb on Sol's box.
  */
-export function StcNoticeCard({ className }: { className?: string }) {
+export function useStcNotice() {
   const [notice, setNotice] = useState<StcNotice | null>(null);
+  const [minimised, setMinimised] = useState(false);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   useEffect(() => {
     let on = true;
-    void loadStcNotice().then((r) => on && r.ok && setNotice(r.notice));
+    void loadStcNotice().then((r) => {
+      if (!on || !r.ok) return;
+      setNotice(r.notice);
+      setMinimised(r.later);
+    });
     return () => {
       on = false;
     };
   }, []);
-  if (!notice && !said) return null;
   const later = async () => {
     setBusy(true);
     const r = await stcLater();
     setBusy(false);
-    if (r.ok) setNotice(null);
-    else setSaid(r.message);
+    if (!r.ok) return setSaid(r.message);
+    setNotice(r.notice);
+    setMinimised(true);
+    setSaid(null);
   };
   const apply = async () => {
     if (!notice?.apply) return;
@@ -59,10 +64,58 @@ export function StcNoticeCard({ className }: { className?: string }) {
     if (!r.ok) return setSaid(r.message);
     setSaid(`Done. New quotes are now priced for installs from ${dayYearWords(r.stcFrom)}. Proposals already sent are as they were.`);
     setNotice(r.notice);
+    setMinimised(false);
   };
+  return { notice, minimised, busy, said, later, apply, open: () => setMinimised(false) };
+}
+export type StcNoticeState = ReturnType<typeof useStcNotice>;
+
+/**
+ * The lightbulb a minimised notice becomes (23 Nov 2026, Martin: "rather than clicking later and it being permanently
+ * gone… a lightbulb that remains when the notification is minimised… in the top corner of the chat box"). Drawn only
+ * while a notice is minimised; a press opens it again under the tray. A dot of the warning colour says it waits.
+ */
+export function NoticeBulb({ state, onOpen, className }: { state: StcNoticeState; onOpen?: () => void; className?: string }) {
+  if (!state.notice || !state.minimised) return null;
+  const when = state.notice.title;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        state.open();
+        onOpen?.();
+      }}
+      title={`${when} · open the notice`}
+      aria-label={`Notice: ${when}. Open it`}
+      className={clsx(
+        "notice-bulb relative grid size-9 place-items-center rounded-full bg-sun text-sun-ink ring-1 ring-sun-line/50 transition hover:ring-sun-line",
+        className,
+      )}
+    >
+      <Lightbulb className="size-[18px]" aria-hidden />
+      <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-warning ring-2 ring-surface" aria-hidden />
+    </button>
+  );
+}
+
+/**
+ * Today's notice, for someone who may change settings: what changes and when, what new quotes are priced for now,
+ * how many proposals out are on the earlier figures, and one press to price new quotes for the new period. "Later"
+ * minimises it to the lightbulb on Sol's box for that person (for a week on the server); the bulb opens it again.
+ * Nothing is drawn when there is nothing to say or while it is minimised.
+ */
+export function StcNoticeCard({ state, className }: { state: StcNoticeState; className?: string }) {
+  const { notice: shownNotice, minimised, busy, said, later, apply } = state;
+  const notice = minimised ? null : shownNotice;
+  if (!notice && !said) return null;
   const soon = notice && notice.kind === "coming";
   return (
-    <section aria-label="STC change" data-stc-notice className={clsx("rounded-[22px] bg-surface px-5 py-4 ring-1 ring-line/70", className)}>
+    <section
+      id="stc-notice"
+      aria-label="STC change"
+      data-stc-notice
+      className={clsx("rounded-[22px] bg-surface px-5 py-4 ring-1 ring-line/70", className)}
+    >
       {notice && (
         <div className="flex items-start gap-3.5">
           <CalendarClock className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden />
@@ -108,8 +161,10 @@ export function StcNoticeCard({ className }: { className?: string }) {
                 type="button"
                 disabled={busy}
                 onClick={() => void later()}
-                className="inline-flex h-9 items-center rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
+                title="Minimise it to a lightbulb on Sol's box"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-ink-2 hover:text-ink"
               >
+                <Lightbulb className="size-3.5" aria-hidden />
                 Later
               </button>
               <Link href={SETTINGS_HREF} className="ml-auto text-[12px] text-muted underline underline-offset-2 hover:text-ink">

@@ -6,9 +6,11 @@ import { ask } from "./crm";
 
 const PATH = "/api/design/stc";
 
-export const loadStcNotice = () => ask<{ notice: StcNotice | null }>(PATH);
-export const stcLater = () => ask<{ notice: null }>(PATH, { method: "POST", body: { do: "later" } });
-export const stcApply = () => ask<{ stcFrom: string; notice: StcNotice | null }>(PATH, { method: "POST", body: { do: "apply" } });
+/** `later`: the person put it away for now, so Today keeps it as a lightbulb on Sol's box. */
+export const loadStcNotice = () => ask<{ notice: StcNotice | null; later: boolean }>(PATH);
+export const stcLater = () => ask<{ notice: StcNotice | null; later: boolean }>(PATH, { method: "POST", body: { do: "later" } });
+export const stcApply = () =>
+  ask<{ stcFrom: string; notice: StcNotice | null; later: boolean }>(PATH, { method: "POST", body: { do: "apply" } });
 
 /** Today's rebate rules, the hand-checked ones when they can't be had. */
 export async function loadRebateRates(): Promise<RebateRates> {

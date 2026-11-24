@@ -3,6 +3,7 @@
 import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
 import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
@@ -464,8 +465,11 @@ export function SolBox({
   replyTo = null,
   onStopReply,
   tall = false,
+  corner = null,
   extras = null,
 }: {
+  /** Kept in the box's top right corner: the lightbulb of a minimised notice (23 Nov 2026, Martin). */
+  corner?: ReactNode;
   /** Shown in the box's foot after the +. */
   extras?: React.ReactNode;
   /** Twice as thick (20 Nov 2026, Martin): the words on top, the paperclip, microphone and send along its foot. */
@@ -504,10 +508,12 @@ export function SolBox({
         void send();
       }}
       className={clsx(
-        "bg-surface text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line",
+        "relative bg-surface text-left shadow-[0_8px_30px_rgb(20_22_26_/_0.08)] ring-1 ring-line focus-within:ring-sun-line",
         tall ? "rounded-[28px] p-3 pl-5 pt-5" : "rounded-[26px] p-2 pl-4",
+        corner && tall && "pr-14",
       )}
     >
+      {corner && <div className="absolute right-3 top-3 z-10">{corner}</div>}
       {replyTo && <ReplyBanner reply={replyTo} onStop={() => onStopReply?.()} className="mb-1.5 mr-2 bg-canvas" />}
       <AttachedFiles attach={attach} />
       {names.chips}
