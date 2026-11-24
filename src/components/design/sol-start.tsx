@@ -10,6 +10,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { ClipboardList, Forward, Lightbulb, PenLine, Search, Wrench, X, type LucideIcon } from "lucide-react";
+import { SolLibrary } from "./sol-library";
 import { SOL_SUGGESTED, SOL_TOPICS, solGreeting, topicOf, type SolTopic } from "@/lib/domain/design/sol-suggest";
 
 const TOPIC_ICONS: Record<SolTopic, LucideIcon> = {
@@ -80,6 +81,8 @@ export function SolStart({
                 </li>
               ))}
             </ul>
+            {/* The business's library under Technical (sol-library.tsx). */}
+            {topic?.id === "solar" && <SolLibrary />}
           </div>
         )}
         {!topic && (

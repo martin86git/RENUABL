@@ -20,7 +20,7 @@ import {
   startNewSol,
   withSol,
 } from "@/lib/server/design-sol-repo";
-import { cleanKnowledgeInput, guessTopic } from "@/lib/domain/design/sol-knowledge";
+import { cleanKnowledgeInput, cleanTipInput, guessTopic } from "@/lib/domain/design/sol-knowledge";
 import { forgetKnowledge, listKnowledge, saveKnowledge } from "@/lib/server/design-sol-knowledge-repo";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -140,6 +140,14 @@ export async function POST(request: Request) {
       // his answers kept by hand (only an answer with pages under it, saved with those pages).
       case "knowledge":
         return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
+      case "tip": {
+        // A tip bookmarked by hand from the Technical tile's library (sol-start.tsx).
+        if (who.member.viewedBy) return Response.json({ ok: false, message: "Not while viewing as someone." }, { status: 403 });
+        const clean = cleanTipInput(body);
+        if (!clean.ok) return Response.json({ ok: false, message: clean.message }, { status: 400 });
+        await saveKnowledge(businessId, clean.value, email);
+        return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
+      }
       case "forget-knowledge":
         await forgetKnowledge(businessId, id);
         return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });

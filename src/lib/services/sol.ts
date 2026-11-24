@@ -43,6 +43,10 @@ export const answerLearn = (at: string, choice: string) => post({ do: "learn", a
 export const forgetBusinessPref = (id: string) => post({ do: "forget-business-pref", id });
 /** Said on the window to open Sol's panel on his introduction (the end of the first visit's tour, Today's card). */
 export const SOL_INDUCTION = "renuabl:sol-induction";
+/** A tip bookmarked by hand into the business's library (sol-knowledge.ts `cleanTipInput`). */
+export const bookmarkTip = (tip: { title: string; tip: string }) =>
+  ask<{ knowledge: KnowledgeEntry[] }>("/api/design/sol", { method: "POST", body: { do: "tip", ...tip } });
+
 /** Sol's memory for the business (domain/design/sol-knowledge.ts). */
 export const listSolKnowledge = () =>
   ask<{ knowledge: KnowledgeEntry[] }>("/api/design/sol", { method: "POST", body: { do: "knowledge" } });
