@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CalendarCheck,
+  Check,
   ChevronLeft,
   Copy,
   FileCheck2,
@@ -440,10 +441,12 @@ function SupplierCard({
           )}
           <button
             type="button"
-            className={clsx(ui.quiet, "h-9")}
+            className={clsx(ui.quiet, "size-9 !px-0")}
             onClick={() => void navigator.clipboard?.writeText(text).then(() => setCopied(true))}
+            aria-label={copied ? "Copied" : "Copy this order"}
+            title={copied ? "Copied" : "Copy this order"}
           >
-            <Copy className="size-4" aria-hidden /> {copied ? "Copied" : "Copy this order"}
+            {copied ? <Check className="size-4 text-positive" aria-hidden /> : <Copy className="size-4" aria-hidden />}
           </button>
         </div>
       </div>
