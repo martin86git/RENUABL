@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -444,31 +445,7 @@ export function PipelinesPage() {
         }
         tray={
           <>
-            <label
-              className={clsx(
-                "relative inline-flex size-8 shrink-0 items-center justify-center rounded-lg",
-                whose === "all" ? "text-ink-2" : "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]",
-              )}
-              title="Whose deals"
-            >
-              <span className="sr-only">Whose deals</span>
-              {whose === "all" ? (
-                <Users className="size-4" aria-hidden />
-              ) : whose === "mine" ? (
-                <User className="size-4" aria-hidden />
-              ) : (
-                <UserX className="size-4" aria-hidden />
-              )}
-              <select
-                className="absolute inset-0 cursor-pointer opacity-0"
-                value={whose}
-                onChange={(e) => setWhose(e.target.value as typeof whose)}
-              >
-                <option value="all">Everyone&apos;s deals</option>
-                <option value="mine">My deals</option>
-                <option value="none">No owner yet</option>
-              </select>
-            </label>
+            <WhoseMenu whose={whose} onChange={setWhose} />
             <span className="h-5 w-px bg-line-strong" aria-hidden />
             {views.map(({ view, name, Icon }) => (
               <button
@@ -1282,5 +1259,82 @@ function ProfitLine({ profit }: { profit: DealProfit | undefined }) {
       <span className="rounded bg-positive/10 px-1.5 py-0.5 font-medium text-positive">GM {marginWords(profit)}</span>
       <span className="text-muted">Comm {commission}</span>
     </p>
+  );
+}
+
+type Whose = "all" | "mine" | "none";
+const WHOSE: readonly { value: Whose; name: string; Icon: typeof Users }[] = [
+  { value: "all", name: "Everyone's deals", Icon: Users },
+  { value: "mine", name: "My deals", Icon: User },
+  { value: "none", name: "No owner yet", Icon: UserX },
+];
+
+/**
+ * Whose deals on a phone, as RENUABL's own menu (24 Nov 2026, Martin: the phone's own picker "should be native" to
+ * RENUABL): a white card under the round, each choice with its icon and a tick on the one shown.
+ */
+function WhoseMenu({ whose, onChange }: { whose: Whose; onChange: (w: Whose) => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+  const Shown = WHOSE.find((w) => w.value === whose)?.Icon ?? Users;
+  return (
+    <div ref={box} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Whose deals"
+        title="Whose deals"
+        onClick={() => setOpen((o) => !o)}
+        className={clsx(
+          "inline-flex size-8 items-center justify-center rounded-lg",
+          whose === "all" && !open ? "text-ink-2" : "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.12)]",
+        )}
+      >
+        <Shown className="size-4" aria-hidden />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Whose deals"
+          className="absolute left-0 top-full z-50 mt-2 w-52 overflow-hidden rounded-2xl bg-surface p-1 shadow-[0_12px_32px_rgba(0,0,0,0.18)] ring-1 ring-line"
+        >
+          <p className="px-3 pb-1 pt-2 text-[10.5px] font-medium uppercase tracking-[0.12em] text-muted">Show</p>
+          {WHOSE.map(({ value, name, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={whose === value}
+              onClick={() => {
+                onChange(value);
+                setOpen(false);
+              }}
+              className={clsx(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm",
+                whose === value ? "bg-canvas font-medium text-ink" : "text-ink-2 active:bg-canvas",
+              )}
+            >
+              <Icon className={clsx("size-4", whose === value ? "text-sun-line" : "text-muted")} aria-hidden />
+              <span className="flex-1">{name}</span>
+              {whose === value && <Check className="size-4 text-sun-line" aria-hidden />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
