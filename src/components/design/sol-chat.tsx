@@ -56,7 +56,8 @@ import { SolUsage } from "./sol-usage";
 import { SolSources } from "./sol-sources";
 import { costWords, TIER_CREDITS } from "@/lib/domain/design/sol-routing";
 import { SolKnows } from "./sol-knows";
-import { STARTER_QUESTIONS } from "@/lib/domain/design/sol-knowledge";
+import { SolStart } from "./sol-start";
+import { useDesignAccount } from "./design-account";
 import { SolThinking, SolWorking } from "./sol-thinking";
 import { filesFromPaste, fitForSol } from "./sol-attach";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
@@ -70,13 +71,6 @@ import { MessageTools, QuotedWords, ReplyBanner } from "./message-tools";
 
 /** The last message the member chose to carry on from after a while away (sessionStorage). */
 const CARRIED_KEY = "renuabl.design.sol-carried";
-
-/** Three to start from (18 Nov 2026, Martin: fewer): two about the business's own work, one of the oracle's (sol-knowledge.ts). */
-const STARTERS = [
-  "Which deals have sat at Proposal sent the longest?",
-  "Write a friendly follow-up email to my newest lead.",
-  STARTER_QUESTIONS[0],
-];
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
@@ -212,6 +206,9 @@ export function SolChat({
   const stageNames = useStageNames();
   const router = useRouter();
   const { state, problem, run, runFor } = useSol();
+  // Greeted by first name once given (sol-start.tsx).
+  const [account] = useDesignAccount();
+  const firstName = account?.signedIn ? account.firstName : undefined;
   // Try another answer: the conversation from that question on is hidden while he answers it again.
   const [redoFrom, setRedoFrom] = useState<number | null>(null);
   const [text, setText] = useState(() => draft?.text ?? "");
@@ -600,12 +597,14 @@ export function SolChat({
       >
         {!state && !problem && <SolThinking plain say="Opening your conversation…" />}
         {state && !inducting && (turns.length === 0 || resting) && !pending && (
-          <div className="space-y-2 text-ink-2">
+          // Opened as HubSpot's Breeze opens (24 Nov 2026, Martin): a greeting, the Suggested card for the first
+          // chats, and four topics, each opening its own prompts; a prompt is sent as it is pressed.
+          <SolStart firstName={firstName} suggested={showStarters(state.chats)} compact={side} onAsk={(p) => void send(p)}>
             {resting && lastAt && (
               <button
                 type="button"
                 onClick={() => carryOn(lastAt)}
-                className="mb-3 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-muted ring-1 ring-line transition hover:text-ink hover:ring-sun-line"
+                className="mb-4 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12.5px] text-muted ring-1 ring-line transition hover:text-ink hover:ring-line-strong"
               >
                 <CornerUpLeft className="size-3.5 shrink-0" aria-hidden />
                 <span className="min-w-0 flex-1 truncate">
@@ -613,22 +612,7 @@ export function SolChat({
                 </span>
               </button>
             )}
-            <p>I&apos;m Sol. Ask me about your deals, a customer or anything solar. Type # to bring in a deal.</p>
-            {showStarters(state.chats) &&
-              STARTERS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => {
-                    setText(s);
-                    box.current?.focus();
-                  }}
-                  className="block w-full rounded-xl bg-surface px-3 py-1.5 text-left text-[13px] text-ink ring-1 ring-line hover:ring-sun-line"
-                >
-                  {s}
-                </button>
-              ))}
-          </div>
+          </SolStart>
         )}
         {(resting ? [] : redoFrom !== null ? turns.slice(0, redoFrom) : turns).map((t, i) => (
           <div key={`${t.at}-${i}`} id={turnId(t)} className="sol-peek-turn group/turn relative scroll-mt-3 space-y-2">
@@ -817,7 +801,7 @@ export function SolChat({
           )}
           {/* Laid out as Claude Code's box (21 Nov 2026, Martin): the words across the top, a + to add a file at the
               left of the row under them, and send then the microphone at the far right. */}
-          <div className="rounded-2xl bg-surface px-1.5 pb-1.5 ring-1 ring-line focus-within:ring-sun-line">
+          <div className="rounded-[20px] bg-surface px-2 pb-2 shadow-[0_2px_10px_rgba(20,22,26,0.06)] ring-1 ring-line focus-within:ring-line-strong">
             <input
               ref={picker}
               type="file"
@@ -874,7 +858,7 @@ export function SolChat({
               }}
               rows={3}
               maxLength={MAX_SAID}
-              placeholder="Message Sol… (# for a deal)"
+              placeholder="Ask Sol, or # for a deal"
               aria-label="Message Sol"
               className="min-h-[5rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
             />
@@ -885,7 +869,7 @@ export function SolChat({
                 disabled={files.length >= MAX_FILES}
                 aria-label="Add a file"
                 title="Add a PDF (an electricity bill, a datasheet) or a picture"
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition hover:bg-surface-2 hover:text-ink disabled:text-muted"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-ink-2 ring-1 ring-line-strong transition hover:bg-surface-2 hover:text-ink disabled:text-muted"
               >
                 <Plus className="size-[18px]" aria-hidden />
               </button>
@@ -895,7 +879,7 @@ export function SolChat({
                   disabled={!text.trim() && !files.length}
                   aria-label="Send to Sol"
                   title={busy ? "Sends as soon as Sol has answered" : "Send to Sol"}
-                  className="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-sun-line text-white transition hover:brightness-105 disabled:bg-surface-2 disabled:text-muted"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink/85 disabled:bg-surface-2 disabled:text-muted"
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -1072,7 +1056,8 @@ function Bubble({
         className={clsx(
           "[overflow-wrap:anywhere]",
           you
-            ? "max-w-[80%] whitespace-pre-wrap border-r border-ink/70 py-0.5 pr-3.5 text-[12.5px] font-normal leading-[1.68] tracking-[-0.008em] text-ink-2 [font-feature-settings:'cv11','ss03','tnum']"
+            ? // A soft grey bubble on the right (24 Nov 2026, Martin, after HubSpot's Breeze: a cleaner look).
+              "max-w-[85%] whitespace-pre-wrap rounded-2xl bg-[#ececee] px-4 py-2.5 text-[13.5px] font-normal leading-[1.5] text-ink [font-feature-settings:'cv11','ss03','tnum']"
             : "sol-prose",
           pinned && (you ? "ring-2 ring-sun-line/50" : "rounded-2xl p-4 ring-2 ring-sun-line/50"),
         )}

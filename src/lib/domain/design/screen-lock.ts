@@ -25,6 +25,13 @@ export function lockDeviceOf(userAgent: string | null | undefined): LockDevice {
   return /iPhone|iPod|Android|Mobile|iPad/i.test(userAgent ?? "") ? "phone" : "computer";
 }
 
+/**
+ * Face ID (a passkey) unlocks only on a phone (24 Nov 2026, Martin: "face id should not appear on desktop ... mobile
+ * only"); a computer unlocks with the PIN. A passkey saved on the phone would otherwise send a computer's browser off
+ * to find that phone.
+ */
+export const faceIdOn = (device: LockDevice) => device === "phone";
+
 /** Locked once unused for its device's time. A session with no use recorded yet (from before the lock) isn't. */
 export function isLocked(activeAt: Date | null | undefined, device: LockDevice, now: Date = new Date()): boolean {
   if (!activeAt) return false;
@@ -85,11 +92,14 @@ export const LOCK_WORDS = {
   why: (minutes: number) =>
     `It locks after ${minutes >= 60 ? `${minutes / 60} hours` : `${minutes} minutes`} without use, so nobody else can open your business on this device.`,
   passkey: "Unlock with Face ID",
-  passkeyHint: "Or Touch ID, Windows Hello or your device's passcode.",
+  passkeyHint: "Or your phone's passcode.",
+  noPinYet: "You haven't set a PIN yet. Sign in another way, then set one in Your account → Screen lock.",
+  pinHere: "Unlock this computer with your PIN. Face ID is for your phone.",
   pin: "Enter your PIN",
   another: "Sign in another way",
   signOut: "Sign out",
   noMethod: "Sign in again to carry on. Set up Face ID or a PIN in Your account and next time it's one glance or a few digits.",
+  noPinComputer: "Sign in again to carry on. Set a PIN in Your account and next time on this computer it's a few digits.",
   tooMany: "Too many tries. Sign in again to carry on.",
   nudge: "Unlock with Face ID or a PIN next time, not a full sign-in.",
 } as const;
