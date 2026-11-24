@@ -117,6 +117,24 @@ export function refusal(action: MemberAction): string {
 /** The most people in one business, for now. */
 export const MAX_MEMBERS = 25;
 
+/**
+ * People who own deals without being invited (24 Nov 2026, Martin: historical deals given to a salesperson before, or
+ * without, inviting them). They are never members: no sign-in, no paid user, nothing sent to them.
+ */
+export const MAX_OWNER_ONLY = 100;
+
+/** The name of someone who owns deals without being invited: one plain line, up to 80 characters, or null when empty. */
+export function cleanOwnerOnlyName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw
+    .replace(/[\u0000-\u001f\u007f<>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80)
+    .trim();
+  return name || null;
+}
+
 /** A business's name as typed: trimmed, on one line, 2 to 80 characters. Null when it isn't a name. */
 export function cleanBusinessName(raw: unknown): string | null {
   if (typeof raw !== "string") return null;

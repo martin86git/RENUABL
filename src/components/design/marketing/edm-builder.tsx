@@ -50,6 +50,12 @@ import {
   cleanColumns,
   cleanLink,
   footerLines,
+  fromNameOf,
+  lookOf,
+  letterWarnings,
+  EDM_LOOKS,
+  EDM_LOOK_WORDS,
+  type EdmLook,
   inksOf,
   isDefaultStyle,
   styleOf,
@@ -145,7 +151,7 @@ export function EdmPreview({
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-canvas">
       <div className="border-b border-line bg-surface px-4 py-2.5 text-[12px]">
-        <p className="truncate font-medium text-ink">{brand.fromName || sender.name}</p>
+        <p className="truncate font-medium text-ink">{fromNameOf(content, brand, sender)}</p>
         <p className="truncate text-ink-2">{content.subject || "No subject yet"}</p>
         {content.preview && <p className="truncate text-muted">{content.preview}</p>}
       </div>
@@ -239,6 +245,18 @@ export function EdmBuilder({
   const set = (patch: Partial<EdmContent>, key: string | null = null) => change({ ...latest.current, ...patch }, key);
   const style = styleOf(content);
   const ink = inksOf(style);
+  const letter = lookOf(content) === "letter";
+  /** Designed or a personal letter: one step to undo. */
+  const setLook = (look: EdmLook) => {
+    const { look: _old, ...rest } = latest.current;
+    void _old;
+    change(look === "letter" ? { ...rest, look } : rest, null);
+  };
+  const setFrom = (name: string) => {
+    const { fromName: _old, ...rest } = latest.current;
+    void _old;
+    change(name ? { ...rest, fromName: name } : rest, "fromName");
+  };
   /** A colour changed: dragging the picker is one step until it rests, as typing is. */
   const setStyle = (next: EdmStyle, which: string) => {
     const { style: _old, ...rest } = latest.current;
@@ -449,7 +467,8 @@ export function EdmBuilder({
                 </div>
               </div>
             ))}
-            <StylePanel style={style} onChange={setStyle} />
+            <LookPanel look={letter ? "letter" : "designed"} onLook={setLook} warnings={letter ? letterWarnings(content) : []} />
+            {!letter && <StylePanel style={style} onChange={setStyle} />}
             <p className="mt-5 border-t border-line pt-4 text-[11px] leading-snug text-muted">
               Personalise with {MERGE_FIELDS.join(" or ")}. The footer is always on: your business&apos;s name, ABN, how to reach you, why
               they&apos;re getting it and an unsubscribe link (wording in Settings).
@@ -463,11 +482,20 @@ export function EdmBuilder({
           style={{ backgroundImage: "radial-gradient(var(--line-strong) 1px, transparent 1px)", backgroundSize: "18px 18px" }}
           onClick={() => (setSelected(null), setAdding(null))}
         >
-          <div className={cn("mx-auto w-full space-y-4", phone ? "max-w-[390px]" : "max-w-[600px]")}>
+          <div className={cn("mx-auto w-full space-y-4", phone ? "max-w-[390px]" : "max-w-[680px]")}>
             <div
               className="overflow-hidden rounded-xl border border-line bg-surface shadow-[var(--shadow-soft)]"
               onClick={(e) => e.stopPropagation()}
             >
+              <InboxRow label="From" improve={null}>
+                <input
+                  value={content.fromName ?? ""}
+                  maxLength={60}
+                  onChange={(e) => setFrom(e.target.value.replace(/[<>"@]/g, ""))}
+                  placeholder={`${brand.fromName || sender.name} (from Settings)`}
+                  className="w-full bg-transparent text-[14px] text-ink outline-none placeholder:text-muted"
+                />
+              </InboxRow>
               <InboxRow label="Subject" improve={solRound("subject", "Improve the subject with Sol")}>
                 <input
                   value={content.subject}
@@ -491,8 +519,13 @@ export function EdmBuilder({
             </div>
 
             <div
-              className="rounded-2xl pt-7 pb-6 shadow-[0_6px_24px_rgba(20,20,30,0.12)] ring-1 ring-black/5"
-              style={{ background: style.background }}
+              className={cn(
+                "pt-7 pb-6",
+                letter
+                  ? "rounded-md bg-white shadow-[0_1px_4px_rgba(20,20,30,0.12)]"
+                  : "rounded-2xl shadow-[0_6px_24px_rgba(20,20,30,0.12)] ring-1 ring-black/5",
+              )}
+              style={letter ? undefined : { background: style.background }}
               onDragOver={(e) => {
                 if (!dragged(e)) return;
                 e.preventDefault();
@@ -507,7 +540,13 @@ export function EdmBuilder({
                 drop(e, dropAt ?? content.blocks.length);
               }}
             >
-              <LogoField brand={brand} sender={sender} ink={ink} readOnly={readOnly} onBrand={onBrand} />
+              {letter ? (
+                <p className="mx-5 mb-3 rounded-lg bg-canvas px-3 py-2 text-[12px] leading-snug text-muted">
+                  Sent as a personal letter: plain words on white, buttons as links, no logo or colours. Preview shows it as it goes.
+                </p>
+              ) : (
+                <LogoField brand={brand} sender={sender} ink={ink} readOnly={readOnly} onBrand={onBrand} />
+              )}
               {content.blocks.length === 0 && (
                 <p
                   className={cn(
@@ -562,7 +601,7 @@ export function EdmBuilder({
                 />
               )}
             </div>
-            <div className="px-8 pb-2 text-center text-[12px] leading-relaxed text-[#7b7d84]">
+            <div className={cn("px-8 pb-2 text-[12px] leading-relaxed text-[#7b7d84]", letter ? "text-left" : "text-center")}>
               {footerLines(brand, sender).map((l) => (
                 <p key={l}>{l}</p>
               ))}
@@ -1729,6 +1768,44 @@ function Toggle({ on, onClick, label, children }: { on: boolean; onClick: () => 
     >
       {children}
     </button>
+  );
+}
+
+/** Designed or a personal letter, with what in a letter would read as a newsletter. */
+function LookPanel({ look, onLook, warnings }: { look: EdmLook; onLook: (l: EdmLook) => void; warnings: string[] }) {
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className="text-[14px] font-semibold text-ink">Look</p>
+      <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-canvas p-1" role="radiogroup" aria-label="Look">
+        {EDM_LOOKS.map((l) => (
+          <button
+            key={l}
+            type="button"
+            role="radio"
+            aria-checked={look === l}
+            onClick={() => onLook(l)}
+            className={cn(
+              "h-8 rounded-md text-[12px] font-medium",
+              look === l ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-muted hover:text-ink",
+            )}
+          >
+            {EDM_LOOK_WORDS[l]}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] leading-snug text-muted">
+        {look === "letter"
+          ? "Reads like an email from a person, which gives it the best chance of Gmail's Primary tab. Nothing can promise it: Gmail also learns from whether people open and reply."
+          : "Your logo, colours and buttons. Gmail usually files designed emails under Promotions."}
+      </p>
+      {warnings.length > 0 && (
+        <ul className="mt-2 space-y-1 text-[11px] leading-snug text-[#9a5b00]">
+          {warnings.map((w) => (
+            <li key={w}>· {w}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

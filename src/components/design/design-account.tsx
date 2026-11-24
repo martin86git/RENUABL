@@ -36,6 +36,7 @@ import { PLAN_CODE_WORDS } from "@/lib/domain/design/plan-codes";
 import { MemberAvatar } from "./member-avatar";
 import { SignInPageSection } from "./sign-in-page-section";
 import { ScreenLockSection } from "./screen-lock-settings";
+import { OwnerOnlySection } from "./owner-only-section";
 import { importDeviceWork, listSavedRoofs, rememberRoof, type DesignRoof } from "@/lib/services/design-store";
 
 const SIGN_IN = "/design/sign-in";
@@ -820,6 +821,8 @@ export function DesignAccountPage() {
             </form>
           )}
         </section>
+
+        {owner && <OwnerOnlySection onMembers={setMembers} />}
 
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-muted">
           <SignOut />
