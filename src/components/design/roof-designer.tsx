@@ -107,7 +107,7 @@ import {
   ZoomOut,
   type LucideIcon,
   Calculator,
-  ArrowRight,
+  SquareKanban,
 } from "lucide-react";
 import { DESIGN_TEMPERATURES, HOT_CELL, checkString, type StringCheck } from "@/lib/domain/design/electrical";
 import type { CatalogueBattery, CatalogueCharger, CatalogueInverter, CataloguePanel } from "@/lib/domain/design/catalogue";
@@ -1190,6 +1190,8 @@ export function RoofDesigner(props: {
   noDeal?: React.ReactNode;
   /** Who the note goes to, for the box's wording. */
   customerName?: string;
+  /** Back to the deal this roof is on: on a phone held upright, a deal mark in the dock under the map. */
+  onOpenDeal?: () => void;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
   /**
@@ -11933,18 +11935,42 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
-                  {/* On to the quote (24 Nov 2026, Martin: in place of Proceed to proposal on the dock, "in the bottom right
-                      corner an arrow pointing right as an indicator to proceed to the next screen, it should take me to the
-                      quote, and I should be able to proceed to the proposal"): the quote sheet carries Proceed to proposal. */}
+                  {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
+                      mark in the dock's bottom left, the way back that sat beside the address under the map. */}
+                  {props.onOpenDeal && (
+                    <button
+                      type="button"
+                      onClick={props.onOpenDeal}
+                      aria-label={props.customerName ? `Open ${props.customerName}'s deal` : "Open the deal"}
+                      title={props.customerName ? `${props.customerName}: open the deal` : "Open the deal"}
+                      className="pointer-events-auto absolute bottom-4 left-4 flex size-12 items-center justify-center text-white/85 transition active:scale-95"
+                    >
+                      <SquareKanban className="size-7" strokeWidth={1.75} aria-hidden />
+                    </button>
+                  )}
+                  {/* On to the quote (24 Nov 2026, Martin: "in the bottom right corner an arrow pointing right… it should take
+                      me to the quote"; then "just the arrow, not with a circle around it… give the length of the horizontal
+                      arrow line a little more"): a long orange arrow, no round; the quote sheet carries Proceed to proposal. */}
                   {!props.sitesOnly && !costsHidden && (
                     <button
                       type="button"
                       onClick={() => showSide("quote")}
                       aria-label="Next: the quote"
                       title="Next: the quote"
-                      className="pointer-events-auto absolute bottom-4 right-4 flex size-12 items-center justify-center rounded-full bg-sun-line text-white shadow-[0_6px_18px_rgba(255,90,31,0.35)] transition active:scale-95"
+                      className="pointer-events-auto absolute bottom-4 right-3 flex h-12 w-20 items-center justify-center text-sun-line transition active:translate-x-0.5"
                     >
-                      <ArrowRight className="size-6" aria-hidden />
+                      <svg
+                        viewBox="0 0 64 24"
+                        className="h-6 w-16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M3 12h56M49 3l10 9-10 9" />
+                      </svg>
                     </button>
                   )}
                 </div>

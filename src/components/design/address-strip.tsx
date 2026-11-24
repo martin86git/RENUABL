@@ -68,7 +68,8 @@ export function AddressStrip({
         className={clsx(
           "flex min-w-0 items-center gap-2.5 bg-surface py-0.5 pr-1 shadow-sm ring-1 ring-line",
           // Searching takes the whole row (the deal button steps aside), so the box is never squeezed to nothing.
-          searching ? "w-full basis-full rounded-2xl pl-1.5" : "flex-1 rounded-full pl-3.5",
+          // On a phone it is one long bar the screen's width under the dock (24 Nov 2026, Martin).
+          searching ? "w-full basis-full rounded-2xl pl-1.5" : "flex-1 rounded-full pl-3.5 max-sm:basis-full",
         )}
       >
         {!searching && <MapPin className="size-4 shrink-0 text-sun-line" aria-hidden />}
@@ -110,7 +111,8 @@ export function AddressStrip({
         <button
           type="button"
           onClick={onOpenDeal}
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-surface px-4 text-[14px] font-medium text-ink shadow-sm ring-1 ring-line hover:text-sun-ink"
+          // On a phone the way back to the deal is the deal mark in the dock above (roof-designer.tsx).
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-surface px-4 text-[14px] font-medium text-ink shadow-sm ring-1 ring-line hover:text-sun-ink max-sm:hidden"
           title={`${deal.customerName}: open the deal`}
         >
           <UserRound className="size-4 text-sun-line" aria-hidden />

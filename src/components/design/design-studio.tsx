@@ -467,6 +467,7 @@ export function DesignStudio() {
           onPickAddress={pick}
           onAddressDoubt={setOnStreet}
           onSearchAddress={popped ? () => setSearchAsk((n) => n + 1) : undefined}
+          onOpenDeal={popped && onJob ? () => goUnderneath(`/design/deals/${onJob.id}`) : undefined}
           image={pictureMissing ? "" : image}
           set={work.set}
           extras={work.extras}
