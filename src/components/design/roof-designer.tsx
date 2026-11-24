@@ -11497,7 +11497,7 @@ export function RoofDesigner(props: {
               {!(solHolds && picks.length > 0) &&
                 (deskFoot
                   ? tips.cornerAt({
-                      className: "bottom-[18px] left-[10.75rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
+                      className: "bottom-[18px] left-[13.75rem] z-[56] transition-transform duration-300 motion-reduce:transition-none",
                       style: trayRow,
                     })
                   : tips.corner)}
@@ -11867,6 +11867,13 @@ export function RoofDesigner(props: {
                   <FootRound label="Whole picture" on={false} onClick={() => setView(WHOLE)}>
                     <Maximize className="size-5" aria-hidden />
                   </FootRound>
+                  {/* The calculator in the dock (25 Nov 2026, Martin: "another way of providing sol instructions for
+                      design"): it opens Sol's size-a-system card, whose Design this lays it out. */}
+                  {!costsHidden && (
+                    <FootRound label="Size a system with the calculator" on={calcOpen} onClick={() => setCalcOpen((o) => !o)}>
+                      <Calculator className="size-5" aria-hidden />
+                    </FootRound>
+                  )}
                 </div>
               )}
               <div data-lift className={clsx("absolute bottom-8 left-4 z-10", (solHolds || deskFoot) && "hidden")}>

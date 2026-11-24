@@ -13,11 +13,17 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "The calculator is now a round in the designer's dock: it opens Sol's size-a-system card.",
+  },
   { day: "2026-11-25", area: "Designer", words: "The Draw the roof view is gone from the designer's tools: the roof is always the photo." },
   {
     day: "2026-11-25",
     area: "Settings",
-    words: "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
+    words:
+      "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
   },
   {
     day: "2026-11-25",
