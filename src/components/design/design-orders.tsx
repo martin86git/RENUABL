@@ -2,7 +2,21 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, Copy, Download, Mail, PenTool, Plus, Printer, RotateCcw, Truck, X } from "lucide-react";
+import {
+  CalendarCheck,
+  ChevronLeft,
+  Copy,
+  FileCheck2,
+  MapPin,
+  Download,
+  Mail,
+  PenTool,
+  Plus,
+  Printer,
+  RotateCcw,
+  Truck,
+  X,
+} from "lucide-react";
 import clsx from "clsx";
 import {
   DEFAULT_PO_INTRO,
@@ -187,29 +201,51 @@ export function OrderPage({ jobId }: { jobId: string }) {
         <span className="text-xs text-muted" role="status">
           {saving === "saving" ? "Saving…" : saving === "saved" ? "Saved" : ""}
         </span>
-        <Link href={`${PATHS.deals}/${data.jobId}`} className={ui.quiet}>
+        <Link href={`${PATHS.deals}/${data.jobId}`} className={clsx(ui.quiet, "max-sm:h-8 max-sm:px-3 max-sm:text-xs")}>
           Open the deal
         </Link>
       </PageHead>
-      <p className="mt-1 text-sm text-ink-2">
-        {data.address || "No address"}
-        {data.signedAt && ` · signed ${shortDate(data.signedAt)}`}
-        {data.installDate && ` · installing ${longDay(data.installDate)}`}
-      </p>
+      {/* One fact a line, each with its mark (24 Nov 2026, Martin: the address, the signed proposal and the install
+          day ran together in one sentence). */}
+      <ul className="mt-2 space-y-1 text-[13px] text-ink-2 sm:text-sm">
+        <li className="flex items-start gap-2">
+          <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted" aria-hidden />
+          <span>{data.address || "No address"}</span>
+        </li>
+        {data.signedAt && (
+          <li className="flex items-center gap-2">
+            <FileCheck2 className="size-3.5 shrink-0 text-positive" aria-hidden />
+            <span>
+              <span className="sr-only">Proposal signed </span>
+              Signed {shortDate(data.signedAt)}
+            </span>
+          </li>
+        )}
+        {data.installDate && (
+          <li className="flex items-center gap-2">
+            <CalendarCheck className="size-3.5 shrink-0 text-sun-line" aria-hidden />
+            <span>Installing {longDay(data.installDate)}</span>
+          </li>
+        )}
+      </ul>
       {problem && (
         <p className="mt-4 rounded-md bg-warning-soft px-4 py-3 text-sm text-warning" role="alert">
           {problem}
         </p>
       )}
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-6 sm:grid-cols-4 sm:gap-3">
         <Stat label="Suppliers" value={String(data.groups.length)} />
         <Stat label="Products" value={String(data.totals.lines)} />
         <Stat label="Ticked off" value={`${data.totals.ticked} of ${data.totals.lines}`} />
         <Stat label="Cost ex GST" value={dollars(data.totals.cost)} />
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-2 print:hidden" role="radiogroup" aria-label="Where the order stands">
+      <div
+        className="mt-4 flex flex-wrap items-center gap-1.5 sm:mt-5 sm:gap-2 print:hidden"
+        role="radiogroup"
+        aria-label="Where the order stands"
+      >
         {ORDER_STATUSES.map((s: OrderStatus) => (
           <button
             key={s}
@@ -217,7 +253,11 @@ export function OrderPage({ jobId }: { jobId: string }) {
             role="radio"
             aria-checked={order.status === s}
             onClick={() => set({ status: s }, 0)}
-            className={clsx(ui.quiet, "h-9", order.status === s && "!border-primary !bg-primary !text-primary-ink")}
+            className={clsx(
+              ui.quiet,
+              "h-9 max-sm:h-8 max-sm:px-3 max-sm:text-xs",
+              order.status === s && "!border-primary !bg-primary !text-primary-ink",
+            )}
           >
             {ORDER_STATUS_LABELS[s]}
           </button>
@@ -331,7 +371,7 @@ export function OrderPage({ jobId }: { jobId: string }) {
 
 function Back() {
   return (
-    <Link href={PATHS.orders} className="mb-4 inline-flex items-center gap-1 text-sm text-ink-2 hover:text-ink print:hidden">
+    <Link href={PATHS.orders} className="mb-3 inline-flex items-center gap-1 text-sm text-ink-2 sm:mb-4 hover:text-ink print:hidden">
       <ChevronLeft className="size-4" aria-hidden /> Ordering Station
     </Link>
   );
@@ -339,9 +379,9 @@ function Back() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className={clsx(ui.card, "px-4 py-3")}>
-      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{label}</p>
-      <p className="mt-1 text-[20px] tabular-nums text-ink">{value}</p>
+    <div className={clsx(ui.card, "px-3 py-2 sm:px-4 sm:py-3")}>
+      <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-muted sm:text-[11px] sm:tracking-[0.14em]">{label}</p>
+      <p className="mt-0.5 text-[16px] tabular-nums text-ink sm:mt-1 sm:text-[20px]">{value}</p>
     </div>
   );
 }
