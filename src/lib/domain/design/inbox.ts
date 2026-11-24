@@ -470,3 +470,27 @@ export const mayReadTalk = (talk: { owner: string; shared: readonly string[] }, 
 
 /** An email's id: Gmail's is short hex, Outlook's a long run of letters, digits, "-", "_" and "=" (never a path). */
 export const isMessageId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_=-]{8,400}$/.test(v);
+
+/**
+ * The email as sent, readable on any screen (24 Nov 2026, Martin: on a phone it was in the browser's
+ * default Times at desktop width). A frame of its own gets the phone's width, our type for email with
+ * no font of its own (its own styles still win: ours are on the elements, theirs are more particular),
+ * and pictures and long lines kept inside the screen. Nothing is taken out of the email.
+ */
+export const EMAIL_FRAME_STYLE = [
+  "html{-webkit-text-size-adjust:100%;text-size-adjust:100%}",
+  "body{margin:0;padding:4px 2px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#1d1d1f;overflow-wrap:anywhere;word-break:break-word}",
+  "img,video{max-width:100%!important;height:auto!important}",
+  "table{max-width:100%!important}",
+  "pre{white-space:pre-wrap}",
+  "a{color:#1d4ed8}",
+  "blockquote{margin:12px 0 0;padding-left:12px;border-left:2px solid #d4d4d8;color:#52525b}",
+  ".gmail_quote,.gmail_attr{color:#52525b}",
+].join("");
+
+export function framedEmail(html: string): string {
+  const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>${EMAIL_FRAME_STYLE}</style>`;
+  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + head);
+  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${head}</head>`);
+  return `<!doctype html><html><head>${head}</head><body>${html}</body></html>`;
+}
