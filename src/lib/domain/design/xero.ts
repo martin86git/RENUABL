@@ -12,8 +12,12 @@
 import type { InstallerInvoice } from "./installer-invoices";
 import type { ISODate } from "@/lib/domain/types";
 
-/** What Xero is asked for: sign-in, a refresh token, contacts and invoices. VERIFY: Xero's newer granular scopes. */
-export const XERO_SCOPES = "openid profile email offline_access accounting.transactions accounting.contacts";
+/**
+ * What Xero is asked for: sign-in, a refresh token, invoices and bills (read and written: the paid status is read off
+ * the invoice itself) and the contacts on them. Xero's granular scopes, which every app made since 2 March 2026 must use
+ * (25 Nov 2026: 'accounting.transactions' was refused as invalid_scope).
+ */
+export const XERO_SCOPES = "openid profile email offline_access accounting.invoices accounting.contacts";
 
 export type InvoiceStatus = "DRAFT" | "AUTHORISED";
 export type StcTax = "BASEXCLUDED" | "OUTPUT";
