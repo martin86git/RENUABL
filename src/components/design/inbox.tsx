@@ -1217,13 +1217,7 @@ function EmailView({
             )}
             <div className="mt-4 border-t border-line pt-4">
               {email.html ? (
-                // The email as sent, in a frame where nothing runs; links open in a new tab.
-                <iframe
-                  title="The email"
-                  sandbox="allow-popups allow-popups-to-escape-sandbox"
-                  srcDoc={framedEmail(email.html)}
-                  className="h-[65dvh] w-full rounded-md bg-white"
-                />
+                <EmailFrame html={email.html} />
               ) : (
                 <p className="whitespace-pre-line text-[15px] leading-relaxed text-ink">{email.text || "(No words in this email.)"}</p>
               )}
@@ -1323,5 +1317,50 @@ function EmailView({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The email as sent, in a frame where nothing runs (no scripts; links open in a new tab), scaled down
+ * to the width it has as Gmail's app does, and as tall as the email so the page scrolls, not the frame
+ * (24 Nov 2026, Martin: a 600px-wide email ran off a phone's screen). Same-origin without scripts lets
+ * this page measure it; nothing in the email can run either way.
+ */
+function EmailFrame({ html }: { html: string }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const doc = useMemo(() => framedEmail(html), [html]);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const fit = () => {
+      const d = el.contentDocument;
+      if (!d?.body) return;
+      d.body.style.zoom = "";
+      const room = el.clientWidth;
+      const wide = Math.max(d.documentElement.scrollWidth, d.body.scrollWidth);
+      const scale = wide > room + 1 ? room / wide : 1;
+      if (scale < 1) d.body.style.zoom = String(scale);
+      setHeight(Math.ceil(d.documentElement.scrollHeight) + 2);
+    };
+    el.addEventListener("load", fit);
+    const seen = new ResizeObserver(() => fit());
+    seen.observe(el);
+    fit();
+    return () => {
+      el.removeEventListener("load", fit);
+      seen.disconnect();
+    };
+  }, [doc]);
+  return (
+    <iframe
+      ref={frame}
+      title="The email"
+      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+      srcDoc={doc}
+      scrolling="no"
+      style={{ height: height ?? undefined }}
+      className={clsx("block w-full rounded-md bg-white", height === null && "h-[65dvh]")}
+    />
   );
 }
