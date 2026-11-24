@@ -7465,7 +7465,7 @@ export function RoofDesigner(props: {
                 // round on the right. Roomier (22 Nov 2026, Martin: "they do not need to be so skinny").
                 <div
                   className={clsx(
-                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-2 pl-4 pr-14 tabular-nums leading-tight transition-colors duration-300",
+                    "grid grid-cols-[1.25fr_1fr_1fr] gap-x-3 pb-2 pl-4 pr-16 tabular-nums leading-tight transition-colors duration-300",
                     growing ? "bg-sun-line" : "",
                   )}
                   style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
@@ -7622,7 +7622,7 @@ export function RoofDesigner(props: {
                     // Clipped, so a figure that runs long never paints under the shade widget beside it.
                     "min-w-0 flex-1 cursor-pointer overflow-hidden",
                     (!shadeOn || (shadeOpen && tool !== "string")) && !phone ? "rounded-r-lg" : "",
-                    phone ? "flex items-center px-4 py-2" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
+                    phone ? "flex items-center py-2 pl-4 pr-16" : props.tight ? "flex items-center px-3 py-1" : "px-3.5 py-1.5",
                     // Red until the bill is in (as Primero's: it was easy to skip past), since saving and payback wait on it.
                     finance ? "hover:bg-surface-2" : "bg-danger/10 ring-2 ring-inset ring-danger hover:bg-danger/15",
                   )}
@@ -7660,7 +7660,7 @@ export function RoofDesigner(props: {
                         ] as const
                       ).map(([name, value, gold], i) => (
                         <div key={i} className="min-w-0">
-                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.12em] text-muted">{name}</dt>
+                          <dt className="truncate text-[9px] font-medium uppercase tracking-[0.16em] text-muted">{name}</dt>
                           <dd className={clsx("truncate text-[16px] font-semibold tracking-[-0.01em]", gold && "text-positive")}>
                             {value}
                           </dd>
