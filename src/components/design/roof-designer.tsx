@@ -11925,6 +11925,15 @@ export function RoofDesigner(props: {
                   There&apos;s no roof data for this address to draw from. Trace the roof faces (top right) and they are drawn here.
                 </p>
               )}
+              {/* The dock under the picture while Sol has nothing to say (24 Nov 2026, Martin: the band "is defaulting to
+                  this light grey"): the same graphite plate notched round him, so Sol and the foot row always stand on it. */}
+              {underUp && !deckUp && stage && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 z-[29] rounded-t-[26px] bg-[#26282c] shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
+                  style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
+                />
+              )}
               {/* Sol's controller for what is picked (22 Nov 2026, Martin): upright a plate under the picture moulded round
                   him, sideways the two thumbs in the picture's bottom corners and a slim pill round him. */}
               {solHolds && picks.length > 0 && !solTray && (sideways || foot !== null) && (
