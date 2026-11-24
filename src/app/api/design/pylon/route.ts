@@ -19,6 +19,7 @@ import {
   bringInProjects,
   fillFromPylonRun,
   fillLeft,
+  giveImportedDeals,
   listSoldProjects,
 } from "@/lib/server/pylon-import";
 import { allow } from "@/lib/server/rate-limit";
@@ -32,6 +33,8 @@ export const maxDuration = 120;
  * The key comes with each call and is never kept.
  * POST { do: "csv-check", ids }: which of the export's sold projects are already brought in.
  * POST { do: "csv", rows, wonWeeks }: a batch of the export's sold rows brought in (read in the browser, read again here).
+ * POST { do: "csv-owners", rows: [{ id, ownerEmail }] }: deals already brought in given to the seller named in the export
+ * (a member or someone kept to own deals), where they still have no owner or are still the importer's.
  * POST { do: "fill-left", pdfs }: how many deals brought in from Pylon are still to be filled in.
  * POST { do: "fill", key, pdfs }: the next few of them read again from Pylon and filled in (equipment, site, map, PDF).
  */
@@ -57,6 +60,18 @@ export async function POST(request: Request) {
       const weeks = Number(read.body.wonWeeks);
       const wonWeeks = Number.isInteger(weeks) && weeks >= 0 && weeks <= 520 ? weeks : PYLON_WON_WEEKS;
       return Response.json({ ok: true, results: await bringInCsvRows(biz, rows, todayInMarket(), wonWeeks, by) });
+    }
+    if (read.body.do === "csv-owners") {
+      const pairs = (Array.isArray(read.body.rows) ? read.body.rows : [])
+        .map((r) => {
+          const row = r && typeof r === "object" ? (r as Record<string, unknown>) : {};
+          const ref = cleanPylonId(row.id);
+          const email = typeof row.ownerEmail === "string" ? row.ownerEmail.trim().toLowerCase().slice(0, 200) : "";
+          return ref && email.includes("@") ? { ref, email } : null;
+        })
+        .filter((p): p is { ref: string; email: string } => Boolean(p))
+        .slice(0, 600);
+      return Response.json({ ok: true, given: await giveImportedDeals(biz, "pylon", pairs, by) });
     }
     if (read.body.do === "fill-left")
       return Response.json({ ok: true, left: await fillLeft(biz, read.body.pdfs === true), any: await fillLeft(biz, true) });

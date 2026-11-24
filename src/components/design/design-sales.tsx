@@ -57,6 +57,8 @@ import {
   shortDate,
   type JobLine,
 } from "@/lib/services/crm";
+import { setDealsOwner } from "@/lib/services/crm";
+import { loadTeam, type Team } from "@/lib/services/design-account";
 import { NewDeal } from "./design-customers";
 import { useDesignAccount } from "./design-account";
 import { PATHS, PageHead, PhoneDealsSwitch, ui } from "./design-shell";
@@ -156,6 +158,12 @@ export function PipelinesPage() {
   const [profits, setProfits] = useState<Record<string, DealProfit>>({});
   // The list's margin and commission columns, once any signed deal has them (they are sent only to who sees costs).
   const showProfit = Object.keys(profits).length > 0;
+  // Deals ticked in the list, to be given to one person at once (24 Nov 2026, Martin: historical deals).
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [team, setTeam] = useState<Team | null>(null);
+  const [giveTo, setGiveTo] = useState("");
+  const [giving, setGiving] = useState<string | null>(null);
+  const cols = (showProfit ? 8 : 6) + 1;
 
   useEffect(() => {
     let gone = false;
@@ -841,10 +849,75 @@ export function PipelinesPage() {
               );
             })}
           </div>
+          {picked.size > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-ink max-sm:hidden">
+              <span className="font-medium">
+                {picked.size} deal{picked.size === 1 ? "" : "s"} picked
+              </span>
+              <label className="flex items-center gap-2">
+                <span>Give to</span>
+                <select
+                  className="h-9 rounded-md bg-surface px-2 text-sm text-ink"
+                  value={giveTo}
+                  onChange={(e) => setGiveTo(e.target.value)}
+                >
+                  <option value="">Choose someone</option>
+                  {(team?.members ?? []).map((m) => (
+                    <option key={m.email} value={m.email}>
+                      {m.email}
+                    </option>
+                  ))}
+                  {(team?.ownerOnly ?? []).map((o) => (
+                    <option key={o.email} value={o.email}>
+                      {o.name} (not invited)
+                    </option>
+                  ))}
+                  <option value="none">No one</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="h-9 rounded-md bg-sun-line px-3 font-medium text-white disabled:opacity-60"
+                disabled={!giveTo || giving === "busy"}
+                onClick={async () => {
+                  setGiving("busy");
+                  const res = await setDealsOwner([...picked], giveTo === "none" ? null : giveTo);
+                  if (!res.ok) return setGiving(res.message);
+                  setGiving(`${res.changed} deal${res.changed === 1 ? "" : "s"} given.`);
+                  setPicked(new Set());
+                  const again = await listJobs();
+                  if (again.ok) setJobs(again.jobs);
+                }}
+              >
+                {giving === "busy" ? "Giving…" : "Give them"}
+              </button>
+              <button type="button" className="ml-auto text-primary-ink/80 underline" onClick={() => setPicked(new Set())}>
+                Clear
+              </button>
+            </div>
+          )}
+          {giving && giving !== "busy" && picked.size === 0 && (
+            <p className="mt-3 text-sm text-ink-2 max-sm:hidden" role="status">
+              {giving}
+            </p>
+          )}
           <div className={clsx(ui.card, "mt-4 overflow-x-auto max-sm:hidden")}>
             <table className="w-full min-w-[46rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                  <th className="w-10 py-3 pl-4">
+                    <input
+                      type="checkbox"
+                      aria-label="Pick every deal shown"
+                      className="size-4 accent-[var(--primary)]"
+                      checked={shown.length > 0 && shown.every((j) => picked.has(j.id))}
+                      onChange={(e) => {
+                        if (!team) void loadTeam().then(setTeam);
+                        setGiving(null);
+                        setPicked(e.target.checked ? new Set(shown.map((j) => j.id)) : new Set());
+                      }}
+                    />
+                  </th>
                   <th className="px-5 py-3 font-medium">Deal</th>
                   <th className="px-3 py-3 font-medium">Address</th>
                   <th className="px-3 py-3 font-medium">Stage</th>
@@ -858,14 +931,14 @@ export function PipelinesPage() {
               <tbody>
                 {!jobs && !problem && (
                   <tr>
-                    <td colSpan={showProfit ? 8 : 6} className="px-5 py-6 text-muted">
+                    <td colSpan={cols} className="px-5 py-6 text-muted">
                       Loading…
                     </td>
                   </tr>
                 )}
                 {jobs && shown.length === 0 && (
                   <tr>
-                    <td colSpan={showProfit ? 8 : 6} className="px-5 py-6 text-ink-2">
+                    <td colSpan={cols} className="px-5 py-6 text-ink-2">
                       No deals at {stages.length === 1 ? "this stage" : "these stages"}.
                     </td>
                   </tr>
@@ -876,6 +949,24 @@ export function PipelinesPage() {
                     onClick={() => router.push(dealOf(job))}
                     className="cursor-pointer border-b border-line last:border-0 hover:bg-surface-2"
                   >
+                    <td className="w-10 py-3 pl-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Pick ${job.customerName}'s deal`}
+                        className="size-4 accent-[var(--primary)]"
+                        checked={picked.has(job.id)}
+                        onChange={(e) => {
+                          if (!team) void loadTeam().then(setTeam);
+                          setGiving(null);
+                          setPicked((was) => {
+                            const next = new Set(was);
+                            if (e.target.checked) next.add(job.id);
+                            else next.delete(job.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    </td>
                     <td className="px-5 py-3">
                       <Link href={dealOf(job)} className="font-medium text-ink hover:underline" onClick={(e) => e.stopPropagation()}>
                         {job.customerName}
