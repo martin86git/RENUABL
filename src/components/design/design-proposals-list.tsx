@@ -16,8 +16,10 @@ import {
   PenTool,
   Phone,
   Plug,
+  Search,
   Send,
   Sun,
+  X,
 } from "lucide-react";
 import { writeWithSol } from "@/lib/services/deal-feed";
 import { emailDeal } from "@/lib/services/crm";
@@ -35,6 +37,8 @@ import {
   byName,
   dueFollowUp,
   followUpLine,
+  latestOf,
+  matchesProposalSearch,
   sentOrder,
   sentStamp,
   systemWords,
@@ -63,6 +67,8 @@ export function ProposalsPage({ signed, bare = false }: { signed: boolean; bare?
   const [problem, setProblem] = useState<string | null>(null);
   // Read once on the client, so "today" and "3 days ago" are the viewer's now.
   const [now] = useState(() => new Date());
+  // What is typed in the search (24 Nov 2026, Martin: "I need a way to search proposals").
+  const [query, setQuery] = useState("");
   useEffect(() => {
     let gone = false;
     void listProposals().then((res) => {
@@ -87,8 +93,37 @@ export function ProposalsPage({ signed, bare = false }: { signed: boolean; bare?
         </p>
       )}
       {!rows && !problem && <p className="mt-6 text-sm text-muted">Loading…</p>}
-      {rows && (signed ? <SignedList rows={rows} imported={imported} now={now} /> : <SentList rows={rows} now={now} days={days} />)}
+      {rows && <SearchBox query={query} onChange={setQuery} signed={signed} />}
+      {rows &&
+        (signed ? (
+          <SignedList rows={rows} imported={imported} now={now} query={query} />
+        ) : (
+          <SentList rows={rows} now={now} days={days} query={query} />
+        ))}
     </div>
+  );
+}
+
+/** The search over the list on show: customer, address, the deal's title, its Pylon reference or who sent it. */
+function SearchBox({ query, onChange, signed }: { query: string; onChange: (q: string) => void; signed: boolean }) {
+  return (
+    <label className="mt-2 flex h-10 items-center gap-2 rounded-full bg-surface px-4 ring-1 ring-line focus-within:ring-ink">
+      <Search className="size-4 shrink-0 text-muted" aria-hidden />
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && onChange("")}
+        placeholder={signed ? "Search sold proposals" : "Search proposals"}
+        aria-label={signed ? "Search sold proposals" : "Search proposals"}
+        className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
+      />
+      {query && (
+        <button type="button" onClick={() => onChange("")} aria-label="Clear the search" className="text-muted hover:text-ink">
+          <X className="size-4" aria-hidden />
+        </button>
+      )}
+    </label>
   );
 }
 
@@ -132,9 +167,21 @@ function SentOn({ at, now }: { at: string; now: Date }) {
   );
 }
 
+/** When it was signed: the same card as Sent, so the last closed deal is plain to see down the list. */
+function SignedOn({ at, now, time = true }: { at: string; now: Date; time?: boolean }) {
+  const s = sentStamp(at, now);
+  return (
+    <div className="w-24 shrink-0 rounded-md bg-positive-soft px-3 py-2 text-positive ring-1 ring-positive/25" title={`Signed ${s.full}`}>
+      <p className="text-[9px] font-semibold uppercase tracking-[0.14em]">Signed</p>
+      <p className="text-[17px] leading-tight tracking-tight text-ink">{s.day}</p>
+      <p className="text-[11px] tabular-nums text-ink-2">{time ? `${s.time} · ${s.ago}` : s.ago}</p>
+    </div>
+  );
+}
+
 type SentLine = ProposalLine & { at: string; due: FollowUpDue | null };
 
-function SentList({ rows, now, days }: { rows: ProposalLine[]; now: Date; days?: number[] }) {
+function SentList({ rows, now, days, query }: { rows: ProposalLine[]; now: Date; days?: number[]; query: string }) {
   const [list, setList] = useState(rows);
   const lines: SentLine[] = sentOrder(
     list.map((r) => ({
@@ -153,6 +200,7 @@ function SentList({ rows, now, days }: { rows: ProposalLine[]; now: Date; days?:
           : null,
     })),
   );
+  const found = lines.filter((l) => matchesProposalSearch(query, [l.customer, l.address, l.title, l.acceptedName, byName(l.by)]));
   const toFollow = lines.filter((l) => l.due).length;
   const out = lines.filter((l) => l.state !== "withdrawn").length;
   const marked = (jobId: string, day: number, how: "call" | "email") =>
@@ -176,9 +224,11 @@ function SentList({ rows, now, days }: { rows: ProposalLine[]; now: Date; days?:
         <p className={clsx(ui.card, "mt-4 p-5 text-sm text-ink-2")}>
           None yet. When a proposal is published from the design tool it appears here.
         </p>
+      ) : found.length === 0 ? (
+        <p className={clsx(ui.card, "mt-4 p-5 text-sm text-ink-2")}>No proposal matches “{query.trim()}”.</p>
       ) : (
         <ul className={clsx(ui.card, "mt-4 divide-y divide-line")}>
-          {lines.map((r) => (
+          {found.map((r) => (
             <li key={r.jobId} className="grid gap-4 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start">
               <Sold kw={r.kw} batteryKwh={r.batteryKwh} />
               <div className="min-w-0">
@@ -592,13 +642,23 @@ type SoldRow = { key: string; signedAt: string; youPay: number; line?: ProposalL
 /** How many sales are drawn at first, and how many more each press shows (Pylon can bring in thousands). */
 const SOLD_PAGE = 120;
 
-function SignedList({ rows, imported, now }: { rows: ProposalLine[]; imported: ImportedSale[]; now: Date }) {
+function SignedList({ rows, imported, now, query }: { rows: ProposalLine[]; imported: ImportedSale[]; now: Date; query: string }) {
   const signed = rows.filter((r) => r.state === "accepted" && r.acceptedAt);
   const here = new Set(signed.map((r) => r.jobId));
-  const all: SoldRow[] = [
+  const every: SoldRow[] = [
     ...signed.map((r) => ({ key: `p-${r.jobId}`, signedAt: r.acceptedAt!, youPay: r.youPay, line: r })),
     ...imported.filter((i) => !here.has(i.jobId)).map((i) => ({ key: `i-${i.jobId}`, signedAt: i.soldAt, youPay: i.value, imported: i })),
   ];
+  // When the last deal was signed, read over every sale whatever is searched (24 Nov 2026, Martin).
+  const last = latestOf(every.map((r) => r.signedAt));
+  const all = every.filter((r) =>
+    matchesProposalSearch(
+      query,
+      r.line
+        ? [r.line.customer, r.line.address, r.line.title, r.line.acceptedName]
+        : [r.imported!.customer, r.imported!.address, r.imported!.title, r.imported!.reference],
+    ),
+  );
   const [shown, setShown] = useState(SOLD_PAGE);
   // Months and weeks are worked out over every sale, so their totals are whole; only the rows drawn are cut short.
   const months = byMonthAndWeek(all);
@@ -614,13 +674,23 @@ function SignedList({ rows, imported, now }: { rows: ProposalLine[]; imported: I
   );
   return (
     <section className="mt-2">
+      {last && !query.trim() && (
+        <p className="mt-3 text-[13px] text-ink-2">
+          Last signed <span className="font-semibold text-ink">{sentStamp(last, now).day}</span> · {sentStamp(last, now).ago}
+        </p>
+      )}
       {all.length > 0 && (
-        <p className="text-[13px] text-ink-2">
-          {all.length.toLocaleString("en-AU")} sold · <span className="font-semibold text-ink">{wholeDollars(total)}</span> in all
+        <p className={clsx("text-[13px] text-ink-2", last && !query.trim() ? "mt-1" : "mt-3")}>
+          {query.trim() && `${all.length.toLocaleString("en-AU")} of ${every.length.toLocaleString("en-AU")} match · `}
+          {!query.trim() && `${all.length.toLocaleString("en-AU")} sold · `}
+          <span className="font-semibold text-ink">{wholeDollars(total)}</span> in all
           {fromPylon > 0 && <span className="text-muted"> · {fromPylon.toLocaleString("en-AU")} brought in from Pylon</span>}
         </p>
       )}
-      {all.length === 0 && (
+      {every.length > 0 && all.length === 0 && (
+        <p className={clsx(ui.card, "mt-4 p-5 text-sm text-ink-2")}>No sale matches “{query.trim()}”.</p>
+      )}
+      {every.length === 0 && (
         <p className={clsx(ui.card, "mt-2 p-5 text-sm text-ink-2")}>
           None yet. When a customer signs their proposal on its page, it appears here with the signed PDF. Sold jobs brought in from Pylon
           show here too.
@@ -670,10 +740,12 @@ function SignedList({ rows, imported, now }: { rows: ProposalLine[]; imported: I
 }
 
 function SignedRow({ r, now }: { r: ProposalLine; now: Date }) {
-  const s = sentStamp(r.acceptedAt!, now);
   return (
     <li className="grid gap-4 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-      <Sold kw={r.kw} batteryKwh={r.batteryKwh} />
+      <div className="flex items-start justify-between gap-3">
+        <Sold kw={r.kw} batteryKwh={r.batteryKwh} />
+        <SignedOn at={r.acceptedAt!} now={now} />
+      </div>
       <div className="min-w-0">
         <p className="truncate text-sm">
           <Link href={`${PATHS.deals}/${r.jobId}`} className="font-semibold text-ink hover:underline">
@@ -682,8 +754,8 @@ function SignedRow({ r, now }: { r: ProposalLine; now: Date }) {
           <span className="text-muted"> · {r.address || r.title}</span>
         </p>
         <p className="mt-0.5 text-[13px] text-ink-2">
-          {systemWords(r.kw, r.batteryKwh)} · <span className="font-semibold text-ink">{wholeDollars(r.youPay)}</span> · signed {s.full}
-          {r.acceptedName && r.acceptedName.toLowerCase() !== r.customer.toLowerCase() && ` as ${r.acceptedName}`}
+          {systemWords(r.kw, r.batteryKwh)} · <span className="font-semibold text-ink">{wholeDollars(r.youPay)}</span>
+          {r.acceptedName && r.acceptedName.toLowerCase() !== r.customer.toLowerCase() && ` · signed as ${r.acceptedName}`}
         </p>
         {(r.depositReceived > 0 || r.depositSaid) && (
           <div className="mt-2 flex flex-wrap gap-2">
@@ -714,10 +786,13 @@ function SignedRow({ r, now }: { r: ProposalLine; now: Date }) {
 
 /** A sold deal brought in from Pylon: its figures as Pylon had them, and its signed PDF when one came across. */
 function ImportedRow({ r, now }: { r: ImportedSale; now: Date }) {
-  const s = sentStamp(r.soldAt, now);
   return (
     <li className="grid gap-4 px-4 py-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-      <Sold kw={r.kw} batteryKwh={r.batteryKwh} />
+      <div className="flex items-start justify-between gap-3">
+        <Sold kw={r.kw} batteryKwh={r.batteryKwh} />
+        {/* Pylon's export gives the day sold, not the time. */}
+        <SignedOn at={r.soldAt} now={now} time={false} />
+      </div>
       <div className="min-w-0">
         <p className="truncate text-sm">
           <Link href={`${PATHS.deals}/${r.jobId}`} className="font-semibold text-ink hover:underline">
@@ -732,8 +807,7 @@ function ImportedRow({ r, now }: { r: ImportedSale; now: Date }) {
               {" "}
               · <span className="font-semibold text-ink">{wholeDollars(r.value)}</span>
             </>
-          )}{" "}
-          · sold {s.full}
+          )}
         </p>
         <p className="mt-1.5">
           <span className="rounded-full bg-canvas px-2 py-0.5 text-[11px] font-medium text-ink-2 ring-1 ring-line">

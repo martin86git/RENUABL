@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { byMonthAndWeek, dueFollowUp, followUpLine, sentOrder, sentStamp, systemWords } from "./proposal-lists";
+import {
+  byMonthAndWeek,
+  latestOf,
+  matchesProposalSearch,
+  dueFollowUp,
+  followUpLine,
+  sentOrder,
+  sentStamp,
+  systemWords,
+} from "./proposal-lists";
 
 // 18 Oct 2026, 3 pm in Melbourne (UTC+11).
 const now = new Date("2026-10-18T04:00:00Z");
@@ -53,5 +62,20 @@ describe("Proposals Signed", () => {
     ]);
     expect(groups[0].weeks.map((w) => [w.label, w.rows.length, w.total])).toEqual([["Week of 12 October", 2, 15000]]);
     expect(groups[1].weeks[0].label).toBe("Week of 28 September");
+  });
+});
+
+describe("Searching proposals", () => {
+  it("finds every word typed, any case, across the fields", () => {
+    const f = ["Chris Voulelis", "28 Shearer Drive, Rowville", "Solar", "213-0391-5780"];
+    expect(matchesProposalSearch("", f)).toBe(true);
+    expect(matchesProposalSearch("chris rowville", f)).toBe(true);
+    expect(matchesProposalSearch("chris glen", f)).toBe(false);
+    expect(matchesProposalSearch("2130391", f)).toBe(true);
+    expect(matchesProposalSearch("213 0391", f)).toBe(true);
+  });
+  it("knows the latest day signed", () => {
+    expect(latestOf([])).toBeNull();
+    expect(latestOf(["2026-11-09T02:00:00Z", "2026-11-16T01:00:00Z", "2026-10-01T00:00:00Z"])).toBe("2026-11-16T01:00:00Z");
   });
 });
