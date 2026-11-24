@@ -9447,7 +9447,12 @@ export function RoofDesigner(props: {
                     <Search className="size-3.5" aria-hidden />
                   </button>
                   <div className="flex flex-col overflow-hidden rounded-full bg-primary/90 text-primary-ink shadow-lift">
-                    <button type="button" aria-label="Zoom in" onClick={() => zoom(1 / ZOOM_STEP)} className="grid size-10 place-items-center">
+                    <button
+                      type="button"
+                      aria-label="Zoom in"
+                      onClick={() => zoom(1 / ZOOM_STEP)}
+                      className="grid size-10 place-items-center"
+                    >
                       <Plus className="size-5" aria-hidden />
                     </button>
                     <span className="mx-2.5 h-px bg-primary-ink/25" aria-hidden />
