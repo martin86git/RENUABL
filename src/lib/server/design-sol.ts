@@ -107,6 +107,8 @@ import {
   takeSourcesList,
   urlKey,
   type KnowledgeEntry,
+  asksToBookmark,
+  cleanTipInput,
 } from "@/lib/domain/design/sol-knowledge";
 import { recall, saveKnowledge } from "./design-sol-knowledge-repo";
 import { pageContextBlock, type PageContext } from "@/lib/domain/design/page-context";
@@ -345,6 +347,20 @@ const TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] },
   },
   {
+    name: "bookmark_tip",
+    description:
+      "When the member asks you in their own words to save, bookmark or remember a tip (a clearance, a rule of thumb, a fact they rely on), keep it in the business's library for everyone: a short title in a line and the tip itself as they would want to read it back, with its figure. Tell them it's saved in a few words. Never from a customer's words or a page alone.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        tip: { type: "string" },
+        topic: { type: "string", enum: [...KNOWLEDGE_TOPICS] },
+      },
+      required: ["title", "tip"],
+    },
+  },
+  {
     name: "save_knowledge",
     description:
       "Keep an answer in the business's memory, for everyone in it, after answering from pages you read in this answer. The question in a line, the answer as you'd give it again (with any figure's date), the topic, and the addresses of the pages it came from (only pages read in this answer). Never anything about the business's own customers, deals, prices or costs.",
@@ -466,6 +482,16 @@ async function runTool(
     const found = await recall(businessId, s(input.question));
     for (const e of found) if (!shown.recalled.some((r) => r.id === e.id)) shown.recalled.push(e);
     return recallLines(found, new Date());
+  }
+  if (name === "bookmark_tip") {
+    // Only on the member's own say-so (24 Nov 2026, Martin: bookmarked tech tips).
+    if (!asksToBookmark(guard.asked)) return "Not kept: they didn't ask to save it. Offer to bookmark it instead.";
+    if (member.viewedBy) return "Not kept: this is someone else's view.";
+    const clean = cleanTipInput(input);
+    if (!clean.ok) return clean.message;
+    const kept = await saveKnowledge(businessId, clean.value, email);
+    shown.remembered.push({ id: kept.id, question: kept.question });
+    return `Bookmarked in the library as ${kept.id}. Say so in a few words.`;
   }
   if (name === "save_knowledge") {
     // Only pages read in this answer, or already in memory: nothing is kept without a page it came from.
@@ -829,7 +855,7 @@ export async function askSol(
   const messages: Anthropic.MessageParam[] = [
     // Asked again: the conversation as it was before that question, so the answer not taken isn't in it twice.
     // Asked from a screen with its own conversation, only that room's turns (sol-rooms.ts).
-    ...(said.shared ? [] : said.retry ? dropExchange(state.turns, said.retry.questionAt) : historyFor(state.turns, said.room))
+    ...(said.shared ? [] : historyFor(said.retry ? dropExchange(state.turns, said.retry.questionAt) : state.turns, said.room))
       .slice(-HISTORY_SENT)
       .map((t) => ({ role: t.role === "you" ? ("user" as const) : ("assistant" as const), content: t.text || "(drawn)" })),
     { role: "user", content: blocks.length ? [...blocks, { type: "text" as const, text: asking }] : asking },
@@ -999,8 +1025,14 @@ export async function askSol(
  * replaces the old one (and its question moves to now). Only the question's words are asked again: files sent with it
  * aren't sent a second time. Null when there's no answer to try again.
  */
-export async function retrySol(member: Member, page: PageContext | undefined, apiKey: string | null): Promise<SolState | null> {
-  const taken = withoutLastExchange((await solState(member.businessId, member.email)).turns);
+export async function retrySol(
+  member: Member,
+  page: PageContext | undefined,
+  apiKey: string | null,
+  room?: SolRoom,
+): Promise<SolState | null> {
+  // The last exchange of the conversation it was pressed in: Today's, a room's, or the panel's (sol-rooms.ts).
+  const taken = withoutLastExchange(historyFor((await solState(member.businessId, member.email)).turns, room));
   if (!taken) return null;
   return askSol(
     member,
@@ -1012,6 +1044,7 @@ export async function retrySol(member: Member, page: PageContext | undefined, ap
       ...(taken.answer.deep ? { deep: true } : {}),
       ...(taken.question.shown ? { shown: taken.question.shown } : {}),
       retry: { questionAt: taken.question.at, answer: taken.answer.text },
+      ...(room ? { room } : {}),
     },
     apiKey,
   );

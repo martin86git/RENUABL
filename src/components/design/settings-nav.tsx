@@ -28,7 +28,7 @@ export function SettingsFrame({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col lg:flex-row">
       <nav
         aria-label="Settings"
-        className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 lg:sticky lg:top-0 lg:h-dvh lg:w-64 lg:flex-col lg:gap-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-5"
+        className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-3 py-2 settings-list lg:sticky lg:top-0 lg:h-dvh lg:flex-col lg:gap-0 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-3 lg:py-5"
       >
         <p className="hidden px-3 text-[17px] tracking-tight text-ink lg:block">Settings</p>
         {groups.map((group) => (
@@ -68,7 +68,8 @@ export function SettingsFrame({ children }: { children: React.ReactNode }) {
           </div>
         ))}
       </nav>
-      <div className="min-w-0 flex-1">{children}</div>
+      {/* A clear gap from the list, so the title, intro and cards share one left edge beside it. */}
+      <div className="min-w-0 flex-1 lg:pl-8">{children}</div>
     </div>
   );
 }

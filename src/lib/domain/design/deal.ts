@@ -530,6 +530,11 @@ export interface JobExtra {
   depositAsked?: number | null;
   solarVicRebate?: number | null;
   solarVicLoan?: number | null;
+  /** Only for members who see costs (deal-profit.ts). */
+  grossMargin?: number;
+  grossShare?: number | null;
+  commission?: number;
+  afterCommission?: number;
 }
 
 /**

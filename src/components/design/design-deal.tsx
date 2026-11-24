@@ -521,13 +521,17 @@ export function DealPage({ id }: { id: string }) {
           depositReceived: extra.depositReceived,
           solarVicRebate: extra.solarVicRebate ?? null,
           solarVicLoan: extra.solarVicLoan ?? null,
+          grossMargin: extra.grossMargin ?? null,
+          grossShare: extra.grossShare ?? null,
+          commission: extra.commission ?? null,
+          afterCommission: extra.afterCommission ?? null,
         }
       : null,
   };
   const tabFields = shownTab ? shownTab.fields.filter((f) => !f.hidden) : [];
   const tabLines = tabFields.map((f) => fieldLine(f, job.details, ctx));
   const tabFilled = tabLines.filter((l) => l.value).length;
-  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived"];
+  const PROPOSAL_KEYS = ["incGst", "stc", "youPay", "depositAsked", "depositReceived", "grossMargin", "afterCommission"];
   const menu = {
     tab,
     onTab: setTab,

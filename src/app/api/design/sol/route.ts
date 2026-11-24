@@ -3,6 +3,7 @@ import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { askSol, chooseReminderTime, retrySol } from "@/lib/server/design-sol";
 import { cleanPageContext } from "@/lib/domain/design/page-context";
+import { cleanRoom } from "@/lib/domain/design/sol-rooms";
 import { cleanAnswer, cleanScope } from "@/lib/domain/design/sol-induction";
 import {
   answerInduction,
@@ -20,7 +21,7 @@ import {
   startNewSol,
   withSol,
 } from "@/lib/server/design-sol-repo";
-import { cleanKnowledgeInput, guessTopic } from "@/lib/domain/design/sol-knowledge";
+import { cleanKnowledgeInput, cleanTipInput, guessTopic } from "@/lib/domain/design/sol-knowledge";
 import { forgetKnowledge, listKnowledge, saveKnowledge } from "@/lib/server/design-sol-knowledge-repo";
 import { allow } from "@/lib/server/rate-limit";
 
@@ -30,7 +31,7 @@ export const maxDuration = 180;
 /**
  * Sol, the member's own conversation (domain/design/sol.ts). GET → { state }, saying any reminder now due first (the
  * rail asks every minute for its count). POST { do } → { state }: "chat" { text, files } asks Sol; "seen" marks the
- * conversation seen; "retry" { page } asks his last answer's question again, a different way; "clear" clears it (preferences and reminders stay); "remind" { id, when } sets a reminder's time
+ * conversation seen; "retry" { page, room } asks his last answer's question again, a different way; "clear" clears it (preferences and reminders stay); "remind" { id, when } sets a reminder's time
  * from the card; "forget-reminder" { id } and "forget-pref" { id } take one off; "past", "past-open" { id }, "new",
  * "resume" { id } and "forget-past" { id } are the past conversations. Each member reads and changes only their own.
  */
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
         if (!allow(request, "design-sol", 120))
           return Response.json({ ok: false, message: "That's a lot of questions this hour: try again shortly." }, { status: 429 });
         const page = cleanPageContext(body.page) ?? undefined;
-        const state = await retrySol(who.member, page, parseApiKey(process.env.ANTHROPIC_API_KEY));
+        const state = await retrySol(who.member, page, parseApiKey(process.env.ANTHROPIC_API_KEY), cleanRoom(body.room));
         return state ? ok(state) : Response.json({ ok: false, message: "There's no answer of Sol's to try again." }, { status: 422 });
       }
       case "seen":
@@ -140,6 +141,14 @@ export async function POST(request: Request) {
       // his answers kept by hand (only an answer with pages under it, saved with those pages).
       case "knowledge":
         return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
+      case "tip": {
+        // A tip bookmarked by hand from the Technical tile's library (sol-start.tsx).
+        if (who.member.viewedBy) return Response.json({ ok: false, message: "Not while viewing as someone." }, { status: 403 });
+        const clean = cleanTipInput(body);
+        if (!clean.ok) return Response.json({ ok: false, message: clean.message }, { status: 400 });
+        await saveKnowledge(businessId, clean.value, email);
+        return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
+      }
       case "forget-knowledge":
         await forgetKnowledge(businessId, id);
         return Response.json({ ok: true, knowledge: await listKnowledge(businessId) });
