@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Wordmark } from "@/components/ui/primitives";
-import { ACTIVE_PING_MS, LOCK_WORDS, LOCKED_STATUS, PIN_MAX, PIN_MIN } from "@/lib/domain/design/screen-lock";
+import { ACTIVE_PING_MS, LOCK_WORDS, LOCKED_STATUS, PIN_MAX, PIN_MIN, faceIdOn, lockDeviceOf } from "@/lib/domain/design/screen-lock";
 import {
   LOCK_EVENT,
   lockNow,
@@ -145,9 +145,14 @@ export function ScreenLock() {
         }}
       />
     );
-  if (!state.exempt && !state.passkeys && !state.pin) return <SetUpNudge />;
+  // A computer unlocks only with the PIN, so a passkey on the phone doesn't count there.
+  const quick = state.pin || (onPhone() && Boolean(state.passkeys));
+  if (!state.exempt && !quick) return <SetUpNudge />;
   return null;
 }
+
+/** A phone or tablet, by its browser (as the server reads it for the lock's time). */
+const onPhone = () => typeof navigator !== "undefined" && faceIdOn(lockDeviceOf(navigator.userAgent));
 
 function LockScreen({ state, onUnlocked }: { state: LockState; onUnlocked: () => void }) {
   const [faceId, setFaceId] = useState(false);
@@ -156,11 +161,14 @@ function LockScreen({ state, onUnlocked }: { state: LockState; onUnlocked: () =>
   const [problem, setProblem] = useState<string | null>(null);
   const [ended, setEnded] = useState(false);
   const [another, setAnother] = useState(false);
-  const noMethod = !state.passkeys && !state.pin;
+  const phone = onPhone();
+  // A computer always offers the PIN (the server says when none is set); Face ID only on a phone.
+  const noMethod = phone && !state.passkeys && !state.pin;
+  const pinShown = state.pin || !phone;
 
   useEffect(() => {
-    if (state.passkeys) void passkeysWork().then(setFaceId);
-  }, [state.passkeys]);
+    if (phone && state.passkeys) void passkeysWork().then(setFaceId);
+  }, [phone, state.passkeys]);
 
   const result = (r: Awaited<ReturnType<typeof unlockWithPin>>) => {
     setBusy(false);
@@ -217,7 +225,7 @@ function LockScreen({ state, onUnlocked }: { state: LockState; onUnlocked: () =>
           {state.email && <p className="mt-1 text-[13px] text-muted">{state.email}</p>}
         </div>
 
-        {!ended && !another && faceId && Boolean(state.passkeys) && (
+        {!ended && !another && phone && faceId && Boolean(state.passkeys) && (
           <div className="w-full">
             <button
               type="button"
@@ -231,11 +239,12 @@ function LockScreen({ state, onUnlocked }: { state: LockState; onUnlocked: () =>
           </div>
         )}
 
-        {!ended && !another && state.pin && (
+        {!ended && !another && pinShown && (
           <form onSubmit={byPin} className="w-full space-y-2">
             <label htmlFor="lock-pin" className="block text-[13px] font-medium text-ink-2">
               {LOCK_WORDS.pin}
             </label>
+            {!phone && state.passkeys ? <p className="text-[12px] text-muted">{LOCK_WORDS.pinHere}</p> : null}
             <input
               id="lock-pin"
               type="password"

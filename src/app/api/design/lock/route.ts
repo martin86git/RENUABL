@@ -88,6 +88,8 @@ export async function POST(request: Request) {
     if (!allow(request, "unlock", 60)) return no(429, "Too many tries. Wait a few minutes.");
 
     if (what === "pin") {
+      // No PIN set: say so, and don't count it as a wrong try.
+      if (!(await hasLockPin(businessId, me.row.email))) return no(404, LOCK_WORDS.noPinYet, { noPin: true });
       if (await lockPinMatches(businessId, me.row.email, typeof read.body.pin === "string" ? read.body.pin.trim() : "")) {
         await unlock(me.idHash);
         return Response.json({ ok: true, locked: false });

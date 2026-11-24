@@ -35,3 +35,12 @@ describe("screen lock", () => {
     expect(relyingParty("localhost:3000")).toBe("localhost");
   });
 });
+
+describe("Face ID is for phones (24 Nov 2026)", () => {
+  it("is offered on a phone and never on a computer", async () => {
+    const { faceIdOn } = await import("./screen-lock");
+    expect(faceIdOn(lockDeviceOf("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1"))).toBe(true);
+    expect(faceIdOn(lockDeviceOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130 Safari/537.36"))).toBe(false);
+    expect(faceIdOn(lockDeviceOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605.1.15"))).toBe(false);
+  });
+});
