@@ -14,6 +14,7 @@ import { PylonImportSettings } from "@/components/design/settings-pylon";
 import { HubSpotImportSettings } from "@/components/design/settings-hubspot";
 import { LeadInboxSettings } from "@/components/design/settings-lead-inbox";
 import { CardPaymentsSettings } from "@/components/design/settings-card-payments";
+import { XeroSettings } from "@/components/design/settings-xero";
 import { CallerSettings } from "@/components/design/settings-caller";
 import { StaffViewAs } from "@/components/design/staff-view-as";
 import { UsagePage } from "@/components/design/usage-page";
@@ -96,6 +97,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <CallerSettings />
         ) : section === "card-payments" ? (
           <CardPaymentsSettings />
+        ) : section === "xero" ? (
+          <XeroSettings />
         ) : section === "view-as" ? (
           <StaffViewAs />
         ) : (

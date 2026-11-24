@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { cleanInvoiceFigures } from "@/lib/domain/design/installer-invoices";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import { addInvoice, invoicesView, workOutAgain } from "@/lib/server/design-after-sale-repo";
+import { sendBillsDue } from "@/lib/server/design-xero";
 
 const validJob = (id: unknown): id is string => typeof id === "string" && /^job_[a-f0-9]{8,64}$/.test(id);
 
@@ -41,6 +43,8 @@ export async function POST(request: Request) {
     const fileName = typeof b.fileName === "string" ? b.fileName.slice(0, 120) : "";
     const saved = await addInvoice(who.member.businessId, jobId, { ...figures, fileName }, who.member.email);
     if (saved === "missing") return Response.json({ ok: false, message: "There's no such job." }, { status: 404 });
+    // A matching installer invoice goes to Xero as a bill, when the business has Xero connected (domain/design/xero.ts).
+    if (jobId) after(() => sendBillsDue(who.member.businessId).catch(() => 0));
     return Response.json({ ok: true, invoice: saved });
   });
 }

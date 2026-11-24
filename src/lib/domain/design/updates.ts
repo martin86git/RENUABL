@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   { day: "2026-11-25", area: "Designer", words: "The Draw the roof view is gone from the designer's tools: the roof is always the photo." },
   {
     day: "2026-11-25",
+    area: "Settings",
+    words: "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
+  },
+  {
+    day: "2026-11-25",
     area: "Designer",
     words: "The Google | Nearmap switch is one round, G or N; pressing it shows G and N to pick, and N opens Nearmap's pictures.",
   },
