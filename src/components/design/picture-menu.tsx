@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, ImageIcon, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { capturedWords, offersOf } from "@/lib/domain/design/nearmap";
 import { chooseImagery, fetchNearmap, loadImagery, type NearmapSurvey, type RoofImagery } from "@/lib/services/nearmap";
@@ -24,16 +24,21 @@ export function PictureMenu({
   onChange: (next: RoofImagery) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // G and N unveiled beside the round; folded again by a press outside or a choice.
+  const [picking, setPicking] = useState(false);
   // A press anywhere outside the box closes it (8 Nov 2026, Martin), as its cross does.
   const menuBox = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open && !picking) return;
     const away = (e: PointerEvent) => {
-      if (menuBox.current && !menuBox.current.contains(e.target as Node)) setOpen(false);
+      if (menuBox.current && !menuBox.current.contains(e.target as Node)) {
+        setOpen(false);
+        setPicking(false);
+      }
     };
     document.addEventListener("pointerdown", away, true);
     return () => document.removeEventListener("pointerdown", away, true);
-  }, [open]);
+  }, [open, picking]);
   const [surveys, setSurveys] = useState<NearmapSurvey[] | null | undefined>(undefined);
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -68,28 +73,40 @@ export function PictureMenu({
 
   return (
     <div className="relative" ref={menuBox}>
-      {/* Which picture is under the design, and the button that calls on Nearmap where Google's isn't good enough. */}
+      {/* Which picture is under the design (25 Nov 2026, Martin: the Google | Nearmap pill was too wide and ran over the
+          tray's other rounds): one round with the picture in use, G or N, that unveils G and N beside it; N opens
+          Nearmap's captures. */}
       <div className="flex items-center gap-1 rounded-full bg-surface/90 p-1 shadow-lift ring-1 ring-line backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => void choose("google")}
-          title={inUse ? "Go back to Google's picture" : "Google's picture is in use"}
-          className={clsx("h-7 rounded-full px-2.5 text-xs", inUse ? "text-ink-2 hover:text-ink" : "bg-surface-2 font-medium text-ink")}
-        >
-          Google
-        </button>
-        <button
-          type="button"
-          onClick={() => void show()}
-          aria-expanded={open}
-          title="Pick a Nearmap picture from the last two years"
-          className={clsx(
-            "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium",
-            inUse ? "bg-primary text-primary-ink" : "bg-primary/90 text-primary-ink hover:bg-primary",
-          )}
-        >
-          <ImageIcon className="size-3.5" aria-hidden /> {inUse ? label : "Nearmap"}
-        </button>
+        {picking && (
+          <>
+            <SourceRound
+              letter="G"
+              on={!inUse}
+              title={inUse ? "Go back to Google's picture" : "Google's picture is in use"}
+              onClick={() => {
+                setPicking(false);
+                setOpen(false);
+                void choose("google");
+              }}
+            />
+            <SourceRound
+              letter="N"
+              on={Boolean(inUse)}
+              title={inUse ? `${label}: pick another Nearmap picture` : "Pick a Nearmap picture from the last two years"}
+              onClick={() => void show()}
+              expanded={open}
+            />
+          </>
+        )}
+        {!picking && (
+          <SourceRound
+            letter={inUse ? "N" : "G"}
+            on
+            title={`Picture: ${label}. Change it`}
+            onClick={() => setPicking(true)}
+            expanded={false}
+          />
+        )}
       </div>
       {open && (
         <div className="absolute bottom-11 right-0 w-[min(20rem,calc(100vw-2rem))] rounded-lg bg-surface p-2 shadow-[var(--shadow-lift)] ring-1 ring-line">
@@ -170,5 +187,40 @@ export function PictureMenu({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A picture's source as a round: G for Google's, N for Nearmap's, the one in use filled graphite. Plain letters in the
+ * tray's own look, not either company's logo.
+ */
+function SourceRound({
+  letter,
+  on,
+  title,
+  onClick,
+  expanded,
+}: {
+  letter: "G" | "N";
+  on: boolean;
+  title: string;
+  onClick: () => void;
+  expanded?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      aria-pressed={expanded === undefined ? on : undefined}
+      aria-expanded={expanded}
+      className={clsx(
+        "grid size-9 place-items-center rounded-full text-[15px] font-bold transition-colors",
+        on ? "bg-primary text-primary-ink" : "text-ink-2 hover:bg-canvas hover:text-ink",
+      )}
+    >
+      {letter}
+    </button>
   );
 }
