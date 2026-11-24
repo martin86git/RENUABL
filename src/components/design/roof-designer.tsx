@@ -6303,6 +6303,18 @@ export function RoofDesigner(props: {
                   With a note to {props.customerName ?? "the customer"}
                 </button>
               )}
+              {props.proposalHref && (
+                <Link
+                  href={props.proposalHref}
+                  onClick={() => {
+                    openMenu(false);
+                    if (saved === "changed") void save();
+                  }}
+                  className="inline-flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-sm font-medium text-ink ring-1 ring-line hover:bg-canvas"
+                >
+                  <FileText className="size-4" aria-hidden /> View proposal
+                </Link>
+              )}
             </>
           )}
           {sent && !sending && (
