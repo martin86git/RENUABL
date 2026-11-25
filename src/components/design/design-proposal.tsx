@@ -174,8 +174,9 @@ function SendToCustomer(props: {
 export function DealProposal({ jobId, hasDesign, statusOnly = false }: { jobId: string; hasDesign: boolean; statusOnly?: boolean }) {
   const [versions, setVersions] = useState<ProposalStatus[] | null>(null);
   const [account] = useDesignAccount();
-  // Marking a deposit is for whoever may publish proposals; the server checks it again.
-  const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
+  // Marking a deposit received is for an admin or finance person (who may change prices and settings, 26 Nov 2026,
+  // Martin); the server checks it again.
+  const mayMark = Boolean(account?.signedIn && (account.may?.prices ?? true));
   useEffect(() => {
     let gone = false;
     void loadProposal(jobId).then((res) => !gone && setVersions(res.ok ? res.versions : []));
@@ -186,13 +187,23 @@ export function DealProposal({ jobId, hasDesign, statusOnly = false }: { jobId: 
   const latest = versions?.[0];
   if (statusOnly && !latest) return null;
   return (
-    <div className="border-t border-line px-5 py-4">
+    <div
+      className={clsx(
+        "border-t border-line px-5 py-4",
+        latest?.state === "accepted" && "border-l-[3px] border-l-positive bg-positive-soft/40",
+      )}
+    >
       <p className={ui.eyebrow}>Proposal</p>
       {latest ? (
         <>
           <p className="mt-1.5 text-sm text-ink">
             {latest.indicative ? "Indicative · " : ""}
-            {STATE_WORDS[latest.state]} <span className="tabular-nums text-ink-2">· {dollars(latest.youPay)}</span>
+            {latest.state === "accepted" ? (
+              <span className="rounded-full bg-positive px-2 py-0.5 text-[12px] font-semibold text-white">{STATE_WORDS[latest.state]}</span>
+            ) : (
+              STATE_WORDS[latest.state]
+            )}{" "}
+            <span className="tabular-nums text-ink-2">· {dollars(latest.youPay)}</span>
           </p>
           <p className="mt-0.5 text-xs text-muted">{standing(latest)}</p>
           {latest.deposit && <DepositLine jobId={jobId} deposit={latest.deposit} mayMark={mayMark} onChange={setVersions} />}
@@ -237,7 +248,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   // The deal has no saved design: its designer may still hold one as a draft (UnsavedDesign).
   const noDesign = problems.some((p) => p.startsWith("This deal has no roof design yet"));
   const [account] = useDesignAccount();
-  const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
+  const mayMark = Boolean(account?.signedIn && (account.may?.prices ?? true));
   const [sending, setSending] = useState(false);
   // After publishing, the screen goes down to the Sent part (24 Nov 2026, Martin: on a phone it stayed on the button).
   const sentRef = useRef<HTMLDivElement>(null);

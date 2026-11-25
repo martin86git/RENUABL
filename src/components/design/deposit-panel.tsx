@@ -182,8 +182,8 @@ export function PayDeposit(props: {
 
 /**
  * Where a deal's deposit stands, for the business: due, said by the customer
- * to be paid (how and when: not confirmed), or received. A member who may
- * publish proposals marks it received once they have seen it in their own
+ * to be paid (how and when: not confirmed), or received. An admin or finance
+ * person (who may change prices and settings) marks it received once they have seen it in their own
  * account, or not received, which makes it due again. Nothing here takes or
  * checks a payment.
  */
