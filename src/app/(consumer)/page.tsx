@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { SalesPage } from "@/components/design/sales-page";
 import { jsonLdHtml, siteJsonLd } from "@/lib/domain/seo";
 import { publicSiteUrl } from "@/lib/domain/site";
+import { redirect } from "next/navigation";
 import { designAccess } from "@/lib/server/design-context";
+import { signedOutSignInPage } from "@/lib/server/design-sign-in-page";
 
 export const metadata: Metadata = {
   title: { absolute: "RENUABL Business: for solar retailers and installers" },
@@ -36,6 +38,9 @@ export const metadata: Metadata = {
  * business already signed in gets "Open RENUABL" in place of Sign in.
  */
 export default async function HomePage() {
+  // A device that signed in at its business's own sign-in page goes back there while signed out (25 Nov 2026).
+  const team = await signedOutSignInPage();
+  if (team) redirect(team);
   const access = await designAccess();
   return (
     <>

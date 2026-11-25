@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LOCK_MINUTES, PIN_MAX, PIN_MIN, faceIdOn, lockDeviceOf } from "@/lib/domain/design/screen-lock";
+import { LOCK_MINUTES, PIN_MAX, PIN_MIN, faceIdOn } from "@/lib/domain/design/screen-lock";
+import { deviceHere } from "./screen-lock";
 import {
   addPasskey,
   lockNow,
@@ -34,7 +35,7 @@ export function ScreenLockSection() {
   useEffect(() => {
     void lockSetup().then(setSetup);
     // Face ID is set up and used on a phone only (24 Nov 2026, Martin); a computer unlocks with the PIN.
-    if (faceIdOn(lockDeviceOf(navigator.userAgent))) void passkeysWork().then(setCanFace);
+    if (faceIdOn(deviceHere())) void passkeysWork().then(setCanFace);
     else void Promise.resolve().then(() => setOnComputer(true));
   }, []);
 

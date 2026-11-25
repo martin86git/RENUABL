@@ -20,9 +20,29 @@ export const ACTIVE_PING_MS = 2 * 60_000;
 export const PIN_MIN = 4;
 export const PIN_MAX = 6;
 
-/** Phones and tablets that say so; anything else counts as a computer (the stricter time). */
-export function lockDeviceOf(userAgent: string | null | undefined): LockDevice {
-  return /iPhone|iPod|Android|Mobile|iPad/i.test(userAgent ?? "") ? "phone" : "computer";
+/**
+ * The cookie the page sets to say it is on a touch screen (25 Nov 2026, Martin: his phone still locked after 30
+ * minutes). Safari on an iPad, and an iPhone asking for the desktop site, says "Macintosh" in its user agent, so the
+ * user agent alone read it as a computer.
+ */
+export const DEVICE_COOKIE = "renuabl_device";
+
+/**
+ * Phones and tablets: by the user agent, else Chrome's own "mobile" hint (`Sec-CH-UA-Mobile: ?1`), else the page's
+ * cookie saying it is a touch screen. Anything else counts as a computer (the stricter time).
+ */
+export function lockDeviceOf(
+  userAgent: string | null | undefined,
+  hints: { mobile?: string | null; cookie?: string | null } = {},
+): LockDevice {
+  if (/iPhone|iPod|Android|Mobile|iPad/i.test(userAgent ?? "")) return "phone";
+  if (hints.mobile?.trim() === "?1") return "phone";
+  return hints.cookie === "phone" ? "phone" : "computer";
+}
+
+/** In the page: a touch screen with no mouse (an iPad or an iPhone that says "Macintosh"; a touch laptop has a mouse too). */
+export function touchScreen(maxTouchPoints: number, coarsePointer: boolean, finePointer: boolean): boolean {
+  return maxTouchPoints > 0 && coarsePointer && !finePointer;
 }
 
 /**
