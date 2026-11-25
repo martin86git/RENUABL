@@ -2,28 +2,14 @@
 
 import { SolShortcutList, SolShortcutRounds } from "./sol-shortcuts";
 import type { SolTopic } from "@/lib/domain/design/sol-suggest";
-import { completionFor, phrasesWith } from "@/lib/domain/design/sol-complete";
+import { useSolAhead } from "./sol-ahead";
 import { useStageNames } from "./stage-select";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
-import {
-  ArrowUp,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  CornerDownRight,
-  Eye,
-  HardHat,
-  Mail,
-  Phone,
-  Play,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
@@ -73,7 +59,7 @@ import { TODAY_CALENDAR, TodayChat, useInsights } from "./today-chat";
 import { TodayCalendar } from "./today-calendar";
 import { InstallListPage } from "./install-lists";
 import { useDockSet } from "@/lib/services/dock-set";
-import { TODAY_FIRST, learnAsked, useLearnedPhrases } from "@/lib/services/sol";
+import { TODAY_FIRST, learnAsked } from "@/lib/services/sol";
 import { useNameHintBox } from "./name-hint-box";
 import type { TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
@@ -578,17 +564,8 @@ export function SolBox({
   // Speak and attach, as in his panel (5 Nov 2026, Martin): the microphone and the paperclip.
   const attach = useSolAttach();
   const ready = text.trim().length >= 2 || attach.files.length > 0;
-  const [dismissed, setDismissed] = useState("");
-  // Their own questions first, learnt as they ask (26 Nov 2026, Martin), then the usual ones.
-  const learned = useLearnedPhrases();
-  const phrases = useMemo(() => phrasesWith(learned), [learned]);
-  const ahead = tall && !heard && !names.showing && dismissed !== text ? completionFor(text, phrases) : "";
-  const takeAhead = () => {
-    if (!ahead) return;
-    const next = (text + ahead).slice(0, 4000);
-    setText(next);
-    window.requestAnimationFrame(() => field.current?.setSelectionRange(next.length, next.length));
-  };
+  // The rest of the sentence: their own questions first, then the team's, then the usual ones (26 Nov 2026, Martin).
+  const guess = useSolAhead(text, setText, field, !tall || Boolean(heard) || names.showing);
   const send = async () => {
     const said = text.trim();
     if (!ready || asking) return;
@@ -625,15 +602,7 @@ export function SolBox({
               auto text"); Tab or → at the end takes it, and on a touch screen the pill under the box. The corner bulb
               keeps its room on the words only, so send and the microphone reach the box's right edge. */}
           <div className={clsx("relative", corner && "pr-12")}>
-            {ahead && (
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words pr-2 pt-1 text-[15.5px] leading-relaxed"
-              >
-                <span className="invisible">{text}</span>
-                <span className="text-muted/70">{ahead}</span>
-              </div>
-            )}
+            {guess.ghost("pr-2 pt-1 text-[15.5px] leading-relaxed")}
             <textarea
               ref={field}
               onPaste={attach.onPaste}
@@ -642,23 +611,13 @@ export function SolBox({
               onChange={(e) => {
                 setHeard("");
                 setText(e.target.value);
-                setDismissed("");
+                guess.changed();
                 names.typed(e.target.value, e.target.selectionStart);
               }}
               onKeyDown={(e) => {
-                if (e.key === "Escape" && ahead) {
-                  e.stopPropagation();
-                  setDismissed(text);
-                  return;
-                }
+                if (guess.key(e)) return;
                 if (e.key === "Escape" && names.escape()) {
                   e.stopPropagation();
-                  return;
-                }
-                const atEnd = e.currentTarget.selectionStart === text.length && e.currentTarget.selectionEnd === text.length;
-                if (ahead && atEnd && (e.key === "Tab" || e.key === "ArrowRight") && !e.shiftKey) {
-                  e.preventDefault();
-                  takeAhead();
                   return;
                 }
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -673,17 +632,7 @@ export function SolBox({
               className="relative block min-h-[6.5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
             />
           </div>
-          {ahead && (
-            <button
-              type="button"
-              onPointerDown={(e) => e.preventDefault()}
-              onClick={takeAhead}
-              className="mt-1 hidden max-w-full items-center gap-1.5 truncate rounded-full bg-canvas px-3 py-1 text-[13px] text-ink-2 ring-1 ring-line [@media(pointer:coarse)]:inline-flex"
-            >
-              <CornerDownRight className="size-3.5 shrink-0 text-sun-line" aria-hidden />
-              <span className="truncate">…{ahead}</span>
-            </button>
-          )}
+          {guess.pill("mt-1")}
           {shortcuts && (
             <SolShortcutList
               open={topic}

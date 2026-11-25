@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Sol",
+    words: "Sol's side panel and the box on a deal suggest the rest of a question too, and the team's common questions join your own.",
+  },
+  {
+    day: "2026-11-26",
     area: "Today",
     words: "Sol's box learns from what you ask him: your own questions come up first as you type.",
   },

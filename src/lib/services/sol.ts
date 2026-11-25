@@ -123,20 +123,22 @@ export const DRAFT_KEY = "renuabl.design.sol-draft";
 // ---------------------------------------------------------------------------
 
 let learned: string[] | null = null;
+let team: string[] = [];
 let asking: Promise<void> | null = null;
 const learners = new Set<() => void>();
 const tellLearners = () => learners.forEach((f) => f());
 
-/** Their own questions, newest asked first. Read from the server once a visit. */
-export function useLearnedPhrases(): readonly string[] {
+/** Their own questions, newest asked first, and the team's. Read from the server once a visit. */
+export function useLearnedPhrases(): { own: readonly string[]; team: readonly string[] } {
   const [, bump] = useState(0);
   useEffect(() => {
     const f = () => bump((n) => n + 1);
     learners.add(f);
     if (!learned && !asking)
-      asking = ask<{ phrases: string[] }>("/api/design/sol", { method: "POST", body: { do: "phrases" } })
+      asking = ask<{ phrases: string[]; team?: string[] }>("/api/design/sol", { method: "POST", body: { do: "phrases" } })
         .then((r) => {
           learned = [...(learned ?? []), ...(r.ok ? r.phrases : [])];
+          team = r.ok ? (r.team ?? []) : [];
           tellLearners();
         })
         .catch(() => undefined);
@@ -144,7 +146,7 @@ export function useLearnedPhrases(): readonly string[] {
       learners.delete(f);
     };
   }, []);
-  return learned ?? [];
+  return { own: learned ?? [], team };
 }
 
 /** A question just asked, put first among the suggestions. */
