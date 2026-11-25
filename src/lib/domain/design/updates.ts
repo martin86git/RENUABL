@@ -20,6 +20,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-25",
+    area: "Proposals",
+    words: "A design not saved yet no longer reads as no design: the proposal offers to save it and carry on.",
+  },
+  {
+    day: "2026-11-25",
     area: "Designer",
     words: "On a phone, Sol's chat box opens above the tools at the foot of the map, not behind them.",
   },
