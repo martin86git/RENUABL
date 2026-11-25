@@ -369,6 +369,9 @@ export function SolChat({
       setDealAt(null);
       return;
     }
+    // On a phone the keyboard goes down once the question is sent, so Sol's answer has the whole panel to land in
+    // (25 Nov 2026, Martin: the reply arrived squeezed above the keyboard). A tap on the box brings it back.
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse) and (max-width: 1023px)").matches) box.current?.blur();
     // Asked from the clean face: the last conversation is filed away first, so this starts a new chat.
     if (resting && !followUp && !(await run(newSolChat()))) return;
     let encoded: SolFile[];
