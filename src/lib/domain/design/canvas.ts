@@ -5,6 +5,7 @@
  * and the panel that shows it is drawn under the answer: the journey, today, sales, upcoming or completed installs.
  * Without Claude, the words of the question pick the panel. Pure, tested.
  */
+import { todayInMarket } from "../market";
 import { stageLabel, type Job, type StageNames } from "./crm";
 import { journey, journeyStopOf, JOURNEY_WORDS, type JourneyStop } from "./journey";
 
@@ -29,7 +30,11 @@ export const CANVAS_STARTERS: readonly { label: string; question: string }[] = [
 
 export const CANVAS_GREETING = "What would you like to see?";
 
-type CanvasJob = Pick<Job, "stage" | "details" | "value" | "installDate" | "kw" | "title" | "wonAt"> & { customerName: string };
+type CanvasJob = Pick<Job, "stage" | "details" | "value" | "installDate" | "kw" | "title" | "wonAt"> & {
+  customerName: string;
+  /** When the deal was made: a new lead is counted by this, never by the stage it stands at now. */
+  createdAt?: string;
+};
 
 const ALL_PATHS = Object.fromEntries(Object.keys(JOURNEY_WORDS).map((k) => [k, ""])) as Record<JourneyStop, string>;
 
@@ -51,6 +56,32 @@ export function canvasFacts(jobs: readonly CanvasJob[], serviceOpen: number, tod
     `Sold this month (${month}): ${sum(sold(`${month}-01`))}`,
     `Sold this financial year (from ${fyStart}): ${sum(sold(fyStart))}`,
   );
+  // New leads (26 Nov 2026, Martin: asked "how many leads today?", Sol counted deals at the Lead stage, then contradicted
+  // himself): a lead is a deal made on the day, whatever stage it has moved to since.
+  const madeOn = (j: CanvasJob) => (j.createdAt ? todayInMarket(new Date(j.createdAt)) : null);
+  const back = (days: number) => {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - days);
+    return d.toISOString().slice(0, 10);
+  };
+  const monday = back((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7);
+  const madeFrom = (from: string) => jobs.filter((j) => (madeOn(j) ?? "") >= from);
+  const named = (list: readonly CanvasJob[]) =>
+    list.length
+      ? ` (${list
+          .slice(0, 12)
+          .map((j) => j.customerName.split(/\s+/)[0] || "a customer")
+          .join(", ")})`
+      : "";
+  if (jobs.some((j) => j.createdAt))
+    lines.push(
+      "",
+      "New leads: deals made in the period, whatever stage they are at now (count leads by this, never by the Lead stage):",
+      `- Today: ${madeFrom(today).length}${named(madeFrom(today))}`,
+      `- Yesterday: ${jobs.filter((j) => madeOn(j) === back(1)).length}`,
+      `- This week (from Monday ${monday}): ${madeFrom(monday).length}`,
+      `- This month: ${madeFrom(`${month}-01`).length}`,
+    );
   const live = jobs.filter((j) => j.stage !== "lost").slice(0, 60);
   if (live.length) lines.push("", "Jobs:");
   for (const j of live) {
@@ -62,6 +93,7 @@ export function canvasFacts(jobs: readonly CanvasJob[], serviceOpen: number, tod
       `stage ${stageLabel(j.stage, names)}`,
       j.value ? `value $${Math.round(j.value).toLocaleString("en-AU")}` : null,
       j.kw ? `${j.kw} kW` : null,
+      madeOn(j) ? `made ${madeOn(j)}` : null,
       j.wonAt ? `sold ${j.wonAt.slice(0, 10)}` : null,
       j.installDate ? `install ${j.installDate}` : null,
     ].filter(Boolean);

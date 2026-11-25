@@ -1,5 +1,7 @@
 "use client";
 
+import { SolShortcutList, SolShortcutRounds } from "./sol-shortcuts";
+import type { SolTopic } from "@/lib/domain/design/sol-suggest";
 import { useStageNames } from "./stage-select";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -534,7 +536,10 @@ export function SolBox({
   tall = false,
   corner = null,
   extras = null,
+  shortcuts = false,
 }: {
+  /** Sol's four topics as rounds after the + , each opening its questions in the box (26 Nov 2026, Martin). */
+  shortcuts?: boolean;
   /** Kept in the box's top right corner: the lightbulb of a minimised notice (23 Nov 2026, Martin). */
   corner?: ReactNode;
   /** Shown in the box's foot after the +. */
@@ -552,6 +557,7 @@ export function SolBox({
 }) {
   const [text, setText] = useState("");
   const [heard, setHeard] = useState("");
+  const [topic, setTopic] = useState<SolTopic | null>(null);
   const field = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
   const names = useNameHintBox(text, setText, field);
   // Speak and attach, as in his panel (5 Nov 2026, Martin): the microphone and the paperclip.
@@ -615,9 +621,20 @@ export function SolBox({
             placeholder={placeholder}
             className="block min-h-[5rem] w-full resize-none bg-transparent pr-2 pt-1 text-[15.5px] leading-relaxed text-ink outline-none placeholder:text-muted"
           />
+          {shortcuts && (
+            <SolShortcutList
+              open={topic}
+              onClose={() => setTopic(null)}
+              onAsk={(q) => {
+                setTopic(null);
+                if (!asking) onAsk(q, []);
+              }}
+            />
+          )}
           {/* As Claude Code's box (21 Nov 2026, Martin): a + at the left, send then the microphone at the far right. */}
           <div className="mt-2 flex items-center gap-1">
             <AttachButton attach={attach} plus />
+            {shortcuts && <SolShortcutRounds open={topic} onOpen={setTopic} />}
             {extras && <span className="ml-1 min-w-0">{extras}</span>}
             <button
               type="submit"
