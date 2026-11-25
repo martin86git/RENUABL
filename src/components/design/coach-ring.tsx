@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PhoneCall, X } from "lucide-react";
+import { AudioLines, PhoneCall, X } from "lucide-react";
 import { reachContacts, type ReachContact } from "@/lib/domain/design/contact-reach";
 import { nameHints, type NameSpan } from "@/lib/domain/design/name-hint";
 import type { CallerKey } from "@/lib/domain/install-call";
@@ -35,17 +35,39 @@ export function NameHints({
   span,
   onPick,
   onDismiss,
+  agents = [],
+  onAgent,
 }: {
   book: Book | null;
   span: NameSpan | null;
   onPick: (name: string, customerId: string) => void;
   onDismiss: () => void;
+  /** The business's own voice agents (26 Nov 2026, Martin): offered first, picked as who is meant, never a customer. */
+  agents?: readonly { id: string; name: string; job: string }[];
+  onAgent?: (name: string) => void;
 }) {
-  if (!book || !span) return null;
-  const found = nameHints(book.customers, span.typed);
-  if (!found.length) return null;
+  if (!span) return null;
+  const mates = onAgent ? nameHints(agents, span.typed) : [];
+  const found = book ? nameHints(book.customers, span.typed) : [];
+  if (!found.length && !mates.length) return null;
   return (
-    <div className="mb-2 flex items-center gap-1.5 overflow-x-auto" role="listbox" aria-label="Customers">
+    <div className="mb-2 flex items-center gap-1.5 overflow-x-auto" role="listbox" aria-label="Customers and agents">
+      {mates.map((a) => (
+        <button
+          key={`agent-${a.id}`}
+          type="button"
+          role="option"
+          aria-selected={false}
+          title={a.job}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onAgent?.(a.name)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-ink ring-1 ring-primary hover:ring-sun-line"
+        >
+          <AudioLines className="size-3.5 text-sun-line" aria-hidden />
+          {a.name}
+          <span className="text-[10px] font-normal opacity-70">{a.job}</span>
+        </button>
+      ))}
       {found.map((c) => (
         <button
           key={c.id}

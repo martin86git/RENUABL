@@ -15,6 +15,17 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Deals",
+    words: "Tap the stage on a deal's cover to move it. Delete is now in the ⋯ menu, not a button of its own.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words:
+      "Sol's box is a line taller, send and the microphone sit apart on the right, and it suggests the rest of a question as you type.",
+  },
+  {
+    day: "2026-11-26",
     area: "Today",
     words: "Summarise, Write, Find and Technical are shortcuts inside Sol's box on Today.",
   },
@@ -52,6 +63,11 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-25",
     area: "Deals",
     words: "A deal's email has Polish to tidy your words, and Sol, write it: say what to send and Sol drafts it.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "Sol knows your voice agents by name and can read their calls. Typing an agent's name offers it as a chip.",
   },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
