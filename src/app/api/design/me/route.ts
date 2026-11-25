@@ -8,6 +8,7 @@ import { answer, designAccess } from "@/lib/server/design-context";
 import { staffBehind } from "@/lib/server/design-staff-view";
 import { marketingOn } from "@/lib/server/marketing-access";
 import { isNotBilled } from "@/lib/server/design-not-billed";
+import { existingSignInPage, rememberSignInPage } from "@/lib/server/design-sign-in-page";
 
 /**
  * GET: who the roof designer is being used by. Signed out, the designer keeps
@@ -39,6 +40,12 @@ export async function GET() {
     const planDue = !exempt && plan !== undefined && needsPlan(cleanKind(member.businessKind), member.role, plan?.status ?? null);
     // Marketing (domain/marketing/access.ts): a retailer's add-on (add-ons.ts), RENUABL's own business always.
     const marketing = member ? await marketingOn(member.businessId).catch(() => false) : false;
+    // The business's own sign-in page, remembered on this device so signing in again starts there (not while
+    // viewing as someone, a demo or a staff sample).
+    if (member && !member.viewedBy && !demo && !staff) {
+      const page = await existingSignInPage(member.businessId).catch(() => null);
+      if (page) await rememberSignInPage(page);
+    }
     return Response.json({
       signedIn: true,
       state: access.state,

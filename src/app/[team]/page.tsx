@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { SignInForm } from "@/components/design/sign-in-form";
+import { RememberTeamPage } from "@/components/design/remember-team-page";
 import { SIGN_IN_PAGE_WORDS, readSignInSegment } from "@/lib/domain/design/sign-in-page";
 import { currentSession } from "@/lib/server/accounts";
 import { dbConfigured } from "@/lib/server/db";
@@ -27,6 +28,7 @@ export default async function TeamSignInPage({ params }: PageProps<"/[team]">) {
 
   return (
     <div className="theme-studio flex min-h-dvh flex-col bg-canvas">
+      <RememberTeamPage segment={`${read.slug}-${read.key}`} />
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 py-12">
         <div className="rounded-2xl bg-surface p-6 shadow-[var(--shadow-soft)] ring-1 ring-line sm:p-8">
           {page.logo && (

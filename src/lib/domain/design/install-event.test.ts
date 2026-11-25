@@ -27,6 +27,7 @@ const input: InstallEventInput = {
   site: [{ label: "NMI", value: "63052732619" }],
   reference: "PO-ABC123",
   slip: "https://example.com/pickup/abc",
+  sitePage: "https://example.com/site/def",
 };
 
 describe("an installation as a calendar event", () => {
@@ -74,6 +75,10 @@ describe("an installation as a calendar event", () => {
     expect(url.searchParams.get("details")).toContain("https://example.com/pickup/abc");
     expect(url.searchParams.get("details")).not.toContain("/design/deals/");
     expect(e.description).toContain("Pickup slip, to show at the counter: https://example.com/pickup/abc");
+    // The layout and photos a calendar can't carry, by their private link.
+    expect(e.description).toContain("Panel layout and site photos: https://example.com/site/def");
+    expect(decodeURIComponent(e.googleUrl)).toContain("https://example.com/site/def");
+    expect(e.ics).toContain("example.com/site/def");
   });
 
   it("makes an .ics file in the market's time zone, with text escaped and lines folded", () => {
