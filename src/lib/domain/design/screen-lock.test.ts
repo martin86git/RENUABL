@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanLockPin, isLocked, lockDeviceOf, passkeyName, relyingParty } from "./screen-lock";
+import { cleanLockPin, isLocked, lockDeviceOf, touchScreen, passkeyName, relyingParty } from "./screen-lock";
 
 describe("screen lock", () => {
   it("tells a phone from a computer", () => {
@@ -7,6 +7,18 @@ describe("screen lock", () => {
     expect(lockDeviceOf("Mozilla/5.0 (Linux; Android 15) Chrome/130 Mobile Safari/537.36")).toBe("phone");
     expect(lockDeviceOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130")).toBe("computer");
     expect(lockDeviceOf(null)).toBe("computer");
+  });
+
+  it("counts a phone that says Macintosh as a phone by its hints", () => {
+    const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15";
+    expect(lockDeviceOf(mac)).toBe("computer");
+    expect(lockDeviceOf(mac, { cookie: "phone" })).toBe("phone");
+    expect(lockDeviceOf(mac, { cookie: "computer" })).toBe("computer");
+    expect(lockDeviceOf("Mozilla/5.0 (Windows NT 10.0) Chrome/130", { mobile: "?1" })).toBe("phone");
+    expect(lockDeviceOf("Mozilla/5.0 (Windows NT 10.0) Chrome/130", { mobile: "?0" })).toBe("computer");
+    expect(touchScreen(5, true, false)).toBe(true);
+    expect(touchScreen(0, false, true)).toBe(false);
+    expect(touchScreen(10, true, true)).toBe(false);
   });
 
   it("locks a computer after 30 minutes and a phone after 4 hours", () => {
