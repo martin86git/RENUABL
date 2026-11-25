@@ -213,6 +213,7 @@ export function TodayChat(props: {
       <div data-tour="today-sol" className="relative z-10 mt-6 w-full">
         <SolBox
           tall
+          shortcuts
           corner={
             first && !mine ? (
               <NoticeBulb
