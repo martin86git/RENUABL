@@ -98,6 +98,8 @@ export const previewProposal = (jobId: string, choice: Partial<ProposalChoice>) 
     customAllowed?: boolean;
     /** For a member who sees costs: the margin as a share of the price ex GST, and the business's margin floor. */
     pricing?: { marginShare: number; floor: number } | null;
+    /** What the configurator couldn't offer the customer, and why. */
+    configuratorSkipped?: string[];
   }>(`${jobProposal(jobId)}/preview`, { method: "POST", body: choice });
 
 export const publishProposal = (jobId: string, choice: Partial<ProposalChoice> & { projectVersion: number }) =>

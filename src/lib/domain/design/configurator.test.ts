@@ -354,3 +354,22 @@ describe("what sets a mix apart on its card", () => {
     );
   });
 });
+
+// 25 Nov 2026: a Sigenergy SigenStor controller is a hybrid; a plain string inverter is never offered in its place.
+describe("inverters beside a SigenStor controller", () => {
+  it("offers only hybrids", () => {
+    const design = {
+      ...sampleSet().designs[0],
+      inverters: [{ sku: "SIG10", name: "Sigenergy 10.0kW SigenStor Single Phase Controller", kw: 10 }],
+    };
+    const got = inverterChoices({
+      design,
+      inverters: [
+        { sku: "SIG10", name: "Sigenergy 10.0kW SigenStor Single Phase Controller", kw: 10 },
+        { sku: "SG8", name: "Sungrow 8kW Single Phase 3 MPPT String Inverter", kw: 8 },
+        { sku: "GW8", name: "Goodwe 8kW Single Phase Hybrid Inverter", kw: 8 },
+      ] as never,
+    });
+    expect(got.map((i) => i.sku)).not.toContain("SG8");
+  });
+});
