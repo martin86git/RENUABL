@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
+    area: "Proposals",
+    words: "On a phone, tap one of your own blocks in the proposal builder to type its heading and words.",
+  },
+  {
+    day: "2026-11-25",
     area: "Deals",
     words: "A deal opens on its timeline: every email, note, call, design saved and proposal, newest first.",
   },
@@ -32,6 +37,11 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-25",
     area: "Designer",
     words: "On a phone, Sol's chat box opens above the tools at the foot of the map, not behind them.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Deals",
+    words: "A deal's email has Polish to tidy your words, and Sol, write it: say what to send and Sol drafts it.",
   },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },

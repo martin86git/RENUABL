@@ -27,6 +27,7 @@ import {
   type ProposalView,
 } from "@/lib/domain/design/proposal";
 import { firstTemplate } from "@/lib/domain/design/send-message";
+import { NoteHelp } from "./note-help";
 import { dollars, shortDate } from "@/lib/services/crm";
 import {
   BRAND_TERMS_URL,
@@ -498,15 +499,27 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 </select>
               </label>
 
-              <label className={ui.label}>
-                A note to the customer (optional)
-                <textarea
-                  className={clsx(ui.input, "mt-1.5 min-h-24 py-2")}
-                  maxLength={1200}
-                  value={choice.note ?? ""}
-                  onChange={(e) => change({ note: e.target.value })}
-                />
-              </label>
+              <div>
+                <label className={ui.label}>
+                  A note to the customer (optional)
+                  <textarea
+                    className={clsx(ui.input, "mt-1.5 min-h-24 py-2")}
+                    maxLength={1200}
+                    value={choice.note ?? ""}
+                    onChange={(e) => change({ note: e.target.value })}
+                  />
+                </label>
+                {view && (
+                  <NoteHelp
+                    note={choice.note ?? ""}
+                    onNote={(note) => change({ note })}
+                    first={view.customer.name.trim().split(/\s+/)[0] ?? ""}
+                    business={view.business.name}
+                    validDays={choice.validDays ?? 14}
+                    start={firstTemplate(versions.length > 0, Boolean(choice.indicative))}
+                  />
+                )}
+              </div>
 
               <button
                 type="button"
