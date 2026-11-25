@@ -121,5 +121,67 @@ export function learnedPhrases(asked: readonly { text: string; at: string }[]): 
     .map((x) => x.phrase);
 }
 
-/** Their own questions first, then the usual ones. */
-export const phrasesWith = (learned: readonly string[]): string[] => [...learned, ...SOL_PHRASES];
+/** Their own questions first, then the team's, then the usual ones. */
+export const phrasesWith = (learned: readonly string[], team: readonly string[] = []): string[] => [...learned, ...team, ...SOL_PHRASES];
+
+/** The most of the team's questions shared. */
+export const TEAM_MAX = 40;
+
+/** Words that may start with a capital mid-question without naming anyone: the product, makers, months and days. */
+const SAFE_CAPITALS = new Set(
+  (
+    "I Sol RENUABL STC STCs BSTC BSTCs VIC NSW QLD SA WA TAS ACT NT AS NZS CEC CER EV EVs PV kW kWh MPPT RCBO MSB NMI CoES " +
+    "AEMO DNSP Solar Victoria Google Meet Gmail Outlook Xero Pylon HubSpot Nearmap Today Feed Proposal Proposals Deals " +
+    "Monday Tuesday Wednesday Thursday Friday Saturday Sunday January February March April May June July August September " +
+    "October November December Jinko Trina LONGi Longi Tindo REC SunPower Canadian Risen Aiko Sungrow Fronius SolarEdge " +
+    "Enphase Huawei GoodWe Growatt SMA Sigenergy Tesla Powerwall BYD Alpha ESS AlphaESS Redback Zappi Wallbox Ocpp OCPP"
+  ).split(" "),
+);
+
+/**
+ * A question safe to offer the rest of the team: no customer's name in it, no email, phone number, address number or
+ * link, and no word with a capital mid-question that isn't a known maker, month, day or solar term (a name of a
+ * person or street we don't know of). Better to drop a good question than show someone's customer to a colleague.
+ */
+export function shareable(text: string, customerWords: ReadonlySet<string>): boolean {
+  if (/@|https?:|www\.|\d{4,}|\d+\s+[a-z]+\s+(st|street|rd|road|ave|avenue|ct|court|dr|drive|cres|pl|place|way|lane|ln)\b/i.test(text))
+    return false;
+  const words = text.match(/[A-Za-z][A-Za-z'’-]*/g) ?? [];
+  for (const [i, w] of words.entries()) {
+    const bare = w.replace(/['’]s$/i, "");
+    if (customerWords.has(bare.toLowerCase())) return false;
+    if (i > 0 && /^[A-Z]/.test(bare) && !SAFE_CAPITALS.has(bare)) return false;
+  }
+  return true;
+}
+
+/** Each customer's first and last names as lower-case words of three letters or more, for `shareable`. */
+export function customerWordsOf(names: readonly string[]): Set<string> {
+  const out = new Set<string>();
+  for (const n of names) for (const w of n.toLowerCase().match(/[a-z][a-z'’-]{2,}/g) ?? []) out.add(w.replace(/['’]s$/, ""));
+  return out;
+}
+
+/**
+ * The team's questions (26 Nov 2026, Martin: next to "building dynamically upon what users are asking", across the
+ * business): what the others in the business asked Sol, only those `shareable`, the questions most people asked first,
+ * then the most asked, then the latest. The asker is never shown.
+ */
+export function teamPhrases(asked: readonly { who: string; text: string; at: string }[], customerWords: ReadonlySet<string>): string[] {
+  const tally = new Map<string, { phrase: string; who: Set<string>; count: number; last: string }>();
+  for (const { who, text, at } of asked) {
+    const t = text.replace(/\s+/g, " ").trim();
+    if (t.length < 8 || t.length > 140 || !shareable(t, customerWords)) continue;
+    if (/^(replying to|on .{1,60}'s deal|let's work on this one|think deeper|@sol)/i.test(t)) continue;
+    const k = plain(t).replace(/[.?!]+$/, "");
+    const seen = tally.get(k) ?? { phrase: t, who: new Set<string>(), count: 0, last: "" };
+    seen.who.add(who);
+    seen.count += 1;
+    if (at > seen.last) seen.last = at;
+    tally.set(k, seen);
+  }
+  return [...tally.values()]
+    .sort((a, b) => b.who.size - a.who.size || b.count - a.count || (a.last < b.last ? 1 : a.last > b.last ? -1 : 0))
+    .slice(0, TEAM_MAX)
+    .map((x) => x.phrase);
+}
