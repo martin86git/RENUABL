@@ -1357,7 +1357,8 @@ export function ProposalPage({
     if (!words && !picture)
       return build && isCustom(block.id) ? (
         <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-[14px] text-muted">
-          Write something here, or drop a picture on it.
+          <span className="[@media(hover:none)]:hidden">Write something here, or drop a picture on it.</span>
+          <span className="hidden [@media(hover:none)]:inline">Tap here to write something, or add a picture.</span>
         </p>
       ) : null;
     if (words && picture && block.layout && block.layout !== "stack")
