@@ -52,7 +52,7 @@ export const DEAL_TOUR: readonly { what: string; now: string; at: string }[] = [
   },
   {
     what: "Deals",
-    now: "takes you back to your pipeline. This sample is yours to try things on. Delete it when you're done, and add your first real deal with New deal.",
+    now: "takes you back to your pipeline. This sample is yours to try things on. Delete it from the ⋯ menu when you're done, and add your first real deal with New deal.",
     at: '[data-tour="deal-back"]',
   },
 ];

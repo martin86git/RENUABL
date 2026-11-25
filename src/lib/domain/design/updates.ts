@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Deals",
+    words: "Tap the stage on a deal's cover to move it. Delete is now in the ⋯ menu, not a button of its own.",
+  },
+  {
+    day: "2026-11-26",
     area: "Today",
     words: "Summarise, Write, Find and Technical are shortcuts inside Sol's box on Today.",
   },
