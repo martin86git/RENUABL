@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { Check, ChevronDown, MoreHorizontal, Trash2 } from "lucide-react";
 import type { Job, JobStage } from "@/lib/domain/design/crm";
-import { keyOfDeal, moveTo, stageChoices } from "@/lib/domain/design/pipeline-stages";
+import { keyOfDeal, moveTo, groupedStageChoices } from "@/lib/domain/design/pipeline-stages";
 import { useStageBook, useDealStageLabel } from "./stage-select";
 
 /** A card under a button, kept on screen, closed by a press outside or Escape. */
@@ -113,31 +113,41 @@ export function StageChip({
       {open && (
         <Pop anchor={anchor} onClose={() => setOpen(false)} align="left" label="Move the deal to">
           <p className="px-2.5 pb-1 pt-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">Move the deal to</p>
-          {stageChoices(own, names).map((c) => {
-            const on = c.key === now;
-            return (
-              <button
-                key={c.key}
-                type="button"
-                role="menuitemradio"
-                aria-checked={on}
-                onClick={() => {
-                  setOpen(false);
-                  if (on) return;
-                  const to = moveTo(c.key, own);
-                  if (to) onChange(to);
-                }}
-                className={clsx(
-                  "flex w-full items-center gap-2 rounded-xl py-2 pr-2.5 text-left text-sm",
-                  c.added ? "pl-7 text-ink-2" : "pl-2.5",
-                  on ? "bg-sun font-medium text-sun-ink" : "hover:bg-canvas",
-                )}
-              >
-                <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                {on && <Check className="size-4 shrink-0 text-sun-line" aria-hidden />}
-              </button>
-            );
-          })}
+          {groupedStageChoices(own, names).map((g) => (
+            <div
+              key={g.name}
+              role="group"
+              aria-label={g.name}
+              className="mt-1 border-t border-line pt-1 first-of-type:mt-0 first-of-type:border-t-0"
+            >
+              <p className="px-2.5 pb-0.5 pt-1.5 text-[11px] font-semibold text-ink-2">{g.name}</p>
+              {g.choices.map((c) => {
+                const on = c.key === now;
+                return (
+                  <button
+                    key={c.key}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={on}
+                    onClick={() => {
+                      setOpen(false);
+                      if (on) return;
+                      const to = moveTo(c.key, own);
+                      if (to) onChange(to);
+                    }}
+                    className={clsx(
+                      "flex w-full items-center gap-2 rounded-xl py-2 pr-2.5 text-left text-sm",
+                      c.added ? "pl-7 text-ink-2" : "pl-2.5",
+                      on ? "bg-sun font-medium text-sun-ink" : "hover:bg-canvas",
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                    {on && <Check className="size-4 shrink-0 text-sun-line" aria-hidden />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </Pop>
       )}
     </>
