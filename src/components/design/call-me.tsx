@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bot, Phone, X } from "lucide-react";
+import type { AskDay } from "@/lib/domain/voice-agent";
 import { askForCall, askedCall, callMeNow, cancelCall } from "@/lib/services/proposals";
 
 /**
@@ -13,6 +14,9 @@ import { askForCall, askedCall, callMeNow, cancelCall } from "@/lib/services/pro
  * clicked on allow it to call now - the customer should know they'll be speaking with an ai assistant"): pressing
  * "We'll call you Friday at 9am." opens who will ring, Call me now and Cancel the call. The page asks the server
  * whether a call is waiting as it opens, so the line is still there after a reload.
+ *
+ * Pressing Call me asks when first (25 Nov 2026, Martin: "In the proposal I requested a call. It didn't ask me when."):
+ * Now, while calling hours are open, or a day and a time from those the server offers (`askTimes`).
  */
 export function CallMe({ token, assistant }: { token: string; assistant: string }) {
   const [busy, setBusy] = useState<"ask" | "now" | "cancel" | null>(null);
@@ -21,25 +25,43 @@ export function CallMe({ token, assistant }: { token: string; assistant: string 
   const [open, setOpen] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The times on offer, read as the page opens; and whether the picker is showing. */
+  const [times, setTimes] = useState<AskDay[]>([]);
+  const [nowOpen, setNowOpen] = useState(true);
+  const [picking, setPicking] = useState(false);
+  const [day, setDay] = useState(0);
+  const [at, setAt] = useState<string | null>(null);
 
   useEffect(() => {
     let gone = false;
     void askedCall(token).then((r) => {
-      if (!gone && r.ok && r.when) setWhen(r.when);
+      if (gone || !r.ok) return;
+      if (r.when) setWhen(r.when);
+      setTimes(r.times ?? []);
+      setNowOpen(r.nowOpen ?? true);
     });
     return () => {
       gone = true;
     };
   }, [token]);
 
-  async function call() {
+  async function call(picked?: string) {
     setBusy("ask");
     setError(null);
     setSaid(null);
-    const res = await askForCall(token);
+    const res = await askForCall(token, picked);
     setBusy(null);
     if (!res.ok) return setError(res.message);
+    setPicking(false);
     setWhen(res.when);
+  }
+
+  function startPicking() {
+    setError(null);
+    setSaid(null);
+    setDay(0);
+    setAt(null);
+    setPicking(true);
   }
 
   async function now() {
@@ -137,17 +159,97 @@ export function CallMe({ token, assistant }: { token: string; assistant: string 
         </div>
       )}
 
-      {!when && (said || error) && (
+      {!when && picking && (
+        <div
+          role="dialog"
+          aria-label="When should we call?"
+          className="w-[18rem] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-line bg-surface p-3.5 text-[13px] text-ink shadow-[0_14px_40px_rgba(11,11,12,0.22)]"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-medium">When should {assistant} call?</p>
+            <button
+              type="button"
+              onClick={() => setPicking(false)}
+              aria-label="Close"
+              className="-mr-1 -mt-1 grid size-7 shrink-0 place-items-center rounded-full text-muted hover:bg-canvas hover:text-ink"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+          <p className="mt-1 flex items-start gap-1.5 leading-snug text-muted">
+            <Bot className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>{who} It rings the mobile we have for you.</span>
+          </p>
+          {nowOpen && (
+            <button
+              type="button"
+              onClick={() => call()}
+              disabled={busy !== null}
+              className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-[13px] font-semibold text-primary-ink disabled:bg-surface-2 disabled:text-muted"
+            >
+              <Phone className="size-4" aria-hidden />
+              {busy === "ask" && !at ? "One moment" : "Call me now"}
+            </button>
+          )}
+          {times.length > 0 && (
+            <>
+              <p className="mt-3 text-[11.5px] font-medium uppercase tracking-wide text-muted">
+                {nowOpen ? "Or pick a time" : "Pick a time"}
+              </p>
+              <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-1">
+                {times.map((d, i) => (
+                  <button
+                    key={d.date}
+                    type="button"
+                    onClick={() => {
+                      setDay(i);
+                      setAt(null);
+                    }}
+                    aria-pressed={day === i}
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-[12px] ${day === i ? "border-primary bg-primary text-primary-ink" : "border-line text-ink hover:border-line-strong"}`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 grid max-h-36 grid-cols-3 gap-1.5 overflow-y-auto">
+                {(times[day]?.times ?? []).map((t) => (
+                  <button
+                    key={t.at}
+                    type="button"
+                    onClick={() => setAt(t.at)}
+                    aria-pressed={at === t.at}
+                    className={`rounded-lg border px-1 py-1.5 text-[12px] tabular-nums ${at === t.at ? "border-primary bg-primary text-primary-ink" : "border-line text-ink hover:border-line-strong"}`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => at && call(at)}
+                disabled={!at || busy !== null}
+                className="mt-3 h-10 w-full rounded-xl border border-line px-3 text-[13px] font-medium text-ink hover:border-line-strong disabled:text-muted"
+              >
+                {busy === "ask" && at ? "Booking…" : "Book this time"}
+              </button>
+            </>
+          )}
+          {error && <p className="mt-2 text-danger">{error}</p>}
+        </div>
+      )}
+
+      {!when && !picking && (said || error) && (
         <p className="max-w-[15rem] rounded-xl border border-line bg-surface px-3 py-2 text-[13px] text-ink shadow-[0_10px_30px_rgba(11,11,12,0.18)]">
           {said}
           {error && <span className="block text-danger">{error}</span>}
         </p>
       )}
 
-      {!when && (
+      {!when && !picking && (
         <button
           type="button"
-          onClick={call}
+          onClick={startPicking}
           disabled={busy !== null}
           title={`Questions? ${assistant}, our AI assistant, can call you on the mobile we have for you to go through it.`}
           aria-label={`Call me: ${assistant}, our AI assistant, rings the mobile we have for you`}

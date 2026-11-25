@@ -30,6 +30,8 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       projectVersion: saved.project.version,
       // Whether a custom design may be published now (the builder says so before anyone publishes).
       customAllowed: await customProposalsAllowed(who.member.businessId),
+      // What the configurator left out and why (25 Nov 2026): the business's to fix on its price lists or quote.
+      configuratorSkipped: built.ok ? (built.internal.configuratorSkipped ?? []) : [],
       // Whether Sol answers this business's customers: the indicative message says so when he does.
       assistant: saved.brand.solAnswers,
       // Sol's price check beside the preview (18 Nov 2026, Martin): the margin and the business's floor, only for a

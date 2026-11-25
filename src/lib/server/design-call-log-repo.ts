@@ -84,8 +84,15 @@ export async function liveCallsNow(businessId: string, viewer: DealViewer): Prom
   return liveNowOrder(calls);
 }
 
-export async function callLog(businessId: string, viewer: DealViewer): Promise<CallLog> {
+/**
+ * The call log. With `role` (25 Nov 2026, Martin: "I navigated to the voice agent and couldn't see an active call or any
+ * history evidence that a call had been made. I think we need a call logs menu in the voice chat"), only that voice
+ * agent's calls: no team calls, and calls it couldn't place (stopped with no attempt ended) listed as not connecting,
+ * with why.
+ */
+export async function callLog(businessId: string, viewer: DealViewer, role?: CallerKey): Promise<CallLog> {
   const p = [businessId, CALL_LOG_DAYS, CALL_LOG_MAX, ...seenParams(viewer)];
+  const mine = role ? ` and c.mode ${callsOf(role, "c.")}` : "";
   const sol = await query<{
     id: string;
     job_id: string;
@@ -103,21 +110,36 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
        join voice_calls c on c.id = e.voice_call_id
        join design_jobs j on j.business_id = c.business_id and j.id = c.job_id
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
-      where c.business_id = $1 and e.kind = 'ended' and e.at > now() - make_interval(days => $2) and ${seen(viewer, 4)}
+      where c.business_id = $1 and e.kind = 'ended' and e.at > now() - make_interval(days => $2) and ${seen(viewer, 4)}${mine}
       order by e.at desc limit $3`,
     p,
   );
   // The team's own: a call logged by a member (the assistant's lines are written by its name, never an email).
-  const team = await query<{ id: string; job_id: string; customer: string; deal: string; at: Date; by: string; text: string }>(
-    `select a.id, j.id as job_id, cu.name as customer, j.title as deal, a.at, a.by_email as by, a.text
+  // Calls that never got through to a ring (Vapi refused, no number, no credit): no ended event, only a stop reason.
+  const stopped = await query<{ id: string; job_id: string; customer: string; deal: string; at: Date; by: string | null; why: string }>(
+    `select c.id, j.id as job_id, cu.name as customer, j.title as deal, c.updated_at as at, c.lead->>'assistant' as by,
+            c.stop_reason as why
+       from voice_calls c
+       join design_jobs j on j.business_id = c.business_id and j.id = c.job_id
+       join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
+      where c.business_id = $1 and c.status = 'stopped' and c.stop_reason is not null
+        and c.updated_at > now() - make_interval(days => $2) and ${seen(viewer, 4)}${mine}
+        and not exists (select 1 from voice_call_events e where e.voice_call_id = c.id and e.kind = 'ended')
+      order by c.updated_at desc limit $3`,
+    p,
+  );
+  const team = role
+    ? []
+    : await query<{ id: string; job_id: string; customer: string; deal: string; at: Date; by: string; text: string }>(
+        `select a.id, j.id as job_id, cu.name as customer, j.title as deal, a.at, a.by_email as by, a.text
        from design_activity a
        join design_jobs j on j.business_id = a.business_id and j.id = a.job_id
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
       where a.business_id = $1 and a.kind = 'call' and a.by_email like '%@%'
         and a.at > now() - make_interval(days => $2) and ${seen(viewer, 4)}
       order by a.at desc limit $3`,
-    p,
-  );
+        p,
+      );
   const coming = await query<{
     id: string;
     job_id: string;
@@ -136,7 +158,7 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
        from voice_calls c
        join design_jobs j on j.business_id = c.business_id and j.id = c.job_id
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
-      where c.business_id = $1 and c.status in ('waiting', 'calling') and $2::int > 0 and ${seen(viewer, 4)}
+      where c.business_id = $1 and c.status in ('waiting', 'calling') and $2::int > 0 and ${seen(viewer, 4)}${mine}
       order by c.updated_at desc limit $3`,
     p,
   );
@@ -152,6 +174,18 @@ export async function callLog(businessId: string, viewer: DealViewer): Promise<C
       outcome: (r.outcome as CallOutcome | null) ?? "talked",
       words: r.summary ?? "",
       transcript: r.transcript,
+    })),
+    ...stopped.map((r) => ({
+      id: r.id,
+      jobId: r.job_id,
+      customer: r.customer,
+      deal: r.deal,
+      at: new Date(r.at).toISOString(),
+      who: "sol" as const,
+      by: r.by || "Sol",
+      outcome: "failed" as CallOutcome,
+      words: `Not placed: ${r.why}`,
+      transcript: null,
     })),
     ...team.map((r) => ({
       id: r.id,

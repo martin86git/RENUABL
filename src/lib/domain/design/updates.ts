@@ -26,6 +26,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
     area: "Proposals",
+    words: "The proposal screen says what the configurator can't offer the customer yet, and why.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Proposals",
     words: "A design not saved yet no longer reads as no design: the proposal offers to save it and carry on.",
   },
   {
