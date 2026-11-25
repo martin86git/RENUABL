@@ -159,7 +159,7 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
-import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
+import { pivotDrag, TOUCH_PIVOT, type PivotState } from "@/lib/domain/design/array-pivot";
 import { arrayFrame, growArray, growCount, growHandles, type ArrayFrame, type GrowSide } from "@/lib/domain/design/array-grow";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
@@ -2041,7 +2041,7 @@ export function RoofDesigner(props: {
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
-    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
+    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null; touch?: boolean; replaces?: string }
     | {
         mode: "grow";
         side: GrowSide;
@@ -3447,6 +3447,29 @@ export function RoofDesigner(props: {
     }
     // Adding panels, a press on a panel that is there is the arrow's: it picks the panel and drags it, as Select would.
     const onOne = tool === "panel" ? hitAt(p) : null;
+    // With a finger, a panel standing on its own is the start of a row (25 Nov 2026, Martin, from his iPhone: it "isn't
+    // allowing to pivot as you add panels like in desktop"): with no hover there is no outline to press, so a panel is
+    // tapped down first and the row dragged out of it after; that drag pivots and adds as one from the open does. It is
+    // taken up and laid again with the row, so off any string it was on it must not be.
+    const loneByFinger =
+      e.pointerType === "touch" && onOne && !onOne.empty && onOne.pick.kind === "loose" && !arrayOf(onOne.pick)
+        ? loose.find((x) => onOne.pick.kind === "loose" && x.id === onOne.pick.id && !strings.some((st) => st.panels.includes(`l:${x.id}`)))
+        : undefined;
+    if (tool === "panel" && loneByFinger) {
+      svg.current?.setPointerCapture(e.pointerId);
+      setLoose(loose.filter((x) => x.id !== loneByFinger.id));
+      setPicks([]);
+      press.current = {
+        mode: "array",
+        anchor: { ...loneByFinger, id: "ghost" },
+        free: true,
+        pivot: null,
+        touch: true,
+        replaces: loneByFinger.id,
+      };
+      setLaying(true);
+      return setGhosts([{ ...loneByFinger, id: "ghost" }]);
+    }
     if (tool === "panel" && !(onOne && !onOne.empty && onOne.pick.kind !== "label")) {
       // The press starts where the outline was: beside the panel under the pointer, or under the pointer itself. Letting go
       // places it; dragging first pulls it out into a row, and up or down into more rows (see `arrayFrom`).
@@ -3456,7 +3479,7 @@ export function RoofDesigner(props: {
       // Put down in the open (not beside a panel), pulled sideways it adds panels and pulled any other way it pivots
       // (`pivotDrag`); on a traced face it starts out facing the way the face runs. Beside a panel it only adds.
       const free = shown.x === p.x && shown.y === p.y;
-      press.current = { mode: "array", anchor: shown, free, pivot: null };
+      press.current = { mode: "array", anchor: shown, free, pivot: null, touch: e.pointerType === "touch" };
       setLaying(true);
       return setGhosts([shown]);
     }
@@ -3619,7 +3642,14 @@ export function RoofDesigner(props: {
       let anchor = held.anchor;
       if (held.free) {
         // Pulled sideways, the way the panel faces, it adds panels as it lies; pulled any other way it pivots to the pointer.
-        const turned = pivotDrag(anchor, p, planSize(anchor, size).w + size.gap, held.pivot ?? null, e.altKey ? [] : squareAngles);
+        const turned = pivotDrag(
+          anchor,
+          p,
+          planSize(anchor, size).w + size.gap,
+          held.pivot ?? null,
+          e.altKey ? [] : squareAngles,
+          held.touch ? TOUCH_PIVOT : undefined,
+        );
         held.pivot = turned.state;
         anchor = { ...anchor, angle: turned.angle };
       }
