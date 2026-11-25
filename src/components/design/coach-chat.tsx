@@ -17,6 +17,7 @@ import {
   Lock,
   LockOpen,
   MessageCircle,
+  History,
   Minus,
   Pencil,
   Phone,
@@ -73,6 +74,7 @@ import {
 import { CallerAvatar, VoicePicker } from "./settings-caller";
 import { VoiceSample } from "./voice-choice";
 import { ContactReach } from "./coach-contacts";
+import { CallLogPage } from "./call-log";
 import { CoachDeals } from "./coach-deals";
 import { CoachWelcome } from "./coach-welcome";
 import { DictateButton, withSpoken } from "./dictate";
@@ -293,6 +295,8 @@ function CoachWindowFor() {
   const [settings, setSettings] = useState(() => readSettingsOpen() && !readDealsOpen());
   // Its deals beside the chat (14 Nov 2026, Martin: split screen, the deals wider, pick one and talk about it).
   const [deals, setDeals] = useState(readDealsOpen);
+  /** The agent's call log in the chat's place (25 Nov 2026, Martin: "we need a call logs menu in the voice chat"). */
+  const [callLog, setCallLog] = useState(false);
   const [picked, setPicked] = useState<AssistantDeal | null>(null);
   // The window's and its panes' sizes, dragged (14 Nov 2026, Martin), kept on the device.
   const [sizes, setSizes] = useState<CoachSizes>(readSizes);
@@ -599,6 +603,19 @@ function CoachWindowFor() {
                   {mayCoach && <RingMe caller={caller} />}
                   <button
                     type="button"
+                    onClick={() => setCallLog((v) => !v)}
+                    aria-pressed={callLog}
+                    aria-label={callLog ? `Close ${name}'s calls` : `${name}'s calls`}
+                    title={callLog ? "Back to the chat" : `${name}'s calls`}
+                    className={clsx(
+                      "grid size-8 shrink-0 place-items-center rounded-full",
+                      callLog ? "bg-white text-ink" : "hover:bg-white/10",
+                    )}
+                  >
+                    <History className="size-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => toggleDeals(!deals)}
                     aria-pressed={deals}
                     aria-label={deals ? `Close ${name}'s deals` : `${name}'s deals`}
@@ -685,218 +702,235 @@ function CoachWindowFor() {
               />
             )}
             <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", (settings || deals) && "hidden sm:flex")}>
-              <ContactReach open={reaching} onOpen={setReaching} />
-              {!reaching && !settings && <TrainingStrip t={training} name={name} onReview={() => toggleSettings(true)} />}
-              {landing && !reaching && (
-                <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
-                  <CoachWelcome
-                    caller={caller}
-                    current={currentChatLine(turns)}
-                    past={past}
-                    onOpenChat={(id) => void chats(openCoachChat(id), true)}
-                    onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
-                    onPick={(d) => {
-                      setPicked(d);
-                      toggleDeals(true);
-                    }}
-                    onDeals={() => toggleDeals(true)}
-                    onTalk={() => {
-                      setLanding(false);
-                      setStartNew(false);
-                    }}
-                  />
-                </div>
-              )}
-              {!landing && !reaching && !state.call && (
-                <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLanding(true);
-                      setStartNew(true);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
-                  >
-                    <ChevronLeft className="size-3.5" aria-hidden />
-                    {name}&apos;s day and chats
-                  </button>
-                  {mayCoach && turns.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void chats(newCoachChat(), true)}
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
-                    >
-                      <Plus className="size-3.5" aria-hidden />
-                      New chat
+              {callLog ? (
+                <div className="min-h-0 flex-1 overflow-y-auto bg-canvas">
+                  <div className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2.5">
+                    <p className="text-[13px] font-semibold text-ink">{name}&apos;s calls</p>
+                    <button type="button" onClick={() => setCallLog(false)} className="tap-area text-[13px] text-ink-2 hover:text-ink">
+                      Back to the chat
                     </button>
+                  </div>
+                  <CallLogPage role={caller.role ?? "sales"} name={name} />
+                </div>
+              ) : (
+                <>
+                  <ContactReach open={reaching} onOpen={setReaching} />
+                  {!reaching && !settings && <TrainingStrip t={training} name={name} onReview={() => toggleSettings(true)} />}
+                  {landing && !reaching && (
+                    <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
+                      <CoachWelcome
+                        caller={caller}
+                        current={currentChatLine(turns)}
+                        past={past}
+                        onOpenChat={(id) => void chats(openCoachChat(id), true)}
+                        onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
+                        onPick={(d) => {
+                          setPicked(d);
+                          toggleDeals(true);
+                        }}
+                        onDeals={() => toggleDeals(true)}
+                        onTalk={() => {
+                          setLanding(false);
+                          setStartNew(false);
+                        }}
+                      />
+                    </div>
                   )}
-                </div>
-              )}
-              <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}>
-                {loaded && turns.length === 0 && (
-                  <div className="flex items-start gap-2">
-                    <CallerAvatar caller={caller} size={28} />
-                    <p className="rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{COACH_COPY.hello(name)}</p>
-                  </div>
-                )}
-                {turns.map((t, i) =>
-                  t.role === "you" ? (
-                    <div key={i} className="flex flex-col items-end">
-                      {t.about && (
-                        <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
-                          {/deal$/.test(t.about) ? (
-                            <SquareKanban className="size-3" aria-hidden />
-                          ) : (
-                            <PhoneCall className="size-3" aria-hidden />
-                          )}
-                          {t.about}
-                        </span>
+                  {!landing && !reaching && !state.call && (
+                    <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLanding(true);
+                          setStartNew(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                      >
+                        <ChevronLeft className="size-3.5" aria-hidden />
+                        {name}&apos;s day and chats
+                      </button>
+                      {mayCoach && turns.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => void chats(newCoachChat(), true)}
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                        >
+                          <Plus className="size-3.5" aria-hidden />
+                          New chat
+                        </button>
                       )}
-                      <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary px-3 py-2 text-sm leading-snug text-white">
-                        {t.text}
-                      </p>
                     </div>
-                  ) : (
-                    <div key={i} className="flex items-start gap-2">
-                      <CallerAvatar caller={caller} size={28} />
-                      <div className="min-w-0 max-w-[88%] flex-1">
-                        <Beanstalk
-                          packets={packetsOf(t.text)}
-                          shown={reveal?.turn === i ? reveal.shown : Infinity}
-                          label={`${name} says`}
-                        />
-                        {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
-                        {/* A call asked for in the chat, ready to send (22 Nov 2026): only under the latest answer. */}
-                        {t.ring && i === turns.length - 1 && (reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && (
-                          <RingCard
-                            key={t.at}
-                            ring={t.ring}
-                            book={book}
-                            picked={tapped}
-                            agent={(caller.role ?? "sales") as CallerKey}
-                            agentName={name}
-                          />
-                        )}
+                  )}
+                  <div
+                    ref={list}
+                    className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}
+                  >
+                    {loaded && turns.length === 0 && (
+                      <div className="flex items-start gap-2">
+                        <CallerAvatar caller={caller} size={28} />
+                        <p className="rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{COACH_COPY.hello(name)}</p>
                       </div>
-                    </div>
-                  ),
-                )}
-                {sending && (
-                  <div className="flex items-center gap-2 text-xs text-muted">
-                    <CallerAvatar caller={caller} size={28} />
-                    <span className="animate-pulse">{name} is thinking about it…</span>
+                    )}
+                    {turns.map((t, i) =>
+                      t.role === "you" ? (
+                        <div key={i} className="flex flex-col items-end">
+                          {t.about && (
+                            <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
+                              {/deal$/.test(t.about) ? (
+                                <SquareKanban className="size-3" aria-hidden />
+                              ) : (
+                                <PhoneCall className="size-3" aria-hidden />
+                              )}
+                              {t.about}
+                            </span>
+                          )}
+                          <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary px-3 py-2 text-sm leading-snug text-white">
+                            {t.text}
+                          </p>
+                        </div>
+                      ) : (
+                        <div key={i} className="flex items-start gap-2">
+                          <CallerAvatar caller={caller} size={28} />
+                          <div className="min-w-0 max-w-[88%] flex-1">
+                            <Beanstalk
+                              packets={packetsOf(t.text)}
+                              shown={reveal?.turn === i ? reveal.shown : Infinity}
+                              label={`${name} says`}
+                            />
+                            {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
+                            {/* A call asked for in the chat, ready to send (22 Nov 2026): only under the latest answer. */}
+                            {t.ring && i === turns.length - 1 && (reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && (
+                              <RingCard
+                                key={t.at}
+                                ring={t.ring}
+                                book={book}
+                                picked={tapped}
+                                agent={(caller.role ?? "sales") as CallerKey}
+                                agentName={name}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ),
+                    )}
+                    {sending && (
+                      <div className="flex items-center gap-2 text-xs text-muted">
+                        <CallerAvatar caller={caller} size={28} />
+                        <span className="animate-pulse">{name} is thinking about it…</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
-                {state.call && (
-                  <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                    <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
-                    About {state.call.about.replace(/^A /, "a ")}
-                    <button
-                      type="button"
-                      onClick={clearCoachCall}
-                      className="ml-auto text-muted hover:text-ink"
-                      aria-label="Not about this call"
-                    >
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  </p>
-                )}
-                {about && (
-                  <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                    <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
-                    About {aboutFirst}&apos;s deal
-                    <button
-                      type="button"
-                      onClick={() => setPicked(null)}
-                      className="ml-auto text-muted hover:text-ink"
-                      aria-label="Not about this deal"
-                    >
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  </p>
-                )}
-                {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
-                {mayCoach && (
-                  <NameHints
-                    book={book}
-                    span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
-                    onPick={(full, id) => {
-                      if (!nameSpan) return;
-                      const next = withName(text, nameSpan, full);
-                      tapped.set(full, id);
-                      setText(next.text);
-                      setNameSpan(null);
-                      requestAnimationFrame(() => {
-                        box.current?.focus();
-                        box.current?.setSelectionRange(next.caret, next.caret);
-                      });
-                    }}
-                    onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
-                  />
-                )}
-                {mayCoach ? (
-                  <div className="flex items-end gap-2">
-                    {/* The microphone sits inside the box, as in Sol's. */}
-                    <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
-                      <DictateButton
-                        label={`Speak to ${name}`}
-                        onHearing={setHeard}
-                        onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
-                      />
-                      <textarea
-                        ref={box}
-                        value={heard ? withSpoken(text, heard) : text}
-                        onChange={(e) => {
-                          setHeard("");
-                          setText(e.target.value);
-                          const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
-                          setNameSpan(span);
-                          if (!span) setNameDismissed(null);
+                  <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
+                    {state.call && (
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                        <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
+                        About {state.call.about.replace(/^A /, "a ")}
+                        <button
+                          type="button"
+                          onClick={clearCoachCall}
+                          className="ml-auto text-muted hover:text-ink"
+                          aria-label="Not about this call"
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      </p>
+                    )}
+                    {about && (
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                        <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
+                        About {aboutFirst}&apos;s deal
+                        <button
+                          type="button"
+                          onClick={() => setPicked(null)}
+                          className="ml-auto text-muted hover:text-ink"
+                          aria-label="Not about this deal"
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      </p>
+                    )}
+                    {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
+                    {mayCoach && (
+                      <NameHints
+                        book={book}
+                        span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
+                        onPick={(full, id) => {
+                          if (!nameSpan) return;
+                          const next = withName(text, nameSpan, full);
+                          tapped.set(full, id);
+                          setText(next.text);
+                          setNameSpan(null);
+                          requestAnimationFrame(() => {
+                            box.current?.focus();
+                            box.current?.setSelectionRange(next.caret, next.caret);
+                          });
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
-                            e.stopPropagation();
-                            setNameDismissed(nameSpan.start);
-                            return;
-                          }
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            void send();
-                          }
-                        }}
-                        rows={2}
-                        maxLength={2000}
-                        placeholder={
-                          state.call
-                            ? COACH_COPY.callAbout(name)
-                            : about
-                              ? `Ask ${name} about ${aboutFirst}…`
-                              : landing && turns.length > 0
-                                ? `Start a new chat with ${name}…`
-                                : `Ask ${name} anything, or to ring someone…`
-                        }
-                        className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+                        onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
                       />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void send()}
-                      disabled={!text.trim() || sending}
-                      aria-label="Send"
-                      className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
-                    >
-                      <ArrowUp className="size-4" aria-hidden />
-                    </button>
+                    )}
+                    {mayCoach ? (
+                      <div className="flex items-end gap-2">
+                        {/* The microphone sits inside the box, as in Sol's. */}
+                        <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
+                          <DictateButton
+                            label={`Speak to ${name}`}
+                            onHearing={setHeard}
+                            onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
+                          />
+                          <textarea
+                            ref={box}
+                            value={heard ? withSpoken(text, heard) : text}
+                            onChange={(e) => {
+                              setHeard("");
+                              setText(e.target.value);
+                              const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                              setNameSpan(span);
+                              if (!span) setNameDismissed(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
+                                e.stopPropagation();
+                                setNameDismissed(nameSpan.start);
+                                return;
+                              }
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                void send();
+                              }
+                            }}
+                            rows={2}
+                            maxLength={2000}
+                            placeholder={
+                              state.call
+                                ? COACH_COPY.callAbout(name)
+                                : about
+                                  ? `Ask ${name} about ${aboutFirst}…`
+                                  : landing && turns.length > 0
+                                    ? `Start a new chat with ${name}…`
+                                    : `Ask ${name} anything, or to ring someone…`
+                            }
+                            className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void send()}
+                          disabled={!text.trim() || sending}
+                          aria-label="Send"
+                          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                        >
+                          <ArrowUp className="size-4" aria-hidden />
+                        </button>
+                      </div>
+                    ) : (
+                      loaded && (
+                        <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
+                      )
+                    )}
                   </div>
-                ) : (
-                  loaded && (
-                    <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
-                  )
-                )}
-              </div>
+                </>
+              )}
             </div>
           </div>
         </section>
