@@ -2,10 +2,10 @@
 
 import { SolShortcutList, SolShortcutRounds } from "./sol-shortcuts";
 import type { SolTopic } from "@/lib/domain/design/sol-suggest";
-import { completionFor } from "@/lib/domain/design/sol-complete";
+import { completionFor, phrasesWith } from "@/lib/domain/design/sol-complete";
 import { useStageNames } from "./stage-select";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
@@ -73,7 +73,7 @@ import { TODAY_CALENDAR, TodayChat, useInsights } from "./today-chat";
 import { TodayCalendar } from "./today-calendar";
 import { InstallListPage } from "./install-lists";
 import { useDockSet } from "@/lib/services/dock-set";
-import { TODAY_FIRST } from "@/lib/services/sol";
+import { TODAY_FIRST, learnAsked, useLearnedPhrases } from "@/lib/services/sol";
 import { useNameHintBox } from "./name-hint-box";
 import type { TodayView } from "@/lib/domain/design/today-view";
 import { InductionReminder } from "./sol-induction";
@@ -579,7 +579,10 @@ export function SolBox({
   const attach = useSolAttach();
   const ready = text.trim().length >= 2 || attach.files.length > 0;
   const [dismissed, setDismissed] = useState("");
-  const ahead = tall && !heard && !names.showing && dismissed !== text ? completionFor(text) : "";
+  // Their own questions first, learnt as they ask (26 Nov 2026, Martin), then the usual ones.
+  const learned = useLearnedPhrases();
+  const phrases = useMemo(() => phrasesWith(learned), [learned]);
+  const ahead = tall && !heard && !names.showing && dismissed !== text ? completionFor(text, phrases) : "";
   const takeAhead = () => {
     if (!ahead) return;
     const next = (text + ahead).slice(0, 4000);
@@ -595,6 +598,7 @@ export function SolBox({
     setHeard("");
     names.clear();
     attach.clear();
+    learnAsked(said);
     onAsk(said, files);
   };
   return (
