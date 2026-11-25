@@ -21,6 +21,7 @@ export default function robots(): MetadataRoute.Robots {
         "/brief",
         "/p/",
         "/pickup/",
+        "/site/",
         "/u/",
         "/c/",
         "/job/",
