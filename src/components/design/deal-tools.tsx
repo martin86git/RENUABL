@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mail, Send } from "lucide-react";
+import { Mail, Send, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import type { Activity, Customer, Job } from "@/lib/domain/design/crm";
 import { DEAL_EMAIL_TEMPLATES, MAX_BODY, MAX_CC, MAX_SUBJECT, fillTemplate, senderName } from "@/lib/domain/design/deal-email";
@@ -10,6 +10,10 @@ import { dealEmailStatus, emailDeal } from "@/lib/services/crm";
 import { ui } from "./design-shell";
 import { DRAFT_KEY } from "@/lib/services/sol";
 import { EmailFileChips, EmailFormatBar, listKey, useEmailFiles } from "./email-compose";
+import { COMPOSE_LIMITS, type ComposeHelp } from "@/lib/domain/design/inbox";
+import { solOnNewEmail } from "@/lib/services/inbox";
+import { DictateButton, withSpoken } from "./dictate";
+import { SolIcon } from "./sol-icon";
 
 /**
  * Emailing the customer from their deal: to their address, a ready-written start to change (`DEAL_EMAIL_TEMPLATES`),
@@ -27,6 +31,32 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
   const [sending, setSending] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const files = useEmailFiles();
+  // Sol (25 Nov 2026, Martin): Polish tidies the words; Sol writes the email from what is asked. Undo puts back what was there.
+  const [solBusy, setSolBusy] = useState<ComposeHelp | null>(null);
+  const [before, setBefore] = useState<{ subject: string; body: string } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [ask, setAsk] = useState("");
+  const [askHeard, setAskHeard] = useState("");
+  const sol = async (mode: ComposeHelp) => {
+    if (solBusy) return;
+    setSolBusy(mode);
+    setNote(null);
+    const who = [customer.firstName, customer.lastName].filter(Boolean).join(" ");
+    const instructions =
+      mode === "write"
+        ? `${ask.trim()}${who ? `\n(The email is to the customer, ${who}; greet them by their first name.)` : ""}`
+        : undefined;
+    const res = await solOnNewEmail({ mode, to, subject, body, instructions: instructions?.slice(0, COMPOSE_LIMITS.instructions) });
+    setSolBusy(null);
+    if (!res.ok) return setNote({ ok: false, text: res.message });
+    setBefore({ subject, body });
+    if (res.subject && (mode === "write" || !subject.trim())) setSubject(res.subject.slice(0, MAX_SUBJECT));
+    setBody(res.body.slice(0, MAX_BODY));
+    if (mode === "write") {
+      setAsking(false);
+      setAsk("");
+    }
+  };
   useEffect(() => {
     void dealEmailStatus(job.id).then((res) => res.ok && setStatus({ canSend: res.canSend, replyTo: res.replyTo }));
   }, [job.id]);
@@ -126,6 +156,61 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
         maxLength={MAX_SUBJECT}
         placeholder="Subject"
       />
+      {asking && (
+        <div className="mt-2 rounded-lg bg-sun/60 p-2.5 ring-1 ring-sun-line/25">
+          <div className="flex items-start gap-2">
+            <SolIcon className="mt-2 size-4 shrink-0 text-sun-ink" aria-hidden />
+            <textarea
+              autoFocus
+              value={askHeard ? withSpoken(ask, askHeard) : ask}
+              onChange={(e) => setAsk(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+                  e.preventDefault();
+                  if (ask.trim()) void sol("write");
+                }
+              }}
+              maxLength={COMPOSE_LIMITS.instructions - 200}
+              rows={2}
+              placeholder={`Tell Sol what to say, e.g. thank ${customer.firstName || "them"} for the call and say the proposal comes Friday`}
+              aria-label="What Sol should write"
+              className="min-h-10 flex-1 resize-none bg-transparent py-1.5 text-sm text-ink outline-none placeholder:text-sun-ink/70"
+            />
+            <DictateButton
+              label="Tell Sol out loud"
+              onHearing={setAskHeard}
+              onWords={(w) => setAsk((t) => withSpoken(t, w).slice(0, COMPOSE_LIMITS.instructions - 200))}
+            />
+          </div>
+          <div className="mt-1.5 flex items-center justify-between gap-2 pl-6">
+            <p className="text-[11px] text-sun-ink">Sol writes it below for you to check. Nothing is sent until you press Send.</p>
+            <button
+              type="button"
+              onClick={() => void sol("write")}
+              disabled={!ask.trim() || Boolean(solBusy)}
+              className={clsx(ui.primary, "h-8 shrink-0 px-3 text-[13px]")}
+            >
+              {solBusy === "write" ? "Writing…" : "Write it"}
+            </button>
+          </div>
+        </div>
+      )}
+      {before && !solBusy && (
+        <p className="mt-2 flex items-center gap-2 text-xs text-muted" role="status">
+          Sol wrote this. Check it before you send.
+          <button
+            type="button"
+            className={ui.link}
+            onClick={() => {
+              setSubject(before.subject);
+              setBody(before.body);
+              setBefore(null);
+            }}
+          >
+            Undo
+          </button>
+        </p>
+      )}
       {/* The words with their tools along the box's foot (8 Nov 2026, Martin: under the words, as in Gmail). */}
       <div className="mt-2 rounded-md border border-line bg-surface focus-within:border-forest">
         <textarea
@@ -133,7 +218,10 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
           aria-label="Email"
           className="block min-h-40 w-full resize-y rounded-t-md bg-transparent px-3 py-2 text-sm leading-relaxed text-ink outline-none placeholder:text-muted"
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => {
+            setBody(e.target.value);
+            if (before) setBefore(null);
+          }}
           onKeyDown={(e) => listKey(e, setBody)}
           onPaste={files.onPaste}
           onDragOver={files.onDragOver}
@@ -141,7 +229,33 @@ export function DealEmail(props: { job: Job; customer: Customer; business: strin
           maxLength={MAX_BODY}
           placeholder={`Write to ${customer.firstName || "the customer"}…`}
         />
-        <EmailFormatBar className="border-t border-line px-1.5 py-1" area={area} text={body} setText={setBody} files={files} />
+        <div className="flex flex-wrap items-center gap-1 border-t border-line px-1.5 py-1">
+          <EmailFormatBar area={area} text={body} setText={setBody} files={files} />
+          <span className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => void sol("polish")}
+              disabled={Boolean(solBusy) || !body.trim()}
+              title="Sol tidies up your words: spelling, grammar, clearer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium text-ink-2 ring-1 ring-line hover:text-ink disabled:text-muted"
+            >
+              <Sparkles className="size-3.5" aria-hidden /> {solBusy === "polish" ? "Polishing…" : "Polish"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAsking((v) => !v)}
+              aria-expanded={asking}
+              title="Tell Sol what the email should say, and he writes it"
+              aria-label="Ask Sol to write it"
+              className={clsx(
+                "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium ring-1",
+                asking ? "bg-primary text-primary-ink ring-primary" : "text-ink-2 ring-line hover:text-ink",
+              )}
+            >
+              <SolIcon className="size-3.5" aria-hidden /> {solBusy === "write" ? "Writing…" : "Sol, write it"}
+            </button>
+          </span>
+        </div>
       </div>
       <EmailFileChips files={files} />
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
