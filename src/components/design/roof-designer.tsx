@@ -168,6 +168,7 @@ import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { lightOf, readiness, readinessLight, shadeLight, type CheckLight, type ReadinessItem } from "@/lib/domain/design/readiness";
+import { designGreeting, type ProposalGlance } from "@/lib/domain/design/design-greeting";
 import {
   faces as facesWay,
   parseCommand,
@@ -1197,6 +1198,8 @@ export function RoofDesigner(props: {
   onOpenDeal?: () => void;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
+  /** Where the deal's proposal stands, for the greeting on the dock: undefined while it loads, null with none or no deal. */
+  proposalGlance?: ProposalGlance | null;
   /**
    * The person may not see costs (the owner's setting, enforced on the server, which sends them no costs at all):
    * no quote and no price are shown, and no price is handed on when saving.
@@ -4235,6 +4238,40 @@ export function RoofDesigner(props: {
    */
   const [opened] = useState(() => openedAs({ panels: summary.panels, battery: Boolean(battery), ready: light.ready }));
   const [solAsked, setSolAsked] = useState(false);
+  /**
+   * The greeting on the dock (25 Nov 2026, Martin: opening a finished design he needed a few seconds to take in that it
+   * was finished): "Design complete · Proposal signed", or what is missing, until the first press or key anywhere. Only
+   * for a roof that opened with panels on it (one Design it for me fills by itself keeps Sol's opening instead).
+   */
+  const [greetOn, setGreetOn] = useState(() => summary.panels > 0);
+  useEffect(() => {
+    if (!greetOn) return;
+    const off = () => setGreetOn(false);
+    window.addEventListener("pointerdown", off, true);
+    window.addEventListener("keydown", off, true);
+    return () => {
+      window.removeEventListener("pointerdown", off, true);
+      window.removeEventListener("keydown", off, true);
+    };
+  }, [greetOn]);
+  const greeting = greetOn
+    ? designGreeting({
+        panels: summary.panels,
+        items: ready,
+        ready: light.ready,
+        proposal: props.proposalGlance,
+        onDeal: props.proposalGlance !== null || Boolean(props.proposalHref),
+      })
+    : null;
+  const greetingNote = greeting && (
+    <div role="status" className="pointer-events-none flex max-w-full flex-col items-center gap-0.5 text-center">
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold text-white">
+        <span aria-hidden className={clsx("size-2 rounded-full", greeting.tone === "done" ? "bg-[#4ade80]" : "bg-sun-line")} />
+        {greeting.title}
+      </span>
+      <span className="text-[12px] leading-snug text-white/75">{greeting.line}</span>
+    </div>
+  );
   const [resumeSaid, setResumeSaid] = useState(false);
   const solQuiet = opened === "done" && light.ready && !solAsked;
   const resumeLine =
@@ -11592,6 +11629,15 @@ export function RoofDesigner(props: {
                   style={{ height: sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY }}
                 />
               )}
+              {/* The greeting above the tray on a computer: the tray itself is full of the foot row. */}
+              {deskFoot && !sideDeckUp && greetingNote && (
+                <div
+                  className="pointer-events-none absolute left-1/2 z-[31] -translate-x-1/2 rounded-full bg-[#26282c]/92 px-4 py-2 shadow-lift backdrop-blur"
+                  style={{ bottom: DESK_TRAY + 40 }}
+                >
+                  {greetingNote}
+                </div>
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideShown && (
                 <div
@@ -11954,6 +12000,9 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
+                  {greetingNote && (
+                    <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                  )}
                   {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
                       mark in the dock's bottom left, the way back that sat beside the address under the map. */}
                   {props.onOpenDeal && (
