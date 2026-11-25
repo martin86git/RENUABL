@@ -72,7 +72,7 @@ const when = (iso: string) =>
   });
 const mapLink = (address: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
-function Drawing({ title, drawing, picture }: { title: string; drawing: JobDrawing; picture: string | null }) {
+export function Drawing({ title, drawing, picture }: { title: string; drawing: JobDrawing; picture: string | null }) {
   return (
     <figure>
       <figcaption className={head}>{title}</figcaption>
