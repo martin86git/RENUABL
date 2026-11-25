@@ -8043,6 +8043,14 @@ export function RoofDesigner(props: {
               {props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) && (
                 <div
                   ref={solPanel}
+                  // On a phone held upright his chat stands above the foot row (Select, Add a panel, Sol, the hand, Erase),
+                  // drawn full size (25 Nov 2026, Martin: it opened behind them). A style of its own keeps it out of the
+                  // phone's smaller drawing.
+                  style={
+                    underUp && stage && !sideDeckUp
+                      ? { bottom: `${Math.round(stage.pb + lift + 52)}px`, paddingBottom: "0.625rem" }
+                      : undefined
+                  }
                   className="absolute bottom-[3.5rem] left-1/2 z-50 flex w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-primary px-2.5 pb-[2.6rem] pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none"
                   data-popup
                 >
