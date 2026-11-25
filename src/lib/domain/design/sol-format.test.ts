@@ -1,7 +1,7 @@
 import { threadDepths } from "./sol-format";
 import { solRow, withSections } from "./sol-format";
 import { describe, expect, it } from "vitest";
-import { LONG_PARAGRAPH, MAX_OPTIONS, answerFor, brokenUp, isYesNoQuestion, solBlocks, solPlain } from "./sol-format";
+import { LONG_PARAGRAPH, MAX_OPTIONS, answerFor, brokenUp, isYesNoQuestion, questionReplies, solBlocks, solPlain } from "./sol-format";
 import { MORE_DETAIL } from "./sol-charts";
 
 describe("Sol's answers laid out", () => {
@@ -205,5 +205,23 @@ describe("a web address in Sol's words", () => {
       { kind: "link", text: "https://meet.google.com/rsk-tcab-iwk" },
     ]);
     expect(solRuns("Email sam@x.au or ring 0412 345 678").map((r) => r.kind)).toEqual(["text", "email", "text", "phone"]);
+  });
+});
+
+describe("questionReplies", () => {
+  it("offers the two things in an either/or offer", () => {
+    expect(questionReplies("Want me to open the approvals list or draft a follow-up to Roberto?")).toEqual([
+      "Open the approvals list",
+      "Draft a follow-up to Roberto",
+    ]);
+    expect(questionReplies("Shall I email him, or text him?")).toEqual(["Email him", "Text him"]);
+  });
+  it("offers Yes and No for a yes-or-no question", () => {
+    expect(questionReplies("Want me to do that swap now?")).toEqual(["Yes", "No"]);
+    expect(questionReplies("Want me to send it or not?")).toEqual(["Yes", "No"]);
+  });
+  it("offers nothing where neither fits", () => {
+    expect(questionReplies("Which customer is the case for?")).toEqual([]);
+    expect(questionReplies("Do you want me to send it")).toEqual([]);
   });
 });
