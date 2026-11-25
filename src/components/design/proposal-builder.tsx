@@ -105,6 +105,7 @@ export function useProposalBuilder(
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [editing, setEditing] = useState<BlockId | null>(null);
+  const touched = useRef(false);
   const [dropAt, setDropAt] = useState<{ id: BlockId; after: boolean } | null>(null);
   const [dragging, setDragging] = useState<BlockId | null>(null);
   const settle = useRef<number | null>(null);
@@ -280,6 +281,16 @@ export function useProposalBuilder(
             if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropAt((d) => (d?.id === block.id ? null : d));
           }}
           onDrop={(e) => dropOn(e, block.id)}
+          // A touch screen has no hover, so a tap on a block's own words opens them to type (25 Nov 2026, Martin:
+          // "I can't type in the mobile builder blocks").
+          onPointerUp={(e) => {
+            touched.current = e.pointerType === "touch" || e.pointerType === "pen";
+          }}
+          onClick={(e) => {
+            if (!touched.current || !custom || !setting || fixed || editing === block.id) return;
+            if ((e.target as HTMLElement).closest("button, a, input, textarea, select, label, [draggable=true]")) return;
+            setEditing(block.id);
+          }}
         >
           {line && dragging !== block.id && (
             <span
@@ -477,7 +488,7 @@ function BlockTools(props: {
         <span
           className={clsx(
             "items-center gap-0.5",
-            props.editing || props.busy ? "flex" : "hidden group-hover/block:flex group-focus-within/block:flex",
+            props.editing || props.busy ? "flex" : "hidden group-hover/block:flex group-focus-within/block:flex [@media(hover:none)]:flex",
           )}
         >
           {!pinned && (
@@ -625,8 +636,13 @@ function BlockWords({
     wait.current = window.setTimeout(() => onSet(patch), 600);
   };
   const usual = blockHeading({ id: setting.id, heading: "" });
+  const box = useRef<HTMLDivElement>(null);
+  // Opened by a tap on a phone, bring the boxes into view above the keyboard's reach.
+  useEffect(() => {
+    box.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, []);
   return (
-    <div className="theme-studio relative z-20 mt-4 rounded-xl border border-line bg-surface p-4 shadow-[var(--shadow-lift)]">
+    <div ref={box} className="theme-studio relative z-20 mt-4 rounded-xl border border-line bg-surface p-4 shadow-[var(--shadow-lift)]">
       <label className={ui.label}>
         {cover ? "Title" : "Heading"}
         <input
@@ -829,7 +845,7 @@ export function BuilderPanel({ builder, customAllowed }: { builder: Builder; cus
           Design
           <Hint>
             {custom
-              ? "Each dashed box on the page is a block. Drag one by its handle to move it, hover it for its picture, words and layout, or add a block between two."
+              ? "Each dashed box on the page is a block. Drag one by its handle to move it, hover it (on a phone, tap it) for its picture, words and layout, or add a block between two."
               : "Each dashed box on the page is a block. In Standard they keep their usual order: switch to Custom to move them, add your own and put pictures on them."}
           </Hint>
         </legend>

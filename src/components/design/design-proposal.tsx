@@ -52,6 +52,7 @@ import { ChartThumb, TemplateThumb } from "./proposal-thumbs";
 import { ProposalPage } from "./proposal-view";
 import { BuilderPanel, Hint, useProposalBuilder } from "./proposal-builder";
 import { PriceCheck } from "./design-quote";
+import { UnsavedDesign } from "./unsaved-design";
 import { priceAdvice } from "@/lib/domain/design/price-check";
 import { usePricePoints } from "@/lib/services/price-check";
 
@@ -233,6 +234,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const latest = versions[0];
+  // The deal has no saved design: its designer may still hold one as a draft (UnsavedDesign).
+  const noDesign = problems.some((p) => p.startsWith("This deal has no roof design yet"));
   const [account] = useDesignAccount();
   const mayMark = Boolean(account?.signedIn && (account.may?.publish ?? true));
   const [sending, setSending] = useState(false);
@@ -369,11 +372,12 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 ))}
               </ul>
               <Link
-                href={`${PATHS.designer}?job=${jobId}&side=quote`}
+                href={`${PATHS.designer}?job=${jobId}${noDesign ? "" : "&side=quote"}`}
                 className="mt-2 inline-block font-medium underline underline-offset-4"
               >
-                Open the quote
+                {noDesign ? "Open the designer" : "Open the quote"}
               </Link>
+              {noDesign && <UnsavedDesign jobId={jobId} onSaved={() => void refresh(choice)} />}
             </div>
           )}
 

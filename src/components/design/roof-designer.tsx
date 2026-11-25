@@ -93,7 +93,6 @@ import {
   Trash2,
   X,
   ChevronDown,
-  GripHorizontal,
   Ellipsis,
   Move,
   Settings2,
@@ -7010,7 +7009,7 @@ export function RoofDesigner(props: {
   const lift = foldable && !solFolded ? Math.min(solLiftByHand ? solLift : solNeeds, liftMost) : 0;
   const deckTop = foot === null ? null : foot - lift;
   const restFolded = 48;
-  // One handle in the box's top left: pressed, it folds or opens the box; dragged, it slides the box up or down (down
+  // A slim grab bar on the box's top edge, at its left (Sol sits in the notch in its middle): pressed, it folds or opens the box; dragged, it slides the box up or down (down
   // past its usual height folds it, up from folded opens it).
   const foldButton = foldable ? (
     <button
@@ -7051,10 +7050,9 @@ export function RoofDesigner(props: {
       aria-expanded={!solFolded}
       aria-label={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
       title={solFolded ? "Open Sol's box, or drag it up" : "Fold Sol's box away, or drag it up to read more"}
-      className="pointer-events-auto absolute left-2.5 top-1.5 z-10 flex h-8 w-12 touch-none flex-col items-center justify-center rounded-full text-white/70 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+      className="group pointer-events-auto absolute left-3 top-0 z-10 flex h-4 w-14 touch-none items-center justify-center"
     >
-      <GripHorizontal className="-mb-1 size-4" aria-hidden />
-      <ChevronDown className={clsx("size-3.5 transition-transform", solFolded && "rotate-180")} aria-hidden />
+      <span className="h-1 w-8 rounded-full bg-white/35 transition-colors group-hover:bg-white/70" aria-hidden />
     </button>
   ) : null;
   // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
