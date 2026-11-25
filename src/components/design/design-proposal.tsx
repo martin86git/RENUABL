@@ -248,6 +248,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   // Sol's price check (18 Nov 2026, Martin: "add the price check to the proposal screen too"): only for a member who
   // sees costs, from the margin the preview gives them and the business's own proposals.
   const [pricing, setPricing] = useState<{ marginShare: number; floor: number } | null>(null);
+  // What the configurator left out and why (25 Nov 2026, Martin: storage wouldn't step down, no other panels or inverters).
+  const [skipped, setSkipped] = useState<string[]>([]);
   const points = usePricePoints(Boolean(pricing));
   // The preview's conversation: empty, taking nothing, so the business sees where its message will show.
   const previewChat = useCustomerChat({ business: view?.business.name ?? "", phone: view?.business.phone });
@@ -267,6 +269,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
       setAssistant(Boolean(res.assistant));
       setCustomAllowed(res.customAllowed !== false);
       setPricing(res.pricing ?? null);
+      setSkipped(res.configuratorSkipped ?? []);
       if (res.choice) setChoice((current) => ({ ...res.choice, ...current }));
     },
     [jobId],
@@ -377,6 +380,20 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
                 {noDesign ? "Open the designer" : "Open the quote"}
               </Link>
               {noDesign && <UnsavedDesign jobId={jobId} onSaved={() => void refresh(choice)} />}
+            </div>
+          )}
+
+          {!building && skipped.length > 0 && problems.length === 0 && (
+            <div className="rounded-md border border-line bg-surface p-3 text-xs text-ink-2">
+              <p className="font-medium text-ink">The configurator can&apos;t offer these yet</p>
+              <ul className="mt-1 list-disc space-y-1 pl-4">
+                {skipped.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+              <p className="mt-1.5 text-muted">
+                Give the product a cost on your price lists (or type one in the quote), then publish again.
+              </p>
             </div>
           )}
 
