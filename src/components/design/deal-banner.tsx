@@ -134,7 +134,11 @@ export function DealBanner({
             <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-1.5 max-sm:gap-1", compact ? "mt-2" : "mt-3")}>
               <Chip>{stageWords(job)}</Chip>
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
-              {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
+              {job.installDate && (
+                <span className="max-sm:hidden">
+                  <Chip>Installing {shortDate(job.installDate)}</Chip>
+                </span>
+              )}
               {pulse && (
                 <span className="[&>*]:mt-0 max-sm:basis-full">
                   <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
@@ -147,6 +151,12 @@ export function DealBanner({
             {actions && <div className="sm:hidden">{actions}</div>}
             <Kit figures={figures} compact={compact} />
           </div>
+          {/* On a phone the install day drops under who it's for and the kit, on its own line (26 Nov 2026, Martin). */}
+          {job.installDate && (
+            <div className="col-span-2 sm:hidden">
+              <Chip>Installing {shortDate(job.installDate)}</Chip>
+            </div>
+          )}
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}

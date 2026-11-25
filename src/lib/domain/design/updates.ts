@@ -58,6 +58,11 @@ export const UPDATES: readonly Update[] = [
     area: "Sol",
     words: "Sol knows your voice agents by name and can read their calls. Typing an agent's name offers it as a chip.",
   },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "On a phone, a deal's install day sits on its own line under the kit at the top of the deal.",
+  },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
   {
