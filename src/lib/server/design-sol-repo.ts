@@ -209,6 +209,12 @@ const savePast = (q: Q, businessId: string, email: string, turns: SolTurn[], pas
     [businessId, email, JSON.stringify(turns), JSON.stringify(past)],
   );
 
+/** What the member has asked Sol, in every conversation: the words they see, for their box's suggestions. */
+export async function solAsked(businessId: string, email: string): Promise<{ text: string; at: string }[]> {
+  const { turns, past } = await transaction((q) => lockedPast(q, businessId, key(email)));
+  return [...turns, ...past.flatMap((p) => p.turns)].filter((t) => t.role === "you").map((t) => ({ text: t.shown ?? t.text, at: t.at }));
+}
+
 /** The past conversations as the history lists them: titles and dates, not the messages. */
 export async function solPast(businessId: string, email: string): Promise<SolPastLine[]> {
   return transaction(async (q) => pastLines((await lockedPast(q, businessId, key(email))).past));

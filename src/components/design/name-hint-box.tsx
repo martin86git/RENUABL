@@ -37,6 +37,8 @@ export function useNameHintBox(
   const book = useContactBook(wanted);
   const shown = span && span.start !== dismissed ? span : null;
   return {
+    /** Whether names are on offer over the box now. */
+    showing: Boolean(shown),
     typed(value: string, caret: number | null) {
       const s = nameAt(value, caret ?? value.length);
       setSpan(s);

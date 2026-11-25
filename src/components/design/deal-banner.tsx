@@ -1,12 +1,13 @@
 "use client";
 
 import { useDealStageLabel } from "./stage-select";
+import { StageChip } from "./deal-menus";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { CalendarCheck, ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
 import type { ReactNode } from "react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
-import type { Customer, Job } from "@/lib/domain/design/crm";
+import type { Customer, Job, JobStage } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 import type { BannerFigure } from "@/lib/domain/design/system-summary";
@@ -69,6 +70,7 @@ export function DealBanner({
   onPlace,
   compact = false,
   actions,
+  onStage,
 }: {
   job: Job;
   customer: Customer;
@@ -83,6 +85,8 @@ export function DealBanner({
   compact?: boolean;
   /** On a phone, the ways of reaching the customer (Call, Email), in the banner's top right corner. */
   actions?: ReactNode;
+  /** Moving the deal from the stage on the banner (26 Nov 2026, Martin): absent, the stage is a plain chip. */
+  onStage?: (change: { stage: JobStage; subStage: string | null }) => void;
 }) {
   // Stages by the business's own names (pipeline-stages.ts).
   const stageWords = useDealStageLabel();
@@ -132,7 +136,7 @@ export function DealBanner({
               {job.title ? ` · ${job.title}` : ""}
             </p>
             <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-1.5 max-sm:gap-1", compact ? "mt-2" : "mt-3")}>
-              <Chip>{stageWords(job)}</Chip>
+              {onStage ? <StageChip job={job} onChange={onStage} /> : <Chip>{stageWords(job)}</Chip>}
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && (
                 <span className="max-sm:hidden">
