@@ -6959,10 +6959,12 @@ export function RoofDesigner(props: {
     const measure = () => {
       const kids = Array.from(box.children) as HTMLElement[];
       if (!kids.length) return;
-      const top = box.getBoundingClientRect().top;
+      // The words' own height, wherever centring puts them in the box.
+      const top = Math.min(...kids.map((k) => k.getBoundingClientRect().top));
       const bottom = Math.max(...kids.map((k) => k.getBoundingClientRect().bottom));
-      const pad = parseFloat(getComputedStyle(box).paddingBottom) || 0;
-      const words = Math.ceil(bottom - top + box.scrollTop + pad);
+      const style = getComputedStyle(box);
+      const pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+      const words = Math.ceil(bottom - top + pad);
       setSolNeeds(Math.max(0, words - restRoom));
     };
     measure();
