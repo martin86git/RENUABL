@@ -3,7 +3,7 @@
 import { useDealStageLabel } from "./stage-select";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
+import { CalendarCheck, ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
 import type { ReactNode } from "react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import type { Customer, Job } from "@/lib/domain/design/crm";
@@ -136,7 +136,10 @@ export function DealBanner({
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
               {job.installDate && (
                 <span className="max-sm:hidden">
-                  <Chip>Installing {shortDate(job.installDate)}</Chip>
+                  <Chip>
+                    <CalendarCheck className="mr-1.5 size-3.5 text-sun-line max-sm:mr-1 max-sm:size-3" aria-hidden />
+                    Installing {shortDate(job.installDate)}
+                  </Chip>
                 </span>
               )}
               {pulse && (
@@ -154,7 +157,10 @@ export function DealBanner({
           {/* On a phone the install day drops under who it's for and the kit, on its own line (26 Nov 2026, Martin). */}
           {job.installDate && (
             <div className="col-span-2 sm:hidden">
-              <Chip>Installing {shortDate(job.installDate)}</Chip>
+              <Chip>
+                <CalendarCheck className="mr-1.5 size-3.5 text-sun-line max-sm:mr-1 max-sm:size-3" aria-hidden />
+                Installing {shortDate(job.installDate)}
+              </Chip>
             </div>
           )}
         </div>
