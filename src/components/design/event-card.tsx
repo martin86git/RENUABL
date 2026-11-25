@@ -2,7 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { AlignLeft, CalendarPlus, Camera, ClipboardList, Download, ExternalLink, FileText, Images, LayoutGrid, MapPin, X } from "lucide-react";
+import {
+  AlignLeft,
+  CalendarPlus,
+  Camera,
+  ClipboardList,
+  Download,
+  ExternalLink,
+  FileText,
+  Images,
+  LayoutGrid,
+  MapPin,
+  X,
+} from "lucide-react";
 import clsx from "clsx";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
 import { loadInstallEvent, type InstallEvent } from "@/lib/services/after-sale";
@@ -246,8 +258,10 @@ export function EventCard({ jobId, onClose }: { jobId: string; onClose: () => vo
                     </>
                   )}
                   {fileProblem && <p className="mt-1.5 text-[12px] text-warning">{fileProblem}</p>}
-                  <p className="mt-1.5 text-[11.5px] text-muted">Kept on the deal&apos;s Files. The calendar event carries a private link to the layout and these photos, opened
-                    with no sign-in, so share the event only with your crew.</p>
+                  <p className="mt-1.5 text-[11.5px] text-muted">
+                    Kept on the deal&apos;s Files. The calendar event carries a private link to the layout and these photos, opened with no
+                    sign-in, so share the event only with your crew.
+                  </p>
                 </div>
               </div>
               <div className={row}>
