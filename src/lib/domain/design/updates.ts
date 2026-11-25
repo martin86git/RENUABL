@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
+    area: "Proposals",
+    words: "On a phone, tap one of your own blocks in the proposal builder to type its heading and words.",
+  },
+  {
+    day: "2026-11-25",
     area: "Deals",
     words: "A deal opens on its timeline: every email, note, call, design saved and proposal, newest first.",
   },
