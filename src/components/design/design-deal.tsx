@@ -43,7 +43,7 @@ import {
 } from "@/lib/domain/design/crm";
 import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
 import { fieldLine, resolveDealFields, type DealFieldsConfig } from "@/lib/domain/design/deal-sections";
-import { INSTALLER_KEY } from "@/lib/domain/design/crm";
+import { INSTALLER_KEY, type ActivityKind } from "@/lib/domain/design/crm";
 import { loadInstallExtras } from "@/lib/services/after-sale";
 import {
   addActivity,
@@ -61,6 +61,23 @@ import {
 import { finishDealTour, loadTeam } from "@/lib/services/design-account";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD } from "./design-home";
+
+/**
+ * Each kind of entry on a deal's timeline in a colour of its own (26 Nov 2026, Martin: the timeline "needs some color…
+ * to help distinguish between events"), from the kind tokens the rest of the product uses.
+ */
+const ENTRY_TINT: Record<ActivityKind, "lead" | "message" | "follow-up" | "order" | "date" | "approvals" | "install"> = {
+  note: "follow-up",
+  call: "order",
+  email: "lead",
+  message: "message",
+  stage: "approvals",
+  proposal: "date",
+  order: "install",
+  invoice: "install",
+  reminder: "follow-up",
+  service: "date",
+};
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
@@ -1049,10 +1066,19 @@ export function DealPage({ id }: { id: string }) {
                         a.mail ? (
                           <MailEntry key={a.id} m={a.mail} />
                         ) : (
-                          <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
+                          <li
+                            key={a.id}
+                            className={clsx(ui.card, "border-l-[3px] border-l-[var(--k)] px-5 py-4")}
+                            style={{
+                              ["--k" as string]: `var(--kind-${ENTRY_TINT[a.kind]})`,
+                              ["--ks" as string]: `var(--kind-${ENTRY_TINT[a.kind]}-soft)`,
+                            }}
+                          >
                             <div className="flex items-baseline justify-between gap-3">
                               <p className="text-sm text-ink">
-                                <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
+                                <strong className="mr-1 inline-block rounded-full bg-[var(--ks)] px-2 py-0.5 text-[12px] font-semibold text-[var(--k)]">
+                                  {a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}
+                                </strong>{" "}
                                 {a.kind === "call" ? (
                                   <CallEntryBy by={a.by} />
                                 ) : (
