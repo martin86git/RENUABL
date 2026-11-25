@@ -1,3 +1,4 @@
+import { learnedPhrases } from "@/lib/domain/design/sol-complete";
 import { cleanSolInput, WHEN_LABELS, type WhenChoice, withPin } from "@/lib/domain/design/sol";
 import { parseApiKey } from "@/lib/server/bill-reader";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
@@ -16,6 +17,7 @@ import {
   markSolSeen,
   resumeSol,
   solPast,
+  solAsked,
   solPastOne,
   solState,
   startNewSol,
@@ -123,6 +125,9 @@ export async function POST(request: Request) {
       }
       // Past conversations (domain/design/sol-history.ts): the list, one to read, a new chat, one picked up again,
       // one forgotten. Only ever the member's own.
+      // The member's own questions, as their box's suggestions (sol-complete.ts).
+      case "phrases":
+        return Response.json({ ok: true, phrases: learnedPhrases(await solAsked(businessId, email)) });
       case "past":
         return Response.json({ ok: true, past: await solPast(businessId, email) });
       case "past-open": {

@@ -89,3 +89,37 @@ export function completionFor(text: string, phrases: readonly string[] = SOL_PHR
   }
   return "";
 }
+
+/** The most of a person's own questions kept as suggestions. */
+export const LEARNED_MAX = 60;
+
+/**
+ * A person's own questions to Sol, as suggestions (26 Nov 2026, Martin: "Can suggestions be building dynamically upon
+ * what users are asking"): what they asked in every conversation, kept and filed away, the most asked first, then the
+ * latest. Only plain questions of a sentence or two: never a reply quoting Sol, a deal's prefix, a row taken up, or
+ * anything long. Their own only: one person's questions never reach another's box.
+ */
+export function learnedPhrases(asked: readonly { text: string; at: string }[]): string[] {
+  const tally = new Map<string, { phrase: string; count: number; last: string }>();
+  for (const { text, at } of asked) {
+    const t = text.replace(/\s+/g, " ").trim();
+    if (t.length < 8 || t.length > 140) continue;
+    if (/^(replying to|on .{1,60}'s deal|let's work on this one|think deeper|@sol)/i.test(t)) continue;
+    const k = plain(t).replace(/[.?!]+$/, "");
+    const seen = tally.get(k);
+    if (seen) {
+      seen.count += 1;
+      if (at > seen.last) {
+        seen.last = at;
+        seen.phrase = t;
+      }
+    } else tally.set(k, { phrase: t, count: 1, last: at });
+  }
+  return [...tally.values()]
+    .sort((a, b) => b.count - a.count || (a.last < b.last ? 1 : a.last > b.last ? -1 : 0))
+    .slice(0, LEARNED_MAX)
+    .map((x) => x.phrase);
+}
+
+/** Their own questions first, then the usual ones. */
+export const phrasesWith = (learned: readonly string[]): string[] => [...learned, ...SOL_PHRASES];

@@ -7,6 +7,7 @@ import type { SolPast, SolPastLine } from "@/lib/domain/design/sol-history";
 import type { KnowledgeEntry } from "@/lib/domain/design/sol-knowledge";
 import type { PageContext } from "@/lib/domain/design/page-context";
 import type { SolRoom } from "@/lib/domain/design/sol-rooms";
+import { useEffect, useState } from "react";
 import { ask } from "./crm";
 
 export const loadSol = () => ask<{ state: SolState }>("/api/design/sol");
@@ -115,3 +116,41 @@ export const SOL_CHANGED = "renuabl:sol-changed";
 
 /** A draft Sol wrote, handed to the deal's Email tab to check and send (kept for this tab only). */
 export const DRAFT_KEY = "renuabl.design.sol-draft";
+
+// ---------------------------------------------------------------------------
+// The box's suggestions, learnt from what this person asks (26 Nov 2026, Martin): read once a visit, and each question
+// asked is put first straight away, so the box learns as they go.
+// ---------------------------------------------------------------------------
+
+let learned: string[] | null = null;
+let asking: Promise<void> | null = null;
+const learners = new Set<() => void>();
+const tellLearners = () => learners.forEach((f) => f());
+
+/** Their own questions, newest asked first. Read from the server once a visit. */
+export function useLearnedPhrases(): readonly string[] {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    const f = () => bump((n) => n + 1);
+    learners.add(f);
+    if (!learned && !asking)
+      asking = ask<{ phrases: string[] }>("/api/design/sol", { method: "POST", body: { do: "phrases" } })
+        .then((r) => {
+          learned = [...(learned ?? []), ...(r.ok ? r.phrases : [])];
+          tellLearners();
+        })
+        .catch(() => undefined);
+    return () => {
+      learners.delete(f);
+    };
+  }, []);
+  return learned ?? [];
+}
+
+/** A question just asked, put first among the suggestions. */
+export function learnAsked(text: string) {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length < 8 || t.length > 140) return;
+  learned = [t, ...(learned ?? []).filter((p) => p.toLowerCase() !== t.toLowerCase())].slice(0, 60);
+  tellLearners();
+}
