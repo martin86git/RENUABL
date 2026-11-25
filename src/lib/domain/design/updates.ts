@@ -16,6 +16,12 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Today",
+    words:
+      "Sol's box is a line taller, send and the microphone sit apart on the right, and it suggests the rest of a question as you type.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
     words: "Summarise, Write, Find and Technical are shortcuts inside Sol's box on Today.",
   },
   {
