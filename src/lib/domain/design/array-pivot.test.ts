@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pivotDrag, type PivotState } from "./array-pivot";
+import { pivotDrag, TOUCH_PIVOT, type PivotState } from "./array-pivot";
 import { settleToEdges } from "./edge-gravity";
 import type { LoosePanel } from "./roof-design";
 
@@ -86,5 +86,20 @@ describe("panels settling against a side traced a little off its face's rows", (
   it("squares them to the side when it has no rows to go by", () => {
     const settle = settleToEdges([panel], [{ a: face[0], b, setback: 0.2 }]);
     expect(settle?.turn).toBeCloseTo(1);
+  });
+});
+
+describe("a row dragged out with a finger", () => {
+  it("lets the finger wander further along the row before it pivots", () => {
+    expect(pivotDrag(anchor, at(2, 18), step, null, [], TOUCH_PIVOT).state).toEqual({ mode: "row" });
+    expect(pivotDrag(anchor, at(2, 18), step, null).state?.mode).toBe("pivot");
+  });
+
+  it("holds a pivot still for a small wobble and near the first panel", () => {
+    const swung = pivotDrag(anchor, at(6, 40), step, null, [], TOUCH_PIVOT);
+    expect(swung.angle).toBeCloseTo(40);
+    expect(pivotDrag(anchor, at(6, 42), step, swung.state, [], TOUCH_PIVOT).angle).toBeCloseTo(40);
+    expect(pivotDrag(anchor, at(1.5, 70), step, swung.state, [], TOUCH_PIVOT).angle).toBeCloseTo(40);
+    expect(pivotDrag(anchor, at(6, 50), step, swung.state, [], TOUCH_PIVOT).angle).toBeCloseTo(50);
   });
 });

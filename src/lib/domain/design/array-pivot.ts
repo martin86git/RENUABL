@@ -30,6 +30,29 @@ export const PIVOT = {
   snap: 4,
 };
 
+/**
+ * With a finger (25 Nov 2026, Martin, from his iPhone: "the pivot is too sensitive"): a fingertip wanders, so the drag
+ * has to go further before it begins, may wander further off the row's line before it pivots, clicks square from
+ * further off, and a pivot holds still until the finger has turned it a few degrees and is clear of the first panel.
+ */
+export const TOUCH_PIVOT = {
+  start: 1.1,
+  cone: 22,
+  snap: 7,
+  /** Pivoting, the row doesn't turn for less than this many degrees. */
+  still: 4,
+  /** Nor while the finger is nearer the first panel than this many steps (near it a small move is a big angle). */
+  near: 1.6,
+};
+
+export interface PivotFeel {
+  start: number;
+  cone: number;
+  snap: number;
+  still?: number;
+  near?: number;
+}
+
 const turn360 = (d: number) => ((d % 360) + 360) % 360;
 /** An angle brought into (-45, 45]: how far from square two directions are. */
 const offSquare = (deg: number) => {
@@ -55,23 +78,30 @@ export function pivotDrag(
   stepX: number,
   state: PivotState | null,
   squareTo: readonly number[] = [],
+  feel: PivotFeel = PIVOT,
 ): { angle: number; state: PivotState | null } {
   const dx = p.x - anchor.x;
   const dy = p.y - anchor.y;
-  if (Math.hypot(dx, dy) < stepX * PIVOT.start) return { angle: turn360(anchor.angle), state: state?.mode === "pivot" ? state : null };
+  if (Math.hypot(dx, dy) < stepX * feel.start) return { angle: turn360(anchor.angle), state: state?.mode === "pivot" ? state : null };
   const raw = (Math.atan2(dy, dx) * 180) / Math.PI;
   const pivoting = state?.mode === "pivot";
   // Still along the row as it lay: panels are added and nothing turns. Once the pointer leaves that line it pivots,
   // and goes on pivoting until it is let go.
-  if (!pivoting && Math.abs(nearer(raw, anchor.angle) - anchor.angle) <= PIVOT.cone)
+  if (!pivoting && Math.abs(nearer(raw, anchor.angle) - anchor.angle) <= feel.cone)
     return { angle: turn360(anchor.angle), state: { mode: "row" } };
   // The panel turns with the pointer from where it last was, so swinging the row half way round turns the way it
   // faces half way round too (a panel looks the same turned half way, but it then faces the other way).
-  const to = nearer(raw, pivoting && state.angle !== undefined ? state.angle : anchor.angle);
+  const was = pivoting && state.angle !== undefined ? state.angle : anchor.angle;
+  let to = nearer(raw, was);
+  // A finger holds the pivot still near the first panel and for a turn of only a few degrees.
+  if (pivoting && state.angle !== undefined) {
+    const close = feel.near !== undefined && Math.hypot(dx, dy) < stepX * feel.near;
+    if (close || (feel.still !== undefined && Math.abs(to - was) < feel.still)) to = was;
+  }
   let click: number | null = null;
   for (const s of [anchor.angle, ...squareTo]) {
     const off = offSquare(s - to);
-    if (Math.abs(off) <= PIVOT.snap && (click === null || Math.abs(off) < Math.abs(click))) click = off;
+    if (Math.abs(off) <= feel.snap && (click === null || Math.abs(off) < Math.abs(click))) click = off;
   }
   return { angle: turn360(to + (click ?? 0)), state: { mode: "pivot", angle: to } };
 }
