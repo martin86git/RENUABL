@@ -8,12 +8,10 @@
  */
 import { clsx } from "clsx";
 import {
-  Cable,
+  Calculator,
   ChevronRight,
   Columns2,
   LayoutGrid,
-  House,
-  Maximize,
   Minus,
   MessageCircle,
   PenTool,
@@ -22,7 +20,6 @@ import {
   RotateCw,
   Ruler,
   Search,
-  SunMedium,
   Tag,
   Trash2,
   TriangleRight,
@@ -41,7 +38,6 @@ type TrayTool = "select" | "panel" | "erase" | "trace" | "string" | "rule" | "la
 // Erase, Select, Add a panel, the hand and zoom are on the map itself, so they aren't repeated here.
 const DRAW: { tool: TrayTool; icon: LucideIcon; name: string }[] = [
   { tool: "trace", icon: PenTool, name: "Trace roof" },
-  { tool: "string", icon: Cable, name: "Strings" },
   { tool: "rule", icon: Ruler, name: "Guide line" },
   { tool: "label", icon: Tag, name: "Label" },
 ];
@@ -69,7 +65,7 @@ function Group(props: { title: string; children: ReactNode }) {
   return (
     <section className="mt-3">
       <h4 className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">{props.title}</h4>
-      <div className="grid grid-cols-4 gap-2">{props.children}</div>
+      <div className="grid grid-cols-4 gap-2 lg:grid-cols-3">{props.children}</div>
     </section>
   );
 }
@@ -82,10 +78,7 @@ export function SolTray(props: {
   onAsk: () => void;
   tool: string;
   onTool: (tool: TrayTool) => void;
-  shadeOn: boolean;
-  onShade: () => void;
   drawn: boolean;
-  onDrawn: () => void;
   zooming: boolean;
   /** Pinch zoom, on a touch screen only (the desktop has the wheel and its own zoom rounds). */
   onZoom?: () => void;
@@ -96,7 +89,11 @@ export function SolTray(props: {
   onDesignForMe?: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onWhole: () => void;
+  /** Sol's size-a-system calculator (25 Nov 2026, Martin: "add the calculator into the phone"). */
+  onCalc?: () => void;
+  calcOn?: boolean;
+  /** The main switchboard's mark (25 Nov 2026, Martin: off the map's kit, into Sol's tools). */
+  msb?: { on: boolean; icon: ReactNode; onClick: () => void };
   /** The house from its sides (Nearmap), when it can be had: its own button and window. */
   sides?: ReactNode;
   /** Which picture is under the design (Google or Nearmap). */
@@ -130,7 +127,7 @@ export function SolTray(props: {
         role="dialog"
         aria-label="Sol's tools"
         data-popup
-        className="fixed inset-x-0 bottom-0 z-[95] mx-auto flex max-h-[88dvh] max-w-[52rem] flex-col rounded-t-[22px] bg-[#26282c] text-white shadow-[0_-12px_32px_rgba(0,0,0,0.35)]"
+        className="fixed inset-x-0 bottom-0 z-[95] mx-auto flex max-h-[min(88dvh,calc(100%-1rem))] max-w-[52rem] flex-col rounded-t-[22px] bg-[#26282c] text-white shadow-[0_-12px_32px_rgba(0,0,0,0.35)]"
       >
         <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 pt-2">
           <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-white/25" aria-hidden />
@@ -161,14 +158,14 @@ export function SolTray(props: {
             </button>
           </div>
           {/* Sideways (a wide, short screen) the groups sit two across, so more of them fit before it scrolls. */}
-          <div className="sm:grid sm:grid-cols-2 sm:gap-x-6">
+          <div className="sm:grid sm:grid-cols-2 sm:gap-x-6 lg:grid-cols-3 lg:gap-x-4">
             <Group title="Draw">
               {DRAW.map(({ tool, icon: Icon, name }) => (
                 <Item key={tool} icon={<Icon aria-hidden />} name={name} on={props.tool === tool} onClick={() => pick(tool)} />
               ))}
+              {props.msb && <Item icon={props.msb.icon} name="Switchboard" on={props.msb.on} onClick={then(props.msb.onClick)} />}
             </Group>
             <Group title="Check">
-              <Item icon={<SunMedium aria-hidden />} name="Shade" on={props.shadeOn} onClick={then(props.onShade)} />
               {props.onPitch && (
                 <Item icon={<TriangleRight aria-hidden />} name={props.pitchWords} on={props.pitchShown} onClick={then(props.onPitch)} />
               )}
@@ -181,8 +178,7 @@ export function SolTray(props: {
               />
             </Group>
             <Group title="View">
-              <Item icon={<Maximize aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
-              <Item icon={<House aria-hidden />} name={props.drawn ? "Photo" : "Drawn roof"} onClick={then(props.onDrawn)} />
+              {props.onCalc && <Item icon={<Calculator aria-hidden />} name="Calculator" on={props.calcOn} onClick={then(props.onCalc)} />}
               {props.sides}
               {props.onZoom && <Item icon={<Search aria-hidden />} name="Pinch zoom" on={props.zooming} onClick={then(props.onZoom)} />}
             </Group>
@@ -479,20 +475,61 @@ export function SolController(props: {
  * tools. With a tool in hand, that tool's mark rides on his upper left so it is plain what is in hand. With his tray up
  * the + turns to a cross.
  */
-export function SolEmerging({ tray, held, small = false }: { tray: boolean; held: LucideIcon | null; small?: boolean }) {
+export function SolEmerging({
+  tray,
+  held,
+  small = false,
+  onPlus,
+}: {
+  tray: boolean;
+  held: LucideIcon | null;
+  small?: boolean;
+  /** A press on the + alone (25 Nov 2026, Martin: Sol opens his chat, the + his tools). */
+  onPlus?: () => void;
+}) {
   const Held = held;
   return (
-    <span aria-hidden className="pointer-events-none absolute inset-0">
-      <span className="absolute -right-[9px] -top-[7px] h-[3px] w-5 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70" />
+    <span className="pointer-events-none absolute inset-0">
+      <span
+        aria-hidden
+        className="absolute -right-[9px] -top-[7px] h-[3px] w-5 origin-left -rotate-[35deg] rounded-full bg-gradient-to-r from-[#ffb347]/0 to-[#ffb347]/70"
+      />
       {Held && (
-        <span className="sol-emerge absolute -left-[12px] -top-[12px] flex size-7 items-center justify-center rounded-full bg-sun-line text-white ring-2 ring-[#26282c] [--emerge-x:12px]">
+        <span
+          aria-hidden
+          className="sol-emerge absolute -left-[12px] -top-[12px] flex size-7 items-center justify-center rounded-full bg-sun-line text-white ring-2 ring-[#26282c] [--emerge-x:12px]"
+        >
           <Held className="size-4" strokeWidth={2.4} />
         </span>
       )}
       {/* Pressable as part of Sol's button (its own pointer events, so a press on it isn't passed to the map). */}
       <span
+        role={onPlus ? "button" : undefined}
+        aria-hidden={onPlus ? undefined : true}
+        aria-label={onPlus ? (tray ? "Put Sol's tools away" : "Sol's tools") : undefined}
+        title={onPlus ? (tray ? "Put Sol's tools away" : "Sol's tools") : undefined}
+        onClick={
+          onPlus
+            ? (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onPlus();
+              }
+            : undefined
+        }
+        tabIndex={onPlus ? 0 : undefined}
+        onKeyDown={
+          onPlus
+            ? (e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.stopPropagation();
+                e.preventDefault();
+                onPlus();
+              }
+            : undefined
+        }
         className={clsx(
-          "sol-emerge pointer-events-auto absolute flex items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 motion-reduce:transition-none",
+          "sol-emerge pointer-events-auto absolute flex cursor-pointer items-center justify-center rounded-full bg-sun-line text-white shadow-[0_3px_10px_rgba(255,90,31,0.5)] ring-[3px] ring-[#26282c] transition-transform duration-300 motion-reduce:transition-none",
           // On a computer, drawn at full size, a smaller + (the phone's controls are drawn at 0.68).
           small ? "-right-[12px] -top-[12px] size-8 [--emerge-x:-12px]" : "-right-[22px] -top-[22px] size-11 [--emerge-x:-22px]",
           tray && "rotate-45",

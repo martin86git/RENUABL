@@ -15,11 +15,70 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-25",
+    area: "Deals",
+    words: "A deal opens on its timeline: every email, note, call, design saved and proposal, newest first.",
+  },
+  { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
+  { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "Bigger kit icons, the EV charger on the battery's end, and the switchboard in Sol's tools.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "The calculator is in the designer's dock, and in Sol's tools on a phone: it opens his size-a-system card.",
+  },
+  { day: "2026-11-25", area: "Designer", words: "The Draw the roof view is gone from the designer's tools: the roof is always the photo." },
+  {
+    day: "2026-11-25",
+    area: "Settings",
+    words:
+      "Connect Xero: signed proposals raise the customer's invoice, Xero's payments mark deals paid, and installer invoices go as bills.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "The Google | Nearmap switch is one round, G or N; pressing it shows G and N to pick, and N opens Nearmap's pictures.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Installations",
+    words: "The job card shows the whole house from above with the panels on it, before the close-up layout, and emails it too.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Installations",
+    words: "A tentative install's deal is picked from RENUABL's own searchable list, not the phone's picker, and the dates fit a phone.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Settings",
+    words: "Installation reminders can go from your own Gmail or Outlook: choose it under Sent from, and they come from your address.",
+  },
+  {
+    day: "2026-11-25",
     area: "Settings",
     words:
       "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",
   },
   { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
+  {
+    day: "2026-11-24",
+    area: "Design tool",
+    words: "Sol's tools are shorter: Strings, Shade and Whole map are on the map already. His Finalise the quote has a Not now.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Installations",
+    words: "On a phone the figures over Installations, After install and Grid sit three across in one slim band, and long addresses wrap.",
+  },
+  {
+    day: "2026-11-24",
+    area: "Installations",
+    words: "The job card lists the system in parts with icons, solar and battery on their own lines, and a Racking part.",
+  },
   {
     day: "2026-11-24",
     area: "Orders",

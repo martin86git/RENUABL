@@ -32,12 +32,12 @@ export const DEAL_TOUR: readonly { what: string; now: string; at: string }[] = [
   },
   {
     what: "Details",
-    now: "is the deal's own record, and where a deal opens.",
+    now: "is the deal's own record. A deal opens on its timeline: every email, note, call, design and proposal, newest first.",
     at: '[data-tour="deal-details"]',
   },
   {
     what: "Inside Details",
-    now: "are four views: the deal's fields, Notes (everything that has happened, newest first), your chat with the customer, and your team's chat about the deal.",
+    now: "are four views: the Timeline (everything that has happened, newest first), the deal's fields, your chat with the customer, and your team's chat about the deal.",
     at: '[data-tour="deal-views"]',
   },
   {

@@ -15,7 +15,9 @@ import { warm, warmed } from "./warm";
 
 export type { BookedJob, ImportedSale, InvoicesView, JobOrder, OrderRow, ProposalLine };
 
-export const loadPrefs = () => ask<{ prefs: BusinessPrefs }>("/api/design/prefs");
+/** A mailbox someone in the business connected that an automated email can go from. */
+export type SendingMailbox = { owner: string; address: string; provider: string };
+export const loadPrefs = () => ask<{ prefs: BusinessPrefs; mailboxes?: SendingMailbox[] }>("/api/design/prefs");
 export const savePrefs = (prefs: BusinessPrefs) => ask<{ prefs: BusinessPrefs }>("/api/design/prefs", { method: "PUT", body: { prefs } });
 
 type Proposals = { proposals: ProposalLine[]; imported?: ImportedSale[]; followUpDays?: number[] };

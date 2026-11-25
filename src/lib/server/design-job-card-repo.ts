@@ -6,6 +6,8 @@
  */
 import { randomBytes } from "node:crypto";
 import { systemDetails } from "@/lib/domain/design/deal";
+import { rackingOf } from "@/lib/domain/design/quote";
+import { systemSpecOf } from "@/lib/domain/design/system";
 import { jobDrawing, stringsInWords, type Installer, type JobDrawing, type JobNote } from "@/lib/domain/design/job-card";
 import { designSummary, type RoofDesign } from "@/lib/domain/design/roof-design";
 import { cleanAsBuilt, plannedFromDetails, type AsBuilt, type AsBuiltInput, type Designed } from "@/lib/domain/design/as-built";
@@ -25,12 +27,16 @@ export interface JobCardView {
   job: { id: string; title: string; address: string; installDate: string | null; stage: string; installed?: boolean };
   customer: { name: string; phone: string; email?: string };
   /** The system, as the deal and its design say: only the lines filled in. */
-  details: { label: string; value: string }[];
+  details: { key?: string; label: string; value: string }[];
+  /** The racking the design takes (`rackingOf`), in plain words; empty without a design and its quote. */
+  racking?: { name: string; qty: number }[];
   /** The solar and battery in sizes, for the card's title (`cardHeadline`): the design's, else the deal's. */
   system: { kw: number | null; batteryKwh: number | null };
   /** The roof picture's place, for the drawings' backdrop. Null without a design. */
   roof: { lat: number; lng: number } | null;
   layout: JobDrawing | null;
+  /** The layout across the whole house (25 Nov 2026, Martin). Optional: older callers and copies have none. */
+  whole?: JobDrawing | null;
   strings: JobDrawing | null;
   stringWords: string[];
   notes: JobNote[];
@@ -73,7 +79,8 @@ export async function jobCard(
   const form = at >= 0 && saved !== NO_DESIGN ? (saved.project.extras.quotes[at]?.form ?? null) : null;
   const details = systemDetails(design, form, job.details)
     .filter((d) => d.value && d.value.trim() && d.value.trim() !== "--")
-    .map((d) => ({ label: d.label, value: d.value!.trim() }));
+    .map((d) => ({ key: d.key, label: d.label, value: d.value!.trim() }));
+  const racking = design && form ? rackingOf(systemSpecOf(design), form).map((r) => ({ name: r.name, qty: r.qty })) : [];
   const designed: Designed | null = design
     ? {
         panels: designSummary(design).panels,
@@ -109,6 +116,7 @@ export async function jobCard(
     },
     customer: { name: customer.name, phone: customer.phone, ...(forInstaller ? {} : { email: customer.email }) },
     details,
+    racking,
     system: {
       kw: design ? designSummary(design).kw || null : (job.kw ?? null),
       batteryKwh: design?.battery
@@ -117,6 +125,7 @@ export async function jobCard(
     },
     roof: design && saved !== NO_DESIGN ? { lat: saved.project.lat, lng: saved.project.lng } : null,
     layout: design ? jobDrawing(design, "layout") : null,
+    whole: design ? jobDrawing(design, "whole") : null,
     strings: design && (design.strings ?? []).some((s) => s.panels.length) ? jobDrawing(design, "strings") : null,
     stringWords: design ? stringsInWords(design) : [],
     notes,

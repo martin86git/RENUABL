@@ -133,5 +133,18 @@ export function installReminderEmail(input: { business: string; firstName: strin
 <p>${esc(contact)}</p>
 <p>${esc(input.business)}</p>
 <p style="color:#777;font-size:12px">Sent for ${esc(input.business)} by RENUABL.</p></div>`;
-  return { subject, text, html };
+  // Sent from the business's own mailbox (prefs.ts `reminderFrom`): the same words as the business writes them, lists
+  // as the email composer reads them, and no line about RENUABL.
+  const body = [
+    hello,
+    "",
+    `${input.business} will be installing your solar on ${day}. A few things to get ready:`,
+    "",
+    ...GET_READY.map((g) => `• ${g}`),
+    "",
+    contact,
+    "",
+    input.business,
+  ].join("\n");
+  return { subject, text, html, body };
 }

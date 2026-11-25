@@ -97,12 +97,13 @@ type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service
  * Email, and Sol is his own lit round after the row (10 Nov 2026, Martin: off the banner).
  */
 /**
- * What Details holds (14 Nov 2026, Martin: Details is the button, and Notes is nested inside it): the deal's details
- * first, then its notes (the whole record as a timeline) and the two chats.
+ * What Details holds (14 Nov 2026, Martin: Details is the button, and the timeline is nested inside it): the timeline
+ * first, where a deal opens (25 Nov 2026, Martin, as HubSpot: every email, note, call, design and proposal, newest
+ * first), then the deal's fields and the two chats.
  */
 const NOTES_VIEWS = [
+  ["activities", "Timeline"],
   ["details", "Details"],
-  ["activities", "Notes"],
   ["chat", "Customer chat"],
   ["team", "Team chat"],
 ] as const;
@@ -282,8 +283,8 @@ export function DealPage({ id }: { id: string }) {
                   ? "files"
                   : asked === "notes" || asked === "activities"
                     ? "activities"
-                    : // A deal opens on its details (14 Nov 2026, Martin); its notes are a press away inside them.
-                      "details",
+                    : // A deal opens on its timeline (25 Nov 2026, Martin, as HubSpot's); its fields are beside it.
+                      "activities",
   );
   // The designer as a centred pop-up over the deal (8 Nov 2026, Martin: in the same space, the page's grey either side, so
   // it reads as quick); ?design=1 opens it. Kept loaded once opened, so closing never loses the work.
@@ -1420,7 +1421,7 @@ function DealPills(props: {
         onClick={props.onDesign}
       />
       <PillRound label="Proposal" icon={FileText} tour="deal-proposal" onClick={props.onProposal} />
-      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("details")} />
+      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("activities")} />
       <PillRound label="Files" icon={Paperclip} on={props.tab === "files"} onClick={() => props.onTab("files")} />
       {sold && <PillRound label="Job card" icon={HardHat} onClick={props.onCard} />}
       {installed && <PillRound label="Service" icon={Wrench} on={props.tab === "service"} onClick={() => props.onTab("service")} />}
@@ -1611,7 +1612,7 @@ function DealMenu({
         tour="deal-details"
         label="Details"
         title="Details: the deal's details, with its notes and chats inside"
-        onClick={() => onTab("details")}
+        onClick={() => onTab("activities")}
         on={NOTES_VIEWS.some(([key]) => key === tab)}
       >
         <span className={round(NOTES_VIEWS.some(([key]) => key === tab))}>
