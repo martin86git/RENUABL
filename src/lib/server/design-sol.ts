@@ -65,6 +65,20 @@ export async function sharedViewer(businessId: string): Promise<DealViewer> {
 }
 
 /** What one answer's tools may use: whose deals it sees, and whether it has read a customer's own words yet. */
+/** The business's named voice agents, for Sol to know they aren't customers (sol-agent-calls.ts). */
+async function businessAgents(businessId: string): Promise<NamedAgent[]> {
+  const [sales, admin, more] = await Promise.all([
+    callerOf(businessId, "sales"),
+    callerOf(businessId, "admin"),
+    moreSalesAgents(businessId),
+  ]);
+  return [
+    ...(sales.named ? [{ name: sales.name, job: "sales voice agent" }] : []),
+    ...more.filter((c) => c.named).map((c) => ({ name: c.name, job: "sales voice agent" })),
+    ...(admin.named ? [{ name: admin.name, job: "post-sale voice agent" }] : []),
+  ];
+}
+
 interface ToolGuard {
   viewer: DealViewer;
   readCustomerText: boolean;
@@ -74,6 +88,9 @@ interface ToolGuard {
   asked: string;
 }
 import { casesForJob, casesToResolve } from "./design-service-repo";
+import { agentCallsWords, agentNamed, agentsBlock, callDay, type NamedAgent } from "@/lib/domain/design/sol-agent-calls";
+import { callerOf, moreSalesAgents } from "./design-caller-repo";
+import { callLog } from "./design-call-log-repo";
 import { addSolTurns, learnState, markLearnAsked, newSolId, solState, withSol } from "./design-sol-repo";
 import { cleanLearnAsk, learnRefusal, type LearnAsk } from "@/lib/domain/design/sol-induction";
 import { addSolCredits, giveBackSolCredit, keepCost, modelFor, takeSolCredit } from "./sol-credits";
@@ -179,6 +196,16 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       'The deals at a stage (say "lead", "proposal sent", "won", "installed"; part of the name will do), longest unchanged first, each with how many days since it last changed. With no stage, every stage and how many deals it holds.',
     input_schema: { type: "object", properties: { stage: { type: "string" } } },
+  },
+  {
+    name: "agent_calls",
+    description:
+      "One of the business's own AI voice agents' calls (by its name, as listed in your instructions): the calls it has lined up or is on now, and the calls it made, each with the customer, deal id, what it came to and its summary. With day (today, yesterday or YYYY-MM-DD) only that day's; else the latest. Use it whenever they ask about an agent's calls or call logs; never look an agent's name up as a customer.",
+    input_schema: {
+      type: "object",
+      properties: { agent: { type: "string" }, day: { type: "string", description: "Optional: today, yesterday or YYYY-MM-DD." } },
+      required: ["agent"],
+    },
   },
   {
     name: "contact_counts",
@@ -564,6 +591,16 @@ async function runTool(
       .join("\n");
   }
   if (name === "deals_at_stage") return dealsAtStage(jobs, s(input.stage), todayInMarket(), await stageNamesOf(businessId));
+  if (name === "agent_calls") {
+    const agents = await businessAgents(businessId);
+    const agent = agentNamed(agents, s(input.agent));
+    if (!agent)
+      return agents.length
+        ? `There's no agent called that. The business's agents: ${agents.map((a) => a.name).join(", ")}.`
+        : "The business hasn't named a voice agent yet.";
+    const log = await callLog(businessId, viewer);
+    return agentCallsWords(agent.name, log.calls, log.coming, callDay(input.day));
+  }
   if (name === "contact_counts") {
     if (!viewer.all) return "This person sees only some of the business's deals, so the business's own counts aren't theirs to read.";
     return contactCountsWords(await contactCounts(businessId, cleanSinceDay(input.since_day)));
@@ -820,12 +857,13 @@ export async function askSol(
   const viewer = said.shared ? await sharedViewer(businessId) : viewerOf(member);
   const costs = !said.shared && can(member.role, "costs", member.permissions);
   const guard: ToolGuard = { viewer, readCustomerText: false, files: said.files, asked: said.routeOn ?? said.text };
-  const [state, jobs, customers, serviceOpen, stageNames] = await Promise.all([
+  const [state, jobs, customers, serviceOpen, stageNames, agents] = await Promise.all([
     solState(businessId, email),
     listJobs(businessId, viewer),
     listCustomers(businessId),
     casesToResolve(businessId),
     stageNamesOf(businessId),
+    businessAgents(businessId).catch(() => [] as NamedAgent[]),
   ]);
   const visible = new Set(jobs.map((j) => j.customerId));
   const phones = new Map(customers.filter((c) => visible.has(c.id)).map((c) => [c.id, c.phone]));
@@ -838,7 +876,9 @@ export async function askSol(
       prefs: state.prefs,
       businessPrefs: state.businessPrefs ?? [],
       now: new Date(),
-    }) + (said.retry ? `\n\n${anotherAnswerNote(said.retry.answer)}` : "");
+    }) +
+    (agents.length ? `\n\n${agentsBlock(agents)}` : "") +
+    (said.retry ? `\n\n${anotherAnswerNote(said.retry.answer)}` : "");
   const ownTools: Anthropic.ToolUnion[] = [
     ...TOOLS,
     ...(costs ? [PRICE_TOOL] : []),
