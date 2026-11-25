@@ -116,11 +116,7 @@ export default async function SitePage({ params }: PageProps<"/site/[token]">) {
             </div>
           )}
           {papers.map((f) => (
-            <a
-              key={f.id}
-              href={`${base}/files/${f.id}`}
-              className="mt-2 block truncate text-[14px] text-ink underline underline-offset-4"
-            >
+            <a key={f.id} href={`${base}/files/${f.id}`} className="mt-2 block truncate text-[14px] text-ink underline underline-offset-4">
               {f.name}
             </a>
           ))}

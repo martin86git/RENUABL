@@ -576,7 +576,7 @@ function CoachWindowFor() {
               />
             </>
           )}
-          <header className={clsx("flex items-center gap-3 bg-primary text-white", small ? "px-3 py-2" : "px-4 py-3")}>
+          <header className={clsx("flex items-center gap-2 bg-primary text-white sm:gap-3", small ? "px-3 py-2" : "px-3 py-3 sm:px-4")}>
             {small ? (
               <button type="button" onClick={() => setSmall(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                 <CallerAvatar caller={caller} size={30} className="ring-2 ring-white/20" />
@@ -585,8 +585,12 @@ function CoachWindowFor() {
             ) : (
               <>
                 <AvatarEdit editable={mayCoach} onFailed={setFailed} />
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
+                {/* On a phone the name alone, so it isn't cut to "Talk …" by the buttons beside it (24 Nov 2026, Martin). */}
+                <div className="min-w-0 flex-1 sm:flex-none">
+                  <p className="truncate font-semibold">
+                    <span className="sm:hidden">{name}</span>
+                    <span className="max-sm:hidden">{COACH_COPY.title(name)}</span>
+                  </p>
                   <p className="truncate text-xs text-white/70">{day ?? "Your phone assistant"}</p>
                 </div>
                 {/* What the window can show and do, together by the title (14 Nov 2026, Martin: kept away from minimise and
@@ -620,7 +624,7 @@ function CoachWindowFor() {
                     <Settings className="size-4" aria-hidden />
                   </button>
                 </div>
-                <span className="flex-1" aria-hidden />
+                <span className="flex-1 max-sm:hidden" aria-hidden />
               </>
             )}
             {/* The window's own controls, alone in the corner. */}
