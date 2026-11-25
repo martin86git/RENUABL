@@ -3,7 +3,8 @@
 import { useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { dealFor } from "@/lib/domain/design/contact-reach";
-import { nameAt, type NameSpan } from "@/lib/domain/design/name-hint";
+import { nameAt, withName, type NameSpan } from "@/lib/domain/design/name-hint";
+import { useCallerInfo } from "@/lib/services/caller";
 import { NameHints, useContactBook } from "./coach-ring";
 
 /**
@@ -17,12 +18,19 @@ import { NameHints, useContactBook } from "./coach-ring";
  * a phone so the deal is seen). What was typed is cleared. The voice agent's chat keeps chips that put the name in.
  */
 export function useNameHintBox(
-  _text: string,
+  text: string,
   setText: (t: string) => void,
-  _box: RefObject<HTMLTextAreaElement | HTMLInputElement | null>,
+  box: RefObject<HTMLTextAreaElement | HTMLInputElement | null>,
   leave?: () => void,
 ) {
   const router = useRouter();
+  // The business's own voice agents come up too, and a press puts the name in as who is meant (26 Nov 2026, Martin).
+  const info = useCallerInfo();
+  const agents = [
+    ...(info.caller.named ? [{ id: "sales", name: info.caller.name, job: "voice agent" }] : []),
+    ...info.more.filter((c) => c.named).map((c, i) => ({ id: `more-${i}`, name: c.name, job: "voice agent" })),
+    ...(info.admin.named ? [{ id: "admin", name: info.admin.name, job: "post-sale agent" }] : []),
+  ];
   const [span, setSpan] = useState<NameSpan | null>(null);
   const [dismissed, setDismissed] = useState<number | null>(null);
   const [wanted, setWanted] = useState(false);
@@ -58,6 +66,19 @@ export function useNameHintBox(
           router.push(job ? `/design/deals/${job.id}` : `/design/customers/${customerId}`);
         }}
         onDismiss={() => setDismissed(shown?.start ?? null)}
+        agents={agents}
+        onAgent={(name) => {
+          if (!shown) return;
+          const done = withName(text, shown, name);
+          setText(done.text);
+          setSpan(null);
+          requestAnimationFrame(() => {
+            const el = box.current;
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(done.caret, done.caret);
+          });
+        }}
       />
     ),
   };
