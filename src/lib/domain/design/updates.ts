@@ -18,6 +18,11 @@ export const UPDATES: readonly Update[] = [
     area: "Deals",
     words: "A deal opens on its timeline: every email, note, call, design saved and proposal, newest first.",
   },
+  {
+    day: "2026-11-25",
+    area: "Proposals",
+    words: "A design not saved yet no longer reads as no design: the proposal offers to save it and carry on.",
+  },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
   {
