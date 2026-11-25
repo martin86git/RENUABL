@@ -744,13 +744,17 @@ export function DealPage({ id }: { id: string }) {
                   type="button"
                   role="tab"
                   aria-selected={tab === key}
+                  aria-label={key === "team" ? label : undefined}
+                  title={key === "team" ? label : undefined}
                   onClick={() => setTab(key)}
                   className={clsx(
-                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors max-sm:px-2.5 max-sm:text-[12px]",
+                    "h-8 rounded-full text-[13px] font-medium transition-colors max-sm:text-[12px]",
+                    key === "team" ? "grid w-10 place-items-center" : "px-3.5 max-sm:px-2.5",
                     tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                   )}
                 >
-                  {label}
+                  {/* Team chat is its icon, so the switch fits a phone (25 Nov 2026, Martin). */}
+                  {key === "team" ? <MessagesSquare className="size-[18px]" aria-hidden /> : label}
                 </button>
               ))}
             </div>
