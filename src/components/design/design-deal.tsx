@@ -82,6 +82,7 @@ import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
 import { StageSelect } from "./stage-select";
+import { DealMoreMenu } from "./deal-menus";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
@@ -641,12 +642,10 @@ export function DealPage({ id }: { id: string }) {
           <p className="min-h-4 flex-1 text-right text-xs text-muted max-sm:min-h-0" role="status">
             {status}
           </p>
-          <button
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger max-sm:hidden"
-            onClick={() => void deleteDeal()}
-          >
-            <Trash2 className="size-3.5" aria-hidden /> Delete
-          </button>
+          {/* Delete is in a ⋯ menu, never one tap away (26 Nov 2026, Martin). */}
+          <span className="max-sm:hidden">
+            <DealMoreMenu tone="light" onDelete={() => void deleteDeal()} />
+          </span>
         </div>
 
         {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
@@ -686,11 +685,13 @@ export function DealPage({ id }: { id: string }) {
                 >
                   <Mail className="size-4" aria-hidden />
                 </button>
+                <DealMoreMenu onDelete={() => void deleteDeal()} />
               </div>
             }
+            onStage={(to) => void patch(to)}
           />
         </div>
-        <DealPills {...menu} onDelete={deleteDeal} />
+        <DealPills {...menu} />
         {askPlace && (
           <AskPlace
             name={customer.firstName}
@@ -1432,7 +1433,6 @@ function DealPills(props: {
   onDesign: () => void;
   onProposal: () => void;
   onCard: () => void;
-  onDelete: () => void;
 }) {
   const sold = WON_STAGES.includes(props.stage);
   const installed = INSTALLED_STAGES.includes(props.stage);
@@ -1455,7 +1455,6 @@ function DealPills(props: {
       <PillRound label="Files" icon={Paperclip} on={props.tab === "files"} onClick={() => props.onTab("files")} />
       {sold && <PillRound label="Job card" icon={HardHat} onClick={props.onCard} />}
       {installed && <PillRound label="Service" icon={Wrench} on={props.tab === "service"} onClick={() => props.onTab("service")} />}
-      <PillRound label="Delete" icon={Trash2} title="Delete this deal" onClick={props.onDelete} />
     </nav>
   );
 }
