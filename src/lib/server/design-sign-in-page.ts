@@ -4,8 +4,10 @@
  * when its name part matches too, so an old name or a guessed one finds nothing.
  */
 import { randomBytes } from "node:crypto";
-import { keyFrom, signInPath, slugOf } from "@/lib/domain/design/sign-in-page";
+import { cookies } from "next/headers";
+import { TEAM_COOKIE, TEAM_COOKIE_DAYS, keyFrom, readSignInSegment, signInPath, slugOf } from "@/lib/domain/design/sign-in-page";
 import { query } from "./db";
+import { designAccess } from "./design-context";
 import { imageFile, loadBrand } from "./design-proposal-repo";
 
 let ready: Promise<unknown> | null = null;
@@ -83,4 +85,46 @@ export async function signInPageFor(slug: string, key: string): Promise<SignInPa
     name: brand.name.trim() || row.name,
     logo: file ? `data:${file.contentType};base64,${file.bytes.toString("base64")}` : null,
   };
+}
+
+/** The business's sign-in address if it has one; never makes one. */
+export async function existingSignInPage(businessId: string): Promise<string | null> {
+  await table();
+  const rows = await query<{ slug: string; key: string }>(`select slug, key from design_sign_in_pages where business_id = $1`, [
+    businessId,
+  ]);
+  return rows[0] ? signInPath(rows[0].slug, rows[0].key) : null;
+}
+
+/** Remembers a business's sign-in page on this device (from a route, where cookies can be set). */
+export async function rememberSignInPage(path: string) {
+  const segment = path.replace(/^\//, "");
+  if (!readSignInSegment(segment)) return;
+  (await cookies()).set(TEAM_COOKIE, segment, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: TEAM_COOKIE_DAYS * 24 * 60 * 60,
+  });
+}
+
+/** The sign-in page this device remembers, while it still opens (a new key made since finds nothing). */
+export async function rememberedSignInPage(): Promise<string | null> {
+  const segment = (await cookies()).get(TEAM_COOKIE)?.value;
+  const read = segment ? readSignInSegment(segment) : null;
+  if (!read) return null;
+  const page = await signInPageFor(read.slug, read.key).catch(() => null);
+  return page ? signInPath(read.slug, read.key) : null;
+}
+
+/**
+ * Where a signed-out visit to the front page, /design or /design/sign-in goes instead: the sign-in page this device
+ * remembers. Only when the session is surely signed out (a session that couldn't be checked stays where it is, so the
+ * page can try again), and only while the remembered page still opens.
+ */
+export async function signedOutSignInPage(): Promise<string | null> {
+  const access = await designAccess(true).catch(() => null);
+  if (access?.state !== "signed-out") return null;
+  return rememberedSignInPage().catch(() => null);
 }

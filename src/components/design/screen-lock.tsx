@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Wordmark } from "@/components/ui/primitives";
-import { ACTIVE_PING_MS, LOCK_WORDS, LOCKED_STATUS, PIN_MAX, PIN_MIN, faceIdOn, lockDeviceOf } from "@/lib/domain/design/screen-lock";
+import {
+  ACTIVE_PING_MS,
+  DEVICE_COOKIE,
+  LOCK_WORDS,
+  LOCKED_STATUS,
+  PIN_MAX,
+  PIN_MIN,
+  faceIdOn,
+  lockDeviceOf,
+  touchScreen,
+} from "@/lib/domain/design/screen-lock";
 import {
   LOCK_EVENT,
   lockNow,
@@ -81,6 +91,7 @@ export function ScreenLock() {
 
   useEffect(() => {
     if (inFrame) return;
+    sayDevice();
     const first = window.setTimeout(() => void check(), 0);
     lastUse.current = Date.now();
     writeLastUse(lastUse.current);
@@ -152,7 +163,30 @@ export function ScreenLock() {
 }
 
 /** A phone or tablet, by its browser (as the server reads it for the lock's time). */
-const onPhone = () => typeof navigator !== "undefined" && faceIdOn(lockDeviceOf(navigator.userAgent));
+/** A touch screen with no mouse, whatever its user agent says (an iPhone asking for the desktop site says Macintosh). */
+const touchHere = () =>
+  typeof window !== "undefined" &&
+  touchScreen(
+    navigator.maxTouchPoints ?? 0,
+    window.matchMedia("(pointer: coarse)").matches,
+    window.matchMedia("(any-pointer: fine)").matches,
+  );
+
+/** This device for the lock, as the server reads it once the cookie below is set. */
+export const deviceHere = () =>
+  typeof navigator === "undefined" ? "computer" : lockDeviceOf(navigator.userAgent, { cookie: touchHere() ? "phone" : null });
+
+const onPhone = () => faceIdOn(deviceHere());
+
+/** Tells the server this is a touch screen, so a phone gets a phone's lock time however its browser names itself. */
+function sayDevice() {
+  try {
+    const secure = location.protocol === "https:" ? "; secure" : "";
+    document.cookie = `${DEVICE_COOKIE}=${touchHere() ? "phone" : "computer"}; path=/; max-age=31536000; samesite=lax${secure}`;
+  } catch {
+    // Cookies blocked: the user agent alone decides.
+  }
+}
 
 function LockScreen({ state, onUnlocked }: { state: LockState; onUnlocked: () => void }) {
   const [faceId, setFaceId] = useState(false);
