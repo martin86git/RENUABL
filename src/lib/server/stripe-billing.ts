@@ -136,7 +136,7 @@ export interface StripeInvoiceRow extends InvoiceFacts {
   hostedUrl: string | null;
 }
 
-const invoiceRow = (inv: Stripe.Invoice): StripeInvoiceRow => ({
+export const invoiceRow = (inv: Stripe.Invoice): StripeInvoiceRow => ({
   id: inv.id ?? "",
   number: inv.number ?? null,
   created: inv.created,

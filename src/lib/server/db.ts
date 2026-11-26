@@ -253,6 +253,8 @@ alter table businesses add column if not exists demo_source text;
 alter table businesses add column if not exists demo_campaign text;
 -- The voices the business has taken off its voice list (domain/design/caller.ts): put away, brought back in a press.
 alter table businesses add column if not exists hidden_voices jsonb;
+-- How the business's voice agents say particular words (domain/design/pronounce.ts), one list for every agent.
+alter table businesses add column if not exists pronunciations jsonb;
 -- The directory and connections (domain/design/connections.ts): a business is listed only once it chooses to be, and
 -- known to others by its key, never its id. A connection is one row a pair (the lower id first), pending until the
 -- other accepts; declining, cancelling or disconnecting removes it.
@@ -1797,6 +1799,12 @@ create table if not exists design_browser_calls (
 create index if not exists design_browser_calls_job on design_browser_calls(business_id, job_id);
 -- The call's transcript as lines (ours and the customer's), kept for the deal's timeline (server/call-transcripts.ts).
 alter table design_browser_calls add column if not exists transcript_lines jsonb;
+-- The live words of a call while the note-taker is on (26 Nov 2026): Twilio's real-time transcription of both sides,
+-- each final stretch as it comes ({who, text}), the stretch still being made out on each side, and the transcription's id.
+alter table design_browser_calls add column if not exists live_sid text;
+alter table design_browser_calls add column if not exists live_words jsonb;
+alter table design_browser_calls add column if not exists live_partial jsonb;
+alter table design_browser_calls add column if not exists live_problem text;
 -- The voice it speaks in (Vapi's or ElevenLabs', by ID; none is the site's default).
 alter table design_caller add column if not exists voice_provider text;
 alter table design_caller add column if not exists voice_id text;

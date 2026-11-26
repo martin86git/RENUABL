@@ -209,3 +209,23 @@ describe("every call under way", () => {
     ).toBe("2 calls live");
   });
 });
+
+describe("a call that came in (26 Nov 2026, Martin)", () => {
+  it("says the assistant is answering, not calling out", () => {
+    expect(phaseWords("on-call", "Jo", true)).toBe("is taking a call from Jo");
+    expect(phaseWords("lined-up", "Jo", true)).toBe("is picking up a call from Jo…");
+    expect(phaseWords("ended", "Jo", true)).toBe("took a call from Jo");
+    expect(liveNowWords([{ phase: "on-call", customer: "Jo Example", by: "Charlie", inbound: true }])).toBe(
+      "Incoming call · Charlie is talking to Jo",
+    );
+    expect(liveNowWords([{ phase: "ringing", customer: "Jo Example", by: "Charlie", inbound: true }])).toBe(
+      "Incoming call · Jo is ringing Charlie",
+    );
+    expect(
+      liveNowWords([
+        { phase: "on-call", customer: "Jo", by: "Charlie", inbound: true },
+        { phase: "on-call", customer: "Sam", by: "Charlie" },
+      ]),
+    ).toBe("2 calls live · 1 incoming");
+  });
+});

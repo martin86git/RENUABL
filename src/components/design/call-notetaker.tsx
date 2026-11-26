@@ -2,11 +2,12 @@
 
 import clsx from "clsx";
 import { Check, Loader2, Mic, MicOff, NotebookPen, Square, X } from "lucide-react";
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { MIN_WORDS, pointsDue, wordsIn, type CallNotes, type HeardLine } from "@/lib/domain/design/call-notes";
 import { MAX_REMIND_DAYS, type DetailChange } from "@/lib/domain/design/prepared";
 import { callPoints } from "@/lib/services/call-points";
+import { readCallWords, startCallWords, stopCallWords } from "@/lib/services/computer-call";
 import { writeUpCall } from "@/lib/services/crm";
 import { PREPARED_CHANGED, applyCall } from "@/lib/services/prepared";
 import { SolIcon } from "./sol-icon";
@@ -26,9 +27,27 @@ const stamp = () => new Date().toLocaleTimeString("en-AU", { hour: "numeric", mi
  */
 /** Starts the note-taker from elsewhere on the page: the deal's call button (8 Nov 2026, Martin). */
 export interface NotetakerHandle {
-  /** Starts it; false when this browser cannot listen. */
-  start: () => boolean;
+  /** Starts it (and, with `listen`, the microphone or the call's live words at once); false when it cannot listen. */
+  start: (o?: { listen?: boolean }) => boolean;
 }
+
+/**
+ * A call made from the computer (26 Nov 2026, Martin: "making calls through the computer, i need to be able to activate
+ * the call notetaker. i want a live transcript"): while it is on, Twilio transcribes both sides and the bar shows them
+ * as they are said (`/api/design/calls/browser/[id]/live`), in place of the browser hearing the member alone.
+ */
+export interface NotetakerCall {
+  callId: string;
+  /** Ringing or on: live words can be had. */
+  live: boolean;
+  /** The customer's first name, over their side of the words. */
+  name: string;
+  /** The call's own controls (who, clock, Mute, Hang up), drawn in the bar's head. */
+  controls?: ReactNode;
+}
+
+/** How often the call's live words are read while on. */
+const CALL_WORDS_MS = 1_500;
 
 export function CallNotetaker({
   jobId,
@@ -36,6 +55,8 @@ export function CallNotetaker({
   handle,
   phone = "",
   button = true,
+  call,
+  onOpenChange,
 }: {
   jobId: string;
   customerId: string;
@@ -45,8 +66,20 @@ export function CallNotetaker({
   phone?: string;
   /** Without its own button: started only through `handle`. */
   button?: boolean;
+  /** A call from the computer: both sides heard through Twilio while it lasts. */
+  call?: NotetakerCall;
+  onOpenChange?: (on: boolean) => void;
 }) {
-  const supported = useSpeechSupported();
+  const speech = useSpeechSupported();
+  const supported = speech || Boolean(call);
+  // Where the words come from: the browser's own recognition (the member's side), or the call's live words (both).
+  const [source, setSource] = useState<"browser" | "call">("browser");
+  const [partial, setPartial] = useState<Partial<Record<"us" | "them", string>>>({});
+  const taken = useRef(0);
+  const callRef = useRef(call);
+  useEffect(() => {
+    callRef.current = call;
+  });
   const [on, setOn] = useState(false);
   const [lines, setLines] = useState<HeardLine[]>([]);
   const [hearing, setHearing] = useState("");
@@ -144,15 +177,91 @@ export function CallNotetaker({
   };
   useEffect(() => () => stopListening(), []);
 
-  const micOn = () => {
+  const micOn = async () => {
     setProblem(null);
+    const c = callRef.current;
+    if (c?.live && c.callId) {
+      setMic(true);
+      const got = await startCallWords(c.callId);
+      if (got === "on") {
+        setSource("call");
+        return;
+      }
+      setSource("browser");
+      if (!speech) {
+        setMic(false);
+        setProblem("Both sides can't be transcribed on this call, and this browser can't turn speech into words: use Chrome or Edge.");
+        return;
+      }
+      setProblem(
+        got === "off"
+          ? "Only your side is being heard: this call isn't recorded, so the customer's side isn't transcribed."
+          : "Twilio couldn't transcribe the call just now, so only your side is being heard. Pause and Listen again to try both sides.",
+      );
+    } else if (!speech) {
+      setProblem("This browser can't turn speech into words: use Chrome or Edge.");
+      return;
+    }
     setMic(true);
     listen();
   };
   const micOff = () => {
     setMic(false);
+    if (source === "call" && callRef.current?.callId) void stopCallWords(callRef.current.callId);
+    setPartial({});
     stopListening();
   };
+
+  // The call's live words, read while on: final stretches added as lines (who said each), the rest shown as heard.
+  const callId = call?.callId ?? "";
+  const callLive = Boolean(call?.live);
+  const reading = on && mic && source === "call" && Boolean(callId);
+  useEffect(() => {
+    if (!reading) return;
+    let alive = true;
+    const read = async () => {
+      const got = await readCallWords(callId, taken.current);
+      if (!alive || !got) return;
+      if (got.words.length) {
+        taken.current = got.total;
+        const n = notingRef.current;
+        setLines((all) => [
+          ...all,
+          ...got.words.map((w) => ({
+            at: stamp(),
+            text: w.text,
+            who: w.who,
+            // While Add a note is held, what the member says is the note (as when the browser hears them).
+            ...(n && w.who === "us" ? { note: true } : {}),
+            ...(n === "design" && w.who === "us" ? { design: true } : {}),
+          })),
+        ]);
+      }
+      setPartial(got.partial);
+      if (got.problem) setProblem(`Twilio stopped transcribing the call: ${got.problem}`);
+    };
+    void read();
+    const t = window.setInterval(() => void read(), CALL_WORDS_MS);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [reading, callId]);
+  // The call ended: read the last words once, then the microphone is off (Twilio stops by itself).
+  useEffect(() => {
+    if (callLive || source !== "call" || !mic || !callId) return;
+    const t = window.setTimeout(() => {
+      void readCallWords(callId, taken.current).then((got) => {
+        if (got?.words.length) {
+          taken.current = got.total;
+          setLines((all) => [...all, ...got.words.map((w) => ({ at: stamp(), text: w.text, who: w.who }))]);
+        }
+        setPartial({});
+        setMic(false);
+      });
+    }, 2_500);
+    return () => window.clearTimeout(t);
+  }, [callLive, source, mic, callId]);
 
   /** Opens the bar with the microphone off: the member dials, then presses Start listening. */
   const start = () => {
@@ -165,8 +274,14 @@ export function CallNotetaker({
     ask.current = { pending: false, wordsAtLast: 0, at: Date.now(), round: ask.current.round + 1 };
     setState("listening");
     setMic(false);
+    setPartial({});
+    setSource("browser");
+    taken.current = 0;
     setOn(true);
   };
+  useEffect(() => {
+    onOpenChange?.(on);
+  }, [on, onOpenChange]);
   const close = () => {
     micOff();
     ask.current.round += 1;
@@ -205,9 +320,10 @@ export function CallNotetaker({
     return () => window.clearInterval(tick);
   }, [listening, lines, jobId]);
   useImperativeHandle(handle, () => ({
-    start: () => {
+    start: (o) => {
       if (!supported) return false;
       if (!on) start();
+      if (o?.listen && !mic) void micOn();
       return true;
     },
   }));
@@ -298,7 +414,8 @@ export function CallNotetaker({
                         ? "Check the notes, then add them to the deal"
                         : "Added to the deal"}
                 </p>
-                {phone && state === "listening" && (
+                {call?.controls}
+                {!call && phone && state === "listening" && (
                   <a href={`tel:${phone.replace(/\s/g, "")}`} className="hidden text-sm text-white/80 sm:inline">
                     Ring <span className="font-medium tabular-nums text-white">{phone}</span> on your phone, held to your ear
                   </a>
@@ -315,11 +432,14 @@ export function CallNotetaker({
               {state === "listening" && (
                 <>
                   <p className="mt-1 text-xs text-white/60">
-                    Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is
-                    recorded or kept.
+                    {call
+                      ? source === "call"
+                        ? `Both sides are being transcribed as you talk (${call.name || "the customer"} heard that the call may be recorded).`
+                        : "Press Start listening to have both sides of this call transcribed as you talk."
+                      : "Take the call on your phone, to your ear or on a headset, never on speaker: this hears your side only. Nothing is recorded or kept."}
                   </p>
                   {/* The words as they are said, typed up live (8 Nov 2026, Martin), the latest always in view. */}
-                  <LiveWords lines={lines} hearing={hearing} mic={mic} />
+                  <LiveWords lines={lines} hearing={hearing} mic={mic} partial={partial} name={call?.name ?? ""} />
                   {(points.length > 0 || pointsNote) && (
                     <div className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white/85" aria-live="polite">
                       {points.length > 0 && (
@@ -343,7 +463,7 @@ export function CallNotetaker({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={mic ? micOff : micOn}
+                      onClick={mic ? micOff : () => void micOn()}
                       aria-pressed={mic}
                       className={clsx(
                         "inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold",
@@ -445,32 +565,65 @@ export function CallNotetaker({
 }
 
 /** The words as they are said, latest last and kept in view: what is still being made out shows lighter as it comes. */
-function LiveWords({ lines, hearing, mic }: { lines: HeardLine[]; hearing: string; mic: boolean }) {
+function LiveWords({
+  lines,
+  hearing,
+  mic,
+  partial = {},
+  name = "",
+}: {
+  lines: HeardLine[];
+  hearing: string;
+  mic: boolean;
+  /** A call's words still being made out, on each side. */
+  partial?: Partial<Record<"us" | "them", string>>;
+  /** The customer's first name, over their side. */
+  name?: string;
+}) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = box.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [lines, hearing]);
+  }, [lines, hearing, partial]);
+  const label = (who: "us" | "them") => (who === "them" ? name || "Customer" : "You");
   return (
     <div
       ref={box}
       aria-live="polite"
       className="mt-3 max-h-44 min-h-20 overflow-y-auto rounded-lg bg-white/5 px-3 py-2 text-[15px] leading-relaxed text-white"
     >
-      {lines.slice(-60).map((l, i) => (
-        <span key={i} className={clsx(l.note && "text-sun-line")}>
-          {l.note ? (l.design ? "Design note: " : "Note: ") : ""}
-          {l.text}{" "}
-        </span>
-      ))}
+      {lines.slice(-60).map((l, i, shown) => {
+        // On a call heard both sides, a new speaker starts a new line with their name.
+        const turn = Boolean(l.who) && !l.note && (i === 0 || shown[i - 1].who !== l.who || shown[i - 1].note);
+        return (
+          <span key={i} className={clsx(l.note && "text-sun-line", l.who === "them" && !l.note && "text-white/85")}>
+            {turn && (
+              <>
+                {i > 0 && <br />}
+                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/50">{label(l.who!)}: </span>
+              </>
+            )}
+            {l.note ? (l.design ? "Design note: " : "Note: ") : ""}
+            {l.text}{" "}
+          </span>
+        );
+      })}
       {hearing && <span className="text-white/55">{hearing}</span>}
+      {(["us", "them"] as const).map((w) =>
+        partial[w] ? (
+          <span key={w} className="block text-white/55">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">{label(w)}: </span>
+            {partial[w]}
+          </span>
+        ) : null,
+      )}
       {mic && (
         <span
           className="ml-0.5 inline-block h-[1.05em] w-0.5 translate-y-[0.15em] animate-pulse bg-sun-line motion-reduce:animate-none"
           aria-hidden
         />
       )}
-      {!lines.length && !hearing && (
+      {!lines.length && !hearing && !partial.us && !partial.them && (
         <p className="text-white/50">
           {mic ? "Listening… start talking." : "Press Start listening when the call begins. What you say is typed here as you say it."}
         </p>

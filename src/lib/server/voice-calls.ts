@@ -1044,6 +1044,10 @@ export async function liveCallFor(businessId: string, jobId: string): Promise<Li
     canCallNow: mayCallNow({ status: r.status, liveStatus: r.live_status }),
     outOfHours: outOfCallingHours(new Date(r.now)),
     transcriptId: written[0]?.id ?? null,
+    // They rang in, and this is that call: the window says the assistant is answering them.
+    ...((r.lead as { inbound?: unknown } | null)?.inbound === true && (!r.live_vapi_id || r.live_vapi_id === r.vapi_call_id)
+      ? { inbound: true }
+      : {}),
   };
 }
 

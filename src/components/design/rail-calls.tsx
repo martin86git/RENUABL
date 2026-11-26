@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import clsx from "clsx";
+import { PhoneIncoming } from "lucide-react";
 import { clockWords } from "@/lib/domain/live-call";
 import { callInitials, railCallWords, railCalls } from "@/lib/domain/design/rail-calls";
 import { setCallWall, useLiveCallsNow, useWatchedCall, watchAssistantCall, type LiveNowCall } from "@/lib/services/assistant-call";
@@ -53,6 +54,15 @@ export function RailCalls() {
             >
               {callInitials(c.customer)}
             </button>
+            {/* They rang in (26 Nov 2026, Martin): a small incoming-phone mark on the round. */}
+            {c.inbound && (
+              <span
+                className="pointer-events-none absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-call text-white ring-2 ring-surface"
+                aria-hidden
+              >
+                <PhoneIncoming className="size-2.5" />
+              </span>
+            )}
           </li>
         );
       })}

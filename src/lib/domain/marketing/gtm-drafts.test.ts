@@ -13,6 +13,7 @@ import {
   MAX_WORDS,
   PRICE_DAY_LINE,
   SOL_TYPES,
+  VOICE_MEET_LINE,
   voiceAday,
   gtmSequence,
   pictureKeyOf,
@@ -25,7 +26,7 @@ const ids = Object.fromEntries(Object.keys(GTM_PICTURES).map((k, i) => [k, `mimg
 
 describe("the launch drafts", () => {
   it("are whole, valid emails once their pictures are in, and come through the cleaner unchanged", () => {
-    expect(GTM_EMAILS).toHaveLength(7);
+    expect(GTM_EMAILS).toHaveLength(15);
     for (const raw of GTM_EMAILS) {
       const c = withPictures(raw, ids);
       expect(contentProblem(c)).toBeNull();
@@ -46,6 +47,9 @@ describe("the launch drafts", () => {
     const art = readFileSync(join(process.cwd(), "tools/marketing/launch-art.mjs"), "utf8");
     for (const words of Object.values(SOL_TYPES)) expect(art).toContain(JSON.stringify(words).slice(1, -1));
     expect(art).toContain(PRICE_DAY_LINE);
+    expect(art).toContain(VOICE_MEET_LINE);
+    // The drawn phone book uses only numbers from the range set aside for fiction.
+    for (const n of art.match(/04dd ?d{3} ?d{3}/g) ?? []) expect(n).toMatch(/^0491 570 /);
     expect(art).not.toMatch(/henderson|shearer/i);
     // The logo is the website's own file, never RENUABL typed in another weight or spacing.
     expect(art).toContain("public/brand/renuabl-logo-white.png");

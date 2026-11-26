@@ -20,6 +20,26 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
+    area: "Calls",
+    words: "Calling from the computer: Note-taker on the call bar types up both sides live, then writes the call up on the deal.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "Texting a customer from a voice agent's call window lets you sign off as yourself or as the agent.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Design tool",
+    words: "Sides now draws your panels on the angled photos as you lay them, beside the plan, on the side that shows them best.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from HubSpot shows a moving bar and a timer while it looks, so you can see it is still working.",
+  },
+  {
+    day: "2026-11-26",
     area: "Settings",
     words: "Bring in from HubSpot joins a deal to the customer's existing deal for the same job, rather than making a second.",
   },
@@ -179,6 +199,7 @@ export const UPDATES: readonly Update[] = [
     area: "Deals",
     words: "On a phone, a deal's install day sits on its own line under the kit at the top of the deal.",
   },
+  { day: "2026-11-26", area: "Billing", words: "When you pay RENUABL, a receipt is emailed with your tax invoice attached as a PDF." },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
   {

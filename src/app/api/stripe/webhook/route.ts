@@ -8,6 +8,7 @@ import { connectFacts } from "@/lib/server/stripe-billing";
 import { businessOfAccount, updateConnect } from "@/lib/server/design-connect-repo";
 import { recordCardPayment } from "@/lib/server/design-proposal-repo";
 import { cleanPack, packDollars } from "@/lib/domain/design/plans";
+import { sendReceipt } from "@/lib/server/design-receipts";
 
 const creditsForPack = (n: number) => {
   const pack = cleanPack(n);
@@ -23,7 +24,8 @@ import { webhookSecrets } from "@/lib/domain/stripe-webhook";
  * tokens is credited once, and a subscription's changes (trial ending, seats,
  * cancelling) are followed. Configure in Stripe: Developers → Webhooks →
  * endpoint https://<site>/api/stripe/webhook, events checkout.session.completed,
- * customer.subscription.updated and customer.subscription.deleted.
+ * customer.subscription.updated, customer.subscription.deleted and invoice.paid (a business's receipt, with its tax
+ * invoice attached, emailed from RENUABL: design-receipts.ts).
  *
  * Businesses' own Stripe accounts (Stripe Connect, card payments on their proposals): a second endpoint at the same
  * address listening to events on connected accounts, with its own signing secret in STRIPE_CONNECT_WEBHOOK_SECRET:
@@ -76,6 +78,12 @@ export async function POST(request: Request) {
         return new Response("Not saved", { status: 500 });
       }
     }
+    return Response.json({ received: true });
+  }
+
+  if (event.type === "invoice.paid") {
+    // A receipt never fails the webhook: Stripe would only send the event again.
+    await sendReceipt(stripe, event.data.object).catch((e) => console.error("receipt not sent", e instanceof Error ? e.message : e));
     return Response.json({ received: true });
   }
 
