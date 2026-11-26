@@ -166,41 +166,70 @@ export async function invoiceOf(stripe: Stripe, customer: string, id: string): P
 }
 
 /*
- * The payment gateway for businesses (`domain/design/proposal-payments.ts`): each business connects a Stripe account of
- * its own (a standard account, which it owns and runs from Stripe's own Dashboard). A customer's payment is a direct
- * charge on that account, so the money goes to the business; RENUABL's 1% comes to RENUABL as an application fee.
+ * The payment gateway for businesses (`domain/design/proposal-payments.ts`; 24 Nov 2026, Martin: "similar to pylon so the
+ * user experience is easy"). Each business has a Stripe account of its own, opened and run by RENUABL's platform: it
+ * has no Stripe Dashboard, Stripe's own forms for its details, bank account, payments and payouts are shown inside
+ * RENUABL (Connect's embedded components), Stripe's processing fees are billed to RENUABL and any loss a business can't
+ * cover falls to RENUABL. A customer's payment is a direct charge on that account, so the money is the business's and
+ * goes to its bank; RENUABL's all-in fee comes to RENUABL as an application fee. Stripe holds the money, never RENUABL.
  */
 
-/** Opens a Stripe account for a business. Returns its id. */
-export async function createConnectAccount(stripe: Stripe, opts: { businessId: string; email: string; name: string }): Promise<string> {
+/** Opens a Stripe account for a business, run by RENUABL's platform. Returns its id. */
+export async function createConnectAccount(
+  stripe: Stripe,
+  opts: { businessId: string; email: string; name: string; url?: string | null },
+): Promise<string> {
   const account = await stripe.accounts.create({
-    type: "standard",
     country: "AU",
     email: opts.email,
-    business_profile: { name: opts.name },
+    business_profile: {
+      name: opts.name,
+      // Electrical contractors: solar, batteries and EV chargers are electrical installations.
+      mcc: "1731",
+      product_description: "Solar, battery and EV charger supply and installation",
+      ...(opts.url ? { url: opts.url } : {}),
+    },
+    capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+    controller: {
+      fees: { payer: "application" },
+      losses: { payments: "application" },
+      stripe_dashboard: { type: "none" },
+      requirement_collection: "application",
+    },
+    settings: { payouts: { schedule: { interval: "daily" } } },
     metadata: { business: opts.businessId },
   });
   return account.id;
 }
 
-/** Stripe's own pages where the business gives (or finishes giving) its details. Returns the first page's URL. */
-export async function connectOnboardingUrl(stripe: Stripe, account: string, origin: string): Promise<string> {
-  const link = await stripe.accountLinks.create({
+/** An account RENUABL's platform runs (made since 24 Nov 2026). One made before is a standard account the business ran itself. */
+export const runByRenuabl = (account: Stripe.Account) => account.controller?.stripe_dashboard?.type === "none";
+
+/**
+ * A short-lived key for Stripe's own forms and lists shown inside RENUABL for one business's account: its details and
+ * bank account (onboarding and management), the notice of anything Stripe still needs, its balance and payouts, and
+ * its payments with refunds and disputes. The browser never sees anything but this.
+ */
+export async function connectSession(stripe: Stripe, account: string): Promise<string> {
+  const own = { external_account_collection: true };
+  const session = await stripe.accountSessions.create({
     account,
-    type: "account_onboarding",
-    refresh_url: `${origin}/design/settings/card-payments?connect=again`,
-    return_url: `${origin}/design/settings/card-payments?connect=back`,
+    components: {
+      account_onboarding: { enabled: true, features: own },
+      account_management: { enabled: true, features: own },
+      notification_banner: { enabled: true, features: own },
+      balances: { enabled: true, features: { ...own, edit_payout_schedule: true, instant_payouts: false, standard_payouts: false } },
+      payouts: { enabled: true, features: { ...own, edit_payout_schedule: true, instant_payouts: false, standard_payouts: false } },
+      payments: { enabled: true, features: { refund_management: true, dispute_management: true, capture_payments: false } },
+    },
   });
-  return link.url;
+  return session.client_secret;
 }
 
 /** Whether a business's account can take card payments yet. */
 export function connectFacts(account: Stripe.Account) {
   return { chargesEnabled: Boolean(account.charges_enabled), detailsSubmitted: Boolean(account.details_submitted) };
 }
-
-/** Stripe's Dashboard for the business's own account (payouts, refunds, disputes). */
-export const dashboardUrl = "https://dashboard.stripe.com/";
 
 /**
  * A customer paying the next amount due on their proposal, on Stripe's page, straight to the business's own account.

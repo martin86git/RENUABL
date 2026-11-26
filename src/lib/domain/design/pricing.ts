@@ -311,6 +311,11 @@ export interface QuoteSettings {
   stcFrom: string | null;
   /** Cable, conduit, labels and sundries not itemised, $ per job. */
   sundries: number;
+  /**
+   * The share of each card payment's fee recovered through the system price (24 Nov 2026, Martin, as Pylon's "fee
+   * absorption"): 0 absorbs it all, `PLATFORM_FEE` (0.025) passes it all on. The quote adds it as a line of its own.
+   */
+  cardRecover: number;
   bill: {
     /** Share of solar a home uses as it's made, without a battery (0 to 1). */
     selfUseShare: number;
@@ -372,6 +377,11 @@ export const SETTING_GROUPS: { title: string; intro: string; fields: SettingFiel
     ],
   },
   {
+    title: "Card payment fees",
+    intro: "How much of each card payment's fee is recovered through the system price. Set on the Payment gateway page.",
+    fields: [{ path: "cardRecover", label: "Recovered through the price", unit: "%", min: 0, max: 0.025, step: 0.0025 }],
+  },
+  {
     title: "Electricity bill",
     intro: "What a new job's bill starts with, until you type in the customer's own figures, and how a home is taken to use its solar.",
     fields: [
@@ -422,6 +432,7 @@ export const DEFAULT_WORKSPACE: Workspace = {
     stcPrice: 38,
     stcFrom: null,
     sundries: 120,
+    cardRecover: 0,
     bill: { selfUseShare: 0.35, rate: 0.3, feedIn: 0.04, supplyPerDay: 1 },
   },
 };

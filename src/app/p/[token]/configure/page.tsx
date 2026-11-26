@@ -46,6 +46,7 @@ export default async function ConfigureProposalPage({ params, searchParams }: Pa
       held={held}
       mix={one(query.mix)}
       week={one(query.week)}
+      datasheets={found.datasheets}
     />
   );
 }

@@ -15,6 +15,106 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Design tool",
+    words: "Sides now draws your panels on the angled photos as you lay them, beside the plan, on the side that shows them best.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from HubSpot shows a moving bar and a timer while it looks, so you can see it is still working.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from HubSpot joins a deal to the customer's existing deal for the same job, rather than making a second.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from Pylon now fills in the jobs your export brought in, with their signed PDFs, instead of skipping them.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "A deal's timeline now says whenever its address changes. The designer moves a deal only after you say yes.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "A deal's Installation details show its installer invoice: what the quote allowed, what was billed, and Compare.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Marketing",
+    words: "Email builder: a Top bar block (a line and a button above your logo) and a panel colour for any block.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "On a phone, Sol's chat stops above the foot bar, so its send button is never hidden behind it.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "On a phone, the dock's turning ball steps aside while Sol's chat is open, so his microphone isn't covered.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "In Sol's draft emails, pick a written web address and press Link to turn it into linked words.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
+    words: "A minus at the top right of a page puts it aside as a chip at the foot of the screen; press the chip to go back.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "The deal's buttons down the left are a little smaller.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Installations",
+    words: "The job card lists each product's datasheet, for your team, the installer's link and the inspector.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The configurator lists the datasheets for the system the customer has picked.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "Each quoted panel, inverter, battery and EV charger's datasheet is listed on the customer's proposal and its PDF.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The proposal screen says which datasheets are missing, with a button to find them online.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Battery and EV charger datasheets can be uploaded or found online in Product datasheets.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "The voice agent's window is taller, the chat on the left, its deals and settings as slim panels to the right.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "Each call can have an objective: a call appointment, a home visit, an install date, or helping them go ahead.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "A voice agent's script is numbered lines, and you can add a line to it directly.",
+  },
+  {
+    day: "2026-11-26",
     area: "Sol",
     words: "Sol's side panel and the box on a deal suggest the rest of a question too, and the team's common questions join your own.",
   },

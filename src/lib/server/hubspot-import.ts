@@ -17,6 +17,9 @@ import {
   dealFromHubSpot,
   engagementLine,
   fieldTargets,
+  fillEmpty,
+  mergeTarget,
+  type DealHere,
   guessFields,
   guessStage,
   hubspotSaid,
@@ -357,6 +360,60 @@ export async function bringInHubSpotDeals(
       const found = await findCustomer(businessId, customerIn.value.email ?? "", customerIn.value.phone ?? "");
       let customerId: string;
       let jobId: string;
+      // The customer's deal already here for the same job (most often one from Pylon): HubSpot's history and the
+      // fields it has nothing in go onto it, and no second deal is made. Its stage, price and owner stay as they are.
+      const here = found
+        ? await query<
+            DealHere & { details: Record<string, string> | null; value: number | null; install: string | null; owner: string | null }
+          >(
+            `select id, stage, to_char((won_at at time zone 'Australia/Melbourne')::date, 'YYYY-MM-DD') as "wonOn",
+                    to_char((created_at at time zone 'Australia/Melbourne')::date, 'YYYY-MM-DD') as "madeOn",
+                    details, value::float8 as value, to_char(install_date, 'YYYY-MM-DD') as install, owner_email as owner
+               from design_jobs where business_id = $1 and customer_id = $2`,
+            [businessId, found],
+          )
+        : [];
+      const target = found ? mergeTarget(here, deal) : null;
+      if (found && target) {
+        const row = here.find((r) => r.id === target.id)!;
+        const { details, filled } = fillEmpty(row.details ?? {}, jobIn.value.details ?? {});
+        const lines: HsLine[] = byDeal.get(d.id) ?? [];
+        await transaction(async (q) => {
+          await q(
+            `update design_jobs set details = $3::jsonb,
+                value = coalesce(value, $4::numeric),
+                install_date = coalesce(install_date, $5::date),
+                owner_email = coalesce(owner_email, (select e from (select m.email as e from business_members m where m.business_id = $1 union all select o.email from design_owner_only o where o.business_id = $1) x where lower(e) = $6 limit 1)),
+                updated_at = now()
+              where business_id = $1 and id = $2`,
+            [businessId, target.id, JSON.stringify(details), jobIn.value.value ?? null, jobIn.value.installDate ?? null, deal.owner],
+          );
+          for (const line of lines)
+            await q(
+              `insert into design_activity (id, business_id, customer_id, job_id, kind, text, by_email, at) values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+              [newId("act"), businessId, found, target.id, line.kind, line.text, line.by.toLowerCase(), line.at],
+            );
+          await record(q, businessId, {
+            customerId: found,
+            jobId: target.id,
+            kind: "note",
+            text: `Joined with this deal from HubSpot (the same customer and job${filled ? `; ${filled} empty field${filled === 1 ? "" : "s"} filled in` : ""}).\n${deal.note}`,
+            by: by.toLowerCase(),
+          });
+          await q(
+            `insert into design_imports (business_id, source, ref, job_id, by_email) values ($1, 'hubspot', $2, $3, $4) on conflict do nothing`,
+            [businessId, deal.hubspotId, target.id, by.toLowerCase()],
+          );
+        });
+        results.push({
+          id: d.id,
+          result: "in",
+          customer: `${deal.customer.firstName} ${deal.customer.lastName}`.trim(),
+          lines: lines.length,
+          joined: true,
+        });
+        continue;
+      }
       if (found) {
         const made = await createJob(businessId, found, jobIn.value, by);
         if (typeof made === "string") {

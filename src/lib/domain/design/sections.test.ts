@@ -7,6 +7,7 @@ describe("the sections across the top", () => {
     expect(pageAt("/design/procurement/orders/job_123")?.page.id).toBe("orders");
     expect(pageAt("/design/sales/proposals")).toMatchObject({ section: { id: "proposals" }, page: { id: "sent" } });
     expect(pageAt("/design/calls")?.section.id).toBe("proposals");
+    expect(pageAt("/design/procurement/pre-approvals")).toMatchObject({ section: { id: "proposals" }, page: { id: "preapproval" } });
   });
 
   it("counts a deal's own page, and the pages folded into Jobs, as Jobs", () => {

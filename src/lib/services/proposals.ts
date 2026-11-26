@@ -7,6 +7,7 @@
  * of a proposal, never a cost. Each call answers with what was asked for, or
  * a plain message to show.
  */
+import type { ProductSheetStanding } from "@/lib/domain/design/proposal-datasheets";
 import type { AskDay } from "@/lib/domain/voice-agent";
 import type { PublicPayments } from "@/lib/domain/design/proposal-payments";
 import type { BrandImage, BrandKit, ImageKind } from "@/lib/domain/design/brand";
@@ -101,6 +102,8 @@ export const previewProposal = (jobId: string, choice: Partial<ProposalChoice>) 
     pricing?: { marginShare: number; floor: number } | null;
     /** What the configurator couldn't offer the customer, and why. */
     configuratorSkipped?: string[];
+    /** Each quoted product and whether its datasheet goes with the proposal. */
+    datasheets?: ProductSheetStanding[];
   }>(`${jobProposal(jobId)}/preview`, { method: "POST", body: choice });
 
 export const publishProposal = (jobId: string, choice: Partial<ProposalChoice> & { projectVersion: number }) =>
@@ -202,4 +205,5 @@ export const proposalUrls = (token: string) => ({
   roof: `${link(token)}/roof`,
   pdf: `${link(token)}/pdf`,
   terms: `${link(token)}/terms`,
+  datasheet: (id: string) => `${link(token)}/datasheet/${encodeURIComponent(id)}`,
 });

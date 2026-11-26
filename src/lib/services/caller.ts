@@ -8,6 +8,7 @@ import type { StrayText, TextLine } from "@/lib/domain/design/texts";
 import { useEffect, useState } from "react";
 import { DEFAULT_CALLER, type CallerBrain, type CallerVoice } from "@/lib/domain/design/caller";
 import type { CallerKey } from "@/lib/domain/install-call";
+import type { Pronunciation } from "@/lib/domain/design/pronounce";
 import type { AskDraft } from "@/lib/domain/design/call-consent";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
 import { watchAssistantCall } from "./assistant-call";
@@ -115,6 +116,18 @@ export const changeHiddenVoices = (voices: { hide: string } | { show: string } |
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ voices }),
+  });
+
+/** How the business's agents say particular words (domain/design/pronounce.ts), and saving the whole list. */
+export const loadPronunciations = async (): Promise<Pronunciation[]> => {
+  const r = await loadCaller();
+  return r.ok ? ((r as { pronounce?: Pronunciation[] }).pronounce ?? []) : [];
+};
+export const savePronunciations = (pronounce: Pronunciation[]) =>
+  ask<{ pronounce: Pronunciation[] }>("/api/design/caller", {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ pronounce }),
   });
 
 export const callerChanged = (caller: CallerState) => window.dispatchEvent(new CustomEvent(CHANGED, { detail: caller }));

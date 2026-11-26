@@ -5,6 +5,7 @@
  */
 import { agentPrefs } from "./design-sol-repo";
 import { callVoice } from "@/lib/domain/design/sol-induction";
+import { cleanPronunciations, type Pronunciation } from "@/lib/domain/design/pronounce";
 import {
   cleanBrain,
   cleanHiddenVoices,
@@ -18,7 +19,7 @@ import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { cleanDelivery, defaultDelivery, type Delivery } from "@/lib/domain/design/delivery";
-import { DEFAULT_CALL_SETUP, cleanCallSetup, type CallAudience, type CallSetup } from "@/lib/domain/design/call-setup";
+import { DEFAULT_CALL_SETUP, cleanCallSetup, type CallAudience, type CallSetup, type CallObjective } from "@/lib/domain/design/call-setup";
 import { cleanScripts, liveName, type LiveScript, type SavedScript } from "@/lib/domain/design/call-scripts";
 import { dbConfigured, query } from "./db";
 
@@ -164,6 +165,19 @@ export async function saveHiddenVoices(businessId: string, hidden: string[]): Pr
   return clean;
 }
 
+/** How the business's agents say particular words (domain/design/pronounce.ts), one list for every agent. */
+export async function pronunciationsOf(businessId: string): Promise<Pronunciation[]> {
+  if (!dbConfigured()) return [];
+  const rows = await query<{ pronunciations: unknown }>(`select pronunciations from businesses where id = $1`, [businessId]);
+  return cleanPronunciations(rows[0]?.pronunciations);
+}
+
+export async function savePronunciations(businessId: string, list: unknown): Promise<Pronunciation[]> {
+  const clean = cleanPronunciations(list);
+  await query(`update businesses set pronunciations = $2 where id = $1`, [businessId, JSON.stringify(clean)]);
+  return clean;
+}
+
 /** How the business has coached its assistant: the notes it keeps for every call, and the conversation so far. */
 export async function coachingOf(businessId: string, role: CallerKey = "sales"): Promise<{ notes: CoachNote[]; turns: CoachTurn[] }> {
   if (!dbConfigured()) return { notes: [], turns: [] };
@@ -272,15 +286,19 @@ export async function scriptFor(
   assistantSaid: string | null;
   audience: CallAudience;
   reason: string | null;
+  objective: CallObjective;
   houseStyle: string[];
+  pronounce: Pronunciation[];
 }> {
-  const [c, delivery, setup, prefs] = await Promise.all([
+  const [c, delivery, setup, prefs, pronounce] = await Promise.all([
     coachingOf(businessId, role).catch(() => null),
     // If it can't be read, the call goes as calls always did.
     deliveryOf(businessId, role).catch(() => null),
     callSetupOf(businessId, role).catch(() => DEFAULT_CALL_SETUP),
     // The owner's preferences from Sol's induction (sol-induction.ts): every voice agent follows them too.
     agentPrefs(businessId).catch(() => ({ business: [], owner: [] })),
+    // How particular words are said, for every agent (pronounce.ts).
+    pronunciationsOf(businessId).catch(() => []),
   ]);
   return {
     ...scriptLines(c?.notes ?? []),
@@ -289,7 +307,9 @@ export async function scriptFor(
     assistantSaid: setup.saidAs || null,
     audience: setup.audience,
     reason: setup.reason || null,
+    objective: setup.objective ?? "none",
     houseStyle: callVoice(prefs.business, prefs.owner),
+    pronounce,
   };
 }
 

@@ -62,7 +62,8 @@ export const BUILTIN_FIELDS: readonly FieldInfo[] = [
   design("systemType", "System type"),
   design("systemSize", "System size"),
   design("propertyType", "Property type"),
-  design("storeys", "Property storeys"),
+  // Storeys are the property type to the business (26 Nov 2026, Martin): one field, called Property type.
+  design("storeys", "Property type"),
   design("roofType", "Roof type"),
   design("phases", "Phases"),
   design("panel", "PV panel"),
@@ -161,13 +162,16 @@ const CUSTOM_KEY = /^c_[a-z0-9]{4,20}$/;
 const CUSTOM_TAB = /^t_[a-z0-9]{4,20}$/;
 
 /** The arrangement every business starts with: our four tabs, our fields in our order. */
+/** Ours that start hidden: the old typed property type, since storeys now carry that name (26 Nov 2026, Martin). */
+const STARTS_HIDDEN = new Set(["propertyType"]);
+
 export function defaultDealFields(): DealFieldsConfig {
   return {
     tabs: BUILTIN_TABS.map((id) => ({
       id,
       label: TAB_LABELS[id],
       hidden: false,
-      fields: BUILTIN_FIELDS.filter((f) => f.tab === id).map((f) => ({ key: f.key, label: f.label, hidden: false })),
+      fields: BUILTIN_FIELDS.filter((f) => f.tab === id).map((f) => ({ key: f.key, label: f.label, hidden: STARTS_HIDDEN.has(f.key) })),
     })),
   };
 }

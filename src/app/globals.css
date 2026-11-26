@@ -1708,6 +1708,19 @@ html:has(.sales-snap) {
     appearance: none;
     text-align: left;
   }
+  /* Every value sits in the middle of its row (26 Nov 2026, Martin: the price and install date sat off centre). */
+  .deal-fields :is(input, select) {
+    line-height: 2.25rem;
+  }
+  .deal-fields input[type="date"] {
+    display: flex;
+    align-items: center;
+  }
+  .deal-fields input[type="date"]::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+    line-height: 2.25rem;
+  }
 }
 
 /* Sol's sheet on a deal, on a phone, as a chat (22 Nov 2026, Martin): his line a bubble from him, the choices as quick
@@ -2171,8 +2184,10 @@ html:has(.sales-snap) {
     transform: translateY(-3px);
   }
 }
-/* A deal's Sol sheet sits where the lip rises: it steps aside while the sheet is open. */
-html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
+/* A deal's Sol sheet, and Sol's panel on a phone (its microphone sits where the lip rises; 26 Nov 2026, Martin),
+   sit where the lip rises: it steps aside while either is open. */
+html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip,
+html.sol-phone-open .dock-lip {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2187,15 +2202,25 @@ html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
 /* Sol's panel on a phone fits the part of the screen the keyboard leaves (sol-dock.tsx, useFitToKeyboard), and the
    page behind it is held still so Safari can't scroll it into view under the panel. */
 @media (max-width: 1023.98px) {
+  /* It stops above the foot bar, which stands over its foot, so the box and its send round are never under the bar
+     (26 Nov 2026, Martin: "Reply not sending", the send round hidden behind the dock); while something is typed the
+     bar steps aside and the panel takes the whole of what the keyboard leaves. */
   aside.sol-panel {
     top: var(--vv-top, 0px);
     bottom: auto;
-    height: var(--vv-h, 100dvh);
+    height: calc(var(--vv-h, 100dvh) - 4rem - env(safe-area-inset-bottom));
   }
   html.sol-phone-open,
   html.sol-phone-open body {
     overflow: hidden;
     overscroll-behavior: none;
+  }
+}
+
+@media (max-width: 1023.98px) and (pointer: coarse) {
+  body:has(.sol-panel :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):focus)
+    aside.sol-panel {
+    height: var(--vv-h, 100dvh);
   }
 }
 

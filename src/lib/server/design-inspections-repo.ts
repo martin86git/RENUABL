@@ -16,7 +16,7 @@ import {
 import { newId, query } from "./db";
 import { areConnected } from "./design-connections-repo";
 import { record } from "./design-crm-repo";
-import { jobCard, jobFile, type JobCardView } from "./design-job-card-repo";
+import { jobCard, jobDatasheet, jobFile, type JobCardView } from "./design-job-card-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`;
 const owner = async (businessId: string) =>
@@ -195,6 +195,12 @@ export async function inspectionCard(inspectorId: string, id: string): Promise<{
 export async function inspectionFile(inspectorId: string, id: string, fileId: string) {
   const open = await openFor(inspectorId, id);
   return open ? jobFile(open.businessId, open.jobId, fileId) : null;
+}
+
+/** A product's datasheet from the job card, for the inspector of a live inspection only. */
+export async function inspectionDatasheet(inspectorId: string, id: string, sheetId: string) {
+  const open = await openFor(inspectorId, id);
+  return open ? jobDatasheet({ businessId: open.businessId, businessName: open.retailer }, open.jobId, sheetId) : null;
 }
 
 /** Where the inspector's view gets its roof picture: the job's place and address. */

@@ -16,15 +16,64 @@
 export const CALL_AUDIENCES = ["enquired", "cold"] as const;
 export type CallAudience = (typeof CALL_AUDIENCES)[number];
 
+/**
+ * What the call is working towards (26 Nov 2026, Martin: "perhaps another field that says Objective - which could be
+ * book an install date, book a call appointment, book a home visit, closing a deal by assisting with proposal
+ * questions"). "none" is the calls as they were.
+ */
+export const CALL_OBJECTIVES = ["none", "call", "visit", "install", "close"] as const;
+export type CallObjective = (typeof CALL_OBJECTIVES)[number];
+
+export const OBJECTIVE_WORDS: Record<CallObjective, { label: string; hint: string }> = {
+  none: { label: "No set objective", hint: "It finds out what they're after and offers the next step." },
+  call: { label: "Book a call appointment", hint: "A time for someone from your team to ring them." },
+  visit: { label: "Book a home visit", hint: "A day and time that suits them for a site visit." },
+  install: { label: "Book an install date", hint: "Days that suit them for the installation, for the team to confirm." },
+  close: { label: "Help them go ahead", hint: "Answers their proposal questions and guides them to sign it online." },
+};
+
+export const cleanObjective = (raw: unknown): CallObjective =>
+  CALL_OBJECTIVES.includes(raw as CallObjective) ? (raw as CallObjective) : "none";
+
+/**
+ * The objective in the call's instructions, or "" for none. What the agent can't book itself (a visit, an install
+ * day) it gathers and hands to the team; nothing here lets it promise, price or press.
+ */
+export function objectiveLine(objective: CallObjective | null | undefined, o: { canBook: boolean; business: string }): string {
+  const aim = "Your objective on this call";
+  switch (objective) {
+    case "call":
+      return o.canBook
+        ? `${aim}: book them a call appointment with the team, from the times you've been given.`
+        : `${aim}: arrange a call appointment with the team: find out the day and time that suits them and ask the team to call then (request_callback).`;
+    case "visit":
+      return `${aim}: arrange a home visit. You can't book it yourself: find out which days and times suit them and anything the team should know about getting there, then ask the team to confirm it (request_callback). Never promise a visit time.`;
+    case "install":
+      return `${aim}: find the days that suit them for the installation. You can't book it yourself: get two or three days that work and ask the team to confirm one (request_callback). Never promise a date.`;
+    case "close":
+      return `${aim}: help them go ahead with ${o.business}'s proposal. If they have one, answer their questions about it from your facts and, once they're happy, guide them to go ahead on the proposal page. Never change, discount or agree anything on the phone; anything you can't answer goes to the team (request_callback).`;
+    default:
+      return "";
+  }
+}
+
 export interface CallSetup {
   /** How the name is written for the voice ("Shar-lee"); "" says it as spelled. */
   saidAs: string;
   audience: CallAudience;
   /** The words after "calling" in the opening; "" is the usual reason for the audience. */
   reason: string;
+  /** What the call works towards; "none" (or unset, for a setup kept before 26 Nov 2026) is the calls as they were. */
+  objective?: CallObjective;
 }
 
 export const DEFAULT_CALL_SETUP: CallSetup = { saidAs: "", audience: "enquired", reason: "" };
+
+/** The objective as kept on a setup: present only when there is one, so a setup without one reads as before. */
+export const withObjective = (o: unknown): { objective?: CallObjective } => {
+  const c = cleanObjective(o);
+  return c === "none" ? {} : { objective: c };
+};
 
 export const SAID_AS_MAX = 30;
 export const REASON_MAX = 160;
@@ -72,11 +121,15 @@ export function cleanCallSetup(raw: unknown): CallSetup {
     saidAs: cleanSaidAs(s.saidAs),
     audience: CALL_AUDIENCES.includes(s.audience as CallAudience) ? (s.audience as CallAudience) : "enquired",
     reason: cleanReason(s.reason),
+    ...withObjective(s.objective),
   };
 }
 
 export const sameCallSetup = (a: CallSetup, b: CallSetup): boolean =>
-  a.saidAs === b.saidAs && a.audience === b.audience && a.reason === b.reason;
+  a.saidAs === b.saidAs &&
+  a.audience === b.audience &&
+  a.reason === b.reason &&
+  cleanObjective(a.objective) === cleanObjective(b.objective);
 
 /** The words after "calling" on this agent's calls. */
 /** Who is rung and why, as a call or the settings hold it (either may be unset). */
@@ -89,6 +142,9 @@ export function reasonWords(s: CallWhy | null | undefined): string {
 
 /** Whether the calls are as they always were: people who enquired, with the usual reason. */
 export const usualCalls = (s: CallWhy | null | undefined): boolean => s?.audience !== "cold" && !cleanReason(s?.reason);
+
+/** The objective in words for the settings' preview, or null for none. */
+export const objectiveWords = (o: CallObjective | null | undefined): string | null => (o && o !== "none" ? OBJECTIVE_WORDS[o].label : null);
 
 /** The name as the voice is given it: the said-as form when there is one, else the name. */
 export function sayName(o: { assistant: string; assistantSaid?: string | null }): string {
@@ -136,6 +192,8 @@ export const CALL_SETUP_COPY = {
   } as Record<CallAudience, readonly [string, string]>,
   reason: "Reason for the call",
   reasonHint: "The words after “calling” in its opening. Leave it blank for the usual reason.",
+  objective: "Objective",
+  objectiveHint: "What the call works towards. It never presses: it suggests the next step once, and a no is a no.",
   opening: "How the call opens",
   cold: "Cold calls have rules of their own: the Do Not Call Register, the hours you may ring, and saying who you are and how you got their number when asked. Check them before ringing anyone. It never says they enquired, and it takes a no the first time.",
   saved: "Saved. Used from the next call.",

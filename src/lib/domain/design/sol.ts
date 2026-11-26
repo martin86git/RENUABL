@@ -537,7 +537,7 @@ export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: stri
 export function whereThingsAre(): string {
   return [
     ...SECTIONS.map((s) => `- ${s.label}: ${s.pages.map((p) => p.label).join(", ")}`),
-    "- Inside Jobs, by stage (Selling, Getting ready, Installing, Finishing, Done) and as a list, board, calendar or map: the deals board, pre-approvals, Solar Victoria, booking installations, the installations calendar, the job map, after install and grid connections",
+    "- Inside Jobs, by stage (Selling, Getting ready, Installing, Finishing, Done) and as a list, board, calendar or map: the deals board, Solar Victoria, booking installations, the installations calendar, the job map, after install and grid connections",
   ].join("\n");
 }
 

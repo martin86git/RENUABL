@@ -8,8 +8,22 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import clsx from "clsx";
-import { useRouter } from "next/navigation";
-import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ArrowUp,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  HardHat,
+  Mail,
+  Minus,
+  Phone,
+  Play,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
@@ -45,6 +59,8 @@ import {
   remindAt,
   retrySol,
 } from "@/lib/services/sol";
+import { chatSince, tabTitle, tabTurns } from "@/lib/domain/design/sol-tabs";
+import { OPEN_SOL_TAB, dropTab, keepTab, tabById } from "@/lib/services/sol-tabs";
 import { ReminderCard, goWhereAsked, openSolPage } from "./sol-chat";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
 import { SolDraftCard, type DraftAsEdited } from "./sol-draft-card";
@@ -126,9 +142,15 @@ const TODAY_ROOM = "today" as const;
 
 /** His latest answer in Today's conversation, as Today shows it. */
 function todayAnswer(state: SolState): TodayAnswer {
-  const last = roomTurns(state.turns, TODAY_ROOM)
-    .reverse()
-    .find((t) => t.role === "sol");
+  return answerOf(
+    roomTurns(state.turns, TODAY_ROOM)
+      .reverse()
+      .find((t) => t.role === "sol"),
+  );
+}
+
+/** One answer of his as Today shows it. */
+function answerOf(last: SolTurn | undefined): TodayAnswer {
   const extra = last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.meeting || last?.reminder;
   return {
     text: last?.text ?? "Done.",
@@ -193,10 +215,12 @@ export function TodayPad(props: {
     window.setTimeout(() => setTouring(true), 80);
   };
   const [turns, setTurns] = useState<Turn[]>([]);
+  // Set once the chat's own fresh start is defined below (the effect under this one runs after render).
+  const freshRef = useRef<() => void>(() => setTurns([]));
   // The phone's Sol round pressed while already on Today: back to the start, out of any conversation.
   useEffect(() => {
     const first = () => {
-      setTurns([]);
+      freshRef.current();
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
     window.addEventListener(TODAY_FIRST, first);
@@ -231,8 +255,16 @@ export function TodayPad(props: {
   };
   // A question of Sol's being answered in the box (8 Nov 2026, Martin): named in what goes to him.
   const [replyTo, setReplyTo] = useState<SolReply | null>(null);
+  // The chat as a tab (sol-tabs.ts, 26 Nov 2026, Martin): when it began, the tab it came from, and which ask is this
+  // chat's own (an answer to a chat minimised meanwhile lands in its tab, not here).
+  const since = useRef<string | null>(null);
+  const tabId = useRef<string | null>(null);
+  const askedAt = useRef<string | null>(null);
+  const seq = useRef(0);
+  // A chat reopened from a tab while its answer was still coming: when it was asked.
+  const [awaiting, setAwaiting] = useState<string | null>(null);
   const ask = async (q: string, files: SolFile[] = [], about: SolReply | null = null) => {
-    if (asking) return;
+    if (asking || awaiting) return;
     setReplyTo(null);
     // On a phone a question asked on Today goes to Sol's own chat, not into a conversation under the Business | Feed
     // switch (23 Nov 2026, Martin). A file still goes in here: his panel's ask carries words only.
@@ -242,22 +274,120 @@ export function TodayPad(props: {
       return;
     }
     const id = Date.now();
+    const mine = ++seq.current;
+    if (!since.current) since.current = chatSince(id);
+    askedAt.current = chatSince(id);
     setAsking(true);
     const replied = replyToSol(about, q);
     const shownQ = (replied.shown ?? q) + (files.length ? `${q ? "\n" : ""}(Attached: ${files.map((f) => f.name).join(", ")})` : "");
     setTurns((t) => [...t, { id, kind: "ask", q: shownQ, a: null }]);
     window.setTimeout(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), 60);
     const r = await askSol(replied.said || q, files, null, false, replied.shown, TODAY_ROOM);
+    if (r.ok) window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
+    // Minimised while he answered: the answer belongs to its tab now.
+    if (mine !== seq.current) return;
     setAsking(false);
     let a: TodayAnswer;
     if (!r.ok) a = { text: r.message };
     else {
-      window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
       a = todayAnswer(r.state);
       goWhereAsked(r.state, router);
     }
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a } : t)));
   };
+  /** A fresh start: nothing of the chat before carried on. */
+  const freshChat = () => {
+    seq.current++;
+    since.current = null;
+    tabId.current = null;
+    askedAt.current = null;
+    setAwaiting(null);
+    setAsking(false);
+    setReplyTo(null);
+    setTurns([]);
+  };
+  useEffect(() => {
+    freshRef.current = freshChat;
+  });
+  /** The chat put away as a tab on the left, the page back to the start for something else. */
+  const minimise = () => {
+    const first = turns.find((t) => t.kind === "ask");
+    if (!first || first.kind !== "ask" || !since.current) return;
+    const waiting = asking || awaiting !== null;
+    keepTab({
+      id: tabId.current ?? `tab-${Date.now().toString(36)}`,
+      title: tabTitle(first.q),
+      since: since.current,
+      waitingSince: waiting ? (awaiting ?? askedAt.current) : null,
+      status: waiting ? "writing" : "idle",
+      at: new Date().toISOString(),
+    });
+    freshChat();
+  };
+  /** A tab's chat back on the page, read from Sol's conversation. */
+  const openTab = useCallback(async (id: string) => {
+    const tab = tabById(id);
+    if (!tab) return;
+    const r = await loadSol();
+    if (!r.ok) return;
+    const back: Turn[] = [];
+    let n = Date.now();
+    for (const t of tabTurns(r.state.turns, tab)) {
+      if (t.role === "you") back.push({ id: n++, kind: "ask", q: t.shown ?? t.text, a: null });
+      else {
+        const last = back[back.length - 1];
+        if (last?.kind === "ask" && !last.a) last.a = answerOf(t);
+      }
+    }
+    dropTab(id);
+    if (!back.length) return;
+    seq.current++;
+    since.current = tab.since;
+    tabId.current = tab.id;
+    askedAt.current = null;
+    setAsking(false);
+    setReplyTo(null);
+    const last = back[back.length - 1];
+    setAwaiting(tab.status === "writing" && last.kind === "ask" && !last.a ? tab.waitingSince : null);
+    setTurns(back);
+  }, []);
+  // A tab pressed while on Today, or on another page that brought us here (?soltab=).
+  useEffect(() => {
+    const open = (e: Event) => void openTab((e as CustomEvent<string>).detail);
+    window.addEventListener(OPEN_SOL_TAB, open);
+    return () => window.removeEventListener(OPEN_SOL_TAB, open);
+  }, [openTab]);
+  // Read through the router's own search params: on arriving from another page the address isn't updated yet when
+  // this page's first effects run.
+  const askedTab = useSearchParams().get("soltab");
+  useEffect(() => {
+    if (!askedTab) return;
+    router.replace("/design", { scroll: false });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a tab asked for from another page opens once it's here
+    void openTab(askedTab);
+  }, [askedTab, openTab, router]);
+  // A reopened chat whose answer was still coming: it lands as soon as Sol's conversation has it.
+  useEffect(() => {
+    if (!awaiting) return;
+    const land = (state: SolState) => {
+      const answer = roomTurns(state.turns, TODAY_ROOM).find((t) => t.role === "sol" && t.at >= awaiting);
+      if (!answer) return;
+      setAwaiting(null);
+      setTurns((all) => all.map((t, i) => (i === all.length - 1 && t.kind === "ask" && !t.a ? { ...t, a: answerOf(answer) } : t)));
+    };
+    const heard = (e: Event) => {
+      const state = (e as CustomEvent<SolState | undefined>).detail;
+      if (state?.turns) land(state);
+    };
+    window.addEventListener(SOL_CHANGED, heard);
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadSol().then((r) => r.ok && land(r.state));
+    }, 4000);
+    return () => {
+      window.removeEventListener(SOL_CHANGED, heard);
+      window.clearInterval(t);
+    };
+  }, [awaiting]);
   /** A draft of his handed to the deal's Email tab, as his panel hands it. */
   const openDraft = (d: DraftAsEdited) => {
     try {
@@ -298,12 +428,15 @@ export function TodayPad(props: {
     const before = turns.find((t) => t.id === id);
     setAsking(true);
     setTurns((all) => all.map((t) => (t.id === id && t.kind === "ask" ? { ...t, a: null } : t)));
+    const mine = ++seq.current;
+    askedAt.current = chatSince(Date.now());
     const r = await retrySol(null, TODAY_ROOM);
+    if (r.ok) window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
+    if (mine !== seq.current) return;
     setAsking(false);
     let a: TodayAnswer;
     if (!r.ok) a = before?.kind === "ask" && before.a ? { ...before.a, again: false } : { text: r.message };
     else {
-      window.dispatchEvent(new CustomEvent(SOL_CHANGED, { detail: r.state }));
       a = todayAnswer(r.state);
       goWhereAsked(r.state, router);
     }
@@ -402,6 +535,9 @@ export function TodayPad(props: {
                   </div>
                   <SolSays>
                     <SolWorking busy={!t.a} />
+                    {!t.a && awaiting && t.id === turns[turns.length - 1]?.id && (
+                      <p className="text-[12.5px] text-muted">Still writing it up. It lands here when it&apos;s ready.</p>
+                    )}
                     {!t.a ? null : (
                       <div className="sol-prose group/turn">
                         <Typed text={t.a.text} onDone={follow} onAnswer={asking ? undefined : answer} />
@@ -487,16 +623,30 @@ export function TodayPad(props: {
       {talking && !onFeed && !onCal && (
         <div className="sticky bottom-0 z-10 bg-gradient-to-t from-canvas from-60% to-transparent pb-5 pt-10 print:hidden">
           <div className="mx-auto max-w-3xl">
-            {!dayTold && (
-              <button
-                type="button"
-                onClick={showDay}
-                className="mb-2.5 inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
-              >
-                <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
-              </button>
-            )}
-            <SolBox onAsk={askIn} asking={asking} replyTo={replyTo} onStopReply={() => setReplyTo(null)} />
+            <div className="mb-2.5 flex items-center gap-2">
+              {!dayTold && (
+                <button
+                  type="button"
+                  onClick={showDay}
+                  className="inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+                >
+                  <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
+                </button>
+              )}
+              {/* The chat put away as a tab on the left, to carry on elsewhere while Sol answers (sol-tabs.ts). */}
+              {turns.some((t) => t.kind === "ask") && (
+                <button
+                  type="button"
+                  onClick={minimise}
+                  title="Keep this chat as a tab on the left and start afresh. It lights up when Sol's answer lands."
+                  className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
+                >
+                  <Minus className="size-3.5" aria-hidden /> Minimise
+                </button>
+              )}
+            </div>
+
+            <SolBox onAsk={askIn} asking={asking || awaiting !== null} replyTo={replyTo} onStopReply={() => setReplyTo(null)} />
           </div>
         </div>
       )}

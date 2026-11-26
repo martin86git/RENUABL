@@ -156,12 +156,15 @@ export function messageBlocks(text: string): MessageBlock[] {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** The words as HTML: escaped, paragraphs with line breaks, and real lists styled inline. */
-export function messageHtml(text: string): string {
-  const li = (items: string[]) => items.map((i) => `<li style="margin:0 0 4px">${esc(i)}</li>`).join("");
+/**
+ * The words as HTML: escaped, paragraphs with line breaks, and real lists styled inline. `line` makes one line's HTML
+ * (a deal's email passes one that makes its links real); left out, a line is only escaped.
+ */
+export function messageHtml(text: string, line: (words: string) => string = esc): string {
+  const li = (items: string[]) => items.map((i) => `<li style="margin:0 0 4px">${line(i)}</li>`).join("");
   return messageBlocks(text)
     .map((b) => {
-      if (b.kind === "p") return `<p>${b.lines.map(esc).join("<br>")}</p>`;
+      if (b.kind === "p") return `<p>${b.lines.map((l) => line(l)).join("<br>")}</p>`;
       if (b.kind === "ul") return `<ul style="margin:0 0 14px;padding-left:22px">${li(b.items)}</ul>`;
       return `<ol${b.start !== 1 ? ` start="${b.start}"` : ""} style="margin:0 0 14px;padding-left:24px">${li(b.items)}</ol>`;
     })

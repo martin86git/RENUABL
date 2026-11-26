@@ -27,6 +27,8 @@ export const saveAsBuilt = (where: { jobId: string } | { token: string }, asBuil
 
 /** Where a file on the card is served: the team's own way, or through the installer's link. */
 export const teamFileHref = (jobId: string, fileId: string) => `${teamPath(jobId)}/files/${encodeURIComponent(fileId)}`;
+export const teamSheetHref = (jobId: string, id: string) => `${teamPath(jobId)}/datasheet/${encodeURIComponent(id)}`;
+export const linkSheetHref = (token: string, id: string) => `${linkPath(token)}/datasheet/${encodeURIComponent(id)}`;
 export const linkFileHref = (token: string, fileId: string) => `${linkPath(token)}/files/${encodeURIComponent(fileId)}`;
 export const linkRoofHref = (token: string) => `${linkPath(token)}/roof`;
 

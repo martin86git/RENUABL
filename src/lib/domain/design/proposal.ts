@@ -318,7 +318,8 @@ export interface ProposalInternal {
   cost: number;
   margin: number;
   priceExGst: number;
-  lines: { group: CostGroup; label: string; amount: number }[];
+  /** Each quote line; a product's code and how many where the line is one product (for the order and its datasheet). */
+  lines: { group: CostGroup; label: string; amount: number; qty?: number; sku?: string }[];
   /** The saved roof's version it was worked out from. */
   projectVersion: number;
   /** Which of the roof's designs it is. */

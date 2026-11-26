@@ -502,6 +502,7 @@ ${phone}
 `
     : ""
 }Your name and voice: when they ask you to go by another name, put it in rename (letters only: it's said out loud on calls). When they ask for another voice, put its id from this list in voice and say which you chose; when nothing on the list fits, say so and suggest the nearest. Otherwise leave both empty. Your picture is changed with the pencil on your photo at the top of this chat: point them there if they ask.
+How you say a word: a note can't change how a word sounds (the voice reads what it sees). When they say you say a word wrong, tell them to open your settings (the cog at the top of this chat), "How words are said", and add the word with how it should sound written out (e.g. Solar, said as "Sola"); every agent then says it that way. Another voice can help too.
 Voices you can speak in (you speak in ${voiceNow} now):
 ${voiceList}
 
@@ -527,15 +528,16 @@ export const COACH_COPY = {
   intro: (name: string) =>
     `Tell ${name} what to say, how to say it, or what to leave out. ${name} keeps what you ask as notes and uses them on every call from then on.`,
   empty: (name: string) =>
-    `${name} hasn't been given any notes yet. Try "Mention we're a local Melbourne business" or "Slow down when you give the call times."`,
+    `${name}'s script has no lines yet. Try "Mention we're a local Melbourne business" or "Slow down when you give the call times."`,
   hello: (name: string) =>
     `Hi, I'm ${name}. Ask me anything, or ask me to ring a customer and I'll get the call ready for you to send. Tell me what to say on calls, how to say it, or what to leave out, and I'll keep it as a note for every call from then on.`,
   script: (name: string) =>
-    `What ${name} has been told to say and how. Everything you tell ${name} in the chat is written here and used on every call.`,
+    `What ${name} says and how, line by line. Write a line here, or tell ${name} in the chat; every line is used on every call.`,
   fixedTitle: "What never changes",
   lockedTitle: "Locked rules",
   lockedNote: (name: string) => `${name} follows these on every call, every time. Only you can unlock one.`,
-  notesTitle: "Notes",
+  notesTitle: "Script lines",
+  addLine: "Add a line to the script",
   lockFull: "That's as many rules as can be locked in. Unlock one first.",
   callAbout: (name: string) => `What should ${name} have done differently on this call?`,
 } as const;

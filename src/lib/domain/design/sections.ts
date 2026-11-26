@@ -49,6 +49,10 @@ export const SECTIONS: readonly Section[] = [
       { id: "pipeline", label: "Pipeline", href: "/design/sales/pipelines" },
       { id: "sent", label: "Proposals open", href: "/design/sales/proposals" },
       { id: "signed", label: "Proposals closed", href: "/design/sales/signed" },
+      // Pre-approvals (26 Nov 2026, Martin: "i would expect this to be in sales… because it comes before the job"): the
+      // network approval asked for while the deal is still being sold, and sold jobs waiting on it (approvals.ts). Its id
+      // is the gate's, so the count of jobs waiting there shows on it.
+      { id: "preapproval", label: "Pre-approvals", href: "/design/procurement/pre-approvals" },
       // The call log (8 Nov 2026), a tab on Today until Today became one page.
       { id: "calls", label: "Calls", href: "/design/calls" },
     ],
@@ -66,7 +70,6 @@ export const SECTIONS: readonly Section[] = [
         also: [
           "/design/deals",
           "/design/sales",
-          "/design/procurement/pre-approvals",
           "/design/procurement/solar-victoria",
           "/design/procurement/book",
           "/design/procurement/map",

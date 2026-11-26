@@ -6,6 +6,8 @@ import { SEAT_MONTHLY_CENTS, dollars } from "@/lib/domain/design/plans";
 import { cleanContent, contentProblem } from "./edm";
 import { claimsToCheck } from "./edm-sol";
 import {
+  PANEL_FIRST,
+  PANEL_REST,
   GTM_EMAILS,
   GTM_PICTURES,
   MAX_WORDS,
@@ -52,8 +54,9 @@ describe("the launch drafts", () => {
 
   it("give every picture a hook above it and a button under it, show the designer but never first, and end on the Marketplace band", () => {
     for (const c of GTM_EMAILS) {
-      expect(c.blocks[0].kind).toBe("heading");
-      const body = c.blocks.slice(0, -2);
+      expect(c.blocks[0].kind).toBe("bar");
+      expect(c.blocks[1].kind).toBe("heading");
+      const body = c.blocks.slice(1, -2).filter((b) => b.kind !== "spacer");
       // Each part: a heading, then at least one picture, then a button before the next heading.
       const parts: (typeof body)[] = [];
       for (const b of body) b.kind === "heading" ? parts.push([b]) : parts.at(-1)!.push(b);
@@ -75,6 +78,19 @@ describe("the launch drafts", () => {
     expect(voiceAday(4900)).toBeCloseTo(1.61, 2);
     expect(4900 / 100 / 28).toBeLessThan(2);
     expect(PRICE_DAY_LINE).toBe("$49 a month is $1.61 a day.");
+  });
+
+  it("put each part on its own panel, apart from the next", () => {
+    for (const c of GTM_EMAILS) {
+      const heads = c.blocks.filter((b) => b.kind === "heading");
+      expect(heads[0].fill).toBe(PANEL_FIRST);
+      for (const h of heads.slice(1)) expect(h.fill).toBe(PANEL_REST);
+      // Neighbouring blocks of one colour join one panel, so parts are kept apart by an unfilled spacer.
+      c.blocks.forEach((b, i) => {
+        const n = c.blocks[i + 1];
+        if (n?.kind === "heading" && i > 1) expect(b.fill).toBeUndefined();
+      });
+    }
   });
 
   it("are short: a glance, not a read", () => {

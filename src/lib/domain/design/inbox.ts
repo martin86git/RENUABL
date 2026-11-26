@@ -92,17 +92,76 @@ export const plainBody = (body: string) =>
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** One line as HTML: escaped, its [words](address) links made real (only safe addresses), the rest left as words. */
-function lineHtml(line: string): string {
+const BARE = /https?:\/\/[^\s<>"]+/g;
+/** What a written address can't end in: the full stop or bracket after it belongs to the sentence. */
+const TRAILING = /[.,;:!?)\]]+$/;
+
+/** Plain words as HTML, with any web address written out in them made a link to itself (`bare`). */
+function wordsHtml(words: string, bare: boolean): string {
+  if (!bare) return esc(words);
+  let out = "";
+  let at = 0;
+  for (const m of words.matchAll(BARE)) {
+    const written = m[0].replace(TRAILING, "");
+    const url = cleanLinkUrl(written);
+    if (!url) continue;
+    out += `${esc(words.slice(at, m.index))}<a href="${esc(url)}" style="color:#1a56db">${esc(written)}</a>`;
+    at = m.index! + written.length;
+  }
+  return out + esc(words.slice(at));
+}
+
+/**
+ * One line as HTML: escaped, its [words](address) links made real (only safe addresses), the rest left as words. With
+ * `bare`, a web address written out in the words is a link too (a deal's email, 26 Nov 2026).
+ */
+export function lineHtml(line: string, bare = false): string {
   let out = "";
   let at = 0;
   for (const m of line.matchAll(LINK)) {
-    out += esc(line.slice(at, m.index));
+    out += wordsHtml(line.slice(at, m.index), bare);
     const url = cleanLinkUrl(m[2]);
     out += url ? `<a href="${esc(url)}" style="color:#1a56db">${esc(m[1])}</a>` : esc(m[1]);
     at = m.index! + m[0].length;
   }
-  return out + esc(line.slice(at));
+  return out + wordsHtml(line.slice(at), bare);
+}
+
+/**
+ * What the link box starts with for a selection (26 Nov 2026, Martin: "i need to be able to turn a written link into a
+ * hyperlink"): a written address picked (or the caret inside one) is the link's address, with the words to show left
+ * to type; picked words are the words, with the address to type. `start` and `end` are what the link will replace.
+ */
+export function linkStart(text: string, start: number, end: number): { start: number; end: number; words: string; url: string } {
+  if (start === end) {
+    for (const m of text.matchAll(BARE)) {
+      const written = m[0].replace(TRAILING, "");
+      if (start >= m.index! && start <= m.index! + written.length && cleanLinkUrl(written))
+        return { start: m.index!, end: m.index! + written.length, words: "", url: written };
+    }
+    return { start, end, words: "", url: "" };
+  }
+  const picked = text.slice(start, end);
+  const lead = picked.length - picked.trimStart().length;
+  const from = start + lead;
+  const to = from + picked.trim().length;
+  const sel = text.slice(from, to);
+  const isAddress = /^(https?:\/\/|www\.)\S+$/i.test(sel) && cleanLinkUrl(sel) !== null;
+  return isAddress ? { start: from, end: to, words: "", url: sel } : { start: from, end: to, words: sel, url: "" };
+}
+
+/** The words with [words](address) put in place of `start`..`end`; null when the address isn't a web or mail link. */
+export function putLink(text: string, start: number, end: number, words: string, url: string): { text: string; caret: number } | null {
+  const safe = cleanLinkUrl(url);
+  if (!safe) return null;
+  const shown =
+    words
+      .replace(/[[\]\n]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 300) || safe.replace(/^mailto:/, "");
+  const link = `[${shown}](${safe})`;
+  return { text: text.slice(0, start) + link + text.slice(end), caret: start + link.length };
 }
 
 /** The words as the email's HTML: paragraphs, real lists and links, at the chosen size, with the pictures under them. */
@@ -111,7 +170,7 @@ export function composeHtml(body: string, size: EmailSize, picturesHtml = ""): s
   const li = (items: string[]) => items.map((i) => `<li style="margin:0 0 4px">${lineHtml(i)}</li>`).join("");
   const blocks = messageBlocks(body)
     .map((b) => {
-      if (b.kind === "p") return `<p style="margin:0 0 12px">${b.lines.map(lineHtml).join("<br>")}</p>`;
+      if (b.kind === "p") return `<p style="margin:0 0 12px">${b.lines.map((l) => lineHtml(l)).join("<br>")}</p>`;
       if (b.kind === "ul") return `<ul style="margin:0 0 12px;padding-left:22px">${li(b.items)}</ul>`;
       return `<ol${b.start !== 1 ? ` start="${b.start}"` : ""} style="margin:0 0 12px;padding-left:24px">${li(b.items)}</ol>`;
     })

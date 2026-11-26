@@ -3,6 +3,7 @@
 import { useDealStageLabel } from "./stage-select";
 import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
+import { interestsOf } from "@/lib/domain/design/deal-interest";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -94,6 +95,7 @@ import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
 import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
+import { DealInstallerInvoice } from "./deal-installer-invoice";
 import { DealFiles } from "./deal-pulse";
 import { DealSol } from "./deal-sol";
 import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
@@ -423,13 +425,14 @@ export function DealPage({ id }: { id: string }) {
   }, [id, activity.length]);
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
+  const [priceFocused, setPriceFocused] = useState(false);
 
   const load = useCallback(async () => {
     const res = await loadJob(id);
     if (!res.ok) return setProblem(res.message);
     setJob(res.job);
     setCustomer(res.customer);
-    setValue(res.job.value === null ? "" : String(Math.round(res.job.value)));
+    setValue(res.job.value === null ? "" : String(res.job.value));
     const [history, design] = await Promise.all([
       loadCustomer(res.job.customerId),
       res.job.projectId ? loadDealDesign(res.job.projectId) : Promise.resolve(null),
@@ -779,9 +782,9 @@ export function DealPage({ id }: { id: string }) {
           )}
 
           {tab === "team" ? (
-            <section className={clsx(ui.card, "mt-5 p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
-              <div className="mt-3">
+            <section className={clsx(ui.card, "mt-5 p-5 max-sm:p-4")}>
+              <h2 className="sr-only">Team chat on this deal</h2>
+              <div>
                 <DealTeamChat jobId={id} />
               </div>
             </section>
@@ -853,9 +856,9 @@ export function DealPage({ id }: { id: string }) {
                   <>
                     <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       <EditLine
-                        key={`title:${job.title}`}
+                        key={`title:${job.title}:${customer.name}`}
                         label="Deal name"
-                        value={job.title}
+                        value={dealName(job.title, customer.name, job.address)}
                         max={120}
                         onSave={async (title) => {
                           if (!title) {
@@ -870,14 +873,17 @@ export function DealPage({ id }: { id: string }) {
                         <StageSelect job={job} className={clsx(ui.input, "mt-1 appearance-auto")} onChange={(to) => void patch(to)} />
                       </label>
                       <label className="block text-xs text-muted">
-                        Quoted price, inc. GST ($)
+                        Quoted price, inc. GST
+                        {/* With its $ and cents (26 Nov 2026, Martin); typed as plain figures. */}
                         <input
                           className={clsx(ui.input, "mt-1 tabular-nums")}
-                          inputMode="numeric"
-                          value={value}
-                          onChange={(e) => setValue(e.target.value.replace(/[^d]/g, "").slice(0, 8))}
+                          inputMode="decimal"
+                          value={priceFocused ? value : value === "" ? "" : dollarsAndCents(Number(value))}
+                          onFocus={() => setPriceFocused(true)}
+                          onChange={(e) => setValue(cleanPriceTyping(e.target.value))}
                           onBlur={() => {
-                            const next = value === "" ? null : Number(value);
+                            setPriceFocused(false);
+                            const next = value === "" ? null : Math.round(Number(value) * 100) / 100;
                             if (next !== job.value) void patch({ value: next });
                           }}
                           placeholder="From the design"
@@ -901,7 +907,7 @@ export function DealPage({ id }: { id: string }) {
                         onSave={(source) => saveWho({ source })}
                       />
                       <label className="block text-xs text-muted">
-                        Owner
+                        Deal owner
                         <select
                           className={clsx(ui.input, "mt-1 appearance-auto")}
                           value={job.owner ?? ""}
@@ -999,6 +1005,7 @@ export function DealPage({ id }: { id: string }) {
                         );
                       })}
                     </div>
+                    {shownTab?.id === "installation" && <DealInstallerInvoice jobId={job.id} />}
                     <Link
                       href={`${PATHS.settings}/deal-fields`}
                       className="mt-4 block text-xs text-muted underline underline-offset-4 hover:text-ink"
@@ -1226,14 +1233,14 @@ function CallMenu({
             <span
               className={clsx(
                 "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
-                mini ? "size-9" : "size-12",
+                mini ? "size-9" : "size-11",
                 at ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
                 !phone && "text-muted group-hover:text-muted",
               )}
             >
-              <Phone className={mini ? "size-4" : "size-5"} aria-hidden />
+              <Phone className={mini ? "size-4" : "size-[18px]"} aria-hidden />
             </span>
-            <span className={clsx(mini ? "text-[9.5px]" : "text-[11px]", "font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
+            <span className={clsx(mini ? "text-[9.5px]" : "text-[10.5px]", "font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
           </>
         ) : (
           <>
@@ -1540,8 +1547,9 @@ function DealMenu({
   const sold = WON_STAGES.includes(stage);
   const installed = INSTALLED_STAGES.includes(stage);
   const down = vertical || mini;
-  const size = mini ? "size-9" : "size-12";
-  const icon = mini ? "size-4" : "size-5";
+  // A little smaller on a computer (26 Nov 2026, Martin): 44 px rounds, 18 px marks.
+  const size = mini ? "size-9" : "size-11";
+  const icon = mini ? "size-4" : "size-[18px]";
   const round = (on: boolean) =>
     clsx(
       "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
@@ -1567,7 +1575,7 @@ function DealMenu({
         mini
           ? "sticky top-3 z-10 -ml-2.5 flex flex-col items-center gap-2 self-start sm:hidden"
           : vertical
-            ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+            ? "sticky hidden flex-col items-center gap-3 pt-1 xl:flex"
             : "-mx-1 hidden items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex xl:hidden [&::-webkit-scrollbar]:hidden"
       }
     >
@@ -1666,7 +1674,7 @@ function DealMenu({
             tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
           )}
         >
-          <SolBadge className={mini ? "size-[18px]" : "size-[22px]"} />
+          <SolBadge className={mini ? "size-[18px]" : "size-5"} />
         </span>
       </RailRound>
       {mini && onDelete && (
@@ -1782,7 +1790,7 @@ function RailRound({
       className={clsx("group flex flex-col items-center", mini ? "gap-0.5" : "gap-1")}
     >
       {children}
-      <span className={clsx(mini ? "text-[9.5px] leading-tight" : "text-[11px]", "font-medium", on ? "text-ink" : "text-ink-2")}>
+      <span className={clsx(mini ? "text-[9.5px] leading-tight" : "text-[10.5px]", "font-medium", on ? "text-ink" : "text-ink-2")}>
         {label}
       </span>
     </button>
@@ -1821,4 +1829,25 @@ function MailEntry({ m }: { m: DealMail }) {
       </a>
     </li>
   );
+}
+
+/** A price as the business reads it: "$14,747.00". */
+function dollarsAndCents(n: number): string {
+  return Number.isFinite(n) ? `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+}
+
+/** What is kept as a price is typed: figures and one point, two places after it. */
+function cleanPriceTyping(typed: string): string {
+  const [whole, ...rest] = typed.replace(/[^\d.]/g, "").split(".");
+  const cents = rest.join("").slice(0, 2);
+  return (whole.slice(0, 8) + (typed.includes(".") ? `.${cents}` : "")).replace(/^\./, "0.");
+}
+
+/**
+ * The deal's name as shown (26 Nov 2026, Martin: "Deal name should be the customer name or the address"): a deal named
+ * only by what they want ("Solar", "Solar and battery") reads as the customer's name, else its address. A name typed
+ * over it is kept as typed.
+ */
+function dealName(title: string, customer: string, address: string): string {
+  return interestsOf(title) !== null ? customer.trim() || address || title : title;
 }

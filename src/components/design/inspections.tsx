@@ -18,6 +18,7 @@ import {
   certificateHref,
   declineInspection,
   inspectionFileHref,
+  inspectionSheetHref,
   inspectionRoofHref,
   jobInspection,
   loadInspection,
@@ -252,6 +253,7 @@ export function InspectionPage({ id }: { id: string }) {
             card={got.card}
             picture={got.card.roof ? inspectionRoofHref(id) : null}
             fileHref={(fileId) => inspectionFileHref(id, fileId)}
+            sheetHref={(sheetId) => inspectionSheetHref(id, sheetId)}
             aside={
               <div className="sm:col-span-2">
                 <Outcome
