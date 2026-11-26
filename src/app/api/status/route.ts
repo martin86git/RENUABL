@@ -1,3 +1,4 @@
+import { webhookSecrets } from "@/lib/domain/stripe-webhook";
 import { connection } from "next/server";
 import { googleAdsConfig } from "@/lib/domain/google-ads";
 import { metaPixelId } from "@/lib/domain/meta-pixel";
@@ -40,7 +41,19 @@ export async function GET() {
   const microsoftVoicesCheck = await checkMicrosoftVoices();
   return Response.json(
     {
-      stripe: { key: mode, accepted: stripeWorks, webhookSecret: set(process.env.STRIPE_WEBHOOK_SECRET) },
+      stripe: {
+        key: mode,
+        accepted: stripeWorks,
+        webhookSecret: set(process.env.STRIPE_WEBHOOK_SECRET),
+        // Whether each signing secret at least looks like one (yes/no only, never the value).
+        webhookSecretLooksRight:
+          webhookSecrets(process.env.STRIPE_WEBHOOK_SECRET).every((x) => x.startsWith("whsec_")) && set(process.env.STRIPE_WEBHOOK_SECRET),
+        connectWebhookSecret: set(process.env.STRIPE_CONNECT_WEBHOOK_SECRET),
+        connectWebhookSecretLooksRight:
+          webhookSecrets(process.env.STRIPE_CONNECT_WEBHOOK_SECRET).every((x) => x.startsWith("whsec_")) &&
+          set(process.env.STRIPE_CONNECT_WEBHOOK_SECRET),
+        publishableKey: set(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
+      },
       hubspot: Boolean(hubToken),
       // A live check: "ok", or what's wrong in plain words.
       hubspotCheck,

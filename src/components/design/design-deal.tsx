@@ -95,6 +95,7 @@ import { DEAL_TOUR, DEAL_TOUR_KEY } from "@/lib/domain/design/deal-tour";
 import { EXAMPLE_SOURCE } from "@/lib/domain/design/example-deals";
 import { DealProposal } from "./design-proposal";
 import { PATHS, ui } from "./design-shell";
+import { DealInstallerInvoice } from "./deal-installer-invoice";
 import { DealFiles } from "./deal-pulse";
 import { DealSol } from "./deal-sol";
 import { hasPulse, type DealPulse } from "@/lib/domain/design/deal-heat";
@@ -1004,6 +1005,7 @@ export function DealPage({ id }: { id: string }) {
                         );
                       })}
                     </div>
+                    {shownTab?.id === "installation" && <DealInstallerInvoice jobId={job.id} />}
                     <Link
                       href={`${PATHS.settings}/deal-fields`}
                       className="mt-4 block text-xs text-muted underline underline-offset-4 hover:text-ink"

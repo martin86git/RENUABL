@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, LayoutGrid, Minus, Plus, Rows3, Wrench, Zap } from "lucide-react";
+import { ArrowRight, BadgeCheck, ChevronDown, ChevronLeft, ChevronRight, CreditCard, LayoutGrid, Minus, Plus, Rows3, Wrench, Zap } from "lucide-react";
 import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import Link from "next/link";
 import { createPortal } from "react-dom";
@@ -56,6 +56,7 @@ const GROUP_ICONS: Record<(typeof COST_GROUPS)[number], GroupIcon> = {
   Switchboard: LayoutGrid,
   Installation: Wrench,
   Commission: BadgeCheck,
+  "Card fees": CreditCard,
 };
 
 /**
