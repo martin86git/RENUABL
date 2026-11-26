@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Pre-approvals",
+    words: "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
+  },
+  {
+    day: "2026-11-26",
     area: "Marketing",
     words: "Email buttons: choose a button's shape, size, width and colour, on a Button block and on the top bar's button.",
   },

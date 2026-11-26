@@ -31,6 +31,7 @@ import type { SolFile, SolReminder, SolState, SolTurn } from "@/lib/domain/desig
 import { roomTurns } from "@/lib/domain/design/sol-rooms";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
+import { SolPortalCard } from "./sol-portal-card";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
@@ -122,7 +123,7 @@ type TodayAnswer = {
   designs?: SolDesignShown[];
   again?: boolean;
   goTo?: SolGoTo;
-  with?: Pick<SolTurn, "charts" | "diagrams" | "drafts" | "meeting" | "reminder">;
+  with?: Pick<SolTurn, "charts" | "diagrams" | "drafts" | "meeting" | "reminder" | "portal">;
 };
 
 /** Today's own room in the member's conversation with Sol. */
@@ -139,11 +140,20 @@ function todayAnswer(state: SolState): TodayAnswer {
 
 /** One answer of his as Today shows it. */
 function answerOf(last: SolTurn | undefined): TodayAnswer {
-  const extra = last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.meeting || last?.reminder;
+  const extra = last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.meeting || last?.reminder || last?.portal;
   return {
     text: last?.text ?? "Done.",
     ...(last && extra
-      ? { with: { charts: last.charts, diagrams: last.diagrams, drafts: last.drafts, meeting: last.meeting, reminder: last.reminder } }
+      ? {
+          with: {
+            charts: last.charts,
+            diagrams: last.diagrams,
+            drafts: last.drafts,
+            meeting: last.meeting,
+            reminder: last.reminder,
+            portal: last.portal,
+          },
+        }
       : {}),
     // A roof design he shows is drawn here, in the conversation itself (3 Nov 2026, Martin).
     ...(last?.designs?.length ? { designs: last.designs } : {}),
@@ -557,6 +567,7 @@ export function TodayPad(props: {
                         ) : null}
                         {t.a.with && (
                           <div className="mt-3 max-w-2xl space-y-3">
+                            {t.a.with.portal && <SolPortalCard portal={t.a.with.portal} />}
                             {t.a.with.charts?.map((c, k) => (
                               <SolChartView key={k} chart={c} />
                             ))}
