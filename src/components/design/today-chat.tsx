@@ -199,10 +199,11 @@ export function TodayChat(props: {
           in place of "How's the business going". */}
       {/* 22 Nov 2026, Martin: here Sol is only the etched brain (`SolEtch`), no colour or glow, a little higher, clear of
           the date; then "more like a white / grey… less dark", on phones too. */}
+      {/* 26 Nov 2026, Martin: on a phone the brain, date, weather and box sit a line lower in the pad (mt-6, was -mt-2). */}
       {/* 23 Nov 2026, Martin: the brain takes the dock's colour, a pale navy on the post-sale tools. */}
       <span
         className={clsx(
-          "relative -mt-2 mb-3 inline-flex transition-colors duration-500 sm:-mt-6 sm:mb-5",
+          "relative mt-6 mb-3 inline-flex transition-colors duration-500 sm:-mt-6 sm:mb-5",
           post ? "text-[#b4cf5e]" : dock === "market" ? "text-[#a9c3ec]" : "text-[#c9ccd3]",
         )}
       >
