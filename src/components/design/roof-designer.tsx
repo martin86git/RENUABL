@@ -1845,9 +1845,12 @@ export function RoofDesigner(props: {
         // The dock under the picture is only as tall as what it holds (26 Nov 2026, Martin): the picture takes the rest.
         const want = solFoldedNow.current ? PHONE_FOLDED_BAND : dockWantNow.current;
         const drop = want !== null ? Math.max(0, restOpen - want) : 0;
-        const pb = drop && want !== null ? want : PHONE_BANDS.below;
-        const rest = restOpen - drop;
-        const tall = photoH + drop;
+        // A dock taller than the room under the picture takes it from the picture, never below 80% of the photo's own
+        // shape (26 Nov 2026, Martin: the controller's turn thumbs ran below the screen).
+        const cut = want !== null && want > restOpen ? Math.min(want - restOpen, Math.max(0, photoH - Math.round(shortest * 0.8))) : 0;
+        const pb = (drop || cut) && want !== null ? (cut ? restOpen + cut : want) : PHONE_BANDS.below;
+        const rest = restOpen - drop + cut;
+        const tall = photoH + drop - cut;
         setStage((was) =>
           was &&
           was.photoH === tall &&

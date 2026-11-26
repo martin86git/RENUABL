@@ -339,7 +339,7 @@ export function SolController(props: {
       onStep={(times) => props.onSlide?.(by * times)}
       onHold={props.onHold}
       aria-label={by < 0 ? "Slide left along the row" : "Slide right along the row"}
-      className={clsx(small, "pointer-events-auto active:bg-white/15", upright ? "h-10 w-[4.25rem]" : "h-8 w-8")}
+      className={clsx(small, "pointer-events-auto active:bg-white/15", upright ? "h-11 w-12" : "h-8 w-8")}
     >
       {by < 0 ? <ChevronLeft className="size-5" aria-hidden /> : <ChevronRight className="size-5" aria-hidden />}
     </HoldButton>
@@ -622,44 +622,54 @@ function UprightPlate(
             {props.done}
           </div>
         </div>
-        {!folded && (props.wholeLine || props.wholeArray) && (
-          <div className="mt-2 flex justify-center gap-2">
-            {props.wholeLine && props.onWholeLine && (
-              <button
-                type="button"
-                onClick={props.onWholeLine}
-                aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
-              >
-                <Columns2 className="size-3.5 text-sun-line" aria-hidden />
-                Line {props.wholeLine}
-              </button>
-            )}
-            {props.wholeArray && props.onWholeArray && (
-              <button
-                type="button"
-                onClick={props.onWholeArray}
-                aria-label={`Pick the whole array: ${props.wholeArray} panels`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
-              >
-                <LayoutGrid className="size-3.5" aria-hidden />
-                Select all {props.wholeArray}
-              </button>
-            )}
-          </div>
-        )}
-        {/* The panel counter while panels are being laid. */}
-        {!folded && props.counter && <div className="mt-2 flex justify-center">{props.counter}</div>}
+        {/* Line and Select all, and the counter while laying, with ← and → either side of them (26 Nov 2026, Martin:
+            stacked, the slide buttons pushed the turn thumbs below the screen). */}
         {!folded && (
-          <div className="mt-2.5 flex items-end justify-between gap-2">
-            {props.panels > 0 ? (
-              <div className="flex flex-col items-center gap-1.5">
-                {props.slideStep && <div className="rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(-1)}</div>}
-                {props.thumb(-1)}
-              </div>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {props.panels > 0 && props.slideStep ? (
+              <div className="shrink-0 rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(-1)}</div>
             ) : (
               <span />
             )}
+            <div className="flex min-w-0 flex-col items-center gap-2">
+              {(props.wholeLine || props.wholeArray) && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {props.wholeLine && props.onWholeLine && (
+                    <button
+                      type="button"
+                      onClick={props.onWholeLine}
+                      aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+                      className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+                    >
+                      <Columns2 className="size-3.5 text-sun-line" aria-hidden />
+                      Line {props.wholeLine}
+                    </button>
+                  )}
+                  {props.wholeArray && props.onWholeArray && (
+                    <button
+                      type="button"
+                      onClick={props.onWholeArray}
+                      aria-label={`Pick the whole array: ${props.wholeArray} panels`}
+                      className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
+                    >
+                      <LayoutGrid className="size-3.5" aria-hidden />
+                      Select all {props.wholeArray}
+                    </button>
+                  )}
+                </div>
+              )}
+              {props.counter}
+            </div>
+            {props.panels > 0 && props.slideStep ? (
+              <div className="shrink-0 rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(1)}</div>
+            ) : (
+              <span />
+            )}
+          </div>
+        )}
+        {!folded && (
+          <div className="mt-2.5 flex items-end justify-between gap-2">
+            {props.panels > 0 ? props.thumb(-1) : <span />}
             <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
               <div className="flex items-center gap-1.5">
                 {props.orient}
@@ -667,14 +677,7 @@ function UprightPlate(
               </div>
               {props.tiltRow}
             </div>
-            {props.panels > 0 ? (
-              <div className="flex flex-col items-center gap-1.5">
-                {props.slideStep && <div className="rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(1)}</div>}
-                {props.thumb(1)}
-              </div>
-            ) : (
-              <span />
-            )}
+            {props.panels > 0 ? props.thumb(1) : <span />}
           </div>
         )}
       </div>
