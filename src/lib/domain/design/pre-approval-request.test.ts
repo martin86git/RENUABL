@@ -37,8 +37,11 @@ describe("Sol's pre-approval card in the designer", () => {
 
   it("says where a request stands, and goes once the network has approved", () => {
     const asked = exportCard({ network: { name: "AusNet Services", guessed: false, preApproval: "Requested", mayRequest: false } });
-    expect(asked?.words).toContain("requested, waiting in Pre-approvals to be submitted");
-    expect(asked?.actions).toEqual([{ label: "OK", act: "ok" }]);
+    expect(asked?.words).toContain("requested, waiting in Pre-approvals (under Sales) to be submitted");
+    expect(asked?.actions).toEqual([
+      { label: "OK", act: "ok" },
+      { label: "Open Pre-approvals", act: "open-preapprovals" },
+    ]);
     expect(
       exportCard({ network: { name: "AusNet Services", guessed: false, preApproval: "Approved", mayRequest: false } }),
     ).toBeUndefined();
