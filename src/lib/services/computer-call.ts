@@ -14,6 +14,8 @@ export type CallPhase = "starting" | "ringing" | "live" | "ended" | "failed";
 export interface ComputerCall {
   phase: CallPhase;
   jobId: string;
+  /** Our id for the call (its ticket), for the note-taker's live words (`/api/design/calls/browser/[id]/live`). */
+  callId: string;
   /** The customer's first name, for the bar. */
   name: string;
   /** When the call was connected (ms), for the timer. */
@@ -128,7 +130,7 @@ function finish(phase: "ended" | "failed", message: string | null = null) {
 export async function callFromComputer(jobId: string, name: string): Promise<void> {
   if (current && current.phase !== "ended" && current.phase !== "failed") return;
   window.clearTimeout(clearTimer);
-  set({ phase: "starting", jobId, name, liveAt: null, muted: false, message: null });
+  set({ phase: "starting", jobId, callId: "", name, liveAt: null, muted: false, message: null });
   try {
     const res = await fetch(`/api/design/jobs/${encodeURIComponent(jobId)}/dial`, { method: "POST", cache: "no-store" });
     const json = (await res.json().catch(() => null)) as { ok?: boolean; ticket?: string; message?: string } | null;
@@ -137,7 +139,7 @@ export async function callFromComputer(jobId: string, name: string): Promise<voi
     if (!d) return finish("failed", "Calling from the computer isn't set up for your business.");
     const c = await d.connect({ params: { ticket: json.ticket } });
     call = c;
-    patch({ phase: "ringing" });
+    patch({ phase: "ringing", callId: json.ticket });
     c.on("accept", () => patch({ phase: "live", liveAt: Date.now() }));
     c.on("mute", (muted: boolean) => patch({ muted }));
     c.on("disconnect", () => finish("ended"));
@@ -162,4 +164,42 @@ export function hangUp() {
 export function dismissCall() {
   window.clearTimeout(clearTimer);
   if (current && (current.phase === "ended" || current.phase === "failed")) set(null);
+}
+
+// --- Live words: the note-taker on this call (26 Nov 2026) ---------------------------------------------------------
+
+export interface CallWordsAnswer {
+  words: { who: "us" | "them"; text: string }[];
+  total: number;
+  partial: Partial<Record<"us" | "them", string>>;
+  on: boolean;
+  problem: string | null;
+}
+
+const liveUrl = (callId: string) => `/api/design/calls/browser/${encodeURIComponent(callId)}/live`;
+
+/** Has Twilio transcribe both sides from now on: "on", else "off" (the note-taker hears the member's side itself). */
+export async function startCallWords(callId: string): Promise<"on" | "off" | "failed"> {
+  try {
+    const res = await fetch(liveUrl(callId), { method: "POST", cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; on?: string } | null;
+    return json?.ok && (json.on === "on" || json.on === "off") ? json.on : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+export async function stopCallWords(callId: string): Promise<void> {
+  await fetch(liveUrl(callId), { method: "DELETE", cache: "no-store" }).catch(() => null);
+}
+
+/** The final stretches from `from` on, and what is still being made out. */
+export async function readCallWords(callId: string, from: number): Promise<CallWordsAnswer | null> {
+  try {
+    const res = await fetch(`${liveUrl(callId)}?from=${from}`, { cache: "no-store" });
+    const json = (await res.json().catch(() => null)) as ({ ok?: boolean } & CallWordsAnswer) | null;
+    return json?.ok && Array.isArray(json.words) ? json : null;
+  } catch {
+    return null;
+  }
 }

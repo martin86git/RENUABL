@@ -144,3 +144,65 @@ export const NOT_WRITTEN = {
   failed: "Recorded. Sol couldn't write it up just now.",
   noCredits: "Recorded. Sol had no answers left this month to write it up.",
 } as const;
+
+// --- Live words on the call (26 Nov 2026, Martin: "i need to be able to activate the call notetaker. i want a live
+// transcript"): the note-taker started from the computer call's bar has Twilio transcribe both sides as they talk
+// (Real-Time Transcriptions on the member's leg), posting each stretch to /api/voice/twilio/live. ---
+
+/** Final stretches kept on a call, at most (a long call is a few hundred). */
+export const MAX_LIVE_WORDS = 1_500;
+
+/** One stretch Twilio heard: "us" the member, "them" the customer. */
+export interface LiveWords {
+  who: "us" | "them";
+  text: string;
+}
+
+/**
+ * The tracks of the member's leg (the browser's call, which <Dial>s the customer): what comes in to Twilio is the
+ * member's voice, what Twilio sends out to the browser is the customer's. VERIFY on a first real call; the labels are
+ * set when the transcription starts (`liveTranscriptionParams`) and read back from each event.
+ */
+export const LIVE_TRACK_LABELS = { inbound: "us", outbound: "them" } as const;
+
+/** What Twilio is asked for when the member starts the note-taker on a call (REST, Calls/{sid}/Transcriptions). */
+export function liveTranscriptionParams(callbackUrl: string): Record<string, string> {
+  return {
+    Track: "both_tracks",
+    StatusCallbackUrl: callbackUrl,
+    StatusCallbackMethod: "POST",
+    InboundTrackLabel: LIVE_TRACK_LABELS.inbound,
+    OutboundTrackLabel: LIVE_TRACK_LABELS.outbound,
+    LanguageCode: "en-AU",
+    PartialResults: "true",
+    EnableAutomaticPunctuation: "true",
+    ProfanityFilter: "false",
+  };
+}
+
+export type LiveEvent =
+  | { kind: "words"; who: "us" | "them"; text: string; final: boolean }
+  | { kind: "stopped" }
+  | { kind: "error"; message: string }
+  | { kind: "other" };
+
+/** One of Twilio's transcription callbacks, read: a stretch of words (partial or final), the end, or an error. */
+export function readLiveEvent(p: Record<string, string>): LiveEvent {
+  const event = p.TranscriptionEvent ?? "";
+  if (event === "transcription-stopped") return { kind: "stopped" };
+  if (event === "transcription-error") return { kind: "error", message: String(p.TranscriptionError ?? "").slice(0, 200) };
+  if (event !== "transcription-content") return { kind: "other" };
+  let text = "";
+  try {
+    const data = JSON.parse(p.TranscriptionData ?? "{}") as { transcript?: unknown };
+    text = typeof data.transcript === "string" ? data.transcript : "";
+  } catch {
+    text = "";
+  }
+  text = text.replace(/\s+/g, " ").trim().slice(0, 2_000);
+  if (!text) return { kind: "other" };
+  // Twilio may give the track by its name or by the label set for it: either way outbound is the customer.
+  const track = [p.Track, p.TrackLabel].map((x) => String(x ?? "").toLowerCase());
+  const who: "us" | "them" = track.some((t) => t === "outbound_track" || t === LIVE_TRACK_LABELS.outbound) ? "them" : "us";
+  return { kind: "words", who, text, final: String(p.Final ?? "").toLowerCase() === "true" };
+}
