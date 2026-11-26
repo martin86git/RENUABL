@@ -438,6 +438,70 @@ const ART = {
     ),
   },
 
+  /**
+   * For "Nobody got into solar to do paperwork." (26 Nov 2026, Martin; a fan of ticked sheets was "a bit lack luster",
+   * then "sol is also selling through voice ai and writing emails. we need the to use the actual sol sunbrain"): the
+   * calls, emails and admin the email lists, as sheets of paper swept across the dark and into Sol's sun, shrinking and
+   * catching his light as they go. The GIF loops (Sol holds still in it, to keep it light); the JPEG is the same picture
+   * held still.
+   */
+  ...Object.fromEntries(
+    [
+      ["paperwork.gif", { frames: 22, delay: 95, hold: 95, colours: 64, photo: true }],
+      ["paperwork.jpg", {}],
+    ].map(([name, how]) => [
+      name,
+      {
+        ...how,
+        html: page(
+          `<div class="corona"></div><div class="rings"><i></i><i></i><i></i></div><div id="sheets"></div>
+           <div class="sun">%%SOLHERO%%</div>
+           <p class="say">You do the solar.<br><span>Sol calls, writes and chases.</span></p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+          `body{background:${GROUND}}
+           .corona{position:absolute;left:900px;top:310px;width:1500px;height:1500px;margin:-750px 0 0 -750px;border-radius:50%;
+             background:radial-gradient(circle,rgba(255,150,70,.5) 0,rgba(255,90,31,.24) 16%,rgba(255,90,31,.08) 34%,transparent 58%)}
+           .rings i{position:absolute;left:900px;top:310px;border-radius:50%;border:1px solid rgba(255,170,110,.16)}
+           .rings i:nth-child(1){width:420px;height:420px;margin:-210px}.rings i:nth-child(2){width:640px;height:640px;margin:-320px;border-color:rgba(255,170,110,.1)}
+           .rings i:nth-child(3){width:900px;height:900px;margin:-450px;border-color:rgba(255,170,110,.06)}
+           .sun{position:absolute;left:760px;top:170px;width:280px;height:280px;display:grid;place-items:center}
+           #sheets{position:absolute;inset:0;perspective:1400px}
+           .sheet{position:absolute;left:0;top:0;width:230px;height:300px;margin:-150px 0 0 -115px;padding:24px 22px;border-radius:6px;will-change:transform}
+           .sheet b{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.14em;color:#1d1d1f}
+           .sheet u{display:block;height:9px;margin:16px 0 20px;border-radius:5px;background:rgba(60,50,40,.3)}
+           .sheet s{display:block;height:6px;margin-top:12px;border-radius:3px;background:rgba(60,50,40,.17)}
+           .say{position:absolute;left:84px;bottom:64px;font-size:62px;line-height:1.08;font-weight:600;letter-spacing:-.04em;color:#fff}
+           .say span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}`,
+          `const NAMES = ["LEAD CALL", "FOLLOW-UP EMAIL", "QUOTE CHASE", "CALL NOTES", "NETWORK RULES", "REMINDERS"];
+           const N = 12, W8 = [92, 84, 96, 70, 88, 76, 58, 90];
+           const box = document.getElementById("sheets");
+           for (let k = 0; k < N; k++) {
+             const el = document.createElement("div"); el.className = "sheet";
+             el.innerHTML = "<b>" + NAMES[k % NAMES.length] + "</b><u style='width:" + (54 + (k * 7) % 26) + "%'></u>" + W8.map((w, i) => "<s style='width:" + W8[(i + k) % 8] + "%'></s>").join("");
+             box.appendChild(el);
+           }
+           const bez = (p, a, b, c, d) => { const q = 1 - p; return q * q * q * a + 3 * q * q * p * b + 3 * q * p * p * c + p * p * p * d; };
+           window.at = (t) => {
+             const tt = (t * ${21 / 22}) % 1;
+             [...box.children].forEach((el, k) => {
+               // Each sheet is like the one six ahead of it, and a loop moves the stream half the way, so the last frame meets the first.
+               const j = k % 6, r = j * 2.4;
+               const pp = (k / N + ((j * 37) % 11) / 160 + tt / 2) % 1;
+               const x = bez(pp, -170, 250, 610, 900) + Math.sin(r) * 46 * (1 - pp), y = bez(pp, 70, 40, 500, 310) + Math.cos(r * 1.7) * 40 * (1 - pp);
+               const s = 1.12 * Math.pow(1 - pp, 1.35) + 0.04;
+               const fade = Math.min(1, pp / 0.05) * Math.min(1, (1 - pp) / 0.1);
+               const heat = Math.max(0, (pp - 0.3) / 0.7);
+               el.style.transform = "translate(" + x + "px," + y + "px) scale(" + s + ") rotateZ(" + (-24 + 250 * pp + Math.sin(r) * 18) + "deg) rotateY(" + 48 * Math.sin(pp * 7 + r) + "deg) rotateX(" + 34 * Math.cos(pp * 6 + r) + "deg)";
+               el.style.opacity = fade; el.style.zIndex = 100 - Math.round(pp * 100);
+               el.style.background = "linear-gradient(160deg,color-mix(in srgb,#fbfaf7,#ffc98a " + heat * 100 + "%),color-mix(in srgb,#dedad2,#ff8a3d " + heat * 100 + "%))";
+               el.style.boxShadow = "0 30px 60px -20px rgba(0,0,0,.9),0 0 " + (20 + heat * 50) + "px rgba(255,120,50," + heat * 0.7 + ")";
+             });
+           };
+           window.at(0);`,
+        ),
+      },
+    ]),
+  ),
+
   ...Object.fromEntries(Object.entries(EXPLAINERS).map(([name, e]) => [name, { frames: 40, delay: 80, hold: 3800, html: explainer(e) }])),
 
   /** Sol in the product: a question typed on Today and his answer. */
@@ -544,9 +608,11 @@ const ART = {
 
 // ---- Taking them ------------------------------------------------------------------------------------------------
 
+/** Chrome's own port: set ART_PORT when two runs may overlap (two sessions on one port take each other's pictures). */
+const ART_PORT = process.env.ART_PORT ?? "9336";
 const chrome = spawn(
   CHROME,
-  ["--headless=new", "--remote-debugging-port=9336", `--user-data-dir=${work}`, "--hide-scrollbars", "about:blank"],
+  ["--headless=new", `--remote-debugging-port=${ART_PORT}`, `--user-data-dir=${work}`, "--hide-scrollbars", "about:blank"],
   {
     stdio: "ignore",
   },
@@ -555,7 +621,7 @@ let target = null;
 for (let i = 0; i < 40 && !target; i++) {
   await sleep(250);
   try {
-    target = (await (await fetch("http://127.0.0.1:9336/json")).json()).find((t) => t.type === "page");
+    target = (await (await fetch(`http://127.0.0.1:${ART_PORT}/json`)).json()).find((t) => t.type === "page");
   } catch {
     // Chrome isn't up yet.
   }
@@ -670,9 +736,10 @@ let solStill = null;
   await send("Page.navigate", { url: `${SITE}/` });
   await sleep(6000);
   const box = await js(`(() => {
-    const c = [...document.querySelectorAll("canvas")].find((x) => (x.parentElement?.className || "").includes("-inset-1/2"));
-    if (!c) return null;
-    const sun = c.parentElement.parentElement;
+    // The sun's canvas sits in a wrapper inside the span that spreads past his round (-inset-1/2); his round is that span's parent.
+    const spread = [...document.querySelectorAll("canvas")].map((x) => x.closest('[class*="-inset-1/2"]')).find(Boolean);
+    if (!spread) return null;
+    const sun = spread.parentElement;
     document.documentElement.style.background = "#000"; document.body.style.background = "#000";
     document.body.style.visibility = "hidden"; sun.style.visibility = "visible";
     document.querySelectorAll("nextjs-portal").forEach((n) => n.remove());
@@ -726,7 +793,11 @@ for (const [name, art] of Object.entries(ART)) {
   const big = solStill
     ? `<img src="${pathToFileURL(solStill).href}" width="84" height="84" style="flex:none;margin:-14px -6px 0 -14px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
     : SOL(64);
-  writeFileSync(file, art.html.replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
+  // The homepage's own sun, large, for a picture he is the middle of (Martin: "the actual sol sunbrain"); the drawn one only when the site isn't up.
+  const hero = solStill
+    ? `<img src="${pathToFileURL(solStill).href}" width="360" height="360" style="flex:none;margin:-40px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
+    : SOL(280);
+  writeFileSync(file, art.html.replaceAll("%%SOLHERO%%", hero).replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
   await send("Page.navigate", { url: pathToFileURL(file).href });
   await sleep(1200);
   if (!art.frames) {
