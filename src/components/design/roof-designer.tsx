@@ -165,6 +165,7 @@ import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, ty
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
+import { hitRun, labelAt, msbRuns, runWords, RUN_NOTE } from "@/lib/domain/design/msb-run";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { lightOf, readiness, readinessLight, shadeLight, type CheckLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import { designGreeting, type ProposalGlance } from "@/lib/domain/design/design-greeting";
@@ -1375,6 +1376,8 @@ export function RoofDesigner(props: {
   const [ruling, setRuling] = useState<{ a: Point; b: Point } | null>(null);
   // The inverters on this design: one, or more on a larger system.
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
+  // How far each placed inverter is from the switchboard, in a straight line from above (26 Nov 2026, Martin).
+  const runs = msbRuns(fitted, msb);
   // Whether the inverter list is showing its suggestions for the panels on the design.
   const [suggesting, setSuggesting] = useState(false);
   // A three-phase inverter picked for a single-phase home (21 Nov 2026, Martin: warn, never let it on blindly): held here
@@ -2057,6 +2060,7 @@ export function RoofDesigner(props: {
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
+    | { mode: "bend"; n: number; bend: number }
     | { mode: "charger"; dx: number; dy: number }
     | { mode: "inverter"; n: number; dx: number; dy: number }
     | { mode: "erase"; faceGone?: boolean }
@@ -3342,6 +3346,34 @@ export function RoofDesigner(props: {
     }
     // A press anywhere else puts down the kit picked; pressing kit picks it (its bar shows over it) as well as dragging it.
     setKitPick(null);
+    if (tool === "select" && runs.length) {
+      // The gold line to the switchboard (26 Nov 2026, Martin: "pull the gold line to change its route"): a press on
+      // it puts a bend in there and drags it; a press on a bend drags it; a double click on a bend takes it away.
+      const reach = 7 * u * scale;
+      for (const run of runs) {
+        const hit = hitRun(run, p, reach);
+        if (!hit) continue;
+        const route = fitted[run.index]?.route ?? [];
+        if (hit.kind === "bend" && e.detail >= 2) {
+          setFitted((list) =>
+            list.map((spec, i) => (i === run.index ? { ...spec, route: (spec.route ?? []).filter((_, k) => k !== hit.bend) } : spec)),
+          );
+          changed();
+          return;
+        }
+        svg.current?.setPointerCapture(e.pointerId);
+        setPicks([]);
+        setKitPick(run.index);
+        const bend = hit.kind === "bend" ? hit.bend : hit.insertAt;
+        if (hit.kind === "line") {
+          const next = [...route.slice(0, bend), { x: cm(p.x), y: cm(p.y) }, ...route.slice(bend)];
+          setFitted((list) => list.map((spec, i) => (i === run.index ? { ...spec, route: next } : spec)));
+          changed();
+        }
+        press.current = { mode: "bend", n: run.index, bend };
+        return;
+      }
+    }
     if (tool === "select" && msb && msbAt(p)) {
       // The main switchboard: press it and drag it to the wall it is on.
       svg.current?.setPointerCapture(e.pointerId);
@@ -3666,6 +3698,16 @@ export function RoofDesigner(props: {
       if (!p) return;
       if (Math.hypot(p.x - held.from.x, p.y - held.from.y) >= 4 * u * scale) held.dragged = true;
       return growTo(held, growCount(held.frame, held.side, held.from, p));
+    }
+    if (held.mode === "bend") {
+      const p = pointAt(e);
+      if (!p) return;
+      setFitted((list) =>
+        list.map((spec, i) =>
+          i === held.n ? { ...spec, route: (spec.route ?? []).map((q, k) => (k === held.bend ? { x: cm(p.x), y: cm(p.y) } : q)) } : spec,
+        ),
+      );
+      return changed();
     }
     if (held.mode === "msb") {
       const p = pointAt(e);
@@ -8979,6 +9021,41 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
+                  {/* From each placed inverter to the switchboard: a dashed line and its length (26 Nov 2026, Martin). */}
+                  {runs.map((r) => {
+                    const [lx, ly] = px(labelAt(r));
+                    const bends = r.points.slice(1, -1);
+                    return (
+                      <g key={`run-${r.index}`} pointerEvents="none">
+                        <title>{`${runWords(r.metres)} from the inverter to the switchboard. ${RUN_NOTE}`}</title>
+                        <polyline
+                          points={path(r.points)}
+                          fill="none"
+                          stroke={GOLD}
+                          strokeWidth={1.1 * u}
+                          strokeDasharray={`${3 * u} ${2 * u}`}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        {bends.map((b, k) => (
+                          <circle key={k} cx={px(b)[0]} cy={px(b)[1]} r={2.4 * u} fill="#0b0c0e" stroke={GOLD} strokeWidth={1 * u} />
+                        ))}
+                        <text
+                          x={lx}
+                          y={ly - 3 * u}
+                          textAnchor="middle"
+                          fontSize={8 * u}
+                          fontWeight="700"
+                          fill="#ffffff"
+                          stroke="#0b0c0e"
+                          strokeWidth={2.4 * u}
+                          paintOrder="stroke"
+                        >
+                          {runWords(r.metres)}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {/* The main switchboard: a board of breakers in the same line style as the inverter and battery, marked MSB. */}
                   {msb &&
                     (() => {
@@ -9841,10 +9918,21 @@ export function RoofDesigner(props: {
                     kitPick === "battery"
                       ? `Battery · ${batteryKwh} kWh`
                       : kitPick === "msb"
-                        ? "Main switchboard"
+                        ? `Main switchboard${
+                            runs.length === 1
+                              ? ` · ${runWords(runs[0].metres)} to the inverter`
+                              : runs.length > 1
+                                ? ` · ${runs.map((r) => `${runWords(r.metres)} to inverter ${r.index + 1}`).join(", ")}`
+                                : fitted.length
+                                  ? " · drag the inverter to its wall to measure"
+                                  : ""
+                          }`
                         : kitPick === "charger"
                           ? `EV charger${charger ? ` · ${charger.kw} kW` : ""}`
-                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW`;
+                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW${(() => {
+                              const run = runs.find((r) => r.index === kitPick);
+                              return run ? ` · ${runWords(run.metres)} to the MSB` : "";
+                            })()}`;
                   return (
                     <div
                       className={clsx(GLASS, "absolute z-30 flex -translate-x-1/2 items-center gap-1 py-0.5 pl-3 pr-0.5")}

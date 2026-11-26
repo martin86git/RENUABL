@@ -112,3 +112,25 @@ describe("reading back an email from the deal's record", () => {
     });
   });
 });
+
+describe("links in a deal's email", () => {
+  const body =
+    "Hi Laura,\n\nYou can [open your proposal](https://www.example.com.au/p/abc123) any time.\nOr see https://www.example.com.au/learn.";
+  it("makes a written link a real one in the HTML, and a written address a link to itself", () => {
+    const e = dealEmail({ business: "Sunny Co", subject: "S", body });
+    expect(e.html).toContain('<a href="https://www.example.com.au/p/abc123" style="color:#1a56db">open your proposal</a>');
+    // The full stop after the address stays outside the link.
+    expect(e.html).toContain('<a href="https://www.example.com.au/learn" style="color:#1a56db">https://www.example.com.au/learn</a>.');
+    expect(e.html).not.toContain("](");
+  });
+  it("writes the link as words and its address in the plain text and on the deal's record", () => {
+    const e = dealEmail({ business: "Sunny Co", subject: "S", body });
+    expect(e.text).toContain("open your proposal (https://www.example.com.au/p/abc123) any time.");
+    expect(emailRecord("jo@example.com", "Hi", body)).toContain("open your proposal (https://www.example.com.au/p/abc123)");
+  });
+  it("never makes a link of anything but a web or mail address", () => {
+    const e = dealEmail({ business: "Sunny Co", subject: "S", body: "[click](javascript:alert(1)) <script>" });
+    expect(e.html).not.toContain("<a ");
+    expect(e.html).not.toContain("<script>");
+  });
+});
