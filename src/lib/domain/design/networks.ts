@@ -14,7 +14,16 @@ export interface Distributor {
   /** The first four digits of the meter's NMI on its network (on the customer's bill). */
   nmiStarts: string;
   url: string;
+  /**
+   * Where a solar pre-approval is applied for online (26 Nov 2026: each address answered on that day; AusNet's and
+   * Jemena's are linked from their own solar pages). VERIFY each still opens on the application before relying on it:
+   * none where we don't know one, and the network's own site is opened in its place.
+   */
+  portal?: { name: string; url: string };
 }
+
+/** CitiPower and Powercor share one portal. */
+const ECONNECT = { name: "eConnect", url: "https://econnect.portal.powercor.com.au/customer/" };
 
 export const VIC_DISTRIBUTORS: readonly Distributor[] = [
   {
@@ -23,6 +32,7 @@ export const VIC_DISTRIBUTORS: readonly Distributor[] = [
     area: "Melbourne's CBD and inner suburbs",
     nmiStarts: "6102",
     url: "https://www.citipower.com.au",
+    portal: ECONNECT,
   },
   {
     id: "powercor",
@@ -30,6 +40,7 @@ export const VIC_DISTRIBUTORS: readonly Distributor[] = [
     area: "Melbourne's western suburbs and central and western Victoria",
     nmiStarts: "6203",
     url: "https://www.powercor.com.au",
+    portal: ECONNECT,
   },
   {
     id: "jemena",
@@ -37,6 +48,7 @@ export const VIC_DISTRIBUTORS: readonly Distributor[] = [
     area: "Melbourne's north and north-west",
     nmiStarts: "6001",
     url: "https://www.jemena.com.au",
+    portal: { name: "My Portal", url: "https://myportal.jemena.com.au/" },
   },
   {
     id: "united-energy",
@@ -51,6 +63,7 @@ export const VIC_DISTRIBUTORS: readonly Distributor[] = [
     area: "Melbourne's outer east and north, and eastern and northern Victoria (Gippsland, the north-east)",
     nmiStarts: "6305",
     url: "https://www.ausnetservices.com.au",
+    portal: { name: "EnergyConnect", url: "https://portal.ausnetservices.com.au/" },
   },
 ];
 

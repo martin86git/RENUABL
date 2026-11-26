@@ -14,6 +14,10 @@ import { solPlain } from "@/lib/domain/design/sol-format";
 import { asBuiltInWords } from "@/lib/domain/design/as-built";
 import { caseInWords } from "@/lib/domain/design/service";
 import { asBuiltOf, jobCard } from "./design-job-card-repo";
+import { preApprovalFor } from "./design-preapproval";
+import { FIELD_WORDS, cleanSuggestion } from "@/lib/domain/design/preapproval";
+import { PRE_APPROVAL } from "@/lib/domain/design/deal-sections";
+import { networkNamed, networksForSol, portalNote, portalOf, type SolPortal } from "@/lib/domain/design/sol-portal";
 import { pageAllowed } from "@/lib/domain/design/business-kind";
 import { START_SERVICE_CASE_NOTE, cleanNewCase, historyFor, type NewCaseAsk, type SolRoom } from "@/lib/domain/design/sol-rooms";
 import { placesForSol, solGoTo, type SolGoTo } from "@/lib/domain/design/sol-goto";
@@ -432,6 +436,26 @@ ${placesForSol()}`,
   },
 };
 
+/**
+ * A network's pre-approval portal (26 Nov 2026, Martin; sol-portal.ts): a card whose button opens it in a window of
+ * its own beside RENUABL, with the deal's details to copy across. Their own conversation only.
+ */
+const OPEN_PORTAL_TOOL: Anthropic.Tool = {
+  name: "open_network_portal",
+  description: `A deal's network (distributor) pre-approval, worked through from a card under your answer. Use it when they ask for or to open a network's pre-approval or connection portal, want to get an application under way or finish one, or tell you something about one (the NMI, that it was submitted, its reference, that it was approved, export limited or declined). The card's button opens the network's portal in its own window beside RENUABL; with a deal it lists that deal's NMI, address and system to copy across, has boxes for what the application still needs, and records where it stands on the deal. Never answer with only the address, and never say you can't open the portal. Pass deal_id when it is for a deal (find it first with find_deal, or use the deal on their screen): the network is then read from the deal's NMI or address, so leave network out unless they named one. With no deal, pass network. Pass nmi, status, reference and export_limit_kw only when their own message gave them: they are filled in on the card and saved when they press Save, never by you. While they fill in the portal, answer what it asks from the deal (deal_details), the product's datasheet (datasheet_lookup) and the network's own pages, and say when the deal doesn't know something. You can't see or fill in the network's portal itself, and you never say an application will be approved. The networks: ${networksForSol()}.`,
+  input_schema: {
+    type: "object",
+    properties: {
+      network: { type: "string", description: "The network, by its id above. Leave out when deal_id is given and they named none." },
+      deal_id: { type: "string", description: "The deal the application is for, when there is one." },
+      nmi: { type: "string", description: "The NMI they just gave, when the deal has none or a different one." },
+      status: { type: "string", enum: PRE_APPROVAL, description: "Where they said the application now stands." },
+      reference: { type: "string", description: "The application's reference they gave." },
+      export_limit_kw: { type: "string", description: "The export limit in kW they said it was approved with." },
+    },
+  },
+};
+
 /** In the Service room only: a card for the member to start a case (sol-rooms.ts). */
 const START_SERVICE_CASE_TOOL: Anthropic.Tool = {
   name: "start_service_case",
@@ -467,6 +491,8 @@ const ASK_HOW_TOOL: Anthropic.Tool = {
 interface Turn {
   /** A page he opened for them (one an answer). */
   goTo?: SolGoTo;
+  /** A network's portal he put up to open (sol-portal.ts). */
+  portal?: SolPortal;
   /** The card to start a service case (Service room only). */
   newCase?: NewCaseAsk;
   charts: SolChart[];
@@ -558,6 +584,41 @@ async function runTool(
     if (!pageAllowed(member.businessKind ?? "retailer", g.goTo.path.split("?")[0])) return "That page isn't part of their RENUABL account.";
     shown.goTo = g.goTo;
     return `Opening ${g.goTo.label} as soon as you answer. Say so in a few words.`;
+  }
+  if (name === "open_network_portal") {
+    const dealId = s(input.deal_id);
+    let named = networkNamed(input.network);
+    if (!dealId) {
+      if (!named) return `Say which network (${networksForSol()}), or pass the deal's id and it is read from the deal.`;
+      shown.portal = { network: named.id, facts: [] };
+      return portalNote(shown.portal);
+    }
+    const view = await preApprovalFor(member, dealId, viewer);
+    if (!view) return "There's no such deal, or this person can't see it.";
+    if (!named) {
+      named = view.portal ? networkNamed(view.portal.id) : null;
+      if (!named)
+        return view.network
+          ? `This deal's network is ${view.network.name}, whose portal we don't hold: tell them so, and that its own website has the application.`
+          : "The deal has no NMI or Victorian address to read its network from: ask which network, then call this again with network.";
+    }
+    // What they said in this message (an NMI, submitted, a reference, a limit): put on the card, saved on their press.
+    const suggest = cleanSuggestion({
+      nmi: input.nmi,
+      status: input.status,
+      reference: input.reference,
+      exportLimit: input.export_limit_kw,
+    });
+    shown.portal = {
+      network: named.id,
+      jobId: view.jobId,
+      customer: view.customer,
+      ...(view.network?.guessed && !input.network ? { guessed: true as const } : {}),
+      facts: view.facts,
+      ...(suggest ? { suggest } : {}),
+    };
+    const standing = `Where it stands on the deal now: ${view.status}${view.reference ? ` (reference ${view.reference})` : ""}${view.missing.fields.length || view.missing.other.length ? `. Still needed for the application: ${[...view.missing.fields.map((k) => FIELD_WORDS[k].label), ...view.missing.other].join("; ")}` : ""}.`;
+    return `${portalNote(shown.portal)} ${standing}`;
   }
   if (name === "find_deal") {
     const found = findDeals(jobs, s(input.query), (c) => phones.get(c) ?? "");
@@ -883,7 +944,7 @@ export async function askSol(
     ...TOOLS,
     ...(costs ? [PRICE_TOOL] : []),
     // Opening a page is for their own conversation, never a channel everyone reads.
-    ...(said.shared ? [] : [OPEN_PAGE_TOOL, ASK_HOW_TOOL]),
+    ...(said.shared ? [] : [OPEN_PAGE_TOOL, OPEN_PORTAL_TOOL, ASK_HOW_TOOL]),
     ...(said.room === "service" ? [START_SERVICE_CASE_TOOL] : []),
     ...WEB_TOOLS,
   ];
@@ -1038,7 +1099,9 @@ export async function askSol(
           ? "Here it is."
           : shown.goTo
             ? `Opening ${shown.goTo.label}.`
-            : "Done."),
+            : shown.portal
+              ? `Here's ${portalOf(shown.portal.network)?.network ?? "the network"}'s portal.`
+              : "Done."),
     at: new Date().toISOString(),
     ...(shown.charts.length ? { charts: shown.charts } : {}),
     ...(shown.diagrams.length ? { diagrams: shown.diagrams } : {}),
@@ -1049,6 +1112,7 @@ export async function askSol(
     ...(shown.remembered.length ? { remembered: shown.remembered } : {}),
     ...(answer ? { credits, ...(tier === "deep" ? { deep: true } : {}) } : {}),
     ...(shown.goTo ? { goTo: shown.goTo } : {}),
+    ...(shown.portal ? { portal: shown.portal } : {}),
     ...(shown.newCase ? { newCase: shown.newCase } : {}),
     ...(shown.meeting ? { meeting: shown.meeting } : {}),
     ...(shown.learn ? { learn: shown.learn } : {}),

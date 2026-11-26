@@ -59,7 +59,7 @@ export interface JobCardView {
 }
 
 /** The design the installer builds: the system the customer chose when they signed, else the roof's primary design. */
-async function chosenDesign(businessId: string, jobId: string, designs: RoofDesign[], primary: number): Promise<RoofDesign> {
+export async function chosenDesign(businessId: string, jobId: string, designs: RoofDesign[], primary: number): Promise<RoofDesign> {
   const rows = await query<{ option: string | null }>(
     `select v.accepted_option as option from design_proposals p
        join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
