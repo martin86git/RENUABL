@@ -70,7 +70,12 @@ export async function POST(request: Request) {
     const usable = current && runByRenuabl(current);
     if (!usable) {
       if (read.body.do === "session") return Response.json({ ok: false, message: "Set up card payments first." }, { status: 409 });
-      const made = await createConnectAccount(stripe, { businessId, email, name: businessName });
+      let made: string;
+      try {
+        made = await createConnectAccount(stripe, { businessId, email, name: businessName });
+      } catch (e) {
+        return stripeRefused("set up the account", e);
+      }
       if (account) await replaceConnectAccount(businessId, made, email);
       else {
         await saveConnectAccount(businessId, made, email);
@@ -79,6 +84,20 @@ export async function POST(request: Request) {
       account = (await connectOf(businessId)).account ?? made;
     }
     if (read.body.do === "start") return Response.json({ ok: true });
-    return Response.json({ ok: true, clientSecret: await connectSession(stripe, account!) });
+    try {
+      return Response.json({ ok: true, clientSecret: await connectSession(stripe, account!) });
+    } catch (e) {
+      return stripeRefused("open its forms", e);
+    }
   });
+}
+
+/**
+ * Stripe turning a request away: its own reason is shown to the owner (it names what is missing, never a secret) and
+ * logged, in place of the general "couldn't reach your account" (26 Nov 2026: the set-up failed with no reason shown).
+ */
+function stripeRefused(what: string, e: unknown): Response {
+  const said = e instanceof Error ? e.message : String(e);
+  console.error(`stripe connect: couldn't ${what}`, said);
+  return Response.json({ ok: false, message: `Stripe couldn't ${what}: ${said}` }, { status: 502 });
 }
