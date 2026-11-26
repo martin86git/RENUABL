@@ -122,17 +122,26 @@ const CALENDAR = (size) => `<span class="graphite" style="width:${size}px;height
   <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
   <path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/></svg></span>`;
 
-const BASE = `*{margin:0;box-sizing:border-box}html,body{width:${W}px;height:${H}px;overflow:hidden;background:#05060a;color:#fff;
+/**
+ * The ground every picture sits on (26 Nov 2026, Martin: "the black in all the marketing emails is too harsh. lets
+ * soften it"): a soft graphite, not black. An email's own dark panels use the same colour, so picture and panel meet
+ * without a seam. Change it here and redraw everything.
+ */
+const GROUND = "#1d1f25";
+const GROUND_RGB = "29,31,37";
+/** The rounds that sit on the ground (a voice agent's, the designer's): a step lighter than it, so they still read. */
+const ROUND = "#2f323a";
+const BASE = `*{margin:0;box-sizing:border-box}html,body{width:${W}px;height:${H}px;overflow:hidden;background:${GROUND};color:#fff;
   font-family:Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   .mark{position:absolute;right:52px;bottom:40px;width:132px;height:auto;opacity:.75}
-  .agent{position:relative;display:inline-grid;place-items:center;border-radius:50%;background:#202227;flex:none;
+  .agent{position:relative;display:inline-grid;place-items:center;border-radius:50%;background:${ROUND};flex:none;
     box-shadow:0 18px 40px -18px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.08)}
   .agent-glow{position:absolute;inset:-14%;border-radius:50%;background:color-mix(in srgb,var(--tint) 30%,transparent);filter:blur(16px);opacity:.5}
   .agent-bars{position:relative;display:flex;align-items:center}.agent-bars i{display:block;border-radius:9px;background:var(--tint)}
   .orb{display:inline-grid;place-items:center;border-radius:50%;flex:none;
     background:radial-gradient(circle at 35% 25%,#ffb08a 0 10%,#ff6a2c 45%,#e8470f 100%);
     box-shadow:inset 0 2px 1px rgba(255,255,255,.55),inset 0 -3px 6px rgba(140,30,0,.3),0 10px 24px rgba(255,90,31,.4)}
-  .graphite{display:inline-grid;place-items:center;border-radius:50%;background:#202227;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}`;
+  .graphite{display:inline-grid;place-items:center;border-radius:50%;background:${ROUND};flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}`;
 
 const page = (body, css = "", script = "") =>
   `<!doctype html><html><head><meta charset="utf-8"><style>${BASE}${css}</style></head><body>${body}<script>
@@ -365,7 +374,7 @@ const ART = {
        .frame{position:absolute;left:48px;top:28px;width:1104px;height:519px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
        .frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
        .tag{position:absolute;left:52px;top:571px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}
-       .fade{position:absolute;left:0;right:0;bottom:0;height:170px;background:linear-gradient(to top,rgba(5,6,10,.92),rgba(5,6,10,.55) 55%,transparent)}
+       .fade{position:absolute;left:0;right:0;bottom:0;height:170px;background:linear-gradient(to top,rgba(${GROUND_RGB},.92),rgba(${GROUND_RGB},.55) 55%,transparent)}
        .say{position:absolute;left:32px;right:32px;bottom:30px;font-size:40px;font-weight:600;letter-spacing:-.02em;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}
        .bar{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,.14)}.bar i{display:block;height:100%;width:0;background:#ff5a1f}`,
       `const SAYS = ${JSON.stringify(BUILD_SAYS)}; window.at = (t) => { const n = Math.round(t * (${BUILD_FRAMES} - 1)); document.querySelectorAll("[data-f]").forEach((el) => { el.style.opacity = +el.dataset.f <= n ? 1 : 0; }); document.getElementById("say").textContent = SAYS[n]; document.getElementById("bar").style.width = ((n + 1) / SAYS.length) * 100 + "%"; }; window.at(0);`,
@@ -387,7 +396,7 @@ const ART = {
       `<div class="grid"></div><div class="top"><i></i>SOL // LIVE LOG<b>EXAMPLE MORNING</b></div>
        <div class="log">${LOG.map(([t, l], i) => `<p data-l="${i}"><span>${t}</span>${l}</p>`).join("")}</div>
        <h1 id="end">You were with another customer.</h1><img class="mark" src="${LOGO}" alt="RENUABL">`,
-      `body{background:#000}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse at 30% 40%,#000,transparent 75%)}
+      `body{background:${GROUND}}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse at 30% 40%,#000,transparent 75%)}
        .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
        .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}.top b{font-weight:400;color:rgba(255,255,255,.3);margin-left:18px}
        .log{position:absolute;left:84px;top:132px;font-family:"JetBrains Mono",Consolas,monospace;font-size:29px;line-height:58px;color:#fff}
@@ -403,7 +412,7 @@ const ART = {
       `<div class="top"><i></i>CALLS &amp; TEXTS // YOUR VOICE AGENT</div><div class="fig">$1.61<small>a day.</small></div>
        <p class="dry">Less than a coffee. Doesn't need a ute.</p>
        <p class="foot">$49 A MONTH, ON TOP OF YOUR RENUABL PLAN. YOUR OWN NUMBER INCLUDED.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
-      `body{background:#000}
+      `body{background:${GROUND}}
        .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
        .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
        .fig{position:absolute;left:76px;top:120px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em}
@@ -419,7 +428,7 @@ const ART = {
       `<div class="glow"></div><div class="top"><i></i>RENUABL // TRY IT FREE</div><div class="fig">$0<small>for your first month.</small></div>
        <p class="dry">Try it. Break it. Keep it if it sells.</p>
        <p class="foot">THEN $49 A USER A MONTH. NO LOCK-IN, CANCEL ANY TIME. ADD-ONS SUCH AS CALLS &amp; TEXTS ARE BILLED FROM THE DAY YOU ADD THEM.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
-      `body{background:#000}.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 82% 108%,rgba(255,90,31,.38),transparent 55%)}
+      `body{background:${GROUND}}.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 82% 108%,rgba(255,90,31,.38),transparent 55%)}
        .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
        .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
        .fig{position:absolute;left:76px;top:120px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em;white-space:nowrap}
@@ -461,8 +470,8 @@ const ART = {
     html: page(
       `<div class="band"><span class="m"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5 8 7l6 5.5"/><path d="M4 11v8h8v-8"/><path d="M11 9.5 16 5l6 5.5"/><path d="M14 19h6v-8"/></svg></span>
         <div><small>RENUABL Marketplace · Coming soon</small><b>Find crews. Win installs. Trade stock.</b><em>One network for solar retailers, installers and inspectors.</em></div></div>`,
-      `body{background:#05060a}.band{position:absolute;left:0;top:0;width:1200px;height:300px;display:flex;align-items:center;gap:40px;padding:0 80px;
-         background:radial-gradient(ellipse at 10% 50%,rgba(60,110,255,.28),transparent 45%),#05060a;border-top:1px solid rgba(255,255,255,.08)}
+      `body{background:${GROUND}}.band{position:absolute;left:0;top:0;width:1200px;height:300px;display:flex;align-items:center;gap:40px;padding:0 80px;
+         background:radial-gradient(ellipse at 10% 50%,rgba(60,110,255,.28),transparent 45%),${GROUND};border-top:1px solid rgba(255,255,255,.08)}
        .m{flex:none;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;
          background:radial-gradient(circle at 35% 25%,#8fb0ff 0 10%,#3b6bff 45%,#1f3fc4 100%);box-shadow:inset 0 2px 1px rgba(255,255,255,.5),0 14px 40px rgba(59,107,255,.45)}
        small{display:block;font-size:16px;letter-spacing:.22em;text-transform:uppercase;color:#7fa2ff}
@@ -477,7 +486,7 @@ const ART = {
     html: page(
       `<div class="strip">${AGENT(64, "#ff5a1f")}<b>Your AI salesperson: <i>less than $2 a day.</i></b><em>Calls &amp; Texts · $49 a month</em></div>`,
       `.strip{position:absolute;left:0;top:0;width:1200px;height:120px;display:flex;align-items:center;gap:26px;padding:0 64px;
-         background:linear-gradient(90deg,rgba(255,90,31,.18),transparent 60%),#0b0c10;border-top:1px solid rgba(255,255,255,.08)}
+         background:linear-gradient(90deg,rgba(255,90,31,.18),transparent 60%),${GROUND};border-top:1px solid rgba(255,255,255,.08)}
        .strip b{font-size:34px;font-weight:600;letter-spacing:-.02em}.strip i{font-style:normal;color:#ff7a2e}
        .strip em{margin-left:auto;font-style:normal;font-size:18px;color:rgba(255,255,255,.5)}`,
     ),
@@ -664,7 +673,7 @@ let solStill = null;
     const c = [...document.querySelectorAll("canvas")].find((x) => (x.parentElement?.className || "").includes("-inset-1/2"));
     if (!c) return null;
     const sun = c.parentElement.parentElement;
-    document.documentElement.style.background = "#05060a"; document.body.style.background = "#05060a";
+    document.documentElement.style.background = "#000"; document.body.style.background = "#000";
     document.body.style.visibility = "hidden"; sun.style.visibility = "visible";
     document.querySelectorAll("nextjs-portal").forEach((n) => n.remove());
     sun.querySelectorAll("*").forEach((n) => (n.style.visibility = "visible"));
@@ -681,6 +690,8 @@ let solStill = null;
     const pad = box.w * 0.12;
     solStill = join(process.env.SOL_STILL_DIR ?? work, "sol-still.png");
     writeFileSync(solStill, await grab({ x: box.x - pad, y: box.y - pad, width: box.w + pad * 2, height: box.h + pad * 2 }));
+    await js(`document.documentElement.style.background = "${GROUND}"; document.body.style.background = "${GROUND}"`);
+    await sleep(200);
     for (const [name, says] of Object.entries(SOL_SAYS)) {
       if (ONLY && ONLY !== name) continue;
       // He sits in his state for two seconds, then types (22 Nov 2026, Martin).
