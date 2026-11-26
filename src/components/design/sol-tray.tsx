@@ -244,6 +244,8 @@ export function SolController(props: {
   onHold?: (holding: boolean) => void;
   /** Upright: how tall the plate is. */
   height?: number;
+  /** While Add a panel is in hand: the panel counter, drawn in the plate's middle. */
+  counter?: ReactNode;
 }) {
   const upright = props.layout === "upright";
   const what = props.panels ? `${props.panels} panel${props.panels === 1 ? "" : "s"}` : `${props.count} picked`;
@@ -290,12 +292,18 @@ export function SolController(props: {
           aria-label={land ? "Landscape" : "Portrait"}
           onClick={() => props.onLandscape(land)}
           className={clsx(
-            "flex h-8 w-9 items-center justify-center rounded-[9px]",
+            "flex items-center justify-center rounded-[9px]",
+            // Larger on a phone held upright, so a thumb finds it (26 Nov 2026, Martin).
+            upright ? "h-12 w-16" : "h-8 w-9",
             props.landscape === land ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
           )}
         >
           <span
-            className={clsx("rounded-[2px] border-[1.5px] border-current", land ? "h-[9px] w-[15px]" : "h-[15px] w-[9px]")}
+            className={clsx(
+              "rounded-[2px] border-current",
+              upright ? "border-2" : "border-[1.5px]",
+              upright ? (land ? "h-[14px] w-[24px]" : "h-[24px] w-[14px]") : land ? "h-[9px] w-[15px]" : "h-[15px] w-[9px]",
+            )}
             aria-hidden
           />
         </button>
@@ -321,9 +329,12 @@ export function SolController(props: {
       type="button"
       onClick={props.onDelete}
       aria-label="Delete what is picked"
-      className="flex size-[38px] shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-[#ff6b5e] hover:bg-white/15"
+      className={clsx(
+        "flex shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-[#ff6b5e] hover:bg-white/15",
+        upright ? "size-[54px]" : "size-[38px]",
+      )}
     >
-      <Trash2 className="size-4" aria-hidden />
+      <Trash2 className={upright ? "size-5" : "size-4"} aria-hidden />
     </button>
   );
   // One panel picked, the rest of its array a press away (22 Nov 2026, Martin: "a select all button").
@@ -421,6 +432,10 @@ export function SolController(props: {
               </button>
             )}
           </div>
+        )}
+        {/* The panel counter while panels are being laid, in the plate's middle where there is room for it. */}
+        {props.counter && (props.height ?? 140) >= 260 && (
+          <div className="absolute inset-x-3 top-[4.75rem] flex justify-center">{props.counter}</div>
         )}
         {/* The thumbs, in the two bottom corners; between them portrait or landscape, the tilt and delete. */}
         <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
@@ -649,5 +664,36 @@ function HoldButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * The panel counter in the dock while Add a panel is in hand (26 Nov 2026, Martin: "a panel counter in the dock so I
+ * can see how many panels left until target… only exist whilst I'm laying panels… large enough so I can see it and it
+ * should also show how many kWs"). The panels and kW large, what is left to the target under them.
+ */
+export function PanelCounter(props: { panels: number; kw: string; line: string | null; state: "short" | "on" | "over" | "none" }) {
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col items-center text-white">
+      <p className="flex items-baseline gap-2 whitespace-nowrap">
+        <b className="text-[34px] font-semibold leading-none tabular-nums">{props.panels}</b>
+        <span className="text-[13px] text-white/60">{props.panels === 1 ? "panel" : "panels"}</span>
+        <span className="mx-1 h-6 w-px self-center bg-white/20" aria-hidden />
+        <b className="text-[24px] font-semibold leading-none tabular-nums text-sun-line">{props.kw}</b>
+        <span className="text-[13px] text-white/60">kW</span>
+      </p>
+      {props.line && (
+        <p
+          className={clsx(
+            "mt-1.5 rounded-full px-3 py-0.5 text-[12.5px] font-semibold tabular-nums",
+            props.state === "on" && "bg-positive/25 text-[#7ee2a8]",
+            props.state === "over" && "bg-danger/25 text-[#ff8a80]",
+            props.state === "short" && "bg-white/10 text-white/85",
+          )}
+        >
+          {props.line}
+        </p>
+      )}
+    </div>
   );
 }

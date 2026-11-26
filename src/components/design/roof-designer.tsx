@@ -14,6 +14,7 @@ import {
   guideStep,
   guiding,
   layingWords,
+  panelCounter,
   panelCells,
   cellWords,
   panelsFor,
@@ -147,7 +148,7 @@ import {
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
 import { SolIcon, SolStars } from "./sol-icon";
 import { SolMark } from "./sol-sun";
-import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
+import { PanelCounter, SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { stcPricingDate } from "@/lib/domain/design/stc-change";
@@ -7012,6 +7013,10 @@ export function RoofDesigner(props: {
   const foot = stage ? stage.pt + stage.photoH : null;
   const underUp = solHolds && !sideways && foot !== null && !solTray;
   const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown || stringsUnder);
+  // The panel counter in the dock, only while Add a panel is in hand (26 Nov 2026, Martin): the panels and kW, and
+  // with Sol's target how many are still to go.
+  const panelCount =
+    tool === "panel" ? <PanelCounter {...panelCounter(summary.panels, laying ? ghosts.length : 0, size.watts, guideTarget)} /> : null;
   const solSaying = guideShown ? `g:${guideNow}` : nudgeShown ? `n:${nudges[0]?.id ?? ""}` : "";
   const [solSaid, setSolSaid] = useState(solSaying);
   if (solSaid !== solSaying) {
@@ -12133,8 +12138,12 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
-                  {greetingNote && (
-                    <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                  {panelCount ? (
+                    <div className="absolute inset-x-20 bottom-2 flex min-h-12 items-center justify-center">{panelCount}</div>
+                  ) : (
+                    greetingNote && (
+                      <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                    )
                   )}
                   {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
                       mark in the dock's bottom left, the way back that sat beside the address under the map. */}
@@ -12214,6 +12223,7 @@ export function RoofDesigner(props: {
                       if (!holding) setSettled((n) => n + 1);
                     }}
                     height={stage?.rest ?? 140}
+                    counter={panelCount}
                   />
                 </div>
               )}
