@@ -20,6 +20,7 @@ import {
 import { loadWorkspace } from "@/lib/services/design-store";
 import { ui } from "./design-shell";
 import { useDesignAccount } from "./design-account";
+import { ProductFileSettings } from "./settings-product-files";
 
 const EMPTY_PANEL: PanelForm = { voc: "", vmp: "", isc: "", imp: "", vocPercent: "", iscPercent: "", pmaxPercent: "" };
 const EMPTY_INVERTER: InverterForm = {
@@ -422,6 +423,8 @@ export function DatasheetSettings() {
           ))}
         </ul>
       </section>
+
+      <ProductFileSettings mayChange={Boolean(may?.prices)} />
     </div>
   );
 }

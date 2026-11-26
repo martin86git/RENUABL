@@ -50,6 +50,7 @@ export default async function ProposalLinkPage({ params }: PageProps<"/p/[token]
       deposit={found.deposit}
       payments={found.payments}
       callMe={callMe}
+      datasheets={found.datasheets}
     />
   );
 }

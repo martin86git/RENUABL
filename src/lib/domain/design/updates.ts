@@ -15,6 +15,46 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Everywhere",
+    words: "A minus at the top right of a page puts it aside as a chip at the foot of the screen; press the chip to go back.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "The deal's buttons down the left are a little smaller.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "Each quoted panel, inverter, battery and EV charger's datasheet is listed on the customer's proposal and its PDF.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The proposal screen says which datasheets are missing, with a button to find them online.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Battery and EV charger datasheets can be uploaded or found online in Product datasheets.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "The voice agent's window is taller, the chat on the left, its deals and settings as slim panels to the right.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "Each call can have an objective: a call appointment, a home visit, an install date, or helping them go ahead.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "A voice agent's script is numbered lines, and you can add a line to it directly.",
+  },
+  {
+    day: "2026-11-26",
     area: "Sol",
     words: "Sol's side panel and the box on a deal suggest the rest of a question too, and the team's common questions join your own.",
   },

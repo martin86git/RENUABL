@@ -132,4 +132,50 @@ describe.skipIf(!url)("product datasheets (database)", () => {
     expect((await sheets.businessDatasheets(b)).panels["FOUND-440"].unchecked).toBe("https://example.com/f.pdf");
     expect(found.figures.basis).toMatch(/found online for another business on RENUABL/);
   });
+
+  it("keeps a battery's sheet as a file alone, matches codes however written, and fills a missing file once found", async () => {
+    const pdf = Buffer.from("%PDF-1.4 sheet");
+    await sheets.saveProductFile(
+      a,
+      { kind: "battery", sku: "SIGEN-BAT-8.0", model: "SigenStor 8", fileName: "sigen.pdf" },
+      { bytes: pdf, type: "application/pdf" },
+      A,
+    );
+    // Batteries never show among the figures the designer reads.
+    expect((await sheets.listSheets(a)).some((x) => x.kind === ("battery" as never))).toBe(false);
+    expect((await sheets.listProductFiles(a)).map((f) => f.sku)).toContain("SIGEN-BAT-8.0");
+    const onHand = await sheets.sheetsOnHand(a, [{ kind: "battery", sku: "sigen bat 8.0" }]);
+    expect([...onHand.keys()]).toEqual(["battery:SIGENBAT8.0"]);
+    expect((await sheets.sheetFileByKey(a, "battery", "sigen_bat_8.0"))?.fileName).toBe("sigen.pdf");
+    // Shared with another business, to check there.
+    expect((await sheets.sheetsOnHand(b, [{ kind: "battery", sku: "SIGEN-BAT-8.0" }])).get("battery:SIGENBAT8.0")).toEqual({
+      unchecked: true,
+    });
+    expect((await sheets.listProductFiles(b)).find((f) => f.sku === "SIGEN-BAT-8.0")?.shared).toBe(true);
+
+    // An inverter with figures and no file: a sheet found online fills the file without counting as new figures.
+    const inverter = checkInverter(
+      {
+        maxVoltage: "600",
+        mppMin: "40",
+        mppMax: "560",
+        startVoltage: "40",
+        mppts: [{ maxCurrent: "16", maxShortCircuit: "20", strings: "1" }],
+      },
+      "inv",
+    );
+    if (!inverter.ok) throw new Error("unexpected");
+    await sheets.saveSheet(a, { kind: "inverter", sku: "FILL-5", model: "Fill 5", fileName: "", figures: inverter.value }, A);
+    const found = {
+      kind: "inverter" as const,
+      sku: "FILL-5",
+      model: "Fill 5",
+      fileName: "fill.pdf",
+      figures: inverter.value,
+      url: "https://x.test/f.pdf",
+    };
+    expect(await sheets.saveFoundSheet(a, found, { bytes: pdf, type: "application/pdf" })).toBe(false);
+    expect((await sheets.sheetFile(a, "inverter", "FILL-5"))?.bytes.length).toBe(pdf.length);
+    expect(await sheets.saveFoundSheet(a, { ...found, sku: "NEW-INV" }, null)).toBe(true);
+  });
 });

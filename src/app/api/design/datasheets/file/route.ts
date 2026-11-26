@@ -1,10 +1,18 @@
-import { KEEP_SHEET_BYTES, cleanSku, type SheetKind } from "@/lib/domain/design/datasheets";
+import { KEEP_SHEET_BYTES, cleanSku } from "@/lib/domain/design/datasheets";
 import { isPdf } from "@/lib/domain/design/brand";
 import { SHEET_TYPES } from "@/lib/server/datasheet-reader";
 import { answer, requireMember } from "@/lib/server/design-context";
-import { putSheetFile, sheetFile } from "@/lib/server/design-datasheets-repo";
+import { listProductFiles, putSheetFile, saveProductFile, sheetFile } from "@/lib/server/design-datasheets-repo";
+import { isDocKind, isFileOnly, type DocKind } from "@/lib/domain/design/proposal-datasheets";
 
-const kindOf = (v: unknown): SheetKind | null => (v === "panel" || v === "inverter" ? v : null);
+const kindOf = (v: unknown): DocKind | null => (isDocKind(v) ? v : null);
+const text = (v: unknown, max: number) =>
+  typeof v === "string"
+    ? v
+        .replace(/[\u0000-\u001f\u007f]/g, " ")
+        .trim()
+        .slice(0, max)
+    : "";
 
 /** What a kept sheet's bytes say it is: a PDF, or a JPEG, PNG or WebP picture (never what the browser says). */
 function sniff(bytes: Uint8Array): string | null {
@@ -38,7 +46,10 @@ export async function GET(request: Request) {
   });
 }
 
-/** POST a form of kind, sku and file: keeps the sheet with that product's saved figures. */
+/**
+ * POST a form of kind, sku and file: keeps the sheet with that product's saved figures. A battery's or EV charger's
+ * (26 Nov 2026) is kept as a file alone, with the model typed (`model`), in place of any it had.
+ */
 export async function POST(request: Request) {
   return answer(async () => {
     const who = await requireMember("prices");
@@ -55,6 +66,16 @@ export async function POST(request: Request) {
     const type = sniff(bytes);
     if (!type || !(SHEET_TYPES as readonly string[]).includes(type))
       return Response.json({ ok: false, message: "Keep a PDF, or a JPG, PNG or WebP picture." }, { status: 415 });
+    if (isFileOnly(kind)) {
+      const fileName = file.name ? text(file.name, 120) : "";
+      await saveProductFile(
+        who.member.businessId,
+        { kind, sku, model: text(form?.get("model"), 120) || sku, fileName },
+        { bytes: Buffer.from(bytes), type },
+        who.member.email,
+      );
+      return Response.json({ ok: true, files: await listProductFiles(who.member.businessId) });
+    }
     if (!(await putSheetFile(who.member.businessId, kind, sku, Buffer.from(bytes), type)))
       return Response.json({ ok: false, message: "Save the product's figures first." }, { status: 404 });
     return Response.json({ ok: true });

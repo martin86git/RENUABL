@@ -4311,20 +4311,27 @@ export function RoofDesigner(props: {
   const [solAsked, setSolAsked] = useState(false);
   /**
    * The greeting on the dock (25 Nov 2026, Martin: opening a finished design he needed a few seconds to take in that it
-   * was finished): "Design complete · Proposal signed", or what is missing, until the first press or key anywhere. Only
+   * was finished): "Design complete · Proposal signed", or what is missing, until the design is first changed. Only
    * for a roof that opened with panels on it (one Design it for me fills by itself keeps Sol's opening instead).
    */
+  // It stays until the design is changed (26 Nov 2026, Martin, from his iPhone: it was gone before he saw it, since the
+  // first touch anywhere, a scroll or a pinch, put it away): the first step that can be undone ends it for the visit.
+  // A change only counts once a person has pressed or typed, so one the roof makes by itself as it opens doesn't end it.
   const [greetOn, setGreetOn] = useState(() => summary.panels > 0);
+  const [greetTouched, setGreetTouched] = useState(false);
+  const [greetBase, setGreetBase] = useState(0);
   useEffect(() => {
-    if (!greetOn) return;
-    const off = () => setGreetOn(false);
-    window.addEventListener("pointerdown", off, true);
-    window.addEventListener("keydown", off, true);
+    if (!greetOn || greetTouched) return;
+    const touched = () => setGreetTouched(true);
+    window.addEventListener("pointerdown", touched, true);
+    window.addEventListener("keydown", touched, true);
     return () => {
-      window.removeEventListener("pointerdown", off, true);
-      window.removeEventListener("keydown", off, true);
+      window.removeEventListener("pointerdown", touched, true);
+      window.removeEventListener("keydown", touched, true);
     };
-  }, [greetOn]);
+  }, [greetOn, greetTouched]);
+  if (greetOn && !greetTouched && greetBase !== pastLen) setGreetBase(pastLen);
+  if (greetOn && greetTouched && pastLen > greetBase) setGreetOn(false);
   const greeting = greetOn
     ? designGreeting({
         panels: summary.panels,
