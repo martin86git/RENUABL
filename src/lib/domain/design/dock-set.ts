@@ -25,26 +25,30 @@ export function nextDockSet(set: DockSet): DockSet {
 /** Where a set sits on the dock's reels, top first. */
 export const reelPlace = (set: DockSet): number => DOCK_SETS.indexOf(set);
 
-/** Words for each set, on the ball and on Today. */
+/**
+ * Words for each set, on the ball and on Today. `ask` is the line in Sol's empty box: it stays neutral (26 Nov 2026,
+ * Martin: "i dont think we should open with negative quesitons. anyone walking past the comuter is gainig insight. it
+ * could simply be whats up next"), never a question that says how the business is going.
+ */
 export const DOCK_SET_WORDS: Record<DockSet, { name: string; turnTo: string; feed: string; ask: string }> = {
   sales: {
     name: "Sales tools",
     turnTo: "Turn the dock to the sales tools",
     feed: "Feed",
-    ask: "Ask about the business: why are we down on last month?",
+    ask: "What's up next?",
   },
   post: {
     name: "Post sale tools",
     turnTo: "Turn the dock to the post sale tools",
     feed: "Jobs",
-    ask: "Ask about jobs: what isn't ordered for next week?",
+    ask: "What's up next for your jobs?",
   },
   // Today keeps the sales view on the Marketplace's tools: the Marketplace is its own pages, not the business's day.
   market: {
     name: "Marketplace tools",
     turnTo: "Turn the dock to the Marketplace",
     feed: "Feed",
-    ask: "Ask about the business: why are we down on last month?",
+    ask: "What's up next?",
   },
 };
 

@@ -11,7 +11,10 @@ import clsx from "clsx";
 import { Loader2, TriangleAlert } from "lucide-react";
 import {
   CALL_AUDIENCES,
+  CALL_OBJECTIVES,
   CALL_SETUP_COPY as COPY,
+  OBJECTIVE_WORDS,
+  cleanObjective,
   REASON_MAX,
   SAID_AS_MAX,
   USUAL_REASON,
@@ -152,6 +155,36 @@ export function CallSetupSettings(props: {
             />
           </label>
 
+          <fieldset disabled={!props.editable || busy}>
+            <legend className={label}>{COPY.objective}</legend>
+            <p className="text-[11px] text-muted">{COPY.objectiveHint}</p>
+            <div role="radiogroup" aria-label={COPY.objective} className="mt-1.5 grid grid-cols-1 gap-1 sm:grid-cols-2">
+              {CALL_OBJECTIVES.map((o) => {
+                const on = cleanObjective(draft.objective) === o;
+                return (
+                  <button
+                    key={o}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    title={OBJECTIVE_WORDS[o].hint}
+                    onClick={() => !on && change({ objective: o })}
+                    className={clsx(
+                      "rounded-lg px-2.5 py-1.5 text-left text-[12px] leading-tight ring-1 transition",
+                      on
+                        ? "bg-primary font-medium text-white ring-primary"
+                        : "bg-surface text-ink-2 ring-line hover:text-ink hover:ring-sun-line",
+                      o === "none" && "sm:col-span-2",
+                    )}
+                  >
+                    {OBJECTIVE_WORDS[o].label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-ink-2">{OBJECTIVE_WORDS[cleanObjective(draft.objective)].hint}</p>
+          </fieldset>
+
           {draft.audience === "cold" && (
             <p className="flex gap-2 rounded-xl bg-warning-soft px-3 py-2 text-[11.5px] leading-snug text-ink">
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
@@ -172,6 +205,12 @@ export function CallSetupSettings(props: {
               })}
               ”
             </p>
+            {cleanObjective(draft.objective) !== "none" && (
+              <p className="mt-1.5 text-[11.5px] text-muted">
+                Then works towards:{" "}
+                <span className="font-medium text-ink">{OBJECTIVE_WORDS[cleanObjective(draft.objective)].label.toLowerCase()}</span>
+              </p>
+            )}
           </div>
         </>
       )}
