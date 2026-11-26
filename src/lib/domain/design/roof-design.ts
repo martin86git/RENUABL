@@ -317,7 +317,15 @@ export interface InverterSpec {
   /** Where it stands on the drawing, in metres from the middle of the picture, once it has been put in its place. */
   x?: number;
   y?: number;
+  /**
+   * The bends of its cable run to the main switchboard, in order from the inverter (26 Nov 2026, Martin: "pull the
+   * gold line to change its route"), in metres like `x` and `y`. None is a straight line.
+   */
+  route?: Point[];
 }
+
+/** The most bends a run to the switchboard keeps. */
+export const MAX_ROUTE_BENDS = 12;
 
 /** Where an inverter is drawn: where it was put, or until then a place of its own to the right of the picture, one under the next. */
 export function inverterSpot(spec: Pick<InverterSpec, "x" | "y">, index: number, lat: number): Point {
@@ -981,7 +989,19 @@ function cleanInverter(raw: unknown): InverterSpec | undefined {
       : "";
   const x = finite(p.x, -200, 200);
   const y = finite(p.y, -200, 200);
-  return { sku: p.sku, name: name || p.sku, kw, ...(x !== null && y !== null ? { x, y } : {}) };
+  const route = (Array.isArray(p.route) ? p.route : []).slice(0, MAX_ROUTE_BENDS).flatMap((b: unknown) => {
+    const q = (b ?? {}) as Record<string, unknown>;
+    const bx = finite(q.x, -200, 200);
+    const by = finite(q.y, -200, 200);
+    return bx === null || by === null ? [] : [{ x: Math.round(bx * 100) / 100, y: Math.round(by * 100) / 100 }];
+  });
+  return {
+    sku: p.sku,
+    name: name || p.sku,
+    kw,
+    ...(x !== null && y !== null ? { x, y } : {}),
+    ...(route.length ? { route } : {}),
+  };
 }
 
 /** Whether a string's panels all look the same way at the same tilt: a string on one input should. */
