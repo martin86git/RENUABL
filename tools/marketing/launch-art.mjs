@@ -37,6 +37,24 @@ const LOGO = pathToFileURL(LOGO_FILE).href;
 // RENUABL-only shots live in marketing/launch/source (private); the rest are the sales page's own public screenshots.
 const OWN_SHOTS = resolve("marketing/launch/source");
 const shot = (f) => pathToFileURL(existsSync(resolve(OWN_SHOTS, f)) ? resolve(OWN_SHOTS, f) : resolve("public/design/landing", f)).href;
+/** A frame of the designer at work, cut from a screen recording of a real design (the map and its figures only: no address, no customer). */
+/** What each frame of the design being made says, in order: a caption per step, held over the frames it covers. */
+const BUILD_SAYS = [
+  "Start with the roof.",
+  "Drag out a row of panels.",
+  "Turn it to the roof.",
+  "Turn it to the roof.",
+  "Set the tilt.",
+  "The quote builds as you go.",
+  "The quote builds as you go.",
+  "The quote builds as you go.",
+  "Shade read on every panel.",
+  "Choose the inverter.",
+  "Add a battery.",
+  "Designed and priced as you draw.",
+];
+const BUILD_FRAMES = BUILD_SAYS.length;
+const build = (n) => pathToFileURL(resolve(OWN_SHOTS, "designer-build", `${n}.webp`)).href;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- The product's own marks ------------------------------------------------------------------------------------
@@ -302,18 +320,47 @@ const ART = {
 
   /**
    * The designer in every email (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it…
-   * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a slim band under the
-   * last part of every email but the designer's, the updated designer on a real roof, its dock and Sol in view (the website's site, under a made-up label; no address shown).
+   * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a band under the last
+   * part of every email but the designer's. Since 26 Nov 2026 it is a system Martin designed on a real roof, cut from
+   * his screen recording: the finished design with its figures across the top (the map only; no address, no customer).
    */
   "designer-band.jpg": {
-    clipH: 560,
+    clipH: 609,
     html: page(
-      `<div class="glow"></div><div class="frame"><img src="${shot("designer-site-1.webp")}"></div>
-       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:518px;bottom:auto">`,
-      `.glow{position:absolute;left:0;right:0;top:0;height:560px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
-       .frame{position:absolute;left:48px;top:28px;width:1104px;height:470px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
-       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 77%}
-       .tag{position:absolute;left:52px;top:522px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+      `<div class="glow"></div><div class="frame"><img src="${build(BUILD_FRAMES)}"></div>
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:567px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:609px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:519px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+       .tag{position:absolute;left:52px;top:571px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+    ),
+  },
+
+  /**
+   * The same design being made (26 Nov 2026, Martin: "if i record designing the system can you use snippets from that?"):
+   * twelve quick cuts from the recording with a caption on each step (`BUILD_SAYS`): the bare roof, a row dragged out
+   * and turned, the tilt, the shade read on each panel, the inverter and the battery, the figures across the top
+   * changing as it grows. Not in the drafts by itself:
+   * it is dropped into a picture block by hand where a moving one is wanted.
+   */
+  "designer-build.gif": {
+    clipH: 609,
+    frames: BUILD_FRAMES,
+    delay: 620,
+    hold: 3400,
+    colours: 96,
+    photo: true,
+    html: page(
+      `<div class="glow"></div><div class="frame">${Array.from({ length: BUILD_FRAMES }, (_, i) => `<img data-f="${i}" src="${build(i + 1)}">`).join("")}<div class="fade"></div><div class="say" id="say"></div><div class="bar"><i id="bar"></i></div></div>
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:567px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:609px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:519px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+       .tag{position:absolute;left:52px;top:571px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}
+       .fade{position:absolute;left:0;right:0;bottom:0;height:170px;background:linear-gradient(to top,rgba(5,6,10,.92),rgba(5,6,10,.55) 55%,transparent)}
+       .say{position:absolute;left:32px;right:32px;bottom:30px;font-size:40px;font-weight:600;letter-spacing:-.02em;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+       .bar{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,.14)}.bar i{display:block;height:100%;width:0;background:#ff5a1f}`,
+      `const SAYS = ${JSON.stringify(BUILD_SAYS)}; window.at = (t) => { const n = Math.round(t * (${BUILD_FRAMES} - 1)); document.querySelectorAll("[data-f]").forEach((el) => { el.style.opacity = +el.dataset.f <= n ? 1 : 0; }); document.getElementById("say").textContent = SAYS[n]; document.getElementById("bar").style.width = ((n + 1) / SAYS.length) * 100 + "%"; }; window.at(0);`,
     ),
   },
 
@@ -468,13 +515,21 @@ const grab = async (clip) =>
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: false });
 
-async function writeGif(name, frames, delays, colours = 160, width = GIF_W) {
+/** `photo` is for frames that are mostly one photograph: only what changed between frames is kept, which cuts such a GIF to a quarter. */
+async function writeGif(name, frames, delays, colours = 160, width = GIF_W, photo = false) {
   // Outlook on Windows shows only a GIF's first frame: the finished picture goes first, then it plays from the start.
   frames = [frames.at(-1), ...frames];
   delays = [1600, ...delays];
   const small = await Promise.all(frames.map((f) => sharp(f).resize(width).png().toBuffer()));
   await sharp(small, { join: { animated: true } })
-    .gif({ delay: delays, loop: 0, effort: 10, colours, dither: 0.5 })
+    .gif({
+      delay: delays,
+      loop: 0,
+      effort: 10,
+      colours,
+      dither: photo ? 0.3 : 0.5,
+      ...(photo ? { interFrameMaxError: 12, interPaletteMaxError: 10 } : {}),
+    })
     .toFile(join(OUT, name));
 }
 
@@ -608,13 +663,15 @@ for (const [name, art] of Object.entries(ART)) {
     for (let i = 0; i < art.frames; i++) {
       await js(`window.at(${i / (art.frames - 1)})`);
       await sleep(30);
-      frames.push(await grab());
+      frames.push(await grab(art.clipH ? { x: 0, y: 0, width: W, height: art.clipH } : undefined));
     }
     await writeGif(
       name,
       frames,
       frames.map((_, i) => (i === frames.length - 1 ? art.hold : i === 0 && art.first ? art.first : art.delay)),
       art.colours ?? 160,
+      GIF_W,
+      art.photo === true,
     );
   }
   console.log("made", name);
