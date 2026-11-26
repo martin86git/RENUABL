@@ -1231,14 +1231,14 @@ function CallMenu({
             <span
               className={clsx(
                 "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
-                mini ? "size-9" : "size-12",
+                mini ? "size-9" : "size-11",
                 at ? "bg-primary text-primary-ink ring-primary" : "bg-surface text-ink-2 ring-line group-hover:text-ink",
                 !phone && "text-muted group-hover:text-muted",
               )}
             >
-              <Phone className={mini ? "size-4" : "size-5"} aria-hidden />
+              <Phone className={mini ? "size-4" : "size-[18px]"} aria-hidden />
             </span>
-            <span className={clsx(mini ? "text-[9.5px]" : "text-[11px]", "font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
+            <span className={clsx(mini ? "text-[9.5px]" : "text-[10.5px]", "font-medium", phone ? "text-ink-2" : "text-muted")}>Call</span>
           </>
         ) : (
           <>
@@ -1545,8 +1545,9 @@ function DealMenu({
   const sold = WON_STAGES.includes(stage);
   const installed = INSTALLED_STAGES.includes(stage);
   const down = vertical || mini;
-  const size = mini ? "size-9" : "size-12";
-  const icon = mini ? "size-4" : "size-5";
+  // A little smaller on a computer (26 Nov 2026, Martin): 44 px rounds, 18 px marks.
+  const size = mini ? "size-9" : "size-11";
+  const icon = mini ? "size-4" : "size-[18px]";
   const round = (on: boolean) =>
     clsx(
       "flex items-center justify-center rounded-full shadow-[0_6px_18px_rgba(11,11,12,0.08)] ring-1 transition",
@@ -1572,7 +1573,7 @@ function DealMenu({
         mini
           ? "sticky top-3 z-10 -ml-2.5 flex flex-col items-center gap-2 self-start sm:hidden"
           : vertical
-            ? "sticky hidden flex-col items-center gap-3.5 pt-1 xl:flex"
+            ? "sticky hidden flex-col items-center gap-3 pt-1 xl:flex"
             : "-mx-1 hidden items-start gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex xl:hidden [&::-webkit-scrollbar]:hidden"
       }
     >
@@ -1671,7 +1672,7 @@ function DealMenu({
             tab === "sol" && "ring-2 ring-sun-line/60 ring-offset-2 ring-offset-canvas",
           )}
         >
-          <SolBadge className={mini ? "size-[18px]" : "size-[22px]"} />
+          <SolBadge className={mini ? "size-[18px]" : "size-5"} />
         </span>
       </RailRound>
       {mini && onDelete && (
@@ -1787,7 +1788,7 @@ function RailRound({
       className={clsx("group flex flex-col items-center", mini ? "gap-0.5" : "gap-1")}
     >
       {children}
-      <span className={clsx(mini ? "text-[9.5px] leading-tight" : "text-[11px]", "font-medium", on ? "text-ink" : "text-ink-2")}>
+      <span className={clsx(mini ? "text-[9.5px] leading-tight" : "text-[10.5px]", "font-medium", on ? "text-ink" : "text-ink-2")}>
         {label}
       </span>
     </button>
