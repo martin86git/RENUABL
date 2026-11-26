@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Search, Trash2, Upload } from "lucide-react";
+import { FileText, Loader2, Search, Trash2, Upload } from "lucide-react";
 import { KEEP_SHEET_BYTES } from "@/lib/domain/design/datasheets";
 import { DOC_KIND_WORDS, type DocKind } from "@/lib/domain/design/proposal-datasheets";
 import { chargersOf, workspaceCatalogue } from "@/lib/domain/design/pricing";
@@ -106,7 +106,11 @@ export function ProductFileSettings(props: { mayChange: boolean }) {
             disabled={busy !== null}
             className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[12.5px] font-medium text-white disabled:bg-line disabled:text-muted"
           >
-            <Search className="size-3.5" aria-hidden />
+            {busy === "find" ? (
+              <Loader2 className="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+            ) : (
+              <Search className="size-3.5" aria-hidden />
+            )}
             {busy === "find" ? "Looking online…" : `Find ${Math.min(6, missing.length) === missing.length ? "them" : "six"} online`}
           </button>
         </div>

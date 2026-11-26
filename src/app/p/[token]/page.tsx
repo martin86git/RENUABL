@@ -6,6 +6,7 @@ import { ProposalGone } from "@/components/design/proposal-view";
 import { todayInMarket } from "@/lib/domain/market";
 import { proposalJob, publicProposal } from "@/lib/server/design-proposal-repo";
 import { callMeFor } from "@/lib/server/voice-calls";
+import { likesOf } from "@/lib/server/design-proposal-likes";
 
 /**
  * Kept out of search, and the page it links to is never told where the
@@ -41,6 +42,7 @@ export default async function ProposalLinkPage({ params }: PageProps<"/p/[token]
   // "Call me" only where the business has calls on (server/voice-calls.ts).
   const job = await proposalJob(token).catch(() => null);
   const callMe = job ? await callMeFor(job.businessId).catch(() => null) : null;
+  const likes = found.view.options && found.view.options.length > 1 ? await likesOf(token).catch(() => []) : [];
   return (
     <CustomerProposal
       token={token}
@@ -51,6 +53,7 @@ export default async function ProposalLinkPage({ params }: PageProps<"/p/[token]
       payments={found.payments}
       callMe={callMe}
       datasheets={found.datasheets}
+      likes={likes}
     />
   );
 }

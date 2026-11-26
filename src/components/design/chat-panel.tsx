@@ -361,6 +361,8 @@ export interface CustomerConversation {
   send: (text: string) => Promise<boolean>;
   /** Sol is writing an answer to what the customer just sent. */
   thinking: boolean;
+  /** Sol answers here as the customer writes (the business has him answering customers). */
+  assistant: boolean;
 }
 
 export function useCustomerChat({
@@ -380,6 +382,7 @@ export function useCustomerChat({
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
   const [shown, show] = useState(false);
+  const [assistant, setAssistant] = useState(false);
   // When the customer has just written and Sol is answering here: when they sent it, so the page looks for his answer
   // every couple of seconds (for up to `SOL_WAIT`) and shows him writing until it comes.
   const [asked, setAsked] = useState<number | null>(null);
@@ -408,6 +411,7 @@ export function useCustomerChat({
       setLines(res.messages);
       setNames(res.names);
       setOpen(res.open);
+      setAssistant(Boolean(res.assistant));
     };
     // Asked once on arrival, then every 20 seconds, but not while the page is behind another tab (nobody is
     // reading it); coming back to the page asks straight away.
@@ -442,7 +446,7 @@ export function useCustomerChat({
   };
   // In the business's preview nothing is asked of the server: the names follow the business as the preview loads.
   const shownNames = token ? names : { customer: "You", business: teamName(business) };
-  return { token, business, phone, lines, names: shownNames, open, shown, show, problem, send, thinking: asked !== null };
+  return { token, business, phone, lines, names: shownNames, open, shown, show, problem, send, thinking: asked !== null, assistant };
 }
 
 /**

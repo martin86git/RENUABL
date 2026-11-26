@@ -199,6 +199,10 @@ export const callMeNow = (token: string) => ask<object>(`${link(token)}/call`, {
 
 export const sayPaid = (token: string, way: PaidWay) => ask<OpenedProposal>(link(token), { method: "POST", body: { action: "paid", way } });
 
+/** Likes or unlikes one of the systems offered (26 Nov 2026); answers the options liked now. */
+export const likeOption = (token: string, option: string, liked: boolean) =>
+  ask<{ likes: string[] }>(link(token), { method: "POST", body: { action: "like", option, liked } });
+
 /** Where a proposal's pictures, its roof from above, its PDF and the business's own terms are, by its private link. */
 export const proposalUrls = (token: string) => ({
   image: (id: string) => `${link(token)}/file/${encodeURIComponent(id)}`,

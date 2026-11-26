@@ -263,7 +263,7 @@ export function SolController(props: {
     .join(" · ");
   const seg = "flex items-center rounded-xl bg-white/[0.08] p-[3px]";
   const small = "flex items-center justify-center rounded-[9px] text-white/85 hover:bg-white/10";
-  // A double tap on either thumb turns both to 5° a press, and another back to 1° (22 Nov 2026, Martin). Kept for the visit.
+  // How far each press of a thumb turns them: 1° or 5°, chosen by the switch beside the tilt.
   const [stepBy, setStepBy] = useState(turnStep);
   const thumb = (by: -1 | 1) => {
     const Turn = by < 0 ? RotateCcw : RotateCw;
@@ -271,13 +271,7 @@ export function SolController(props: {
       <HoldButton
         onStep={(times) => props.onTurn(by * stepBy * times)}
         onHold={props.onHold}
-        onDoubleTap={() => {
-          // The first tap of the two turned the panels: take it back, so a double tap only changes the step.
-          props.onTakeBack(by * stepBy);
-          turnStep = turnStep === 1 ? 5 : 1;
-          setStepBy(turnStep);
-        }}
-        aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"} (double tap for ${stepBy === 1 ? 5 : 1}°)`}
+        aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"}`}
         className={clsx(
           "pointer-events-auto flex flex-col items-center justify-center rounded-full bg-[#3a3d43] text-white shadow-[0_6px_18px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/10 active:scale-95 active:bg-[#4a4e55] motion-reduce:active:scale-100",
           // Larger on a phone held upright (26 Nov 2026, Martin: "the left and right toggles need to be bigger").
@@ -360,6 +354,36 @@ export function SolController(props: {
       {tiltStep(1)}
     </div>
   );
+  // How far a press of either thumb turns them, chosen here (26 Nov 2026, Martin: the thumbs "aren't working"; a double
+  // tap switched the step and took the first tap's turn back, so quick taps in a row undid each other). Kept for the visit.
+  const stepSwitch = props.panels > 0 && (
+    <div className={seg} role="radiogroup" aria-label="How far each press turns them">
+      {([1, 5] as const).map((d) => (
+        <button
+          key={d}
+          type="button"
+          role="radio"
+          aria-checked={stepBy === d}
+          onClick={() => {
+            turnStep = d;
+            setStepBy(d);
+          }}
+          className={clsx(
+            "flex h-8 w-9 items-center justify-center rounded-[9px] text-[12px] font-semibold tabular-nums",
+            stepBy === d ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
+          )}
+        >
+          {d}°
+        </button>
+      ))}
+    </div>
+  );
+  const tiltAndStep = props.panels > 0 && (
+    <div className="flex flex-wrap items-center justify-center gap-1.5">
+      {tilt}
+      {stepSwitch}
+    </div>
+  );
   const remove = (
     <button
       type="button"
@@ -431,7 +455,7 @@ export function SolController(props: {
         done={done}
         orient={orient}
         remove={remove}
-        tiltRow={tilt}
+        tiltRow={tiltAndStep}
         thumb={thumb}
         slideStep={props.onSlide ? slideStep : undefined}
       />
@@ -452,7 +476,7 @@ export function SolController(props: {
             {detail && <span className="block truncate text-[10.5px]">{detail}</span>}
           </p>
           {orient}
-          {tilt}
+          {tiltAndStep}
         </div>
         <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
