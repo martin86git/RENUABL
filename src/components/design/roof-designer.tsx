@@ -3322,11 +3322,12 @@ export function RoofDesigner(props: {
   // Where the loupe goes for a finger at this pointer event, or null when it isn't a finger or nothing is held.
   const loupeFor = (e: React.PointerEvent): typeof loupe => {
     if (e.pointerType !== "touch" || !press.current || press.current.mode === "pan") return null;
-    const at = pointAt(e);
     const box = svg.current?.getBoundingClientRect();
-    if (!at || !box || !box.width) return null;
+    if (!box || !box.width) return null;
     const fx = (e.clientX - box.left) / box.width;
     const fy = (e.clientY - box.top) / box.height;
+    // In the picture's own units (its viewBox), not metres: the loupe draws the picture itself, magnified.
+    const at = { x: view.x + fx * view.w, y: view.y + fy * view.h };
     return { at, left: fx > 0.5 && fy < 0.5, per: view.w / box.width };
   };
   const onPointerDown = (e: React.PointerEvent) => {
