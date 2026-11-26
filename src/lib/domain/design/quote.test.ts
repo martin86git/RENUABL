@@ -401,3 +401,16 @@ describe("the parts every job needs, for a new business", () => {
     expect(componentCost(DEFAULT_WORKSPACE, "rail")).toBeNull();
   });
 });
+
+describe("card payment fees in the price", () => {
+  it("adds the recovered share as a line, so it holds on the whole price", () => {
+    const plain = costSystem(system, form, withList);
+    const ws = { ...withList, settings: { ...withList.settings, cardRecover: 0.0175 } };
+    const c = costSystem(system, form, ws);
+    const line = c.lines.find((l) => l.group === "Card fees");
+    expect(line?.label).toBe("Card payment fees (1.75% recovered)");
+    expect(c.priceExGst - plain.priceExGst).toBe(line!.amount);
+    expect(Math.abs(line!.amount - c.priceExGst * 0.0175)).toBeLessThan(1);
+    expect(costSystem(system, form, withList).lines.some((l) => l.group === "Card fees")).toBe(false);
+  });
+});

@@ -2,10 +2,11 @@
  * Paying a business by card from its proposal (Martin, 1 Nov 2026: the payment gateway for RENUABL's businesses).
  * Pure, tested (`proposal-payments.test.ts`).
  *
- * A business connects its own Stripe account (Stripe Connect, a standard account it owns). The customer pays on
- * Stripe's page, and the money goes straight into the business's Stripe account as a direct charge: RENUABL never
- * holds it. RENUABL's fee, `PLATFORM_FEE` of each payment (GST inclusive), is taken by Stripe as an application fee;
- * Stripe's own processing fees are the business's, as with any Stripe account of its own.
+ * Each business has a Stripe account of its own, run by RENUABL's platform (24 Nov 2026, Martin: "similar to pylon",
+ * 2.5%): it is set up, and its bank account, payouts and payments seen, inside RENUABL. The customer pays on Stripe's
+ * form, and the money goes straight into the business's Stripe account as a direct charge, then to its bank: RENUABL
+ * never holds it. RENUABL's fee, `PLATFORM_FEE` of each payment, all in (Stripe's own processing fee is paid by RENUABL
+ * out of it; GST inclusive), is taken by Stripe as an application fee.
  *
  * What can be paid is what the accepted proposal asked for, to the cent, and nothing else: the deposit first, then each
  * payment milestone in turn. The deposit counts towards the milestones: it comes off the first of them (and the next,
@@ -13,8 +14,8 @@
  */
 import { money } from "./deposit";
 
-/** RENUABL's share of each card payment taken through a proposal, GST inclusive. */
-export const PLATFORM_FEE = 0.01;
+/** RENUABL's fee on each card payment taken through a proposal, all in (Stripe's processing fee comes out of it), GST inclusive. */
+export const PLATFORM_FEE = 0.025;
 
 export type DueKey = "deposit" | `m${number}`;
 
@@ -77,9 +78,9 @@ export const takesCards = (state: ConnectState, switchedOn: boolean) => switched
 
 /** For a business's screens. */
 export function connectWords(state: ConnectState): string {
-  if (!state.connected) return "Not connected";
-  if (state.chargesEnabled) return "Connected: card payments are on";
-  return state.detailsSubmitted ? "Stripe is checking your details" : "Stripe needs a few more details";
+  if (!state.connected) return "Not set up";
+  if (state.chargesEnabled) return "Verified: ready to take card payments";
+  return state.detailsSubmitted ? "Stripe is checking your details" : "A few more details needed";
 }
 
 /** Beside "Pay by card" on the customer's page. */

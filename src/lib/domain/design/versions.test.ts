@@ -84,7 +84,10 @@ describe("a note that needs nothing done", () => {
       kw: 8,
       network: { name: "United Energy", guessed: false, preApproval: "Requested", mayRequest: true },
     }).find((x) => x.id === "export")!;
-    expect(n.actions).toEqual([{ label: "OK", act: "ok" }]);
+    expect(n.actions).toEqual([
+      { label: "OK", act: "ok" },
+      { label: "Open Pre-approvals", act: "open-preapprovals" },
+    ]);
   });
   it("offers No beside raising the request, and OK when it can't be raised", () => {
     const ask = nudgesFor({

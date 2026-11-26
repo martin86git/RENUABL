@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronRight, MessageSquare, PhoneCall, X } from "lucide-react";
 import { callsToday, callsTodayWords, type AssistantDeal } from "@/lib/domain/design/assistant-deals";
 import { chatDayWords, type CoachChatLine } from "@/lib/domain/design/coach-threads";
@@ -38,6 +38,8 @@ export function CoachWelcome(props: {
   onPick: (deal: AssistantDeal) => void;
   onDeals: () => void;
   onTalk: () => void;
+  /** The chat box, floating under the agent as on Today (26 Nov 2026, Martin). */
+  box?: ReactNode;
 }) {
   const { caller } = props;
   const name = caller.name;
@@ -76,18 +78,20 @@ export function CoachWelcome(props: {
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col px-1 py-3">
-      <div className="flex items-center gap-3 px-1">
-        <CallerAvatar caller={caller} size={36} />
-        <div className="min-w-0">
-          <p className="text-[19px] font-light leading-tight tracking-tight text-ink">{name}&apos;s day</p>
-          <p className="truncate text-xs text-muted">
-            {!deals && !failed ? "Looking at today's calls…" : (callsTodayWords(today) ?? "No calls lined up for today")}
-          </p>
-        </div>
+      {/* The agent large in the middle, its day under it, and the box floating below, as on Today (26 Nov 2026,
+          Martin: "i prefer having a large voice agent icon in the middle. with also the chat box floating underneath"). */}
+      <div className="flex flex-col items-center pt-4 text-center">
+        <CallerAvatar caller={caller} size={88} />
+        <p className="mt-3 text-[24px] font-light leading-tight tracking-tight text-ink">What&apos;s next for {name}?</p>
+        <p className="mt-1 text-[13px] text-muted">
+          {!deals && !failed ? "Looking at today's calls…" : (callsTodayWords(today) ?? "No calls lined up for today")}
+        </p>
       </div>
+      {props.box && <div className="mt-5 w-full rounded-3xl bg-surface p-2.5 shadow-lift ring-1 ring-line">{props.box}</div>}
+      {today.length > 0 && <p className="mt-5 px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">Today</p>}
 
       {today.length > 0 && (
-        <ol aria-label={`${name}'s calls today, in the order they ring`} className="mt-3 w-full space-y-1 text-left">
+        <ol aria-label={`${name}'s calls today, in the order they ring`} className="mt-1.5 w-full space-y-1 text-left">
           {today.map((d) => (
             <li key={d.jobId}>
               <button
@@ -201,7 +205,7 @@ export function CoachWelcome(props: {
               Show all {props.past.length + (props.current ? 1 : 0)} chats
             </button>
           )}
-          <p className="mt-2 px-1 text-[11px] text-muted">Type below to start a new chat.</p>
+          <p className="mt-2 px-1 text-[11px] text-muted">Type above to start a new chat.</p>
         </section>
       )}
     </div>

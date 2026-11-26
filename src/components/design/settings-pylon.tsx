@@ -47,7 +47,9 @@ export function PylonImportSettings() {
     setFound({ projects: res.projects, already: res.already, more: res.more });
   };
 
-  const toBring = found ? found.projects.filter((p) => !found.already.includes(p.id)) : [];
+  // New ones, then those already here (from the export), which the run fills in and gives their signed PDF.
+  const fresh = found ? found.projects.filter((p) => !found.already.includes(p.id)) : [];
+  const toBring = found ? [...fresh, ...found.projects.filter((p) => found.already.includes(p.id))] : [];
 
   const bring = async () => {
     if (!found) return;
@@ -71,7 +73,8 @@ export function PylonImportSettings() {
       }
       for (const r of res.results as PylonOutcome[]) {
         if (r.result === "in") state = { ...state, done: state.done + 1, pdfs: state.pdfs + (r.pdf ? 1 : 0) };
-        else if (r.result === "already") state = { ...state, done: state.done + 1, already: state.already + 1 };
+        else if (r.result === "already")
+          state = { ...state, done: state.done + 1, already: state.already + 1, pdfs: state.pdfs + (r.pdf ? 1 : 0) };
         else {
           state = { ...state, failed: state.failed + 1 };
           failed.push({ customer: names.get(r.id) ?? r.id, why: r.why });
@@ -157,13 +160,13 @@ export function PylonImportSettings() {
           {toBring.length > 0 && (
             <>
               <ul className="mt-3 max-h-48 divide-y divide-line overflow-y-auto rounded-xl border border-line text-sm">
-                {toBring.slice(0, 50).map((p) => (
+                {fresh.slice(0, 50).map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2">
                     <span className="min-w-0 truncate text-ink">{p.customer || "No name in Pylon"}</span>
                     <span className="shrink-0 font-mono text-xs text-muted">{p.reference}</span>
                   </li>
                 ))}
-                {toBring.length > 50 && <li className="px-3 py-2 text-muted">and {toBring.length - 50} more</li>}
+                {fresh.length > 50 && <li className="px-3 py-2 text-muted">and {fresh.length - 50} more</li>}
               </ul>
 
               <fieldset className="mt-4" disabled={run?.running}>
@@ -199,7 +202,11 @@ export function PylonImportSettings() {
 
           {toBring.length > 0 && !run?.running && (
             <button type="button" className={clsx(ui.primary, "mt-4")} onClick={() => void bring()} disabled={!key.trim()}>
-              {run?.stopped ? "Carry on" : `Bring in ${toBring.length} sold job${toBring.length === 1 ? "" : "s"}`}
+              {run?.stopped
+                ? "Carry on"
+                : fresh.length
+                  ? `Bring in ${fresh.length} sold job${fresh.length === 1 ? "" : "s"}${found.already.length ? ` and fill in the ${found.already.length} already here` : ""}`
+                  : `Fill in the ${found.already.length} already here, with their signed PDFs`}
             </button>
           )}
         </div>

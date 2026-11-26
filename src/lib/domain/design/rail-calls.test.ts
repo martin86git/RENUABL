@@ -31,3 +31,11 @@ describe("how many calls get a round", () => {
     expect(railCalls(calls(9)).more).toBe(9 - (RAIL_CALLS_MAX - 1));
   });
 });
+
+describe("a call that came in", () => {
+  it("says they rang in", () => {
+    const c = { customer: "Jo Example", deal: "Solar", by: "Charlie", inbound: true };
+    expect(railCallWords({ ...c, phase: "on-call" }, "0:40")).toBe("Jo Example · rang in, on the call with Charlie · 0:40 · Solar");
+    expect(railCallWords({ ...c, phase: "ringing" }, null)).toBe("Jo Example · is ringing Charlie · Solar");
+  });
+});

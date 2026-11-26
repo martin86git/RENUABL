@@ -47,7 +47,7 @@ export const HUBSPOT_WORDS = {
     "In HubSpot, make a service key (or a private app under Settings → Integrations → Private apps) with these read scopes, then copy its key or access token and paste it here:",
   keyKept: "The token is used for this import only. RENUABL doesn't keep it.",
   notCarried:
-    "Attachments, tasks, quotes and marketing history stay in HubSpot. A deal's customer is its first contact; someone already in RENUABL (by email, then mobile) gets the deal and isn't changed.",
+    "Attachments, tasks, quotes and marketing history stay in HubSpot. A deal's customer is its first contact; someone already in RENUABL (by email, then mobile) isn't changed. When they already have a deal here for the same job (dated within about four months, such as one from Pylon), HubSpot's notes, emails, calls and meetings go onto that deal and fill only its empty fields, instead of making a second deal.",
   again: "Run it again any time: deals already brought in are passed over, so only new ones come across.",
   badKey: "That doesn't look like a HubSpot token or service key. Copy it whole, with no spaces, from HubSpot.",
   refused: "HubSpot didn't accept that token. Check it was copied whole and the key or private app hasn't been deleted.",
@@ -629,16 +629,77 @@ export function engagementLine(type: EngagementType, e: HsRecord, owners: readon
 
 /** What became of one deal. */
 export type HsOutcome =
-  | { id: string; result: "in"; customer: string; lines: number }
+  | { id: string; result: "in"; customer: string; lines: number; joined?: boolean }
   | { id: string; result: "already" }
   | { id: string; result: "skipped" }
   | { id: string; result: "failed"; why: string };
 
 /** The run so far, in a line. */
-export function hubspotProgress(o: { done: number; total: number; already: number; failed: number; skipped: number }): string {
+export function hubspotProgress(o: {
+  done: number;
+  total: number;
+  already: number;
+  failed: number;
+  skipped: number;
+  joined?: number;
+}): string {
   const parts = [`${o.done} of ${o.total} deal${o.total === 1 ? "" : "s"} in`];
+  if (o.joined) parts.push(`${o.joined} joined to a deal already here`);
   if (o.already) parts.push(`${o.already} already here`);
   if (o.skipped) parts.push(`${o.skipped} left in HubSpot`);
   if (o.failed) parts.push(`${o.failed} couldn't come across`);
   return parts.join(" · ");
+}
+
+// ---------------------------------------------------------------------------
+// One job, not two (26 Nov 2026, Martin: Primero's sold jobs are in Pylon and in HubSpot, so a HubSpot deal whose
+// customer already has a deal here, most often one brought in from Pylon, joins that deal instead of making a second).
+// ---------------------------------------------------------------------------
+
+/** How far apart (in days) a HubSpot deal and a deal here may be dated and still be the same job. */
+export const MERGE_DAYS = 120;
+
+/** A deal of the customer's already here, as the match reads it. */
+export interface DealHere {
+  id: string;
+  stage: JobStage;
+  /** The day it was won (YYYY-MM-DD), else null. */
+  wonOn: string | null;
+  /** The day it was made here (YYYY-MM-DD). */
+  madeOn: string;
+}
+
+const dayNumber = (d: string) => Date.parse(`${d.slice(0, 10)}T00:00:00Z`) / 86_400_000;
+
+/**
+ * The customer's deal a HubSpot deal joins: of their deals not lost, the one dated nearest the HubSpot deal (each by
+ * its won day, else the day it was made), within `MERGE_DAYS`. None: the HubSpot deal comes in as a deal of its own (a
+ * second job years later stays a second deal).
+ */
+export function mergeTarget(here: readonly DealHere[], hub: { wonOn: string | null; createdAt: string | null }): DealHere | null {
+  const hubDay = hub.wonOn ?? hub.createdAt?.slice(0, 10) ?? null;
+  const open = here.filter((d) => d.stage !== "lost");
+  if (!open.length) return null;
+  if (!hubDay) return open.length === 1 ? open[0] : null;
+  let best: { deal: DealHere; gap: number } | null = null;
+  for (const d of open) {
+    const gap = Math.abs(dayNumber(d.wonOn ?? d.madeOn) - dayNumber(hubDay));
+    if (gap <= MERGE_DAYS && (!best || gap < best.gap)) best = { deal: d, gap };
+  }
+  return best?.deal ?? null;
+}
+
+/** HubSpot's fields put on a deal here only where it has nothing: what a person or Pylon gave is never written over. */
+export function fillEmpty(
+  current: Record<string, string>,
+  hub: Record<string, string>,
+): { details: Record<string, string>; filled: number } {
+  const details = { ...current };
+  let filled = 0;
+  for (const [k, v] of Object.entries(hub)) {
+    if (!v || (details[k] ?? "").trim()) continue;
+    details[k] = v;
+    filled++;
+  }
+  return { details, filled };
 }

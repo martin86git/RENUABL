@@ -29,7 +29,12 @@ export type NudgeAct =
   /** Read and understood: the note is put aside. */
   | "ok"
   | "finalise"
-  | "request-preapproval";
+  | "request-preapproval"
+  /** Pre-approvals, under Sales (26 Nov 2026, Martin: "where do i find… pre-approvals"). */
+  | "open-preapprovals";
+
+/** Where Pre-approvals is (sections.ts, under Sales). */
+export const PRE_APPROVALS_HREF = "/design/procurement/pre-approvals";
 
 export interface NudgeAction {
   label: string;
@@ -271,10 +276,14 @@ function preApprovalNudge(s: NudgeState): Nudge | null {
     return {
       id: "export",
       kind: "option",
-      words: `${over}. Pre-approval with ${who}: ${v === "Requested" ? "requested, waiting in Pre-approvals to be submitted" : v.toLowerCase()}.`,
+      words: `${over}. Pre-approval with ${who}: ${v === "Requested" ? "requested, waiting in Pre-approvals (under Sales) to be submitted" : v.toLowerCase()}.`,
       ...(where ? { why: where } : {}),
-      // Read and understood (19 Nov 2026, Martin: "this should have a button acknowledged or OK").
-      actions: [{ label: "OK", act: "ok" }],
+      // Read and understood (19 Nov 2026, Martin: "this should have a button acknowledged or OK"), and the way to the
+      // request itself (26 Nov 2026, Martin: he couldn't find Pre-approvals).
+      actions: [
+        { label: "OK", act: "ok" },
+        { label: "Open Pre-approvals", act: "open-preapprovals" },
+      ],
     };
   const ask = Boolean(net && s.onDeal && net.mayRequest);
   return {

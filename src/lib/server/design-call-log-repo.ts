@@ -47,10 +47,13 @@ export async function liveCallsNow(businessId: string, viewer: DealViewer): Prom
     by: string | null;
     last_role: string | null;
     last_text: string | null;
+    inbound: boolean;
     now: Date;
   }>(
     `select j.id as job_id, cu.name as customer, j.title as deal, c.status, c.live_status, c.live_started_at,
-            c.lead->>'assistant' as by, l.role as last_role, l.text as last_text, now() as now
+            c.lead->>'assistant' as by, l.role as last_role, l.text as last_text, now() as now,
+            -- They rang in, and this is that call (26 Nov 2026, Martin): the assistant is answering, not calling out.
+            (coalesce(c.lead->>'inbound', '') = 'true' and c.live_vapi_id is not distinct from c.vapi_call_id) as inbound
        from voice_calls c
        join design_jobs j on j.business_id = c.business_id and j.id = c.job_id
        join design_customers cu on cu.business_id = j.business_id and cu.id = j.customer_id
@@ -79,6 +82,7 @@ export async function liveCallsNow(businessId: string, viewer: DealViewer): Prom
       startedAgo: phase === "on-call" && started !== null ? new Date(r.now).getTime() - started : null,
       by: r.by || "Sol",
       last: r.last_text && (r.last_role === "assistant" || r.last_role === "customer") ? { role: r.last_role, text: r.last_text } : null,
+      ...(r.inbound ? { inbound: true } : {}),
     });
   }
   return liveNowOrder(calls);

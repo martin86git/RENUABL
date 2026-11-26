@@ -42,6 +42,13 @@ import {
   SOCIAL_NETWORKS,
   SOCIAL_WORDS,
   SPACER_SIZES,
+  BUTTON_SHAPES,
+  BUTTON_SHAPE_WORDS,
+  BUTTON_SIZES,
+  BUTTON_SIZE_WORDS,
+  buttonLook,
+  buttonShapeOf,
+  buttonSizeOf,
   SPACER_WORDS,
   SOCIAL_LOOKS,
   SOCIAL_LOOK_WORDS,
@@ -363,6 +370,33 @@ export function EdmBuilder({
     flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
     return true;
   }
+  // The member's direction for the whole email, and whether there is an email yet to change.
+  const [direction, setDirection] = useState("");
+  const hasDraft = Boolean(
+    content.subject.trim() ||
+    content.preview.trim() ||
+    content.blocks.some((b) => (b.kind === "text" || b.kind === "heading") && b.text.trim() && b.text.trim() !== "Hi {firstName},"),
+  );
+  async function changeEmail() {
+    const { draft } = draftFor();
+    setBusy("direction");
+    setSolMsg(null);
+    const r = await writeWithSol({ part: "all", brief, draft, note: direction });
+    setBusy(null);
+    if (!r.ok) return setSolMsg({ ok: false, text: r.message });
+    let blocks = content.blocks;
+    const fill = (kind: "heading" | "text", words: string | undefined) => {
+      if (words === undefined) return;
+      const id = blocks.find((b) => b.kind === kind)?.id;
+      if (id) blocks = blocks.map((b) => (b.id === id ? { ...b, text: words } : b));
+    };
+    fill("heading", r.heading);
+    fill("text", r.text);
+    change({ ...content, subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
+    setUndo(true);
+    setDirection("");
+    flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
+  }
   // Sol's button beside a field opens his box under it: what to change, then a choice. It no longer rewrites on a press.
   const solRound = (part: EdmSolPart, label: string, blockId?: string) =>
     readOnly ? null : (
@@ -631,8 +665,39 @@ export function EdmBuilder({
                     <X className="size-4" />
                   </button>
                 </div>
+                {/* Direction for the whole email once there is one (26 Nov 2026, Martin: "the ability to provide sol feedback
+                    in a text box to give direction around the marketing"): Sol rewrites it as told, keeping what works. */}
+                {hasDraft && (
+                  <div className="mt-3">
+                    <label htmlFor="sol-direction" className="text-[12px] font-medium text-ink-2">
+                      Tell Sol what to change
+                    </label>
+                    <textarea
+                      id="sol-direction"
+                      autoFocus
+                      value={direction}
+                      maxLength={EDM_SOL_LIMITS.direction}
+                      rows={3}
+                      onChange={(e) => setDirection(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && direction.trim()) void changeEmail();
+                      }}
+                      placeholder="e.g. Lead with the voice agent booking calls. Shorter, less salesy. Make the subject a question."
+                      className={cn(field, "mt-1 h-auto resize-none py-2 text-[13px] leading-relaxed")}
+                    />
+                    <button
+                      disabled={busy !== null || !direction.trim()}
+                      onClick={() => void changeEmail()}
+                      className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas disabled:bg-line disabled:text-muted"
+                    >
+                      {busy === "direction" ? <Loader2 className="size-4 animate-spin" /> : <SolIcon className="size-4" />}
+                      Change the email
+                    </button>
+                    <p className="mt-3 text-[12px] font-medium text-ink-2">Or write it again from a brief</p>
+                  </div>
+                )}
                 <textarea
-                  autoFocus
+                  autoFocus={!hasDraft}
                   value={brief}
                   maxLength={EDM_SOL_LIMITS.brief}
                   rows={4}
@@ -981,18 +1046,21 @@ function CanvasBlock({
       {solAsk && <div onClick={(e) => e.stopPropagation()}>{solAsk}</div>}
       {b.kind === "button" && (
         <div className="py-2" style={{ textAlign: align }}>
-          <span className="inline-block rounded-full px-6 py-3" style={{ background: colour }}>
+          <span className={b.wide ? "block text-center" : "inline-block"} style={buttonStyle(b, colour)}>
             <input
               value={b.text}
               maxLength={EDM_LIMITS.label}
               size={Math.max(6, b.text.length)}
               onChange={(e) => onChange({ text: e.target.value })}
               placeholder="Button"
-              className="bg-transparent text-center text-[15px] font-semibold text-white outline-none placeholder:text-white/70"
+              className="bg-transparent text-center font-semibold outline-none placeholder:text-current placeholder:opacity-70"
+              style={{ color: "inherit", fontSize: "inherit" }}
             />
           </span>
           {picked && (
             <div className="mt-3 text-left">
+              <ButtonLookFields block={b} colour={colour} onChange={onChange} />
+              <div className="h-2" />
               <LinkInput value={b.url} onChange={(url) => onChange({ url })} />
               {b.url === null && <p className="mt-1 text-[12px] text-muted">A button needs an https link.</p>}
             </div>
@@ -1814,7 +1882,7 @@ function BarView({
           className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
           style={{ color: on.heading }}
         />
-        <span className="shrink-0 rounded-lg px-4 py-2" style={{ background: colour }}>
+        <span className="shrink-0" style={buttonStyle(b, colour)}>
           <input
             value={b.label ?? ""}
             maxLength={EDM_LIMITS.label}
@@ -1822,7 +1890,8 @@ function BarView({
             onChange={(e) => onChange({ label: e.target.value })}
             placeholder={BAR_BUTTON}
             aria-label="The bar's button"
-            className="bg-transparent text-center text-[14px] font-semibold text-white outline-none placeholder:text-white/70"
+            className="bg-transparent text-center font-semibold outline-none placeholder:text-current placeholder:opacity-70"
+            style={{ color: "inherit", fontSize: "inherit" }}
           />
         </span>
       </div>
@@ -1832,8 +1901,119 @@ function BarView({
           <p className="mt-1 text-[12px] text-muted">
             {b.url === null ? "The button needs an https link. " : ""}At the top of the email, it shows above your logo.
           </p>
+          <ButtonLookFields block={b} colour={colour} onChange={onChange} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** A button's box in the builder, as the email will draw it. */
+function buttonStyle(b: EdmBlock, colour: string) {
+  const l = buttonLook(b, colour);
+  return {
+    background: l.background,
+    color: l.ink,
+    fontSize: l.fontSize,
+    padding: `${l.padY}px ${l.padX}px`,
+    borderRadius: l.radius,
+  };
+}
+
+/**
+ * A button's look (26 Nov 2026, Martin: "edit button shapes and sizes, button colors"): its shape, its size, how wide
+ * (a Button block only) and its colour, the brand's unless another is picked. Its words are typed on the button itself.
+ */
+const BUTTON_SWATCHES = ["#0b0b0c", "#ff5a1f", "#1f6feb", "#16a34a"];
+function ButtonLookFields({ block: b, colour, onChange }: { block: EdmBlock; colour: string; onChange: (patch: BlockPatch) => void }) {
+  const shape = buttonShapeOf(b);
+  const size = buttonSizeOf(b);
+  const swatches = BUTTON_SWATCHES.filter((c) => c !== colour.toLowerCase());
+  const group = "flex items-center gap-1";
+  return (
+    <div
+      className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className={group} role="group" aria-label="Button shape">
+        <span className="pr-1 text-muted">Shape</span>
+        {BUTTON_SHAPES.map((k) => (
+          <Toggle
+            key={k}
+            on={shape === k}
+            onClick={() => onChange(() => ({ shape: k === buttonShapeOf({ kind: b.kind }) ? undefined : k }))}
+            label={`${BUTTON_SHAPE_WORDS[k]} button`}
+          >
+            <span
+              className="block h-3 w-6 border-[1.5px] border-current"
+              style={{ borderRadius: k === "pill" ? 999 : k === "rounded" ? 4 : 0 }}
+            />
+          </Toggle>
+        ))}
+      </div>
+      <div className={group} role="group" aria-label="Button size">
+        <span className="pr-1 text-muted">Size</span>
+        {BUTTON_SIZES.map((k) => (
+          <Toggle
+            key={k}
+            on={size === k}
+            onClick={() => onChange(() => ({ size: k === "medium" ? undefined : k }))}
+            label={`${BUTTON_SIZE_WORDS[k]} button`}
+          >
+            <span className="px-0.5 font-medium">{BUTTON_SIZE_WORDS[k][0]}</span>
+          </Toggle>
+        ))}
+      </div>
+      {b.kind === "button" && (
+        <div className={group} role="group" aria-label="Button width">
+          <span className="pr-1 text-muted">Width</span>
+          <Toggle on={!b.wide} onClick={() => onChange(() => ({ wide: undefined }))} label="As wide as its words">
+            <span className="px-1 font-medium">Fit</span>
+          </Toggle>
+          <Toggle on={b.wide === true} onClick={() => onChange(() => ({ wide: true }))} label="As wide as the email">
+            <span className="px-1 font-medium">Full</span>
+          </Toggle>
+        </div>
+      )}
+      <div className={group} role="group" aria-label="Button colour">
+        <span className="pr-1 text-muted">Colour</span>
+        <button
+          type="button"
+          onClick={() => onChange(() => ({ colour: undefined }))}
+          aria-pressed={!b.colour}
+          className={cn(
+            "flex h-7 items-center gap-1.5 rounded-full px-2.5 ring-1",
+            b.colour ? "ring-line hover:ring-ink/40" : "bg-ink text-canvas ring-ink",
+          )}
+        >
+          <span className="size-3 rounded-full ring-1 ring-white/40" style={{ background: colour }} />
+          Brand
+        </button>
+        {swatches.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-label={`Button colour ${c}`}
+            aria-pressed={b.colour === c}
+            onClick={() => onChange({ colour: c })}
+            className={cn(
+              "size-7 rounded-full ring-1 ring-black/15",
+              b.colour === c && "outline-2 outline-offset-2 outline-sun-line outline-solid",
+            )}
+            style={{ background: c }}
+          />
+        ))}
+        <label className="relative size-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-black/15" title="Another colour">
+          <span className="grid size-full place-items-center bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)]" />
+          <input
+            type="color"
+            value={b.colour ?? colour}
+            onChange={(e) => onChange({ colour: e.target.value.toLowerCase() })}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            aria-label="Another button colour"
+          />
+        </label>
+      </div>
     </div>
   );
 }

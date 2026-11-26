@@ -25,8 +25,17 @@ import {
 import { SolNudges } from "./sol-nudges";
 import { WalkthroughRecorder } from "./walkthrough-recorder";
 import { PRESENTING_EVENT } from "@/lib/services/walkthrough";
-import { leftOffWords, nudgesFor, openedAs, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
-import { SideViewsButton } from "./side-views";
+import {
+  leftOffWords,
+  nudgesFor,
+  openedAs,
+  PRE_APPROVALS_HREF,
+  SHADE_LOSS,
+  type Nudge,
+  type NudgeAction,
+} from "@/lib/domain/design/sol-nudges";
+import { goUnderneath } from "./design-drawer";
+import { SideViewsButton, type SideDesign } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
   HAS_SOLAR_NOTE,
@@ -4163,6 +4172,8 @@ export function RoofDesigner(props: {
         ),
       ]
     : [];
+  // The design on Nearmap's angled photos (26 Nov 2026, Martin): every panel standing, at the roof's heights.
+  const sideDesign: SideDesign = { panels: standingPanels, terrain, lat: spot.lat };
   // The shade is worked out again a moment after the panels stop changing, not on every movement of a drag.
   const shadeKey =
     terrain && terrain !== "none" && standingPanels.length
@@ -4703,14 +4714,18 @@ export function RoofDesigner(props: {
    * laid panels over a home's existing ones). Null when it can't be had: then it designs as before.
    */
   const [roofCheckNow, setRoofCheckNow] = useState<RoofCheck | null>(null);
+  /** The person said the roof has no panels on it: what the check took for them is dropped, not kept clear of. */
+  const noSolarRef = useRef(false);
   const checkRoof = async (): Promise<RoofCheck | null> => {
     const picture = props.nearmapPicture ? `nearmap ${props.nearmapCaptured ?? ""}` : "google";
     const check = await Promise.race([
       loadRoofCheck(spot.lat, spot.lng, picture),
       new Promise<null>((done) => window.setTimeout(() => done(null), 45_000)),
     ]);
-    setRoofCheckNow(check);
-    return check;
+    // Told there aren't any (26 Nov 2026, Martin: the check took a pergola for panels), it stays out for the visit.
+    const kept = check && noSolarRef.current ? { ...check, things: withoutExisting(check.things) } : check;
+    setRoofCheckNow(kept);
+    return kept;
   };
   /**
    * The panels already on the roof are being replaced (9 Nov 2026, Martin: nothing let him disregard them): then panels
@@ -5090,6 +5105,11 @@ export function RoofDesigner(props: {
         // Filed in Pre-approvals on the deal; the card then says it is requested (19 Nov 2026, Martin).
         void dealNetwork.request(summary.kw).then((why) => why && console.warn(`Pre-approval request not raised: ${why}`));
         return;
+      case "open-preapprovals":
+        // Shown underneath when the designer is the pop-up over a page, else gone to.
+        if (window.parent !== window) goUnderneath(PRE_APPROVALS_HREF);
+        else router.push(PRE_APPROVALS_HREF);
+        return;
       case "ok":
         return aside();
       case "line-v2": {
@@ -5396,10 +5416,17 @@ export function RoofDesigner(props: {
     },
     onFind: () => void askSol(),
     // The panels already on the roof (12 Nov 2026, Martin): replaced, so new ones may go where they are, or worked round.
-    onExisting: (replace: boolean) => {
+    onExisting: (replace: boolean | "none") => {
       existingAsked.current = true;
-      replacingRef.current = replace;
-      setReplacing(replace);
+      if (replace === "none") {
+        noSolarRef.current = true;
+        replacingRef.current = false;
+        setReplacing(false);
+        setRoofCheckNow((c) => (c ? { ...c, things: withoutExisting(c.things) } : c));
+      } else {
+        replacingRef.current = replace;
+        setReplacing(replace);
+      }
       answerGuide("existing");
     },
     // The panel chosen, the pointer lays panels straight away (12 Nov 2026, Martin: no tray; Sol counts down to the
@@ -7223,7 +7250,7 @@ export function RoofDesigner(props: {
           onRedo={redo}
           {...(costsHidden ? {} : { onCalc: () => setCalcOpen(true), calcOn: calcOpen })}
           msb={{ on: msb !== null, icon: <SwitchboardGlyph />, onClick: toggleMsb }}
-          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
+          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray design={sideDesign} /> } : {})}
           {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
           footRoom={solHolds ? 78 : 0}
         />
@@ -9725,9 +9752,9 @@ export function RoofDesigner(props: {
                     </button>
                     {props.sidesReady &&
                       (sideways ? (
-                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon />
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon design={sideDesign} />
                       ) : (
-                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab />
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab design={sideDesign} />
                       ))}
                   </div>
                 </div>

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { FileUp, ReceiptText, RotateCcw, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, FileUp, ReceiptText, RotateCcw, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 import { LIKELY_MATCH, VARIANCE_LABELS, varianceText, type InstallerInvoice, type Variance } from "@/lib/domain/design/installer-invoices";
 import { dollars, shortDate } from "@/lib/services/crm";
@@ -49,6 +49,17 @@ export function InvoicesPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void reload();
   }, [reload]);
+  // Opened from a deal's Installation tab (?job=): that job's comparison open and in view (26 Nov 2026, Martin).
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!data || asked.current) return;
+    asked.current = true;
+    const job = new URLSearchParams(window.location.search).get("job");
+    if (!job || !data.rows.some((r) => r.jobId === job)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setOpen(job);
+    window.setTimeout(() => document.getElementById(`invoice-${job}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 80);
+  }, [data]);
 
   const rows = data?.rows ?? [];
   const count = (v: Variance) => rows.filter((r) => r.status === v).length;
@@ -112,7 +123,7 @@ export function InvoicesPage() {
         {data && !shown.length && <li className="px-5 py-10 text-center text-sm text-muted">Nothing here.</li>}
         {!data && !problem && <li className="px-5 py-10 text-center text-sm text-muted">Loading…</li>}
         {shown.map((r) => (
-          <li key={r.jobId} className="px-5 py-4">
+          <li key={r.jobId} id={`invoice-${r.jobId}`} className="scroll-mt-24 px-5 py-4">
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <div className="min-w-[14rem] flex-1">
                 <Link href={`${PATHS.deals}/${r.jobId}`} className="font-medium text-ink hover:underline">
@@ -128,16 +139,20 @@ export function InvoicesPage() {
               <Figure label="Installer billed" value={r.billed === null ? "–" : money2(r.billed)} />
               <span
                 className={clsx(
-                  "rounded px-2 py-1 text-xs font-medium",
-                  r.status === "over"
-                    ? "bg-warning-soft text-danger"
-                    : r.status === "under"
-                      ? "bg-positive-soft text-positive"
-                      : r.status === "match"
-                        ? "bg-surface-2 text-ink"
-                        : "bg-sun text-sun-ink",
+                  "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium",
+                  // Matches is green; over or under (it doesn't match) is red (26 Nov 2026, Martin).
+                  r.status === "match"
+                    ? "bg-positive-soft text-positive"
+                    : r.status === "over" || r.status === "under"
+                      ? "bg-danger/10 text-danger"
+                      : "bg-sun text-sun-ink",
                 )}
               >
+                {r.status === "match" ? (
+                  <Check className="size-3.5" aria-hidden />
+                ) : r.status === "over" || r.status === "under" ? (
+                  <X className="size-3.5" aria-hidden />
+                ) : null}
                 {varianceText(r)}
               </span>
               <div className="flex gap-2">

@@ -9,21 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowUp,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  HardHat,
-  Mail,
-  Minus,
-  Phone,
-  Play,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
@@ -45,6 +31,7 @@ import type { SolFile, SolReminder, SolState, SolTurn } from "@/lib/domain/desig
 import { roomTurns } from "@/lib/domain/design/sol-rooms";
 import type { SolDesignShown } from "@/lib/domain/design/sol-designs";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
+import { SolPortalCard } from "./sol-portal-card";
 import type { ISODate } from "@/lib/domain/types";
 import { dollars, loadCustomer, loadJob, type JobLine } from "@/lib/services/crm";
 import { loadMailMarks } from "@/lib/services/deal-pulse";
@@ -55,11 +42,14 @@ import {
   askSol,
   askSolInPanel,
   handsToPanel,
+  listSolPast,
   loadSol,
+  openSolPast,
   remindAt,
   retrySol,
 } from "@/lib/services/sol";
-import { chatSince, tabTitle, tabTurns } from "@/lib/domain/design/sol-tabs";
+import { chatSince, tabTitle, tabTurns, tabTurnsIn } from "@/lib/domain/design/sol-tabs";
+import { FoldToTab } from "./minimise-mark";
 import { OPEN_SOL_TAB, dropTab, keepTab, tabById } from "@/lib/services/sol-tabs";
 import { ReminderCard, goWhereAsked, openSolPage } from "./sol-chat";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
@@ -134,7 +124,7 @@ type TodayAnswer = {
   designs?: SolDesignShown[];
   again?: boolean;
   goTo?: SolGoTo;
-  with?: Pick<SolTurn, "charts" | "diagrams" | "drafts" | "meeting" | "reminder">;
+  with?: Pick<SolTurn, "charts" | "diagrams" | "drafts" | "meeting" | "reminder" | "portal">;
 };
 
 /** Today's own room in the member's conversation with Sol. */
@@ -151,11 +141,20 @@ function todayAnswer(state: SolState): TodayAnswer {
 
 /** One answer of his as Today shows it. */
 function answerOf(last: SolTurn | undefined): TodayAnswer {
-  const extra = last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.meeting || last?.reminder;
+  const extra = last?.charts?.length || last?.diagrams?.length || last?.drafts?.length || last?.meeting || last?.reminder || last?.portal;
   return {
     text: last?.text ?? "Done.",
     ...(last && extra
-      ? { with: { charts: last.charts, diagrams: last.diagrams, drafts: last.drafts, meeting: last.meeting, reminder: last.reminder } }
+      ? {
+          with: {
+            charts: last.charts,
+            diagrams: last.diagrams,
+            drafts: last.drafts,
+            meeting: last.meeting,
+            reminder: last.reminder,
+            portal: last.portal,
+          },
+        }
       : {}),
     // A roof design he shows is drawn here, in the conversation itself (3 Nov 2026, Martin).
     ...(last?.designs?.length ? { designs: last.designs } : {}),
@@ -324,23 +323,41 @@ export function TodayPad(props: {
     });
     freshChat();
   };
+  const minimiseRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    minimiseRef.current = minimise;
+  });
   /** A tab's chat back on the page, read from Sol's conversation. */
   const openTab = useCallback(async (id: string) => {
     const tab = tabById(id);
     if (!tab) return;
     const r = await loadSol();
     if (!r.ok) return;
+    let found = tabTurns(r.state.turns, tab);
+    // Filed away since (a new chat in his panel files Today's turns with it): read back from his past conversations,
+    // so a tab opens wherever its chat now lives (26 Nov 2026, Martin).
+    if (!found.length) {
+      const list = await listSolPast();
+      const near = list.ok ? list.past.filter((p) => p.endedAt >= tab.since && p.startedAt <= tab.at) : [];
+      for (const p of near) {
+        const one = await openSolPast(p.id);
+        if (one.ok) found = tabTurnsIn([one.past], tab);
+        if (found.length) break;
+      }
+    }
     const back: Turn[] = [];
     let n = Date.now();
-    for (const t of tabTurns(r.state.turns, tab)) {
+    for (const t of found) {
       if (t.role === "you") back.push({ id: n++, kind: "ask", q: t.shown ?? t.text, a: null });
       else {
         const last = back[back.length - 1];
         if (last?.kind === "ask" && !last.a) last.a = answerOf(t);
       }
     }
-    dropTab(id);
     if (!back.length) return;
+    dropTab(id);
+    // A chat on screen already is kept as a tab of its own, not lost.
+    minimiseRef.current?.();
     seq.current++;
     since.current = tab.since;
     tabId.current = tab.id;
@@ -521,7 +538,7 @@ export function TodayPad(props: {
         </div>
 
         {talking && !onFeed && !onCal && (
-          <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
+          <div className="relative mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
             {turns.map((t) =>
               t.kind === "day" ? (
                 <SolDay key={t.id} {...props} items={items} onGrow={follow} />
@@ -551,6 +568,7 @@ export function TodayPad(props: {
                         ) : null}
                         {t.a.with && (
                           <div className="mt-3 max-w-2xl space-y-3">
+                            {t.a.with.portal && <SolPortalCard portal={t.a.with.portal} />}
                             {t.a.with.charts?.map((c, k) => (
                               <SolChartView key={k} chart={c} />
                             ))}
@@ -603,6 +621,20 @@ export function TodayPad(props: {
               ),
             )}
             <div ref={end} className="scroll-mb-40" />
+            {/* The chat put away as a tab on the left, to carry on elsewhere while Sol answers (sol-tabs.ts). Level with
+                the first message, off to its right (26 Nov 2026, Martin), with a mark of its own: the chat folding into
+                a tab. */}
+            {turns.some((t) => t.kind === "ask") && (
+              <button
+                type="button"
+                onClick={minimise}
+                title="Minimise: keep this chat as a tab and start afresh. It lights up when Sol's answer lands."
+                aria-label="Minimise this chat into a tab"
+                className="group/min absolute left-0 top-2 z-[1] !mt-0 inline-flex size-11 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary xl:left-[calc(100%+0.75rem)]"
+              >
+                <FoldToTab className="size-[22px]" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -631,17 +663,6 @@ export function TodayPad(props: {
                   className="inline-flex h-9 items-center gap-2 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
                 >
                   <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
-                </button>
-              )}
-              {/* The chat put away as a tab on the left, to carry on elsewhere while Sol answers (sol-tabs.ts). */}
-              {turns.some((t) => t.kind === "ask") && (
-                <button
-                  type="button"
-                  onClick={minimise}
-                  title="Keep this chat as a tab on the left and start afresh. It lights up when Sol's answer lands."
-                  className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
-                >
-                  <Minus className="size-3.5" aria-hidden /> Minimise
                 </button>
               )}
             </div>

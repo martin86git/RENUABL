@@ -151,3 +151,56 @@ export const DATASHEET_WORDS = {
   allThere: "Each product's datasheet goes with this proposal, on the customer's page.",
   find: "Find the missing ones online",
 } as const;
+
+/**
+ * The products a roof design names (the job card's: the design the installer builds), one a product, as `quotedProducts`
+ * gives them. Panel, inverters, battery and EV charger, each by the code it was chosen with.
+ */
+export function designProducts(design: {
+  panel?: { sku: string; name: string };
+  inverters?: readonly { sku: string; name: string }[];
+  battery?: { sku: string; name: string };
+  charger?: { sku: string; name: string };
+}): QuotedProduct[] {
+  const all: { kind: DocKind; item?: { sku: string; name: string } }[] = [
+    { kind: "panel", item: design.panel },
+    ...(design.inverters ?? []).map((item) => ({ kind: "inverter" as const, item })),
+    { kind: "battery", item: design.battery },
+    { kind: "charger", item: design.charger },
+  ];
+  const found = new Map<string, QuotedProduct>();
+  for (const { kind, item } of all) {
+    const sku = item?.sku?.trim() ?? "";
+    if (!sku) continue;
+    const key = `${kind}:${codeKey(sku)}`;
+    if (!found.has(key)) found.set(key, { kind, sku, name: productName(item?.name ?? "") || sku, options: null });
+  }
+  return [...found.values()];
+}
+
+const plain = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/**
+ * The configurator's sheets for the mix on show: its mixes aren't split out when the proposal is published, so a sheet
+ * is kept when the mix's system words name its product. A kind none of whose sheets is named keeps them all (better a
+ * sheet too many than the battery's missing), and a kind the mix doesn't have at all (no battery picked) shows none.
+ */
+export function sheetsInMix(
+  sheets: readonly ProposalDatasheet[],
+  mix: { words: string; has: Partial<Record<DocKind, boolean>> },
+): ProposalDatasheet[] {
+  const words = ` ${plain(mix.words)} `;
+  const named = (s: ProposalDatasheet) => {
+    const n = plain(s.name);
+    return n.length > 0 && words.includes(` ${n} `);
+  };
+  return sheets.filter((s) => {
+    if (mix.has[s.kind] === false) return false;
+    const ofKind = sheets.filter((x) => x.kind === s.kind);
+    return ofKind.some(named) ? named(s) : true;
+  });
+}

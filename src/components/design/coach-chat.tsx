@@ -25,6 +25,7 @@ import {
   Plus,
   ScrollText,
   Settings,
+  SpellCheck,
   ShieldCheck,
   SquareKanban,
   Trash2,
@@ -50,6 +51,8 @@ import { callerChanged, removeCallerPhoto, saveCallerTint, uploadCallerPhoto, us
 import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
 import { CALL_SETUP_COPY, DEFAULT_CALL_SETUP, type CallSetup } from "@/lib/domain/design/call-setup";
 import { CallSetupSettings } from "./coach-call-setup";
+import { PronounceSettings, pronounceSummary } from "./coach-pronounce";
+import type { Pronunciation } from "@/lib/domain/design/pronounce";
 import type { ScriptLine } from "@/lib/domain/design/call-scripts";
 import { ScriptPicker } from "./coach-scripts";
 import { roleOfKey } from "@/lib/domain/install-call";
@@ -533,6 +536,113 @@ function CoachWindowFor() {
     }
   };
 
+  // The box, with what it is about: at the foot of a chat, or floating in the middle of the landing (26 Nov 2026,
+  // Martin: "a large voice agent icon in the middle. with also the chat box floating underneath - similar to the today
+  // screen").
+  const composer = (
+    <>
+      {state.call && (
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+          <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
+          About {state.call.about.replace(/^A /, "a ")}
+          <button type="button" onClick={clearCoachCall} className="ml-auto text-muted hover:text-ink" aria-label="Not about this call">
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </p>
+      )}
+      {about && (
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+          <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
+          About {aboutFirst}&apos;s deal
+          <button
+            type="button"
+            onClick={() => setPicked(null)}
+            className="ml-auto text-muted hover:text-ink"
+            aria-label="Not about this deal"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        </p>
+      )}
+      {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
+      {mayCoach && (
+        <NameHints
+          book={book}
+          span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
+          onPick={(full, id) => {
+            if (!nameSpan) return;
+            const next = withName(text, nameSpan, full);
+            tapped.set(full, id);
+            setText(next.text);
+            setNameSpan(null);
+            requestAnimationFrame(() => {
+              box.current?.focus();
+              box.current?.setSelectionRange(next.caret, next.caret);
+            });
+          }}
+          onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
+        />
+      )}
+      {mayCoach ? (
+        <div className="flex items-end gap-2">
+          {/* The microphone sits inside the box, as in Sol's. */}
+          <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
+            <DictateButton
+              label={`Speak to ${name}`}
+              onHearing={setHeard}
+              onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
+            />
+            <textarea
+              ref={box}
+              value={heard ? withSpoken(text, heard) : text}
+              onChange={(e) => {
+                setHeard("");
+                setText(e.target.value);
+                const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                setNameSpan(span);
+                if (!span) setNameDismissed(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
+                  e.stopPropagation();
+                  setNameDismissed(nameSpan.start);
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              rows={2}
+              maxLength={2000}
+              placeholder={
+                state.call
+                  ? COACH_COPY.callAbout(name)
+                  : about
+                    ? `Ask ${name} about ${aboutFirst}…`
+                    : landing && turns.length > 0
+                      ? `Start a new chat with ${name}…`
+                      : `Ask ${name} anything, or to ring someone…`
+              }
+              className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void send()}
+            disabled={!text.trim() || sending}
+            aria-label="Send"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+          >
+            <ArrowUp className="size-4" aria-hidden />
+          </button>
+        </div>
+      ) : (
+        loaded && <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
+      )}
+    </>
+  );
+
   return createPortal(
     // Drawn on the page body, outside the shell: the wrapper brings the business theme's colours and draws nothing
     // (without it the window took the homeowner site's cream and green, and its parts ran together).
@@ -693,6 +803,7 @@ function CoachWindowFor() {
                     <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
                       <CoachWelcome
                         caller={caller}
+                        box={composer}
                         current={currentChatLine(turns)}
                         past={past}
                         onOpenChat={(id) => void chats(openCoachChat(id), true)}
@@ -794,114 +905,8 @@ function CoachWindowFor() {
                     )}
                   </div>
 
-                  <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
-                    {state.call && (
-                      <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                        <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
-                        About {state.call.about.replace(/^A /, "a ")}
-                        <button
-                          type="button"
-                          onClick={clearCoachCall}
-                          className="ml-auto text-muted hover:text-ink"
-                          aria-label="Not about this call"
-                        >
-                          <X className="size-3.5" aria-hidden />
-                        </button>
-                      </p>
-                    )}
-                    {about && (
-                      <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                        <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
-                        About {aboutFirst}&apos;s deal
-                        <button
-                          type="button"
-                          onClick={() => setPicked(null)}
-                          className="ml-auto text-muted hover:text-ink"
-                          aria-label="Not about this deal"
-                        >
-                          <X className="size-3.5" aria-hidden />
-                        </button>
-                      </p>
-                    )}
-                    {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
-                    {mayCoach && (
-                      <NameHints
-                        book={book}
-                        span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
-                        onPick={(full, id) => {
-                          if (!nameSpan) return;
-                          const next = withName(text, nameSpan, full);
-                          tapped.set(full, id);
-                          setText(next.text);
-                          setNameSpan(null);
-                          requestAnimationFrame(() => {
-                            box.current?.focus();
-                            box.current?.setSelectionRange(next.caret, next.caret);
-                          });
-                        }}
-                        onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
-                      />
-                    )}
-                    {mayCoach ? (
-                      <div className="flex items-end gap-2">
-                        {/* The microphone sits inside the box, as in Sol's. */}
-                        <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
-                          <DictateButton
-                            label={`Speak to ${name}`}
-                            onHearing={setHeard}
-                            onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
-                          />
-                          <textarea
-                            ref={box}
-                            value={heard ? withSpoken(text, heard) : text}
-                            onChange={(e) => {
-                              setHeard("");
-                              setText(e.target.value);
-                              const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
-                              setNameSpan(span);
-                              if (!span) setNameDismissed(null);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
-                                e.stopPropagation();
-                                setNameDismissed(nameSpan.start);
-                                return;
-                              }
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                void send();
-                              }
-                            }}
-                            rows={2}
-                            maxLength={2000}
-                            placeholder={
-                              state.call
-                                ? COACH_COPY.callAbout(name)
-                                : about
-                                  ? `Ask ${name} about ${aboutFirst}…`
-                                  : landing && turns.length > 0
-                                    ? `Start a new chat with ${name}…`
-                                    : `Ask ${name} anything, or to ring someone…`
-                            }
-                            className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void send()}
-                          disabled={!text.trim() || sending}
-                          aria-label="Send"
-                          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
-                        >
-                          <ArrowUp className="size-4" aria-hidden />
-                        </button>
-                      </div>
-                    ) : (
-                      loaded && (
-                        <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
-                      )
-                    )}
-                  </div>
+                  {/* The box sits in the landing's middle while it shows (26 Nov 2026, Martin), else at the foot. */}
+                  {!reaching && !landing && <div className="border-t border-line p-3">{composer}</div>}
                 </>
               )}
             </div>
@@ -992,6 +997,8 @@ function CoachSettings(props: {
   const [whoOpen, setWhoOpen] = useState(true);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
+  const [wordsOpen, setWordsOpen] = useState(false);
+  const [words, setWords] = useState<Pronunciation[] | null>(null);
   const [fixedOpen, setFixedOpen] = useState(false);
   const locked = props.notes.filter((n) => n.locked);
   const loose = props.notes.filter((n) => !n.locked);
@@ -1072,6 +1079,18 @@ function CoachSettings(props: {
                 <p className="text-xs text-muted">Only an admin can change the voice.</p>
               )}
               {status && <p className={clsx("mt-2 text-xs", status.ok ? "text-ink-2" : "text-danger")}>{status.text}</p>}
+            </div>
+          )}
+        </section>
+
+        {/* How particular words are said, for every agent (pronounce.ts, 26 Nov 2026, Martin). */}
+        <section className={card}>
+          {head(<SpellCheck className="size-4" />, "bg-surface-2 text-ink", "How words are said", pronounceSummary(words), wordsOpen, () =>
+            setWordsOpen((o) => !o),
+          )}
+          {wordsOpen && (
+            <div className="border-t border-line px-3.5 py-3">
+              <PronounceSettings editable={props.mayCoach} onList={setWords} />
             </div>
           )}
         </section>

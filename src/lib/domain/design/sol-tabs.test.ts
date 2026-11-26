@@ -69,3 +69,12 @@ describe("what a tab says", () => {
     expect(tabsGlance([tab(), tab({ id: "b", status: "ready" })])).toEqual({ count: 2, writing: true, ready: true });
   });
 });
+
+describe("a tab's turns, bounded", () => {
+  const t = (role: "you" | "sol", at: string) => ({ role, text: "x", at, room: "today" }) as never;
+  it("stops at the next chat's first question", () => {
+    const turns = [t("you", "2026-11-26T01:00:00.000Z"), t("sol", "2026-11-26T01:05:00.000Z"), t("you", "2026-11-26T01:10:00.000Z")];
+    const got = tabTurns(turns, { since: "2026-11-26T00:59:00.000Z", at: "2026-11-26T01:02:00.000Z" });
+    expect(got.length).toBe(2);
+  });
+});

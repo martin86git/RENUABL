@@ -37,6 +37,32 @@ const LOGO = pathToFileURL(LOGO_FILE).href;
 // RENUABL-only shots live in marketing/launch/source (private); the rest are the sales page's own public screenshots.
 const OWN_SHOTS = resolve("marketing/launch/source");
 const shot = (f) => pathToFileURL(existsSync(resolve(OWN_SHOTS, f)) ? resolve(OWN_SHOTS, f) : resolve("public/design/landing", f)).href;
+/** A frame of the designer at work, cut from a screen recording of a real design (the map and its figures only: no address, no customer). */
+/** What each frame of the design being made says, in order: a caption per step, held over the frames it covers. */
+const BUILD_SAYS = [
+  "Start with the roof.",
+  "Drag out a row of panels.",
+  "Turn it to the roof.",
+  "Turn it to the roof.",
+  "Set the tilt.",
+  "The quote builds as you go.",
+  "The quote builds as you go.",
+  "The quote builds as you go.",
+  "Shade read on every panel.",
+  "Choose the inverter.",
+  "Add a battery.",
+  "Designed and priced as you draw.",
+];
+const BUILD_FRAMES = BUILD_SAYS.length;
+const build = (n) => pathToFileURL(resolve(OWN_SHOTS, "designer-build", `${n}.webp`)).href;
+/** One example morning, as the log picture types it: a time and what happened. Each is something the product does. */
+const LOG = [
+  ["09:00", "A lead comes in."],
+  ["09:05", "Sol emails them their home from above."],
+  ["09:06", "Your voice agent rings them."],
+  ["09:14", "Questions answered. Call booked."],
+  ["09:15", "Written up, on the deal."],
+];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- The product's own marks ------------------------------------------------------------------------------------
@@ -96,17 +122,26 @@ const CALENDAR = (size) => `<span class="graphite" style="width:${size}px;height
   <svg viewBox="0 0 24 24" width="${size * 0.44}" height="${size * 0.44}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
   <path d="M8 2v3"/><path d="M16 2v3"/><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="m9 15 2 2 4-4"/></svg></span>`;
 
-const BASE = `*{margin:0;box-sizing:border-box}html,body{width:${W}px;height:${H}px;overflow:hidden;background:#05060a;color:#fff;
+/**
+ * The ground every picture sits on (26 Nov 2026, Martin: "the black in all the marketing emails is too harsh. lets
+ * soften it"): a soft graphite, not black. An email's own dark panels use the same colour, so picture and panel meet
+ * without a seam. Change it here and redraw everything.
+ */
+const GROUND = "#1d1f25";
+const GROUND_RGB = "29,31,37";
+/** The rounds that sit on the ground (a voice agent's, the designer's): a step lighter than it, so they still read. */
+const ROUND = "#2f323a";
+const BASE = `*{margin:0;box-sizing:border-box}html,body{width:${W}px;height:${H}px;overflow:hidden;background:${GROUND};color:#fff;
   font-family:Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
   .mark{position:absolute;right:52px;bottom:40px;width:132px;height:auto;opacity:.75}
-  .agent{position:relative;display:inline-grid;place-items:center;border-radius:50%;background:#202227;flex:none;
+  .agent{position:relative;display:inline-grid;place-items:center;border-radius:50%;background:${ROUND};flex:none;
     box-shadow:0 18px 40px -18px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.08)}
   .agent-glow{position:absolute;inset:-14%;border-radius:50%;background:color-mix(in srgb,var(--tint) 30%,transparent);filter:blur(16px);opacity:.5}
   .agent-bars{position:relative;display:flex;align-items:center}.agent-bars i{display:block;border-radius:9px;background:var(--tint)}
   .orb{display:inline-grid;place-items:center;border-radius:50%;flex:none;
     background:radial-gradient(circle at 35% 25%,#ffb08a 0 10%,#ff6a2c 45%,#e8470f 100%);
     box-shadow:inset 0 2px 1px rgba(255,255,255,.55),inset 0 -3px 6px rgba(140,30,0,.3),0 10px 24px rgba(255,90,31,.4)}
-  .graphite{display:inline-grid;place-items:center;border-radius:50%;background:#202227;flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}`;
+  .graphite{display:inline-grid;place-items:center;border-radius:50%;background:${ROUND};flex:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}`;
 
 const page = (body, css = "", script = "") =>
   `<!doctype html><html><head><meta charset="utf-8"><style>${BASE}${css}</style></head><body>${body}<script>
@@ -123,6 +158,27 @@ const page = (body, css = "", script = "") =>
   ${script}</script></body></html>`;
 
 // ---- The pictures -----------------------------------------------------------------------------------------------
+
+/** The voice email's agent (26 Nov 2026): an example name in its own colour, its opening line and what a business chooses for it. */
+const VOICE_TINT = "#a78bfa";
+const VOICE_OPENING = "Hi, it's Gary, Sunrise Solar's automated assistant. Have you got a few minutes?";
+const VOICE_TAGS = ["Named by you", "Voice chosen by you", "Follows your script", "Always says it's automated"];
+const ico = (d, size = 18) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  phone: ico(
+    '<path d="M13.8 16.6a1 1 0 0 0 1.2-.3l.4-.5a2 2 0 0 1 1.6-.8h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.600l-.5.4a1 1 0 0 0-.3 1.200 14 14 0 0 0 6.400 6.400"/>',
+  ),
+  chat: ico('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+  mail: ico('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>'),
+  tick: ico('<path d="M20 6 9 17l-5-5"/>', 18),
+  globe: ico('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20"/>', 14),
+  search: ico('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.300-4.300"/>'),
+  hang: ico(
+    '<path d="M10.700 13.300a14 14 0 0 1-2.300-3.100 1 1 0 0 1 .3-1.200l.5-.4A2 2 0 0 0 10 7V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2 18 18 0 0 0 3.500 10.500"/><path d="M22 2 2 22"/><path d="M14.500 16.200a1 1 0 0 0 .5.100l.4-.500a2 2 0 0 1 1.600-.800h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2 18 18 0 0 1-9.500-2.700"/>',
+    16,
+  ),
+};
 
 const CARDS = [
   { icon: AGENT(56, "#ff5a1f"), head: "Your customers, answered.", sub: "Voice agents ring every new lead" },
@@ -207,6 +263,47 @@ const product = (file, crop, tag) => {
      .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
   );
 };
+
+/**
+ * A campaign's hero (26 Nov 2026): the hook large on the left, the product drawn on a white card on the right. `panel`
+ * is the card's own HTML; rows (`.r`), a head (`.chead`), a caption (`.cap`) and a foot with Sol (`.cfoot`) are shared.
+ */
+const hero = (kicker, first, second, sub, panel, css = "") =>
+  page(
+    `<div class="glow"></div><div class="top"><i></i>${kicker}</div>
+     <div class="say"><h1>${first}<b>${second}</b></h1><p>${sub}</p></div>
+     <div class="card">${panel}</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+    `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 78% 110%,rgba(255,90,31,.3),transparent 55%)}
+     .top{position:absolute;left:64px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+     .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+     .say{position:absolute;left:64px;top:150px;width:520px}
+     .say h1{font-size:70px;line-height:1;font-weight:600;letter-spacing:-.05em}.say h1 b{display:block;font-weight:600;color:#ff6a2c;margin-top:6px}
+     .say p{margin-top:26px;font-size:23px;line-height:1.4;color:rgba(255,255,255,.7);max-width:440px}
+     .card{position:absolute;right:56px;top:66px;width:500px;border-radius:22px;background:#fff;color:#1d1d1f;padding:22px 24px;overflow:hidden;
+       box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.14)}
+     .chead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}.chead b{font-size:21px;font-weight:600;letter-spacing:-.02em}
+     .chead span{display:block;font-size:13.5px;color:#6e6e73;margin-top:2px}
+     .chead em{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#c2410c;background:#fff1e8;border-radius:999px;padding:6px 11px}
+     .r{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #ececef;font-size:15.5px}.r span{flex:1;color:#6e6e73}.r b{font-weight:600}
+     .r i{color:#ff5a1f;display:grid;place-items:center}
+     .cap{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#6e6e73;margin:4px 0 8px}
+     .cfoot{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13.5px;color:#3a3d43}.cfoot img,.a img{filter:none;mix-blend-mode:normal!important}
+     ${css}`,
+  );
+
+/** A statement picture, as aday.jpg: a small lead-in, a few words very large, a line under them, the small print. */
+const statement = (kicker, pre, big, dry, foot, size = 160, tint = "#fff") =>
+  page(
+    `<div class="top"><i></i>${kicker}</div><p class="pre">${pre}</p><div class="fig">${big}</div>
+     <p class="dry">${dry}</p><p class="foot">${foot}</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+    `body{background:${GROUND}}
+     .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+     .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+     .pre{position:absolute;left:84px;top:150px;font-size:44px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5)}
+     .fig{position:absolute;left:80px;top:218px;font-size:${size}px;line-height:1;font-weight:600;letter-spacing:-.055em;color:${tint};white-space:nowrap}
+     .dry{position:absolute;left:84px;top:${250 + size + 40}px;font-size:34px;letter-spacing:-.02em;color:#fff;max-width:1000px}
+     .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
+  );
 
 /** Each picture: a page, and for a moving one how many frames, how long each shows and how long the last holds. */
 const ART = {
@@ -302,20 +399,171 @@ const ART = {
 
   /**
    * The designer in every email (22 Nov 2026, Martin: "important in all emails to have a view of the designer in it…
-   * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a slim band under the
-   * last part of every email but the designer's, the updated designer on a real roof, its dock and Sol in view (the website's site, under a made-up label; no address shown).
+   * so that the recipient also doesnt mistake this for some irrelevant promotional marketing"): a band under the last
+   * part of every email but the designer's. Since 26 Nov 2026 it is a system Martin designed on a real roof, cut from
+   * his screen recording: the finished design with its figures across the top (the map only; no address, no customer).
    */
   "designer-band.jpg": {
-    clipH: 560,
+    clipH: 609,
     html: page(
-      `<div class="glow"></div><div class="frame"><img src="${shot("designer-site-1.webp")}"></div>
-       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:518px;bottom:auto">`,
-      `.glow{position:absolute;left:0;right:0;top:0;height:560px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
-       .frame{position:absolute;left:48px;top:28px;width:1104px;height:470px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
-       .frame img{width:100%;height:100%;object-fit:cover;object-position:50% 77%}
-       .tag{position:absolute;left:52px;top:522px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
+      `<div class="glow"></div><div class="frame"><img src="${build(BUILD_FRAMES)}"></div>
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:567px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:609px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:519px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+       .tag{position:absolute;left:52px;top:571px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
     ),
   },
+
+  /**
+   * The same design being made (26 Nov 2026, Martin: "if i record designing the system can you use snippets from that?"):
+   * twelve quick cuts from the recording with a caption on each step (`BUILD_SAYS`): the bare roof, a row dragged out
+   * and turned, the tilt, the shade read on each panel, the inverter and the battery, the figures across the top
+   * changing as it grows. Not in the drafts by itself:
+   * it is dropped into a picture block by hand where a moving one is wanted.
+   */
+  "designer-build.gif": {
+    clipH: 609,
+    frames: BUILD_FRAMES,
+    delay: 620,
+    hold: 3400,
+    colours: 96,
+    photo: true,
+    html: page(
+      `<div class="glow"></div><div class="frame">${Array.from({ length: BUILD_FRAMES }, (_, i) => `<img data-f="${i}" src="${build(i + 1)}">`).join("")}<div class="fade"></div><div class="say" id="say"></div><div class="bar"><i id="bar"></i></div></div>
+       <div class="tag">Made for solar · The RENUABL designer</div><img class="mark" src="${LOGO}" alt="RENUABL" style="top:567px;bottom:auto">`,
+      `.glow{position:absolute;left:0;right:0;top:0;height:609px;background:radial-gradient(ellipse at 50% 100%,rgba(255,90,31,.32),transparent 60%)}
+       .frame{position:absolute;left:48px;top:28px;width:1104px;height:519px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.16);box-shadow:0 30px 80px rgba(0,0,0,.85)}
+       .frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+       .tag{position:absolute;left:52px;top:571px;color:rgba(255,255,255,.6);font-size:13px;letter-spacing:.24em;text-transform:uppercase}
+       .fade{position:absolute;left:0;right:0;bottom:0;height:170px;background:linear-gradient(to top,rgba(${GROUND_RGB},.92),rgba(${GROUND_RGB},.55) 55%,transparent)}
+       .say{position:absolute;left:32px;right:32px;bottom:30px;font-size:40px;font-weight:600;letter-spacing:-.02em;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+       .bar{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,.14)}.bar i{display:block;height:100%;width:0;background:#ff5a1f}`,
+      `const SAYS = ${JSON.stringify(BUILD_SAYS)}; window.at = (t) => { const n = Math.round(t * (${BUILD_FRAMES} - 1)); document.querySelectorAll("[data-f]").forEach((el) => { el.style.opacity = +el.dataset.f <= n ? 1 : 0; }); document.getElementById("say").textContent = SAYS[n]; document.getElementById("bar").style.width = ((n + 1) / SAYS.length) * 100 + "%"; }; window.at(0);`,
+    ),
+  },
+
+  /**
+   * "09:00. A lead comes in." (26 Nov 2026, Martin: "lets create another marketing email. get creative with it the way
+   * xAi would"): stark black, monospace, almost no words. A log of one example morning typed a line at a time, ending
+   * on the line the email is about. Every line is something the product does in the business's own hours; the times
+   * are an example and the picture says so.
+   */
+  "log.gif": {
+    frames: LOG.length + 2,
+    delay: 720,
+    hold: 3600,
+    colours: 48,
+    html: page(
+      `<div class="grid"></div><div class="top"><i></i>SOL // LIVE LOG<b>EXAMPLE MORNING</b></div>
+       <div class="log">${LOG.map(([t, l], i) => `<p data-l="${i}"><span>${t}</span>${l}</p>`).join("")}</div>
+       <h1 id="end">You were with another customer.</h1><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:${GROUND}}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse at 30% 40%,#000,transparent 75%)}
+       .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}.top b{font-weight:400;color:rgba(255,255,255,.3);margin-left:18px}
+       .log{position:absolute;left:84px;top:132px;font-family:"JetBrains Mono",Consolas,monospace;font-size:29px;line-height:58px;color:#fff}
+       .log p{opacity:0;white-space:nowrap}.log span{color:#ff6a2c;margin-right:34px}
+       h1{position:absolute;left:84px;top:494px;font-size:66px;font-weight:600;letter-spacing:-.045em;opacity:0}`,
+      `window.at = (t) => { const n = Math.round(t * ${LOG.length + 1}); document.querySelectorAll("[data-l]").forEach((el) => { el.style.opacity = +el.dataset.l < n ? 1 : 0; }); document.getElementById("end").style.opacity = n > ${LOG.length} ? 1 : 0; }; window.at(0);`,
+    ),
+  },
+
+  /** The same email's second picture: what the voice agent costs, said flat. The figure is Calls & Texts' monthly price over a month's days. */
+  "aday.jpg": {
+    html: page(
+      `<div class="top"><i></i>CALLS &amp; TEXTS // YOUR VOICE AGENT</div><p class="pre">Less than</p><div class="fig">$2<small>a day.</small></div>
+       <p class="dry">Cheaper than a coffee. Doesn't need a ute.</p>
+       <p class="foot">$49 A MONTH, ON TOP OF YOUR RENUABL PLAN. YOUR OWN NUMBER INCLUDED.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:${GROUND}}
+       .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .pre{position:absolute;left:84px;top:112px;font-size:54px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5)}
+       .fig{position:absolute;left:76px;top:160px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em}
+       .fig small{font-size:64px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5);margin-left:26px}
+       .dry{position:absolute;left:84px;top:462px;font-size:40px;letter-spacing:-.02em;color:#fff}
+       .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
+    ),
+  },
+
+  /** The same email's close (Martin: 'call out the "try for free" free for a month'): the plan's first month, said flat, with what follows it in the small print. */
+  "free.jpg": {
+    html: page(
+      `<div class="glow"></div><div class="top"><i></i>RENUABL // TRY IT FREE</div><div class="fig">$0<small>for your first month.</small></div>
+       <p class="dry">Try it. Break it. Keep it if it sells.</p>
+       <p class="foot">THEN $49 A USER A MONTH. NO LOCK-IN, CANCEL ANY TIME. ADD-ONS SUCH AS CALLS &amp; TEXTS ARE BILLED FROM THE DAY YOU ADD THEM.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:${GROUND}}.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 82% 108%,rgba(255,90,31,.38),transparent 55%)}
+       .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .fig{position:absolute;left:76px;top:120px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em;white-space:nowrap}
+       .fig small{font-size:64px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5);margin-left:30px}
+       .dry{position:absolute;left:84px;top:428px;font-size:40px;letter-spacing:-.02em;color:#fff}
+       .foot{position:absolute;left:84px;right:250px;bottom:40px;font-family:"JetBrains Mono",Consolas,monospace;font-size:13px;line-height:1.6;letter-spacing:.14em;color:rgba(255,255,255,.42)}`,
+    ),
+  },
+
+  /**
+   * For "Nobody got into solar to do paperwork." (26 Nov 2026, Martin; a fan of ticked sheets was "a bit lack luster",
+   * then "sol is also selling through voice ai and writing emails. we need the to use the actual sol sunbrain"): the
+   * calls, emails and admin the email lists, as sheets of paper swept across the dark and into Sol's sun, shrinking and
+   * catching his light as they go. The GIF loops (Sol holds still in it, to keep it light); the JPEG is the same picture
+   * held still.
+   */
+  ...Object.fromEntries(
+    [
+      ["paperwork.gif", { frames: 22, delay: 95, hold: 95, colours: 64, photo: true }],
+      ["paperwork.jpg", {}],
+    ].map(([name, how]) => [
+      name,
+      {
+        ...how,
+        html: page(
+          `<div class="corona"></div><div class="rings"><i></i><i></i><i></i></div><div id="sheets"></div>
+           <div class="sun">%%SOLHERO%%</div>
+           <p class="say">You do the solar.<br><span>Sol calls, writes and chases.</span></p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+          `body{background:${GROUND}}
+           .corona{position:absolute;left:900px;top:310px;width:1500px;height:1500px;margin:-750px 0 0 -750px;border-radius:50%;
+             background:radial-gradient(circle,rgba(255,150,70,.5) 0,rgba(255,90,31,.24) 16%,rgba(255,90,31,.08) 34%,transparent 58%)}
+           .rings i{position:absolute;left:900px;top:310px;border-radius:50%;border:1px solid rgba(255,170,110,.16)}
+           .rings i:nth-child(1){width:420px;height:420px;margin:-210px}.rings i:nth-child(2){width:640px;height:640px;margin:-320px;border-color:rgba(255,170,110,.1)}
+           .rings i:nth-child(3){width:900px;height:900px;margin:-450px;border-color:rgba(255,170,110,.06)}
+           .sun{position:absolute;left:760px;top:170px;width:280px;height:280px;display:grid;place-items:center}
+           #sheets{position:absolute;inset:0;perspective:1400px}
+           .sheet{position:absolute;left:0;top:0;width:230px;height:300px;margin:-150px 0 0 -115px;padding:24px 22px;border-radius:6px;will-change:transform}
+           .sheet b{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.14em;color:#1d1d1f}
+           .sheet u{display:block;height:9px;margin:16px 0 20px;border-radius:5px;background:rgba(60,50,40,.3)}
+           .sheet s{display:block;height:6px;margin-top:12px;border-radius:3px;background:rgba(60,50,40,.17)}
+           .say{position:absolute;left:84px;bottom:64px;font-size:62px;line-height:1.08;font-weight:600;letter-spacing:-.04em;color:#fff}
+           .say span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}`,
+          `const NAMES = ["LEAD CALL", "FOLLOW-UP EMAIL", "QUOTE CHASE", "CALL NOTES", "NETWORK RULES", "REMINDERS"];
+           const N = 12, W8 = [92, 84, 96, 70, 88, 76, 58, 90];
+           const box = document.getElementById("sheets");
+           for (let k = 0; k < N; k++) {
+             const el = document.createElement("div"); el.className = "sheet";
+             el.innerHTML = "<b>" + NAMES[k % NAMES.length] + "</b><u style='width:" + (54 + (k * 7) % 26) + "%'></u>" + W8.map((w, i) => "<s style='width:" + W8[(i + k) % 8] + "%'></s>").join("");
+             box.appendChild(el);
+           }
+           const bez = (p, a, b, c, d) => { const q = 1 - p; return q * q * q * a + 3 * q * q * p * b + 3 * q * p * p * c + p * p * p * d; };
+           window.at = (t) => {
+             const tt = (t * ${21 / 22}) % 1;
+             [...box.children].forEach((el, k) => {
+               // Each sheet is like the one six ahead of it, and a loop moves the stream half the way, so the last frame meets the first.
+               const j = k % 6, r = j * 2.4;
+               const pp = (k / N + ((j * 37) % 11) / 160 + tt / 2) % 1;
+               const x = bez(pp, -170, 250, 610, 900) + Math.sin(r) * 46 * (1 - pp), y = bez(pp, 70, 40, 500, 310) + Math.cos(r * 1.7) * 40 * (1 - pp);
+               const s = 1.12 * Math.pow(1 - pp, 1.35) + 0.04;
+               const fade = Math.min(1, pp / 0.05) * Math.min(1, (1 - pp) / 0.1);
+               const heat = Math.max(0, (pp - 0.3) / 0.7);
+               el.style.transform = "translate(" + x + "px," + y + "px) scale(" + s + ") rotateZ(" + (-24 + 250 * pp + Math.sin(r) * 18) + "deg) rotateY(" + 48 * Math.sin(pp * 7 + r) + "deg) rotateX(" + 34 * Math.cos(pp * 6 + r) + "deg)";
+               el.style.opacity = fade; el.style.zIndex = 100 - Math.round(pp * 100);
+               el.style.background = "linear-gradient(160deg,color-mix(in srgb,#fbfaf7,#ffc98a " + heat * 100 + "%),color-mix(in srgb,#dedad2,#ff8a3d " + heat * 100 + "%))";
+               el.style.boxShadow = "0 30px 60px -20px rgba(0,0,0,.9),0 0 " + (20 + heat * 50) + "px rgba(255,120,50," + heat * 0.7 + ")";
+             });
+           };
+           window.at(0);`,
+        ),
+      },
+    ]),
+  ),
 
   ...Object.fromEntries(Object.entries(EXPLAINERS).map(([name, e]) => [name, { frames: 40, delay: 80, hold: 3800, html: explainer(e) }])),
 
@@ -340,6 +588,331 @@ const ART = {
   },
 
   /**
+   * The voice email's character picture (26 Nov 2026, Martin: "add in a nice visual to bring character to the voice
+   * ai"): a voice agent introduced as a member of the team, by the name a business might give it. Its wave beats, it
+   * says its opening line, and what the business chooses for it comes in as tags. The name is an example.
+   */
+  "voice-meet.gif": {
+    frames: 40,
+    delay: 100,
+    hold: 3600,
+    html: page(
+      `<div class="sky"></div>
+       <div class="who">${AGENT(210, VOICE_TINT, "big")}<b>Gary</b><span>Voice agent · Sales</span><em><i></i>Ready for your leads</em></div>
+       <div class="say"><small>YOUR VOICE AGENT</small><h1>Meet Gary.</h1>
+         <p class="sub">Or whatever you call yours. You choose the name, the voice and the script.</p>
+         <div class="b"><s>Gary</s><p id="line" data-text="${VOICE_OPENING}"></p></div>
+         <div class="tags">${VOICE_TAGS.map((t, i) => `<span data-g="${i}">${t}</span>`).join("")}</div>
+       </div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `.sky{position:absolute;inset:0;background:radial-gradient(circle at 21% 44%,color-mix(in srgb,${VOICE_TINT} 30%,transparent),transparent 36%)}
+       .who{position:absolute;left:72px;top:112px;width:330px;display:flex;flex-direction:column;align-items:center;text-align:center}
+       .who b{margin-top:30px;font-size:34px;font-weight:600;letter-spacing:-.02em}.who span{font-size:17px;color:rgba(255,255,255,.55);margin-top:4px}
+       .who em{margin-top:16px;font-style:normal;font-size:15px;color:${VOICE_TINT};font-family:"JetBrains Mono",Consolas,monospace}
+       .who em i{display:inline-block;width:8px;height:8px;border-radius:50%;background:${VOICE_TINT};margin-right:8px;box-shadow:0 0 10px ${VOICE_TINT}}
+       .big .agent-glow{inset:-30%;filter:blur(32px)}
+       .say{position:absolute;left:470px;top:84px;width:660px}
+       .say small{font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.22em;color:rgba(255,255,255,.5)}
+       .say h1{margin-top:10px;font-size:96px;line-height:1;font-weight:600;letter-spacing:-.05em}
+       .sub{margin-top:16px;font-size:22px;line-height:1.4;color:rgba(255,255,255,.7);max-width:560px}
+       .b{margin-top:28px;width:560px;border-radius:22px;padding:16px 20px;background:#fff;color:#0b0b0c;box-shadow:0 18px 40px -20px rgba(0,0,0,.9)}
+       .b s{display:block;text-decoration:none;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#7c5cf0}
+       .b p{font-size:21px;line-height:1.4;margin-top:4px;min-height:2.8em}
+       .tags{margin-top:22px;display:flex;flex-wrap:wrap;gap:10px;width:600px}
+       .tags span{padding:9px 16px;border-radius:999px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);font-size:15px;color:rgba(255,255,255,.85);opacity:0}`,
+      `const line = document.getElementById("line"); const text = line.dataset.text;
+       window.at = (t) => {
+         line.textContent = text.slice(0, Math.round(text.length * span(t, 0.08, 0.6)));
+         document.querySelectorAll("[data-g]").forEach((el) => {
+           const k = span(t, 0.62 + el.dataset.g * 0.08, 0.72 + el.dataset.g * 0.08);
+           el.style.opacity = k; el.style.transform = "translateY(" + (1 - k) * 10 + "px)";
+         });
+         beat(t, t < 0.6);
+       }; window.at(0);`,
+    ),
+  },
+
+  /**
+   * The voice email's product picture (26 Nov 2026, Martin: "one visual to understand how it looks in the software, the
+   * phone book"; "update the text in the screenshots so it doesnt have my name… or any real phonenumbers"): the agent's
+   * window drawn as the product shows it, from two of Martin's screenshots: a call in progress beside the contacts, one
+   * opened on Hand it to the agent. Drawn here, not photographed, so every name is made up and every number is from the
+   * range set aside for fiction (0491 570 …).
+   */
+  "product-phonebook.jpg": {
+    html: page(
+      `<div class="glow"></div><div class="win">
+        <div class="call">
+          <div class="chead"><div class="row"><span class="live"><i></i>CALL IN PROGRESS</span><tt>0:26</tt></div>
+            <div class="row2">${AGENT(44, VOICE_TINT)}<div><b>Gary <u>with</u> Olivia</b><span>New lead · solar and a battery</span></div></div></div>
+          <div class="lines">
+            ${[
+              ["Gary", "Hi. Is that Olivia?"],
+              ["Olivia", "Yes, it is."],
+              [
+                "Gary",
+                "Hi Olivia, it's Gary, Sunrise Solar's automated assistant, calling about your solar enquiry. Have you got a few minutes?",
+              ],
+              ["Olivia", "Oh, yes. Absolutely."],
+            ]
+              .map(([who, text]) => `<div class="l ${who === "Gary" ? "g" : "c"}"><s>${who}</s><p>${text}</p></div>`)
+              .join("")}
+          </div>
+          <div class="cfoot"><div class="tell">Tell Gary something…</div><div class="hang">${ICON.hang} Hang up</div></div>
+        </div>
+        <div class="book">
+          <div class="bhead">${AGENT(44, VOICE_TINT)}<div><b>Talk to Gary</b><span>On a call now · 2 calls today</span></div></div>
+          <div class="search">${ICON.search} Search contacts</div>
+          <div class="list">
+            <p class="letter">A</p>
+            <div class="open">
+              <div class="c"><div><b>Alex Example</b><span>0491 570 006 · Solar · Designed</span></div><i class="on">${ICON.phone}</i><i>${ICON.chat}</i></div>
+              <p class="cap">WHAT THE CALL IS ABOUT</p><div class="about">Their proposal went out on Monday. See if they have any questions.</div>
+              <div class="hand">${AGENT(34, VOICE_TINT)}<div><b>Hand it to Gary</b><span>Gary rings Alex and you watch the call here</span></div></div>
+              <div class="opt">${ICON.mail}<div><b>Ask Alex by email first</b><span>Gary rings only after a yes</span></div></div>
+            </div>
+            <p class="letter">C</p>
+            <div class="c"><div><b>Casey Demo</b><span>0491 570 110 · Solar · Proposal sent</span></div><i>${ICON.phone}</i><i>${ICON.chat}</i></div>
+            <p class="letter">J</p>
+            <div class="c"><div><b>Jordan Placeholder</b><span>0491 570 157 · Solar and battery · Designed</span></div><i>${ICON.phone}</i><i>${ICON.chat}</i></div>
+          </div>
+        </div>
+      </div><div class="tag">In RENUABL · your voice agent's phone book (example data)</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
+       .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}
+       .win{position:absolute;left:70px;top:24px;width:1060px;height:580px;border-radius:20px;overflow:hidden;display:flex;background:#fff;color:#1d1d1f;
+         box-shadow:0 0 0 2px #2fae84,0 40px 120px rgba(0,0,0,.85)}
+       .win .agent{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);background:#2f323a}.win .agent-glow{display:none}
+       .call{width:372px;display:flex;flex-direction:column;border-right:1px solid #e3e3e8}
+       .chead{background:#2fae84;color:#fff;padding:16px 18px 14px}
+       .row{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;letter-spacing:.12em}
+       .live i{display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;box-shadow:0 0 0 4px rgba(255,255,255,.3)}
+       .row tt{font-family:"JetBrains Mono",Consolas,monospace;font-size:16px;letter-spacing:.04em}
+       .row2{display:flex;align-items:center;gap:12px;margin-top:14px}.row2 b{font-size:18px;font-weight:600}.row2 u{text-decoration:none;font-weight:400;opacity:.85}
+       .row2>div>span{display:block;font-size:13px;opacity:.85;margin-top:1px}
+       .lines{flex:1;padding:14px 16px 0;overflow:hidden}
+       .l{margin-bottom:7px;display:flex;flex-direction:column;align-items:flex-start}.l.c{align-items:flex-end}
+       .l s{text-decoration:none;font-size:11px;color:#8a8a90;margin:0 6px 3px}
+       .l p{max-width:268px;padding:8px 13px;border-radius:16px;background:#ececef;font-size:14px;line-height:1.35}
+       .l.c p{background:#3a3d43;color:#fff;font-weight:600}
+       .cfoot{padding:12px 14px 14px;border-top:1px solid #e3e3e8}
+       .tell{height:38px;border-radius:999px;background:#ececef;color:#8a8a90;font-size:14px;display:flex;align-items:center;padding:0 16px}
+       .hang{margin-top:10px;height:36px;border-radius:999px;background:#fde7e7;color:#d92d20;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+       .book{flex:1;display:flex;flex-direction:column;min-width:0}
+       .bhead{background:#3a3d43;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px}
+       .bhead b{font-size:17px;font-weight:600}.bhead>div>span{display:block;font-size:12.5px;color:rgba(255,255,255,.65)}
+       .search{height:44px;display:flex;align-items:center;gap:10px;padding:0 20px;color:#8a8a90;font-size:14.5px;border-bottom:1px solid #e3e3e8}
+       .list{padding:6px 14px 0;flex:1;overflow:hidden}
+       .letter{font-size:11px;font-weight:700;color:#8a8a90;letter-spacing:.1em;margin:7px 8px 3px}
+       .c{display:flex;align-items:center;gap:8px;padding:7px 10px}.c>div{flex:1;min-width:0}
+       .c b{font-size:15.5px;font-weight:500}.c>div>span{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:11.5px;color:#6e6e73;margin-top:1px}
+       .c i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1px #d9d9de;color:#1d1d1f;flex:none}
+       .c i.on{background:#3a3d43;color:#fff;box-shadow:none}
+       .open{background:#ececef;border-radius:14px;padding:2px 4px 8px}
+       .cap{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:#6e6e73;margin:7px 14px 5px}
+       .about{margin:0 10px;padding:9px 12px;border-radius:10px;background:#fff;font-size:13.5px;color:#1d1d1f;box-shadow:inset 0 0 0 1px #d9d9de}
+       .hand{margin:9px 6px 3px;padding:10px 16px;border-radius:14px;background:#3a3d43;color:#fff;display:flex;align-items:center;gap:14px}
+       .hand b{font-size:15.5px;font-weight:600}.hand>div>span{display:block;font-size:12.5px;color:rgba(255,255,255,.7)}
+       .opt{display:flex;align-items:center;gap:13px;padding:6px 16px;color:#1d1d1f}.opt b{font-size:14px;font-weight:500}
+       .opt>div>span{display:block;font-size:12px;color:#6e6e73}.opt svg,.search svg{flex:none}`,
+    ),
+  },
+
+  /**
+   * Seven more campaigns (26 Nov 2026, Martin: "create 7 more… different hooks and selling propositions… the pain
+   * points in solar: admin, compliance, technical issues needing expertise"). Each has a hero: the hook large on the
+   * left, the product drawn on a white card on the right (made-up customers; drawn, not photographed), and some a
+   * statement picture, the words alone, as aday.jpg is.
+   */
+  "hero-fill.jpg": {
+    html: hero(
+      "DESIGNER // CRM",
+      "Design it once.",
+      "The deal fills itself in.",
+      "Save the design and every detail is on the customer's file.",
+      `<div class="chead"><div><b>Olivia Hart</b><span>Solar and battery · Designed</span></div><em>FILLED FROM THE DESIGN</em></div>
+       ${[
+         ["System size", "6.65 kW"],
+         ["Panels", "14 × 475 W"],
+         ["Inverter", "5 kW hybrid"],
+         ["Battery", "16 kWh"],
+         ["Roof", "Tile · 22°"],
+         ["Storeys", "Single"],
+         ["Phase", "Single"],
+         ["Strings", "2"],
+       ]
+         .map(([k, v]) => `<div class="r"><span>${k}</span><b>${v}</b><i>${ICON.tick}</i></div>`)
+         .join("")}
+       <div class="cfoot">%%SOL%%<span>Filled in when the design was saved. Nothing typed twice.</span></div>`,
+    ),
+  },
+  "hero-proposal.jpg": {
+    html: hero(
+      "PROPOSALS // YOUR BRAND",
+      "Your proposal.",
+      "Not ours.",
+      "Your logo, your colours, your layout. Signed online.",
+      `<div class="pbar"><span class="logo">YOUR LOGO</span><span>Proposal for Olivia Hart</span></div>
+       <div class="pcover"><div class="roof">${Array.from({ length: 14 }, () => "<i></i>").join("")}</div>
+         <div><small>YOUR SYSTEM</small><b>6.65 kW solar</b><b>16 kWh battery</b></div></div>
+       <div class="r"><span>Your price, after the federal rebate</span><b>$18,400</b></div>
+       <div class="go">I'd like to go ahead</div>
+       <div class="chips"><span>Your logo</span><span>Your colours</span><span>Your type</span><span>Your blocks, in your order</span></div>`,
+      `.pbar{background:#0f766e;color:#fff;margin:-22px -24px 16px;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+       .logo{border:1.5px dashed rgba(255,255,255,.7);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;letter-spacing:.14em}
+       .pcover{display:flex;gap:18px;align-items:center;margin-bottom:10px}.pcover small{display:block;font-size:11px;letter-spacing:.14em;color:#6e6e73;font-weight:700}
+       .pcover b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+       .roof{width:190px;height:120px;border-radius:12px;background:#b9a48c;padding:14px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;transform:skewX(-8deg)}
+       .roof i{background:#1b2333;border:1px solid #9aa3b5;border-radius:2px}
+       .go{margin-top:16px;height:50px;border-radius:999px;background:#0f766e;color:#fff;font-weight:600;font-size:17px;display:grid;place-items:center}
+       .chips{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}.chips span{padding:6px 12px;border-radius:999px;background:#ececef;font-size:13px;color:#3a3d43}`,
+    ),
+  },
+  "hero-promo.jpg": {
+    html: hero(
+      "GROWTH // EMAIL MARKETING",
+      "Got an offer?",
+      "Tell Sol.",
+      "He writes the email. You press send.",
+      `<p class="cap">WHAT DO YOU WANT TO ACHIEVE?</p>
+       <div class="tiles"><span>Announce something</span><span class="on">Promote an offer</span><span>Win back quiet contacts</span></div>
+       <p class="cap">YOUR OFFER, IN YOUR WORDS</p>
+       <div class="brief">A battery for customers who already have solar. Free site check in March.</div>
+       <div class="cfoot" style="margin-top:14px">%%SOL%%<span>Written by Sol from your words. Nothing added.</span></div>
+       <div class="mail"><small>SUBJECT</small><b>Your solar is ready for a battery</b><p>Hi Olivia, your panels make more than you use by day. A battery keeps it for the evening…</p></div>`,
+      `.tiles{display:flex;gap:8px;margin-bottom:6px}.tiles span{flex:1;padding:12px 10px;border-radius:12px;box-shadow:inset 0 0 0 1px #d9d9de;font-size:13.5px;text-align:center}
+       .tiles .on{background:#1d1d1f;color:#fff;box-shadow:none;font-weight:600}
+       .brief{padding:12px 14px;border-radius:12px;background:#f4f4f6;font-size:15px;line-height:1.4}
+       .mail{margin-top:14px;padding:14px 16px;border-radius:14px;box-shadow:inset 0 0 0 1px #d9d9de}
+       .mail small{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#6e6e73}.mail b{display:block;font-size:18px;margin-top:3px}
+       .mail p{font-size:14px;line-height:1.45;color:#3a3d43;margin-top:6px}`,
+    ),
+  },
+  "hero-tech.jpg": {
+    html: hero(
+      "SOL // TECHNICAL",
+      "Fronius State 475?",
+      "Ask Sol.",
+      "Answers to hard technical questions, with his sources.",
+      `<div class="q">Fronius is showing State 475. What is it?</div>
+       <div class="a">%%SOL%%<div><p>Fronius lists State 475 as an insulation fault on the DC side: a path to earth somewhere between the panels and the inverter.</p>
+         <p class="k">Check the DC isolators and connectors for water first, then test each string's insulation resistance.</p>
+         <span class="src">${ICON.globe} Sources · 2</span></div></div>
+       <div class="q">And one that's lost its Wi-Fi?</div>
+       <div class="a">%%SOL%%<div><p>Start at the router: many inverters only join a 2.4 GHz network. Then run the inverter's network setup again from its app.</p></div></div>
+       <div class="note">An example answer. Your electrician makes the call on site.</div>`,
+      `.q{margin-left:auto;width:fit-content;max-width:330px;padding:10px 14px;border-radius:16px;box-shadow:inset 0 0 0 1.5px #1d1d1f;font-size:15px;margin-bottom:12px}
+       .a{display:flex;gap:12px;margin-bottom:14px}.a p{font-size:15px;line-height:1.5}.a .k{margin-top:8px;padding:10px 12px;border-radius:10px;background:#fff1e8;box-shadow:inset 0 0 0 1px #ffc9a8}
+       .src{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:5px 11px;border-radius:999px;background:#ececef;font-size:12.5px;color:#3a3d43}
+       .note{font-size:12px;color:#8a8a90;margin-top:6px}`,
+    ),
+  },
+  "hero-paper.jpg": {
+    html: hero(
+      "AFTER THE SALE // PAPERWORK",
+      "The paperwork,",
+      "lined up.",
+      "Every sold job filed at the step it's waiting on.",
+      `<div class="chead"><div><b>Olivia Hart</b><span>6.65 kW solar · 16 kWh battery</span></div><em>SOLD</em></div>
+       ${[
+         ["Network pre-approval", "Approved", "g"],
+         ["Solar Victoria", "Applied", "a"],
+         ["Installation", "Booked · 12 March", "g"],
+         ["Inspection certificate", "Waiting", "n"],
+         ["STCs", "To claim", "n"],
+         ["Grid connection", "To raise", "n"],
+       ]
+         .map(([k, v, c]) => `<div class="r"><span>${k}</span><u class="${c}">${v}</u></div>`)
+         .join("")}
+       <div class="cfoot">%%SOL%%<span>The next step is the first one not done. Today tells you which.</span></div>`,
+      `.r u{text-decoration:none;font-size:13.5px;font-weight:600;padding:5px 12px;border-radius:999px;background:#ececef;color:#3a3d43}
+       .r u.g{background:#dff5ea;color:#12784f}.r u.a{background:#fff1d6;color:#8a5a00}`,
+    ),
+  },
+  "hero-one.jpg": {
+    html: hero(
+      "ONE WORKSPACE // END TO END",
+      "Six tools.",
+      "One login.",
+      "From the first call to the last invoice, in one place.",
+      `${[
+        ["Lead", "Answered in minutes"],
+        ["Design", "Priced as you draw"],
+        ["Proposal", "Signed online"],
+        ["Order", "Built from what was sold"],
+        ["Install", "On one calendar"],
+        ["Service", "Every case, with its history"],
+      ]
+        .map(([k, v], i) => `<div class="stop"><i>${i + 1}</i><div><b>${k}</b><span>${v}</span></div></div>`)
+        .join("")}
+       <div class="cfoot">%%SOL%%<span>Sol works across all six.</span></div>`,
+      `.stop{display:flex;align-items:center;gap:16px;padding:9px 0;position:relative}
+       .stop i{width:34px;height:34px;border-radius:50%;background:#1d1d1f;color:#fff;font-style:normal;font-weight:600;font-size:14px;display:grid;place-items:center;flex:none;position:relative;z-index:1}
+       .stop:not(:last-of-type)::after{content:"";position:absolute;left:16px;top:38px;width:2px;height:28px;background:#ff5a1f}
+       .stop b{font-size:18px;font-weight:600}.stop span{display:block;font-size:13.5px;color:#6e6e73}`,
+    ),
+  },
+  "hero-reply.jpg": {
+    html: hero(
+      "SOL // REPLIES",
+      "Faster replies.",
+      "Sol drafts. You send.",
+      "From the deal's own record, in your voice.",
+      `<p class="cap">OLIVIA WROTE · 2 MIN AGO</p>
+       <div class="q" style="margin-left:0">Is the battery big enough to get us through the evening?</div>
+       <div class="draft"><small>DRAFTED BY SOL · NOT SENT</small>
+         <p>Hi Olivia, good question. The battery on your proposal holds 16 kWh, and your bill shows about 12 kWh used after dark, so on a typical day it carries the evening.</p>
+         <p>Happy to go through it on a quick call.</p></div>
+       <div class="btns"><span class="on">Send</span><span>Edit first</span><span>Not now</span></div>`,
+      `.q{width:fit-content;max-width:380px;padding:10px 14px;border-radius:16px;background:#ececef;font-size:15px;margin-bottom:14px}
+       .draft{padding:14px 16px;border-radius:14px;background:#fff6ee;box-shadow:inset 0 0 0 1px #ffc9a8}
+       .draft small{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#c2410c}.draft p{font-size:15px;line-height:1.5;margin-top:8px}
+       .btns{display:flex;gap:10px;margin-top:16px}.btns span{height:42px;padding:0 20px;border-radius:999px;display:grid;place-items:center;font-size:15px;font-weight:600;box-shadow:inset 0 0 0 1px #d9d9de}
+       .btns .on{background:#ff5a1f;color:#fff;box-shadow:none}`,
+    ),
+  },
+  "say-list.jpg": {
+    html: statement(
+      "GROWTH // EMAIL MARKETING",
+      "Customers with",
+      "Solar. No battery.",
+      "One list. One email. Written by Sol.",
+      "GROWTH · $19 A MONTH, ON TOP OF YOUR RENUABL PLAN.",
+      128,
+    ),
+  },
+  "say-sources.jpg": {
+    html: statement(
+      "SOL // TECHNICAL",
+      "Every answer comes with",
+      "Sources.",
+      "Maker pages, datasheets and network rules, under the answer.",
+      "SOL IS IN EVERY PLAN.",
+      230,
+    ),
+  },
+  "say-ready.jpg": {
+    html: statement(
+      "DESIGNER // CHECKS",
+      "A light that goes green:",
+      "Ready to install.",
+      "Strings, inverter limits and clearances, checked as you draw.",
+      "A GUIDE, NEVER A SITE INSPECTION.",
+      132,
+      "#34c98a",
+    ),
+  },
+  "say-opened.jpg": {
+    html: statement(
+      "EMAIL // OPENS",
+      "Under every email you send:",
+      "Opened 3 times.",
+      "Know who's reading, and who to ring next.",
+      "AN OPEN IS A GUIDE, NOT PROOF.",
+      140,
+    ),
+  },
+
+  /**
    * The band at the foot of every email (22 Nov 2026, Martin: "design something into the footer of each email - to
    * reinforce a message… marketplace coming soon"): RENUABL Marketplace's blue round with its two roofs, and the line.
    * Taken as the top 1200 x 300 of the page.
@@ -349,8 +922,8 @@ const ART = {
     html: page(
       `<div class="band"><span class="m"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12.5 8 7l6 5.5"/><path d="M4 11v8h8v-8"/><path d="M11 9.5 16 5l6 5.5"/><path d="M14 19h6v-8"/></svg></span>
         <div><small>RENUABL Marketplace · Coming soon</small><b>Find crews. Win installs. Trade stock.</b><em>One network for solar retailers, installers and inspectors.</em></div></div>`,
-      `body{background:#05060a}.band{position:absolute;left:0;top:0;width:1200px;height:300px;display:flex;align-items:center;gap:40px;padding:0 80px;
-         background:radial-gradient(ellipse at 10% 50%,rgba(60,110,255,.28),transparent 45%),#05060a;border-top:1px solid rgba(255,255,255,.08)}
+      `body{background:${GROUND}}.band{position:absolute;left:0;top:0;width:1200px;height:300px;display:flex;align-items:center;gap:40px;padding:0 80px;
+         background:radial-gradient(ellipse at 10% 50%,rgba(60,110,255,.28),transparent 45%),${GROUND};border-top:1px solid rgba(255,255,255,.08)}
        .m{flex:none;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;
          background:radial-gradient(circle at 35% 25%,#8fb0ff 0 10%,#3b6bff 45%,#1f3fc4 100%);box-shadow:inset 0 2px 1px rgba(255,255,255,.5),0 14px 40px rgba(59,107,255,.45)}
        small{display:block;font-size:16px;letter-spacing:.22em;text-transform:uppercase;color:#7fa2ff}
@@ -365,7 +938,7 @@ const ART = {
     html: page(
       `<div class="strip">${AGENT(64, "#ff5a1f")}<b>Your AI salesperson: <i>less than $2 a day.</i></b><em>Calls &amp; Texts · $49 a month</em></div>`,
       `.strip{position:absolute;left:0;top:0;width:1200px;height:120px;display:flex;align-items:center;gap:26px;padding:0 64px;
-         background:linear-gradient(90deg,rgba(255,90,31,.18),transparent 60%),#0b0c10;border-top:1px solid rgba(255,255,255,.08)}
+         background:linear-gradient(90deg,rgba(255,90,31,.18),transparent 60%),${GROUND};border-top:1px solid rgba(255,255,255,.08)}
        .strip b{font-size:34px;font-weight:600;letter-spacing:-.02em}.strip i{font-style:normal;color:#ff7a2e}
        .strip em{margin-left:auto;font-style:normal;font-size:18px;color:rgba(255,255,255,.5)}`,
     ),
@@ -423,9 +996,11 @@ const ART = {
 
 // ---- Taking them ------------------------------------------------------------------------------------------------
 
+/** Chrome's own port: set ART_PORT when two runs may overlap (two sessions on one port take each other's pictures). */
+const ART_PORT = process.env.ART_PORT ?? "9336";
 const chrome = spawn(
   CHROME,
-  ["--headless=new", "--remote-debugging-port=9336", `--user-data-dir=${work}`, "--hide-scrollbars", "about:blank"],
+  ["--headless=new", `--remote-debugging-port=${ART_PORT}`, `--user-data-dir=${work}`, "--hide-scrollbars", "about:blank"],
   {
     stdio: "ignore",
   },
@@ -434,7 +1009,7 @@ let target = null;
 for (let i = 0; i < 40 && !target; i++) {
   await sleep(250);
   try {
-    target = (await (await fetch("http://127.0.0.1:9336/json")).json()).find((t) => t.type === "page");
+    target = (await (await fetch(`http://127.0.0.1:${ART_PORT}/json`)).json()).find((t) => t.type === "page");
   } catch {
     // Chrome isn't up yet.
   }
@@ -468,13 +1043,21 @@ const grab = async (clip) =>
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: false });
 
-async function writeGif(name, frames, delays, colours = 160, width = GIF_W) {
+/** `photo` is for frames that are mostly one photograph: only what changed between frames is kept, which cuts such a GIF to a quarter. */
+async function writeGif(name, frames, delays, colours = 160, width = GIF_W, photo = false) {
   // Outlook on Windows shows only a GIF's first frame: the finished picture goes first, then it plays from the start.
   frames = [frames.at(-1), ...frames];
   delays = [1600, ...delays];
   const small = await Promise.all(frames.map((f) => sharp(f).resize(width).png().toBuffer()));
   await sharp(small, { join: { animated: true } })
-    .gif({ delay: delays, loop: 0, effort: 10, colours, dither: 0.5 })
+    .gif({
+      delay: delays,
+      loop: 0,
+      effort: 10,
+      colours,
+      dither: photo ? 0.3 : 0.5,
+      ...(photo ? { interFrameMaxError: 12, interPaletteMaxError: 10 } : {}),
+    })
     .toFile(join(OUT, name));
 }
 
@@ -541,10 +1124,11 @@ let solStill = null;
   await send("Page.navigate", { url: `${SITE}/` });
   await sleep(6000);
   const box = await js(`(() => {
-    const c = [...document.querySelectorAll("canvas")].find((x) => (x.parentElement?.className || "").includes("-inset-1/2"));
-    if (!c) return null;
-    const sun = c.parentElement.parentElement;
-    document.documentElement.style.background = "#05060a"; document.body.style.background = "#05060a";
+    // The sun's canvas sits in a wrapper inside the span that spreads past his round (-inset-1/2); his round is that span's parent.
+    const spread = [...document.querySelectorAll("canvas")].map((x) => x.closest('[class*="-inset-1/2"]')).find(Boolean);
+    if (!spread) return null;
+    const sun = spread.parentElement;
+    document.documentElement.style.background = "#000"; document.body.style.background = "#000";
     document.body.style.visibility = "hidden"; sun.style.visibility = "visible";
     document.querySelectorAll("nextjs-portal").forEach((n) => n.remove());
     sun.querySelectorAll("*").forEach((n) => (n.style.visibility = "visible"));
@@ -561,6 +1145,8 @@ let solStill = null;
     const pad = box.w * 0.12;
     solStill = join(process.env.SOL_STILL_DIR ?? work, "sol-still.png");
     writeFileSync(solStill, await grab({ x: box.x - pad, y: box.y - pad, width: box.w + pad * 2, height: box.h + pad * 2 }));
+    await js(`document.documentElement.style.background = "${GROUND}"; document.body.style.background = "${GROUND}"`);
+    await sleep(200);
     for (const [name, says] of Object.entries(SOL_SAYS)) {
       if (ONLY && ONLY !== name) continue;
       // He sits in his state for two seconds, then types (22 Nov 2026, Martin).
@@ -595,7 +1181,11 @@ for (const [name, art] of Object.entries(ART)) {
   const big = solStill
     ? `<img src="${pathToFileURL(solStill).href}" width="84" height="84" style="flex:none;margin:-14px -6px 0 -14px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
     : SOL(64);
-  writeFileSync(file, art.html.replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
+  // The homepage's own sun, large, for a picture he is the middle of (Martin: "the actual sol sunbrain"); the drawn one only when the site isn't up.
+  const hero = solStill
+    ? `<img src="${pathToFileURL(solStill).href}" width="360" height="360" style="flex:none;margin:-40px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
+    : SOL(280);
+  writeFileSync(file, art.html.replaceAll("%%SOLHERO%%", hero).replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
   await send("Page.navigate", { url: pathToFileURL(file).href });
   await sleep(1200);
   if (!art.frames) {
@@ -608,13 +1198,15 @@ for (const [name, art] of Object.entries(ART)) {
     for (let i = 0; i < art.frames; i++) {
       await js(`window.at(${i / (art.frames - 1)})`);
       await sleep(30);
-      frames.push(await grab());
+      frames.push(await grab(art.clipH ? { x: 0, y: 0, width: W, height: art.clipH } : undefined));
     }
     await writeGif(
       name,
       frames,
       frames.map((_, i) => (i === frames.length - 1 ? art.hold : i === 0 && art.first ? art.first : art.delay)),
       art.colours ?? 160,
+      GIF_W,
+      art.photo === true,
     );
   }
   console.log("made", name);
