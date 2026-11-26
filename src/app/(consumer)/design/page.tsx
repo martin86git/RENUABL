@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { DesignHome } from "@/components/design/design-home";
 import { designAccess } from "@/lib/server/design-context";
+import { signedOutSignInPage } from "@/lib/server/design-sign-in-page";
 
 export const metadata: Metadata = {
   title: "For solar installers and retailers",
@@ -17,6 +18,9 @@ export const metadata: Metadata = {
  * (signing in, a bookmark, a new tab) lands on the design tool; Today is still a press away inside the app.
  */
 export default async function DesignHomePage() {
+  // Signed out on a device that signed in at its business's own sign-in page: back there (25 Nov 2026, Martin).
+  const team = await signedOutSignInPage();
+  if (team) redirect(team);
   const access = await designAccess();
   if (access.state === "ready" && access.member.role === "designer") {
     const from = (await headers()).get("referer") ?? "";

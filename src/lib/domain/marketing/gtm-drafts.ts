@@ -123,6 +123,14 @@ interface Section {
   cta: [string, string];
 }
 
+/**
+ * Laid out as Xero's invoicing email (26 Nov 2026, Martin: "a good email marketing example we could reference for our
+ * Renuabl launch"): a bar at the very top for whoever is ready to buy, then each part on a panel of its own.
+ */
+export const TOP_BAR: [string, string] = ["Ready for your AI sales force?", "See pricing"];
+export const PANEL_FIRST = "#fff3ea";
+export const PANEL_REST = "#f4f4f5";
+
 /** The designer's own part, near the end of every email but the designer's (it isn't the first thing anyone sees). */
 const DESIGNER_PART: Section = {
   hook: "Made for solar. Design and price a roof while you're on the phone.",
@@ -144,12 +152,18 @@ function email(key: string, subject: string, preview: string, parts: [Section, .
     subject,
     preview,
     blocks: [
-      ...all.flatMap((p, i) => [
-        block(`h${i}`, { kind: "heading", text: p.hook, url: null, align: "left" }),
-        ...p.pictures.map((k) => picture(k, p.cta[1])),
-        ...(p.words?.length ? [block(`t${i}`, { kind: "text", text: p.words.join("\n\n"), url: null, align: "left" })] : []),
-        block(`b${i}`, { kind: "button", text: p.cta[0], url: p.cta[1], align: "left" }),
-      ]),
+      block("bar", { kind: "bar", text: TOP_BAR[0], label: TOP_BAR[1], url: PRICING, align: "left" }),
+      ...all.flatMap((p, i) => {
+        // Each part on its own panel, the first warm and the rest a quiet grey, a gap between so they stay apart.
+        const fill = i === 0 ? PANEL_FIRST : PANEL_REST;
+        return [
+          ...(i > 0 ? [block(`gap${i}`, { kind: "spacer", text: "", url: null, align: "left", space: "small" })] : []),
+          block(`h${i}`, { kind: "heading", text: p.hook, url: null, align: "center", fill }),
+          ...p.pictures.map((k) => ({ ...picture(k, p.cta[1]), fill })),
+          ...(p.words?.length ? [block(`t${i}`, { kind: "text", text: p.words.join("\n\n"), url: null, align: "center", fill })] : []),
+          block(`b${i}`, { kind: "button", text: p.cta[0], url: p.cta[1], align: "center", fill }),
+        ];
+      }),
       picture("footv", SITE),
       picture("footer", MARKETPLACE),
     ],

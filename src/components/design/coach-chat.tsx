@@ -17,6 +17,7 @@ import {
   Lock,
   LockOpen,
   MessageCircle,
+  History,
   Minus,
   Pencil,
   Phone,
@@ -66,6 +67,7 @@ import {
   openCoach,
   openCoachChat,
   removeNote,
+  addScriptLines,
   rewordNote,
   useCoachCaller,
   useCoachOpen,
@@ -73,6 +75,7 @@ import {
 import { CallerAvatar, VoicePicker } from "./settings-caller";
 import { VoiceSample } from "./voice-choice";
 import { ContactReach } from "./coach-contacts";
+import { CallLogPage } from "./call-log";
 import { CoachDeals } from "./coach-deals";
 import { CoachWelcome } from "./coach-welcome";
 import { DictateButton, withSpoken } from "./dictate";
@@ -290,9 +293,13 @@ function CoachWindowFor() {
   const [tapped] = useState(() => new Map<string, string>());
   const [sending, setSending] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
-  const [settings, setSettings] = useState(() => readSettingsOpen() && !readDealsOpen());
+  const [settings, setSettings] = useState(readSettingsOpen);
   // Its deals beside the chat (14 Nov 2026, Martin: split screen, the deals wider, pick one and talk about it).
   const [deals, setDeals] = useState(readDealsOpen);
+  // The panel opened last: the one a phone shows in the window's place.
+  const [front, setFront] = useState<CoachPane | null>(null);
+  /** The agent's call log in the chat's place (25 Nov 2026, Martin: "we need a call logs menu in the voice chat"). */
+  const [callLog, setCallLog] = useState(false);
   const [picked, setPicked] = useState<AssistantDeal | null>(null);
   // The window's and its panes' sizes, dragged (14 Nov 2026, Martin), kept on the device.
   const [sizes, setSizes] = useState<CoachSizes>(readSizes);
@@ -374,7 +381,7 @@ function CoachWindowFor() {
     setStartNew(!state?.call);
     if (state && !state.call && window.innerWidth >= 1024) {
       setDeals(true);
-      setSettings(false);
+      setFront("deals");
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [state]);
@@ -434,22 +441,21 @@ function CoachWindowFor() {
       // Private window: it opens as it would the first time.
     }
   };
-  // One pane beside the chat at a time: the deals or the settings.
+  // Slim panels to the chat's right, one or both (26 Nov 2026, Martin). On a phone the one opened last takes the
+  // window's place.
   const toggleSettings = (open: boolean) => {
     setSettings(open);
     keep(SETTINGS_KEY, open);
-    if (open && deals) toggleDeals(false);
+    setFront(open ? "settings" : deals ? "deals" : null);
   };
   const toggleDeals = (open: boolean) => {
     setDeals(open);
     keep(DEALS_KEY, open);
-    if (open && settings) {
-      setSettings(false);
-      keep(SETTINGS_KEY, false);
-    }
+    setFront(open ? "deals" : settings ? "settings" : null);
   };
-  const pane: CoachPane | null = settings ? "settings" : deals ? "deals" : null;
-  const layout = coachLayout(sizes, pane, view);
+  const open: CoachPane[] = [...(deals ? (["deals"] as const) : []), ...(settings ? (["settings"] as const) : [])];
+  const onPhone = (p: CoachPane) => (front ?? open[open.length - 1]) === p;
+  const layout = coachLayout(sizes, open, view);
   const resize = (next: CoachSizes) => {
     setSizes(next);
     try {
@@ -458,12 +464,15 @@ function CoachWindowFor() {
       // Private window: the size lasts for the visit.
     }
   };
-  const edge = (grip: "divider" | "left" | "top") => ({
+  const edge = (grip: CoachPane | "left" | "top") => ({
     start: () => layout,
     // Centred on a wide screen, the window grows both ways from its middle: the top edge follows the pointer at twice dy.
     onDrag: (dx: number, dy: number, from: CoachLayout) =>
-      resize(dragCoach(sizes, pane, from, grip, dx, grip === "top" && window.innerWidth >= 1024 ? dy * 2 : dy)),
-    onReset: () => resize(grip === "top" ? { ...sizes, height: null } : { ...sizes, chat: null, ...(pane ? { [pane]: null } : {}) }),
+      resize(dragCoach(sizes, open, from, grip, dx, grip === "top" && window.innerWidth >= 1024 ? dy * 2 : dy)),
+    onReset: () =>
+      resize(
+        grip === "top" ? { ...sizes, height: null } : grip === "left" ? { ...sizes, chat: null } : { ...sizes, chat: null, [grip]: null },
+      ),
   });
   const about = state.call ? null : deals ? picked : null;
   const aboutFirst = about ? about.customer.split(" ")[0] || about.customer : "";
@@ -554,8 +563,9 @@ function CoachWindowFor() {
             small
               ? undefined
               : ({
-                  width: `min(${layout.pane + layout.chat}px, calc(100vw - 2rem))`,
-                  "--coach-pane": `${layout.pane}px`,
+                  width: `min(${layout.chat + layout.deals + layout.settings}px, calc(100vw - 2rem))`,
+                  "--coach-deals": `${layout.deals}px`,
+                  "--coach-settings": `${layout.settings}px`,
                 } as React.CSSProperties)
           }
           className={clsx("relative flex min-w-0 shrink flex-col overflow-hidden bg-surface", small && "flex-1")}
@@ -576,7 +586,7 @@ function CoachWindowFor() {
               />
             </>
           )}
-          <header className={clsx("flex items-center gap-3 bg-primary text-white", small ? "px-3 py-2" : "px-4 py-3")}>
+          <header className={clsx("flex items-center gap-2 bg-primary text-white sm:gap-3", small ? "px-3 py-2" : "px-3 py-3 sm:px-4")}>
             {small ? (
               <button type="button" onClick={() => setSmall(false)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
                 <CallerAvatar caller={caller} size={30} className="ring-2 ring-white/20" />
@@ -585,14 +595,31 @@ function CoachWindowFor() {
             ) : (
               <>
                 <AvatarEdit editable={mayCoach} onFailed={setFailed} />
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{COACH_COPY.title(name)}</p>
+                {/* On a phone the name alone, so it isn't cut to "Talk …" by the buttons beside it (24 Nov 2026, Martin). */}
+                <div className="min-w-0 flex-1 sm:flex-none">
+                  <p className="truncate font-semibold">
+                    <span className="sm:hidden">{name}</span>
+                    <span className="max-sm:hidden">{COACH_COPY.title(name)}</span>
+                  </p>
                   <p className="truncate text-xs text-white/70">{day ?? "Your phone assistant"}</p>
                 </div>
                 {/* What the window can show and do, together by the title (14 Nov 2026, Martin: kept away from minimise and
                 close, so they aren't taken for window controls). */}
                 <div className="ml-1 flex shrink-0 items-center gap-0.5 rounded-full bg-white/10 p-0.5">
                   {mayCoach && <RingMe caller={caller} />}
+                  <button
+                    type="button"
+                    onClick={() => setCallLog((v) => !v)}
+                    aria-pressed={callLog}
+                    aria-label={callLog ? `Close ${name}'s calls` : `${name}'s calls`}
+                    title={callLog ? "Back to the chat" : `${name}'s calls`}
+                    className={clsx(
+                      "grid size-8 shrink-0 place-items-center rounded-full",
+                      callLog ? "bg-white text-ink" : "hover:bg-white/10",
+                    )}
+                  >
+                    <History className="size-4" aria-hidden />
+                  </button>
                   <button
                     type="button"
                     onClick={() => toggleDeals(!deals)}
@@ -620,7 +647,7 @@ function CoachWindowFor() {
                     <Settings className="size-4" aria-hidden />
                   </button>
                 </div>
-                <span className="flex-1" aria-hidden />
+                <span className="flex-1 max-sm:hidden" aria-hidden />
               </>
             )}
             {/* The window's own controls, alone in the corner. */}
@@ -647,253 +674,284 @@ function CoachWindowFor() {
           </header>
 
           <div className={clsx("flex min-h-0 flex-1", small && "hidden")}>
-            {settings && (
-              <CoachSettings
-                training={training}
-                onTrainingNotes={(next) => {
-                  const was = new Map(notes.map((n) => [n.id, n.text]));
-                  setFresh(new Set(next.filter((n) => was.get(n.id) !== n.text).map((n) => n.id)));
-                  setNotes(next);
-                }}
-                notes={notes}
-                fixed={fixed}
-                fresh={fresh}
-                mayCoach={mayCoach}
-                delivery={delivery}
-                onDelivery={setDelivery}
-                setup={setup}
-                onSetup={setSetup}
-                scripts={scripts}
-                onScripts={setScripts}
-                business={business}
-                loaded={loaded}
-                onNotes={setNotes}
-                onBack={() => toggleSettings(false)}
-              />
-            )}
-            {deals && !settings && <CoachDeals picked={picked} onPick={setPicked} onBack={() => toggleDeals(false)} />}
-            {pane && (
-              <DragEdge
-                label="Drag to resize the two sides"
-                orientation="vertical"
-                className="hidden w-1.5 shrink-0 cursor-col-resize bg-line hover:bg-sun-line/60 active:bg-sun-line sm:block"
-                {...edge("divider")}
-              />
-            )}
-            <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", (settings || deals) && "hidden sm:flex")}>
-              <ContactReach open={reaching} onOpen={setReaching} />
-              {!reaching && !settings && <TrainingStrip t={training} name={name} onReview={() => toggleSettings(true)} />}
-              {landing && !reaching && (
-                <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
-                  <CoachWelcome
-                    caller={caller}
-                    current={currentChatLine(turns)}
-                    past={past}
-                    onOpenChat={(id) => void chats(openCoachChat(id), true)}
-                    onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
-                    onPick={(d) => {
-                      setPicked(d);
-                      toggleDeals(true);
-                    }}
-                    onDeals={() => toggleDeals(true)}
-                    onTalk={() => {
-                      setLanding(false);
-                      setStartNew(false);
-                    }}
-                  />
-                </div>
-              )}
-              {!landing && !reaching && !state.call && (
-                <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLanding(true);
-                      setStartNew(true);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
-                  >
-                    <ChevronLeft className="size-3.5" aria-hidden />
-                    {name}&apos;s day and chats
-                  </button>
-                  {mayCoach && turns.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => void chats(newCoachChat(), true)}
-                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
-                    >
-                      <Plus className="size-3.5" aria-hidden />
-                      New chat
+            <div className={clsx("flex min-w-0 flex-1 flex-col bg-surface", open.length > 0 && "hidden sm:flex")}>
+              {callLog ? (
+                <div className="min-h-0 flex-1 overflow-y-auto bg-canvas">
+                  <div className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-2.5">
+                    <p className="text-[13px] font-semibold text-ink">{name}&apos;s calls</p>
+                    <button type="button" onClick={() => setCallLog(false)} className="tap-area text-[13px] text-ink-2 hover:text-ink">
+                      Back to the chat
                     </button>
+                  </div>
+                  <CallLogPage role={caller.role ?? "sales"} name={name} />
+                </div>
+              ) : (
+                <>
+                  <ContactReach open={reaching} onOpen={setReaching} />
+                  {!reaching && !settings && <TrainingStrip t={training} name={name} onReview={() => toggleSettings(true)} />}
+                  {landing && !reaching && (
+                    <div className="min-h-40 flex-1 overflow-y-auto px-4 py-3">
+                      <CoachWelcome
+                        caller={caller}
+                        current={currentChatLine(turns)}
+                        past={past}
+                        onOpenChat={(id) => void chats(openCoachChat(id), true)}
+                        onForgetChat={mayCoach ? (id) => void chats(forgetCoachChat(id), false) : undefined}
+                        onPick={(d) => {
+                          setPicked(d);
+                          toggleDeals(true);
+                        }}
+                        onDeals={() => toggleDeals(true)}
+                        onTalk={() => {
+                          setLanding(false);
+                          setStartNew(false);
+                        }}
+                      />
+                    </div>
                   )}
-                </div>
-              )}
-              <div ref={list} className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}>
-                {loaded && turns.length === 0 && (
-                  <div className="flex items-start gap-2">
-                    <CallerAvatar caller={caller} size={28} />
-                    <p className="rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{COACH_COPY.hello(name)}</p>
-                  </div>
-                )}
-                {turns.map((t, i) =>
-                  t.role === "you" ? (
-                    <div key={i} className="flex flex-col items-end">
-                      {t.about && (
-                        <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
-                          {/deal$/.test(t.about) ? (
-                            <SquareKanban className="size-3" aria-hidden />
-                          ) : (
-                            <PhoneCall className="size-3" aria-hidden />
-                          )}
-                          {t.about}
-                        </span>
+                  {!landing && !reaching && !state.call && (
+                    <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLanding(true);
+                          setStartNew(true);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                      >
+                        <ChevronLeft className="size-3.5" aria-hidden />
+                        {name}&apos;s day and chats
+                      </button>
+                      {mayCoach && turns.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => void chats(newCoachChat(), true)}
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-1 font-medium text-ink-2 hover:bg-canvas hover:text-ink"
+                        >
+                          <Plus className="size-3.5" aria-hidden />
+                          New chat
+                        </button>
                       )}
-                      <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary px-3 py-2 text-sm leading-snug text-white">
-                        {t.text}
-                      </p>
                     </div>
-                  ) : (
-                    <div key={i} className="flex items-start gap-2">
-                      <CallerAvatar caller={caller} size={28} />
-                      <div className="min-w-0 max-w-[88%] flex-1">
-                        <Beanstalk
-                          packets={packetsOf(t.text)}
-                          shown={reveal?.turn === i ? reveal.shown : Infinity}
-                          label={`${name} says`}
-                        />
-                        {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
-                        {/* A call asked for in the chat, ready to send (22 Nov 2026): only under the latest answer. */}
-                        {t.ring && i === turns.length - 1 && (reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && (
-                          <RingCard
-                            key={t.at}
-                            ring={t.ring}
-                            book={book}
-                            picked={tapped}
-                            agent={(caller.role ?? "sales") as CallerKey}
-                            agentName={name}
-                          />
-                        )}
+                  )}
+                  <div
+                    ref={list}
+                    className={clsx("min-h-40 flex-1 space-y-3 overflow-y-auto px-4 py-3", (reaching || landing) && "hidden")}
+                  >
+                    {loaded && turns.length === 0 && (
+                      <div className="flex items-start gap-2">
+                        <CallerAvatar caller={caller} size={28} />
+                        <p className="rounded-2xl bg-surface-2 px-3 py-2 text-sm leading-snug text-ink">{COACH_COPY.hello(name)}</p>
                       </div>
-                    </div>
-                  ),
-                )}
-                {sending && (
-                  <div className="flex items-center gap-2 text-xs text-muted">
-                    <CallerAvatar caller={caller} size={28} />
-                    <span className="animate-pulse">{name} is thinking about it…</span>
+                    )}
+                    {turns.map((t, i) =>
+                      t.role === "you" ? (
+                        <div key={i} className="flex flex-col items-end">
+                          {t.about && (
+                            <span className="mb-0.5 inline-flex items-center gap-1 text-[11px] text-muted">
+                              {/deal$/.test(t.about) ? (
+                                <SquareKanban className="size-3" aria-hidden />
+                              ) : (
+                                <PhoneCall className="size-3" aria-hidden />
+                              )}
+                              {t.about}
+                            </span>
+                          )}
+                          <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-primary px-3 py-2 text-sm leading-snug text-white">
+                            {t.text}
+                          </p>
+                        </div>
+                      ) : (
+                        <div key={i} className="flex items-start gap-2">
+                          <CallerAvatar caller={caller} size={28} />
+                          <div className="min-w-0 max-w-[88%] flex-1">
+                            <Beanstalk
+                              packets={packetsOf(t.text)}
+                              shown={reveal?.turn === i ? reveal.shown : Infinity}
+                              label={`${name} says`}
+                            />
+                            {(reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && <Changes changes={t.changes} />}
+                            {/* A call asked for in the chat, ready to send (22 Nov 2026): only under the latest answer. */}
+                            {t.ring && i === turns.length - 1 && (reveal?.turn !== i || reveal.shown >= packetsOf(t.text).length) && (
+                              <RingCard
+                                key={t.at}
+                                ring={t.ring}
+                                book={book}
+                                picked={tapped}
+                                agent={(caller.role ?? "sales") as CallerKey}
+                                agentName={name}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ),
+                    )}
+                    {sending && (
+                      <div className="flex items-center gap-2 text-xs text-muted">
+                        <CallerAvatar caller={caller} size={28} />
+                        <span className="animate-pulse">{name} is thinking about it…</span>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
-                {state.call && (
-                  <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                    <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
-                    About {state.call.about.replace(/^A /, "a ")}
-                    <button
-                      type="button"
-                      onClick={clearCoachCall}
-                      className="ml-auto text-muted hover:text-ink"
-                      aria-label="Not about this call"
-                    >
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  </p>
-                )}
-                {about && (
-                  <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
-                    <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
-                    About {aboutFirst}&apos;s deal
-                    <button
-                      type="button"
-                      onClick={() => setPicked(null)}
-                      className="ml-auto text-muted hover:text-ink"
-                      aria-label="Not about this deal"
-                    >
-                      <X className="size-3.5" aria-hidden />
-                    </button>
-                  </p>
-                )}
-                {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
-                {mayCoach && (
-                  <NameHints
-                    book={book}
-                    span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
-                    onPick={(full, id) => {
-                      if (!nameSpan) return;
-                      const next = withName(text, nameSpan, full);
-                      tapped.set(full, id);
-                      setText(next.text);
-                      setNameSpan(null);
-                      requestAnimationFrame(() => {
-                        box.current?.focus();
-                        box.current?.setSelectionRange(next.caret, next.caret);
-                      });
-                    }}
-                    onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
-                  />
-                )}
-                {mayCoach ? (
-                  <div className="flex items-end gap-2">
-                    {/* The microphone sits inside the box, as in Sol's. */}
-                    <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
-                      <DictateButton
-                        label={`Speak to ${name}`}
-                        onHearing={setHeard}
-                        onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
-                      />
-                      <textarea
-                        ref={box}
-                        value={heard ? withSpoken(text, heard) : text}
-                        onChange={(e) => {
-                          setHeard("");
-                          setText(e.target.value);
-                          const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
-                          setNameSpan(span);
-                          if (!span) setNameDismissed(null);
+                  <div className={clsx("border-t border-line p-3", reaching && "hidden")}>
+                    {state.call && (
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                        <PhoneCall className="size-3.5 text-sun-line" aria-hidden />
+                        About {state.call.about.replace(/^A /, "a ")}
+                        <button
+                          type="button"
+                          onClick={clearCoachCall}
+                          className="ml-auto text-muted hover:text-ink"
+                          aria-label="Not about this call"
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      </p>
+                    )}
+                    {about && (
+                      <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-2">
+                        <SquareKanban className="size-3.5 text-sun-line" aria-hidden />
+                        About {aboutFirst}&apos;s deal
+                        <button
+                          type="button"
+                          onClick={() => setPicked(null)}
+                          className="ml-auto text-muted hover:text-ink"
+                          aria-label="Not about this deal"
+                        >
+                          <X className="size-3.5" aria-hidden />
+                        </button>
+                      </p>
+                    )}
+                    {failed && <p className="mb-2 text-xs text-danger">{failed}</p>}
+                    {mayCoach && (
+                      <NameHints
+                        book={book}
+                        span={nameSpan && nameSpan.start !== nameDismissed ? nameSpan : null}
+                        onPick={(full, id) => {
+                          if (!nameSpan) return;
+                          const next = withName(text, nameSpan, full);
+                          tapped.set(full, id);
+                          setText(next.text);
+                          setNameSpan(null);
+                          requestAnimationFrame(() => {
+                            box.current?.focus();
+                            box.current?.setSelectionRange(next.caret, next.caret);
+                          });
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
-                            e.stopPropagation();
-                            setNameDismissed(nameSpan.start);
-                            return;
-                          }
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            void send();
-                          }
-                        }}
-                        rows={2}
-                        maxLength={2000}
-                        placeholder={
-                          state.call
-                            ? COACH_COPY.callAbout(name)
-                            : about
-                              ? `Ask ${name} about ${aboutFirst}…`
-                              : landing && turns.length > 0
-                                ? `Start a new chat with ${name}…`
-                                : `Ask ${name} anything, or to ring someone…`
-                        }
-                        className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+                        onDismiss={() => setNameDismissed(nameSpan?.start ?? null)}
                       />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void send()}
-                      disabled={!text.trim() || sending}
-                      aria-label="Send"
-                      className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
-                    >
-                      <ArrowUp className="size-4" aria-hidden />
-                    </button>
+                    )}
+                    {mayCoach ? (
+                      <div className="flex items-end gap-2">
+                        {/* The microphone sits inside the box, as in Sol's. */}
+                        <div className="flex min-h-11 min-w-0 flex-1 items-end gap-1 rounded-2xl bg-canvas py-1 pl-1.5 pr-1 ring-1 ring-line focus-within:ring-sun-line">
+                          <DictateButton
+                            label={`Speak to ${name}`}
+                            onHearing={setHeard}
+                            onWords={(w) => setText((was) => withSpoken(was, w).slice(0, 2000))}
+                          />
+                          <textarea
+                            ref={box}
+                            value={heard ? withSpoken(text, heard) : text}
+                            onChange={(e) => {
+                              setHeard("");
+                              setText(e.target.value);
+                              const span = nameAt(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                              setNameSpan(span);
+                              if (!span) setNameDismissed(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape" && nameSpan && nameSpan.start !== nameDismissed) {
+                                e.stopPropagation();
+                                setNameDismissed(nameSpan.start);
+                                return;
+                              }
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                void send();
+                              }
+                            }}
+                            rows={2}
+                            maxLength={2000}
+                            placeholder={
+                              state.call
+                                ? COACH_COPY.callAbout(name)
+                                : about
+                                  ? `Ask ${name} about ${aboutFirst}…`
+                                  : landing && turns.length > 0
+                                    ? `Start a new chat with ${name}…`
+                                    : `Ask ${name} anything, or to ring someone…`
+                            }
+                            className="min-w-0 flex-1 resize-none bg-transparent px-1.5 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void send()}
+                          disabled={!text.trim() || sending}
+                          aria-label="Send"
+                          className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white disabled:bg-surface-2 disabled:text-muted"
+                        >
+                          <ArrowUp className="size-4" aria-hidden />
+                        </button>
+                      </div>
+                    ) : (
+                      loaded && (
+                        <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
+                      )
+                    )}
                   </div>
-                ) : (
-                  loaded && (
-                    <p className="text-xs text-muted">{`Only an admin can coach ${name}. You can read ${name}'s script in settings.`}</p>
-                  )
-                )}
-              </div>
+                </>
+              )}
             </div>
+            {deals && (
+              <>
+                <DragEdge
+                  label="Drag to resize the chat and the deals"
+                  orientation="vertical"
+                  className="hidden w-1.5 shrink-0 cursor-col-resize bg-line hover:bg-sun-line/60 active:bg-sun-line sm:block"
+                  {...edge("deals")}
+                />
+                <div className={clsx("min-w-0 sm:flex", onPhone("deals") ? "flex w-full sm:w-auto" : "hidden")}>
+                  <CoachDeals picked={picked} onPick={setPicked} onBack={() => toggleDeals(false)} />
+                </div>
+              </>
+            )}
+            {settings && (
+              <>
+                <DragEdge
+                  label="Drag to resize the panels"
+                  orientation="vertical"
+                  className="hidden w-1.5 shrink-0 cursor-col-resize bg-line hover:bg-sun-line/60 active:bg-sun-line sm:block"
+                  {...edge("settings")}
+                />
+                <div className={clsx("min-w-0 sm:flex", onPhone("settings") ? "flex w-full sm:w-auto" : "hidden")}>
+                  <CoachSettings
+                    training={training}
+                    onTrainingNotes={(next) => {
+                      const was = new Map(notes.map((n) => [n.id, n.text]));
+                      setFresh(new Set(next.filter((n) => was.get(n.id) !== n.text).map((n) => n.id)));
+                      setNotes(next);
+                    }}
+                    notes={notes}
+                    fixed={fixed}
+                    fresh={fresh}
+                    mayCoach={mayCoach}
+                    delivery={delivery}
+                    onDelivery={setDelivery}
+                    setup={setup}
+                    onSetup={setSetup}
+                    scripts={scripts}
+                    onScripts={setScripts}
+                    business={business}
+                    loaded={loaded}
+                    onNotes={setNotes}
+                    onBack={() => toggleSettings(false)}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </section>
       </div>
@@ -958,7 +1016,10 @@ function CoachSettings(props: {
     </button>
   );
   return (
-    <aside aria-label={`${name}'s settings`} className="flex w-full shrink-0 flex-col overflow-y-auto bg-canvas sm:w-[var(--coach-pane)]">
+    <aside
+      aria-label={`${name}'s settings`}
+      className="flex w-full shrink-0 flex-col overflow-y-auto bg-canvas sm:w-[var(--coach-settings)]"
+    >
       <button
         type="button"
         onClick={props.onBack}
@@ -1076,8 +1137,15 @@ function CoachSettings(props: {
                 </p>
                 <p className="mt-0.5 text-xs text-muted">{COACH_COPY.lockedNote(name)}</p>
                 <div className="mt-1.5 space-y-1 border-l-2 border-sun-line pl-2">
-                  {locked.map((n) => (
-                    <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
+                  {locked.map((n, i) => (
+                    <NoteRow
+                      key={n.id}
+                      n={i + 1}
+                      note={n}
+                      editable={props.mayCoach}
+                      fresh={props.fresh.has(n.id)}
+                      onNotes={props.onNotes}
+                    />
                   ))}
                 </div>
               </div>
@@ -1087,13 +1155,16 @@ function CoachSettings(props: {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                   {COACH_COPY.notesTitle} · {loose.length}
                 </p>
-                <div className="mt-1.5 space-y-1 border-l-2 border-line pl-2">
-                  {loose.map((n) => (
-                    <NoteRow key={n.id} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
+                <ol className="mt-1.5 space-y-0.5">
+                  {loose.map((n, i) => (
+                    <li key={n.id}>
+                      <NoteRow n={i + 1} note={n} editable={props.mayCoach} fresh={props.fresh.has(n.id)} onNotes={props.onNotes} />
+                    </li>
                   ))}
-                </div>
+                </ol>
               </div>
             )}
+            {props.mayCoach && <AddScriptLine onNotes={props.onNotes} />}
           </div>
           {props.fixed.length > 0 && (
             <div className="border-t border-line bg-canvas/60">
@@ -1297,12 +1368,58 @@ function Changes({ changes }: { changes?: CoachTurn["changes"] }) {
   );
 }
 
+/** A line typed straight into the script, kept as written (Enter adds it; several lines add several). */
+function AddScriptLine({ onNotes }: { onNotes: (n: CoachNote[]) => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const add = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    setSaid(null);
+    const res = await addScriptLines(text);
+    setBusy(false);
+    if (!res.ok) return setSaid(res.message);
+    onNotes(res.notes);
+    setText("");
+  };
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 rounded-lg bg-canvas px-2 py-1 ring-1 ring-line focus-within:ring-sun-line">
+        <Plus className="size-3.5 shrink-0 text-muted" aria-hidden />
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), void add())}
+          maxLength={240}
+          placeholder={COACH_COPY.addLine}
+          aria-label={COACH_COPY.addLine}
+          className="min-w-0 flex-1 bg-transparent py-0.5 text-[13px] text-ink placeholder:text-muted focus:outline-none"
+        />
+        {text.trim() && (
+          <button
+            type="button"
+            onClick={() => void add()}
+            disabled={busy}
+            className="shrink-0 text-xs font-semibold text-ink hover:text-sun-line"
+          >
+            Add
+          </button>
+        )}
+      </div>
+      {said && <p className="mt-1 text-xs text-danger">{said}</p>}
+    </div>
+  );
+}
+
 function NoteRow({
+  n,
   note,
   editable,
   fresh = false,
   onNotes,
 }: {
+  n?: number;
   note: CoachNote;
   editable: boolean;
   fresh?: boolean;
@@ -1359,11 +1476,11 @@ function NoteRow({
         fresh && "bg-sun ring-1 ring-sun-line/40",
       )}
     >
-      {note.locked ? (
-        <Lock className="mt-1 size-3 shrink-0 text-sun-line" aria-hidden />
-      ) : (
-        <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-sun-line" aria-hidden />
-      )}
+      {/* Numbered as a script reads (26 Nov 2026, Martin: "notes feels less like a script"). */}
+      <span className="mt-px w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted" aria-hidden>
+        {n ? String(n).padStart(2, "0") : ""}
+      </span>
+      {note.locked && <Lock className="mt-1 size-3 shrink-0 text-sun-line" aria-hidden />}
       <span className="flex-1">
         {note.text}
         {said && <span className="block text-xs text-warning">{said}</span>}
@@ -1381,7 +1498,7 @@ function NoteRow({
           >
             {note.locked ? <LockOpen className="size-3.5" aria-hidden /> : <Lock className="size-3.5" aria-hidden />}
           </button>
-          <button type="button" onClick={() => setEditing(true)} aria-label="Reword this note" className="text-muted hover:text-ink">
+          <button type="button" onClick={() => setEditing(true)} aria-label="Reword this line" className="text-muted hover:text-ink">
             <Pencil className="size-3.5" aria-hidden />
           </button>
           <button

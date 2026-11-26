@@ -52,8 +52,8 @@ export const sharedBasis = (model: string, fileName: string, on: string, uncheck
  * The sheets shared with a business: other businesses' sheets for the products it has none of its own for, one a
  * product (`codeKey`), the first given winning (the repo gives checked ones first, then the newest).
  */
-export function sharedFor<T extends { kind: SheetKind; sku: string }>(
-  own: readonly { kind: SheetKind; sku: string }[],
+export function sharedFor<T extends { kind: string; sku: string }>(
+  own: readonly { kind: string; sku: string }[],
   others: readonly T[],
 ): T[] {
   const taken = new Set(own.map((s) => `${s.kind}:${codeKey(s.sku)}`));

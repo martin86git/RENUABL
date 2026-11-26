@@ -18,7 +18,7 @@ import { roleOfKey, SALES_KEYS, type CallerKey } from "@/lib/domain/install-call
 import { cleanCoachChats, type CoachChat } from "@/lib/domain/design/coach-threads";
 import { cleanNotes, cleanTurns, scriptLines, type CoachNote, type CoachTurn } from "@/lib/domain/design/coaching";
 import { cleanDelivery, defaultDelivery, type Delivery } from "@/lib/domain/design/delivery";
-import { DEFAULT_CALL_SETUP, cleanCallSetup, type CallAudience, type CallSetup } from "@/lib/domain/design/call-setup";
+import { DEFAULT_CALL_SETUP, cleanCallSetup, type CallAudience, type CallSetup, type CallObjective } from "@/lib/domain/design/call-setup";
 import { cleanScripts, liveName, type LiveScript, type SavedScript } from "@/lib/domain/design/call-scripts";
 import { dbConfigured, query } from "./db";
 
@@ -272,6 +272,7 @@ export async function scriptFor(
   assistantSaid: string | null;
   audience: CallAudience;
   reason: string | null;
+  objective: CallObjective;
   houseStyle: string[];
 }> {
   const [c, delivery, setup, prefs] = await Promise.all([
@@ -289,6 +290,7 @@ export async function scriptFor(
     assistantSaid: setup.saidAs || null,
     audience: setup.audience,
     reason: setup.reason || null,
+    objective: setup.objective ?? "none",
     houseStyle: callVoice(prefs.business, prefs.owner),
   };
 }

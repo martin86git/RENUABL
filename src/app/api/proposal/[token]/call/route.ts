@@ -1,6 +1,7 @@
 import { proposalJob } from "@/lib/server/design-proposal-repo";
 import { answer } from "@/lib/server/design-context";
 import { allow } from "@/lib/server/rate-limit";
+import { askTimes, askedWindow, mayCallNow } from "@/lib/domain/voice-agent";
 import { askedCallOf, cancelAskedCall, queueCall, ringAskedCallNow } from "@/lib/server/voice-calls";
 
 const PRIVATE = { "cache-control": "private, no-store", "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer" };
@@ -18,7 +19,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
     const { token } = await ctx.params;
     const found = await proposalJob(token);
     if (!found || found.withdrawn) return notFound();
+    // Now, or a time they picked from those offered (`askTimes`): only one offered right now is taken.
+    const body = (await request.json().catch(() => ({}))) as { at?: unknown };
+    const at = body.at === undefined || body.at === "now" ? undefined : askedWindow(body.at, new Date());
+    if (at === null)
+      return Response.json({ ok: false, message: "That time isn't available any more. Pick another." }, { status: 422, headers: PRIVATE });
     const r = await queueCall({
+      at,
       businessId: found.businessId,
       jobId: found.jobId,
       mode: "proposal",
@@ -49,7 +56,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/proposal/[t
     const found = await proposalJob(token);
     if (!found || found.withdrawn) return notFound();
     const waiting = await askedCallOf(found.businessId, found.jobId);
-    return Response.json({ ok: true, when: waiting?.when ?? null }, { headers: PRIVATE });
+    const now = new Date();
+    return Response.json({ ok: true, when: waiting?.when ?? null, times: askTimes(now), nowOpen: mayCallNow(now) }, { headers: PRIVATE });
   });
 }
 

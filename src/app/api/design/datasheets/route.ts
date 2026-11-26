@@ -1,4 +1,5 @@
 import { checkInverter, checkPanel, cleanSku, sheetBasis, type SheetKind } from "@/lib/domain/design/datasheets";
+import { listProductFiles } from "@/lib/server/design-datasheets-repo";
 import { todayInMarket } from "@/lib/domain/market";
 import { answer, readBody, requireMember } from "@/lib/server/design-context";
 import {
@@ -9,13 +10,16 @@ import {
   listSheets,
   saveSheet,
 } from "@/lib/server/design-datasheets-repo";
-import { findDatasheet } from "@/lib/server/datasheet-finder";
+import { findDatasheet, findQuotedSheets } from "@/lib/server/datasheet-finder";
+import { isDocKind, type DocKind } from "@/lib/domain/design/proposal-datasheets";
 import { allow } from "@/lib/server/rate-limit";
 
 /** Finding a datasheet online (a search, a download, a read) can take a couple of minutes, after the answer too. */
 export const maxDuration = 300;
 
 const kindOf = (v: unknown): SheetKind | null => (v === "panel" || v === "inverter" ? v : null);
+/** Any kind of datasheet, files alone included (batteries, EV chargers). */
+const docKindOf = (v: unknown): DocKind | null => (isDocKind(v) ? v : null);
 const text = (v: unknown, max: number) =>
   typeof v === "string"
     ? v
@@ -32,8 +36,12 @@ export async function GET() {
   return answer(async () => {
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
-    const [sheets, datasheets] = await Promise.all([listSheets(who.member.businessId), businessDatasheets(who.member.businessId)]);
-    return Response.json({ ok: true, sheets, datasheets });
+    const [sheets, datasheets, files] = await Promise.all([
+      listSheets(who.member.businessId),
+      businessDatasheets(who.member.businessId),
+      listProductFiles(who.member.businessId),
+    ]);
+    return Response.json({ ok: true, sheets, datasheets, files });
   });
 }
 
@@ -75,9 +83,25 @@ export async function PUT(request: Request) {
  */
 export async function POST(request: Request) {
   return answer(async () => {
-    const read = await readBody(request, 2_000);
+    const read = await readBody(request, 8_000);
     if ("refuse" in read) return read.refuse;
-    const kind = kindOf(read.body.kind);
+    if (read.body.do === "find-quoted") {
+      // A proposal's quoted products with no sheet on hand, looked for online now (26 Nov 2026), up to six.
+      const who = await requireMember("design");
+      if ("refuse" in who) return who.refuse;
+      if (!allow(request, "datasheet-find", 30))
+        return Response.json({ ok: false, message: "Try again in a little while." }, { status: 429 });
+      const raw = Array.isArray(read.body.products) ? (read.body.products as unknown[]).slice(0, 12) : [];
+      const products = raw.flatMap((r) => {
+        const o = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
+        const k = docKindOf(o.kind);
+        const code = cleanSku(o.sku);
+        return k && code ? [{ kind: k, sku: code, name: text(o.name, 160) || code }] : [];
+      });
+      const found = await findQuotedSheets(who.member.businessId, products, 6);
+      return Response.json({ ok: true, found });
+    }
+    const kind = docKindOf(read.body.kind);
     const sku = cleanSku(read.body.sku);
     if (!kind || !sku) return Response.json({ ok: false, message: "Which product?" }, { status: 422 });
     if (read.body.do === "confirm") {
@@ -89,9 +113,13 @@ export async function POST(request: Request) {
         !(await adoptSharedSheet(who.member.businessId, kind, sku, who.member.email))
       )
         return Response.json({ ok: false, message: "There are no figures waiting to be checked for that product." }, { status: 404 });
-      return Response.json({ ok: true, sheets: await listSheets(who.member.businessId) });
+      return Response.json({
+        ok: true,
+        sheets: await listSheets(who.member.businessId),
+        files: await listProductFiles(who.member.businessId),
+      });
     }
-    if (read.body.do !== "find") return Response.json({ ok: false }, { status: 400 });
+    if (read.body.do !== "find" || (kind !== "panel" && kind !== "inverter")) return Response.json({ ok: false }, { status: 400 });
     const who = await requireMember("design");
     if ("refuse" in who) return who.refuse;
     if (!allow(request, "datasheet-find", 30))
@@ -119,10 +147,14 @@ export async function DELETE(request: Request) {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
     const q = new URL(request.url).searchParams;
-    const kind = kindOf(q.get("kind"));
+    const kind = docKindOf(q.get("kind"));
     const sku = cleanSku(q.get("sku"));
     if (!kind || !sku || !(await deleteSheet(who.member.businessId, kind, sku)))
       return Response.json({ ok: false, message: "That datasheet isn't here." }, { status: 404 });
-    return Response.json({ ok: true, sheets: await listSheets(who.member.businessId) });
+    return Response.json({
+      ok: true,
+      sheets: await listSheets(who.member.businessId),
+      files: await listProductFiles(who.member.businessId),
+    });
   });
 }

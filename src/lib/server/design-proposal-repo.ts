@@ -50,6 +50,17 @@ import {
 import { cleanExtras, defaultBill, postcodeIn, type DesignExtras } from "@/lib/domain/design/quote";
 import { cleanDesignSet, type DesignSet } from "@/lib/domain/design/roof-design";
 import type { ISODate } from "@/lib/domain/types";
+import { codeKey } from "@/lib/domain/design/datasheets";
+import {
+  customerDatasheets,
+  isDatasheetId,
+  productForId,
+  quotedProducts,
+  type ProductSheetStanding,
+  type ProposalDatasheet,
+  type QuotedProduct,
+} from "@/lib/domain/design/proposal-datasheets";
+import { sheetFileByKey, sheetsOnHand } from "./design-datasheets-repo";
 import { newId, query, transaction } from "./db";
 import { jobById, joinNearbyDesign, record, stageNamesIn, type Q } from "./design-crm-repo";
 import { connectOf, paymentsOn } from "./design-connect-repo";
@@ -388,6 +399,8 @@ export interface PublicProposal {
   deposit: PublicDeposit | null;
   /** What the accepted proposal asks to be paid, in order, what is paid, and whether the next can be paid by card here. */
   payments: PublicPayments | null;
+  /** The datasheets for the products it quotes that are on hand (26 Nov 2026): an id, a kind and a name, never a code. */
+  datasheets: ProposalDatasheet[];
 }
 
 /** The amounts due on an accepted version, what of them is paid (by card here, or the deposit marked received). */
@@ -444,7 +457,54 @@ export async function publicProposal(token: string, today: ISODate): Promise<Pub
     accepted: row.acceptedAt && row.acceptedName ? { name: row.acceptedName, at: row.acceptedAt, option: row.acceptedOption } : null,
     deposit: state === "accepted" ? publicDeposit(depositOn(row)) : null,
     payments: state === "accepted" ? await paymentsOf(row) : null,
+    datasheets: state === "withdrawn" ? [] : await datasheetsOf(row).catch(() => []),
   };
+}
+
+/** The products a version behind a link quotes, read from the business's side here and never sent. */
+async function productsBehind(row: Found): Promise<QuotedProduct[]> {
+  const rows = await query<{ internal: ProposalInternal }>(
+    `select internal from design_proposal_versions where business_id = $1 and id = $2`,
+    [row.businessId, row.versionId],
+  );
+  return rows[0] ? quotedProducts(rows[0].internal, row.acceptedAt ? row.acceptedOption : null) : [];
+}
+
+/** The sheets on hand for what a version quotes, as its customer is sent them. */
+async function datasheetsOf(row: Found): Promise<ProposalDatasheet[]> {
+  const products = await productsBehind(row);
+  const onHand = await sheetsOnHand(row.businessId, products);
+  return customerDatasheets(products, (p) => onHand.has(`${p.kind}:${codeKey(p.sku)}`));
+}
+
+/** One of those sheets, by the id its customer's page was sent: only for a product that version quotes, and none once withdrawn. */
+export async function publicDatasheet(token: string, id: string): Promise<{ fileName: string; type: string; bytes: Buffer } | null> {
+  if (!isDatasheetId(id)) return null;
+  const row = await behind(query, token);
+  if (!row || row.withdrawn) return null;
+  const product = productForId(await productsBehind(row), id);
+  return product ? sheetFileByKey(row.businessId, product.kind, product.sku) : null;
+}
+
+/** The quoted products of a job's newest published version and whether each one's sheet is on hand, for its business. */
+export async function proposalSheetStanding(businessId: string, jobId: string): Promise<ProductSheetStanding[] | null> {
+  const rows = await query<{ internal: ProposalInternal; acceptedOption: OptionKey | null; acceptedAt: string | null }>(
+    `select v.internal, v.accepted_option as "acceptedOption", v.accepted_at as "acceptedAt"
+       from design_proposals p join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
+      where p.business_id = $1 and p.job_id = $2 order by v.version desc limit 1`,
+    [businessId, jobId],
+  );
+  if (!rows[0]) return null;
+  return standingOf(businessId, quotedProducts(rows[0].internal, rows[0].acceptedAt ? rows[0].acceptedOption : null));
+}
+
+/** Whether each product's sheet is on hand for a business, and whether it is still to check. */
+export async function standingOf(businessId: string, products: readonly QuotedProduct[]): Promise<ProductSheetStanding[]> {
+  const onHand = await sheetsOnHand(businessId, products);
+  return products.map((p) => {
+    const got = onHand.get(`${p.kind}:${codeKey(p.sku)}`);
+    return { kind: p.kind, sku: p.sku, name: p.name, hasFile: Boolean(got), unchecked: Boolean(got?.unchecked) };
+  });
 }
 
 /**

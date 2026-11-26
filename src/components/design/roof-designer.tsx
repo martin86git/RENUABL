@@ -93,7 +93,6 @@ import {
   Trash2,
   X,
   ChevronDown,
-  GripHorizontal,
   Ellipsis,
   Move,
   Settings2,
@@ -159,15 +158,17 @@ import { autoStringDesign } from "@/lib/domain/design/auto-string";
 import { batteryFits, suggestBatteries } from "@/lib/domain/design/battery-suggest";
 import { TILT, bestTilt, compass, gainOverFlat } from "@/lib/domain/design/tilt";
 import { applySettle, settleToEdges, type RoofEdge } from "@/lib/domain/design/edge-gravity";
-import { pivotDrag, type PivotState } from "@/lib/domain/design/array-pivot";
+import { pivotDrag, TOUCH_PIVOT, type PivotState } from "@/lib/domain/design/array-pivot";
 import { arrayFrame, growArray, growCount, growHandles, type ArrayFrame, type GrowSide } from "@/lib/domain/design/array-grow";
 import { billFieldsFromPhoto, billWith, dailyFromBillFields, usageFromAmount, type BillPhotoRead } from "@/lib/domain/design/design-bill";
 import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, type KwSize } from "@/lib/domain/design/quick-size";
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
+import { hitRun, labelAt, msbRuns, runWords, RUN_NOTE } from "@/lib/domain/design/msb-run";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { lightOf, readiness, readinessLight, shadeLight, type CheckLight, type ReadinessItem } from "@/lib/domain/design/readiness";
+import { designGreeting, type ProposalGlance } from "@/lib/domain/design/design-greeting";
 import {
   faces as facesWay,
   parseCommand,
@@ -1197,6 +1198,8 @@ export function RoofDesigner(props: {
   onOpenDeal?: () => void;
   /** Where this roof's proposal is, once there is one. */
   proposalHref?: string | null;
+  /** Where the deal's proposal stands, for the greeting on the dock: undefined while it loads, null with none or no deal. */
+  proposalGlance?: ProposalGlance | null;
   /**
    * The person may not see costs (the owner's setting, enforced on the server, which sends them no costs at all):
    * no quote and no price are shown, and no price is handed on when saving.
@@ -1373,6 +1376,8 @@ export function RoofDesigner(props: {
   const [ruling, setRuling] = useState<{ a: Point; b: Point } | null>(null);
   // The inverters on this design: one, or more on a larger system.
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
+  // How far each placed inverter is from the switchboard, in a straight line from above (26 Nov 2026, Martin).
+  const runs = msbRuns(fitted, msb);
   // Whether the inverter list is showing its suggestions for the panels on the design.
   const [suggesting, setSuggesting] = useState(false);
   // A three-phase inverter picked for a single-phase home (21 Nov 2026, Martin: warn, never let it on blindly): held here
@@ -2038,7 +2043,7 @@ export function RoofDesigner(props: {
     | { mode: "band"; at: Point; face: string | null; add: boolean; moved: boolean }
     | { mode: "pan"; x: number; y: number; from: typeof WHOLE }
     | { mode: "turn"; id: string; centre: Point }
-    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null }
+    | { mode: "array"; anchor: LoosePanel; free?: boolean; pivot?: PivotState | null; touch?: boolean; replaces?: string }
     | {
         mode: "grow";
         side: GrowSide;
@@ -2055,6 +2060,7 @@ export function RoofDesigner(props: {
     | { mode: "wire"; id: string; first: string; had: boolean; dragged: boolean }
     | { mode: "battery"; dx: number; dy: number }
     | { mode: "msb"; dx: number; dy: number }
+    | { mode: "bend"; n: number; bend: number }
     | { mode: "charger"; dx: number; dy: number }
     | { mode: "inverter"; n: number; dx: number; dy: number }
     | { mode: "erase"; faceGone?: boolean }
@@ -3340,6 +3346,34 @@ export function RoofDesigner(props: {
     }
     // A press anywhere else puts down the kit picked; pressing kit picks it (its bar shows over it) as well as dragging it.
     setKitPick(null);
+    if (tool === "select" && runs.length) {
+      // The gold line to the switchboard (26 Nov 2026, Martin: "pull the gold line to change its route"): a press on
+      // it puts a bend in there and drags it; a press on a bend drags it; a double click on a bend takes it away.
+      const reach = 7 * u * scale;
+      for (const run of runs) {
+        const hit = hitRun(run, p, reach);
+        if (!hit) continue;
+        const route = fitted[run.index]?.route ?? [];
+        if (hit.kind === "bend" && e.detail >= 2) {
+          setFitted((list) =>
+            list.map((spec, i) => (i === run.index ? { ...spec, route: (spec.route ?? []).filter((_, k) => k !== hit.bend) } : spec)),
+          );
+          changed();
+          return;
+        }
+        svg.current?.setPointerCapture(e.pointerId);
+        setPicks([]);
+        setKitPick(run.index);
+        const bend = hit.kind === "bend" ? hit.bend : hit.insertAt;
+        if (hit.kind === "line") {
+          const next = [...route.slice(0, bend), { x: cm(p.x), y: cm(p.y) }, ...route.slice(bend)];
+          setFitted((list) => list.map((spec, i) => (i === run.index ? { ...spec, route: next } : spec)));
+          changed();
+        }
+        press.current = { mode: "bend", n: run.index, bend };
+        return;
+      }
+    }
     if (tool === "select" && msb && msbAt(p)) {
       // The main switchboard: press it and drag it to the wall it is on.
       svg.current?.setPointerCapture(e.pointerId);
@@ -3444,6 +3478,29 @@ export function RoofDesigner(props: {
     }
     // Adding panels, a press on a panel that is there is the arrow's: it picks the panel and drags it, as Select would.
     const onOne = tool === "panel" ? hitAt(p) : null;
+    // With a finger, a panel standing on its own is the start of a row (25 Nov 2026, Martin, from his iPhone: it "isn't
+    // allowing to pivot as you add panels like in desktop"): with no hover there is no outline to press, so a panel is
+    // tapped down first and the row dragged out of it after; that drag pivots and adds as one from the open does. It is
+    // taken up and laid again with the row, so off any string it was on it must not be.
+    const loneByFinger =
+      e.pointerType === "touch" && onOne && !onOne.empty && onOne.pick.kind === "loose" && !arrayOf(onOne.pick)
+        ? loose.find((x) => onOne.pick.kind === "loose" && x.id === onOne.pick.id && !strings.some((st) => st.panels.includes(`l:${x.id}`)))
+        : undefined;
+    if (tool === "panel" && loneByFinger) {
+      svg.current?.setPointerCapture(e.pointerId);
+      setLoose(loose.filter((x) => x.id !== loneByFinger.id));
+      setPicks([]);
+      press.current = {
+        mode: "array",
+        anchor: { ...loneByFinger, id: "ghost" },
+        free: true,
+        pivot: null,
+        touch: true,
+        replaces: loneByFinger.id,
+      };
+      setLaying(true);
+      return setGhosts([{ ...loneByFinger, id: "ghost" }]);
+    }
     if (tool === "panel" && !(onOne && !onOne.empty && onOne.pick.kind !== "label")) {
       // The press starts where the outline was: beside the panel under the pointer, or under the pointer itself. Letting go
       // places it; dragging first pulls it out into a row, and up or down into more rows (see `arrayFrom`).
@@ -3453,7 +3510,7 @@ export function RoofDesigner(props: {
       // Put down in the open (not beside a panel), pulled sideways it adds panels and pulled any other way it pivots
       // (`pivotDrag`); on a traced face it starts out facing the way the face runs. Beside a panel it only adds.
       const free = shown.x === p.x && shown.y === p.y;
-      press.current = { mode: "array", anchor: shown, free, pivot: null };
+      press.current = { mode: "array", anchor: shown, free, pivot: null, touch: e.pointerType === "touch" };
       setLaying(true);
       return setGhosts([shown]);
     }
@@ -3616,7 +3673,14 @@ export function RoofDesigner(props: {
       let anchor = held.anchor;
       if (held.free) {
         // Pulled sideways, the way the panel faces, it adds panels as it lies; pulled any other way it pivots to the pointer.
-        const turned = pivotDrag(anchor, p, planSize(anchor, size).w + size.gap, held.pivot ?? null, e.altKey ? [] : squareAngles);
+        const turned = pivotDrag(
+          anchor,
+          p,
+          planSize(anchor, size).w + size.gap,
+          held.pivot ?? null,
+          e.altKey ? [] : squareAngles,
+          held.touch ? TOUCH_PIVOT : undefined,
+        );
         held.pivot = turned.state;
         anchor = { ...anchor, angle: turned.angle };
       }
@@ -3634,6 +3698,16 @@ export function RoofDesigner(props: {
       if (!p) return;
       if (Math.hypot(p.x - held.from.x, p.y - held.from.y) >= 4 * u * scale) held.dragged = true;
       return growTo(held, growCount(held.frame, held.side, held.from, p));
+    }
+    if (held.mode === "bend") {
+      const p = pointAt(e);
+      if (!p) return;
+      setFitted((list) =>
+        list.map((spec, i) =>
+          i === held.n ? { ...spec, route: (spec.route ?? []).map((q, k) => (k === held.bend ? { x: cm(p.x), y: cm(p.y) } : q)) } : spec,
+        ),
+      );
+      return changed();
     }
     if (held.mode === "msb") {
       const p = pointAt(e);
@@ -4235,6 +4309,47 @@ export function RoofDesigner(props: {
    */
   const [opened] = useState(() => openedAs({ panels: summary.panels, battery: Boolean(battery), ready: light.ready }));
   const [solAsked, setSolAsked] = useState(false);
+  /**
+   * The greeting on the dock (25 Nov 2026, Martin: opening a finished design he needed a few seconds to take in that it
+   * was finished): "Design complete · Proposal signed", or what is missing, until the design is first changed. Only
+   * for a roof that opened with panels on it (one Design it for me fills by itself keeps Sol's opening instead).
+   */
+  // It stays until the design is changed (26 Nov 2026, Martin, from his iPhone: it was gone before he saw it, since the
+  // first touch anywhere, a scroll or a pinch, put it away): the first step that can be undone ends it for the visit.
+  // A change only counts once a person has pressed or typed, so one the roof makes by itself as it opens doesn't end it.
+  const [greetOn, setGreetOn] = useState(() => summary.panels > 0);
+  const [greetTouched, setGreetTouched] = useState(false);
+  const [greetBase, setGreetBase] = useState(0);
+  useEffect(() => {
+    if (!greetOn || greetTouched) return;
+    const touched = () => setGreetTouched(true);
+    window.addEventListener("pointerdown", touched, true);
+    window.addEventListener("keydown", touched, true);
+    return () => {
+      window.removeEventListener("pointerdown", touched, true);
+      window.removeEventListener("keydown", touched, true);
+    };
+  }, [greetOn, greetTouched]);
+  if (greetOn && !greetTouched && greetBase !== pastLen) setGreetBase(pastLen);
+  if (greetOn && greetTouched && pastLen > greetBase) setGreetOn(false);
+  const greeting = greetOn
+    ? designGreeting({
+        panels: summary.panels,
+        items: ready,
+        ready: light.ready,
+        proposal: props.proposalGlance,
+        onDeal: props.proposalGlance !== null || Boolean(props.proposalHref),
+      })
+    : null;
+  const greetingNote = greeting && (
+    <div role="status" className="pointer-events-none flex max-w-full flex-col items-center gap-0.5 text-center">
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold text-white">
+        <span aria-hidden className={clsx("size-2 rounded-full", greeting.tone === "done" ? "bg-[#4ade80]" : "bg-sun-line")} />
+        {greeting.title}
+      </span>
+      <span className="text-[12px] leading-snug text-white/75">{greeting.line}</span>
+    </div>
+  );
   const [resumeSaid, setResumeSaid] = useState(false);
   const solQuiet = opened === "done" && light.ready && !solAsked;
   const resumeLine =
@@ -6922,10 +7037,12 @@ export function RoofDesigner(props: {
     const measure = () => {
       const kids = Array.from(box.children) as HTMLElement[];
       if (!kids.length) return;
-      const top = box.getBoundingClientRect().top;
+      // The words' own height, wherever centring puts them in the box.
+      const top = Math.min(...kids.map((k) => k.getBoundingClientRect().top));
       const bottom = Math.max(...kids.map((k) => k.getBoundingClientRect().bottom));
-      const pad = parseFloat(getComputedStyle(box).paddingBottom) || 0;
-      const words = Math.ceil(bottom - top + box.scrollTop + pad);
+      const style = getComputedStyle(box);
+      const pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+      const words = Math.ceil(bottom - top + pad);
       setSolNeeds(Math.max(0, words - restRoom));
     };
     measure();
@@ -6941,7 +7058,7 @@ export function RoofDesigner(props: {
   const lift = foldable && !solFolded ? Math.min(solLiftByHand ? solLift : solNeeds, liftMost) : 0;
   const deckTop = foot === null ? null : foot - lift;
   const restFolded = 48;
-  // One handle in the box's top left: pressed, it folds or opens the box; dragged, it slides the box up or down (down
+  // A slim grab bar on the box's top edge, at its left (Sol sits in the notch in its middle): pressed, it folds or opens the box; dragged, it slides the box up or down (down
   // past its usual height folds it, up from folded opens it).
   const foldButton = foldable ? (
     <button
@@ -6982,10 +7099,9 @@ export function RoofDesigner(props: {
       aria-expanded={!solFolded}
       aria-label={solFolded ? "Open Sol's box" : "Fold Sol's box away"}
       title={solFolded ? "Open Sol's box, or drag it up" : "Fold Sol's box away, or drag it up to read more"}
-      className="pointer-events-auto absolute left-2.5 top-1.5 z-10 flex h-8 w-12 touch-none flex-col items-center justify-center rounded-full text-white/70 ring-1 ring-white/20 hover:bg-white/10 hover:text-white"
+      className="group pointer-events-auto absolute left-3 top-0 z-10 flex h-4 w-14 touch-none items-center justify-center"
     >
-      <GripHorizontal className="-mb-1 size-4" aria-hidden />
-      <ChevronDown className={clsx("size-3.5 transition-transform", solFolded && "rotate-180")} aria-hidden />
+      <span className="h-1 w-8 rounded-full bg-white/35 transition-colors group-hover:bg-white/70" aria-hidden />
     </button>
   ) : null;
   // Sideways, Sol's step and suggestions are a plate along the foot moulded round him, as under the picture upright
@@ -7092,8 +7208,6 @@ export function RoofDesigner(props: {
             setPhonePitch(false);
             pickTool(t);
           }}
-          shadeOn={shadeOn}
-          onShade={toggleShade}
           drawn={illustrated}
           zooming={zooming}
           {...(solHolds ? { onPitch: () => setPhonePitch((v) => !v) } : {})}
@@ -7102,7 +7216,6 @@ export function RoofDesigner(props: {
           {...(costsHidden ? {} : { onDesignForMe: () => setMineIntro(true) })}
           onUndo={undo}
           onRedo={redo}
-          onWhole={() => setView(WHOLE)}
           {...(costsHidden ? {} : { onCalc: () => setCalcOpen(true), calcOn: calcOpen })}
           msb={{ on: msb !== null, icon: <SwitchboardGlyph />, onClick: toggleMsb }}
           {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
@@ -8046,6 +8159,14 @@ export function RoofDesigner(props: {
               {props.tight && !solAway && (commandOpen || commandReply || commandBusy || opening || calcOpen) && (
                 <div
                   ref={solPanel}
+                  // On a phone held upright his chat stands above the foot row (Select, Add a panel, Sol, the hand, Erase),
+                  // drawn full size (25 Nov 2026, Martin: it opened behind them). A style of its own keeps it out of the
+                  // phone's smaller drawing.
+                  style={
+                    underUp && stage && !sideDeckUp
+                      ? { bottom: `${Math.round(stage.pb + lift + 52)}px`, paddingBottom: "0.625rem" }
+                      : undefined
+                  }
                   className="absolute bottom-[3.5rem] left-1/2 z-50 flex w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 rounded-[28px] bg-primary px-2.5 pb-[2.6rem] pt-2.5 text-white shadow-[0_18px_50px_rgba(11,11,12,0.4)] ring-1 ring-white/10 transition duration-200 ease-out starting:translate-y-3 starting:opacity-0 motion-reduce:transition-none"
                   data-popup
                 >
@@ -8896,6 +9017,41 @@ export function RoofDesigner(props: {
                         />
                         <text x={bx + 2 * u} y={by - 9.5 * u} textAnchor="middle" fontSize={8 * u} fontWeight="700" fill="#0b0c0e">
                           {c.id === "new" ? "+" : c.resolved ? "✓" : c.notes.length}
+                        </text>
+                      </g>
+                    );
+                  })}
+                  {/* From each placed inverter to the switchboard: a dashed line and its length (26 Nov 2026, Martin). */}
+                  {runs.map((r) => {
+                    const [lx, ly] = px(labelAt(r));
+                    const bends = r.points.slice(1, -1);
+                    return (
+                      <g key={`run-${r.index}`} pointerEvents="none">
+                        <title>{`${runWords(r.metres)} from the inverter to the switchboard. ${RUN_NOTE}`}</title>
+                        <polyline
+                          points={path(r.points)}
+                          fill="none"
+                          stroke={GOLD}
+                          strokeWidth={1.1 * u}
+                          strokeDasharray={`${3 * u} ${2 * u}`}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        {bends.map((b, k) => (
+                          <circle key={k} cx={px(b)[0]} cy={px(b)[1]} r={2.4 * u} fill="#0b0c0e" stroke={GOLD} strokeWidth={1 * u} />
+                        ))}
+                        <text
+                          x={lx}
+                          y={ly - 3 * u}
+                          textAnchor="middle"
+                          fontSize={8 * u}
+                          fontWeight="700"
+                          fill="#ffffff"
+                          stroke="#0b0c0e"
+                          strokeWidth={2.4 * u}
+                          paintOrder="stroke"
+                        >
+                          {runWords(r.metres)}
                         </text>
                       </g>
                     );
@@ -9762,10 +9918,21 @@ export function RoofDesigner(props: {
                     kitPick === "battery"
                       ? `Battery · ${batteryKwh} kWh`
                       : kitPick === "msb"
-                        ? "Main switchboard"
+                        ? `Main switchboard${
+                            runs.length === 1
+                              ? ` · ${runWords(runs[0].metres)} to the inverter`
+                              : runs.length > 1
+                                ? ` · ${runs.map((r) => `${runWords(r.metres)} to inverter ${r.index + 1}`).join(", ")}`
+                                : fitted.length
+                                  ? " · drag the inverter to its wall to measure"
+                                  : ""
+                          }`
                         : kitPick === "charger"
                           ? `EV charger${charger ? ` · ${charger.kw} kW` : ""}`
-                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW`;
+                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW${(() => {
+                              const run = runs.find((r) => r.index === kitPick);
+                              return run ? ` · ${runWords(run.metres)} to the MSB` : "";
+                            })()}`;
                   return (
                     <div
                       className={clsx(GLASS, "absolute z-30 flex -translate-x-1/2 items-center gap-1 py-0.5 pl-3 pr-0.5")}
@@ -11595,6 +11762,15 @@ export function RoofDesigner(props: {
                   style={{ height: sideDeckUp ? Math.max(DESK_TRAY, sideDeckH) : DESK_TRAY }}
                 />
               )}
+              {/* The greeting above the tray on a computer: the tray itself is full of the foot row. */}
+              {deskFoot && !sideDeckUp && greetingNote && (
+                <div
+                  className="pointer-events-none absolute left-1/2 z-[31] -translate-x-1/2 rounded-full bg-[#26282c]/92 px-4 py-2 shadow-lift backdrop-blur"
+                  style={{ bottom: DESK_TRAY + 40 }}
+                >
+                  {greetingNote}
+                </div>
+              )}
               {/* Sol leading the design: the step at hand, over Ask Sol. */}
               {guideShown && (
                 <div
@@ -11957,6 +12133,9 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
+                  {greetingNote && (
+                    <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                  )}
                   {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
                       mark in the dock's bottom left, the way back that sat beside the address under the map. */}
                   {props.onOpenDeal && (

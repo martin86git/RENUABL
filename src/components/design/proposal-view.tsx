@@ -910,6 +910,8 @@ export interface ProposalPageProps {
    * be framed with its tools and drop zones, and an own block with nothing in it yet shown as a place to fill.
    */
   build?: BuildHooks;
+  /** The product datasheets that go with it, at the foot of the page. Drawn by the page that knows the link. */
+  datasheets?: React.ReactNode;
 }
 
 /** What the proposal builder wraps round the page's parts. */
@@ -951,6 +953,7 @@ export function ProposalPage({
   choice,
   onOpenChat,
   build,
+  datasheets,
 }: ProposalPageProps) {
   const b = view.business;
   const look = lookOf(view.template);
@@ -1357,7 +1360,8 @@ export function ProposalPage({
     if (!words && !picture)
       return build && isCustom(block.id) ? (
         <p className="rounded-xl border border-dashed border-line px-5 py-10 text-center text-[14px] text-muted">
-          Write something here, or drop a picture on it.
+          <span className="[@media(hover:none)]:hidden">Write something here, or drop a picture on it.</span>
+          <span className="hidden [@media(hover:none)]:inline">Tap here to write something, or add a picture.</span>
         </p>
       ) : null;
     if (words && picture && block.layout && block.layout !== "stack")
@@ -1482,6 +1486,7 @@ export function ProposalPage({
               </section>,
             );
           })}
+        {datasheets}
       </main>
 
       <footer className="border-t border-line">

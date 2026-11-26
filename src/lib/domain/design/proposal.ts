@@ -318,7 +318,8 @@ export interface ProposalInternal {
   cost: number;
   margin: number;
   priceExGst: number;
-  lines: { group: CostGroup; label: string; amount: number }[];
+  /** Each quote line; a product's code and how many where the line is one product (for the order and its datasheet). */
+  lines: { group: CostGroup; label: string; amount: number; qty?: number; sku?: string }[];
   /** The saved roof's version it was worked out from. */
   projectVersion: number;
   /** Which of the roof's designs it is. */
@@ -329,6 +330,8 @@ export interface ProposalInternal {
   options?: { goal: OptionKey; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
   /** The configurator's mixes, the business's side of each, as `options`. */
   configurator?: { goal: OptionKey; design: number; cost: number; margin: number; priceExGst: number; lines: ProposalInternal["lines"] }[];
+  /** What the configurator couldn't offer and why, for the business's proposal screen only. */
+  configuratorSkipped?: string[];
 }
 
 /** What each goal is called on a proposal, and what it promises, in the customer's words. Never a figure. */
@@ -815,7 +818,7 @@ export function buildProposal(given: ProposalInputs): Built {
           }),
         }
       : {}),
-    ...(configurator ? { configurator: configurator.view } : {}),
+    ...(configurator.view ? { configurator: configurator.view } : {}),
   };
   const internal: ProposalInternal = {
     cost: totals.cost,
@@ -840,7 +843,8 @@ export function buildProposal(given: ProposalInputs): Built {
           }),
         }
       : {}),
-    ...(configurator ? { configurator: configurator.internal } : {}),
+    ...(configurator.internal ? { configurator: configurator.internal } : {}),
+    ...(configurator.skipped.length ? { configuratorSkipped: configurator.skipped } : {}),
   };
   return { ok: true, view, internal };
 }
@@ -916,7 +920,7 @@ function configuratorFor(
   offered: readonly { goal: OptionKey; at: number; name: string; promise: string }[],
   recommended: number,
   dailyKwh: number | null,
-): { view: ConfiguratorView; internal: NonNullable<ProposalInternal["configurator"]> } | null {
+): { view: ConfiguratorView | null; internal: NonNullable<ProposalInternal["configurator"]> | null; skipped: string[] } {
   const { project, workspace } = input;
   const designs = project.set.designs;
   const quotes = project.extras.quotes;
@@ -926,7 +930,7 @@ function configuratorFor(
 
   // The sizes: the designs on offer, else the primary as drawn and worked back from it.
   const drawn = designPanels(designs[primary]).length;
-  if (drawn === 0) return null;
+  if (drawn === 0) return { view: null, internal: null, skipped: [] };
   const sources =
     offered.length >= 2
       ? offered.map((g) => ({ at: g.at, design: designs[g.at], name: g.name, note: g.promise, worked: false, pick: g.at === recommended }))
@@ -941,7 +945,7 @@ function configuratorFor(
   const ordered = sources.map((src) => ({ ...src, kw: designSummary(src.design, YIELD_PER_KW_DAY).kw })).sort((a, b) => b.kw - a.kw);
 
   const designedPanel = designs[primary].panel ?? (firstListed ? { ...firstListed } : null);
-  if (!designedPanel) return null;
+  if (!designedPanel) return { view: null, internal: null, skipped: [] };
   const panelList = panelChoices(designedPanel, catalogue.panels ?? []);
   // The EV charger: the one on a design, else the first on the business's lists.
   const listedCharger = chargersOf(workspace)[0];
@@ -964,6 +968,12 @@ function configuratorFor(
   const variants: ConfigVariant[] = [];
   const internal: NonNullable<ProposalInternal["configurator"]> = [];
   const usedPanels = new Set<number>();
+  // What the configurator couldn't offer and why (25 Nov 2026, Martin: "won't let me decrease storage… not letting me
+  // choose different panels, inverter, battery"): said to the business on the proposal screen, never to the customer.
+  const skipped = new Map<string, string>();
+  const skip = (what: string, why: string) => {
+    if (!skipped.has(what)) skipped.set(what, why);
+  };
   let chargerOffered: { name: string; kw: number } | null = null;
   // The designed panel's input limits, when on file, to check another inverter takes its strings.
   const panelLimits = (catalogue.panels ?? []).find((p) => p.sku === designedPanel.sku)?.electrical;
@@ -1012,7 +1022,17 @@ function configuratorFor(
             const at = designs.length;
             const extra = withExtra(mix, src.at);
             const out = workOut(extra, at);
-            if (!out.ok) continue;
+            if (!out.ok) {
+              const why = out.problems[0] ?? "it couldn't be priced";
+              if (j > 0) skip(`${panel.name} panels`, why);
+              else if (k > 0) skip(`The ${inv.name}`, why);
+              else if (bp.extra) skip(`${bp.extra < 0 ? "One module fewer" : "One module more"} of the ${choices[bp.id!].name}`, why);
+              else if (bp.id !== null && !bp.backup) skip(`The ${choices[bp.id].name}`, why);
+              else if (bp.reserve) skip("A module kept for blackouts", why);
+              else if (bp.backup) skip("Blackout backup", why);
+              else if (ev) skip("The EV charger", why);
+              continue;
+            }
             const goal = configKey({
               size: id,
               panel: j,
@@ -1085,7 +1105,9 @@ function configuratorFor(
       })(),
     });
   });
-  if (variants.length < 2 || !sizes.length) return null;
+  if (panelList.length < 2) skip("Other panels", "your price lists have no panel of another maker with a price");
+  const why = [...skipped].map(([what, reason]) => `${what}: ${reason}`).slice(0, 8);
+  if (variants.length < 2 || !sizes.length) return { view: null, internal: null, skipped: why };
   // It opens as the business recommends it: the recommended size, the panel and battery designed, its backup and charger.
   const startSize = ordered.findIndex((src) => src.pick);
   const first = sizes.find((sz) => sz.id === startSize) ?? sizes[0];
@@ -1107,7 +1129,11 @@ function configuratorFor(
   const panels: ConfigPanel[] = panelList.flatMap((p, id) =>
     usedPanels.has(id) ? [{ id, name: p.name, maker: makerName(makerOf(p.name)), watts: p.watts }] : [],
   );
-  return { view: packLines({ sizes, panels, inverters, batteries, charger: chargerOffered, variants, start: start.goal }), internal };
+  return {
+    view: packLines({ sizes, panels, inverters, batteries, charger: chargerOffered, variants, start: start.goal }),
+    internal,
+    skipped: why,
+  };
 }
 
 /** A quote's lines as kept on the business's side: a product's code and how many where the line is one product (for the order). */

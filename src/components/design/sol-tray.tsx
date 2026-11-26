@@ -9,11 +9,9 @@
 import { clsx } from "clsx";
 import {
   Calculator,
-  Cable,
   ChevronRight,
   Columns2,
   LayoutGrid,
-  Maximize,
   Minus,
   MessageCircle,
   PenTool,
@@ -22,7 +20,6 @@ import {
   RotateCw,
   Ruler,
   Search,
-  SunMedium,
   Tag,
   Trash2,
   TriangleRight,
@@ -41,7 +38,6 @@ type TrayTool = "select" | "panel" | "erase" | "trace" | "string" | "rule" | "la
 // Erase, Select, Add a panel, the hand and zoom are on the map itself, so they aren't repeated here.
 const DRAW: { tool: TrayTool; icon: LucideIcon; name: string }[] = [
   { tool: "trace", icon: PenTool, name: "Trace roof" },
-  { tool: "string", icon: Cable, name: "Strings" },
   { tool: "rule", icon: Ruler, name: "Guide line" },
   { tool: "label", icon: Tag, name: "Label" },
 ];
@@ -69,7 +65,7 @@ function Group(props: { title: string; children: ReactNode }) {
   return (
     <section className="mt-3">
       <h4 className="mb-1.5 px-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">{props.title}</h4>
-      <div className="grid grid-cols-4 gap-2">{props.children}</div>
+      <div className="grid grid-cols-4 gap-2 lg:grid-cols-3">{props.children}</div>
     </section>
   );
 }
@@ -82,8 +78,6 @@ export function SolTray(props: {
   onAsk: () => void;
   tool: string;
   onTool: (tool: TrayTool) => void;
-  shadeOn: boolean;
-  onShade: () => void;
   drawn: boolean;
   zooming: boolean;
   /** Pinch zoom, on a touch screen only (the desktop has the wheel and its own zoom rounds). */
@@ -95,7 +89,6 @@ export function SolTray(props: {
   onDesignForMe?: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onWhole: () => void;
   /** Sol's size-a-system calculator (25 Nov 2026, Martin: "add the calculator into the phone"). */
   onCalc?: () => void;
   calcOn?: boolean;
@@ -134,7 +127,7 @@ export function SolTray(props: {
         role="dialog"
         aria-label="Sol's tools"
         data-popup
-        className="fixed inset-x-0 bottom-0 z-[95] mx-auto flex max-h-[88dvh] max-w-[52rem] flex-col rounded-t-[22px] bg-[#26282c] text-white shadow-[0_-12px_32px_rgba(0,0,0,0.35)]"
+        className="fixed inset-x-0 bottom-0 z-[95] mx-auto flex max-h-[min(88dvh,calc(100%-1rem))] max-w-[52rem] flex-col rounded-t-[22px] bg-[#26282c] text-white shadow-[0_-12px_32px_rgba(0,0,0,0.35)]"
       >
         <div className="min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 pt-2">
           <div className="mx-auto mb-2 h-1 w-9 rounded-full bg-white/25" aria-hidden />
@@ -165,7 +158,7 @@ export function SolTray(props: {
             </button>
           </div>
           {/* Sideways (a wide, short screen) the groups sit two across, so more of them fit before it scrolls. */}
-          <div className="sm:grid sm:grid-cols-2 sm:gap-x-6">
+          <div className="sm:grid sm:grid-cols-2 sm:gap-x-6 lg:grid-cols-3 lg:gap-x-4">
             <Group title="Draw">
               {DRAW.map(({ tool, icon: Icon, name }) => (
                 <Item key={tool} icon={<Icon aria-hidden />} name={name} on={props.tool === tool} onClick={() => pick(tool)} />
@@ -173,7 +166,6 @@ export function SolTray(props: {
               {props.msb && <Item icon={props.msb.icon} name="Switchboard" on={props.msb.on} onClick={then(props.msb.onClick)} />}
             </Group>
             <Group title="Check">
-              <Item icon={<SunMedium aria-hidden />} name="Shade" on={props.shadeOn} onClick={then(props.onShade)} />
               {props.onPitch && (
                 <Item icon={<TriangleRight aria-hidden />} name={props.pitchWords} on={props.pitchShown} onClick={then(props.onPitch)} />
               )}
@@ -186,7 +178,6 @@ export function SolTray(props: {
               />
             </Group>
             <Group title="View">
-              <Item icon={<Maximize aria-hidden />} name="Whole map" onClick={then(props.onWhole)} />
               {props.onCalc && <Item icon={<Calculator aria-hidden />} name="Calculator" on={props.calcOn} onClick={then(props.onCalc)} />}
               {props.sides}
               {props.onZoom && <Item icon={<Search aria-hidden />} name="Pinch zoom" on={props.zooming} onClick={then(props.onZoom)} />}

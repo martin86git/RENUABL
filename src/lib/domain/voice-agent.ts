@@ -1,5 +1,5 @@
 import { buildCallAvailability, formatCallTime, isBookableCallSlot } from "./booking";
-import { reasonWords, sayName, sayNameNote, usualCalls, type CallAudience } from "./design/call-setup";
+import { objectiveLine, reasonWords, sayName, sayNameNote, usualCalls, type CallAudience, type CallObjective } from "./design/call-setup";
 import { coachingBlock } from "./design/coaching";
 import { callVoiceBlock } from "./design/sol-induction";
 import { deliveryBlock, deliveryParams, type Delivery } from "./design/delivery";
@@ -98,6 +98,66 @@ export function nextCallWindow(now: Date): { from: Date; until: Date } | null {
     return { from: now > from ? now : from, until };
   }
   return null;
+}
+
+/** Days offered when a customer picks a time for the call they asked for. */
+export const ASK_DAYS = 4;
+/** Minutes between the times offered. */
+export const ASK_STEP_MINUTES = 30;
+
+export interface AskDay {
+  date: ISODate;
+  /** "Today", "Tomorrow", else "Monday 30 Nov". */
+  label: string;
+  /** Each time on offer that day: its moment (ISO) and "2:30pm". */
+  times: { at: string; label: string }[];
+}
+
+/**
+ * The times a customer may pick for the call they asked for (25 Nov 2026, Martin: "In the proposal I requested a call.
+ * It didn't ask me when."): the next `ASK_DAYS` days with calling hours, each on the half hour from at least 15
+ * minutes from now until half an hour before that day's hours end.
+ */
+export function askTimes(now: Date): AskDay[] {
+  const today = todayInMarket(now);
+  const days: AskDay[] = [];
+  for (let i = 0; i < 21 && days.length < ASK_DAYS; i++) {
+    const date = toISODate(addDays(fromISODate(today), i));
+    const h = hoursOn(date);
+    if (!h) continue;
+    const times: AskDay["times"] = [];
+    for (let hour = h.from; hour <= h.to - 0.5; hour += ASK_STEP_MINUTES / 60) {
+      const at = atHour(date, hour);
+      if (at.getTime() < now.getTime() + 15 * 60_000) continue;
+      const hh = String(Math.floor(hour)).padStart(2, "0");
+      const mm = String(Math.round((hour % 1) * 60)).padStart(2, "0");
+      times.push({ at: at.toISOString(), label: formatCallTime(`${hh}:${mm}`) });
+    }
+    if (!times.length) continue;
+    const label =
+      i === 0
+        ? "Today"
+        : date === toISODate(addDays(fromISODate(today), 1))
+          ? "Tomorrow"
+          : formatDate(date, { weekday: "short", day: "numeric", month: "short" });
+    days.push({ date, label, times });
+  }
+  return days;
+}
+
+/**
+ * A time a customer picked, checked on the server: only one `askTimes` offers right now, as the window Vapi is given
+ * (from it to the end of that day's calling hours). Null for anything else.
+ */
+export function askedWindow(at: unknown, now: Date): { from: Date; until: Date } | null {
+  if (typeof at !== "string") return null;
+  const t = new Date(at);
+  if (Number.isNaN(t.getTime())) return null;
+  const offered = askTimes(now).some((d) => d.times.some((x) => new Date(x.at).getTime() === t.getTime()));
+  if (!offered) return null;
+  const date = todayInMarket(t);
+  const h = hoursOn(date);
+  return h ? { from: t, until: atHour(date, h.to) } : null;
 }
 
 /** "now", "today at 1pm", "Monday at 9am": when a call will come, for the customer who asked for it. */
@@ -236,6 +296,8 @@ export interface CallBrief {
   audience?: CallAudience;
   /** The business's own reason for those calls, the words after "calling" (call-setup.ts `cleanReason`). */
   reason?: string | null;
+  /** What the business's own calls work towards (call-setup.ts); unset or "none" is the calls as they were. */
+  objective?: CallObjective | null;
 }
 
 /**
@@ -508,6 +570,8 @@ export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTran
           `Your job: find out what they're after, answer their questions, help with any worries, and explain that once the team has designed their system ` +
           `they'll be sent a proposal to look over and sign online when they're happy. ${b.canBook ? "Then book them a free 15-minute call with the team from the times below." : "Then offer a call back from the team at a time that suits them."}`);
 
+  // The business's objective for its own calls (26 Nov 2026, Martin), after the job: it steers the call, no rule gives way.
+  const aim = ownReason(b) ? objectiveLine(b.objective, { canBook: Boolean(b.canBook), business }) : "";
   const tools = [
     b.canBook &&
       "- book_call: when they choose a time from the list, with that time's date and time exactly as written (e.g. date 2026-11-04, time 09:30). Only say it's booked once the tool says so, then read back the day and time.",
@@ -535,7 +599,7 @@ export function voiceSystemPrompt(b: CallBrief, slots: VoiceSlot[], o: { canTran
   const nameNote = sayNameNote(b);
   return `You are ${sayName(b)}, ${business}'s automated phone assistant.
 
-${job}
+${job}${aim ? `\n\n${aim}` : ""}
 
 How to talk: this is a phone call. Short sentences, one question at a time, warm, plain Australian English. Listen more than you talk. Say figures the way people say them ("about twelve thousand dollars"), and read back anything they tell you that matters ("about four hundred a quarter, is that right?"). Never read out lists of more than three things.
 

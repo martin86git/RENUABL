@@ -3,9 +3,9 @@
  * everywhere (domain/design/screen-lock.ts). Sessions are found by their hash, as in accounts.ts.
  */
 import { createHash } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { SESSION_COOKIE } from "@/lib/domain/accounts";
-import { UNLOCK_TRIES } from "@/lib/domain/design/screen-lock";
+import { DEVICE_COOKIE, UNLOCK_TRIES, lockDeviceOf, type LockDevice } from "@/lib/domain/design/screen-lock";
 import { query } from "./db";
 import { hashPassword, passwordMatches } from "./design-passwords";
 
@@ -15,6 +15,12 @@ const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 export async function sessionHash(): Promise<string | null> {
   const id = (await cookies()).get(SESSION_COOKIE)?.value;
   return id && /^[a-f0-9]{64}$/.test(id) ? hash(id) : null;
+}
+
+/** This request's device for the lock: its user agent, Chrome's mobile hint and the page's own touch-screen cookie. */
+export async function requestDevice(): Promise<LockDevice> {
+  const [h, c] = await Promise.all([headers(), cookies()]);
+  return lockDeviceOf(h.get("user-agent"), { mobile: h.get("sec-ch-ua-mobile"), cookie: c.get(DEVICE_COOKIE)?.value });
 }
 
 export interface LockRow {

@@ -27,7 +27,7 @@ import type { Profile } from "@/lib/domain/design/profile";
 import { MAX_SUPPLIER_LISTS, type SupplierList } from "@/lib/domain/design/pricing";
 import type { DesignExtras } from "@/lib/domain/design/quote";
 import { newId, query, transaction } from "./db";
-import { linkJobsToRoof } from "./design-crm-repo";
+import { linkJobsToRoof, noteDesignSaved } from "./design-crm-repo";
 import { memberPhotoVersions } from "./design-member-photos";
 
 // ---------------------------------------------------------------------------
@@ -421,6 +421,7 @@ export async function createProject(
   const existing = made[0] ?? (await projectAt(businessId, roof));
   if (!existing) throw new Error("the roof couldn't be kept");
   await linkJobsToRoof(businessId, roof, by);
+  if (made[0]) await noteDesignSaved(businessId, existing.id, work.design, by);
   return { project: existing, existed: !made[0] };
 }
 
@@ -448,6 +449,7 @@ export async function saveProject(
   if (rows[0]) {
     // A job added for this address since the roof was first drawn picks the design up here.
     await linkJobsToRoof(businessId, rows[0], by);
+    await noteDesignSaved(businessId, id, work.design, by);
     return { version: rows[0].version };
   }
   return (await projectById(businessId, id)) ? "conflict" : "missing";

@@ -295,6 +295,35 @@ export function isYesNoQuestion(question: string): boolean {
   return /^(do|does|did|want|shall|should|can|could|would|will|is|are|was|were|have|has|may|happy|ok|okay)\b/i.test(q);
 }
 
+/** The openings that ask whether to do something ("Want me to …", "Shall I …"), taken off an either/or's first half. */
+const OFFER_OPENING = /^(?:do you want me to|would you like me to|want me to|shall i|should i|can i|do you want|would you like|want)\s+/i;
+/** Second halves that aren't a choice of their own ("… or not?", "… or something else?"). */
+const NOT_A_CHOICE = /^(not|neither|something else|anything else|both|none)$/i;
+/** The longest either/or half kept as a pill. */
+export const REPLY_PILL_MAX = 60;
+
+/**
+ * The pills under one of Sol's questions (26 Nov 2026, Martin: "Should have yes / no / Something else pills to help
+ * reply to the question"). An offer of two things ("Want me to open the approvals list or draft a follow-up to
+ * Roberto?") gives the two things; a yes-or-no question gives Yes and No; anything else gives none. "Something
+ * else" (a reply in his own words) is always drawn beside them, so it isn't listed here.
+ */
+export function questionReplies(question: string): string[] {
+  const q = question.trim().replace(/^[^A-Za-z]+/, "");
+  if (!q.endsWith("?")) return [];
+  const body = q.slice(0, -1).trim();
+  const halves = body.split(/,?\s+or\s+/i);
+  if (halves.length === 2 && OFFER_OPENING.test(halves[0])) {
+    const first = halves[0].replace(OFFER_OPENING, "").trim();
+    const second = halves[1].trim();
+    if (NOT_A_CHOICE.test(second)) return ["Yes", "No"];
+    const pills = [first, second].map((h) => h.charAt(0).toUpperCase() + h.slice(1));
+    if (pills.every((h) => h.length >= 2 && h.length <= REPLY_PILL_MAX)) return pills;
+    return [];
+  }
+  return isYesNoQuestion(q) ? ["Yes", "No"] : [];
+}
+
 /**
  * What goes to Sol when a question of his is answered from his message (a Yes, a No or a reply typed to it): the
  * question named, so he knows which one even from earlier in the chat. The chat shows only the answer.

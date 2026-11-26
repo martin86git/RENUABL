@@ -18,9 +18,10 @@ import {
   demoRefuses,
   isDemoEmail,
 } from "@/lib/domain/design/demo";
-import { LOCKED_MESSAGE, LOCKED_STATUS, isLocked, lockDeviceOf } from "@/lib/domain/design/screen-lock";
+import { LOCKED_MESSAGE, LOCKED_STATUS, isLocked } from "@/lib/domain/design/screen-lock";
 import { currentSession, readSession } from "./accounts";
 import { dbConfigured } from "./db";
+import { requestDevice } from "./screen-lock";
 import { memberByEmail, type Member } from "./design-repo";
 
 export type DesignAccess =
@@ -42,7 +43,7 @@ export async function designAccess(strict = false): Promise<DesignAccess> {
   if (session?.role !== "business") return { state: "signed-out" };
   const member = await memberByEmail(session.email);
   if (!member) return { state: "no-business", email: session.email };
-  const locked = !isDemoEmail(session.email) && isLocked(session.activeAt, lockDeviceOf((await headers()).get("user-agent")));
+  const locked = !isDemoEmail(session.email) && isLocked(session.activeAt, await requestDevice());
   if (member.termsVersion !== BUSINESS_TERMS_VERSION) return { state: "needs-terms", email: session.email, member };
   // The owner viewing as another member of their business (read only: the proxy refuses changes while it is set).
   const viewing = (await cookies()).get(VIEW_AS_COOKIE)?.value;

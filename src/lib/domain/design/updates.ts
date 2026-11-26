@@ -13,6 +13,137 @@ export interface Update {
 }
 
 export const UPDATES: readonly Update[] = [
+  {
+    day: "2026-11-26",
+    area: "Marketing",
+    words: "Email builder: a Top bar block (a line and a button above your logo) and a panel colour for any block.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "In Sol's draft emails, pick a written web address and press Link to turn it into linked words.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
+    words: "A minus at the top right of a page puts it aside as a chip at the foot of the screen; press the chip to go back.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "The deal's buttons down the left are a little smaller.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Installations",
+    words: "The job card lists each product's datasheet, for your team, the installer's link and the inspector.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The configurator lists the datasheets for the system the customer has picked.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "Each quoted panel, inverter, battery and EV charger's datasheet is listed on the customer's proposal and its PDF.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The proposal screen says which datasheets are missing, with a button to find them online.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Battery and EV charger datasheets can be uploaded or found online in Product datasheets.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "The voice agent's window is taller, the chat on the left, its deals and settings as slim panels to the right.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "Each call can have an objective: a call appointment, a home visit, an install date, or helping them go ahead.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "A voice agent's script is numbered lines, and you can add a line to it directly.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "Sol's side panel and the box on a deal suggest the rest of a question too, and the team's common questions join your own.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words: "Sol's box learns from what you ask him: your own questions come up first as you type.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "Tap the stage on a deal's cover to move it. Delete is now in the ⋯ menu, not a button of its own.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words:
+      "Sol's box is a line taller, send and the microphone sit apart on the right, and it suggests the rest of a question as you type.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words: "Summarise, Write, Find and Technical are shortcuts inside Sol's box on Today.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "Sol counts new leads by the day the deal came in, and no longer corrects an earlier answer inside a new one.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Proposals",
+    words: "On a phone, tap one of your own blocks in the proposal builder to type its heading and words.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Deals",
+    words: "A deal opens on its timeline: every email, note, call, design saved and proposal, newest first.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Proposals",
+    words: "The proposal screen says what the configurator can't offer the customer yet, and why.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Proposals",
+    words: "A design not saved yet no longer reads as no design: the proposal offers to save it and carry on.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Designer",
+    words: "On a phone, Sol's chat box opens above the tools at the foot of the map, not behind them.",
+  },
+  {
+    day: "2026-11-25",
+    area: "Deals",
+    words: "A deal's email has Polish to tidy your words, and Sol, write it: say what to send and Sol drafts it.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "Sol knows your voice agents by name and can read their calls. Typing an agent's name offers it as a chip.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "On a phone, a deal's install day sits on its own line under the kit at the top of the deal.",
+  },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
   {
@@ -59,6 +190,11 @@ export const UPDATES: readonly Update[] = [
       "The installation reminder's preview shows your business's own name, with the customer's name and day marked as filled in for each one.",
   },
   { day: "2026-11-25", area: "Sol", words: "Typing a customer's name to Sol brings them up; tapping the name opens their deal." },
+  {
+    day: "2026-11-24",
+    area: "Design tool",
+    words: "Sol's tools are shorter: Strings, Shade and Whole map are on the map already. His Finalise the quote has a Not now.",
+  },
   {
     day: "2026-11-24",
     area: "Installations",

@@ -7,6 +7,8 @@
  * of a proposal, never a cost. Each call answers with what was asked for, or
  * a plain message to show.
  */
+import type { ProductSheetStanding } from "@/lib/domain/design/proposal-datasheets";
+import type { AskDay } from "@/lib/domain/voice-agent";
 import type { PublicPayments } from "@/lib/domain/design/proposal-payments";
 import type { BrandImage, BrandKit, ImageKind } from "@/lib/domain/design/brand";
 import type { Job } from "@/lib/domain/design/crm";
@@ -98,6 +100,10 @@ export const previewProposal = (jobId: string, choice: Partial<ProposalChoice>) 
     customAllowed?: boolean;
     /** For a member who sees costs: the margin as a share of the price ex GST, and the business's margin floor. */
     pricing?: { marginShare: number; floor: number } | null;
+    /** What the configurator couldn't offer the customer, and why. */
+    configuratorSkipped?: string[];
+    /** Each quoted product and whether its datasheet goes with the proposal. */
+    datasheets?: ProductSheetStanding[];
   }>(`${jobProposal(jobId)}/preview`, { method: "POST", body: choice });
 
 export const publishProposal = (jobId: string, choice: Partial<ProposalChoice> & { projectVersion: number }) =>
@@ -183,9 +189,10 @@ export const orderFromConfigurator = (token: string, o: { option: string; week: 
 
 /** The customer saying they have paid the deposit, and how. Kept as what they said: it is not a payment. */
 /** "Call me": the business's assistant rings the number on the customer's record. `when` is "now", "today at 1pm", … */
-export const askForCall = (token: string) => ask<{ when: string; already?: boolean }>(`${link(token)}/call`, { method: "POST" });
+export const askForCall = (token: string, at?: string) =>
+  ask<{ when: string; already?: boolean }>(`${link(token)}/call`, { method: "POST", body: at ? { at } : {} });
 /** Whether a call they asked for is still waiting, and when it comes (null with none). */
-export const askedCall = (token: string) => ask<{ when: string | null }>(`${link(token)}/call`);
+export const askedCall = (token: string) => ask<{ when: string | null; times: AskDay[]; nowOpen: boolean }>(`${link(token)}/call`);
 /** Cancel the call they asked for, or have it ring now. */
 export const cancelCall = (token: string) => ask<object>(`${link(token)}/call`, { method: "DELETE" });
 export const callMeNow = (token: string) => ask<object>(`${link(token)}/call`, { method: "PUT" });
@@ -198,4 +205,5 @@ export const proposalUrls = (token: string) => ({
   roof: `${link(token)}/roof`,
   pdf: `${link(token)}/pdf`,
   terms: `${link(token)}/terms`,
+  datasheet: (id: string) => `${link(token)}/datasheet/${encodeURIComponent(id)}`,
 });

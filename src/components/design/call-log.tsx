@@ -20,6 +20,7 @@ import { keptCallLog, loadCallLog } from "@/lib/services/call-log";
 import { SolBadge } from "./sol-sun";
 import { useCaller } from "@/lib/services/caller";
 import { CallerAvatar } from "./settings-caller";
+import type { CallerKey } from "@/lib/domain/install-call";
 
 const time = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", timeZone: "Australia/Melbourne" });
@@ -30,10 +31,10 @@ const dealHref = (jobId: string) => `/design/deals/${encodeURIComponent(jobId)}`
  * Calls on Today (8 Nov 2026, Martin): Sol's phone calls through Vapi and the calls the team logged on a deal, newest
  * first and grouped by day, with what Sol still has lined up above them.
  */
-export function CallLogPage() {
+export function CallLogPage({ role, name }: { role?: CallerKey; name?: string } = {}) {
   // Starts on the call log Today read as it opened, then reads it again behind it.
   const [data, setData] = useState<{ calls: CallLogEntry[]; coming: CallComing[]; solOn: boolean } | null>(() => {
-    const k = keptCallLog();
+    const k = role ? null : keptCallLog();
     return k ? { calls: k.calls, coming: k.coming, solOn: k.solOn } : null;
   });
   const [problem, setProblem] = useState<string | null>(null);
@@ -47,17 +48,19 @@ export function CallLogPage() {
       setProblem(null);
     } else setProblem(r.message);
   };
-  const load = () => void loadCallLog().then(apply);
+  const load = () => void loadCallLog(role).then(apply);
   useEffect(() => {
     let gone = false;
-    const go = () => void loadCallLog().then((r) => !gone && apply(r));
+    const go = () => void loadCallLog(role).then((r) => !gone && apply(r));
     go();
-    const t = window.setInterval(go, 60_000);
+    // One agent's log (its window) is read more often, so a call ringing or just ended shows.
+    const t = window.setInterval(go, role ? 15_000 : 60_000);
     return () => {
       gone = true;
       window.clearInterval(t);
     };
-  }, []);
+  }, [role]);
+  const who = name || "Sol";
 
   const shown = data ? callsOf(data.calls, filter) : [];
   const days: { day: string; calls: CallLogEntry[] }[] = [];
@@ -69,9 +72,9 @@ export function CallLogPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl pb-10">
+    <div className={clsx("mx-auto w-full max-w-3xl", role ? "px-3 pb-4 pt-3" : "pb-10")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-full bg-surface p-1 ring-1 ring-line">
+        <div className={clsx("inline-flex rounded-full bg-surface p-1 ring-1 ring-line", role && "hidden")}>
           {CALL_FILTERS.map((f) => (
             <button
               key={f.id}
@@ -108,13 +111,17 @@ export function CallLogPage() {
       {data && !data.solOn && (
         <p className="mt-4 flex items-start gap-2 rounded-2xl bg-surface px-4 py-3 text-[13px] text-ink-2 ring-1 ring-line">
           <SolBadge className="mt-0.5 size-4 shrink-0" />
-          Sol&apos;s phone calls aren&apos;t switched on for your business yet. Calls your team logs on a deal show here.
+          {role
+            ? `Calls aren't switched on for your business yet, so ${who} can't ring customers. Its test and training calls aren't listed here.`
+            : "Sol's phone calls aren't switched on for your business yet. Calls your team logs on a deal show here."}
         </p>
       )}
 
       {data && data.coming.length > 0 && (
         <section className="mt-6">
-          <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">Sol has lined up</h3>
+          <h3 className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">
+            {role ? "Lined up and ringing" : "Sol has lined up"}
+          </h3>
           <ul className="mt-2 grid gap-2">
             {data.coming.map((c) => (
               <li key={c.id} className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 ring-1 ring-line">
@@ -142,7 +149,11 @@ export function CallLogPage() {
           <Phone className="mx-auto size-6 text-muted" aria-hidden />
           <p className="mt-3 text-[15px] text-ink">No calls yet.</p>
           <p className="mt-1 text-[13px] text-muted">
-            {filter === "sol" ? "Sol's calls show here as they end." : "Calls show here as they end or are logged on a deal."}
+            {role
+              ? `${who}'s calls to customers show here as they end, and any it couldn't place.`
+              : filter === "sol"
+                ? "Sol's calls show here as they end."
+                : "Calls show here as they end or are logged on a deal."}
           </p>
         </div>
       )}
