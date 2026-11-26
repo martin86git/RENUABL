@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Design tool",
+    words: "Sides now draws your panels on the angled photos as you lay them, beside the plan, on the side that shows them best.",
+  },
+  {
+    day: "2026-11-26",
     area: "Settings",
     words: "Bring in from Pylon now fills in the jobs your export brought in, with their signed PDFs, instead of skipping them.",
   },
