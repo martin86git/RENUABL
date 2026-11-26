@@ -90,6 +90,22 @@ export const VOICE_AGENTS = [
   },
 ] as const;
 
+/**
+ * The voice agents' opening slide (26 Nov 2026, Martin, from a voice-agent builder's landing page: "we can introduce a
+ * similar slide on the home page to talk about our Voice AI"): on black, one pill, one large headline, one line and two
+ * buttons. Where that page shows customers' logos we show what an agent does, since RENUABL names no customers. Every
+ * line is something the agents do today; the price is read from the add-on.
+ */
+export const VOICE_INTRO = {
+  pill: "RENUABL Voice AI",
+  headline: ["Voice agents that", "ring every lead."],
+  sub: "Give each one a name, a voice and your script. They ring your new leads, answer your number and book your installs.",
+  demo: "Start demo",
+  hear: "Hear a call",
+  does: ["Rings new leads", "Answers your number", "Books installs", "Writes every call on the deal", "Always says it's automated"],
+  price: (monthly: string) => `Comes with Calls & Texts, ${monthly} a month on top of your plan.`,
+} as const;
+
 export const RAYS = {
   eyebrow: "Voice agents",
   headline: ["The sales force", "you always wished you had."],
@@ -1144,10 +1160,20 @@ export const STICKY = {
   close: "Put the sign-up bar away",
 } as const;
 
+/** The voice slide's price line, from the Calls & Texts add-on's own price. */
+export const voiceIntroPrice = () => VOICE_INTRO.price(dollars(ADD_ON_MONTHLY_CENTS.voice ?? 0));
+
 export function salesCopy(): string[] {
   return [
     ...Object.values(STICKY),
     ...Object.values(SALES_HERO).flat(),
+    VOICE_INTRO.pill,
+    ...VOICE_INTRO.headline,
+    VOICE_INTRO.sub,
+    VOICE_INTRO.demo,
+    VOICE_INTRO.hear,
+    ...VOICE_INTRO.does,
+    voiceIntroPrice(),
     RAYS.eyebrow,
     ...RAYS.headline,
     ...RAYS.body,
