@@ -295,3 +295,27 @@ it("keeps an unknown property's value as it is", () => {
   const unknown: HsProperty | undefined = undefined;
   expect(valueForField({ key: "nmi", label: "NMI", kind: "text" }, unknown ?? "6305")).toBe("6305");
 });
+
+import { fillEmpty, mergeTarget } from "./hubspot-import";
+
+describe("one job, not two", () => {
+  const pylon = { id: "j1", stage: "won" as const, wonOn: "2026-11-16", madeOn: "2026-11-20" };
+  it("joins the customer's deal won near the HubSpot deal", () => {
+    expect(mergeTarget([pylon], { wonOn: "2026-11-10", createdAt: "2026-10-01T00:00:00Z" })?.id).toBe("j1");
+  });
+  it("leaves a job years apart as a deal of its own", () => {
+    expect(mergeTarget([pylon], { wonOn: "2024-03-01", createdAt: "2024-01-01T00:00:00Z" })).toBeNull();
+  });
+  it("never joins a lost deal, and picks the nearest", () => {
+    const lost = { id: "j0", stage: "lost" as const, wonOn: null, madeOn: "2026-11-10" };
+    const later = { id: "j2", stage: "lead" as const, wonOn: null, madeOn: "2027-01-20" };
+    expect(mergeTarget([lost, pylon, later], { wonOn: null, createdAt: "2026-11-01T00:00:00Z" })?.id).toBe("j1");
+    expect(mergeTarget([lost], { wonOn: null, createdAt: "2026-11-10T00:00:00Z" })).toBeNull();
+  });
+  it("fills only what is empty", () => {
+    expect(fillEmpty({ battery: "Sigenergy", nmi: "" }, { battery: "Tesla", nmi: "6305", meter: "" })).toEqual({
+      details: { battery: "Sigenergy", nmi: "6305" },
+      filled: 1,
+    });
+  });
+});

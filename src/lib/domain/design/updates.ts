@@ -21,6 +21,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Settings",
+    words: "Bring in from HubSpot joins a deal to the customer's existing deal for the same job, rather than making a second.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
     words: "Bring in from Pylon now fills in the jobs your export brought in, with their signed PDFs, instead of skipping them.",
   },
   {

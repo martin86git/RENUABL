@@ -253,6 +253,8 @@ alter table businesses add column if not exists demo_source text;
 alter table businesses add column if not exists demo_campaign text;
 -- The voices the business has taken off its voice list (domain/design/caller.ts): put away, brought back in a press.
 alter table businesses add column if not exists hidden_voices jsonb;
+-- How the business's voice agents say particular words (domain/design/pronounce.ts), one list for every agent.
+alter table businesses add column if not exists pronunciations jsonb;
 -- The directory and connections (domain/design/connections.ts): a business is listed only once it chooses to be, and
 -- known to others by its key, never its id. A connection is one row a pair (the lower id first), pending until the
 -- other accepts; declining, cancelling or disconnecting removes it.

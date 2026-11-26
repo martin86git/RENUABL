@@ -5,7 +5,9 @@ import {
   callerOf,
   hiddenVoicesOf,
   moreSalesAgents,
+  pronunciationsOf,
   saveHiddenVoices,
+  savePronunciations,
   setCallerName,
   setCallerBrain,
   setCallerTint,
@@ -29,7 +31,7 @@ export async function GET() {
     if ("refuse" in who) return who.refuse;
     const id = who.member.businessId;
     const biz = await query<{ name: string }>(`select name from businesses where id = $1`, [id]);
-    const [caller, admin, more, callsOn, textsOn, brand, hiddenVoices] = await Promise.all([
+    const [caller, admin, more, callsOn, textsOn, brand, hiddenVoices, pronounce] = await Promise.all([
       callerOf(id),
       // The admin assistant, which rings sold customers to book their installation (domain/install-call.ts).
       callerOf(id, "admin"),
@@ -40,6 +42,8 @@ export async function GET() {
       loadBrand(id, biz[0]?.name ?? ""),
       // The voices the business has taken off its list.
       hiddenVoicesOf(id).catch(() => []),
+      // How particular words are said on calls, for every agent (pronounce.ts).
+      pronunciationsOf(id).catch(() => []),
     ]);
     // Setting it up is for an admin: whoever may change the business's settings.
     const mayChange = can(who.member.role, "prices", who.member.permissions);
@@ -55,6 +59,7 @@ export async function GET() {
       mayChange,
       business: brand.name || biz[0]?.name || "",
       hiddenVoices,
+      pronounce,
       // The makers whose voices can speak the solar sample line (their key is set): the rest play the maker's clip.
       speakers: speakingProviders(),
     });
@@ -66,9 +71,13 @@ export async function PUT(request: Request) {
   return answer(async () => {
     const who = await requireMember("prices");
     if ("refuse" in who) return who.refuse;
-    const read = await readBody(request, 1_000);
+    const read = await readBody(request, 6_000);
     if ("refuse" in read) return read.refuse;
     const role = cleanCallerKey(read.body.role);
+    if (Array.isArray(read.body.pronounce)) {
+      // How particular words are said, for every agent the business has (pronounce.ts): the whole list, cleaned.
+      return Response.json({ ok: true, pronounce: await savePronunciations(who.member.businessId, read.body.pronounce) });
+    }
     if (read.body.voices && typeof read.body.voices === "object") {
       // A voice taken off the business's list, or brought back (caller.ts): put away, never deleted.
       const v = read.body.voices as Record<string, unknown>;
