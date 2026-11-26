@@ -153,7 +153,7 @@ export function CallPanel({ docked = false }: { docked?: boolean }) {
             <p className="truncate font-semibold">
               {caller.name} <span className="font-normal text-white/75">with</span> {practice ? "you" : customer}
             </p>
-            <p className="truncate text-xs text-white/75">{practice ? "Your practice call" : phaseWords(phase, customer)}</p>
+            <p className="truncate text-xs text-white/75">{practice ? "Your practice call" : phaseWords(phase, customer, call?.inbound)}</p>
           </div>
         </div>
       </header>
@@ -283,7 +283,7 @@ export function CallInPane({
           <CallerAvatar caller={caller} size={26} className="relative ring-2 ring-white/20" />
         </span>
         <p className="min-w-0 flex-1 truncate text-sm font-semibold">
-          {caller.name} {phaseWords(phase, customer)}
+          {caller.name} {phaseWords(phase, customer, call?.inbound)}
         </p>
         {onCall && <span className="shrink-0 text-sm font-semibold tabular-nums">{clockWords(elapsed)}</span>}
       </header>

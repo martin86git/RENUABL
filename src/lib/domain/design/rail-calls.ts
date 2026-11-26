@@ -28,10 +28,16 @@ export function railCalls<T>(calls: readonly T[], max = RAIL_CALLS_MAX): { shown
 
 /** What a call's round says when pointed at. */
 export function railCallWords(
-  c: { customer: string; deal: string; phase: "ringing" | "on-call"; by: string },
+  c: { customer: string; deal: string; phase: "ringing" | "on-call"; by: string; inbound?: boolean },
   clock: string | null,
 ): string {
   const who = c.customer.trim() || "A customer";
-  const state = c.phase === "on-call" ? `on the call with ${c.by}${clock ? ` · ${clock}` : ""}` : `${c.by} is ringing`;
+  const state = c.inbound
+    ? c.phase === "on-call"
+      ? `rang in, on the call with ${c.by}${clock ? ` · ${clock}` : ""}`
+      : `is ringing ${c.by}`
+    : c.phase === "on-call"
+      ? `on the call with ${c.by}${clock ? ` · ${clock}` : ""}`
+      : `${c.by} is ringing`;
   return `${who} · ${state}${c.deal ? ` · ${c.deal}` : ""}`;
 }
