@@ -9,6 +9,7 @@
 import { clsx } from "clsx";
 import {
   Calculator,
+  ChevronLeft,
   ChevronRight,
   Columns2,
   LayoutGrid,
@@ -228,6 +229,8 @@ export function SolController(props: {
   canUndo: boolean;
   onUndo: () => void;
   onTurn: (degrees: number) => void;
+  /** Slide what is picked along its row, left (-1) or right (1) as seen on the picture, this many steps. */
+  onSlide?: (by: number) => void;
   onLandscape: (landscape: boolean) => void;
   onTilt: (by: number) => void;
   onDelete: () => void;
@@ -271,11 +274,12 @@ export function SolController(props: {
         aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"}`}
         className={clsx(
           "pointer-events-auto flex flex-col items-center justify-center rounded-full bg-[#3a3d43] text-white shadow-[0_6px_18px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/10 active:scale-95 active:bg-[#4a4e55] motion-reduce:active:scale-100",
-          upright ? "size-[4.25rem]" : "size-[3.4rem]",
+          // Larger on a phone held upright (26 Nov 2026, Martin: "the left and right toggles need to be bigger").
+          upright ? "size-[5rem]" : "size-[3.75rem]",
         )}
       >
-        <Turn className={upright ? "size-6" : "size-5"} aria-hidden />
-        <span className={clsx("mt-0.5 text-[11px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
+        <Turn className={upright ? "size-7" : "size-6"} aria-hidden />
+        <span className={clsx("mt-0.5 text-[13px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
           {stepBy}°
         </span>
       </HoldButton>
@@ -294,7 +298,7 @@ export function SolController(props: {
           className={clsx(
             "flex items-center justify-center rounded-[9px]",
             // Larger on a phone held upright, so a thumb finds it (26 Nov 2026, Martin).
-            upright ? "h-12 w-16" : "h-8 w-9",
+            upright ? "h-12 w-14" : "h-8 w-9",
             props.landscape === land ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
           )}
         >
@@ -321,6 +325,24 @@ export function SolController(props: {
     >
       {by < 0 ? <Minus className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
     </HoldButton>
+  );
+  // Tap the panels across their row, left or right (26 Nov 2026, Martin: "a left and right button to be able to tap the
+  // panel across. Typically useful for panels in landscape"); held, they keep sliding, as one step to undo.
+  const slideStep = (by: -1 | 1) => (
+    <HoldButton
+      onStep={(times) => props.onSlide?.(by * times)}
+      onHold={props.onHold}
+      aria-label={by < 0 ? "Slide left along the row" : "Slide right along the row"}
+      className={clsx(small, "pointer-events-auto active:bg-white/15", upright ? "h-11 w-12" : "h-8 w-8")}
+    >
+      {by < 0 ? <ChevronLeft className="size-5" aria-hidden /> : <ChevronRight className="size-5" aria-hidden />}
+    </HoldButton>
+  );
+  const slide = props.panels > 0 && props.onSlide && (
+    <div className={seg} role="group" aria-label="Slide along the row">
+      {slideStep(-1)}
+      {slideStep(1)}
+    </div>
   );
   const tilt = props.panels > 0 && (
     <div className={seg} role="group" aria-label="Tilt">
@@ -435,6 +457,7 @@ export function SolController(props: {
         remove={remove}
         tiltRow={tiltAndStep}
         thumb={thumb}
+        slideStep={props.onSlide ? slideStep : undefined}
       />
     );
 
@@ -457,6 +480,7 @@ export function SolController(props: {
         </div>
         <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
+          {slide}
           {line}
           {whole}
           {remove}
@@ -571,6 +595,8 @@ function UprightPlate(
     remove: ReactNode;
     tiltRow: ReactNode;
     thumb: (by: -1 | 1) => ReactNode;
+    /** ← over the left thumb and → over the right, where the plate has room. */
+    slideStep?: (by: -1 | 1) => ReactNode;
   },
 ) {
   const inside = useRef<HTMLDivElement | null>(null);
@@ -620,34 +646,51 @@ function UprightPlate(
             {props.done}
           </div>
         </div>
-        {!folded && (props.wholeLine || props.wholeArray) && (
-          <div className="mt-2 flex justify-center gap-2">
-            {props.wholeLine && props.onWholeLine && (
-              <button
-                type="button"
-                onClick={props.onWholeLine}
-                aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
-              >
-                <Columns2 className="size-3.5 text-sun-line" aria-hidden />
-                Line {props.wholeLine}
-              </button>
+        {/* Line and Select all, and the counter while laying, with ← and → either side of them (26 Nov 2026, Martin:
+            stacked, the slide buttons pushed the turn thumbs below the screen). */}
+        {!folded && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {props.panels > 0 && props.slideStep ? (
+              <div className="shrink-0 rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(-1)}</div>
+            ) : (
+              <span />
             )}
-            {props.wholeArray && props.onWholeArray && (
-              <button
-                type="button"
-                onClick={props.onWholeArray}
-                aria-label={`Pick the whole array: ${props.wholeArray} panels`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
-              >
-                <LayoutGrid className="size-3.5" aria-hidden />
-                Select all {props.wholeArray}
-              </button>
+            <div className="flex min-w-0 flex-col items-center gap-2">
+              {(props.wholeLine || props.wholeArray) && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {props.wholeLine && props.onWholeLine && (
+                    <button
+                      type="button"
+                      onClick={props.onWholeLine}
+                      aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+                      className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+                    >
+                      <Columns2 className="size-3.5 text-sun-line" aria-hidden />
+                      Line {props.wholeLine}
+                    </button>
+                  )}
+                  {props.wholeArray && props.onWholeArray && (
+                    <button
+                      type="button"
+                      onClick={props.onWholeArray}
+                      aria-label={`Pick the whole array: ${props.wholeArray} panels`}
+                      className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
+                    >
+                      <LayoutGrid className="size-3.5" aria-hidden />
+                      Select all {props.wholeArray}
+                    </button>
+                  )}
+                </div>
+              )}
+              {props.counter}
+            </div>
+            {props.panels > 0 && props.slideStep ? (
+              <div className="shrink-0 rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(1)}</div>
+            ) : (
+              <span />
             )}
           </div>
         )}
-        {/* The panel counter while panels are being laid. */}
-        {!folded && props.counter && <div className="mt-2 flex justify-center">{props.counter}</div>}
         {!folded && (
           <div className="mt-2.5 flex items-end justify-between gap-2">
             {props.panels > 0 ? props.thumb(-1) : <span />}

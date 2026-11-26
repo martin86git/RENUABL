@@ -481,6 +481,9 @@ const PHONE_STRIP_LIFT = 16;
 const PHONE_RAIL_ZOOM = 0.72;
 /** A phone upright opens one zoom press (1.4×) closer than the pop-up does, so the roof reads (21 Nov 2026, Martin). */
 const PHONE_ZOOM = 1.4;
+/** How far Sol's ← → buttons slide what is picked along its row, a tap (26 Nov 2026, Martin: "a left and right button to
+    be able to tap the panel across"); held, it keeps sliding. */
+const SLIDE_STEP_M = 0.05;
 /** The view's size for a pinch: no closer than this many photo pixels across, no further out than the whole photo. */
 const PINCH_MIN_W = 40;
 
@@ -1842,9 +1845,12 @@ export function RoofDesigner(props: {
         // The dock under the picture is only as tall as what it holds (26 Nov 2026, Martin): the picture takes the rest.
         const want = solFoldedNow.current ? PHONE_FOLDED_BAND : dockWantNow.current;
         const drop = want !== null ? Math.max(0, restOpen - want) : 0;
-        const pb = drop && want !== null ? want : PHONE_BANDS.below;
-        const rest = restOpen - drop;
-        const tall = photoH + drop;
+        // A dock taller than the room under the picture takes it from the picture, never below 80% of the photo's own
+        // shape (26 Nov 2026, Martin: the controller's turn thumbs ran below the screen).
+        const cut = want !== null && want > restOpen ? Math.min(want - restOpen, Math.max(0, photoH - Math.round(shortest * 0.8))) : 0;
+        const pb = (drop || cut) && want !== null ? (cut ? restOpen + cut : want) : PHONE_BANDS.below;
+        const rest = restOpen - drop + cut;
+        const tall = photoH + drop - cut;
         setStage((was) =>
           was &&
           was.photoH === tall &&
@@ -3344,11 +3350,12 @@ export function RoofDesigner(props: {
   // Where the loupe goes for a finger at this pointer event, or null when it isn't a finger or nothing is held.
   const loupeFor = (e: React.PointerEvent): typeof loupe => {
     if (e.pointerType !== "touch" || !press.current || press.current.mode === "pan") return null;
-    const at = pointAt(e);
     const box = svg.current?.getBoundingClientRect();
-    if (!at || !box || !box.width) return null;
+    if (!box || !box.width) return null;
     const fx = (e.clientX - box.left) / box.width;
     const fy = (e.clientY - box.top) / box.height;
+    // In the picture's own units (its viewBox), not metres: the loupe draws the picture itself, magnified.
+    const at = { x: view.x + fx * view.w, y: view.y + fy * view.h };
     return { at, left: fx > 0.5 && fy < 0.5, per: view.w / box.width };
   };
   const onPointerDown = (e: React.PointerEvent) => {
@@ -12415,6 +12422,19 @@ export function RoofDesigner(props: {
                     canUndo={changedSincePicked}
                     onUndo={undoKeepingPicks}
                     onTurn={(degrees) => turn(degrees)}
+                    onSlide={(by) => {
+                      // Along the panels' own row (across the way they face), left or right as seen on the picture.
+                      const first = pickedPanels[0];
+                      if (!first) return;
+                      const f = ((pickedFacing ?? panelFacing(first)) * Math.PI) / 180;
+                      let ax = Math.cos(f);
+                      let ay = Math.sin(f);
+                      if (ax < -1e-6 || (Math.abs(ax) <= 1e-6 && ay < 0)) {
+                        ax = -ax;
+                        ay = -ay;
+                      }
+                      nudge(cm(ax * by * SLIDE_STEP_M), cm(ay * by * SLIDE_STEP_M));
+                    }}
                     onLandscape={turnLandscape}
                     onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
                     onDelete={removePicked}
