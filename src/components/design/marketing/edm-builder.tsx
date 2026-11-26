@@ -26,6 +26,8 @@ import {
   ShoppingBag,
   Timer,
   CirclePlay,
+  PanelTop,
+  PaintBucket,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
@@ -50,6 +52,8 @@ import {
   cleanColumns,
   cleanLink,
   footerLines,
+  inksOn,
+  BAR_BUTTON,
   fromNameOf,
   lookOf,
   letterWarnings,
@@ -100,6 +104,7 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   products: ShoppingBag,
   countdown: Timer,
   video: CirclePlay,
+  bar: PanelTop,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
@@ -107,7 +112,7 @@ const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
   { name: "Basics", kinds: ["heading", "text", "button", "image", "video", "products", "countdown"] },
-  { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
+  { name: "Layout", kinds: ["bar", "tiles", "divider", "spacer", "social"] },
 ];
 
 /** When a change was made, for grouping typing into one undo step. */
@@ -570,7 +575,7 @@ export function EdmBuilder({
                   )}
                   <CanvasBlock
                     block={b}
-                    ink={ink}
+                    ink={b.fill && b.kind !== "bar" ? inksOn(b.fill, style) : ink}
                     picked={selected === b.id}
                     onPick={() => (setSelected(b.id), setAdding(null))}
                     onDragEnd={() => setDropAt(null)}
@@ -908,7 +913,10 @@ function CanvasBlock({
         picked ? "outline-2 outline-sun-line outline-solid" : "outline-1 outline-dashed",
       )}
       // The dashed edge is drawn in the words' own colour, so it shows on a dark background as on a light one.
-      style={picked ? undefined : { outlineColor: `color-mix(in srgb, ${ink.words} 28%, transparent)` }}
+      style={{
+        ...(picked ? {} : { outlineColor: `color-mix(in srgb, ${ink.words} 28%, transparent)` }),
+        ...(b.fill && b.kind !== "bar" ? { background: b.fill } : {}),
+      }}
     >
       <div
         className={cn(
@@ -947,6 +955,7 @@ function CanvasBlock({
         </IconButton>
       </div>
 
+      {b.kind === "bar" && <BarView block={b} colour={colour} picked={picked} onChange={onChange} />}
       {b.kind === "heading" && (
         <AutoText
           value={b.text}
@@ -1067,6 +1076,14 @@ function CanvasBlock({
           <CountdownView endsAt={b.endsAt ?? null} colour={colour} ink={ink} align={align} />
           {picked && <CountdownFields block={b} onChange={onChange} />}
         </>
+      )}
+      {picked && (
+        <PanelColour
+          value={b.fill ?? null}
+          colour={colour}
+          label={b.kind === "bar" ? "Bar colour" : "Panel colour"}
+          onChange={(fill) => onChange(() => ({ fill: fill ?? undefined }))}
+        />
       )}
       {b.kind === "products" &&
         (picked ? (
@@ -1768,6 +1785,112 @@ function Toggle({ on, onClick, label, children }: { on: boolean; onClick: () => 
     >
       {children}
     </button>
+  );
+}
+
+/** A top bar: its line beside a button, the strip in a soft grey (or its own colour), as the email will show it. */
+function BarView({
+  block: b,
+  colour,
+  picked,
+  onChange,
+}: {
+  block: EdmBlock;
+  colour: string;
+  picked: boolean;
+  onChange: (patch: BlockPatch) => void;
+}) {
+  const ground = b.fill ?? "#f4f4f5";
+  const on = inksOn(ground, DEFAULT_STYLE);
+  return (
+    <div>
+      <div className="flex items-center gap-3 rounded-xl px-4 py-2.5" style={{ background: ground }}>
+        <input
+          value={b.text}
+          maxLength={EDM_LIMITS.heading}
+          onChange={(e) => onChange({ text: e.target.value })}
+          placeholder="Ready to get started?"
+          aria-label="The bar's line"
+          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+          style={{ color: on.heading }}
+        />
+        <span className="shrink-0 rounded-lg px-4 py-2" style={{ background: colour }}>
+          <input
+            value={b.label ?? ""}
+            maxLength={EDM_LIMITS.label}
+            size={Math.max(6, (b.label ?? "").length)}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder={BAR_BUTTON}
+            aria-label="The bar's button"
+            className="bg-transparent text-center text-[14px] font-semibold text-white outline-none placeholder:text-white/70"
+          />
+        </span>
+      </div>
+      {picked && (
+        <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+          <LinkInput value={b.url} onChange={(url) => onChange({ url })} />
+          <p className="mt-1 text-[12px] text-muted">
+            {b.url === null ? "The button needs an https link. " : ""}At the top of the email, it shows above your logo.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A panel behind the block: none, a few quiet colours, the brand colour or any other. Blocks in a row of one colour make one panel. */
+const PANEL_SWATCHES = ["#f4f4f5", "#eef2ff", "#fff3ea", "#e8f5ec", "#26282c"];
+function PanelColour({
+  value,
+  colour,
+  label,
+  onChange,
+}: {
+  value: string | null;
+  colour: string;
+  label: string;
+  onChange: (fill: string | null) => void;
+}) {
+  const swatches = [...PANEL_SWATCHES, colour.toLowerCase()].filter((c, i, all) => all.indexOf(c) === i);
+  return (
+    <div
+      className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <PaintBucket className="size-3.5 text-muted" />
+      <span className="text-muted">{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={cn("h-7 rounded-full px-2.5 ring-1", value ? "ring-line hover:ring-ink/40" : "bg-ink text-canvas ring-ink")}
+      >
+        None
+      </button>
+      {swatches.map((c) => (
+        <button
+          key={c}
+          type="button"
+          aria-label={`Panel colour ${c}`}
+          aria-pressed={value === c}
+          onClick={() => onChange(c)}
+          className={cn(
+            "size-7 rounded-full ring-1 ring-black/15",
+            value === c && "outline-2 outline-offset-2 outline-sun-line outline-solid",
+          )}
+          style={{ background: c }}
+        />
+      ))}
+      <label className="relative size-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-black/15" title="Another colour">
+        <span className="grid size-full place-items-center bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)] text-[10px]" />
+        <input
+          type="color"
+          value={value ?? "#eef2ff"}
+          onChange={(e) => onChange(e.target.value.toLowerCase())}
+          className="absolute inset-0 cursor-pointer opacity-0"
+        />
+      </label>
+      <span className="basis-full pt-0.5 text-[11px] text-muted">Blocks next to each other in one colour make one panel.</span>
+    </div>
   );
 }
 

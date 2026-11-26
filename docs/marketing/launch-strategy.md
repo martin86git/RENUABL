@@ -59,6 +59,8 @@ Victoria first, then by state.
 
 **A glance, not a read.** Nobody reads about something before they know it pays them. Each email is one product, sold the way Apple sells a product: a moving or still picture, a headline of four words or so, one or two lines (45 words at most, tested), one button. No greeting, no paragraphs.
 
+**Laid out as Xero's invoicing email** (26 Nov 2026, Martin: "a good email marketing example we could reference"): a bar at the very top, "Ready for your AI sales force?" with **See pricing**, above the logo for whoever is already sold; then each part (hook, picture, button) centred on a panel of its own, the first on a warm tint, the rest a quiet grey, with a gap between. Like Xero's, this is a designed email, so expect Gmail to file it under Promotions; the personal letter look is for one-to-one follow-ups.
+
 **The products are the heroes:** Sol (filmed off the homepage, so he is the same sun with the brain in it), the voice agent (its sound wave on graphite, as on the homepage and in the app) and the AI designer (its orange round). The launch shows them all at once as **a staggered stack of cards** dealt in one by one: Your customers, answered · Your emails, written · Your calls, written up · Your super-intelligent advisor · Your roofs, designed · Your installs, lined up.
 
 **Moving pictures are GIFs**, the only animation email apps play: the cards dealt in, **a voice agent on a call** (its wave beating, the clock running, the words typed as they are said, then Booked), Sol breathing, the designer laying panels row by row with the kW counting up. **Outlook on Windows shows only a GIF's first frame**, so each starts on its finished picture and then plays. Sizes: 0.2 to 0.8 MB each.
