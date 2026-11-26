@@ -203,6 +203,20 @@ Victoria first, then by state.
 - **Footer picture** `marketing/launch/footer-voice.jpg`: “Your AI salesperson: less than $2 a day. Calls & Texts, $49 a month.”
 - **Footer picture** `marketing/launch/footer-marketplace.jpg`: “RENUABL Marketplace, coming soon: find crews, win installs, trade stock.”
 
+### The voice email · a campaign of its own
+
+Added 26 Nov 2026 (Martin: "another marketing email… emphasising voice… a nice visual to bring character to the voice ai… one visual to understand how it looks in the software, the phone book"). Not in the series, which is full at six emails: send it by hand as its own campaign, "Meet your voice agent · voice".
+
+- **Subject:** Meet your voice agent. It rings your leads in minutes.
+- **Preview:** You choose its name, its voice and its script. It always says it's automated.
+- **Hook:** Meet the voice agent that rings your leads.
+  - **Picture** `marketing/launch/voice-meet.gif`: "Meet Gary." (an example name), its wave beating, its opening line typed, then Named by you · Voice chosen by you · Follows your script · Always says it's automated. Button: Hear it call.
+- **Hook:** Pick a contact. Hand over the call. Watch it happen.
+  - **Picture** `marketing/launch/product-phonebook.jpg`: the agent's window drawn as the product shows it: a call in progress beside the phone book, a contact opened on Hand it to Gary. Made-up names; every number from the range set aside for fiction (0491 570 …). Button: Try the demo.
+- **Hook:** Your own number, for less than $2 a day.
+  - **Picture** `marketing/launch/aday.jpg`. Words: Calls & Texts is $49 a month, on top of your RENUABL plan. Every call says it's your automated assistant, and goes out in calling hours. Button: See the pricing.
+- **Hook:** Made for solar. Design and price a roof while you're on the phone.
+
 ## 6. Must be true before anything is sent
 
 1. **Consent of the list.** Only contacts with express or inferred consent are ever emailed; anyone imported as "Not checked" is skipped. Confirm what consent the bought list carries.

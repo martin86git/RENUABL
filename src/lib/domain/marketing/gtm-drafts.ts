@@ -72,7 +72,19 @@ export const SOL_TYPES: Record<string, string> = {
   sol: "I know every deal. I write your emails in your voice, and tell you who to ring next.",
 };
 
+/** What the voice agent says on its own picture (voice-meet.gif in the picture tool; a test keeps them in step). */
+export const VOICE_MEET_LINE = "Hi, it's Gary, Sunrise Solar's automated assistant. Have you got a few minutes?";
+
 export const GTM_PICTURES: Record<string, GtmPicture> = {
+  vmeet: {
+    file: "voice-meet.gif",
+    alt: `Meet Gary, a voice agent (you choose its name, voice and script): "${VOICE_MEET_LINE}"`,
+  },
+  pbook: {
+    file: "product-phonebook.jpg",
+    alt: "In RENUABL: a voice agent on a call beside its phone book, with a contact opened to hand the call over (example data)",
+  },
+  aday: { file: "aday.jpg", alt: `Calls & Texts, your voice agent: ${VOICE_DAY_WORDS}. ${VOICE}, on top of your RENUABL plan.` },
   dband: {
     file: "designer-band.jpg",
     alt: "Made for solar: RENUABL's designer, a system laid out on a real roof and priced as it's drawn",
@@ -194,6 +206,34 @@ export const GTM_LAUNCH: EdmContent = email(
   ],
 );
 
+/**
+ * The voice email, a campaign of its own (26 Nov 2026, Martin: "lets create another marketing email. do it emphasising
+ * voice. add in a nice visual to bring character to the voice ai. then add one visual to understand how it looks in the
+ * software, the phone book"): the agent introduced by an example name, the product drawn with made-up names and
+ * numbers, then the price a day. Not part of the series, which is full at six emails.
+ */
+export const GTM_VOICE_NAME = "Meet your voice agent · voice";
+export const GTM_VOICE: EdmContent = email(
+  "v",
+  "Meet your voice agent. It rings your leads in minutes.",
+  "You choose its name, its voice and its script. It always says it's automated.",
+  [
+    { hook: "Meet the voice agent that rings your leads.", pictures: ["vmeet"], cta: ["Hear it call", SITE] },
+    { hook: "Pick a contact. Hand over the call. Watch it happen.", pictures: ["pbook"], cta: ["Try the demo", DEMO] },
+    {
+      hook: `Your own number, for ${VOICE_DAY_WORDS}.`,
+      pictures: ["aday"],
+      words: [
+        `Calls & Texts is ${VOICE}, on top of your RENUABL plan. Every call says it's your automated assistant, and goes out in calling hours.`,
+      ],
+      cta: ["See the pricing", PRICING],
+    },
+  ],
+);
+
+/** The campaigns of their own, beside the launch and its series: each added once by its name (the gtm route). */
+export const GTM_CAMPAIGNS: { name: string; content: EdmContent }[] = [{ name: GTM_VOICE_NAME, content: GTM_VOICE }];
+
 /** The series: one product an email, each picture with its own hook and button. */
 const SERIES: { wait: number; content: EdmContent }[] = [
   {
@@ -284,4 +324,7 @@ export function gtmSequence(launchCampaignId: string, ids: Record<string, string
 }
 
 /** Every email in the drafts, for the checks and the review copy. */
-export const GTM_EMAILS: EdmContent[] = [GTM_LAUNCH, ...SERIES.map((s) => s.content)];
+export const GTM_EMAILS: EdmContent[] = [GTM_LAUNCH, ...SERIES.map((s) => s.content), ...GTM_CAMPAIGNS.map((c) => c.content)];
+
+/** The picture keys an email uses, so only those are read in when it alone is added. */
+export const pictureKeys = (c: EdmContent): string[] => c.blocks.map(pictureKeyOf).filter((k): k is string => Boolean(k));

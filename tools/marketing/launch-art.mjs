@@ -159,6 +159,25 @@ const page = (body, css = "", script = "") =>
 
 // ---- The pictures -----------------------------------------------------------------------------------------------
 
+/** The voice email's agent (26 Nov 2026): an example name in its own colour, its opening line and what a business chooses for it. */
+const VOICE_TINT = "#a78bfa";
+const VOICE_OPENING = "Hi, it's Gary, Sunrise Solar's automated assistant. Have you got a few minutes?";
+const VOICE_TAGS = ["Named by you", "Voice chosen by you", "Follows your script", "Always says it's automated"];
+const ico = (d, size = 18) =>
+  `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  phone: ico(
+    '<path d="M13.8 16.6a1 1 0 0 0 1.2-.3l.4-.5a2 2 0 0 1 1.6-.8h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.600l-.5.4a1 1 0 0 0-.3 1.200 14 14 0 0 0 6.400 6.400"/>',
+  ),
+  chat: ico('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+  mail: ico('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>'),
+  search: ico('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.300-4.300"/>'),
+  hang: ico(
+    '<path d="M10.700 13.300a14 14 0 0 1-2.300-3.100 1 1 0 0 1 .3-1.200l.5-.4A2 2 0 0 0 10 7V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2 18 18 0 0 0 3.500 10.500"/><path d="M22 2 2 22"/><path d="M14.500 16.200a1 1 0 0 0 .5.100l.4-.500a2 2 0 0 1 1.600-.800h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2 18 18 0 0 1-9.500-2.700"/>',
+    16,
+  ),
+};
+
 const CARDS = [
   { icon: AGENT(56, "#ff5a1f"), head: "Your customers, answered.", sub: "Voice agents ring every new lead" },
   { icon: "%%SOL%%", head: "Your emails, written.", sub: "Sol drafts every follow-up in your voice" },
@@ -522,6 +541,136 @@ const ART = {
        .say small{font-size:15px;letter-spacing:.2em;text-transform:uppercase;color:#ff8f4a}
        .say h1{margin-top:18px;font-size:92px;line-height:1;font-weight:600;letter-spacing:-.04em}.say h1 b{color:#ff7a2e;font-weight:600}
        .say p{margin-top:26px;font-size:26px;color:rgba(255,255,255,.62)}`,
+    ),
+  },
+
+  /**
+   * The voice email's character picture (26 Nov 2026, Martin: "add in a nice visual to bring character to the voice
+   * ai"): a voice agent introduced as a member of the team, by the name a business might give it. Its wave beats, it
+   * says its opening line, and what the business chooses for it comes in as tags. The name is an example.
+   */
+  "voice-meet.gif": {
+    frames: 40,
+    delay: 100,
+    hold: 3600,
+    html: page(
+      `<div class="sky"></div>
+       <div class="who">${AGENT(210, VOICE_TINT, "big")}<b>Gary</b><span>Voice agent · Sales</span><em><i></i>Ready for your leads</em></div>
+       <div class="say"><small>YOUR VOICE AGENT</small><h1>Meet Gary.</h1>
+         <p class="sub">Or whatever you call yours. You choose the name, the voice and the script.</p>
+         <div class="b"><s>Gary</s><p id="line" data-text="${VOICE_OPENING}"></p></div>
+         <div class="tags">${VOICE_TAGS.map((t, i) => `<span data-g="${i}">${t}</span>`).join("")}</div>
+       </div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `.sky{position:absolute;inset:0;background:radial-gradient(circle at 21% 44%,color-mix(in srgb,${VOICE_TINT} 30%,transparent),transparent 36%)}
+       .who{position:absolute;left:72px;top:112px;width:330px;display:flex;flex-direction:column;align-items:center;text-align:center}
+       .who b{margin-top:30px;font-size:34px;font-weight:600;letter-spacing:-.02em}.who span{font-size:17px;color:rgba(255,255,255,.55);margin-top:4px}
+       .who em{margin-top:16px;font-style:normal;font-size:15px;color:${VOICE_TINT};font-family:"JetBrains Mono",Consolas,monospace}
+       .who em i{display:inline-block;width:8px;height:8px;border-radius:50%;background:${VOICE_TINT};margin-right:8px;box-shadow:0 0 10px ${VOICE_TINT}}
+       .big .agent-glow{inset:-30%;filter:blur(32px)}
+       .say{position:absolute;left:470px;top:84px;width:660px}
+       .say small{font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.22em;color:rgba(255,255,255,.5)}
+       .say h1{margin-top:10px;font-size:96px;line-height:1;font-weight:600;letter-spacing:-.05em}
+       .sub{margin-top:16px;font-size:22px;line-height:1.4;color:rgba(255,255,255,.7);max-width:560px}
+       .b{margin-top:28px;width:560px;border-radius:22px;padding:16px 20px;background:#fff;color:#0b0b0c;box-shadow:0 18px 40px -20px rgba(0,0,0,.9)}
+       .b s{display:block;text-decoration:none;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#7c5cf0}
+       .b p{font-size:21px;line-height:1.4;margin-top:4px;min-height:2.8em}
+       .tags{margin-top:22px;display:flex;flex-wrap:wrap;gap:10px;width:600px}
+       .tags span{padding:9px 16px;border-radius:999px;background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);font-size:15px;color:rgba(255,255,255,.85);opacity:0}`,
+      `const line = document.getElementById("line"); const text = line.dataset.text;
+       window.at = (t) => {
+         line.textContent = text.slice(0, Math.round(text.length * span(t, 0.08, 0.6)));
+         document.querySelectorAll("[data-g]").forEach((el) => {
+           const k = span(t, 0.62 + el.dataset.g * 0.08, 0.72 + el.dataset.g * 0.08);
+           el.style.opacity = k; el.style.transform = "translateY(" + (1 - k) * 10 + "px)";
+         });
+         beat(t, t < 0.6);
+       }; window.at(0);`,
+    ),
+  },
+
+  /**
+   * The voice email's product picture (26 Nov 2026, Martin: "one visual to understand how it looks in the software, the
+   * phone book"; "update the text in the screenshots so it doesnt have my name… or any real phonenumbers"): the agent's
+   * window drawn as the product shows it, from two of Martin's screenshots: a call in progress beside the contacts, one
+   * opened on Hand it to the agent. Drawn here, not photographed, so every name is made up and every number is from the
+   * range set aside for fiction (0491 570 …).
+   */
+  "product-phonebook.jpg": {
+    html: page(
+      `<div class="glow"></div><div class="win">
+        <div class="call">
+          <div class="chead"><div class="row"><span class="live"><i></i>CALL IN PROGRESS</span><tt>0:26</tt></div>
+            <div class="row2">${AGENT(44, VOICE_TINT)}<div><b>Gary <u>with</u> Olivia</b><span>New lead · solar and a battery</span></div></div></div>
+          <div class="lines">
+            ${[
+              ["Gary", "Hi. Is that Olivia?"],
+              ["Olivia", "Yes, it is."],
+              [
+                "Gary",
+                "Hi Olivia, it's Gary, Sunrise Solar's automated assistant, calling about your solar enquiry. Have you got a few minutes?",
+              ],
+              ["Olivia", "Oh, yes. Absolutely."],
+            ]
+              .map(([who, text]) => `<div class="l ${who === "Gary" ? "g" : "c"}"><s>${who}</s><p>${text}</p></div>`)
+              .join("")}
+          </div>
+          <div class="cfoot"><div class="tell">Tell Gary something…</div><div class="hang">${ICON.hang} Hang up</div></div>
+        </div>
+        <div class="book">
+          <div class="bhead">${AGENT(44, VOICE_TINT)}<div><b>Talk to Gary</b><span>On a call now · 2 calls today</span></div></div>
+          <div class="search">${ICON.search} Search contacts</div>
+          <div class="list">
+            <p class="letter">A</p>
+            <div class="open">
+              <div class="c"><div><b>Alex Example</b><span>0491 570 006 · Solar · Designed</span></div><i class="on">${ICON.phone}</i><i>${ICON.chat}</i></div>
+              <p class="cap">WHAT THE CALL IS ABOUT</p><div class="about">Their proposal went out on Monday. See if they have any questions.</div>
+              <div class="hand">${AGENT(34, VOICE_TINT)}<div><b>Hand it to Gary</b><span>Gary rings Alex and you watch the call here</span></div></div>
+              <div class="opt">${ICON.mail}<div><b>Ask Alex by email first</b><span>Gary rings only after a yes</span></div></div>
+            </div>
+            <p class="letter">C</p>
+            <div class="c"><div><b>Casey Demo</b><span>0491 570 110 · Solar · Proposal sent</span></div><i>${ICON.phone}</i><i>${ICON.chat}</i></div>
+            <p class="letter">J</p>
+            <div class="c"><div><b>Jordan Placeholder</b><span>0491 570 157 · Solar and battery · Designed</span></div><i>${ICON.phone}</i><i>${ICON.chat}</i></div>
+          </div>
+        </div>
+      </div><div class="tag">In RENUABL · your voice agent's phone book (example data)</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 112%,rgba(255,90,31,.34),transparent 58%)}
+       .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}
+       .win{position:absolute;left:70px;top:24px;width:1060px;height:580px;border-radius:20px;overflow:hidden;display:flex;background:#fff;color:#1d1d1f;
+         box-shadow:0 0 0 2px #2fae84,0 40px 120px rgba(0,0,0,.85)}
+       .win .agent{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);background:#2f323a}.win .agent-glow{display:none}
+       .call{width:372px;display:flex;flex-direction:column;border-right:1px solid #e3e3e8}
+       .chead{background:#2fae84;color:#fff;padding:16px 18px 14px}
+       .row{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;letter-spacing:.12em}
+       .live i{display:inline-block;width:9px;height:9px;border-radius:50%;background:#fff;margin-right:8px;box-shadow:0 0 0 4px rgba(255,255,255,.3)}
+       .row tt{font-family:"JetBrains Mono",Consolas,monospace;font-size:16px;letter-spacing:.04em}
+       .row2{display:flex;align-items:center;gap:12px;margin-top:14px}.row2 b{font-size:18px;font-weight:600}.row2 u{text-decoration:none;font-weight:400;opacity:.85}
+       .row2>div>span{display:block;font-size:13px;opacity:.85;margin-top:1px}
+       .lines{flex:1;padding:14px 16px 0;overflow:hidden}
+       .l{margin-bottom:7px;display:flex;flex-direction:column;align-items:flex-start}.l.c{align-items:flex-end}
+       .l s{text-decoration:none;font-size:11px;color:#8a8a90;margin:0 6px 3px}
+       .l p{max-width:268px;padding:8px 13px;border-radius:16px;background:#ececef;font-size:14px;line-height:1.35}
+       .l.c p{background:#3a3d43;color:#fff;font-weight:600}
+       .cfoot{padding:12px 14px 14px;border-top:1px solid #e3e3e8}
+       .tell{height:38px;border-radius:999px;background:#ececef;color:#8a8a90;font-size:14px;display:flex;align-items:center;padding:0 16px}
+       .hang{margin-top:10px;height:36px;border-radius:999px;background:#fde7e7;color:#d92d20;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px}
+       .book{flex:1;display:flex;flex-direction:column;min-width:0}
+       .bhead{background:#3a3d43;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px}
+       .bhead b{font-size:17px;font-weight:600}.bhead>div>span{display:block;font-size:12.5px;color:rgba(255,255,255,.65)}
+       .search{height:44px;display:flex;align-items:center;gap:10px;padding:0 20px;color:#8a8a90;font-size:14.5px;border-bottom:1px solid #e3e3e8}
+       .list{padding:6px 14px 0;flex:1;overflow:hidden}
+       .letter{font-size:11px;font-weight:700;color:#8a8a90;letter-spacing:.1em;margin:7px 8px 3px}
+       .c{display:flex;align-items:center;gap:8px;padding:7px 10px}.c>div{flex:1;min-width:0}
+       .c b{font-size:15.5px;font-weight:500}.c>div>span{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:11.5px;color:#6e6e73;margin-top:1px}
+       .c i{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1px #d9d9de;color:#1d1d1f;flex:none}
+       .c i.on{background:#3a3d43;color:#fff;box-shadow:none}
+       .open{background:#ececef;border-radius:14px;padding:2px 4px 8px}
+       .cap{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:#6e6e73;margin:7px 14px 5px}
+       .about{margin:0 10px;padding:9px 12px;border-radius:10px;background:#fff;font-size:13.5px;color:#1d1d1f;box-shadow:inset 0 0 0 1px #d9d9de}
+       .hand{margin:9px 6px 3px;padding:10px 16px;border-radius:14px;background:#3a3d43;color:#fff;display:flex;align-items:center;gap:14px}
+       .hand b{font-size:15.5px;font-weight:600}.hand>div>span{display:block;font-size:12.5px;color:rgba(255,255,255,.7)}
+       .opt{display:flex;align-items:center;gap:13px;padding:6px 16px;color:#1d1d1f}.opt b{font-size:14px;font-weight:500}
+       .opt>div>span{display:block;font-size:12px;color:#6e6e73}.opt svg,.search svg{flex:none}`,
     ),
   },
 
