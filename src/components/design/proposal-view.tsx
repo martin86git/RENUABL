@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { ShadeSummary } from "./shade-summary";
 import { accessColour } from "@/lib/domain/design/shade";
 import clsx from "clsx";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Heart } from "lucide-react";
 import {
   blockHeading,
   isCustom,
@@ -902,7 +902,13 @@ export interface ProposalPageProps {
    * With options: which one the page shows, and how the customer changes it (left out once the choice is made, by
    * going ahead, and in the business's preview, where the cards still show the choice).
    */
-  choice?: { chosen: OptionKey | null; onChoose?: (goal: OptionKey) => void };
+  choice?: {
+    chosen: OptionKey | null;
+    onChoose?: (goal: OptionKey) => void;
+    /** The options the customer likes, and liking one (26 Nov 2026): only on the customer's own page. */
+    liked?: readonly string[];
+    onLike?: (goal: OptionKey, liked: boolean) => void;
+  };
   /** Opens the chat dock: the thank you after an indicative proposal's thoughts are sent offers it. */
   onOpenChat?: () => void;
   /**
@@ -1460,6 +1466,7 @@ export function ProposalPage({
               block,
               <section
                 key={block.id}
+                data-block={block.id}
                 aria-label={heading || undefined}
                 style={dark ? ({ ...darkGroundVars(view.theme), background: "var(--block-ground)" } as React.CSSProperties) : undefined}
                 className={clsx(
@@ -1547,62 +1554,92 @@ function ChooseSystem({ view, choice, locked }: { view: ProposalView; choice?: P
       >
         {options.map((o) => {
           const on = o.goal === chosen;
+          const liked = Boolean(choice?.liked?.includes(o.goal));
           return (
-            <button
-              key={o.goal}
-              type="button"
-              role="radio"
-              aria-checked={on}
-              disabled={locked || !choice?.onChoose}
-              onClick={() => choice?.onChoose?.(o.goal)}
-              className={clsx(
-                "relative flex flex-col rounded-xl border bg-surface p-5 text-left transition-shadow",
-                on ? "border-[var(--primary)] shadow-[0_0_0_2px_var(--primary)]" : "border-line",
-                !locked && choice?.onChoose && !on && "hover:border-ink/40",
-                locked && !on && "opacity-50",
-              )}
-            >
-              {o.recommended && (
-                <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-medium text-primary-ink">
-                  Recommended
+            <div key={o.goal} className="relative flex">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={locked || !choice?.onChoose}
+                onClick={() => choice?.onChoose?.(o.goal)}
+                className={clsx(
+                  "relative flex w-full flex-col rounded-xl border bg-surface p-5 text-left transition-shadow",
+                  on ? "border-[var(--primary)] shadow-[0_0_0_2px_var(--primary)]" : "border-line",
+                  !locked && choice?.onChoose && !on && "hover:border-ink/40",
+                  locked && !on && "opacity-50",
+                )}
+              >
+                {o.recommended && (
+                  <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-medium text-primary-ink">
+                    Recommended
+                  </span>
+                )}
+                <span className="text-[16px] font-semibold text-ink">{o.name}</span>
+                <span className="mt-1 text-[13.5px] leading-snug text-muted">{o.promise}</span>
+                {o.backup && (
+                  <span className="mt-2 w-fit rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-ink">
+                    Blackout backup
+                  </span>
+                )}
+                <span className="mt-4 text-[13.5px] text-ink">
+                  {o.system.kw.toFixed(2)} kW solar{o.system.batteryKwh > 0 ? ` · ${o.system.batteryKwh} kWh battery` : ""}
                 </span>
-              )}
-              <span className="text-[16px] font-semibold text-ink">{o.name}</span>
-              <span className="mt-1 text-[13.5px] leading-snug text-muted">{o.promise}</span>
-              {o.backup && (
-                <span className="mt-2 w-fit rounded-full bg-surface-2 px-2.5 py-0.5 text-[11.5px] font-medium text-ink">
-                  Blackout backup
+                {/* What is in it, a line each (as Primero's: comparing options page by page was slow). */}
+                {o.system.details.length > 0 && (
+                  <span className="mt-2 block space-y-0.5 text-[12.5px] text-muted">
+                    {o.system.details.slice(0, 4).map((x) => (
+                      <span key={x.label} className="block">
+                        {x.label}: <span className="text-ink">{x.value}</span>
+                      </span>
+                    ))}
+                  </span>
+                )}
+                <span className="mt-3 text-[24px] font-semibold tabular-nums tracking-tight text-ink">{dollars(o.price.youPay)}</span>
+                <span className={fine}>You pay, after the federal rebate</span>
+                {o.bill && (
+                  <span className="mt-3 space-y-0.5 text-[13.5px] text-ink">
+                    <span className="block">Saves about {dollars(o.bill.saving)} a year</span>
+                    {o.paybackYears !== null && <span className="block">Pays for itself in about {o.paybackYears} years</span>}
+                  </span>
+                )}
+                <span className={clsx("mt-4 text-[13px] font-medium", on ? "text-[color:var(--primary)]" : "text-muted")}>
+                  {on ? (locked ? "Chosen" : "Showing below") : "Show this one"}
                 </span>
+              </button>
+              {choice?.onLike && (
+                <LikeButton
+                  liked={liked}
+                  name={o.name}
+                  onClick={() => choice.onLike?.(o.goal, !liked)}
+                  className="absolute right-3 top-3"
+                />
               )}
-              <span className="mt-4 text-[13.5px] text-ink">
-                {o.system.kw.toFixed(2)} kW solar{o.system.batteryKwh > 0 ? ` · ${o.system.batteryKwh} kWh battery` : ""}
-              </span>
-              {/* What is in it, a line each (as Primero's: comparing options page by page was slow). */}
-              {o.system.details.length > 0 && (
-                <span className="mt-2 block space-y-0.5 text-[12.5px] text-muted">
-                  {o.system.details.slice(0, 4).map((x) => (
-                    <span key={x.label} className="block">
-                      {x.label}: <span className="text-ink">{x.value}</span>
-                    </span>
-                  ))}
-                </span>
-              )}
-              <span className="mt-3 text-[24px] font-semibold tabular-nums tracking-tight text-ink">{dollars(o.price.youPay)}</span>
-              <span className={fine}>You pay, after the federal rebate</span>
-              {o.bill && (
-                <span className="mt-3 space-y-0.5 text-[13.5px] text-ink">
-                  <span className="block">Saves about {dollars(o.bill.saving)} a year</span>
-                  {o.paybackYears !== null && <span className="block">Pays for itself in about {o.paybackYears} years</span>}
-                </span>
-              )}
-              <span className={clsx("mt-4 text-[13px] font-medium", on ? "text-[color:var(--primary)]" : "text-muted")}>
-                {on ? (locked ? "Chosen" : "Showing below") : "Show this one"}
-              </span>
-            </button>
+            </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+/** A heart to like one of the systems (26 Nov 2026): filled in the business's colour once liked. */
+export function LikeButton({ liked, name, onClick, className }: { liked: boolean; name: string; onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={liked}
+      aria-label={liked ? `You like ${name}` : `Like ${name}`}
+      title={liked ? "You like this one" : "Like this one"}
+      className={clsx(
+        "flex size-10 items-center justify-center rounded-full transition-transform active:scale-90",
+        liked ? "bg-primary/10 text-primary" : "text-muted hover:bg-surface-2 hover:text-ink",
+        className,
+      )}
+    >
+      <Heart className={clsx("size-5", liked && "fill-current")} aria-hidden />
+    </button>
   );
 }
 
