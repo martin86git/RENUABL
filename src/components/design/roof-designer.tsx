@@ -14,6 +14,7 @@ import {
   guideStep,
   guiding,
   layingWords,
+  panelCounter,
   panelCells,
   cellWords,
   panelsFor,
@@ -156,7 +157,7 @@ import {
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
 import { SolIcon, SolStars } from "./sol-icon";
 import { SolMark } from "./sol-sun";
-import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
+import { PanelCounter, SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { stcPricingDate } from "@/lib/domain/design/stc-change";
@@ -1805,6 +1806,8 @@ export function RoofDesigner(props: {
   // Sol's box folded on a phone: the picture grows down into its room (22 Nov 2026, Martin: "minimize down so that there
   // is more of the map"), read by the measure below.
   const solFoldedNow = useRef(false);
+  // How tall the dock under the picture wants to be (its contents), null for to the foot of the screen.
+  const dockWantNow = useRef<number | null>(null);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1836,8 +1839,10 @@ export function RoofDesigner(props: {
         const stripH = Math.round(box.height);
         const restOpen = Math.max(PHONE_BANDS.below, Math.round(window.innerHeight - box.top - box.height - PHONE_BANDS.above - photoH));
         // Folded, the strip sits at the foot of the screen and the picture takes the rest of the box's room.
-        const drop = solFoldedNow.current ? Math.max(0, restOpen - PHONE_FOLDED_BAND) : 0;
-        const pb = drop ? PHONE_FOLDED_BAND : PHONE_BANDS.below;
+        // The dock under the picture is only as tall as what it holds (26 Nov 2026, Martin): the picture takes the rest.
+        const want = solFoldedNow.current ? PHONE_FOLDED_BAND : dockWantNow.current;
+        const drop = want !== null ? Math.max(0, restOpen - want) : 0;
+        const pb = drop && want !== null ? want : PHONE_BANDS.below;
         const rest = restOpen - drop;
         const tall = photoH + drop;
         setStage((was) =>
@@ -1949,8 +1954,18 @@ export function RoofDesigner(props: {
   // A phone upright: the picture as tall as the stage says, so a narrower band of the photo, larger.
   const phoneAcross = phone && stage && stage.photoH > 0 ? Math.round((stage.across / stage.photoH) * 1000) / 1000 : null;
   useEffect(() => {
+    if (!phoneAcross) return;
+    const was = acrossNow.current;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (phoneAcross) setAcross(phoneAcross);
+    setAcross(phoneAcross);
+    // The picture grown or shrunk under the dock (26 Nov 2026, Martin: the dock as tall as what it holds): the same
+    // scale and the same top edge, so the roof stays where it was under the finger and more or less shows below.
+    if (was && was !== phoneAcross)
+      setView((kept) => {
+        const h = Math.min(ROOF_IMAGE.height * 1.5, kept.h * (was / phoneAcross));
+        const w = (h * ROOF_IMAGE.width) / ROOF_IMAGE.height;
+        return { x: kept.x + (kept.w - w) / 2, y: kept.y, w, h };
+      });
   }, [phoneAcross]);
   // Zoom mode on a phone (21 Nov 2026, Martin: a magnifier that, tapped, lets the picture be pinched in and out): while it
   // is on, a layer over the picture takes the fingers, so no tool acts. Two fingers pinch about where they are; one moves.
@@ -1965,6 +1980,13 @@ export function RoofDesigner(props: {
   // Sol's box under the picture on a phone, folded to a strip (22 Nov 2026, Martin: "minimize down to a height where I
   // can still see the sol icon, pointer, eraser etc"); a new step or suggestion opens it again.
   const [solFolded, setSolFolded] = useState(false);
+  // How tall Sol's words and the controller's contents are, for the dock's height (26 Nov 2026, Martin).
+  const [solWords, setSolWords] = useState<number | null>(null);
+  const [ctrlH, setCtrlH] = useState<number | null>(null);
+  const [ctrlFolded, setCtrlFolded] = useState(false);
+  // The steering wheel round picked panels on a phone (26 Nov 2026, Martin): where a thumb on its rim was last, in degrees,
+  // and the part of a degree not yet turned.
+  const wheelDrag = useRef<{ cx: number; cy: number; last: number; owed: number } | null>(null);
   // How far the box has been slid up over the picture to show more words (22 Nov 2026, Martin: "slide it up higher").
   const [solLift, setSolLift] = useState(0);
   const [solDragging, setSolDragging] = useState(false);
@@ -7055,6 +7077,10 @@ export function RoofDesigner(props: {
   const foot = stage ? stage.pt + stage.photoH : null;
   const underUp = solHolds && !sideways && foot !== null && !solTray;
   const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown || stringsUnder);
+  // The panel counter in the dock, only while Add a panel is in hand (26 Nov 2026, Martin): the panels and kW, and
+  // with Sol's target how many are still to go.
+  const panelCount =
+    tool === "panel" ? <PanelCounter {...panelCounter(summary.panels, laying ? ghosts.length : 0, size.watts, guideTarget)} /> : null;
   const solSaying = guideShown ? `g:${guideNow}` : nudgeShown ? `n:${nudges[0]?.id ?? ""}` : "";
   const [solSaid, setSolSaid] = useState(solSaying);
   if (solSaid !== solSaying) {
@@ -7086,6 +7112,7 @@ export function RoofDesigner(props: {
       const style = getComputedStyle(box);
       const pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
       const words = Math.ceil(bottom - top + pad);
+      setSolWords(words);
       setSolNeeds(Math.max(0, words - restRoom));
     };
     measure();
@@ -7100,6 +7127,24 @@ export function RoofDesigner(props: {
   }, [solUnder, restRoom, solSaying]);
   const lift = foldable && !solFolded ? Math.min(solLiftByHand ? solLift : solNeeds, liftMost) : 0;
   const deckTop = foot === null ? null : foot - lift;
+  // The dock is as tall as what it holds, the picture taking the rest (26 Nov 2026, Martin: "The dock height should auto
+  // adjust relative to the information it's showing… It should [not] remain open to its largest unnecessarily").
+  const dockWantNext = !underUp
+    ? null
+    : stringsUnder
+      ? null
+      : picks.length > 0
+        ? ctrlH
+        : guideShown || nudgeShown
+          ? solWords === null
+            ? null
+            : Math.max(PHONE_BANDS.below, solWords + 8)
+          : PHONE_BANDS.below;
+  useEffect(() => {
+    if (dockWantNow.current === dockWantNext) return;
+    dockWantNow.current = dockWantNext;
+    window.dispatchEvent(new Event("resize"));
+  }, [dockWantNext]);
   const restFolded = 48;
   // A slim grab bar on the box's top edge, at its left (Sol sits in the notch in its middle): pressed, it folds or opens the box; dragged, it slides the box up or down (down
   // past its usual height folds it, up from folded opens it).
@@ -9666,6 +9711,116 @@ export function RoofDesigner(props: {
                       </text>
                     </g>
                   </g>
+                  {/* A steering wheel round the panels picked, on a phone (26 Nov 2026, Martin: "a larger round icon… so I can
+                      just run my thumb around the inside of it resulting in the panels turning"; the turn buttons were too small
+                      with the whole roof in view): a broad rim the thumb runs round, turning them a degree at a time; inside it
+                      the panels can still be pressed and dragged. One turn of the thumb is one step to undo. */}
+                  {solHolds &&
+                    !solTray &&
+                    tool === "select" &&
+                    pickedPanels.length > 0 &&
+                    (() => {
+                      const corners = pickedPanels.flatMap((p) => looseCorners(p, size));
+                      const c = px(middle(corners));
+                      // Screen pixels to the picture's units: the picture runs the screen's width on a phone.
+                      const perPx = view.w / (stage?.across ?? (svg.current?.getBoundingClientRect().width || 390));
+                      const reach = Math.max(...corners.map((k) => Math.hypot(px(k)[0] - c[0], px(k)[1] - c[1])));
+                      const r = Math.min(Math.max(reach + 34 * perPx, 100 * perPx), 175 * perPx);
+                      const band = 30 * perPx;
+                      const ticks = Array.from({ length: 24 }, (_, i) => (i * 15 * Math.PI) / 180);
+                      const angleAt = (e: React.PointerEvent, d: { cx: number; cy: number }) =>
+                        (Math.atan2(e.clientY - d.cy, e.clientX - d.cx) * 180) / Math.PI;
+                      return (
+                        <g aria-label="Turn the panels: run a thumb round the wheel">
+                          <circle
+                            cx={c[0]}
+                            cy={c[1]}
+                            r={r}
+                            fill="none"
+                            stroke="#1d1f23"
+                            strokeOpacity={0.4}
+                            strokeWidth={band}
+                            pointerEvents="none"
+                          />
+                          {ticks.map((t, i) => (
+                            <line
+                              key={i}
+                              x1={c[0] + Math.sin(t) * (r - band * (i % 6 ? 0.18 : 0.32))}
+                              y1={c[1] - Math.cos(t) * (r - band * (i % 6 ? 0.18 : 0.32))}
+                              x2={c[0] + Math.sin(t) * (r + band * (i % 6 ? 0.18 : 0.32))}
+                              y2={c[1] - Math.cos(t) * (r + band * (i % 6 ? 0.18 : 0.32))}
+                              stroke="#ffffff"
+                              strokeOpacity={i % 6 ? 0.45 : 0.85}
+                              strokeWidth={(i % 6 ? 1.2 : 2) * perPx}
+                              strokeLinecap="round"
+                              pointerEvents="none"
+                            />
+                          ))}
+                          <circle
+                            cx={c[0]}
+                            cy={c[1]}
+                            r={r - band / 2}
+                            fill="none"
+                            stroke="#ff5a1f"
+                            strokeOpacity={0.8}
+                            strokeWidth={1.5 * perPx}
+                            pointerEvents="none"
+                          />
+                          <circle
+                            cx={c[0]}
+                            cy={c[1]}
+                            r={r}
+                            fill="none"
+                            stroke="transparent"
+                            strokeWidth={band * 1.6}
+                            pointerEvents="stroke"
+                            className="touch-none"
+                            style={{ cursor: "grab" }}
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const box = svg.current?.getBoundingClientRect();
+                              if (!box) return;
+                              const d = {
+                                cx: box.left + ((c[0] - view.x) / view.w) * box.width,
+                                cy: box.top + ((c[1] - view.y) / view.h) * box.height,
+                              };
+                              e.currentTarget.setPointerCapture(e.pointerId);
+                              wheelDrag.current = { ...d, last: angleAt(e, d), owed: 0 };
+                              sliding.current = true;
+                            }}
+                            onPointerMove={(e) => {
+                              const d = wheelDrag.current;
+                              if (!d) return;
+                              e.stopPropagation();
+                              const now = angleAt(e, d);
+                              let by = now - d.last;
+                              if (by > 180) by -= 360;
+                              if (by < -180) by += 360;
+                              d.last = now;
+                              d.owed += by;
+                              const whole = Math.trunc(d.owed);
+                              if (whole) {
+                                d.owed -= whole;
+                                turn(whole);
+                              }
+                            }}
+                            onPointerUp={(e) => {
+                              e.stopPropagation();
+                              if (!wheelDrag.current) return;
+                              wheelDrag.current = null;
+                              sliding.current = false;
+                              setSettled((n) => n + 1);
+                            }}
+                            onPointerCancel={() => {
+                              wheelDrag.current = null;
+                              sliding.current = false;
+                              setSettled((n) => n + 1);
+                            }}
+                          />
+                        </g>
+                      );
+                    })()}
                 </svg>
                 {loupe && <Loupe artId={artId} at={loupe.at} per={loupe.per} u={u} left={loupe.left} top={phone ? 76 : 12} />}
               </div>
@@ -11999,7 +12154,7 @@ export function RoofDesigner(props: {
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
               {/* The hand to grab the map, in reach on a phone (22 Nov 2026, Martin: "an easy way of selecting the grab
                   tool… grab the map and reposition and recenter the rooftop"): one round, lit while in hand; again puts it down. */}
-              {solHolds && !(picks.length > 0 && !solTray) && (
+              {solHolds && !(sideways && picks.length > 0 && !solTray) && (
                 <div
                   className="pointer-events-auto absolute z-[55]"
                   // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
@@ -12066,7 +12221,7 @@ export function RoofDesigner(props: {
               )}
               {/* The panel round, on the map's bottom centre on a phone (22 Nov 2026, Martin: out of Sol's tool kit, on the map):
                   a press takes up Add a panel and asks which way they go down; a press with it in hand puts it down. */}
-              {solHolds && !solTray && picks.length === 0 && (
+              {solHolds && !solTray && (!sideways || picks.length === 0) && (
                 <div
                   className="pointer-events-auto absolute z-[55] flex flex-col items-center"
                   style={
@@ -12196,8 +12351,12 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
-                  {greetingNote && (
-                    <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                  {panelCount ? (
+                    <div className="absolute inset-x-20 bottom-2 flex min-h-12 items-center justify-center">{panelCount}</div>
+                  ) : (
+                    greetingNote && (
+                      <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                    )
                   )}
                   {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
                       mark in the dock's bottom left, the way back that sat beside the address under the map. */}
@@ -12277,6 +12436,10 @@ export function RoofDesigner(props: {
                       if (!holding) setSettled((n) => n + 1);
                     }}
                     height={stage?.rest ?? 140}
+                    onHeight={setCtrlH}
+                    folded={ctrlFolded}
+                    onFold={setCtrlFolded}
+                    counter={panelCount}
                   />
                 </div>
               )}
