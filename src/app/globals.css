@@ -2184,8 +2184,10 @@ html:has(.sales-snap) {
     transform: translateY(-3px);
   }
 }
-/* A deal's Sol sheet sits where the lip rises: it steps aside while the sheet is open. */
-html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip {
+/* A deal's Sol sheet, and Sol's panel on a phone (its microphone sits where the lip rises; 26 Nov 2026, Martin),
+   sit where the lip rises: it steps aside while either is open. */
+html[data-deal-sol]:not([data-deal-sol-tucked]) .dock-lip,
+html.sol-phone-open .dock-lip {
   display: none;
 }
 @media (prefers-reduced-motion: reduce) {
