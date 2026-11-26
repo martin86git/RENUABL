@@ -165,6 +165,7 @@ import { EVENING_WORTH_STORING, openingAdvice, quickSize, type BatteryChoice, ty
 import { SolCalculator, SolOpening, type Opening } from "./sol-opening";
 import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
+import { msbRuns, runWords, RUN_NOTE } from "@/lib/domain/design/msb-run";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
 import { lightOf, readiness, readinessLight, shadeLight, type CheckLight, type ReadinessItem } from "@/lib/domain/design/readiness";
 import { designGreeting, type ProposalGlance } from "@/lib/domain/design/design-greeting";
@@ -1375,6 +1376,8 @@ export function RoofDesigner(props: {
   const [ruling, setRuling] = useState<{ a: Point; b: Point } | null>(null);
   // The inverters on this design: one, or more on a larger system.
   const [fitted, setFitted] = useState<InverterSpec[]>(first.inverters ?? []);
+  // How far each placed inverter is from the switchboard, in a straight line from above (26 Nov 2026, Martin).
+  const runs = msbRuns(fitted, msb);
   // Whether the inverter list is showing its suggestions for the panels on the design.
   const [suggesting, setSuggesting] = useState(false);
   // A three-phase inverter picked for a single-phase home (21 Nov 2026, Martin: warn, never let it on blindly): held here
@@ -8972,6 +8975,39 @@ export function RoofDesigner(props: {
                       </g>
                     );
                   })}
+                  {/* From each placed inverter to the switchboard: a dashed line and its length (26 Nov 2026, Martin). */}
+                  {runs.map((r) => {
+                    const [x1, y1] = px(r.from);
+                    const [x2, y2] = px(r.to);
+                    return (
+                      <g key={`run-${r.index}`} pointerEvents="none">
+                        <title>{`${runWords(r.metres)} from the inverter to the switchboard. ${RUN_NOTE}`}</title>
+                        <line
+                          x1={x1}
+                          y1={y1}
+                          x2={x2}
+                          y2={y2}
+                          stroke={GOLD}
+                          strokeWidth={1.1 * u}
+                          strokeDasharray={`${3 * u} ${2 * u}`}
+                          strokeLinecap="round"
+                        />
+                        <text
+                          x={(x1 + x2) / 2}
+                          y={(y1 + y2) / 2 - 3 * u}
+                          textAnchor="middle"
+                          fontSize={8 * u}
+                          fontWeight="700"
+                          fill="#ffffff"
+                          stroke="#0b0c0e"
+                          strokeWidth={2.4 * u}
+                          paintOrder="stroke"
+                        >
+                          {runWords(r.metres)}
+                        </text>
+                      </g>
+                    );
+                  })}
                   {/* The main switchboard: a board of breakers in the same line style as the inverter and battery, marked MSB. */}
                   {msb &&
                     (() => {
@@ -9834,10 +9870,21 @@ export function RoofDesigner(props: {
                     kitPick === "battery"
                       ? `Battery · ${batteryKwh} kWh`
                       : kitPick === "msb"
-                        ? "Main switchboard"
+                        ? `Main switchboard${
+                            runs.length === 1
+                              ? ` · ${runWords(runs[0].metres)} to the inverter`
+                              : runs.length > 1
+                                ? ` · ${runs.map((r) => `${runWords(r.metres)} to inverter ${r.index + 1}`).join(", ")}`
+                                : fitted.length
+                                  ? " · drag the inverter to its wall to measure"
+                                  : ""
+                          }`
                         : kitPick === "charger"
                           ? `EV charger${charger ? ` · ${charger.kw} kW` : ""}`
-                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW`;
+                          : `${fitted.length > 1 ? `Inverter ${(kitPick as number) + 1}` : "Inverter"} · ${inverter?.kw} kW${(() => {
+                              const run = runs.find((r) => r.index === kitPick);
+                              return run ? ` · ${runWords(run.metres)} to the MSB` : "";
+                            })()}`;
                   return (
                     <div
                       className={clsx(GLASS, "absolute z-30 flex -translate-x-1/2 items-center gap-1 py-0.5 pl-3 pr-0.5")}
