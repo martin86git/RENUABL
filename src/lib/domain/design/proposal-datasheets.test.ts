@@ -66,6 +66,21 @@ describe("the products a proposal quotes", () => {
     expect(quotedProducts(internal, "payback").map((x) => x.kind)).toEqual(["panel"]);
   });
 
+  it("leaves the configurator's other products out unless asked, and marks them when asked", () => {
+    const internal: ProposalInternal = {
+      ...base,
+      configurator: [
+        { goal: "cfg-0-1-0-0", design: 0, cost: 0, margin: 0, priceExGst: 0, lines: [line("Battery", "Sungrow SBR 3.2", "SBR032")] },
+      ] as ProposalInternal["configurator"],
+    };
+    expect(quotedProducts(internal).some((x) => x.sku === "SBR032")).toBe(false);
+    const all = quotedProducts(internal, null, { mixes: true });
+    expect(all.find((x) => x.sku === "SBR032")?.mixOnly).toBe(true);
+    expect(all.find((x) => x.sku === "SIGEN-BAT-8.0")?.mixOnly).toBeUndefined();
+    const sent = customerDatasheets(all, () => true);
+    expect(sheetsForChoice(sent, null).some((s) => s.name.includes("SBR"))).toBe(false);
+  });
+
   it("strips a count", () => {
     expect(productName("3 × Thing")).toBe("Thing");
     expect(productName("Thing")).toBe("Thing");
