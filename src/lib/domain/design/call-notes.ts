@@ -14,7 +14,15 @@ export interface HeardLine {
   note?: boolean;
   /** A note marked as for the design (the system), not the conversation. */
   design?: boolean;
+  /**
+   * Who said it, on a call made from the computer whose both sides are transcribed live (26 Nov 2026,
+   * domain/browser-call.ts `readLiveEvent`): "us" the member, "them" the customer. Absent: the member's side only.
+   */
+  who?: "us" | "them";
 }
+
+/** Whether these lines carry both sides of the call (a computer call transcribed live). */
+export const bothSides = (lines: readonly HeardLine[]) => lines.some((l) => l.who === "them");
 
 export const INTENDED_FIELDS = [
   ["solar", "Solar"],
@@ -71,12 +79,18 @@ export function wordsIn(lines: readonly HeardLine[]): number {
   return lines.reduce((n, l) => n + l.text.split(/\s+/).filter(Boolean).length, 0);
 }
 
-/** The lines as Claude reads them: in order, notes marked, cut from the front if too long (the end of a call matters most). */
-export function transcriptOf(lines: readonly HeardLine[]): string {
+/**
+ * The lines as Claude reads them: in order, notes marked, cut from the front if too long (the end of a call matters
+ * most). With both sides (`bothSides`), each heard line starts "Us:" or "<first name> (customer):", as the prompts'
+ * `both` reads them.
+ */
+export function transcriptOf(lines: readonly HeardLine[], customer = ""): string {
+  const both = bothSides(lines);
+  const them = `${customer.trim().split(/\s+/)[0] || "Customer"} (customer)`;
   const text = lines
     .map((l) => ({ l, t: l.text.trim() }))
     .filter(({ t }) => t)
-    .map(({ l, t }) => (l.note ? `${l.design ? "[Design note]" : "[Note]"} ${t}` : t))
+    .map(({ l, t }) => (l.note ? `${l.design ? "[Design note]" : "[Note]"} ${t}` : both ? `${l.who === "them" ? them : "Us"}: ${t}` : t))
     .join("\n");
   return text.length > MAX_CHARS ? text.slice(text.length - MAX_CHARS) : text;
 }
@@ -90,6 +104,7 @@ export function cleanHeard(raw: unknown): HeardLine[] {
       text: String(l.text ?? "").slice(0, 2_000),
       ...(l.note === true ? { note: true } : {}),
       ...(l.design === true ? { design: true } : {}),
+      ...(l.who === "us" || l.who === "them" ? { who: l.who } : {}),
     }))
     .slice(0, 2_000);
 }
@@ -312,10 +327,20 @@ export const CALL_POINTS_SCHEMA = {
   properties: { points: { type: "array", items: { type: "string" } } },
 } as const;
 
-export function callPointsPrompt(business: string, customer: string, transcript: string, previous: readonly string[]): string {
+export function callPointsPrompt(
+  business: string,
+  customer: string,
+  transcript: string,
+  previous: readonly string[],
+  both = false,
+): string {
   return [
     `You are keeping live notes for a salesperson at ${business || "a solar business"} (solar panels, batteries and EV chargers in Australia), during their call with ${customer || "a customer"}.`,
-    `Below is what a microphone has heard so far of the salesperson's side only, as speech recognition wrote it: infer what the customer said only from what the salesperson says back. Read numbers as said ("ten kilowatt" is 10 kW, a battery's size in kWh). Lines starting [Note] or [Design note] were added on purpose: give them priority.`,
+    `${
+      both
+        ? 'Below is both sides of the call so far, as speech recognition wrote them: each turn starts "Us:" (the salesperson) or with the customer\'s name. What the customer said themselves is the strongest evidence.'
+        : "Below is what a microphone has heard so far of the salesperson's side only, as speech recognition wrote it: infer what the customer said only from what the salesperson says back."
+    } Read numbers as said ("ten kilowatt" is 10 kW, a battery's size in kWh). Lines starting [Note] or [Design note] were added on purpose: give them priority.`,
     `Give at most ${MAX_POINTS} short points (each under 15 words) of what matters so far, most useful first, each starting with a short label and a colon: Wants, Bill, Usage, Roof, Battery, EV, Worry, Budget, Timing, Decided, Question. Only what is about this customer's own home: leave out neighbours' homes, past jobs and examples.`,
     "Keep the points already shown (below) while they still hold, in the same words, changing one only when something new changes it, so the list doesn't jump about.",
     "Only what was said: never invent a figure, a product, a price, a date or a promise. Fewer points rather than a guess, and none at all when nothing salient has been said yet.",

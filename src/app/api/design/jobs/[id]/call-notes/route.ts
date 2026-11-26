@@ -1,5 +1,6 @@
 import {
   CALL_NOTES_SCHEMA,
+  bothSides,
   MIN_WORDS,
   callNotesPrompt,
   callNotesText,
@@ -52,7 +53,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
           readWithClaude<unknown>(
             [],
             CALL_NOTES_SCHEMA,
-            callNotesPrompt(who.member.businessName, found.customer.name, transcriptOf(lines)),
+            callNotesPrompt(who.member.businessName, found.customer.name, transcriptOf(lines, found.customer.name), bothSides(lines)),
             apiKey,
             ai,
           ),
