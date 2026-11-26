@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Today",
+    words: "Minimise sits beside the chat's first message with a mark of its own; a minimised chat opens again from any page.",
+  },
+  {
+    day: "2026-11-26",
     area: "Settings",
     words: "Bring in from HubSpot joins a deal to the customer's existing deal for the same job, rather than making a second.",
   },
