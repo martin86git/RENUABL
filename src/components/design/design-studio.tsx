@@ -35,7 +35,8 @@ import { createCustomer, loadJob, saveJob } from "@/lib/services/crm";
 import { AddressStrip, type NewDealInput } from "./address-strip";
 import { onStreetWords } from "@/lib/domain/address";
 import { CREDITS_EVENT } from "./design-credits";
-import { NEEDS_ACCOUNT, NO_DEAL, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
+import { NEEDS_ACCOUNT, NO_DEAL, loadProposal, proposalScreen, publishFromDesigner } from "@/lib/services/proposals";
+import type { ProposalGlance } from "@/lib/domain/design/design-greeting";
 import { useChatWaiting } from "./chat-panel";
 import { sendReply, unreadChanged } from "@/lib/services/chat";
 import { DesignKeptNote, DesignRoofList, useDesignAccount } from "./design-account";
@@ -345,6 +346,23 @@ export function DesignStudio() {
   useEffect(() => {
     if (onJobId && inDrawer()) tellDeal({ job: onJobId });
   }, [onJobId]);
+  // Where the deal's proposal stands, for the designer's greeting on the dock (25 Nov 2026, Martin): read once a deal.
+  const [glance, setGlance] = useState<{ jobId: string; proposal: ProposalGlance | null } | null>(null);
+  useEffect(() => {
+    if (!onJobId) return;
+    let live = true;
+    void loadProposal(onJobId).then((res) => {
+      if (!live) return;
+      const latest = res.ok ? res.versions[0] : undefined;
+      setGlance({
+        jobId: onJobId,
+        proposal: latest ? { state: latest.state, openedAt: latest.openedAt, indicative: latest.indicative } : null,
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [onJobId]);
   const signedIn = Boolean(account?.signedIn && account.business);
 
   /**
@@ -540,6 +558,7 @@ export function DesignStudio() {
             ) : undefined
           }
           proposalHref={onJob ? proposalScreen(onJob.id) : null}
+          proposalGlance={onJob ? (glance?.jobId === onJob.id ? glance.proposal : undefined) : null}
           waiting={waiting}
           jobId={onJob?.id}
           notes={onJob ? <DealNotes jobId={onJob.id} customerId={onJob.customerId} /> : null}

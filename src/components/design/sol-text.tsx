@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, CircleHelp, CornerUpLeft, PencilLine, X } from "lucide-react";
 import {
-  isYesNoQuestion,
+  questionReplies,
   namedItem,
   solBlocks,
   solRow,
@@ -266,31 +266,28 @@ function Block({ block, tail, onAnswer }: { block: SolBlock; tail: React.ReactNo
           </p>
           {onAnswer && (
             <div className="mt-2 flex flex-wrap gap-1.5 pl-[1.625rem] text-[13px] font-medium">
-              {isYesNoQuestion(block.text) && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onAnswer(block.text, "Yes")}
-                    className="rounded-full bg-primary px-3.5 py-1 text-primary-ink hover:opacity-90"
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onAnswer(block.text, "No")}
-                    className="rounded-full bg-canvas px-3.5 py-1 text-ink ring-1 ring-line hover:bg-surface-2"
-                  >
-                    No
-                  </button>
-                </>
-              )}
+              {/* Its answers as pills, then Something else for his own words (26 Nov 2026, Martin). */}
+              {questionReplies(block.text).map((pill, i) => (
+                <button
+                  key={pill}
+                  type="button"
+                  onClick={() => onAnswer(block.text, pill)}
+                  className={
+                    i === 0
+                      ? "rounded-full bg-primary px-3.5 py-1 text-primary-ink hover:opacity-90"
+                      : "rounded-full bg-canvas px-3.5 py-1 text-ink ring-1 ring-line hover:bg-surface-2"
+                  }
+                >
+                  {pill}
+                </button>
+              ))}
               <button
                 type="button"
                 onClick={() => onAnswer(block.text, null)}
-                className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-ink-2 hover:bg-canvas hover:text-ink"
+                className="inline-flex items-center gap-1 rounded-full bg-canvas px-3 py-1 text-ink-2 ring-1 ring-line hover:bg-surface-2 hover:text-ink"
               >
                 <CornerUpLeft className="size-3.5" aria-hidden />
-                Reply
+                Something else
               </button>
             </div>
           )}

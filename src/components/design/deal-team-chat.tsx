@@ -1,21 +1,18 @@
 "use client";
 
 import { TEXT_MAX } from "@/lib/domain/design/contact-reach";
-import { TEXTS_COPY } from "@/lib/domain/design/texts";
-import { textCustomer } from "@/lib/services/caller";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { linkRuns } from "@/lib/domain/design/sol-meeting";
 import { MeetingCard } from "./meeting-card";
-import { Bell, Check, MessageSquare, PencilRuler, RotateCcw, SendHorizonal, Users } from "lucide-react";
+import { Bell, Check, MessageSquare, PencilRuler, RotateCcw, SendHorizonal } from "lucide-react";
 import {
   ASK_TYPES,
   DEAL_TEAM_POLL_MS,
   askWords,
   CUSTOMER_WRITER,
   SOL_WRITER,
-  boxGoesTo,
   briefHref,
   saidWhen,
   typingMention,
@@ -116,28 +113,10 @@ export function DealTeamChat(props: {
     onChanged.current?.();
   };
 
-  // Who the box writes to: the team (the chat), or the customer by text (15 Nov 2026, Martin: "I should also be able
-  // to text back… make it jump to Text when the customer's line is latest"). It is Text while their text is the
-  // latest line, else the team; a choice made by hand holds until the next line comes (`boxGoesTo`).
-  const [chosen, setChosen] = useState<{ to: "team" | "text"; on: string } | null>(null);
-  const texting = !pad ? (view?.texting ?? null) : null;
-  const to = texting ? boxGoesTo(lines, chosen) : "team";
-  const setTo = (next: "team" | "text") => setChosen({ to: next, on: lines.at(-1)?.id ?? "" });
-  const byText = to === "text" && texting !== null && !texting.stopped;
-  const firstName = writerName(CUSTOMER_WRITER, view?.customer);
+  // The team chat is for the team (26 Nov 2026, Martin: "The team chat shouldn't give the option of the customer"):
+  // texting the customer is done from Customer chat, the Text button and the agent's contacts, never from here.
 
   const send = async (text: string): Promise<boolean> => {
-    if (byText) {
-      const sent = await textCustomer(jobId, text);
-      if (!sent.ok) {
-        setProblem(sent.message);
-        return false;
-      }
-      setProblem(null);
-      await load();
-      changed();
-      return true;
-    }
     const r = await sayOnDeal(jobId, text);
     if (!r.ok) {
       setProblem(r.message);
@@ -180,9 +159,7 @@ export function DealTeamChat(props: {
     <div className={clsx("flex min-w-0 flex-col", pad ? "gap-2" : "gap-3", fill && "h-full min-h-0")}>
       {!pad && (
         <div className="flex items-start gap-3">
-          <p className="flex-1 text-[12.5px] text-muted">
-            For your team and Sol only: the customer never sees this. Type @ to bring someone in, or @Sol to ask him.
-          </p>
+          <p className="flex-1 self-center text-[12px] text-muted">Only your team and Sol see this.</p>
           {following !== null && (
             <button
               type="button"
@@ -217,13 +194,7 @@ export function DealTeamChat(props: {
           l.kind === "ask" && l.ask ? (
             <AskCard key={l.id} line={l} jobId={jobId} pad={pad} onSettle={settle} />
           ) : (
-            <Line
-              key={l.id}
-              line={l}
-              pad={pad}
-              customer={view?.customer}
-              onReply={texting && !texting.stopped && l.by === CUSTOMER_WRITER ? () => setTo("text") : undefined}
-            />
+            <Line key={l.id} line={l} pad={pad} customer={view?.customer} />
           ),
         )}
         {waitingOnSol !== null && (
@@ -242,41 +213,8 @@ export function DealTeamChat(props: {
         <OpenBox onOpen={props.onOpen} />
       ) : (
         <>
-          {texting && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div role="group" aria-label="Who this goes to" className="inline-flex rounded-full bg-surface-2 p-0.5 ring-1 ring-line">
-                {(["team", "text"] as const).map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    aria-pressed={to === k}
-                    disabled={k === "text" && texting.stopped}
-                    onClick={() => setTo(k)}
-                    className={clsx(
-                      "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition-colors",
-                      to === k ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink disabled:text-muted",
-                    )}
-                  >
-                    {k === "team" ? <Users className="size-3.5" aria-hidden /> : <MessageSquare className="size-3.5" aria-hidden />}
-                    {k === "team" ? "To the team" : `Text ${firstName}`}
-                  </button>
-                ))}
-              </div>
-              <p className="min-w-0 flex-1 truncate text-[11.5px] text-muted">
-                {texting.stopped
-                  ? TEXTS_COPY.stopped(firstName)
-                  : byText
-                    ? `Goes to ${firstName} on ${texting.to}${texting.signOff ? ` · ends with ${texting.signOff.replace("\n", " ")}` : ""}`
-                    : "Only your team sees this."}
-              </p>
-              <p className="sr-only" role="status">
-                {byText ? `This will be texted to ${firstName}.` : "This goes to your team only."}
-              </p>
-            </div>
-          )}
           <Composer
             pad={pad}
-            text={byText ? { who: firstName } : undefined}
             people={people}
             onNeedPeople={() => !view && void load()}
             onSend={send}
@@ -375,23 +313,24 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
     setBusy(false);
   };
   return (
+    // Sol's message in the chat, as his other lines are (26 Nov 2026, Martin: it sat squashed in a box of its own
+    // above the chat): his name, what he needs, then its buttons under it.
     <li
       className={clsx(
-        // A border, not a ring: a ring is drawn outside the card and the scrolling list cut it off (14 Nov 2026, Martin).
-        "min-w-0 rounded-xl border",
-        pad ? "p-2.5 text-[12.5px]" : "p-3.5 text-[13.5px]",
-        done ? "border-line bg-surface-2" : "border-sun-line/60 bg-surface",
+        "w-fit min-w-0 max-w-[92%] rounded-xl",
+        pad ? "px-2.5 py-1.5 text-[12.5px]" : "px-3 py-2 text-[13.5px]",
+        done ? "bg-surface-2" : "bg-sun ring-1 ring-sun-line/25",
       )}
     >
-      <p className="flex flex-wrap items-center gap-1.5">
-        <SolIcon className="size-3.5 text-sun-line" />
-        <span className="font-semibold text-ink">Sol needs</span>
-        <span className="rounded-full bg-sun px-2 py-0.5 text-[11px] font-medium text-sun-ink">
-          {type.label} · {type.forWho}
+      <p className="flex items-baseline gap-1.5">
+        <SolIcon className="size-3.5 shrink-0 self-center text-sun-ink" />
+        <span className="font-semibold text-sun-ink">Sol</span>
+        <span className="text-[11px] text-sun-ink/80">
+          needs {type.label.toLowerCase()} · {type.forWho}
         </span>
-        <span className="ml-auto text-[11px] text-muted">{agoWords(l.at)}</span>
+        <span className="ml-auto shrink-0 pl-3 text-[11px] text-muted">{agoWords(l.at)}</span>
       </p>
-      <p className={clsx("mt-1.5 font-medium text-ink", done && "font-normal text-ink-2", pad && !done && "line-clamp-2")}>{askWords(l)}</p>
+      <p className={clsx("text-ink", done && "text-ink-2", pad && !done && "line-clamp-2")}>{askWords(l)}</p>
       {!pad && ask.why.length > 0 && showWhy && (
         <div className="mt-2">
           <ul className="space-y-1.5">
@@ -406,7 +345,7 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
           </ul>
         </div>
       )}
-      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {done ? (
           <>
             <span className="inline-flex items-center gap-1 text-[12px] text-positive">
@@ -427,18 +366,18 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
               <button
                 type="button"
                 onClick={() => openDesigner(briefHref(jobId, l.id), router)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-[12.5px] font-medium text-primary-ink hover:brightness-110"
+                className="inline-flex h-7 items-center gap-1.5 rounded-full bg-primary px-3 text-[12px] font-medium text-primary-ink hover:brightness-110"
               >
-                <PencilRuler className="size-3.5" /> {pad ? "Open the designer" : type.action}
+                <PencilRuler className="size-3.5" /> Open the designer
               </button>
             )}
             <button
               type="button"
               disabled={busy}
               onClick={() => void settle(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-full bg-surface px-3 text-[12.5px] font-medium text-ink ring-1 ring-line hover:ring-ink-2 disabled:text-muted"
+              className="inline-flex h-7 items-center gap-1 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink-2 disabled:text-muted"
             >
-              <Check className="size-3.5" /> Mark done
+              <Check className="size-3.5" /> Done
             </button>
           </>
         )}
@@ -447,7 +386,7 @@ function AskCard(props: { line: DealLine; jobId: string; pad?: boolean; onSettle
             type="button"
             onClick={() => setShowWhy((w) => !w)}
             aria-expanded={showWhy}
-            className="ml-auto text-[12px] font-medium text-ink-2 hover:text-ink"
+            className="px-1 text-[12px] font-medium text-sun-ink hover:text-ink"
           >
             {showWhy ? "Hide why" : "Why"}
           </button>

@@ -23,7 +23,8 @@ import { markPreparedSent } from "@/lib/services/prepared";
 import { sendReply } from "@/lib/services/chat";
 import { WRITE_ASK_MAX } from "@/lib/domain/design/deal-write";
 import { leadPageFor } from "@/lib/services/hello";
-import { askSolInPanel, draftInSolPanel, handsToPanel } from "@/lib/services/sol";
+import { askSolInPanel, draftInSolPanel, handsToPanel, learnAsked } from "@/lib/services/sol";
+import { useSolAhead } from "./sol-ahead";
 import { ContextLine } from "./context-line";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolMark } from "./sol-sun";
@@ -106,6 +107,8 @@ export function SolTerminal(props: {
   // What the microphone is hearing, shown in the box as it comes.
   const [heard, setHeard] = useState("");
   const box = useRef<HTMLInputElement>(null);
+  // The rest of the sentence as they type (26 Nov 2026, Martin), as in Sol's other boxes.
+  const guess = useSolAhead(ask, setAsk, box, Boolean(heard), 2000);
   const [leftIt, setLeftIt] = useState(false);
 
   // The customer is waiting on an answer (18 Nov 2026, Martin: "sol should already be proposing the response to Priya,
@@ -257,6 +260,7 @@ export function SolTerminal(props: {
         `Write the reply to ${name} again: ${t}. The last draft began: "${answer.body.replace(/\s+/g, " ").slice(0, 220)}"`,
       );
     }
+    learnAsked(t);
     askSolInPanel({ text: `On ${deal.customer}'s deal (#${props.jobId}): ${t}`, shown: t });
     setAsk("");
     setHeard("");
@@ -477,34 +481,41 @@ export function SolTerminal(props: {
                 <span className="sol-prompt font-mono text-[12px] text-muted" aria-hidden>
                   {">"}
                 </span>
-                <input
-                  ref={box}
-                  value={heard ? withSpoken(ask, heard) : ask}
-                  onChange={(e) => {
-                    setHeard("");
-                    // On a phone the box is too small to write in (22 Nov 2026, Martin): the first letter brings up
-                    // Sol's full chat with the words in its box, about this deal. Changing the drafted reply stays here.
-                    if (e.target.value.trim() && handsToPanel() && !(waiting && answer)) {
-                      draftInSolPanel({
-                        text: e.target.value,
-                        about: `On ${deal.customer}'s deal (#${props.jobId}): `,
-                        label: deal.customer,
-                      });
-                      setAsk("");
-                      return;
+                <span className="relative flex min-w-0 flex-1">
+                  {guess.ghost("py-1 text-[12.5px]", true)}
+                  <input
+                    ref={box}
+                    value={heard ? withSpoken(ask, heard) : ask}
+                    onKeyDown={(e) => {
+                      guess.key(e);
+                    }}
+                    onChange={(e) => {
+                      setHeard("");
+                      // On a phone the box is too small to write in (22 Nov 2026, Martin): the first letter brings up
+                      // Sol's full chat with the words in its box, about this deal. Changing the drafted reply stays here.
+                      if (e.target.value.trim() && handsToPanel() && !(waiting && answer)) {
+                        draftInSolPanel({
+                          text: e.target.value,
+                          about: `On ${deal.customer}'s deal (#${props.jobId}): `,
+                          label: deal.customer,
+                        });
+                        setAsk("");
+                        return;
+                      }
+                      setAsk(e.target.value);
+                      guess.changed();
+                    }}
+                    placeholder={
+                      waiting && answer
+                        ? "Tell Sol what to change in the reply…"
+                        : p.yes
+                          ? `Or tell Sol what to do for ${name}…`
+                          : `Tell Sol what to do for ${name}…`
                     }
-                    setAsk(e.target.value);
-                  }}
-                  placeholder={
-                    waiting && answer
-                      ? "Tell Sol what to change in the reply…"
-                      : p.yes
-                        ? `Or tell Sol what to do for ${name}…`
-                        : `Tell Sol what to do for ${name}…`
-                  }
-                  aria-label={`Tell Sol what to do for ${name}`}
-                  className="min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
-                />
+                    aria-label={`Tell Sol what to do for ${name}`}
+                    className="relative min-w-0 flex-1 bg-transparent py-1 text-[12.5px] text-ink outline-none placeholder:text-muted"
+                  />
+                </span>
                 <DictateButton
                   label={`Speak to Sol about ${name}`}
                   onHearing={setHeard}

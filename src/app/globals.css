@@ -959,7 +959,13 @@ button.team-flash:not([aria-pressed="true"]) {
   height: var(--sol-rest, 9.25rem);
   max-height: var(--sol-rest, 9.25rem);
   overflow-y: auto;
-  padding-top: 2rem;
+  padding-top: 2.25rem;
+  /* Centred in the room under Sol's row (25 Nov 2026, Martin: "even when there's enough space below the text anchors up
+     top"): auto margins on the words, which fall to nothing once they fill the box, so a long card still scrolls from
+     its top. Opaque, so the address strip under it doesn't show through. */
+  display: flex;
+  flex-direction: column;
+  background-color: var(--primary);
   border-radius: 22px 22px 0 0;
   outline: 1.5px solid color-mix(in srgb, var(--sun-line) 70%, transparent);
   outline-offset: -1.5px;
@@ -971,6 +977,9 @@ button.team-flash:not([aria-pressed="true"]) {
     max-height 0.25s ease-out,
     opacity 0.2s ease-out,
     translate 0.2s ease-out;
+}
+.sol-moulded > [data-popup] > * {
+  margin-block: auto;
 }
 .sol-moulded.sol-folded > [data-popup] {
   height: 3rem;
@@ -1698,6 +1707,19 @@ html:has(.sales-snap) {
     -webkit-appearance: none;
     appearance: none;
     text-align: left;
+  }
+  /* Every value sits in the middle of its row (26 Nov 2026, Martin: the price and install date sat off centre). */
+  .deal-fields :is(input, select) {
+    line-height: 2.25rem;
+  }
+  .deal-fields input[type="date"] {
+    display: flex;
+    align-items: center;
+  }
+  .deal-fields input[type="date"]::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+    line-height: 2.25rem;
   }
 }
 

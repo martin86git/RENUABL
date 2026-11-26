@@ -337,7 +337,9 @@ export function panelChoices(
 /** An inverter's supply and whether it takes a battery: as the list says, else read from its name. */
 const phaseOf = (i: Pick<CatalogueInverter, "name" | "phase">) =>
   i.phase ?? (/three|3s?-?ph/i.test(i.name) ? "three" : /single|1s?-?ph/i.test(i.name) ? "single" : null);
-const hybridOf = (i: Pick<CatalogueInverter, "name" | "hybrid">) => i.hybrid ?? /hybrid/i.test(i.name);
+// Sigenergy's SigenStor controller is its hybrid inverter, though its name doesn't say so (25 Nov 2026: a string inverter
+// was offered in its place on a battery design).
+const hybridOf = (i: Pick<CatalogueInverter, "name" | "hybrid">) => i.hybrid ?? /hybrid|sigenstor|energy controller/i.test(i.name);
 
 /**
  * The inverters a customer can choose between for a design (19 Nov 2026, Martin): the one designed with first, then,

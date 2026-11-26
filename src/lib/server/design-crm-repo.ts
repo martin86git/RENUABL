@@ -12,6 +12,8 @@ import { leadOwnerFor } from "@/lib/domain/design/deal-feed";
 import { marketDateTime, todayInMarket } from "@/lib/domain/market";
 import { roofKey, type DealViewer } from "@/lib/domain/design/account";
 import { homeFor } from "@/lib/domain/design/same-home";
+import { DESIGN_SAVED, DESIGN_SAVED_HOURS, designSavedLine } from "@/lib/domain/design/design-record";
+import { cleanDesignSet } from "@/lib/domain/design/roof-design";
 import {
   INSTALLED_STAGES,
   JOB_STAGES,
@@ -193,6 +195,45 @@ export async function linkJobsToRoof(businessId: string, roof: { lat: number; ln
     await transaction((q) => link(q, businessId, { roof }, by.toLowerCase()));
   } catch (e) {
     console.error("joining jobs to a roof design failed", e instanceof Error ? e.message : e);
+  }
+}
+
+/**
+ * Writes "Roof design saved · …" on the timeline of every deal joined to a roof design (25 Nov 2026, Martin: the deal's
+ * timeline shows a design being done). A save within `DESIGN_SAVED_HOURS` of the last such line replaces it, so a run
+ * of saves is one entry. Never stops a save.
+ */
+export async function noteDesignSaved(businessId: string, projectId: string, design: unknown, by: string): Promise<void> {
+  try {
+    const set = cleanDesignSet(design);
+    if (!set) return;
+    const text = designSavedLine(set);
+    const who = by.toLowerCase();
+    await transaction(async (q) => {
+      const jobs = await q<{ id: string; customer_id: string }>(
+        `select id, customer_id from design_jobs where business_id = $1 and project_id = $2`,
+        [businessId, projectId],
+      );
+      for (const job of jobs) {
+        const recent = await q<{ id: string }>(
+          `select id from design_activity where business_id = $1 and job_id = $2 and kind = 'note'
+             and text like $3 and at > now() - ($4 || ' hours')::interval order by at desc limit 1`,
+          [businessId, job.id, `${DESIGN_SAVED}%`, String(DESIGN_SAVED_HOURS)],
+        );
+        if (recent[0]) {
+          await q(`update design_activity set text = $3, by_email = $4, at = now() where business_id = $1 and id = $2`, [
+            businessId,
+            recent[0].id,
+            text,
+            who,
+          ]);
+        } else {
+          await record(q, businessId, { customerId: job.customer_id, jobId: job.id, kind: "note", text, by: who });
+        }
+      }
+    });
+  } catch (e) {
+    console.error("noting a saved design failed", e instanceof Error ? e.message : e);
   }
 }
 

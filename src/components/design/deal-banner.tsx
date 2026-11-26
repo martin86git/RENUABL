@@ -1,12 +1,13 @@
 "use client";
 
 import { useDealStageLabel } from "./stage-select";
+import { StageChip } from "./deal-menus";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
+import { CalendarCheck, ChevronUp, Maximize2, MapPin, PenTool } from "lucide-react";
 import type { ReactNode } from "react";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
-import type { Customer, Job } from "@/lib/domain/design/crm";
+import type { Customer, Job, JobStage } from "@/lib/domain/design/crm";
 import type { JobDrawing } from "@/lib/domain/design/job-card";
 import type { DealPulse } from "@/lib/domain/design/deal-heat";
 import type { BannerFigure } from "@/lib/domain/design/system-summary";
@@ -69,6 +70,7 @@ export function DealBanner({
   onPlace,
   compact = false,
   actions,
+  onStage,
 }: {
   job: Job;
   customer: Customer;
@@ -83,6 +85,8 @@ export function DealBanner({
   compact?: boolean;
   /** On a phone, the ways of reaching the customer (Call, Email), in the banner's top right corner. */
   actions?: ReactNode;
+  /** Moving the deal from the stage on the banner (26 Nov 2026, Martin): absent, the stage is a plain chip. */
+  onStage?: (change: { stage: JobStage; subStage: string | null }) => void;
 }) {
   // Stages by the business's own names (pipeline-stages.ts).
   const stageWords = useDealStageLabel();
@@ -132,9 +136,16 @@ export function DealBanner({
               {job.title ? ` · ${job.title}` : ""}
             </p>
             <div className={clsx("flex flex-wrap items-center gap-2 max-sm:mt-1.5 max-sm:gap-1", compact ? "mt-2" : "mt-3")}>
-              <Chip>{stageWords(job)}</Chip>
+              {onStage ? <StageChip job={job} onChange={onStage} /> : <Chip>{stageWords(job)}</Chip>}
               {job.value != null && <Chip>{dollars(job.value)}</Chip>}
-              {job.installDate && <Chip>Installing {shortDate(job.installDate)}</Chip>}
+              {job.installDate && (
+                <span className="max-sm:hidden">
+                  <Chip>
+                    <CalendarCheck className="mr-1.5 size-3.5 text-sun-line max-sm:mr-1 max-sm:size-3" aria-hidden />
+                    Installing {shortDate(job.installDate)}
+                  </Chip>
+                </span>
+              )}
               {pulse && (
                 <span className="[&>*]:mt-0 max-sm:basis-full">
                   <DealPulseBadges clock={pulse.clock} heat={pulse.heat} />
@@ -147,6 +158,15 @@ export function DealBanner({
             {actions && <div className="sm:hidden">{actions}</div>}
             <Kit figures={figures} compact={compact} />
           </div>
+          {/* On a phone the install day drops under who it's for and the kit, on its own line (26 Nov 2026, Martin). */}
+          {job.installDate && (
+            <div className="col-span-2 sm:hidden">
+              <Chip>
+                <CalendarCheck className="mr-1.5 size-3.5 text-sun-line max-sm:mr-1 max-sm:size-3" aria-hidden />
+                Installing {shortDate(job.installDate)}
+              </Chip>
+            </div>
+          )}
         </div>
 
         {/* The roof, a third of the banner: the design on it, and the battery on its wall when there is one. */}

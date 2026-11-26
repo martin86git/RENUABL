@@ -3,6 +3,7 @@
 import { useDealStageLabel } from "./stage-select";
 import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
+import { interestsOf } from "@/lib/domain/design/deal-interest";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -43,7 +44,7 @@ import {
 } from "@/lib/domain/design/crm";
 import { systemDetails, type DealDetail, type JobExtra } from "@/lib/domain/design/deal";
 import { fieldLine, resolveDealFields, type DealFieldsConfig } from "@/lib/domain/design/deal-sections";
-import { INSTALLER_KEY } from "@/lib/domain/design/crm";
+import { INSTALLER_KEY, type ActivityKind } from "@/lib/domain/design/crm";
 import { loadInstallExtras } from "@/lib/services/after-sale";
 import {
   addActivity,
@@ -61,10 +62,28 @@ import {
 import { finishDealTour, loadTeam } from "@/lib/services/design-account";
 import { handleOf, mentionText } from "@/lib/domain/design/mentions";
 import { ACTIVITY_WORD } from "./design-home";
+
+/**
+ * Each kind of entry on a deal's timeline in a colour of its own (26 Nov 2026, Martin: the timeline "needs some color…
+ * to help distinguish between events"), from the kind tokens the rest of the product uses.
+ */
+const ENTRY_TINT: Record<ActivityKind, "lead" | "message" | "follow-up" | "order" | "date" | "approvals" | "install"> = {
+  note: "follow-up",
+  call: "order",
+  email: "lead",
+  message: "message",
+  stage: "approvals",
+  proposal: "date",
+  order: "install",
+  invoice: "install",
+  reminder: "follow-up",
+  service: "date",
+};
 import { DealChat } from "./chat-panel";
 import { DealService } from "./design-service";
 import { AddressField } from "./design-customers";
 import { StageSelect } from "./stage-select";
+import { DealMoreMenu } from "./deal-menus";
 import { useDesignAccount } from "./design-account";
 import { DealEmail, SectionFieldLine } from "./deal-tools";
 import { DesignDrawer, designHref, proposalHref, toolOf } from "./design-drawer";
@@ -97,12 +116,13 @@ type Tab = "activities" | "team" | "email" | "chat" | "sol" | "files" | "service
  * Email, and Sol is his own lit round after the row (10 Nov 2026, Martin: off the banner).
  */
 /**
- * What Details holds (14 Nov 2026, Martin: Details is the button, and Notes is nested inside it): the deal's details
- * first, then its notes (the whole record as a timeline) and the two chats.
+ * What Details holds (14 Nov 2026, Martin: Details is the button, and the timeline is nested inside it): the timeline
+ * first, where a deal opens (25 Nov 2026, Martin, as HubSpot: every email, note, call, design and proposal, newest
+ * first), then the deal's fields and the two chats.
  */
 const NOTES_VIEWS = [
+  ["activities", "Timeline"],
   ["details", "Details"],
-  ["activities", "Notes"],
   ["chat", "Customer chat"],
   ["team", "Team chat"],
 ] as const;
@@ -282,8 +302,8 @@ export function DealPage({ id }: { id: string }) {
                   ? "files"
                   : asked === "notes" || asked === "activities"
                     ? "activities"
-                    : // A deal opens on its details (14 Nov 2026, Martin); its notes are a press away inside them.
-                      "details",
+                    : // A deal opens on its timeline (25 Nov 2026, Martin, as HubSpot's); its fields are beside it.
+                      "activities",
   );
   // The designer as a centred pop-up over the deal (8 Nov 2026, Martin: in the same space, the page's grey either side, so
   // it reads as quick); ?design=1 opens it. Kept loaded once opened, so closing never loses the work.
@@ -404,13 +424,14 @@ export function DealPage({ id }: { id: string }) {
   }, [id, activity.length]);
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
+  const [priceFocused, setPriceFocused] = useState(false);
 
   const load = useCallback(async () => {
     const res = await loadJob(id);
     if (!res.ok) return setProblem(res.message);
     setJob(res.job);
     setCustomer(res.customer);
-    setValue(res.job.value === null ? "" : String(Math.round(res.job.value)));
+    setValue(res.job.value === null ? "" : String(res.job.value));
     const [history, design] = await Promise.all([
       loadCustomer(res.job.customerId),
       res.job.projectId ? loadDealDesign(res.job.projectId) : Promise.resolve(null),
@@ -623,12 +644,10 @@ export function DealPage({ id }: { id: string }) {
           <p className="min-h-4 flex-1 text-right text-xs text-muted max-sm:min-h-0" role="status">
             {status}
           </p>
-          <button
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-danger max-sm:hidden"
-            onClick={() => void deleteDeal()}
-          >
-            <Trash2 className="size-3.5" aria-hidden /> Delete
-          </button>
+          {/* Delete is in a ⋯ menu, never one tap away (26 Nov 2026, Martin). */}
+          <span className="max-sm:hidden">
+            <DealMoreMenu tone="light" onDelete={() => void deleteDeal()} />
+          </span>
         </div>
 
         {/* The deal as a picture (8 Nov 2026, Martin): the roof across the top with who it's for laid over it. */}
@@ -668,11 +687,13 @@ export function DealPage({ id }: { id: string }) {
                 >
                   <Mail className="size-4" aria-hidden />
                 </button>
+                <DealMoreMenu onDelete={() => void deleteDeal()} />
               </div>
             }
+            onStage={(to) => void patch(to)}
           />
         </div>
-        <DealPills {...menu} onDelete={deleteDeal} />
+        <DealPills {...menu} />
         {askPlace && (
           <AskPlace
             name={customer.firstName}
@@ -743,22 +764,26 @@ export function DealPage({ id }: { id: string }) {
                   type="button"
                   role="tab"
                   aria-selected={tab === key}
+                  aria-label={key === "team" ? label : undefined}
+                  title={key === "team" ? label : undefined}
                   onClick={() => setTab(key)}
                   className={clsx(
-                    "h-8 rounded-full px-3.5 text-[13px] font-medium transition-colors max-sm:px-2.5 max-sm:text-[12px]",
+                    "h-8 rounded-full text-[13px] font-medium transition-colors max-sm:text-[12px]",
+                    key === "team" ? "grid w-10 place-items-center" : "px-3.5 max-sm:px-2.5",
                     tab === key ? "bg-primary text-primary-ink" : "text-ink-2 hover:text-ink",
                   )}
                 >
-                  {label}
+                  {/* Team chat is its icon, so the switch fits a phone (25 Nov 2026, Martin). */}
+                  {key === "team" ? <MessagesSquare className="size-[18px]" aria-hidden /> : label}
                 </button>
               ))}
             </div>
           )}
 
           {tab === "team" ? (
-            <section className={clsx(ui.card, "mt-5 p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
-              <div className="mt-3">
+            <section className={clsx(ui.card, "mt-5 p-5 max-sm:p-4")}>
+              <h2 className="sr-only">Team chat on this deal</h2>
+              <div>
                 <DealTeamChat jobId={id} />
               </div>
             </section>
@@ -830,9 +855,9 @@ export function DealPage({ id }: { id: string }) {
                   <>
                     <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       <EditLine
-                        key={`title:${job.title}`}
+                        key={`title:${job.title}:${customer.name}`}
                         label="Deal name"
-                        value={job.title}
+                        value={dealName(job.title, customer.name, job.address)}
                         max={120}
                         onSave={async (title) => {
                           if (!title) {
@@ -847,14 +872,17 @@ export function DealPage({ id }: { id: string }) {
                         <StageSelect job={job} className={clsx(ui.input, "mt-1 appearance-auto")} onChange={(to) => void patch(to)} />
                       </label>
                       <label className="block text-xs text-muted">
-                        Quoted price, inc. GST ($)
+                        Quoted price, inc. GST
+                        {/* With its $ and cents (26 Nov 2026, Martin); typed as plain figures. */}
                         <input
                           className={clsx(ui.input, "mt-1 tabular-nums")}
-                          inputMode="numeric"
-                          value={value}
-                          onChange={(e) => setValue(e.target.value.replace(/[^d]/g, "").slice(0, 8))}
+                          inputMode="decimal"
+                          value={priceFocused ? value : value === "" ? "" : dollarsAndCents(Number(value))}
+                          onFocus={() => setPriceFocused(true)}
+                          onChange={(e) => setValue(cleanPriceTyping(e.target.value))}
                           onBlur={() => {
-                            const next = value === "" ? null : Number(value);
+                            setPriceFocused(false);
+                            const next = value === "" ? null : Math.round(Number(value) * 100) / 100;
                             if (next !== job.value) void patch({ value: next });
                           }}
                           placeholder="From the design"
@@ -878,7 +906,7 @@ export function DealPage({ id }: { id: string }) {
                         onSave={(source) => saveWho({ source })}
                       />
                       <label className="block text-xs text-muted">
-                        Owner
+                        Deal owner
                         <select
                           className={clsx(ui.input, "mt-1 appearance-auto")}
                           value={job.owner ?? ""}
@@ -1048,10 +1076,19 @@ export function DealPage({ id }: { id: string }) {
                         a.mail ? (
                           <MailEntry key={a.id} m={a.mail} />
                         ) : (
-                          <li key={a.id} className={clsx(ui.card, "px-5 py-4")}>
+                          <li
+                            key={a.id}
+                            className={clsx(ui.card, "border-l-[3px] border-l-[var(--k)] px-5 py-4")}
+                            style={{
+                              ["--k" as string]: `var(--kind-${ENTRY_TINT[a.kind]})`,
+                              ["--ks" as string]: `var(--kind-${ENTRY_TINT[a.kind]}-soft)`,
+                            }}
+                          >
                             <div className="flex items-baseline justify-between gap-3">
                               <p className="text-sm text-ink">
-                                <strong className="font-semibold">{a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}</strong>{" "}
+                                <strong className="mr-1 inline-block rounded-full bg-[var(--ks)] px-2 py-0.5 text-[12px] font-semibold text-[var(--k)]">
+                                  {a.kind === "stage" ? "Deal activity" : ACTIVITY_WORD[a.kind]}
+                                </strong>{" "}
                                 {a.kind === "call" ? (
                                   <CallEntryBy by={a.by} />
                                 ) : (
@@ -1401,7 +1438,6 @@ function DealPills(props: {
   onDesign: () => void;
   onProposal: () => void;
   onCard: () => void;
-  onDelete: () => void;
 }) {
   const sold = WON_STAGES.includes(props.stage);
   const installed = INSTALLED_STAGES.includes(props.stage);
@@ -1420,11 +1456,10 @@ function DealPills(props: {
         onClick={props.onDesign}
       />
       <PillRound label="Proposal" icon={FileText} tour="deal-proposal" onClick={props.onProposal} />
-      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("details")} />
+      <PillRound label="Details" icon={LayoutList} on={inDetails} tour="deal-details" onClick={() => props.onTab("activities")} />
       <PillRound label="Files" icon={Paperclip} on={props.tab === "files"} onClick={() => props.onTab("files")} />
       {sold && <PillRound label="Job card" icon={HardHat} onClick={props.onCard} />}
       {installed && <PillRound label="Service" icon={Wrench} on={props.tab === "service"} onClick={() => props.onTab("service")} />}
-      <PillRound label="Delete" icon={Trash2} title="Delete this deal" onClick={props.onDelete} />
     </nav>
   );
 }
@@ -1611,7 +1646,7 @@ function DealMenu({
         tour="deal-details"
         label="Details"
         title="Details: the deal's details, with its notes and chats inside"
-        onClick={() => onTab("details")}
+        onClick={() => onTab("activities")}
         on={NOTES_VIEWS.some(([key]) => key === tab)}
       >
         <span className={round(NOTES_VIEWS.some(([key]) => key === tab))}>
@@ -1791,4 +1826,25 @@ function MailEntry({ m }: { m: DealMail }) {
       </a>
     </li>
   );
+}
+
+/** A price as the business reads it: "$14,747.00". */
+function dollarsAndCents(n: number): string {
+  return Number.isFinite(n) ? `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+}
+
+/** What is kept as a price is typed: figures and one point, two places after it. */
+function cleanPriceTyping(typed: string): string {
+  const [whole, ...rest] = typed.replace(/[^\d.]/g, "").split(".");
+  const cents = rest.join("").slice(0, 2);
+  return (whole.slice(0, 8) + (typed.includes(".") ? `.${cents}` : "")).replace(/^\./, "0.");
+}
+
+/**
+ * The deal's name as shown (26 Nov 2026, Martin: "Deal name should be the customer name or the address"): a deal named
+ * only by what they want ("Solar", "Solar and battery") reads as the customer's name, else its address. A name typed
+ * over it is kept as typed.
+ */
+function dealName(title: string, customer: string, address: string): string {
+  return interestsOf(title) !== null ? customer.trim() || address || title : title;
 }

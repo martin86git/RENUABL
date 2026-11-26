@@ -32,6 +32,14 @@ export function keyFrom(bytes: Uint8Array): string {
   return key;
 }
 
+/**
+ * The device's own sign-in page, remembered for a year (25 Nov 2026, Martin: "the dedicated company page isn't
+ * sticking. I'm taken to the main Renuabl.com.au page"). Signed out on this device, the front page, /design and
+ * /design/sign-in send it back there. Holds only the address's last part (/<name>-<key>).
+ */
+export const TEAM_COOKIE = "renuabl_team";
+export const TEAM_COOKIE_DAYS = 365;
+
 export function signInPath(slug: string, key: string): string {
   return `/${slug}-${key}`;
 }

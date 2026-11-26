@@ -1,5 +1,5 @@
 import { generateAuthenticationOptions, verifyAuthenticationResponse, type AuthenticationResponseJSON } from "@simplewebauthn/server";
-import { LOCK_MINUTES, LOCK_WORDS, isLocked, lockDeviceOf, relyingParty } from "@/lib/domain/design/screen-lock";
+import { LOCK_MINUTES, LOCK_WORDS, isLocked, relyingParty } from "@/lib/domain/design/screen-lock";
 import { isDemoEmail } from "@/lib/domain/design/demo";
 import { answer, readBody } from "@/lib/server/design-context";
 import { memberByEmail } from "@/lib/server/design-repo";
@@ -13,6 +13,7 @@ import {
   lockRow,
   markActive,
   passkeysOf,
+  requestDevice,
   sessionHash,
   setChallenge,
   takeChallenge,
@@ -25,14 +26,14 @@ import {
  * never on someone the owner is viewing as, so it passes the view-as proxy. GET: whether it's locked and how it can be
  * unlocked. POST `do`: active (real use; never unlocks), lock, pin, passkey-options, passkey, signout-others, signout-all.
  */
-async function who(request: Request) {
+async function who() {
   const idHash = await sessionHash();
   if (!idHash) return null;
   const row = await lockRow(idHash);
   if (!row) return null;
   const member = await memberByEmail(row.email);
   if (!member) return null;
-  const device = lockDeviceOf(request.headers.get("user-agent"));
+  const device = await requestDevice();
   const exempt = isDemoEmail(row.email);
   return { idHash, row, member, device, locked: !exempt && isLocked(row.activeAt, device) };
 }
@@ -44,9 +45,9 @@ const originOf = (request: Request) => {
 };
 const no = (status: number, message: string, more: object = {}) => Response.json({ ok: false, message, ...more }, { status });
 
-export async function GET(request: Request) {
+export async function GET() {
   return answer(async () => {
-    const me = await who(request);
+    const me = await who();
     if (!me) return Response.json({ signedIn: false });
     const [keys, pin] = await Promise.all([passkeysOf(me.member.businessId, me.row.email), hasLockPin(me.member.businessId, me.row.email)]);
     return Response.json({
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return answer(async () => {
-    const me = await who(request);
+    const me = await who();
     if (!me) return no(401, "Sign in to your business.");
     const read = await readBody(request, 20_000);
     if ("refuse" in read) return read.refuse;

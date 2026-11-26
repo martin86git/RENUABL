@@ -209,6 +209,8 @@ export async function queueCall(o: {
   teamAbout?: { text: string; by: string };
   /** Which sales agent it was handed to (its key), when not the first. */
   agent?: CallerKey;
+  /** A time the customer picked (`askedWindow`): the call is held for it, else it rings at the next calling hour. */
+  at?: { from: Date; until: Date };
 }): Promise<QueueResult> {
   const s = voiceSettings();
   if (!s || !(await voiceOnFor(o.businessId))) return { result: "off" };
@@ -270,7 +272,7 @@ export async function queueCall(o: {
         { ...rows[0], lead: { ...rows[0].lead, assistant: (await callerOf(o.businessId, keyOfCall(rows[0]))).name } },
         `${o.teamAbout.by} handed over a call about: ${o.teamAbout.text}`,
       );
-    const window = nextCallWindow(new Date());
+    const window = o.at ?? nextCallWindow(new Date());
     if (!(await placeCall(s, rows[0], window)) || !window) {
       // Why it was turned away is kept on the call: out of credit is said as that (call-credit.ts).
       const why = await query<{ stop_reason: string | null }>(`select stop_reason from voice_calls where id = $1`, [rows[0].id]).catch(

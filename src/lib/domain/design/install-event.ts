@@ -52,6 +52,8 @@ export interface InstallEventInput {
   reference: string;
   /** The pickup slip's private link: what the installer shows at the counter. Null when there is no order. */
   slip: string | null;
+  /** The job's site page's private link: the panel layout and the deal's photos, which a calendar can't carry. */
+  sitePage?: string | null;
 }
 
 export interface EventGroup {
@@ -76,6 +78,8 @@ export interface InstallEvent {
   description: string;
   /** The pickup slip's link, for the card's button. */
   slip: string | null;
+  /** The site page's link (layout and photos), for the card's button. */
+  sitePage: string | null;
   googleUrl: string;
   ics: string;
 }
@@ -180,6 +184,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
       ]),
     ]),
     ...(input.slip ? [`Pickup slip, to show at the counter: ${input.slip}`] : []),
+    ...(input.sitePage ? [`Panel layout and site photos: ${input.sitePage}`] : []),
   ].join("\n");
 
   // Google Calendar shows a little formatting in an event's description: the same sheet with its headings in bold.
@@ -199,6 +204,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
       ].join("<br><br>"),
     ),
     ...(input.slip ? [`<b>Pickup slip</b>, to show at the counter: ${esc(input.slip)}`] : []),
+    ...(input.sitePage ? [`<b>Panel layout and site photos</b>: ${esc(input.sitePage)}`] : []),
   ].join("<br><br>");
 
   // The Google link carries the whole job sheet, as the business's own bookings do (never the customer's email).
@@ -221,6 +227,7 @@ export function installEvent(input: InstallEventInput): InstallEvent {
     sections,
     description,
     slip: input.slip,
+    sitePage: input.sitePage ?? null,
     googleUrl,
     ics: icsFile({
       uid: `${input.jobId}-install@renuabl`,

@@ -555,6 +555,16 @@ create table if not exists design_pickup_links (
   unique (business_id, job_id),
   foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
 );
+-- The private link to a job's site page (/site/<token>): its panel layout and the deal's photos, carried in the install
+-- calendar event, since a calendar can't carry pictures. One a job, for good; no sign-in, the token is the key.
+create table if not exists design_site_links (
+  token text primary key,
+  business_id text not null references businesses(id) on delete cascade,
+  job_id text not null,
+  created_at timestamptz not null default now(),
+  unique (business_id, job_id),
+  foreign key (business_id, job_id) references design_jobs(business_id, id) on delete cascade
+);
 -- Follow-ups made on a proposal that is out (domain/design/proposal-lists.ts): one for each follow-up day reached,
 -- marked called or emailed by a member.
 create table if not exists design_followups (

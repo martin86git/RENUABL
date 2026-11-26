@@ -76,3 +76,24 @@ describe("without Claude", () => {
     expect(g.reply).toContain("every job, from enquiry to service");
   });
 });
+
+// 26 Nov 2026, Martin: "how many leads today?" is the deals made today, whatever stage they've moved to.
+describe("new leads in the facts", () => {
+  it("counts deals made today by when they were made, not their stage", () => {
+    const made = (stage: JobStage, createdAt: string) =>
+      ({
+        stage,
+        details: {},
+        value: null,
+        installDate: null,
+        kw: null,
+        title: "Solar",
+        wonAt: null,
+        customerName: "Jo Lee",
+        createdAt,
+      }) as never;
+    const facts = canvasFacts([made("designed", "2026-11-26T01:00:00Z"), made("lead", "2026-11-20T01:00:00Z")], 0, "2026-11-26");
+    expect(facts).toContain("- Today: 1 (Jo)");
+    expect(facts).toContain("- This week (from Monday 2026-11-23): 1");
+  });
+});
