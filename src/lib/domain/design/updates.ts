@@ -20,11 +20,6 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
-    area: "Voice agents",
-    words: "Texting a customer from a voice agent's call window lets you sign off as yourself or as the agent.",
-  },
-  {
-    day: "2026-11-26",
     area: "Design tool",
     words: "Sides now draws your panels on the angled photos as you lay them, beside the plan, on the side that shows them best.",
   },
