@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   CalendarDays,
+  Newspaper,
   ClipboardCheck,
   Eye,
   MessageCircle,
@@ -942,6 +943,8 @@ function Shell({
               {/* On the design tool the floating rounds are put away for the roof, so team chat comes up here. */}
               {retail && tool && <SolNavButton small />}
               {retail && tool && <TeamChatButton me={account.email} customers={unread + mentions} />}
+              {/* Industry news, found from every page (26 Nov 2026, Martin: it was only in the cog's menu). */}
+              <TopIcon href="/design/news" label="Industry news" icon={Newspaper} on={path.startsWith("/design/news")} badge={0} />
               {/* Email, with its unread count, on every page. */}
               {retail && (
                 <TopIcon href={PATHS.calendar} label="Calendar" icon={CalendarDays} on={path.startsWith(PATHS.calendar)} badge={0} />
