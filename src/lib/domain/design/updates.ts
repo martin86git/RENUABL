@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Everywhere",
+    words: "Every page's minimise is now the same larger round, inside the grey pad's top right corner.",
+  },
+  {
+    day: "2026-11-26",
     area: "Today",
     words: "Minimise sits beside the chat's first message with a mark of its own; a minimised chat opens again from any page.",
   },

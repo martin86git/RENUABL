@@ -48,6 +48,7 @@ import {
   retrySol,
 } from "@/lib/services/sol";
 import { chatSince, tabTitle, tabTurns, tabTurnsIn } from "@/lib/domain/design/sol-tabs";
+import { FoldToTab } from "./minimise-mark";
 import { OPEN_SOL_TAB, dropTab, keepTab, tabById } from "@/lib/services/sol-tabs";
 import { ReminderCard, goWhereAsked, openSolPage } from "./sol-chat";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
@@ -618,9 +619,9 @@ export function TodayPad(props: {
                 onClick={minimise}
                 title="Minimise: keep this chat as a tab and start afresh. It lights up when Sol's answer lands."
                 aria-label="Minimise this chat into a tab"
-                className="group/min absolute left-0 top-2 z-[1] !mt-0 inline-flex size-9 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary xl:left-[calc(100%+0.75rem)]"
+                className="group/min absolute left-0 top-2 z-[1] !mt-0 inline-flex size-11 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary xl:left-[calc(100%+0.75rem)]"
               >
-                <FoldToTab className="size-[18px]" />
+                <FoldToTab className="size-[22px]" />
               </button>
             )}
           </div>
@@ -660,23 +661,6 @@ export function TodayPad(props: {
         </div>
       )}
     </div>
-  );
-}
-
-/** The chat folding into a tab: a window, a corner arrow and the tab it lands in. */
-function FoldToTab({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
-      <path d="M8 3.5h7.5a1.5 1.5 0 0 1 1.5 1.5v7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      <path
-        d="M14 6 6.5 13.5M6.5 13.5V9.5M6.5 13.5h4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <rect x="2.5" y="15.25" width="7" height="2.5" rx="1.25" fill="#ff5a1f" />
-    </svg>
   );
 }
 

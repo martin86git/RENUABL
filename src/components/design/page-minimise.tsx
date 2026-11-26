@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import { Minus, X } from "lucide-react";
+import { X } from "lucide-react";
+import { FoldToTab } from "./minimise-mark";
 import {
   MINIMISED_KEY,
   afterMinimise,
@@ -101,11 +102,11 @@ export function PageMinimise(props: { fallback: string }) {
         <button
           type="button"
           onClick={minimise}
-          title="Minimise this page"
+          title="Minimise: put this page aside as a tab at the foot of the screen"
           aria-label="Minimise this page"
-          className="absolute right-6 top-1 z-20 hidden size-7 items-center justify-center rounded-full bg-surface text-ink-2 shadow-[0_4px_12px_rgba(11,11,12,0.1)] ring-1 ring-line transition hover:text-ink lg:flex lg:right-16"
+          className="absolute right-[2.25rem] top-[1.25rem] z-20 hidden size-11 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary lg:flex lg:right-[4.25rem] lg:top-[2.75rem]"
         >
-          <Minus className="size-3.5" aria-hidden />
+          <FoldToTab className="size-[22px]" />
         </button>
       )}
       {chips.length > 0 &&
