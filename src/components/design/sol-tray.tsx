@@ -280,11 +280,12 @@ export function SolController(props: {
         aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"} (double tap for ${stepBy === 1 ? 5 : 1}°)`}
         className={clsx(
           "pointer-events-auto flex flex-col items-center justify-center rounded-full bg-[#3a3d43] text-white shadow-[0_6px_18px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/10 active:scale-95 active:bg-[#4a4e55] motion-reduce:active:scale-100",
-          upright ? "size-[4.25rem]" : "size-[3.4rem]",
+          // Larger on a phone held upright (26 Nov 2026, Martin: "the left and right toggles need to be bigger").
+          upright ? "size-[5rem]" : "size-[3.75rem]",
         )}
       >
-        <Turn className={upright ? "size-6" : "size-5"} aria-hidden />
-        <span className={clsx("mt-0.5 text-[11px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
+        <Turn className={upright ? "size-7" : "size-6"} aria-hidden />
+        <span className={clsx("mt-0.5 text-[13px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
           {stepBy}°
         </span>
       </HoldButton>
@@ -303,7 +304,7 @@ export function SolController(props: {
           className={clsx(
             "flex items-center justify-center rounded-[9px]",
             // Larger on a phone held upright, so a thumb finds it (26 Nov 2026, Martin).
-            upright ? "h-12 w-16" : "h-8 w-9",
+            upright ? "h-12 w-14" : "h-8 w-9",
             props.landscape === land ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
           )}
         >
@@ -338,7 +339,7 @@ export function SolController(props: {
       onStep={(times) => props.onSlide?.(by * times)}
       onHold={props.onHold}
       aria-label={by < 0 ? "Slide left along the row" : "Slide right along the row"}
-      className={clsx(small, "pointer-events-auto active:bg-white/15", upright ? "h-9 w-[3.75rem]" : "h-8 w-8")}
+      className={clsx(small, "pointer-events-auto active:bg-white/15", upright ? "h-10 w-[4.25rem]" : "h-8 w-8")}
     >
       {by < 0 ? <ChevronLeft className="size-5" aria-hidden /> : <ChevronRight className="size-5" aria-hidden />}
     </HoldButton>
