@@ -11,6 +11,8 @@ import { PayDeposit } from "./deposit-panel";
 import { PaySchedule } from "./pay-schedule";
 import type { PublicPayments } from "@/lib/services/proposals";
 import { PoweredByRenuabl, ProposalPage } from "./proposal-view";
+import { ProposalDatasheets } from "./proposal-datasheets";
+import type { ProposalDatasheet } from "@/lib/domain/design/proposal-datasheets";
 import { WalkthroughPlayer } from "./walkthrough-player";
 
 /**
@@ -30,6 +32,8 @@ export function CustomerProposal(props: {
   payments: PublicPayments | null;
   /** "Call me" with the business's automated assistant, when the business has calls on. */
   callMe?: { assistant: string } | null;
+  /** The datasheets for the products it quotes (26 Nov 2026). */
+  datasheets?: ProposalDatasheet[];
 }) {
   const { token, view } = props;
   const [state, setState] = useState(props.state);
@@ -72,6 +76,7 @@ export function CustomerProposal(props: {
         ) : null
       }
       onOpenChat={() => chat.show(true)}
+      datasheets={props.datasheets?.length ? <ProposalDatasheets sheets={props.datasheets} chosen={chosen} href={urls.datasheet} /> : null}
       greeting={
         <>
           {state !== "withdrawn" && (

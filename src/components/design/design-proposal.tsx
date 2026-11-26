@@ -53,6 +53,8 @@ import { ProposalPage } from "./proposal-view";
 import { BuilderPanel, Hint, useProposalBuilder } from "./proposal-builder";
 import { PriceCheck } from "./design-quote";
 import { UnsavedDesign } from "./unsaved-design";
+import { DatasheetCheck } from "./proposal-datasheets";
+import type { ProductSheetStanding } from "@/lib/domain/design/proposal-datasheets";
 import { priceAdvice } from "@/lib/domain/design/price-check";
 import { usePricePoints } from "@/lib/services/price-check";
 
@@ -262,6 +264,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [pricing, setPricing] = useState<{ marginShare: number; floor: number } | null>(null);
   // What the configurator left out and why (25 Nov 2026, Martin: storage wouldn't step down, no other panels or inverters).
   const [skipped, setSkipped] = useState<string[]>([]);
+  // The quoted products and whether each one's datasheet goes with the proposal (26 Nov 2026).
+  const [sheets, setSheets] = useState<ProductSheetStanding[]>([]);
   const points = usePricePoints(Boolean(pricing));
   // The preview's conversation: empty, taking nothing, so the business sees where its message will show.
   const previewChat = useCustomerChat({ business: view?.business.name ?? "", phone: view?.business.phone });
@@ -282,6 +286,7 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
       setCustomAllowed(res.customAllowed !== false);
       setPricing(res.pricing ?? null);
       setSkipped(res.configuratorSkipped ?? []);
+      setSheets(res.datasheets ?? []);
       if (res.choice) setChoice((current) => ({ ...res.choice, ...current }));
     },
     [jobId],
@@ -408,6 +413,8 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
               </p>
             </div>
           )}
+
+          {!building && problems.length === 0 && <DatasheetCheck products={sheets} onFound={() => void refresh(choice)} />}
 
           {!building && advice.length > 0 && (
             <div className="-mt-2">

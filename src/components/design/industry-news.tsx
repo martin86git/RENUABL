@@ -228,51 +228,55 @@ export function NewsPage() {
       </div>
       {business && <BusinessSheet businessKey={business} staff={staff} onClose={() => setBusiness(null)} onFollow={refresh} />}
 
-      <div className="mt-4">
-        <PostComposer
-          onPosted={() => {
-            if (filter !== "all" && filter !== "posts") setFilter("all");
-            refresh();
-          }}
-        />
-      </div>
+      {/* The share box and the chips stay at the top as the feed scrolls (26 Nov 2026, Martin: a persistent nav), on
+          the panel's own tint so the stories pass under them. */}
+      <div className="sticky top-[var(--studio-head,0px)] z-10 -mx-4 bg-[color-mix(in_srgb,var(--market)_4%,var(--canvas))] px-4 pb-3 pt-4 sm:-mx-6 sm:px-6">
+        <div>
+          <PostComposer
+            onPosted={() => {
+              if (filter !== "all" && filter !== "posts") setFilter("all");
+              refresh();
+            }}
+          />
+        </div>
 
-      <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Show">
-        {chips.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => setFilter(c.id)}
-            aria-pressed={filter === c.id || part === c.id}
-            className={clsx(
-              "rounded-full px-3 py-1.5 text-[13px] ring-1 transition",
-              filter === c.id || part === c.id
-                ? "bg-primary text-primary-ink ring-primary"
-                : "bg-surface text-ink-2 ring-line hover:text-ink",
-            )}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-      {topics.length > 1 && (
-        <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Topics">
-          {topics.map((t) => (
+        <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Show">
+          {chips.map((c) => (
             <button
-              key={t}
+              key={c.id}
               type="button"
-              onClick={() => setFilter(filter === t ? (part ?? "all") : t)}
-              aria-pressed={filter === t}
+              onClick={() => setFilter(c.id)}
+              aria-pressed={filter === c.id || part === c.id}
               className={clsx(
-                "rounded-full px-2.5 py-1 text-[12.5px] transition",
-                filter === t ? "bg-ink-2 text-canvas" : "text-ink-2 hover:bg-surface hover:text-ink",
+                "rounded-full px-3 py-1.5 text-[13px] ring-1 transition",
+                filter === c.id || part === c.id
+                  ? "bg-primary text-primary-ink ring-primary"
+                  : "bg-surface text-ink-2 ring-line hover:text-ink",
               )}
             >
-              {NEWS_TOPIC_LABELS[t]}
+              {c.label}
             </button>
           ))}
         </div>
-      )}
+        {topics.length > 1 && (
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Topics">
+            {topics.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setFilter(filter === t ? (part ?? "all") : t)}
+                aria-pressed={filter === t}
+                className={clsx(
+                  "rounded-full px-2.5 py-1 text-[12.5px] transition",
+                  filter === t ? "bg-ink-2 text-canvas" : "text-ink-2 hover:bg-surface hover:text-ink",
+                )}
+              >
+                {NEWS_TOPIC_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {talked.length > 0 && <TalkedAbout talked={talked} />}
 

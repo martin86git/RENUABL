@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   CalendarDays,
+  Newspaper,
   ClipboardCheck,
   Eye,
   MessageCircle,
@@ -49,6 +50,7 @@ import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
 import { UsageButton } from "./usage-pop";
 import { PhoneVoiceTab } from "./phone-voice";
 import { PhoneTop } from "./phone-top";
+import { PageMinimise } from "./page-minimise";
 import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
@@ -942,6 +944,8 @@ function Shell({
               {/* On the design tool the floating rounds are put away for the roof, so team chat comes up here. */}
               {retail && tool && <SolNavButton small />}
               {retail && tool && <TeamChatButton me={account.email} customers={unread + mentions} />}
+              {/* Industry news, found from every page (26 Nov 2026, Martin: it was only in the cog's menu). */}
+              <TopIcon href="/design/news" label="Industry news" icon={Newspaper} on={path.startsWith("/design/news")} badge={0} />
               {/* Email, with its unread count, on every page. */}
               {retail && (
                 <TopIcon href={PATHS.calendar} label="Calendar" icon={CalendarDays} on={path.startsWith(PATHS.calendar)} badge={0} />
@@ -1008,7 +1012,9 @@ function Shell({
         </div>
       ) : (
         // `studio-room`: beside Sol's panel the pad keeps clear of the floating bar and of the panel (globals.css).
-        <div className="studio-room px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
+        <div className="studio-room relative px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
+          {/* A minus over the pad's top right puts the page aside as a chip at the foot (26 Nov 2026, Martin). */}
+          <PageMinimise fallback={here?.page.label ?? current.label} />
           <div data-tour="pad" data-sol-page className={PAD}>
             {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad
                 disappeared): its own grey with its rounded corners, drawn on a wide screen only (globals.css .pad-cap). */}

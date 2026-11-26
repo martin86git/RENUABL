@@ -1,4 +1,7 @@
+import { after } from "next/server";
 import { todayInMarket } from "@/lib/domain/market";
+import { quotedProducts } from "@/lib/domain/design/proposal-datasheets";
+import { findQuotedSheets } from "@/lib/server/datasheet-finder";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { jobById } from "@/lib/server/design-crm-repo";
 import { workOutProposal } from "@/lib/server/design-proposal";
@@ -55,6 +58,11 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     if (!kept) return notFound();
     if (kept === "raced")
       return Response.json({ ok: false, message: "Someone published this a moment ago. Reload to see it." }, { status: 409 });
+    // The datasheets for what it quotes that aren't on hand are looked for online after the answer (26 Nov 2026), a couple
+    // now; the proposal screen finds the rest. Each one found goes with the proposal from then on.
+    const businessId = who.member.businessId;
+    const products = quotedProducts(worked.built.internal);
+    after(() => findQuotedSheets(businessId, products, 2).catch(() => 0));
     const versions = await proposalVersions(who.member.businessId, id, todayInMarket());
     const found = await jobById(who.member.businessId, id, viewerOf(who.member));
     return Response.json({ ok: true, proposal: versions[0], versions, job: found?.job });
