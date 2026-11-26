@@ -52,6 +52,7 @@ import { PhoneTop } from "./phone-top";
 import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
+import { SolTabs } from "./sol-tabs";
 import { AssistantCallWindow } from "./assistant-call";
 import { LiveCallsTray } from "./live-calls";
 import { CoachWindow } from "./coach-chat";
@@ -709,6 +710,8 @@ function Shell({
       <ShellDesignDrawer />
       {/* A call made from the computer: who, how long, Mute and Hang up, over every page while it lasts. */}
       <ComputerCallBar />
+      {/* Sol's chats minimised on Today, kept as tabs on the left while you carry on elsewhere. */}
+      {retail && <SolTabs />}
       {/* The phone assistant's call as it happens, once a call is handed to it. */}
       <AssistantCallWindow />
       {/* Every call it has under way: a pill while any is ringing or on, opening one, or all of them side by side. */}
