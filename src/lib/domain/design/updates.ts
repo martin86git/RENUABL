@@ -20,8 +20,18 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
+    area: "Today",
+    words: "Minimise sits beside the chat's first message with a mark of its own; a minimised chat opens again from any page.",
+  },
+  {
+    day: "2026-11-26",
     area: "Calls",
     words: "Calling from the computer: Note-taker on the call bar types up both sides live, then writes the call up on the deal.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "Texting a customer from a voice agent's call window lets you sign off as yourself or as the agent.",
   },
   {
     day: "2026-11-26",

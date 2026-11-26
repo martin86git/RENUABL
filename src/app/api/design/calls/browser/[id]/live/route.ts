@@ -10,7 +10,9 @@ const gone = () => Response.json({ ok: false, message: "There's no such call." }
  * the note-taker hears the member's side in the browser); DELETE stops it; GET ?from=n → the final stretches from n on,
  * what is still being made out on each side, and whether it is on. Only the member who made the call.
  */
-async function call(ctx: RouteContext<"/api/design/calls/browser/[id]/live">) {
+async function call(
+  ctx: RouteContext<"/api/design/calls/browser/[id]/live">,
+): Promise<{ refuse: Response } | { row: NonNullable<Awaited<ReturnType<typeof ownCall>>> }> {
   const who = await requireMember("design");
   if ("refuse" in who) return { refuse: who.refuse };
   const { id } = await ctx.params;

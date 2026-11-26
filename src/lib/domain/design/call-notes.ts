@@ -104,7 +104,7 @@ export function cleanHeard(raw: unknown): HeardLine[] {
       text: String(l.text ?? "").slice(0, 2_000),
       ...(l.note === true ? { note: true } : {}),
       ...(l.design === true ? { design: true } : {}),
-      ...(l.who === "us" || l.who === "them" ? { who: l.who } : {}),
+      ...(l.who === "us" || l.who === "them" ? { who: l.who as "us" | "them" } : {}),
     }))
     .slice(0, 2_000);
 }

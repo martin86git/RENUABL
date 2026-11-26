@@ -9,21 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import clsx from "clsx";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowUp,
-  ArrowUpRight,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  HardHat,
-  Mail,
-  Minus,
-  Phone,
-  Play,
-  RefreshCw,
-  Search,
-  X,
-} from "lucide-react";
+import { ArrowUp, ArrowUpRight, ChevronLeft, ChevronRight, Eye, HardHat, Mail, Phone, Play, RefreshCw, Search, X } from "lucide-react";
 import { LAUNCH_MARKET } from "@/lib/domain/market";
 import { searchNext, searchWords, workThroughAt, type NextItem } from "@/lib/domain/design/next-up";
 import { WELCOME_TOUR } from "@/lib/domain/design/welcome";
@@ -55,11 +41,13 @@ import {
   askSol,
   askSolInPanel,
   handsToPanel,
+  listSolPast,
   loadSol,
+  openSolPast,
   remindAt,
   retrySol,
 } from "@/lib/services/sol";
-import { chatSince, tabTitle, tabTurns } from "@/lib/domain/design/sol-tabs";
+import { chatSince, tabTitle, tabTurns, tabTurnsIn } from "@/lib/domain/design/sol-tabs";
 import { OPEN_SOL_TAB, dropTab, keepTab, tabById } from "@/lib/services/sol-tabs";
 import { ReminderCard, goWhereAsked, openSolPage } from "./sol-chat";
 import { SolChartView, SolDiagramView } from "./sol-visuals";
@@ -324,23 +312,41 @@ export function TodayPad(props: {
     });
     freshChat();
   };
+  const minimiseRef = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    minimiseRef.current = minimise;
+  });
   /** A tab's chat back on the page, read from Sol's conversation. */
   const openTab = useCallback(async (id: string) => {
     const tab = tabById(id);
     if (!tab) return;
     const r = await loadSol();
     if (!r.ok) return;
+    let found = tabTurns(r.state.turns, tab);
+    // Filed away since (a new chat in his panel files Today's turns with it): read back from his past conversations,
+    // so a tab opens wherever its chat now lives (26 Nov 2026, Martin).
+    if (!found.length) {
+      const list = await listSolPast();
+      const near = list.ok ? list.past.filter((p) => p.endedAt >= tab.since && p.startedAt <= tab.at) : [];
+      for (const p of near) {
+        const one = await openSolPast(p.id);
+        if (one.ok) found = tabTurnsIn([one.past], tab);
+        if (found.length) break;
+      }
+    }
     const back: Turn[] = [];
     let n = Date.now();
-    for (const t of tabTurns(r.state.turns, tab)) {
+    for (const t of found) {
       if (t.role === "you") back.push({ id: n++, kind: "ask", q: t.shown ?? t.text, a: null });
       else {
         const last = back[back.length - 1];
         if (last?.kind === "ask" && !last.a) last.a = answerOf(t);
       }
     }
-    dropTab(id);
     if (!back.length) return;
+    dropTab(id);
+    // A chat on screen already is kept as a tab of its own, not lost.
+    minimiseRef.current?.();
     seq.current++;
     since.current = tab.since;
     tabId.current = tab.id;
@@ -521,7 +527,7 @@ export function TodayPad(props: {
         </div>
 
         {talking && !onFeed && !onCal && (
-          <div className="mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
+          <div className="relative mx-auto w-full max-w-3xl flex-1 space-y-7 pb-4 pt-2" aria-live="polite">
             {turns.map((t) =>
               t.kind === "day" ? (
                 <SolDay key={t.id} {...props} items={items} onGrow={follow} />
@@ -603,6 +609,20 @@ export function TodayPad(props: {
               ),
             )}
             <div ref={end} className="scroll-mb-40" />
+            {/* The chat put away as a tab on the left, to carry on elsewhere while Sol answers (sol-tabs.ts). Level with
+                the first message, off to its right (26 Nov 2026, Martin), with a mark of its own: the chat folding into
+                a tab. */}
+            {turns.some((t) => t.kind === "ask") && (
+              <button
+                type="button"
+                onClick={minimise}
+                title="Minimise: keep this chat as a tab and start afresh. It lights up when Sol's answer lands."
+                aria-label="Minimise this chat into a tab"
+                className="group/min absolute left-0 top-2 z-[1] !mt-0 inline-flex size-9 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary xl:left-[calc(100%+0.75rem)]"
+              >
+                <FoldToTab className="size-[18px]" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -633,17 +653,6 @@ export function TodayPad(props: {
                   <SolIcon className="size-3.5 text-sun-line" aria-hidden /> Show me my day
                 </button>
               )}
-              {/* The chat put away as a tab on the left, to carry on elsewhere while Sol answers (sol-tabs.ts). */}
-              {turns.some((t) => t.kind === "ask") && (
-                <button
-                  type="button"
-                  onClick={minimise}
-                  title="Keep this chat as a tab on the left and start afresh. It lights up when Sol's answer lands."
-                  className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium text-ink ring-1 ring-line hover:ring-sun-line"
-                >
-                  <Minus className="size-3.5" aria-hidden /> Minimise
-                </button>
-              )}
             </div>
 
             <SolBox onAsk={askIn} asking={asking || awaiting !== null} replyTo={replyTo} onStopReply={() => setReplyTo(null)} />
@@ -651,6 +660,23 @@ export function TodayPad(props: {
         </div>
       )}
     </div>
+  );
+}
+
+/** The chat folding into a tab: a window, a corner arrow and the tab it lands in. */
+function FoldToTab({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className={className} aria-hidden>
+      <path d="M8 3.5h7.5a1.5 1.5 0 0 1 1.5 1.5v7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M14 6 6.5 13.5M6.5 13.5V9.5M6.5 13.5h4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="2.5" y="15.25" width="7" height="2.5" rx="1.25" fill="#ff5a1f" />
+    </svg>
   );
 }
 

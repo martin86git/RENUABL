@@ -18,7 +18,7 @@ import {
   useLiveCall,
   useWatchedCall,
 } from "@/lib/services/assistant-call";
-import { askAssistantToCallBack, textCustomer, useCallerInfo, type CallerState, callerFor } from "@/lib/services/caller";
+import { askAssistantToCallBack, loadDealTexts, textCustomer, useCallerInfo, type CallerState, callerFor } from "@/lib/services/caller";
 import { openCoach } from "@/lib/services/coaching";
 import { OtherCallsStrip } from "./live-calls";
 import { PRACTICE_ID } from "@/lib/domain/design/practice-call";
@@ -342,6 +342,22 @@ export function AfterCall(p: {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   const name = p.caller.name;
+  // A text is signed by the member or by the agent (26 Nov 2026, Martin); each sign-off read from the server.
+  const agentKey = p.caller.role ?? "sales";
+  const [signAs, setSignAs] = useState<"me" | "agent">("me");
+  const [signOffs, setSignOffs] = useState<{ me: string; agent: string } | null>(null);
+  useEffect(() => {
+    if (doing !== "text" || signOffs) return;
+    let live = true;
+    void Promise.all([loadDealTexts(p.jobId), p.caller.named ? loadDealTexts(p.jobId, agentKey) : null]).then(([me, agent]) => {
+      if (!live || !me.ok) return;
+      setSignOffs({ me: me.signOff, agent: agent && agent.ok ? agent.signOff : "" });
+    });
+    return () => {
+      live = false;
+    };
+  }, [doing, signOffs, p.jobId, p.caller.named, agentKey]);
+  const signOff = signOffs ? (signAs === "agent" && signOffs.agent ? signOffs.agent : signOffs.me) : "";
   const pick = (d: "back" | "text") => {
     setDoing((now) => (now === d ? null : d));
     setWords("");
@@ -352,7 +368,10 @@ export function AfterCall(p: {
     if (!t || busy || !doing) return;
     setBusy(true);
     setNote(null);
-    const res = doing === "back" ? await askAssistantToCallBack(p.jobId, t) : await textCustomer(p.jobId, t);
+    const res =
+      doing === "back"
+        ? await askAssistantToCallBack(p.jobId, t)
+        : await textCustomer(p.jobId, t, signAs === "agent" && p.caller.named ? agentKey : undefined);
     setBusy(false);
     setNote({ ok: res.ok, text: res.message });
     if (!res.ok) return;
@@ -432,6 +451,27 @@ export function AfterCall(p: {
             aria-label={doing === "back" ? `What ${name} should ask on the call back` : `A text to ${p.customer}`}
             className="w-full resize-none rounded-xl bg-surface-2 px-3 py-2 text-sm text-ink outline-none ring-1 ring-line placeholder:text-muted focus:ring-sun-line disabled:text-muted"
           />
+          {doing === "text" && !off && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+              <span>Sign off as</span>
+              {(p.caller.named ? (["me", "agent"] as const) : (["me"] as const)).map((who) => (
+                <button
+                  key={who}
+                  type="button"
+                  onClick={() => setSignAs(who)}
+                  aria-pressed={signAs === who}
+                  className={clsx(
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ring-1",
+                    signAs === who ? "bg-ink text-white ring-ink" : "bg-surface text-ink ring-line hover:ring-sun-line",
+                  )}
+                >
+                  {who === "agent" && <CallerAvatar caller={p.caller} size={14} />}
+                  {who === "me" ? "Me" : name}
+                </button>
+              ))}
+              {signOff && <span className="basis-full">Ends: {signOff.replace(/\n/g, " ")}</span>}
+            </div>
+          )}
           <div className="mt-1.5 flex items-center justify-between gap-2">
             <p className="text-[11px] text-muted">
               {off
