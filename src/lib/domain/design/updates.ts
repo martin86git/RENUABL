@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Marketing",
+    words: "Email builder: a Top bar block (a line and a button above your logo) and a panel colour for any block.",
+  },
+  {
+    day: "2026-11-26",
     area: "Sol",
     words: "In Sol's draft emails, pick a written web address and press Link to turn it into linked words.",
   },
