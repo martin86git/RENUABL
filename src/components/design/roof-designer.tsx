@@ -24,7 +24,16 @@ import {
 import { SolNudges } from "./sol-nudges";
 import { WalkthroughRecorder } from "./walkthrough-recorder";
 import { PRESENTING_EVENT } from "@/lib/services/walkthrough";
-import { leftOffWords, nudgesFor, openedAs, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
+import {
+  leftOffWords,
+  nudgesFor,
+  openedAs,
+  PRE_APPROVALS_HREF,
+  SHADE_LOSS,
+  type Nudge,
+  type NudgeAction,
+} from "@/lib/domain/design/sol-nudges";
+import { goUnderneath } from "./design-drawer";
 import { SideViewsButton } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
@@ -5088,6 +5097,11 @@ export function RoofDesigner(props: {
       case "request-preapproval":
         // Filed in Pre-approvals on the deal; the card then says it is requested (19 Nov 2026, Martin).
         void dealNetwork.request(summary.kw).then((why) => why && console.warn(`Pre-approval request not raised: ${why}`));
+        return;
+      case "open-preapprovals":
+        // Shown underneath when the designer is the pop-up over a page, else gone to.
+        if (window.parent !== window) goUnderneath(PRE_APPROVALS_HREF);
+        else router.push(PRE_APPROVALS_HREF);
         return;
       case "ok":
         return aside();
