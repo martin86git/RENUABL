@@ -26,6 +26,7 @@ type Run = {
   failed: number;
   skipped: number;
   lines: number;
+  joined: number;
   running: boolean;
   stopped: boolean;
 };
@@ -93,7 +94,7 @@ export function HubSpotImportSettings() {
     stop.current = false;
     const names = new Map(look.deals.map((d) => [d.id, d.name || `Deal ${d.id}`]));
     const list = toBring;
-    let state: Run = { done: 0, total: list.length, already: 0, failed: 0, skipped: 0, lines: 0, running: true, stopped: false };
+    let state: Run = { done: 0, total: list.length, already: 0, failed: 0, skipped: 0, lines: 0, joined: 0, running: true, stopped: false };
     setRun(state);
     setProblem(null);
     const failed: { name: string; why: string }[] = [];
@@ -118,7 +119,7 @@ export function HubSpotImportSettings() {
       for (const r of res.results as HsOutcome[]) {
         if (r.result === "in") {
           kept.push(r.id);
-          state = { ...state, done: state.done + 1, lines: state.lines + r.lines };
+          state = { ...state, done: state.done + 1, lines: state.lines + r.lines, joined: state.joined + (r.joined ? 1 : 0) };
         } else if (r.result === "already") {
           kept.push(r.id);
           state = { ...state, done: state.done + 1, already: state.already + 1 };
