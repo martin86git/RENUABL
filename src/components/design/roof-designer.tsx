@@ -481,6 +481,9 @@ const PHONE_STRIP_LIFT = 16;
 const PHONE_RAIL_ZOOM = 0.72;
 /** A phone upright opens one zoom press (1.4×) closer than the pop-up does, so the roof reads (21 Nov 2026, Martin). */
 const PHONE_ZOOM = 1.4;
+/** How far Sol's ← → buttons slide what is picked along its row, a tap (26 Nov 2026, Martin: "a left and right button to
+    be able to tap the panel across"); held, it keeps sliding. */
+const SLIDE_STEP_M = 0.05;
 /** The view's size for a pinch: no closer than this many photo pixels across, no further out than the whole photo. */
 const PINCH_MIN_W = 40;
 
@@ -12416,6 +12419,19 @@ export function RoofDesigner(props: {
                     canUndo={changedSincePicked}
                     onUndo={undoKeepingPicks}
                     onTurn={(degrees) => turn(degrees)}
+                    onSlide={(by) => {
+                      // Along the panels' own row (across the way they face), left or right as seen on the picture.
+                      const first = pickedPanels[0];
+                      if (!first) return;
+                      const f = ((pickedFacing ?? panelFacing(first)) * Math.PI) / 180;
+                      let ax = Math.cos(f);
+                      let ay = Math.sin(f);
+                      if (ax < -1e-6 || (Math.abs(ax) <= 1e-6 && ay < 0)) {
+                        ax = -ax;
+                        ay = -ay;
+                      }
+                      nudge(cm(ax * by * SLIDE_STEP_M), cm(ay * by * SLIDE_STEP_M));
+                    }}
                     onLandscape={turnLandscape}
                     onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
                     onDelete={removePicked}
