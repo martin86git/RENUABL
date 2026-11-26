@@ -14,6 +14,7 @@ import {
   guideStep,
   guiding,
   layingWords,
+  panelCounter,
   panelCells,
   cellWords,
   panelsFor,
@@ -61,7 +62,7 @@ import { todayInMarket } from "@/lib/domain/market";
 import { GROUND_COLOURS, faceShade, facesFromModel, groundOf, tidyGround, type DrawnFace, type Ground } from "@/lib/domain/design/drawing";
 import { CELLS_UP_TO } from "@/lib/domain/design/illustrated-roof";
 import { FlowLine, PanelArt, RoofArt, WallStrip, useRoofGhost, type ArtFace } from "./illustrated-roof";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import {
   BatteryCharging,
@@ -156,7 +157,7 @@ import {
 import { LIVE_LIMITS, LIVE_POLL_MS, liveStatusWords, type LiveSnapshot } from "@/lib/domain/design/live";
 import { SolIcon, SolStars } from "./sol-icon";
 import { SolMark } from "./sol-sun";
-import { SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
+import { PanelCounter, SolController, SolEmerging, SolTray, solNotch } from "./sol-tray";
 import type { RoofModel } from "@/lib/domain/roof-layout";
 import { mismatchNote, modelOffset, suggestPanels } from "@/lib/domain/design/suggest";
 import { stcPricingDate } from "@/lib/domain/design/stc-change";
@@ -480,6 +481,9 @@ const PHONE_STRIP_LIFT = 16;
 const PHONE_RAIL_ZOOM = 0.72;
 /** A phone upright opens one zoom press (1.4×) closer than the pop-up does, so the roof reads (21 Nov 2026, Martin). */
 const PHONE_ZOOM = 1.4;
+/** How far Sol's ← → buttons slide what is picked along its row, a tap (26 Nov 2026, Martin: "a left and right button to
+    be able to tap the panel across"); held, it keeps sliding. */
+const SLIDE_STEP_M = 0.05;
 /** The view's size for a pinch: no closer than this many photo pixels across, no further out than the whole photo. */
 const PINCH_MIN_W = 40;
 
@@ -1805,6 +1809,8 @@ export function RoofDesigner(props: {
   // Sol's box folded on a phone: the picture grows down into its room (22 Nov 2026, Martin: "minimize down so that there
   // is more of the map"), read by the measure below.
   const solFoldedNow = useRef(false);
+  // How tall the dock under the picture wants to be (its contents), null for to the foot of the screen.
+  const dockWantNow = useRef<number | null>(null);
   const [sideways, setSideways] = useState(false);
   const tightNow = useRef(props.tight);
   useEffect(() => {
@@ -1836,10 +1842,15 @@ export function RoofDesigner(props: {
         const stripH = Math.round(box.height);
         const restOpen = Math.max(PHONE_BANDS.below, Math.round(window.innerHeight - box.top - box.height - PHONE_BANDS.above - photoH));
         // Folded, the strip sits at the foot of the screen and the picture takes the rest of the box's room.
-        const drop = solFoldedNow.current ? Math.max(0, restOpen - PHONE_FOLDED_BAND) : 0;
-        const pb = drop ? PHONE_FOLDED_BAND : PHONE_BANDS.below;
-        const rest = restOpen - drop;
-        const tall = photoH + drop;
+        // The dock under the picture is only as tall as what it holds (26 Nov 2026, Martin): the picture takes the rest.
+        const want = solFoldedNow.current ? PHONE_FOLDED_BAND : dockWantNow.current;
+        const drop = want !== null ? Math.max(0, restOpen - want) : 0;
+        // A dock taller than the room under the picture takes it from the picture, never below 80% of the photo's own
+        // shape (26 Nov 2026, Martin: the controller's turn thumbs ran below the screen).
+        const cut = want !== null && want > restOpen ? Math.min(want - restOpen, Math.max(0, photoH - Math.round(shortest * 0.8))) : 0;
+        const pb = (drop || cut) && want !== null ? (cut ? restOpen + cut : want) : PHONE_BANDS.below;
+        const rest = restOpen - drop + cut;
+        const tall = photoH + drop - cut;
         setStage((was) =>
           was &&
           was.photoH === tall &&
@@ -1949,17 +1960,39 @@ export function RoofDesigner(props: {
   // A phone upright: the picture as tall as the stage says, so a narrower band of the photo, larger.
   const phoneAcross = phone && stage && stage.photoH > 0 ? Math.round((stage.across / stage.photoH) * 1000) / 1000 : null;
   useEffect(() => {
+    if (!phoneAcross) return;
+    const was = acrossNow.current;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (phoneAcross) setAcross(phoneAcross);
+    setAcross(phoneAcross);
+    // The picture grown or shrunk under the dock (26 Nov 2026, Martin: the dock as tall as what it holds): the same
+    // scale and the same top edge, so the roof stays where it was under the finger and more or less shows below.
+    if (was && was !== phoneAcross)
+      setView((kept) => {
+        const h = Math.min(ROOF_IMAGE.height * 1.5, kept.h * (was / phoneAcross));
+        const w = (h * ROOF_IMAGE.width) / ROOF_IMAGE.height;
+        return { x: kept.x + (kept.w - w) / 2, y: kept.y, w, h };
+      });
   }, [phoneAcross]);
   // Zoom mode on a phone (21 Nov 2026, Martin: a magnifier that, tapped, lets the picture be pinched in and out): while it
   // is on, a layer over the picture takes the fingers, so no tool acts. Two fingers pinch about where they are; one moves.
   const [zooming, setZooming] = useState(false);
+  // The loupe (26 Nov 2026, Martin: "as I press my thumb onto the map I can't see where I'm laying them"): while a finger
+  // works on the picture, a magnified circle of what is under it shows in a corner it isn't in. `at` is the point in
+  // the picture's units, `left` puts it in the top left when the finger is in the top right, `per` is units a pixel.
+  const [loupe, setLoupe] = useState<{ at: Point; left: boolean; per: number } | null>(null);
+  const artId = `roof-art-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   // Sol holds the tools on a phone upright (sol-tray.tsx): his tray, and the roof pitch marks shown only when asked for.
   const [solTray, setSolTray] = useState(false);
   // Sol's box under the picture on a phone, folded to a strip (22 Nov 2026, Martin: "minimize down to a height where I
   // can still see the sol icon, pointer, eraser etc"); a new step or suggestion opens it again.
   const [solFolded, setSolFolded] = useState(false);
+  // How tall Sol's words and the controller's contents are, for the dock's height (26 Nov 2026, Martin).
+  const [solWords, setSolWords] = useState<number | null>(null);
+  const [ctrlH, setCtrlH] = useState<number | null>(null);
+  const [ctrlFolded, setCtrlFolded] = useState(false);
+  // The steering wheel round picked panels on a phone (26 Nov 2026, Martin): where a thumb on its rim was last, in degrees,
+  // and the part of a degree not yet turned.
+  const wheelDrag = useRef<{ cx: number; cy: number; last: number; owed: number } | null>(null);
   // How far the box has been slid up over the picture to show more words (22 Nov 2026, Martin: "slide it up higher").
   const [solLift, setSolLift] = useState(0);
   const [solDragging, setSolDragging] = useState(false);
@@ -3314,6 +3347,17 @@ export function RoofDesigner(props: {
   /** Whether a press here is on the small round that picks the whole array. */
   const onArrayHint = (p: Point) => arrayHint !== null && Math.hypot(p.x - arrayHint.at.x, p.y - arrayHint.at.y) < 8 * u * scale;
 
+  // Where the loupe goes for a finger at this pointer event, or null when it isn't a finger or nothing is held.
+  const loupeFor = (e: React.PointerEvent): typeof loupe => {
+    if (e.pointerType !== "touch" || !press.current || press.current.mode === "pan") return null;
+    const box = svg.current?.getBoundingClientRect();
+    if (!box || !box.width) return null;
+    const fx = (e.clientX - box.left) / box.width;
+    const fy = (e.clientY - box.top) / box.height;
+    // In the picture's own units (its viewBox), not metres: the loupe draws the picture itself, magnified.
+    const at = { x: view.x + fx * view.w, y: view.y + fy * view.h };
+    return { at, left: fx > 0.5 && fy < 0.5, per: view.w / box.width };
+  };
   const onPointerDown = (e: React.PointerEvent) => {
     // The right button opens the tool menu (onContextMenu); it presses nothing.
     if (e.button === 2) return;
@@ -4713,14 +4757,18 @@ export function RoofDesigner(props: {
    * laid panels over a home's existing ones). Null when it can't be had: then it designs as before.
    */
   const [roofCheckNow, setRoofCheckNow] = useState<RoofCheck | null>(null);
+  /** The person said the roof has no panels on it: what the check took for them is dropped, not kept clear of. */
+  const noSolarRef = useRef(false);
   const checkRoof = async (): Promise<RoofCheck | null> => {
     const picture = props.nearmapPicture ? `nearmap ${props.nearmapCaptured ?? ""}` : "google";
     const check = await Promise.race([
       loadRoofCheck(spot.lat, spot.lng, picture),
       new Promise<null>((done) => window.setTimeout(() => done(null), 45_000)),
     ]);
-    setRoofCheckNow(check);
-    return check;
+    // Told there aren't any (26 Nov 2026, Martin: the check took a pergola for panels), it stays out for the visit.
+    const kept = check && noSolarRef.current ? { ...check, things: withoutExisting(check.things) } : check;
+    setRoofCheckNow(kept);
+    return kept;
   };
   /**
    * The panels already on the roof are being replaced (9 Nov 2026, Martin: nothing let him disregard them): then panels
@@ -5411,10 +5459,17 @@ export function RoofDesigner(props: {
     },
     onFind: () => void askSol(),
     // The panels already on the roof (12 Nov 2026, Martin): replaced, so new ones may go where they are, or worked round.
-    onExisting: (replace: boolean) => {
+    onExisting: (replace: boolean | "none") => {
       existingAsked.current = true;
-      replacingRef.current = replace;
-      setReplacing(replace);
+      if (replace === "none") {
+        noSolarRef.current = true;
+        replacingRef.current = false;
+        setReplacing(false);
+        setRoofCheckNow((c) => (c ? { ...c, things: withoutExisting(c.things) } : c));
+      } else {
+        replacingRef.current = replace;
+        setReplacing(replace);
+      }
       answerGuide("existing");
     },
     // The panel chosen, the pointer lays panels straight away (12 Nov 2026, Martin: no tray; Sol counts down to the
@@ -7028,6 +7083,10 @@ export function RoofDesigner(props: {
   const foot = stage ? stage.pt + stage.photoH : null;
   const underUp = solHolds && !sideways && foot !== null && !solTray;
   const deckUp = underUp && (picks.length > 0 || guideShown || nudgeShown || stringsUnder);
+  // The panel counter in the dock, only while Add a panel is in hand (26 Nov 2026, Martin): the panels and kW, and
+  // with Sol's target how many are still to go.
+  const panelCount =
+    tool === "panel" ? <PanelCounter {...panelCounter(summary.panels, laying ? ghosts.length : 0, size.watts, guideTarget)} /> : null;
   const solSaying = guideShown ? `g:${guideNow}` : nudgeShown ? `n:${nudges[0]?.id ?? ""}` : "";
   const [solSaid, setSolSaid] = useState(solSaying);
   if (solSaid !== solSaying) {
@@ -7059,6 +7118,7 @@ export function RoofDesigner(props: {
       const style = getComputedStyle(box);
       const pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
       const words = Math.ceil(bottom - top + pad);
+      setSolWords(words);
       setSolNeeds(Math.max(0, words - restRoom));
     };
     measure();
@@ -7073,6 +7133,24 @@ export function RoofDesigner(props: {
   }, [solUnder, restRoom, solSaying]);
   const lift = foldable && !solFolded ? Math.min(solLiftByHand ? solLift : solNeeds, liftMost) : 0;
   const deckTop = foot === null ? null : foot - lift;
+  // The dock is as tall as what it holds, the picture taking the rest (26 Nov 2026, Martin: "The dock height should auto
+  // adjust relative to the information it's showing… It should [not] remain open to its largest unnecessarily").
+  const dockWantNext = !underUp
+    ? null
+    : stringsUnder
+      ? null
+      : picks.length > 0
+        ? ctrlH
+        : guideShown || nudgeShown
+          ? solWords === null
+            ? null
+            : Math.max(PHONE_BANDS.below, solWords + 8)
+          : PHONE_BANDS.below;
+  useEffect(() => {
+    if (dockWantNow.current === dockWantNext) return;
+    dockWantNow.current = dockWantNext;
+    window.dispatchEvent(new Event("resize"));
+  }, [dockWantNext]);
   const restFolded = 48;
   // A slim grab bar on the box's top edge, at its left (Sol sits in the notch in its middle): pressed, it folds or opens the box; dragged, it slides the box up or down (down
   // past its usual height folds it, up from folded opens it).
@@ -8630,9 +8708,16 @@ export function RoofDesigner(props: {
                     const box = e.currentTarget.getBoundingClientRect();
                     setToolMenu({ x: ((e.clientX - box.left) / box.width) * 100, y: ((e.clientY - box.top) / box.height) * 100 });
                   }}
-                  onPointerDown={onPointerDown}
-                  onPointerMove={onPointerMove}
+                  onPointerDown={(e) => {
+                    onPointerDown(e);
+                    setLoupe(loupeFor(e));
+                  }}
+                  onPointerMove={(e) => {
+                    onPointerMove(e);
+                    if (e.pointerType === "touch") setLoupe(loupeFor(e));
+                  }}
                   onPointerUp={(e) => {
+                    setLoupe(null);
                     const box = e.currentTarget.getBoundingClientRect();
                     lastPress.current = {
                       x: ((e.clientX - box.left) / box.width) * 100,
@@ -8641,7 +8726,10 @@ export function RoofDesigner(props: {
                     };
                     onPointerUp(e);
                   }}
-                  onPointerCancel={onPointerUp}
+                  onPointerCancel={(e) => {
+                    setLoupe(null);
+                    onPointerUp(e);
+                  }}
                   onPointerLeave={() => {
                     pointer.current = null;
                     setHover(null);
@@ -8651,269 +8739,228 @@ export function RoofDesigner(props: {
                   role="img"
                   aria-label={`The roof at ${props.address} from above, with ${summary.panels} panels placed`}
                 >
-                  {props.image && !drawn && !art && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
-                  {/* The Drawn view: the roof as an illustration, its surroundings a dim ghost of the photo. */}
-                  {art && !drawn && (
-                    <RoofArt
-                      faces={artFaces}
-                      ghost={ghost}
-                      width={ROOF_IMAGE.width}
-                      height={ROOF_IMAGE.height}
-                      u={u}
-                      perMetre={1 / scale}
-                    />
-                  )}
-                  {/* Drawing mode: plain ground, and the roof's faces drawn on it, each a grey of its own by the way it
+                  <g id={artId}>
+                    {props.image && !drawn && !art && <image href={props.image} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />}
+                    {/* The Drawn view: the roof as an illustration, its surroundings a dim ghost of the photo. */}
+                    {art && !drawn && (
+                      <RoofArt
+                        faces={artFaces}
+                        ghost={ghost}
+                        width={ROOF_IMAGE.width}
+                        height={ROOF_IMAGE.height}
+                        u={u}
+                        perMetre={1 / scale}
+                      />
+                    )}
+                    {/* Drawing mode: plain ground, and the roof's faces drawn on it, each a grey of its own by the way it
                       faces. Google's faces (where there is roof data) go underneath; the faces traced here, which are
                       exact, go over them. */}
-                  {drawn && (
-                    <g pointerEvents="none">
-                      <rect width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} fill="#4c6b45" />
-                      {/* The ground as read from the photo: lawn, the darker green of trees, and paving (drives, paths, the
+                    {drawn && (
+                      <g pointerEvents="none">
+                        <rect width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} fill="#4c6b45" />
+                        {/* The ground as read from the photo: lawn, the darker green of trees, and paving (drives, paths, the
                           road), softened so it reads as plain shapes. */}
-                      {measured === "there" ? (
-                        <image href={measuredUrl} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />
-                      ) : (
-                        ground && (
-                          <image href={ground} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} style={{ filter: "blur(1.2px)" }} />
-                        )
-                      )}
-                      {/* The roof being designed, always lighter than everything around it and edged in white, so it stands
+                        {measured === "there" ? (
+                          <image href={measuredUrl} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} />
+                        ) : (
+                          ground && (
+                            <image href={ground} width={ROOF_IMAGE.width} height={ROOF_IMAGE.height} style={{ filter: "blur(1.2px)" }} />
+                          )
+                        )}
+                        {/* The roof being designed, always lighter than everything around it and edged in white, so it stands
                           out: the faces traced here (exact); or, until some are traced, Google's faces for the home. */}
-                      {faces.length === 0 &&
-                        Array.isArray(modelFaces) &&
-                        modelFaces.map((face, i) => (
+                        {faces.length === 0 &&
+                          Array.isArray(modelFaces) &&
+                          modelFaces.map((face, i) => (
+                            <polygon
+                              key={i}
+                              points={path(face.points)}
+                              fill={faceShade(face.azimuth, face.pitch, OWN_ROOF_LIFT)}
+                              stroke="#ffffff"
+                              strokeWidth={1.2 * u}
+                              strokeLinejoin="round"
+                            />
+                          ))}
+                        {faces.map((face) => (
                           <polygon
-                            key={i}
+                            key={face.id}
                             points={path(face.points)}
-                            fill={faceShade(face.azimuth, face.pitch, OWN_ROOF_LIFT)}
+                            fill={faceShade(faceFacing(face), face.tilt ?? TILT.roof, OWN_ROOF_LIFT)}
                             stroke="#ffffff"
-                            strokeWidth={1.2 * u}
+                            strokeWidth={1.4 * u}
                             strokeLinejoin="round"
                           />
                         ))}
-                      {faces.map((face) => (
-                        <polygon
-                          key={face.id}
-                          points={path(face.points)}
-                          fill={faceShade(faceFacing(face), face.tilt ?? TILT.roof, OWN_ROOF_LIFT)}
-                          stroke="#ffffff"
-                          strokeWidth={1.4 * u}
-                          strokeLinejoin="round"
-                        />
-                      ))}
-                    </g>
-                  )}
-                  {/* Is this the home? The lot the address is registered to, outlined in gold with everything off it
+                      </g>
+                    )}
+                    {/* Is this the home? The lot the address is registered to, outlined in gold with everything off it
                       dimmed and its address over it, while Sol asks (18 Nov 2026, Martin, as Primero's designer). */}
-                  {lot &&
-                    lot.outlines.length > 0 &&
-                    guideNow === "house" &&
-                    (() => {
-                      const rings = lot.outlines.map((outline) => outline.map((p) => px(p)));
-                      const cut = rings.map((ring) => `M${ring.map((p) => p.join(",")).join(" L")} Z`).join(" ");
-                      const all = rings.flat();
-                      const midX = (Math.min(...all.map((p) => p[0])) + Math.max(...all.map((p) => p[0]))) / 2;
-                      const topY = Math.min(...all.map((p) => p[1]));
-                      const held = (n: number, least: number, most: number) => Math.min(Math.max(n, least), Math.max(least, most));
-                      const nameX = held(midX, view.x + 120 * u, view.x + view.w - 120 * u);
-                      const nameY = held(topY - 6 * u, view.y + 70 * u, view.y + view.h - 24 * u);
-                      const doubt = lotDoubt(lot);
+                    {lot &&
+                      lot.outlines.length > 0 &&
+                      guideNow === "house" &&
+                      (() => {
+                        const rings = lot.outlines.map((outline) => outline.map((p) => px(p)));
+                        const cut = rings.map((ring) => `M${ring.map((p) => p.join(",")).join(" L")} Z`).join(" ");
+                        const all = rings.flat();
+                        const midX = (Math.min(...all.map((p) => p[0])) + Math.max(...all.map((p) => p[0]))) / 2;
+                        const topY = Math.min(...all.map((p) => p[1]));
+                        const held = (n: number, least: number, most: number) => Math.min(Math.max(n, least), Math.max(least, most));
+                        const nameX = held(midX, view.x + 120 * u, view.x + view.w - 120 * u);
+                        const nameY = held(topY - 6 * u, view.y + 70 * u, view.y + view.h - 24 * u);
+                        const doubt = lotDoubt(lot);
+                        return (
+                          <g pointerEvents="none">
+                            <path
+                              d={`M${view.x - view.w},${view.y - view.h} H${view.x + 2 * view.w} V${view.y + 2 * view.h} H${view.x - view.w} Z ${cut}`}
+                              fillRule="evenodd"
+                              fill="#0b0c0e"
+                              fillOpacity="0.55"
+                            />
+                            <path
+                              d={cut}
+                              fill="none"
+                              stroke={doubt ? "#ffffff" : "#e6b84a"}
+                              strokeWidth={1.8 * u}
+                              strokeLinejoin="round"
+                              strokeDasharray={doubt ? `${5 * u} ${3 * u}` : undefined}
+                              style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.9))` }}
+                            />
+                            {/* Where Google put the address: the middle of the picture. */}
+                            <circle
+                              cx={ROOF_IMAGE.width / 2}
+                              cy={ROOF_IMAGE.height / 2}
+                              r={5 * u}
+                              fill="none"
+                              stroke="#ffffff"
+                              strokeWidth={u}
+                            >
+                              <animate attributeName="r" values={`${3 * u};${9 * u};${3 * u}`} dur="2.4s" repeatCount="indefinite" />
+                              <animate attributeName="opacity" values="1;0.2;1" dur="2.4s" repeatCount="indefinite" />
+                            </circle>
+                            <circle cx={ROOF_IMAGE.width / 2} cy={ROOF_IMAGE.height / 2} r={1.8 * u} fill="#ffffff" />
+                            <text
+                              x={nameX}
+                              y={nameY}
+                              textAnchor="middle"
+                              fontSize={9 * u}
+                              fontWeight="700"
+                              fill="#e6b84a"
+                              stroke="#0b0c0e"
+                              strokeWidth={2.6 * u}
+                              paintOrder="stroke"
+                            >
+                              {lot.registered ?? props.address.split(",")[0].toUpperCase()}
+                            </text>
+                          </g>
+                        );
+                      })()}
+                    {faces.map((f) => {
+                      const on = f.id === selected;
+                      const off = new Set(f.off);
                       return (
-                        <g pointerEvents="none">
-                          <path
-                            d={`M${view.x - view.w},${view.y - view.h} H${view.x + 2 * view.w} V${view.y + 2 * view.h} H${view.x - view.w} Z ${cut}`}
-                            fillRule="evenodd"
-                            fill="#0b0c0e"
-                            fillOpacity="0.55"
+                        <g key={f.id}>
+                          <polygon
+                            points={path(f.points)}
+                            fill="#ffffff"
+                            fillOpacity={on ? 0.08 : 0.03}
+                            stroke={on ? GOLD : severalRoofs ? roofEdge(f) : "#ffffff"}
+                            strokeOpacity={on ? 1 : severalRoofs ? 0.9 : 0.55}
+                            strokeWidth={(on ? 1.4 : severalRoofs ? 1.3 : 1) * u}
                           />
-                          <path
-                            d={cut}
-                            fill="none"
-                            stroke={doubt ? "#ffffff" : "#e6b84a"}
-                            strokeWidth={1.8 * u}
-                            strokeLinejoin="round"
-                            strokeDasharray={doubt ? `${5 * u} ${3 * u}` : undefined}
-                            style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.9))` }}
-                          />
-                          {/* Where Google put the address: the middle of the picture. */}
-                          <circle
-                            cx={ROOF_IMAGE.width / 2}
-                            cy={ROOF_IMAGE.height / 2}
-                            r={5 * u}
-                            fill="none"
-                            stroke="#ffffff"
-                            strokeWidth={u}
-                          >
-                            <animate attributeName="r" values={`${3 * u};${9 * u};${3 * u}`} dur="2.4s" repeatCount="indefinite" />
-                            <animate attributeName="opacity" values="1;0.2;1" dur="2.4s" repeatCount="indefinite" />
-                          </circle>
-                          <circle cx={ROOF_IMAGE.width / 2} cy={ROOF_IMAGE.height / 2} r={1.8 * u} fill="#ffffff" />
-                          <text
-                            x={nameX}
-                            y={nameY}
-                            textAnchor="middle"
-                            fontSize={9 * u}
-                            fontWeight="700"
-                            fill="#e6b84a"
-                            stroke="#0b0c0e"
-                            strokeWidth={2.6 * u}
-                            paintOrder="stroke"
-                          >
-                            {lot.registered ?? props.address.split(",")[0].toUpperCase()}
-                          </text>
+                          {panelPlaces(f, size).map((panel) => {
+                            // A place whose panel was taken out or moved away is simply empty roof: nothing is drawn there.
+                            if (off.has(panel.index)) return null;
+                            const pick: Pick = { kind: "grid", face: f.id, index: panel.index };
+                            const lit = isPicked(pick);
+                            const wired = stringOf(keyOf(pick));
+                            if (art)
+                              return (
+                                <PanelArt
+                                  key={panel.index}
+                                  corners={panel.corners.map(px)}
+                                  u={u}
+                                  cells={summary.panels <= CELLS_UP_TO}
+                                  {...(wired >= 0 ? { fill: STRING_COLOURS[wired % STRING_COLOURS.length] } : {})}
+                                  {...(lit
+                                    ? { edge: GOLD, edgeWidth: 1 }
+                                    : severalRoofs && wired < 0
+                                      ? { edge: roofEdge(f), edgeWidth: 0.8 }
+                                      : {})}
+                                />
+                              );
+                            return (
+                              <g key={panel.index}>
+                                <polygon
+                                  points={path(panel.corners)}
+                                  fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
+                                  fillOpacity={wired >= 0 ? 0.72 : 0.9}
+                                  stroke={
+                                    lit
+                                      ? GOLD
+                                      : wired >= 0
+                                        ? STRING_COLOURS[wired % STRING_COLOURS.length]
+                                        : severalRoofs
+                                          ? roofEdge(f)
+                                          : "#93a0b1"
+                                  }
+                                  strokeWidth={(lit ? 0.9 : severalRoofs && wired < 0 ? 0.8 : 0.5) * u}
+                                />
+                                {aspect(
+                                  middle(panel.corners),
+                                  faceFacing(f),
+                                  f.tilt ?? TILT.roof,
+                                  wired >= 0 ? "#0b0c0e" : lit ? GOLD : "#93a0b1",
+                                )}
+                              </g>
+                            );
+                          })}
                         </g>
                       );
-                    })()}
-                  {faces.map((f) => {
-                    const on = f.id === selected;
-                    const off = new Set(f.off);
-                    return (
-                      <g key={f.id}>
-                        <polygon
-                          points={path(f.points)}
-                          fill="#ffffff"
-                          fillOpacity={on ? 0.08 : 0.03}
-                          stroke={on ? GOLD : severalRoofs ? roofEdge(f) : "#ffffff"}
-                          strokeOpacity={on ? 1 : severalRoofs ? 0.9 : 0.55}
-                          strokeWidth={(on ? 1.4 : severalRoofs ? 1.3 : 1) * u}
-                        />
-                        {panelPlaces(f, size).map((panel) => {
-                          // A place whose panel was taken out or moved away is simply empty roof: nothing is drawn there.
-                          if (off.has(panel.index)) return null;
-                          const pick: Pick = { kind: "grid", face: f.id, index: panel.index };
-                          const lit = isPicked(pick);
-                          const wired = stringOf(keyOf(pick));
-                          if (art)
-                            return (
-                              <PanelArt
-                                key={panel.index}
-                                corners={panel.corners.map(px)}
-                                u={u}
-                                cells={summary.panels <= CELLS_UP_TO}
-                                {...(wired >= 0 ? { fill: STRING_COLOURS[wired % STRING_COLOURS.length] } : {})}
-                                {...(lit
-                                  ? { edge: GOLD, edgeWidth: 1 }
-                                  : severalRoofs && wired < 0
-                                    ? { edge: roofEdge(f), edgeWidth: 0.8 }
-                                    : {})}
-                              />
-                            );
-                          return (
-                            <g key={panel.index}>
-                              <polygon
-                                points={path(panel.corners)}
-                                fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
-                                fillOpacity={wired >= 0 ? 0.72 : 0.9}
-                                stroke={
-                                  lit
-                                    ? GOLD
-                                    : wired >= 0
-                                      ? STRING_COLOURS[wired % STRING_COLOURS.length]
-                                      : severalRoofs
-                                        ? roofEdge(f)
-                                        : "#93a0b1"
-                                }
-                                strokeWidth={(lit ? 0.9 : severalRoofs && wired < 0 ? 0.8 : 0.5) * u}
-                              />
-                              {aspect(
-                                middle(panel.corners),
-                                faceFacing(f),
-                                f.tilt ?? TILT.roof,
-                                wired >= 0 ? "#0b0c0e" : lit ? GOLD : "#93a0b1",
-                              )}
-                            </g>
-                          );
-                        })}
-                      </g>
-                    );
-                  })}
-                  {/* Panels placed by hand, on top. */}
-                  {loose.map((panel) => {
-                    const pick: Pick = { kind: "loose", id: panel.id };
-                    const lit = isPicked(pick);
-                    const wired = stringOf(keyOf(pick));
-                    if (art)
+                    })}
+                    {/* Panels placed by hand, on top. */}
+                    {loose.map((panel) => {
+                      const pick: Pick = { kind: "loose", id: panel.id };
+                      const lit = isPicked(pick);
+                      const wired = stringOf(keyOf(pick));
+                      if (art)
+                        return (
+                          <PanelArt
+                            key={panel.id}
+                            corners={looseCorners(panel, size).map(px)}
+                            u={u}
+                            cells={summary.panels <= CELLS_UP_TO}
+                            {...(wired >= 0 ? { fill: STRING_COLOURS[wired % STRING_COLOURS.length] } : {})}
+                            {...(lit
+                              ? { edge: GOLD, edgeWidth: 1 }
+                              : severalRoofs && wired < 0
+                                ? { edge: roofEdge(panel), edgeWidth: 0.8 }
+                                : {})}
+                          />
+                        );
                       return (
-                        <PanelArt
-                          key={panel.id}
-                          corners={looseCorners(panel, size).map(px)}
-                          u={u}
-                          cells={summary.panels <= CELLS_UP_TO}
-                          {...(wired >= 0 ? { fill: STRING_COLOURS[wired % STRING_COLOURS.length] } : {})}
-                          {...(lit
-                            ? { edge: GOLD, edgeWidth: 1 }
-                            : severalRoofs && wired < 0
-                              ? { edge: roofEdge(panel), edgeWidth: 0.8 }
-                              : {})}
-                        />
+                        <g key={panel.id}>
+                          <polygon
+                            points={path(looseCorners(panel, size))}
+                            fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
+                            fillOpacity={wired >= 0 ? 0.72 : 0.9}
+                            stroke={
+                              lit
+                                ? GOLD
+                                : wired >= 0
+                                  ? STRING_COLOURS[wired % STRING_COLOURS.length]
+                                  : severalRoofs
+                                    ? roofEdge(panel)
+                                    : "#93a0b1"
+                            }
+                            strokeWidth={(lit ? 0.9 : severalRoofs && wired < 0 ? 0.8 : 0.5) * u}
+                          />
+                          {aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, wired >= 0 ? "#0b0c0e" : lit ? GOLD : "#93a0b1")}
+                        </g>
                       );
-                    return (
-                      <g key={panel.id}>
-                        <polygon
-                          points={path(looseCorners(panel, size))}
-                          fill={wired >= 0 ? STRING_COLOURS[wired % STRING_COLOURS.length] : "#0d1219"}
-                          fillOpacity={wired >= 0 ? 0.72 : 0.9}
-                          stroke={
-                            lit
-                              ? GOLD
-                              : wired >= 0
-                                ? STRING_COLOURS[wired % STRING_COLOURS.length]
-                                : severalRoofs
-                                  ? roofEdge(panel)
-                                  : "#93a0b1"
-                          }
-                          strokeWidth={(lit ? 0.9 : severalRoofs && wired < 0 ? 0.8 : 0.5) * u}
-                        />
-                        {aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, wired >= 0 ? "#0b0c0e" : lit ? GOLD : "#93a0b1")}
-                      </g>
-                    );
-                  })}
-                  {/* Guide lines, at rest: thin gold lines along the roof edges they were drawn on. */}
-                  {!guide &&
-                    rules.map((g) => (
-                      <line
-                        key={g.id}
-                        x1={px(g.a)[0]}
-                        y1={px(g.a)[1]}
-                        x2={px(g.b)[0]}
-                        y2={px(g.b)[1]}
-                        stroke={GOLD}
-                        strokeWidth={1.1 * u}
-                        strokeLinecap="round"
-                        pointerEvents="none"
-                      />
-                    ))}
-                  {ruling && (
-                    <g pointerEvents="none">
-                      <line
-                        x1={px(ruling.a)[0]}
-                        y1={px(ruling.a)[1]}
-                        x2={px(ruling.b)[0]}
-                        y2={px(ruling.b)[1]}
-                        stroke="#ffffff"
-                        strokeWidth={1.4 * u}
-                        strokeDasharray={`${4 * u} ${3 * u}`}
-                      />
-                      <circle cx={px(ruling.a)[0]} cy={px(ruling.a)[1]} r={3 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
-                      <text
-                        x={px(ruling.b)[0] + 8 * u}
-                        y={px(ruling.b)[1] - 6 * u}
-                        fontSize={7.5 * u}
-                        fontWeight="700"
-                        fill="#ffffff"
-                        stroke="#0b0c0e"
-                        strokeWidth={2.2 * u}
-                        paintOrder="stroke"
-                      >
-                        {Math.hypot(ruling.b.x - ruling.a.x, ruling.b.y - ruling.a.y).toFixed(2)} m
-                      </text>
-                    </g>
-                  )}
-                  {/* The roof's outline, lit while panels are being placed or lined up, with the distance to each edge of the face they are on. */}
-                  {guide && (
-                    <g pointerEvents="none">
-                      {rules.map((g) => (
+                    })}
+                    {/* Guide lines, at rest: thin gold lines along the roof edges they were drawn on. */}
+                    {!guide &&
+                      rules.map((g) => (
                         <line
                           key={g.id}
                           x1={px(g.a)[0]}
@@ -8921,394 +8968,396 @@ export function RoofDesigner(props: {
                           x2={px(g.b)[0]}
                           y2={px(g.b)[1]}
                           stroke={GOLD}
-                          strokeWidth={2.4 * u}
-                          strokeLinecap="round"
-                          style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.95))` }}
-                        />
-                      ))}
-                      {faces.map((f) => (
-                        <polygon
-                          key={f.id}
-                          points={path(f.points)}
-                          fill="none"
-                          stroke={GOLD}
-                          strokeWidth={2.4 * u}
-                          strokeLinejoin="round"
-                          style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.95))` }}
-                        />
-                      ))}
-                      {measures.map((m, i) => {
-                        const [x1, y1] = px(m.from);
-                        const [x2, y2] = px(m.to);
-                        return (
-                          <g key={i}>
-                            <line
-                              x1={x1}
-                              y1={y1}
-                              x2={x2}
-                              y2={y2}
-                              stroke="#ffffff"
-                              strokeWidth={0.7 * u}
-                              strokeDasharray={`${2 * u} ${1.5 * u}`}
-                            />
-                            <text
-                              x={Math.hypot(x2 - x1, y2 - y1) > 34 * u ? (x1 + x2) / 2 : x2 + m.way.x * 17 * u}
-                              y={(Math.hypot(x2 - x1, y2 - y1) > 34 * u ? (y1 + y2) / 2 : y2 + m.way.y * 9 * u) + 2.5 * u}
-                              textAnchor="middle"
-                              fontSize={7.5 * u}
-                              fontWeight="700"
-                              fill="#ffffff"
-                              stroke="#0b0c0e"
-                              strokeWidth={2.2 * u}
-                              paintOrder="stroke"
-                            >
-                              {m.gap.toFixed(2)} m
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </g>
-                  )}
-                  {/* The strings: a line from panel to panel in wiring order, numbered at its first panel. */}
-                  {strings.map((s, i) => {
-                    const points = s.panels.map((k) => centres[k]).filter(Boolean);
-                    if (!points.length) return null;
-                    const colour = STRING_COLOURS[i % STRING_COLOURS.length];
-                    const [sx, sy] = px(points[0]);
-                    return (
-                      <g key={s.id} pointerEvents="none">
-                        <polyline
-                          points={path(points)}
-                          fill="none"
-                          stroke="#ffffff"
-                          strokeWidth={(s.id === hover ? 2.2 : 1.3) * u}
-                          strokeLinejoin="round"
-                          opacity={s.id === wiring || s.id === hover || tool !== "string" ? 1 : 0.6}
-                        />
-                        {/* The Drawn view: power moving along the string, towards its first panel and the inverter. */}
-                        {art && points.length > 1 && <FlowLine points={path([...points].reverse())} u={u} />}
-                        {points.map((p, n) => (
-                          <circle key={n} cx={px(p)[0]} cy={px(p)[1]} r={1.6 * u} fill="#ffffff" />
-                        ))}
-                        <circle cx={sx} cy={sy} r={5.5 * u} fill={colour} stroke="#0b0c0e" strokeWidth={0.8 * u} />
-                        <text x={sx} y={sy + 2.4 * u} textAnchor="middle" fontSize={6.5 * u} fontWeight="700" fill="#0b0c0e">
-                          {letter(i)}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  {/* Panels on a string: their arrows again, over the wiring line, so the way each faces still shows. */}
-                  {strings.length > 0 && (
-                    <g>
-                      {faces.flatMap((f) =>
-                        panelPlaces(f, size)
-                          .filter((place) => !f.off.includes(place.index) && stringOf(`g:${f.id}:${place.index}`) >= 0)
-                          .map((place) => (
-                            <g key={`${f.id}:${place.index}`}>
-                              {aspect(middle(place.corners), faceFacing(f), f.tilt ?? TILT.roof, "#0b0c0e", 1.5)}
-                            </g>
-                          )),
-                      )}
-                      {loose
-                        .filter((panel) => stringOf(`l:${panel.id}`) >= 0)
-                        .map((panel) => (
-                          <g key={panel.id}>{aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, "#0b0c0e", 1.5)}</g>
-                        ))}
-                    </g>
-                  )}
-                  {/* The discussion: a speech bubble at each spot, with how many things have been said. */}
-                  {[
-                    ...comments,
-                    ...(thread && "at" in thread ? [{ id: "new", x: thread.at.x, y: thread.at.y, resolved: false, notes: [] }] : []),
-                  ].map((c) => {
-                    const [bx, by] = px(c);
-                    const open = thread && "id" in thread ? thread.id === c.id : c.id === "new";
-                    return (
-                      <g key={c.id} opacity={c.resolved && !open ? 0.45 : 1}>
-                        <path
-                          d={`M${bx},${by} l${3 * u},${-5 * u} h${7 * u} a${3 * u},${3 * u} 0 0 0 ${3 * u},${-3 * u} v${-8 * u} a${3 * u},${3 * u} 0 0 0 ${-3 * u},${-3 * u} h${-16 * u} a${3 * u},${3 * u} 0 0 0 ${-3 * u},${3 * u} v${8 * u} a${3 * u},${3 * u} 0 0 0 ${3 * u},${3 * u} h${3 * u} z`}
-                          fill={open ? "#ffffff" : GOLD}
-                          stroke="#0b0c0e"
-                          strokeWidth={0.9 * u}
-                        />
-                        <text x={bx + 2 * u} y={by - 9.5 * u} textAnchor="middle" fontSize={8 * u} fontWeight="700" fill="#0b0c0e">
-                          {c.id === "new" ? "+" : c.resolved ? "✓" : c.notes.length}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  {/* From each placed inverter to the switchboard: a dashed line and its length (26 Nov 2026, Martin). */}
-                  {runs.map((r) => {
-                    const [lx, ly] = px(labelAt(r));
-                    const bends = r.points.slice(1, -1);
-                    return (
-                      <g key={`run-${r.index}`} pointerEvents="none">
-                        <title>{`${runWords(r.metres)} from the inverter to the switchboard. ${RUN_NOTE}`}</title>
-                        <polyline
-                          points={path(r.points)}
-                          fill="none"
-                          stroke={GOLD}
                           strokeWidth={1.1 * u}
-                          strokeDasharray={`${3 * u} ${2 * u}`}
                           strokeLinecap="round"
-                          strokeLinejoin="round"
+                          pointerEvents="none"
                         />
-                        {bends.map((b, k) => (
-                          <circle key={k} cx={px(b)[0]} cy={px(b)[1]} r={2.4 * u} fill="#0b0c0e" stroke={GOLD} strokeWidth={1 * u} />
-                        ))}
+                      ))}
+                    {ruling && (
+                      <g pointerEvents="none">
+                        <line
+                          x1={px(ruling.a)[0]}
+                          y1={px(ruling.a)[1]}
+                          x2={px(ruling.b)[0]}
+                          y2={px(ruling.b)[1]}
+                          stroke="#ffffff"
+                          strokeWidth={1.4 * u}
+                          strokeDasharray={`${4 * u} ${3 * u}`}
+                        />
+                        <circle cx={px(ruling.a)[0]} cy={px(ruling.a)[1]} r={3 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
                         <text
-                          x={lx}
-                          y={ly - 3 * u}
-                          textAnchor="middle"
-                          fontSize={8 * u}
+                          x={px(ruling.b)[0] + 8 * u}
+                          y={px(ruling.b)[1] - 6 * u}
+                          fontSize={7.5 * u}
                           fontWeight="700"
                           fill="#ffffff"
                           stroke="#0b0c0e"
-                          strokeWidth={2.4 * u}
+                          strokeWidth={2.2 * u}
                           paintOrder="stroke"
                         >
-                          {runWords(r.metres)}
+                          {Math.hypot(ruling.b.x - ruling.a.x, ruling.b.y - ruling.a.y).toFixed(2)} m
                         </text>
                       </g>
-                    );
-                  })}
-                  {/* The main switchboard: a board of breakers in the same line style as the inverter and battery, marked MSB. */}
-                  {msb &&
-                    (() => {
-                      const [mx, my] = px(msb);
-                      const w = 22 * ku;
-                      const h = 26 * ku;
+                    )}
+                    {/* The roof's outline, lit while panels are being placed or lined up, with the distance to each edge of the face they are on. */}
+                    {guide && (
+                      <g pointerEvents="none">
+                        {rules.map((g) => (
+                          <line
+                            key={g.id}
+                            x1={px(g.a)[0]}
+                            y1={px(g.a)[1]}
+                            x2={px(g.b)[0]}
+                            y2={px(g.b)[1]}
+                            stroke={GOLD}
+                            strokeWidth={2.4 * u}
+                            strokeLinecap="round"
+                            style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.95))` }}
+                          />
+                        ))}
+                        {faces.map((f) => (
+                          <polygon
+                            key={f.id}
+                            points={path(f.points)}
+                            fill="none"
+                            stroke={GOLD}
+                            strokeWidth={2.4 * u}
+                            strokeLinejoin="round"
+                            style={{ filter: `drop-shadow(0 0 ${3 * u}px rgba(230, 184, 74, 0.95))` }}
+                          />
+                        ))}
+                        {measures.map((m, i) => {
+                          const [x1, y1] = px(m.from);
+                          const [x2, y2] = px(m.to);
+                          return (
+                            <g key={i}>
+                              <line
+                                x1={x1}
+                                y1={y1}
+                                x2={x2}
+                                y2={y2}
+                                stroke="#ffffff"
+                                strokeWidth={0.7 * u}
+                                strokeDasharray={`${2 * u} ${1.5 * u}`}
+                              />
+                              <text
+                                x={Math.hypot(x2 - x1, y2 - y1) > 34 * u ? (x1 + x2) / 2 : x2 + m.way.x * 17 * u}
+                                y={(Math.hypot(x2 - x1, y2 - y1) > 34 * u ? (y1 + y2) / 2 : y2 + m.way.y * 9 * u) + 2.5 * u}
+                                textAnchor="middle"
+                                fontSize={7.5 * u}
+                                fontWeight="700"
+                                fill="#ffffff"
+                                stroke="#0b0c0e"
+                                strokeWidth={2.2 * u}
+                                paintOrder="stroke"
+                              >
+                                {m.gap.toFixed(2)} m
+                              </text>
+                            </g>
+                          );
+                        })}
+                      </g>
+                    )}
+                    {/* The strings: a line from panel to panel in wiring order, numbered at its first panel. */}
+                    {strings.map((s, i) => {
+                      const points = s.panels.map((k) => centres[k]).filter(Boolean);
+                      if (!points.length) return null;
+                      const colour = STRING_COLOURS[i % STRING_COLOURS.length];
+                      const [sx, sy] = px(points[0]);
                       return (
-                        <g pointerEvents="none">
+                        <g key={s.id} pointerEvents="none">
+                          <polyline
+                            points={path(points)}
+                            fill="none"
+                            stroke="#ffffff"
+                            strokeWidth={(s.id === hover ? 2.2 : 1.3) * u}
+                            strokeLinejoin="round"
+                            opacity={s.id === wiring || s.id === hover || tool !== "string" ? 1 : 0.6}
+                          />
+                          {/* The Drawn view: power moving along the string, towards its first panel and the inverter. */}
+                          {art && points.length > 1 && <FlowLine points={path([...points].reverse())} u={u} />}
+                          {points.map((p, n) => (
+                            <circle key={n} cx={px(p)[0]} cy={px(p)[1]} r={1.6 * u} fill="#ffffff" />
+                          ))}
+                          <circle cx={sx} cy={sy} r={5.5 * u} fill={colour} stroke="#0b0c0e" strokeWidth={0.8 * u} />
+                          <text x={sx} y={sy + 2.4 * u} textAnchor="middle" fontSize={6.5 * u} fontWeight="700" fill="#0b0c0e">
+                            {letter(i)}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* Panels on a string: their arrows again, over the wiring line, so the way each faces still shows. */}
+                    {strings.length > 0 && (
+                      <g>
+                        {faces.flatMap((f) =>
+                          panelPlaces(f, size)
+                            .filter((place) => !f.off.includes(place.index) && stringOf(`g:${f.id}:${place.index}`) >= 0)
+                            .map((place) => (
+                              <g key={`${f.id}:${place.index}`}>
+                                {aspect(middle(place.corners), faceFacing(f), f.tilt ?? TILT.roof, "#0b0c0e", 1.5)}
+                              </g>
+                            )),
+                        )}
+                        {loose
+                          .filter((panel) => stringOf(`l:${panel.id}`) >= 0)
+                          .map((panel) => (
+                            <g key={panel.id}>{aspect(panel, panelFacing(panel), panel.tilt ?? TILT.roof, "#0b0c0e", 1.5)}</g>
+                          ))}
+                      </g>
+                    )}
+                    {/* The discussion: a speech bubble at each spot, with how many things have been said. */}
+                    {[
+                      ...comments,
+                      ...(thread && "at" in thread ? [{ id: "new", x: thread.at.x, y: thread.at.y, resolved: false, notes: [] }] : []),
+                    ].map((c) => {
+                      const [bx, by] = px(c);
+                      const open = thread && "id" in thread ? thread.id === c.id : c.id === "new";
+                      return (
+                        <g key={c.id} opacity={c.resolved && !open ? 0.45 : 1}>
+                          <path
+                            d={`M${bx},${by} l${3 * u},${-5 * u} h${7 * u} a${3 * u},${3 * u} 0 0 0 ${3 * u},${-3 * u} v${-8 * u} a${3 * u},${3 * u} 0 0 0 ${-3 * u},${-3 * u} h${-16 * u} a${3 * u},${3 * u} 0 0 0 ${-3 * u},${3 * u} v${8 * u} a${3 * u},${3 * u} 0 0 0 ${3 * u},${3 * u} h${3 * u} z`}
+                            fill={open ? "#ffffff" : GOLD}
+                            stroke="#0b0c0e"
+                            strokeWidth={0.9 * u}
+                          />
+                          <text x={bx + 2 * u} y={by - 9.5 * u} textAnchor="middle" fontSize={8 * u} fontWeight="700" fill="#0b0c0e">
+                            {c.id === "new" ? "+" : c.resolved ? "✓" : c.notes.length}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* From each placed inverter to the switchboard: a dashed line and its length (26 Nov 2026, Martin). */}
+                    {runs.map((r) => {
+                      const [lx, ly] = px(labelAt(r));
+                      const bends = r.points.slice(1, -1);
+                      return (
+                        <g key={`run-${r.index}`} pointerEvents="none">
+                          <title>{`${runWords(r.metres)} from the inverter to the switchboard. ${RUN_NOTE}`}</title>
+                          <polyline
+                            points={path(r.points)}
+                            fill="none"
+                            stroke={GOLD}
+                            strokeWidth={1.1 * u}
+                            strokeDasharray={`${3 * u} ${2 * u}`}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          {bends.map((b, k) => (
+                            <circle key={k} cx={px(b)[0]} cy={px(b)[1]} r={2.4 * u} fill="#0b0c0e" stroke={GOLD} strokeWidth={1 * u} />
+                          ))}
+                          <text
+                            x={lx}
+                            y={ly - 3 * u}
+                            textAnchor="middle"
+                            fontSize={8 * u}
+                            fontWeight="700"
+                            fill="#ffffff"
+                            stroke="#0b0c0e"
+                            strokeWidth={2.4 * u}
+                            paintOrder="stroke"
+                          >
+                            {runWords(r.metres)}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* The main switchboard: a board of breakers in the same line style as the inverter and battery, marked MSB. */}
+                    {msb &&
+                      (() => {
+                        const [mx, my] = px(msb);
+                        const w = 22 * ku;
+                        const h = 26 * ku;
+                        return (
+                          <g pointerEvents="none">
+                            <rect
+                              x={mx - w / 2}
+                              y={my - h / 2}
+                              width={w}
+                              height={h}
+                              rx={3 * ku}
+                              fill="#0b0c0e"
+                              fillOpacity="0.92"
+                              stroke={GOLD}
+                              strokeWidth={1.1 * ku}
+                            />
+                            {[0, 1].map((row) =>
+                              Array.from({ length: 4 }, (_, k) => (
+                                <rect
+                                  key={`${row}-${k}`}
+                                  x={mx - w / 2 + 3.2 * ku + k * 4.2 * ku}
+                                  y={my - h / 2 + 4 * ku + row * 9 * ku}
+                                  width={2.6 * ku}
+                                  height={6 * ku}
+                                  rx={0.6 * ku}
+                                  fill="none"
+                                  stroke="#ffffff"
+                                  strokeOpacity="0.7"
+                                  strokeWidth={0.6 * ku}
+                                />
+                              )),
+                            )}
+                            <line
+                              x1={mx - w / 2 + 3 * ku}
+                              x2={mx + w / 2 - 3 * ku}
+                              y1={my + h / 2 - 4 * ku}
+                              y2={my + h / 2 - 4 * ku}
+                              stroke={GOLD}
+                              strokeWidth={1 * ku}
+                            />
+                            <text
+                              x={mx}
+                              y={my + h / 2 + 11 * ku}
+                              textAnchor="middle"
+                              fontSize={8 * ku}
+                              fontWeight="700"
+                              fill="#ffffff"
+                              stroke="#0b0c0e"
+                              strokeWidth={2.4 * ku}
+                              paintOrder="stroke"
+                            >
+                              MSB
+                            </text>
+                          </g>
+                        );
+                      })()}
+                    {/* The battery: a stack of its modules lit from the bottom up as far as the panels fill it on an average day
+                      (10 Nov 2026, Martin: no line from the panels; too few panels for the home and it isn't filled). */}
+                    {battery &&
+                      (() => {
+                        const [bx, by] = px(battery);
+                        const layers = batteryLayers;
+                        const w = 24 * ku;
+                        const lh = 8 * ku;
+                        const top = by - (layers * lh) / 2;
+                        const fill = batteryFill({
+                          solarDayKwh: Number(summary.kwhPerDay) || 0,
+                          homeDayKwh: finance?.dailyKwh ?? null,
+                          batteryKwh: battery.kwh * battery.qty,
+                          backupKwh: heldModulesOf({ battery }) * battery.kwh,
+                        });
+                        const share = fill?.share ?? 0;
+                        // The bars lit, counted from the bottom: seven a module.
+                        const lit = Math.round(share * layers * 7);
+                        return (
+                          <g pointerEvents="none">
+                            <circle cx={bx} cy={by} r={20 * ku} fill={GOLD}>
+                              <animate attributeName="r" values={`${17 * ku};${27 * ku};${17 * ku}`} dur="3s" repeatCount="indefinite" />
+                              <animate attributeName="opacity" values="0.26;0.04;0.26" dur="3s" repeatCount="indefinite" />
+                            </circle>
+                            <rect x={bx - 4.5 * ku} y={top - 7 * ku} width={9 * ku} height={3 * ku} rx={ku} fill={GOLD} />
+                            <rect
+                              x={bx - w / 2 - 3 * ku}
+                              y={top - 4 * ku}
+                              width={w + 6 * ku}
+                              height={layers * lh + 8 * ku}
+                              rx={3.5 * ku}
+                              fill="#0b0c0e"
+                              fillOpacity="0.92"
+                              stroke={GOLD}
+                              strokeWidth={1.1 * ku}
+                            />
+                            {Array.from({ length: layers }, (_, i) => {
+                              // Counted from the bottom, so the charge climbs.
+                              const y = top + (layers - 1 - i) * lh;
+                              return (
+                                <g key={i}>
+                                  <rect
+                                    x={bx - w / 2}
+                                    y={y + 0.7 * ku}
+                                    width={w}
+                                    height={lh - 1.4 * ku}
+                                    rx={1.2 * ku}
+                                    fill="none"
+                                    stroke="#ffffff"
+                                    strokeOpacity="0.45"
+                                    strokeWidth={0.5 * ku}
+                                  />
+                                  {Array.from({ length: 7 }, (_, k) => (
+                                    <line
+                                      key={k}
+                                      x1={bx - w / 2 + 2.7 * ku + k * 3.1 * ku}
+                                      x2={bx - w / 2 + 2.7 * ku + k * 3.1 * ku}
+                                      y1={y + 1.7 * ku}
+                                      y2={y + lh - 1.7 * ku}
+                                      stroke={GOLD}
+                                      strokeWidth={0.9 * ku}
+                                      opacity={i * 7 + k < lit ? 1 : 0.15}
+                                      style={{ transition: "opacity 300ms ease-out" }}
+                                    />
+                                  ))}
+                                </g>
+                              );
+                            })}
+                            <text
+                              x={bx}
+                              y={top + layers * lh + 13 * ku}
+                              textAnchor="middle"
+                              fontSize={8 * ku}
+                              fontWeight="700"
+                              fill="#ffffff"
+                              stroke="#0b0c0e"
+                              strokeWidth={2.4 * ku}
+                              paintOrder="stroke"
+                            >
+                              {batteryKwh} kWh{fill && fill.share < 1 ? ` · ${Math.round(fill.share * 100)}%` : ""}
+                            </text>
+                          </g>
+                        );
+                      })()}
+                    {/* The inverters: a box each, in the same line style as the battery, to be dragged to the wall it will go on. */}
+                    {fitted.map((spec, n) => {
+                      const [ix, iy] = px(inverterSpot(spec, n, spot.lat));
+                      const w = 20 * ku;
+                      const h = 28 * ku;
+                      const lit = kit === n;
+                      return (
+                        <g key={n} pointerEvents="none">
                           <rect
-                            x={mx - w / 2}
-                            y={my - h / 2}
+                            x={ix - w / 2}
+                            y={iy - h / 2}
                             width={w}
                             height={h}
                             rx={3 * ku}
                             fill="#0b0c0e"
                             fillOpacity="0.92"
                             stroke={GOLD}
-                            strokeWidth={1.1 * ku}
+                            strokeWidth={(lit ? 1.8 : 1.1) * ku}
                           />
-                          {[0, 1].map((row) =>
-                            Array.from({ length: 4 }, (_, k) => (
-                              <rect
-                                key={`${row}-${k}`}
-                                x={mx - w / 2 + 3.2 * ku + k * 4.2 * ku}
-                                y={my - h / 2 + 4 * ku + row * 9 * ku}
-                                width={2.6 * ku}
-                                height={6 * ku}
-                                rx={0.6 * ku}
-                                fill="none"
-                                stroke="#ffffff"
-                                strokeOpacity="0.7"
-                                strokeWidth={0.6 * ku}
-                              />
-                            )),
-                          )}
-                          <line
-                            x1={mx - w / 2 + 3 * ku}
-                            x2={mx + w / 2 - 3 * ku}
-                            y1={my + h / 2 - 4 * ku}
-                            y2={my + h / 2 - 4 * ku}
-                            stroke={GOLD}
-                            strokeWidth={1 * ku}
-                          />
-                          <text
-                            x={mx}
-                            y={my + h / 2 + 11 * ku}
-                            textAnchor="middle"
-                            fontSize={8 * ku}
-                            fontWeight="700"
-                            fill="#ffffff"
-                            stroke="#0b0c0e"
-                            strokeWidth={2.4 * ku}
-                            paintOrder="stroke"
-                          >
-                            MSB
-                          </text>
-                        </g>
-                      );
-                    })()}
-                  {/* The battery: a stack of its modules lit from the bottom up as far as the panels fill it on an average day
-                      (10 Nov 2026, Martin: no line from the panels; too few panels for the home and it isn't filled). */}
-                  {battery &&
-                    (() => {
-                      const [bx, by] = px(battery);
-                      const layers = batteryLayers;
-                      const w = 24 * ku;
-                      const lh = 8 * ku;
-                      const top = by - (layers * lh) / 2;
-                      const fill = batteryFill({
-                        solarDayKwh: Number(summary.kwhPerDay) || 0,
-                        homeDayKwh: finance?.dailyKwh ?? null,
-                        batteryKwh: battery.kwh * battery.qty,
-                        backupKwh: heldModulesOf({ battery }) * battery.kwh,
-                      });
-                      const share = fill?.share ?? 0;
-                      // The bars lit, counted from the bottom: seven a module.
-                      const lit = Math.round(share * layers * 7);
-                      return (
-                        <g pointerEvents="none">
-                          <circle cx={bx} cy={by} r={20 * ku} fill={GOLD}>
-                            <animate attributeName="r" values={`${17 * ku};${27 * ku};${17 * ku}`} dur="3s" repeatCount="indefinite" />
-                            <animate attributeName="opacity" values="0.26;0.04;0.26" dur="3s" repeatCount="indefinite" />
-                          </circle>
-                          <rect x={bx - 4.5 * ku} y={top - 7 * ku} width={9 * ku} height={3 * ku} rx={ku} fill={GOLD} />
                           <rect
-                            x={bx - w / 2 - 3 * ku}
-                            y={top - 4 * ku}
-                            width={w + 6 * ku}
-                            height={layers * lh + 8 * ku}
-                            rx={3.5 * ku}
-                            fill="#0b0c0e"
-                            fillOpacity="0.92"
-                            stroke={GOLD}
-                            strokeWidth={1.1 * ku}
-                          />
-                          {Array.from({ length: layers }, (_, i) => {
-                            // Counted from the bottom, so the charge climbs.
-                            const y = top + (layers - 1 - i) * lh;
-                            return (
-                              <g key={i}>
-                                <rect
-                                  x={bx - w / 2}
-                                  y={y + 0.7 * ku}
-                                  width={w}
-                                  height={lh - 1.4 * ku}
-                                  rx={1.2 * ku}
-                                  fill="none"
-                                  stroke="#ffffff"
-                                  strokeOpacity="0.45"
-                                  strokeWidth={0.5 * ku}
-                                />
-                                {Array.from({ length: 7 }, (_, k) => (
-                                  <line
-                                    key={k}
-                                    x1={bx - w / 2 + 2.7 * ku + k * 3.1 * ku}
-                                    x2={bx - w / 2 + 2.7 * ku + k * 3.1 * ku}
-                                    y1={y + 1.7 * ku}
-                                    y2={y + lh - 1.7 * ku}
-                                    stroke={GOLD}
-                                    strokeWidth={0.9 * ku}
-                                    opacity={i * 7 + k < lit ? 1 : 0.15}
-                                    style={{ transition: "opacity 300ms ease-out" }}
-                                  />
-                                ))}
-                              </g>
-                            );
-                          })}
-                          <text
-                            x={bx}
-                            y={top + layers * lh + 13 * ku}
-                            textAnchor="middle"
-                            fontSize={8 * ku}
-                            fontWeight="700"
-                            fill="#ffffff"
-                            stroke="#0b0c0e"
-                            strokeWidth={2.4 * ku}
-                            paintOrder="stroke"
-                          >
-                            {batteryKwh} kWh{fill && fill.share < 1 ? ` · ${Math.round(fill.share * 100)}%` : ""}
-                          </text>
-                        </g>
-                      );
-                    })()}
-                  {/* The inverters: a box each, in the same line style as the battery, to be dragged to the wall it will go on. */}
-                  {fitted.map((spec, n) => {
-                    const [ix, iy] = px(inverterSpot(spec, n, spot.lat));
-                    const w = 20 * ku;
-                    const h = 28 * ku;
-                    const lit = kit === n;
-                    return (
-                      <g key={n} pointerEvents="none">
-                        <rect
-                          x={ix - w / 2}
-                          y={iy - h / 2}
-                          width={w}
-                          height={h}
-                          rx={3 * ku}
-                          fill="#0b0c0e"
-                          fillOpacity="0.92"
-                          stroke={GOLD}
-                          strokeWidth={(lit ? 1.8 : 1.1) * ku}
-                        />
-                        <rect
-                          x={ix - w / 2 + 3 * ku}
-                          y={iy - h / 2 + 3.5 * ku}
-                          width={w - 6 * ku}
-                          height={6 * ku}
-                          rx={1.2 * ku}
-                          fill="none"
-                          stroke="#ffffff"
-                          strokeOpacity="0.6"
-                          strokeWidth={0.5 * ku}
-                        />
-                        <path
-                          d={`M${ix - w / 2 + 4.5 * ku},${iy - h / 2 + 8 * ku} q${2.7 * ku},${-0.3 * ku} ${4 * ku},${-2 * ku} t${3.6 * ku},${-1 * ku} t${3.4 * ku},${2.4 * ku}`}
-                          fill="none"
-                          stroke={GOLD}
-                          strokeWidth={0.6 * ku}
-                        />
-                        {Array.from({ length: 6 }, (_, k) => (
-                          <line
-                            key={k}
-                            x1={ix - w / 2 + 3.75 * ku + k * 2.5 * ku}
-                            x2={ix - w / 2 + 3.75 * ku + k * 2.5 * ku}
-                            y1={iy - h / 2 + 12.5 * ku}
-                            y2={iy + h / 2 - 6 * ku}
+                            x={ix - w / 2 + 3 * ku}
+                            y={iy - h / 2 + 3.5 * ku}
+                            width={w - 6 * ku}
+                            height={6 * ku}
+                            rx={1.2 * ku}
+                            fill="none"
                             stroke="#ffffff"
-                            strokeOpacity="0.32"
+                            strokeOpacity="0.6"
                             strokeWidth={0.5 * ku}
                           />
-                        ))}
-                        <circle cx={ix} cy={iy + h / 2 - 3.2 * ku} r={1.1 * ku} fill={GOLD}>
-                          <animate attributeName="opacity" values="1;0.3;1" dur="2.6s" repeatCount="indefinite" />
-                        </circle>
-                        <text
-                          x={ix}
-                          y={iy + h / 2 + 9 * ku}
-                          textAnchor="middle"
-                          fontSize={8 * ku}
-                          fontWeight="700"
-                          fill="#ffffff"
-                          stroke="#0b0c0e"
-                          strokeWidth={2.4 * ku}
-                          paintOrder="stroke"
-                        >
-                          {fitted.length > 1 ? `${n + 1} · ` : ""}
-                          {spec.kw} kW
-                        </text>
-                      </g>
-                    );
-                  })}
-                  {/* The EV charger: a small wall box with a bolt, in the same line style as the inverter, dragged to its wall. */}
-                  {charger &&
-                    (() => {
-                      const [cx, cy] = px(charger);
-                      const w = 16 * ku;
-                      const h = 20 * ku;
-                      return (
-                        <g pointerEvents="none">
-                          <rect
-                            x={cx - w / 2}
-                            y={cy - h / 2}
-                            width={w}
-                            height={h}
-                            rx={4 * ku}
-                            fill="#0b0c0e"
-                            fillOpacity="0.92"
-                            stroke={GOLD}
-                            strokeWidth={1.1 * ku}
-                          />
                           <path
-                            d={`M${cx + 1.4 * ku},${cy - 6 * ku} L${cx - 3.4 * ku},${cy + 0.8 * ku} H${cx} L${cx - 1.4 * ku},${cy + 6 * ku} L${cx + 3.4 * ku},${cy - 0.8 * ku} H${cx} Z`}
-                            fill={GOLD}
+                            d={`M${ix - w / 2 + 4.5 * ku},${iy - h / 2 + 8 * ku} q${2.7 * ku},${-0.3 * ku} ${4 * ku},${-2 * ku} t${3.6 * ku},${-1 * ku} t${3.4 * ku},${2.4 * ku}`}
+                            fill="none"
+                            stroke={GOLD}
+                            strokeWidth={0.6 * ku}
                           />
+                          {Array.from({ length: 6 }, (_, k) => (
+                            <line
+                              key={k}
+                              x1={ix - w / 2 + 3.75 * ku + k * 2.5 * ku}
+                              x2={ix - w / 2 + 3.75 * ku + k * 2.5 * ku}
+                              y1={iy - h / 2 + 12.5 * ku}
+                              y2={iy + h / 2 - 6 * ku}
+                              stroke="#ffffff"
+                              strokeOpacity="0.32"
+                              strokeWidth={0.5 * ku}
+                            />
+                          ))}
+                          <circle cx={ix} cy={iy + h / 2 - 3.2 * ku} r={1.1 * ku} fill={GOLD}>
+                            <animate attributeName="opacity" values="1;0.3;1" dur="2.6s" repeatCount="indefinite" />
+                          </circle>
                           <text
-                            x={cx}
-                            y={cy + h / 2 + 9 * ku}
+                            x={ix}
+                            y={iy + h / 2 + 9 * ku}
                             textAnchor="middle"
                             fontSize={8 * ku}
                             fontWeight="700"
@@ -9317,310 +9366,469 @@ export function RoofDesigner(props: {
                             strokeWidth={2.4 * ku}
                             paintOrder="stroke"
                           >
-                            EV {charger.kw} kW
+                            {fitted.length > 1 ? `${n + 1} · ` : ""}
+                            {spec.kw} kW
                           </text>
                         </g>
                       );
-                    })()}
-                  {/* What was found on the roof and kept clear of: a dashed box each, named, never picked or moved. */}
-                  {roofCheckNow?.things.map((t, i) => {
-                    const pts = t.box.map(px);
-                    const [lx, ly] = pts[0];
-                    const going = replacing && t.type === "existing panels";
-                    return (
-                      <g key={`found-${i}`} className={clsx("pointer-events-none", going && "opacity-45")}>
-                        <polygon
-                          points={pts.map(([x, y]) => `${x},${y}`).join(" ")}
-                          className="fill-warning/10 stroke-warning"
-                          strokeWidth={1.2 * u}
+                    })}
+                    {/* The EV charger: a small wall box with a bolt, in the same line style as the inverter, dragged to its wall. */}
+                    {charger &&
+                      (() => {
+                        const [cx, cy] = px(charger);
+                        const w = 16 * ku;
+                        const h = 20 * ku;
+                        return (
+                          <g pointerEvents="none">
+                            <rect
+                              x={cx - w / 2}
+                              y={cy - h / 2}
+                              width={w}
+                              height={h}
+                              rx={4 * ku}
+                              fill="#0b0c0e"
+                              fillOpacity="0.92"
+                              stroke={GOLD}
+                              strokeWidth={1.1 * ku}
+                            />
+                            <path
+                              d={`M${cx + 1.4 * ku},${cy - 6 * ku} L${cx - 3.4 * ku},${cy + 0.8 * ku} H${cx} L${cx - 1.4 * ku},${cy + 6 * ku} L${cx + 3.4 * ku},${cy - 0.8 * ku} H${cx} Z`}
+                              fill={GOLD}
+                            />
+                            <text
+                              x={cx}
+                              y={cy + h / 2 + 9 * ku}
+                              textAnchor="middle"
+                              fontSize={8 * ku}
+                              fontWeight="700"
+                              fill="#ffffff"
+                              stroke="#0b0c0e"
+                              strokeWidth={2.4 * ku}
+                              paintOrder="stroke"
+                            >
+                              EV {charger.kw} kW
+                            </text>
+                          </g>
+                        );
+                      })()}
+                    {/* What was found on the roof and kept clear of: a dashed box each, named, never picked or moved. */}
+                    {roofCheckNow?.things.map((t, i) => {
+                      const pts = t.box.map(px);
+                      const [lx, ly] = pts[0];
+                      const going = replacing && t.type === "existing panels";
+                      return (
+                        <g key={`found-${i}`} className={clsx("pointer-events-none", going && "opacity-45")}>
+                          <polygon
+                            points={pts.map(([x, y]) => `${x},${y}`).join(" ")}
+                            className="fill-warning/10 stroke-warning"
+                            strokeWidth={1.2 * u}
+                            strokeDasharray={`${4 * u} ${3 * u}`}
+                          />
+                          <text x={lx + 2 * u} y={ly - 2.5 * u} className="fill-warning" fontSize={7 * u} fontWeight={600}>
+                            {going ? "Being replaced" : thingLabel(t)}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* Labels: a pin and its name. */}
+                    {labels.map((l) => {
+                      const [lx, ly] = px(l);
+                      const lit = isPicked({ kind: "label", id: l.id });
+                      const words = l.kind === "Note" ? l.text || "Note" : l.kind;
+                      const width = (words.length * 4.4 + 10) * u;
+                      return (
+                        <g key={l.id}>
+                          <circle cx={lx} cy={ly} r={3 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={0.8 * u} />
+                          <rect
+                            x={lx + 5 * u}
+                            y={ly - 7 * u}
+                            width={width}
+                            height={14 * u}
+                            rx={3 * u}
+                            fill="#0b0c0e"
+                            stroke={lit ? "#ffffff" : GOLD}
+                            strokeWidth={(lit ? 1.4 : 0.8) * u}
+                          />
+                          <text x={lx + 10 * u} y={ly + 2.8 * u} fontSize={8 * u} fontWeight="600" fill="#ffffff">
+                            {words}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {tool === "trace" && tracing.length > 0 && (
+                      <g>
+                        <polyline
+                          points={path(tracing)}
+                          fill="none"
+                          stroke="#ffffff"
+                          strokeWidth={1.4 * u}
                           strokeDasharray={`${4 * u} ${3 * u}`}
                         />
-                        <text x={lx + 2 * u} y={ly - 2.5 * u} className="fill-warning" fontSize={7 * u} fontWeight={600}>
-                          {going ? "Being replaced" : thingLabel(t)}
-                        </text>
+                        {tracing.map((p, i) => (
+                          <circle
+                            key={i}
+                            cx={px(p)[0]}
+                            cy={px(p)[1]}
+                            r={(i === 0 ? 5 : 3) * u}
+                            fill={i === 0 ? GOLD : "#ffffff"}
+                            stroke="#0b0c0e"
+                            strokeWidth={u}
+                          />
+                        ))}
                       </g>
-                    );
-                  })}
-                  {/* Labels: a pin and its name. */}
-                  {labels.map((l) => {
-                    const [lx, ly] = px(l);
-                    const lit = isPicked({ kind: "label", id: l.id });
-                    const words = l.kind === "Note" ? l.text || "Note" : l.kind;
-                    const width = (words.length * 4.4 + 10) * u;
-                    return (
-                      <g key={l.id}>
-                        <circle cx={lx} cy={ly} r={3 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={0.8 * u} />
-                        <rect
-                          x={lx + 5 * u}
-                          y={ly - 7 * u}
-                          width={width}
-                          height={14 * u}
-                          rx={3 * u}
-                          fill="#0b0c0e"
-                          stroke={lit ? "#ffffff" : GOLD}
-                          strokeWidth={(lit ? 1.4 : 0.8) * u}
-                        />
-                        <text x={lx + 10 * u} y={ly + 2.8 * u} fontSize={8 * u} fontWeight="600" fill="#ffffff">
-                          {words}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  {tool === "trace" && tracing.length > 0 && (
-                    <g>
-                      <polyline
-                        points={path(tracing)}
-                        fill="none"
-                        stroke="#ffffff"
-                        strokeWidth={1.4 * u}
-                        strokeDasharray={`${4 * u} ${3 * u}`}
-                      />
-                      {tracing.map((p, i) => (
+                    )}
+                    {/* The panel a click would place, as an outline. */}
+                    {(tool === "panel" || tool === "select") &&
+                      ghosts.map((ghost, i) => (
+                        <g key={i} pointerEvents="none">
+                          <polygon
+                            points={path(looseCorners(ghost, size))}
+                            fill="#ffffff"
+                            fillOpacity="0.18"
+                            stroke="#ffffff"
+                            strokeWidth={u}
+                            strokeDasharray={`${3 * u} ${2 * u}`}
+                          />
+                          {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
+                          {/* The edge it shares with the panel it clicks against, lit. */}
+                          {ghost.join && ghosts.length === 1 && (
+                            <line
+                              x1={px(ghost.join[0])[0]}
+                              y1={px(ghost.join[0])[1]}
+                              x2={px(ghost.join[1])[0]}
+                              y2={px(ghost.join[1])[1]}
+                              stroke="var(--sun-line)"
+                              strokeWidth={2.5 * u}
+                              strokeLinecap="round"
+                            />
+                          )}
+                        </g>
+                      ))}
+                    {/* Shaded panels as they are laid, with the shade view closed: a tint, stronger the more shaded. */}
+                    {shadeHints &&
+                      standingPanels.map((p) => {
+                        const at = shadeHints.keys.indexOf(p.key);
+                        const access = at < 0 ? null : shadeHints.report.panels[at]?.access;
+                        const tint = shadeHint(access);
+                        if (tint === null || access === null || access === undefined) return null;
+                        return (
+                          <polygon
+                            key={`hint-${p.key}`}
+                            points={path(p.corners)}
+                            fill={accessColour(access)}
+                            fillOpacity={tint}
+                            pointerEvents="none"
+                          >
+                            <title>{`About ${Math.round(access * 100)}% of the year's sun reaches it`}</title>
+                          </polygon>
+                        );
+                      })}
+                    {/* Shade analysis: each panel tinted by how open it is to the sun over a year, with the figure on it. */}
+                    {shadePanels &&
+                      standingPanels.map((p) => {
+                        const at = shadePanels.keys.indexOf(p.key);
+                        const access = at < 0 ? null : shadePanels.report.panels[at]?.access;
+                        if (access === null || access === undefined) return null;
+                        const [cx, cy] = px(p);
+                        return (
+                          <g key={p.key} pointerEvents="none">
+                            <polygon
+                              points={path(p.corners)}
+                              fill={accessColour(access)}
+                              fillOpacity="0.62"
+                              stroke={accessColour(access)}
+                              strokeWidth={0.8 * u}
+                            />
+                            <text x={cx} y={cy + 2.4 * u} fontSize={6.5 * u} fontWeight="700" fill="#0b0c0e" textAnchor="middle">
+                              {Math.round(access * 100)}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    {/* The arrays list is open: each array carries its number and its size. */}
+                    {arrayList.map((a, i) => {
+                      const [x, y] = px(a.at);
+                      const words = `${i + 1} · ${a.kw.toFixed(2)} kW`;
+                      const w = (words.length * 4.6 + 10) * u;
+                      return (
+                        <g key={i} pointerEvents="none">
+                          <rect
+                            x={x - w / 2}
+                            y={y - 17 * u}
+                            width={w}
+                            height={13 * u}
+                            rx={6.5 * u}
+                            fill="#0b0c0e"
+                            stroke={GOLD}
+                            strokeWidth={u}
+                          />
+                          <text x={x} y={y - 7.8 * u} fontSize={7.5 * u} fontWeight="600" fill="#ffffff" textAnchor="middle">
+                            {words}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {/* The pointer is on an array: a small round beside it picks every panel in it. */}
+                    {arrayHint && (tool === "select" || tool === "panel") && !arrayHint.picks.every(isPicked) && (
+                      <g className="cursor-pointer">
+                        <title>{`Select all ${arrayHint.picks.length} panels in this array`}</title>
                         <circle
-                          key={i}
-                          cx={px(p)[0]}
-                          cy={px(p)[1]}
-                          r={(i === 0 ? 5 : 3) * u}
-                          fill={i === 0 ? GOLD : "#ffffff"}
+                          cx={px(arrayHint.at)[0]}
+                          cy={px(arrayHint.at)[1]}
+                          r={6.5 * u}
+                          fill={GOLD}
+                          stroke="#ffffff"
+                          strokeWidth={1.4 * u}
+                        />
+                        {[
+                          [-1, -1],
+                          [1, -1],
+                          [-1, 1],
+                          [1, 1],
+                        ].map(([i, j]) => (
+                          <rect
+                            key={`${i}${j}`}
+                            x={px(arrayHint.at)[0] + i * 1.7 * u - 1.3 * u}
+                            y={px(arrayHint.at)[1] + j * 1.7 * u - 1.3 * u}
+                            width={2.6 * u}
+                            height={2.6 * u}
+                            rx={0.5 * u}
+                            fill="#ffffff"
+                          />
+                        ))}
+                      </g>
+                    )}
+                    {/* Several panels picked: one handle to spin them all about the middle of the group. */}
+                    {spinGroup && (
+                      <g pointerEvents="none">
+                        <line
+                          x1={px(spinGroup.centre)[0]}
+                          y1={px(spinGroup.centre)[1]}
+                          x2={px(spinGroup.turn)[0]}
+                          y2={px(spinGroup.turn)[1]}
+                          stroke="#ffffff"
+                          strokeWidth={0.8 * u}
+                          strokeDasharray={`${3 * u} ${2 * u}`}
+                        />
+                        <circle
+                          cx={px(spinGroup.centre)[0]}
+                          cy={px(spinGroup.centre)[1]}
+                          r={2.4 * u}
+                          fill="#ffffff"
                           stroke="#0b0c0e"
                           strokeWidth={u}
                         />
-                      ))}
-                    </g>
-                  )}
-                  {/* The panel a click would place, as an outline. */}
-                  {(tool === "panel" || tool === "select") &&
-                    ghosts.map((ghost, i) => (
-                      <g key={i} pointerEvents="none">
-                        <polygon
-                          points={path(looseCorners(ghost, size))}
+                        <circle
+                          cx={px(spinGroup.turn)[0]}
+                          cy={px(spinGroup.turn)[1]}
+                          r={8.5 * u}
                           fill="#ffffff"
-                          fillOpacity="0.18"
-                          stroke="#ffffff"
-                          strokeWidth={u}
-                          strokeDasharray={`${3 * u} ${2 * u}`}
+                          stroke={GOLD}
+                          strokeWidth={1.6 * u}
                         />
-                        {aspect(ghost, panelFacing(ghost), ghost.tilt ?? TILT.roof, "#ffffff")}
-                        {/* The edge it shares with the panel it clicks against, lit. */}
-                        {ghost.join && ghosts.length === 1 && (
-                          <line
-                            x1={px(ghost.join[0])[0]}
-                            y1={px(ghost.join[0])[1]}
-                            x2={px(ghost.join[1])[0]}
-                            y2={px(ghost.join[1])[1]}
-                            stroke="var(--sun-line)"
-                            strokeWidth={2.5 * u}
-                            strokeLinecap="round"
-                          />
-                        )}
+                        <path
+                          d={`M${px(spinGroup.turn)[0] - 4.2 * u},${px(spinGroup.turn)[1]} a${4.2 * u},${4.2 * u} 0 1 1 ${4.2 * u},${4.2 * u}`}
+                          fill="none"
+                          stroke="#0b0c0e"
+                          strokeWidth={1.5 * u}
+                          strokeLinecap="round"
+                        />
                       </g>
-                    ))}
-                  {/* Shaded panels as they are laid, with the shade view closed: a tint, stronger the more shaded. */}
-                  {shadeHints &&
-                    standingPanels.map((p) => {
-                      const at = shadeHints.keys.indexOf(p.key);
-                      const access = at < 0 ? null : shadeHints.report.panels[at]?.access;
-                      const tint = shadeHint(access);
-                      if (tint === null || access === null || access === undefined) return null;
+                    )}
+                    {/* A + on each side of the picked array: dragged out it adds a row or column there, dragged in it takes them away. */}
+                    {growSpots.map((handle) => {
+                      const [hx, hy] = px(handle.at);
                       return (
-                        <polygon
-                          key={`hint-${p.key}`}
-                          points={path(p.corners)}
-                          fill={accessColour(access)}
-                          fillOpacity={tint}
-                          pointerEvents="none"
-                        >
-                          <title>{`About ${Math.round(access * 100)}% of the year's sun reaches it`}</title>
-                        </polygon>
-                      );
-                    })}
-                  {/* Shade analysis: each panel tinted by how open it is to the sun over a year, with the figure on it. */}
-                  {shadePanels &&
-                    standingPanels.map((p) => {
-                      const at = shadePanels.keys.indexOf(p.key);
-                      const access = at < 0 ? null : shadePanels.report.panels[at]?.access;
-                      if (access === null || access === undefined) return null;
-                      const [cx, cy] = px(p);
-                      return (
-                        <g key={p.key} pointerEvents="none">
-                          <polygon
-                            points={path(p.corners)}
-                            fill={accessColour(access)}
-                            fillOpacity="0.62"
-                            stroke={accessColour(access)}
-                            strokeWidth={0.8 * u}
+                        <g key={handle.side} style={{ cursor: "pointer" }}>
+                          <title>Press to add a row of panels here. Drag out for more, or in to take them away.</title>
+                          <circle cx={hx} cy={hy} r={5.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.3 * u} />
+                          <path
+                            d={`M${hx - 2.6 * u},${hy} h${5.2 * u} M${hx},${hy - 2.6 * u} v${5.2 * u}`}
+                            stroke="#0b0c0e"
+                            strokeWidth={1.3 * u}
+                            strokeLinecap="round"
+                            fill="none"
                           />
-                          <text x={cx} y={cy + 2.4 * u} fontSize={6.5 * u} fontWeight="700" fill="#0b0c0e" textAnchor="middle">
-                            {Math.round(access * 100)}
-                          </text>
                         </g>
                       );
                     })}
-                  {/* The arrays list is open: each array carries its number and its size. */}
-                  {arrayList.map((a, i) => {
-                    const [x, y] = px(a.at);
-                    const words = `${i + 1} · ${a.kw.toFixed(2)} kW`;
-                    const w = (words.length * 4.6 + 10) * u;
-                    return (
-                      <g key={i} pointerEvents="none">
-                        <rect
-                          x={x - w / 2}
-                          y={y - 17 * u}
-                          width={w}
-                          height={13 * u}
-                          rx={6.5 * u}
-                          fill="#0b0c0e"
-                          stroke={GOLD}
-                          strokeWidth={u}
+                    {/* One panel picked: a grip in its middle to drag it by, and a handle above it to turn it with. */}
+                    {grip && (
+                      <g pointerEvents="none">
+                        <line
+                          x1={px(grip.panel)[0]}
+                          y1={px(grip.panel)[1]}
+                          x2={px(grip.turn)[0]}
+                          y2={px(grip.turn)[1]}
+                          stroke="#ffffff"
+                          strokeWidth={0.8 * u}
                         />
-                        <text x={x} y={y - 7.8 * u} fontSize={7.5 * u} fontWeight="600" fill="#ffffff" textAnchor="middle">
-                          {words}
-                        </text>
-                      </g>
-                    );
-                  })}
-                  {/* The pointer is on an array: a small round beside it picks every panel in it. */}
-                  {arrayHint && (tool === "select" || tool === "panel") && !arrayHint.picks.every(isPicked) && (
-                    <g className="cursor-pointer">
-                      <title>{`Select all ${arrayHint.picks.length} panels in this array`}</title>
-                      <circle
-                        cx={px(arrayHint.at)[0]}
-                        cy={px(arrayHint.at)[1]}
-                        r={6.5 * u}
-                        fill={GOLD}
-                        stroke="#ffffff"
-                        strokeWidth={1.4 * u}
-                      />
-                      {[
-                        [-1, -1],
-                        [1, -1],
-                        [-1, 1],
-                        [1, 1],
-                      ].map(([i, j]) => (
-                        <rect
-                          key={`${i}${j}`}
-                          x={px(arrayHint.at)[0] + i * 1.7 * u - 1.3 * u}
-                          y={px(arrayHint.at)[1] + j * 1.7 * u - 1.3 * u}
-                          width={2.6 * u}
-                          height={2.6 * u}
-                          rx={0.5 * u}
+                        <circle
+                          cx={px(grip.turn)[0]}
+                          cy={px(grip.turn)[1]}
+                          r={6.5 * u}
                           fill="#ffffff"
+                          stroke={GOLD}
+                          strokeWidth={1.4 * u}
                         />
-                      ))}
-                    </g>
-                  )}
-                  {/* Several panels picked: one handle to spin them all about the middle of the group. */}
-                  {spinGroup && (
-                    <g pointerEvents="none">
-                      <line
-                        x1={px(spinGroup.centre)[0]}
-                        y1={px(spinGroup.centre)[1]}
-                        x2={px(spinGroup.turn)[0]}
-                        y2={px(spinGroup.turn)[1]}
-                        stroke="#ffffff"
-                        strokeWidth={0.8 * u}
-                        strokeDasharray={`${3 * u} ${2 * u}`}
-                      />
-                      <circle
-                        cx={px(spinGroup.centre)[0]}
-                        cy={px(spinGroup.centre)[1]}
-                        r={2.4 * u}
-                        fill="#ffffff"
-                        stroke="#0b0c0e"
-                        strokeWidth={u}
-                      />
-                      <circle
-                        cx={px(spinGroup.turn)[0]}
-                        cy={px(spinGroup.turn)[1]}
-                        r={8.5 * u}
-                        fill="#ffffff"
-                        stroke={GOLD}
-                        strokeWidth={1.6 * u}
-                      />
-                      <path
-                        d={`M${px(spinGroup.turn)[0] - 4.2 * u},${px(spinGroup.turn)[1]} a${4.2 * u},${4.2 * u} 0 1 1 ${4.2 * u},${4.2 * u}`}
-                        fill="none"
-                        stroke="#0b0c0e"
-                        strokeWidth={1.5 * u}
-                        strokeLinecap="round"
-                      />
-                    </g>
-                  )}
-                  {/* A + on each side of the picked array: dragged out it adds a row or column there, dragged in it takes them away. */}
-                  {growSpots.map((handle) => {
-                    const [hx, hy] = px(handle.at);
-                    return (
-                      <g key={handle.side} style={{ cursor: "pointer" }}>
-                        <title>Press to add a row of panels here. Drag out for more, or in to take them away.</title>
-                        <circle cx={hx} cy={hy} r={5.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.3 * u} />
                         <path
-                          d={`M${hx - 2.6 * u},${hy} h${5.2 * u} M${hx},${hy - 2.6 * u} v${5.2 * u}`}
+                          d={`M${px(grip.turn)[0] - 3.2 * u},${px(grip.turn)[1]} a${3.2 * u},${3.2 * u} 0 1 1 ${3.2 * u},${3.2 * u}`}
+                          fill="none"
                           stroke="#0b0c0e"
                           strokeWidth={1.3 * u}
                           strokeLinecap="round"
-                          fill="none"
                         />
+                        <circle cx={px(grip.panel)[0]} cy={px(grip.panel)[1]} r={3.2 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
+                        {[0, 90, 180, 270].map((d) => (
+                          <line
+                            key={d}
+                            x1={px(grip.panel)[0]}
+                            y1={px(grip.panel)[1] - 4.5 * u}
+                            x2={px(grip.panel)[0]}
+                            y2={px(grip.panel)[1] - 7.5 * u}
+                            stroke="#ffffff"
+                            strokeWidth={1.2 * u}
+                            strokeLinecap="round"
+                            transform={`rotate(${d} ${px(grip.panel)[0]} ${px(grip.panel)[1]})`}
+                          />
+                        ))}
                       </g>
-                    );
-                  })}
-                  {/* One panel picked: a grip in its middle to drag it by, and a handle above it to turn it with. */}
-                  {grip && (
-                    <g pointerEvents="none">
-                      <line
-                        x1={px(grip.panel)[0]}
-                        y1={px(grip.panel)[1]}
-                        x2={px(grip.turn)[0]}
-                        y2={px(grip.turn)[1]}
+                    )}
+                    {band && (
+                      <rect
+                        x={Math.min(px(band.a)[0], px(band.b)[0])}
+                        y={Math.min(px(band.a)[1], px(band.b)[1])}
+                        width={Math.abs(px(band.a)[0] - px(band.b)[0])}
+                        height={Math.abs(px(band.a)[1] - px(band.b)[1])}
+                        fill="#ffffff"
+                        fillOpacity="0.12"
                         stroke="#ffffff"
-                        strokeWidth={0.8 * u}
+                        strokeWidth={u}
+                        strokeDasharray={`${4 * u} ${3 * u}`}
                       />
-                      <circle cx={px(grip.turn)[0]} cy={px(grip.turn)[1]} r={6.5 * u} fill="#ffffff" stroke={GOLD} strokeWidth={1.4 * u} />
-                      <path
-                        d={`M${px(grip.turn)[0] - 3.2 * u},${px(grip.turn)[1]} a${3.2 * u},${3.2 * u} 0 1 1 ${3.2 * u},${3.2 * u}`}
-                        fill="none"
-                        stroke="#0b0c0e"
-                        strokeWidth={1.3 * u}
-                        strokeLinecap="round"
-                      />
-                      <circle cx={px(grip.panel)[0]} cy={px(grip.panel)[1]} r={3.2 * u} fill={GOLD} stroke="#0b0c0e" strokeWidth={u} />
-                      {[0, 90, 180, 270].map((d) => (
-                        <line
-                          key={d}
-                          x1={px(grip.panel)[0]}
-                          y1={px(grip.panel)[1] - 4.5 * u}
-                          x2={px(grip.panel)[0]}
-                          y2={px(grip.panel)[1] - 7.5 * u}
-                          stroke="#ffffff"
-                          strokeWidth={1.2 * u}
-                          strokeLinecap="round"
-                          transform={`rotate(${d} ${px(grip.panel)[0]} ${px(grip.panel)[1]})`}
-                        />
-                      ))}
+                    )}
+                    {/* A scale bar: five metres on the ground, however far in the view is. */}
+                    <g
+                      transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : solHolds && !sideways ? 64 : 30) * u})`}
+                    >
+                      <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
+                      <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
+                        5 m
+                      </text>
                     </g>
-                  )}
-                  {band && (
-                    <rect
-                      x={Math.min(px(band.a)[0], px(band.b)[0])}
-                      y={Math.min(px(band.a)[1], px(band.b)[1])}
-                      width={Math.abs(px(band.a)[0] - px(band.b)[0])}
-                      height={Math.abs(px(band.a)[1] - px(band.b)[1])}
-                      fill="#ffffff"
-                      fillOpacity="0.12"
-                      stroke="#ffffff"
-                      strokeWidth={u}
-                      strokeDasharray={`${4 * u} ${3 * u}`}
-                    />
-                  )}
-                  {/* A scale bar: five metres on the ground, however far in the view is. */}
-                  <g
-                    transform={`translate(${view.x + 100 * u} ${view.y + view.h - (deskFoot ? 30 + DESK_TRAY : solHolds && !sideways ? 64 : 30) * u})`}
-                  >
-                    <line x1="0" x2={5 / scale} y1="0" y2="0" stroke="#ffffff" strokeWidth={2 * u} />
-                    <text x={5 / scale + 5 * u} y={3.5 * u} fill="#ffffff" fontSize={10 * u}>
-                      5 m
-                    </text>
                   </g>
+                  {/* A steering wheel round the panels picked, on a phone (26 Nov 2026, Martin: "a larger round icon… so I can
+                      just run my thumb around the inside of it resulting in the panels turning"; the turn buttons were too small
+                      with the whole roof in view): a broad rim the thumb runs round, turning them a degree at a time; inside it
+                      the panels can still be pressed and dragged. One turn of the thumb is one step to undo. */}
+                  {solHolds &&
+                    !solTray &&
+                    tool === "select" &&
+                    pickedPanels.length > 0 &&
+                    (() => {
+                      const corners = pickedPanels.flatMap((p) => looseCorners(p, size));
+                      const c = px(middle(corners));
+                      // Screen pixels to the picture's units: the picture runs the screen's width on a phone.
+                      const perPx = view.w / (stage?.across ?? (svg.current?.getBoundingClientRect().width || 390));
+                      const reach = Math.max(...corners.map((k) => Math.hypot(px(k)[0] - c[0], px(k)[1] - c[1])));
+                      const r = Math.min(Math.max(reach + 34 * perPx, 100 * perPx), 175 * perPx);
+                      const band = 30 * perPx;
+                      const ticks = Array.from({ length: 24 }, (_, i) => (i * 15 * Math.PI) / 180);
+                      const angleAt = (e: React.PointerEvent, d: { cx: number; cy: number }) =>
+                        (Math.atan2(e.clientY - d.cy, e.clientX - d.cx) * 180) / Math.PI;
+                      return (
+                        <g aria-label="Turn the panels: run a thumb round the wheel">
+                          <circle
+                            cx={c[0]}
+                            cy={c[1]}
+                            r={r}
+                            fill="none"
+                            stroke="#1d1f23"
+                            strokeOpacity={0.4}
+                            strokeWidth={band}
+                            pointerEvents="none"
+                          />
+                          {ticks.map((t, i) => (
+                            <line
+                              key={i}
+                              x1={c[0] + Math.sin(t) * (r - band * (i % 6 ? 0.18 : 0.32))}
+                              y1={c[1] - Math.cos(t) * (r - band * (i % 6 ? 0.18 : 0.32))}
+                              x2={c[0] + Math.sin(t) * (r + band * (i % 6 ? 0.18 : 0.32))}
+                              y2={c[1] - Math.cos(t) * (r + band * (i % 6 ? 0.18 : 0.32))}
+                              stroke="#ffffff"
+                              strokeOpacity={i % 6 ? 0.45 : 0.85}
+                              strokeWidth={(i % 6 ? 1.2 : 2) * perPx}
+                              strokeLinecap="round"
+                              pointerEvents="none"
+                            />
+                          ))}
+                          <circle
+                            cx={c[0]}
+                            cy={c[1]}
+                            r={r - band / 2}
+                            fill="none"
+                            stroke="#ff5a1f"
+                            strokeOpacity={0.8}
+                            strokeWidth={1.5 * perPx}
+                            pointerEvents="none"
+                          />
+                          <circle
+                            cx={c[0]}
+                            cy={c[1]}
+                            r={r}
+                            fill="none"
+                            stroke="transparent"
+                            strokeWidth={band * 1.6}
+                            pointerEvents="stroke"
+                            className="touch-none"
+                            style={{ cursor: "grab" }}
+                            onPointerDown={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              const box = svg.current?.getBoundingClientRect();
+                              if (!box) return;
+                              const d = {
+                                cx: box.left + ((c[0] - view.x) / view.w) * box.width,
+                                cy: box.top + ((c[1] - view.y) / view.h) * box.height,
+                              };
+                              e.currentTarget.setPointerCapture(e.pointerId);
+                              wheelDrag.current = { ...d, last: angleAt(e, d), owed: 0 };
+                              sliding.current = true;
+                            }}
+                            onPointerMove={(e) => {
+                              const d = wheelDrag.current;
+                              if (!d) return;
+                              e.stopPropagation();
+                              const now = angleAt(e, d);
+                              let by = now - d.last;
+                              if (by > 180) by -= 360;
+                              if (by < -180) by += 360;
+                              d.last = now;
+                              d.owed += by;
+                              const whole = Math.trunc(d.owed);
+                              if (whole) {
+                                d.owed -= whole;
+                                turn(whole);
+                              }
+                            }}
+                            onPointerUp={(e) => {
+                              e.stopPropagation();
+                              if (!wheelDrag.current) return;
+                              wheelDrag.current = null;
+                              sliding.current = false;
+                              setSettled((n) => n + 1);
+                            }}
+                            onPointerCancel={() => {
+                              wheelDrag.current = null;
+                              sliding.current = false;
+                              setSettled((n) => n + 1);
+                            }}
+                          />
+                        </g>
+                      );
+                    })()}
                 </svg>
+                {loupe && <Loupe artId={artId} at={loupe.at} per={loupe.per} u={u} left={loupe.left} top={phone ? 76 : 12} />}
               </div>
               {/* Zoom on a phone (22 Nov 2026, Martin: the pinch pill was hidden behind Sol, and "the zoom + and - … out of the
                   tool bar and on the right hand side … with a small magnifying glass next to it"): + and − on the map's right
@@ -11952,7 +12160,7 @@ export function RoofDesigner(props: {
                   circle, with zoom in (to its right) and zoom out (above it) as its half-rounds. */}
               {/* The hand to grab the map, in reach on a phone (22 Nov 2026, Martin: "an easy way of selecting the grab
                   tool… grab the map and reposition and recenter the rooftop"): one round, lit while in hand; again puts it down. */}
-              {solHolds && !(picks.length > 0 && !solTray) && (
+              {solHolds && !(sideways && picks.length > 0 && !solTray) && (
                 <div
                   className="pointer-events-auto absolute z-[55]"
                   // Sideways and upright alike: to Sol's right, the Select and panel rounds to his left (22 Nov 2026, Martin).
@@ -12019,7 +12227,7 @@ export function RoofDesigner(props: {
               )}
               {/* The panel round, on the map's bottom centre on a phone (22 Nov 2026, Martin: out of Sol's tool kit, on the map):
                   a press takes up Add a panel and asks which way they go down; a press with it in hand puts it down. */}
-              {solHolds && !solTray && picks.length === 0 && (
+              {solHolds && !solTray && (!sideways || picks.length === 0) && (
                 <div
                   className="pointer-events-auto absolute z-[55] flex flex-col items-center"
                   style={
@@ -12149,8 +12357,12 @@ export function RoofDesigner(props: {
                   className="pointer-events-none absolute inset-x-0 z-[29] flex flex-col items-center justify-end gap-1 rounded-t-[26px] bg-[#26282c] px-4 pb-3 shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
                   style={{ top: foot ?? 0, height: stage.pb, ...solNotch(0, 30) }}
                 >
-                  {greetingNote && (
-                    <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                  {panelCount ? (
+                    <div className="absolute inset-x-20 bottom-2 flex min-h-12 items-center justify-center">{panelCount}</div>
+                  ) : (
+                    greetingNote && (
+                      <div className="absolute inset-x-20 bottom-4 flex min-h-12 items-center justify-center">{greetingNote}</div>
+                    )
                   )}
                   {/* Back to the deal (24 Nov 2026, Martin: "just the deal icon… somewhere in the graphite area"): the deal
                       mark in the dock's bottom left, the way back that sat beside the address under the map. */}
@@ -12210,6 +12422,19 @@ export function RoofDesigner(props: {
                     canUndo={changedSincePicked}
                     onUndo={undoKeepingPicks}
                     onTurn={(degrees) => turn(degrees)}
+                    onSlide={(by) => {
+                      // Along the panels' own row (across the way they face), left or right as seen on the picture.
+                      const first = pickedPanels[0];
+                      if (!first) return;
+                      const f = ((pickedFacing ?? panelFacing(first)) * Math.PI) / 180;
+                      let ax = Math.cos(f);
+                      let ay = Math.sin(f);
+                      if (ax < -1e-6 || (Math.abs(ax) <= 1e-6 && ay < 0)) {
+                        ax = -ax;
+                        ay = -ay;
+                      }
+                      nudge(cm(ax * by * SLIDE_STEP_M), cm(ay * by * SLIDE_STEP_M));
+                    }}
                     onLandscape={turnLandscape}
                     onTilt={(by) => amend((p) => ({ ...p, tilt: Math.max(0, Math.min(TILT.max, (p.tilt ?? TILT.roof) + by)) }))}
                     onDelete={removePicked}
@@ -12230,6 +12455,10 @@ export function RoofDesigner(props: {
                       if (!holding) setSettled((n) => n + 1);
                     }}
                     height={stage?.rest ?? 140}
+                    onHeight={setCtrlH}
+                    folded={ctrlFolded}
+                    onFold={setCtrlFolded}
+                    counter={panelCount}
                   />
                 </div>
               )}
@@ -13139,6 +13368,34 @@ export function RoofDesigner(props: {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The loupe: a magnified circle of the picture round a point, drawn from the picture itself (`<use>`), with a cross
+ *  where the finger is. Nothing in it can be pressed. */
+function Loupe(props: { artId: string; at: Point; per: number; u: number; left: boolean; top: number }) {
+  const SIZE = 132;
+  const ZOOM = 2.5;
+  const span = (SIZE * props.per) / ZOOM;
+  const { x, y } = props.at;
+  const arm = (9 * props.u) / ZOOM;
+  return (
+    <div
+      aria-hidden
+      className={clsx(
+        "pointer-events-none absolute z-40 overflow-hidden rounded-full bg-surface-2 shadow-lift ring-[3px] ring-white",
+        props.left ? "left-3" : "right-3",
+      )}
+      style={{ top: props.top, width: SIZE, height: SIZE }}
+    >
+      <svg viewBox={`${x - span / 2} ${y - span / 2} ${span} ${span}`} width={SIZE} height={SIZE} className="block">
+        <use href={`#${props.artId}`} />
+        <g stroke="#FF5A1F" strokeWidth={(1.4 * props.u) / ZOOM} strokeLinecap="round">
+          <line x1={x - arm} x2={x + arm} y1={y} y2={y} />
+          <line x1={x} x2={x} y1={y - arm} y2={y + arm} />
+        </g>
+      </svg>
     </div>
   );
 }

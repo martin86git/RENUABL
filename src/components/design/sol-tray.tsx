@@ -9,6 +9,7 @@
 import { clsx } from "clsx";
 import {
   Calculator,
+  ChevronLeft,
   ChevronRight,
   Columns2,
   LayoutGrid,
@@ -228,6 +229,8 @@ export function SolController(props: {
   canUndo: boolean;
   onUndo: () => void;
   onTurn: (degrees: number) => void;
+  /** Slide what is picked along its row, left (-1) or right (1) as seen on the picture, this many steps. */
+  onSlide?: (by: number) => void;
   onLandscape: (landscape: boolean) => void;
   onTilt: (by: number) => void;
   onDelete: () => void;
@@ -242,8 +245,16 @@ export function SolController(props: {
   onTakeBack: (degrees: number) => void;
   /** A press and hold on a 1° button begins (true) and ends (false): its turns are one step to undo. */
   onHold?: (holding: boolean) => void;
-  /** Upright: how tall the plate is. */
+  /** Upright: the least the plate stands (to the foot of the screen when its contents are taller than the room). */
   height?: number;
+  /** Upright: how tall its contents are, so the dock is only as tall as what it holds and the map takes the rest
+      (26 Nov 2026, Martin: "The dock height should auto adjust relative to the information it's showing"). */
+  onHeight?: (px: number) => void;
+  /** Upright: folded down to its header by the grab bar on its top edge. */
+  folded?: boolean;
+  onFold?: (folded: boolean) => void;
+  /** While Add a panel is in hand: the panel counter, drawn in the plate's middle. */
+  counter?: ReactNode;
 }) {
   const upright = props.layout === "upright";
   const what = props.panels ? `${props.panels} panel${props.panels === 1 ? "" : "s"}` : `${props.count} picked`;
@@ -252,7 +263,7 @@ export function SolController(props: {
     .join(" · ");
   const seg = "flex items-center rounded-xl bg-white/[0.08] p-[3px]";
   const small = "flex items-center justify-center rounded-[9px] text-white/85 hover:bg-white/10";
-  // A double tap on either thumb turns both to 5° a press, and another back to 1° (22 Nov 2026, Martin). Kept for the visit.
+  // How far each press of a thumb turns them: 1° or 5°, chosen by the switch beside the tilt.
   const [stepBy, setStepBy] = useState(turnStep);
   const thumb = (by: -1 | 1) => {
     const Turn = by < 0 ? RotateCcw : RotateCw;
@@ -260,20 +271,15 @@ export function SolController(props: {
       <HoldButton
         onStep={(times) => props.onTurn(by * stepBy * times)}
         onHold={props.onHold}
-        onDoubleTap={() => {
-          // The first tap of the two turned the panels: take it back, so a double tap only changes the step.
-          props.onTakeBack(by * stepBy);
-          turnStep = turnStep === 1 ? 5 : 1;
-          setStepBy(turnStep);
-        }}
-        aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"} (double tap for ${stepBy === 1 ? 5 : 1}°)`}
+        aria-label={`Turn ${stepBy} degree${stepBy === 1 ? "" : "s"} ${by < 0 ? "anticlockwise" : "clockwise"}`}
         className={clsx(
           "pointer-events-auto flex flex-col items-center justify-center rounded-full bg-[#3a3d43] text-white shadow-[0_6px_18px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.12)] ring-1 ring-white/10 active:scale-95 active:bg-[#4a4e55] motion-reduce:active:scale-100",
-          upright ? "size-[4.25rem]" : "size-[3.4rem]",
+          // Larger on a phone held upright (26 Nov 2026, Martin: "the left and right toggles need to be bigger").
+          upright ? "size-[5rem]" : "size-[3.75rem]",
         )}
       >
-        <Turn className={upright ? "size-6" : "size-5"} aria-hidden />
-        <span className={clsx("mt-0.5 text-[11px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
+        <Turn className={upright ? "size-7" : "size-6"} aria-hidden />
+        <span className={clsx("mt-0.5 text-[13px] font-semibold tabular-nums", stepBy === 1 ? "text-white/80" : "text-sun-line")}>
           {stepBy}°
         </span>
       </HoldButton>
@@ -290,30 +296,92 @@ export function SolController(props: {
           aria-label={land ? "Landscape" : "Portrait"}
           onClick={() => props.onLandscape(land)}
           className={clsx(
-            "flex h-8 w-9 items-center justify-center rounded-[9px]",
+            "flex items-center justify-center rounded-[9px]",
+            // Larger on a phone held upright, so a thumb finds it (26 Nov 2026, Martin).
+            upright ? "h-12 w-14" : "h-8 w-9",
             props.landscape === land ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
           )}
         >
           <span
-            className={clsx("rounded-[2px] border-[1.5px] border-current", land ? "h-[9px] w-[15px]" : "h-[15px] w-[9px]")}
+            className={clsx(
+              "rounded-[2px] border-current",
+              upright ? "border-2" : "border-[1.5px]",
+              upright ? (land ? "h-[14px] w-[24px]" : "h-[24px] w-[14px]") : land ? "h-[9px] w-[15px]" : "h-[15px] w-[9px]",
+            )}
             aria-hidden
           />
         </button>
       ))}
     </div>
   );
+  // The tilt's − and + step on the press itself, and keep stepping while held (26 Nov 2026, Martin: "The + and - panel
+  // adjusters aren't working" on his iPhone): a press, not a click, as the thumbs are.
+  const tiltStep = (by: -1 | 1) => (
+    <HoldButton
+      onStep={(times) => props.onTilt(by * times)}
+      onHold={props.onHold}
+      aria-label={by < 0 ? "Tilt down a degree" : "Tilt up a degree"}
+      className={clsx(small, "pointer-events-auto h-9 w-10 active:bg-white/15")}
+    >
+      {by < 0 ? <Minus className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
+    </HoldButton>
+  );
+  // Tap the panels across their row, left or right (26 Nov 2026, Martin: "a left and right button to be able to tap the
+  // panel across. Typically useful for panels in landscape"); held, they keep sliding, as one step to undo.
+  const slideStep = (by: -1 | 1) => (
+    <HoldButton
+      onStep={(times) => props.onSlide?.(by * times)}
+      onHold={props.onHold}
+      aria-label={by < 0 ? "Slide left along the row" : "Slide right along the row"}
+      className={clsx(small, "pointer-events-auto active:bg-white/15", upright ? "h-11 w-12" : "h-8 w-8")}
+    >
+      {by < 0 ? <ChevronLeft className="size-5" aria-hidden /> : <ChevronRight className="size-5" aria-hidden />}
+    </HoldButton>
+  );
+  const slide = props.panels > 0 && props.onSlide && (
+    <div className={seg} role="group" aria-label="Slide along the row">
+      {slideStep(-1)}
+      {slideStep(1)}
+    </div>
+  );
   const tilt = props.panels > 0 && (
     <div className={seg} role="group" aria-label="Tilt">
-      <button type="button" onClick={() => props.onTilt(-1)} aria-label="Tilt down a degree" className={clsx(small, "h-8 w-8")}>
-        <Minus className="size-3.5" aria-hidden />
-      </button>
+      {tiltStep(-1)}
       <span className="min-w-[3.25rem] text-center text-[12px] tabular-nums">
         <span className="text-white/55">tilt </span>
         <b className="font-semibold">{props.tilt === null ? "–" : `${props.tilt}°`}</b>
       </span>
-      <button type="button" onClick={() => props.onTilt(1)} aria-label="Tilt up a degree" className={clsx(small, "h-8 w-8")}>
-        <Plus className="size-3.5" aria-hidden />
-      </button>
+      {tiltStep(1)}
+    </div>
+  );
+  // How far a press of either thumb turns them, chosen here (26 Nov 2026, Martin: the thumbs "aren't working"; a double
+  // tap switched the step and took the first tap's turn back, so quick taps in a row undid each other). Kept for the visit.
+  const stepSwitch = props.panels > 0 && (
+    <div className={seg} role="radiogroup" aria-label="How far each press turns them">
+      {([1, 5] as const).map((d) => (
+        <button
+          key={d}
+          type="button"
+          role="radio"
+          aria-checked={stepBy === d}
+          onClick={() => {
+            turnStep = d;
+            setStepBy(d);
+          }}
+          className={clsx(
+            "flex h-8 w-9 items-center justify-center rounded-[9px] text-[12px] font-semibold tabular-nums",
+            stepBy === d ? "bg-white text-[#1d1f23]" : "text-white/75 hover:bg-white/10",
+          )}
+        >
+          {d}°
+        </button>
+      ))}
+    </div>
+  );
+  const tiltAndStep = props.panels > 0 && (
+    <div className="flex flex-wrap items-center justify-center gap-1.5">
+      {tilt}
+      {stepSwitch}
     </div>
   );
   const remove = (
@@ -321,9 +389,12 @@ export function SolController(props: {
       type="button"
       onClick={props.onDelete}
       aria-label="Delete what is picked"
-      className="flex size-[38px] shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-[#ff6b5e] hover:bg-white/15"
+      className={clsx(
+        "flex shrink-0 items-center justify-center rounded-xl bg-white/[0.08] text-[#ff6b5e] hover:bg-white/15",
+        upright ? "size-[54px]" : "size-[38px]",
+      )}
     >
-      <Trash2 className="size-4" aria-hidden />
+      <Trash2 className={upright ? "size-5" : "size-4"} aria-hidden />
     </button>
   );
   // One panel picked, the rest of its array a press away (22 Nov 2026, Martin: "a select all button").
@@ -376,65 +447,18 @@ export function SolController(props: {
 
   if (upright)
     return (
-      <div
-        role="group"
-        aria-label="What is picked"
-        className="pointer-events-auto relative rounded-t-[26px] bg-[#26282c] text-white shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
-        style={{ height: props.height ?? 140, ...solNotch(0, 30) }}
-      >
-        {/* Beside Sol's notch: what is picked on the left; undo and pick none on the right. */}
-        <div className="absolute inset-x-3 top-2 flex items-center">
-          <p className="w-[calc(50%-2.25rem)] min-w-0 truncate text-[12px] text-white/60">
-            <b className="font-semibold text-white">{what}</b>
-            {detail && ` · ${detail}`}
-          </p>
-          <span className="w-[4.5rem] shrink-0" aria-hidden />
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
-            {undo}
-            {done}
-          </div>
-        </div>
-        {/* Picking more, given its own row under the header (24 Nov 2026, Martin: All "would be a highly sought after and
-            used function"): the panel's line and the whole array, All filled as the one most reached for. */}
-        {(props.wholeLine || props.wholeArray) && (
-          <div className="absolute inset-x-3 top-[2.1rem] flex justify-center gap-2">
-            {props.wholeLine && props.onWholeLine && (
-              <button
-                type="button"
-                onClick={props.onWholeLine}
-                aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
-              >
-                <Columns2 className="size-3.5 text-sun-line" aria-hidden />
-                Line {props.wholeLine}
-              </button>
-            )}
-            {props.wholeArray && props.onWholeArray && (
-              <button
-                type="button"
-                onClick={props.onWholeArray}
-                aria-label={`Pick the whole array: ${props.wholeArray} panels`}
-                className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
-              >
-                <LayoutGrid className="size-3.5" aria-hidden />
-                Select all {props.wholeArray}
-              </button>
-            )}
-          </div>
-        )}
-        {/* The thumbs, in the two bottom corners; between them portrait or landscape, the tilt and delete. */}
-        <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
-          {props.panels > 0 ? thumb(-1) : <span />}
-          <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
-            <div className="flex items-center gap-1.5">
-              {orient}
-              {remove}
-            </div>
-            {tilt}
-          </div>
-          {props.panels > 0 ? thumb(1) : <span />}
-        </div>
-      </div>
+      <UprightPlate
+        {...props}
+        what={what}
+        detail={detail}
+        undo={undo}
+        done={done}
+        orient={orient}
+        remove={remove}
+        tiltRow={tiltAndStep}
+        thumb={thumb}
+        slideStep={props.onSlide ? slideStep : undefined}
+      />
     );
 
   return (
@@ -452,10 +476,11 @@ export function SolController(props: {
             {detail && <span className="block truncate text-[10.5px]">{detail}</span>}
           </p>
           {orient}
-          {tilt}
+          {tiltAndStep}
         </div>
         <span className="w-[4.25rem] shrink-0" aria-hidden />
         <div className="flex w-[17.5rem] items-center gap-1.5">
+          {slide}
           {line}
           {whole}
           {remove}
@@ -555,6 +580,135 @@ const HOLD_MOST_AT_ONCE = 5;
  * A button that steps once on a press and keeps stepping while held (22 Nov 2026, Martin: "press and hold and it should
  * continue to successively add or subtract 1 deg so I don't have to keep tapping"). A keyboard press steps once.
  */
+/**
+ * The controller on a phone held upright: a plate under the picture moulded round Sol, as tall as what it holds (26 Nov
+ * 2026, Martin: it stood open to the foot of the screen with nothing in it), the foot row's rounds standing on its top
+ * edge, a grab bar at its top left that folds it to its header and opens it again.
+ */
+function UprightPlate(
+  props: Parameters<typeof SolController>[0] & {
+    what: string;
+    detail: string;
+    undo: ReactNode;
+    done: ReactNode;
+    orient: ReactNode;
+    remove: ReactNode;
+    tiltRow: ReactNode;
+    thumb: (by: -1 | 1) => ReactNode;
+    /** ← over the left thumb and → over the right, where the plate has room. */
+    slideStep?: (by: -1 | 1) => ReactNode;
+  },
+) {
+  const inside = useRef<HTMLDivElement | null>(null);
+  const report = useRef(props.onHeight);
+  useEffect(() => {
+    report.current = props.onHeight;
+  });
+  useEffect(() => {
+    const el = inside.current;
+    if (!el) return;
+    const measure = () => report.current?.(Math.ceil(el.getBoundingClientRect().height));
+    measure();
+    const seen = new ResizeObserver(measure);
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, []);
+  const folded = Boolean(props.folded);
+  return (
+    <div
+      role="group"
+      aria-label="What is picked"
+      className="pointer-events-auto relative rounded-t-[26px] bg-[#26282c] text-white shadow-[0_-8px_24px_rgba(0,0,0,0.25)]"
+      style={{ minHeight: props.height, ...solNotch(0, 30) }}
+    >
+      {props.onFold && (
+        <button
+          type="button"
+          onClick={() => props.onFold?.(!folded)}
+          aria-expanded={!folded}
+          aria-label={folded ? "Open the controls" : "Fold the controls away"}
+          title={folded ? "Open the controls" : "Fold the controls away for more of the map"}
+          className="group absolute left-3 top-0 z-10 flex h-5 w-11 touch-none items-center justify-center"
+        >
+          <span className="h-1 w-8 rounded-full bg-white/35 transition-colors group-hover:bg-white/70" aria-hidden />
+        </button>
+      )}
+      <div ref={inside} className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-7">
+        {/* Under the foot row's rounds: what is picked on the left; undo and pick none on the right, Sol's notch between. */}
+        <div className="flex items-center">
+          <p className="w-[calc(50%-2.25rem)] min-w-0 truncate text-[12px] text-white/60">
+            <b className="font-semibold text-white">{props.what}</b>
+            {props.detail && ` · ${props.detail}`}
+          </p>
+          <span className="w-[4.5rem] shrink-0" aria-hidden />
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1.5">
+            {props.undo}
+            {props.done}
+          </div>
+        </div>
+        {/* Line and Select all, and the counter while laying, with ← and → either side of them (26 Nov 2026, Martin:
+            stacked, the slide buttons pushed the turn thumbs below the screen). */}
+        {!folded && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {props.panels > 0 && props.slideStep ? (
+              <div className="shrink-0 rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(-1)}</div>
+            ) : (
+              <span />
+            )}
+            <div className="flex min-w-0 flex-col items-center gap-2">
+              {(props.wholeLine || props.wholeArray) && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  {props.wholeLine && props.onWholeLine && (
+                    <button
+                      type="button"
+                      onClick={props.onWholeLine}
+                      aria-label={`Pick the panel's line: ${props.wholeLine} panels`}
+                      className="flex h-7 items-center gap-1.5 rounded-full bg-white/10 px-3 text-[12px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/15"
+                    >
+                      <Columns2 className="size-3.5 text-sun-line" aria-hidden />
+                      Line {props.wholeLine}
+                    </button>
+                  )}
+                  {props.wholeArray && props.onWholeArray && (
+                    <button
+                      type="button"
+                      onClick={props.onWholeArray}
+                      aria-label={`Pick the whole array: ${props.wholeArray} panels`}
+                      className="flex h-7 items-center gap-1.5 rounded-full bg-sun-line px-3.5 text-[12px] font-semibold text-white shadow-[0_4px_12px_rgba(255,90,31,0.35)]"
+                    >
+                      <LayoutGrid className="size-3.5" aria-hidden />
+                      Select all {props.wholeArray}
+                    </button>
+                  )}
+                </div>
+              )}
+              {props.counter}
+            </div>
+            {props.panels > 0 && props.slideStep ? (
+              <div className="shrink-0 rounded-xl bg-white/[0.08] p-[3px]">{props.slideStep(1)}</div>
+            ) : (
+              <span />
+            )}
+          </div>
+        )}
+        {!folded && (
+          <div className="mt-2.5 flex items-end justify-between gap-2">
+            {props.panels > 0 ? props.thumb(-1) : <span />}
+            <div className="flex min-w-0 flex-col items-center gap-1.5 pb-0.5">
+              <div className="flex items-center gap-1.5">
+                {props.orient}
+                {props.remove}
+              </div>
+              {props.tiltRow}
+            </div>
+            {props.panels > 0 ? props.thumb(1) : <span />}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HoldButton({
   onStep,
   onHold,
@@ -649,5 +803,36 @@ function HoldButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * The panel counter in the dock while Add a panel is in hand (26 Nov 2026, Martin: "a panel counter in the dock so I
+ * can see how many panels left until target… only exist whilst I'm laying panels… large enough so I can see it and it
+ * should also show how many kWs"). The panels and kW large, what is left to the target under them.
+ */
+export function PanelCounter(props: { panels: number; kw: string; line: string | null; state: "short" | "on" | "over" | "none" }) {
+  return (
+    <div role="status" aria-live="polite" className="flex flex-col items-center text-white">
+      <p className="flex items-baseline gap-2 whitespace-nowrap">
+        <b className="text-[34px] font-semibold leading-none tabular-nums">{props.panels}</b>
+        <span className="text-[13px] text-white/60">{props.panels === 1 ? "panel" : "panels"}</span>
+        <span className="mx-1 h-6 w-px self-center bg-white/20" aria-hidden />
+        <b className="text-[24px] font-semibold leading-none tabular-nums text-sun-line">{props.kw}</b>
+        <span className="text-[13px] text-white/60">kW</span>
+      </p>
+      {props.line && (
+        <p
+          className={clsx(
+            "mt-1.5 rounded-full px-3 py-0.5 text-[12.5px] font-semibold tabular-nums",
+            props.state === "on" && "bg-positive/25 text-[#7ee2a8]",
+            props.state === "over" && "bg-danger/25 text-[#ff8a80]",
+            props.state === "short" && "bg-white/10 text-white/85",
+          )}
+        >
+          {props.line}
+        </p>
+      )}
+    </div>
   );
 }

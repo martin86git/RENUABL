@@ -20,8 +20,14 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
+    area: "Designer",
+    words: "On a phone, laying panels shows a counter in the dock: panels, kW and how many to go. Portrait and landscape are larger.",
+  },
+  {
+    day: "2026-11-26",
     area: "Pre-approvals",
-    words: "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
+    words:
+      "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
   },
   {
     day: "2026-11-26",
