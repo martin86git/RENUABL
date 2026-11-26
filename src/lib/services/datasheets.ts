@@ -3,11 +3,57 @@
  * the figures by product code for the designer. Signed out there are none (the designer uses RENUABL's own).
  */
 import type { Datasheets, InverterForm, PanelForm, SavedSheet, SheetKind } from "@/lib/domain/design/datasheets";
+import type { DocKind } from "@/lib/domain/design/proposal-datasheets";
 import { ask } from "./crm";
 
 export type SheetForm = { kind: SheetKind; model: string; panel: PanelForm; inverter: InverterForm };
 
-export const loadDatasheets = () => ask<{ sheets: SavedSheet[]; datasheets: Datasheets }>("/api/design/datasheets");
+/** A battery's or EV charger's datasheet: a file, with no figures. */
+export interface SavedFile {
+  kind: DocKind;
+  sku: string;
+  model: string;
+  fileName: string;
+  checkedBy: string;
+  checkedAt: string;
+  foundUrl: string | null;
+  unchecked: boolean;
+  shared?: boolean;
+}
+
+export const loadDatasheets = () => ask<{ sheets: SavedSheet[]; datasheets: Datasheets; files?: SavedFile[] }>("/api/design/datasheets");
+
+/** Keeps a battery's or EV charger's datasheet as a file alone (26 Nov 2026), in place of any it had. */
+export async function keepProductFile(
+  kind: DocKind,
+  sku: string,
+  model: string,
+  file: File,
+): Promise<{ ok: true; files: SavedFile[] } | { ok: false; message: string }> {
+  const body = new FormData();
+  body.append("kind", kind);
+  body.append("sku", sku);
+  body.append("model", model);
+  body.append("file", file);
+  try {
+    const res = await fetch("/api/design/datasheets/file", { method: "POST", body });
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; message?: string; files?: SavedFile[] } | null;
+    return res.ok && json?.ok
+      ? { ok: true, files: json.files ?? [] }
+      : { ok: false, message: json?.message ?? "The sheet couldn't be kept." };
+  } catch {
+    return { ok: false, message: "The sheet couldn't be kept. Check your connection." };
+  }
+}
+
+/** Looks online for each of a proposal's quoted products with no sheet on hand (up to six); how many were found. */
+export const findQuotedOnline = (products: readonly { kind: DocKind; sku: string; name: string }[]) =>
+  ask<{ found: number }>("/api/design/datasheets", { method: "POST", body: { do: "find-quoted", products } });
+
+export const deleteProductFile = (kind: DocKind, sku: string) =>
+  ask<{ files: SavedFile[] }>(`/api/design/datasheets?kind=${kind}&sku=${encodeURIComponent(sku)}`, { method: "DELETE" });
+
+export const productFileHref = (kind: DocKind, sku: string) => `/api/design/datasheets/file?kind=${kind}&sku=${encodeURIComponent(sku)}`;
 
 /** Sends a datasheet to be read; nothing is kept. */
 export async function readDatasheet(file: File): Promise<{ ok: true; form: SheetForm; fileName: string } | { ok: false; message: string }> {
@@ -58,5 +104,5 @@ export const findDatasheetOnline = (product: { kind: SheetKind; sku: string; nam
   ask<{ message: string; datasheets: Datasheets }>("/api/design/datasheets", { method: "POST", body: { do: "find", ...product } });
 
 /** A person has checked figures found online against the sheet. */
-export const confirmDatasheet = (kind: SheetKind, sku: string) =>
+export const confirmDatasheet = (kind: DocKind, sku: string) =>
   ask<{ sheets: SavedSheet[] }>("/api/design/datasheets", { method: "POST", body: { do: "confirm", kind, sku } });

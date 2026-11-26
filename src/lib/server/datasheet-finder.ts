@@ -11,13 +11,14 @@ import { lookup as dnsLookup } from "node:dns";
 import type { LookupFunction } from "node:net";
 import { get as httpsGet } from "node:https";
 import Anthropic from "@anthropic-ai/sdk";
-import { KEEP_SHEET_BYTES, foundFigures, sheetCandidates, type SheetKind } from "@/lib/domain/design/datasheets";
+import { KEEP_SHEET_BYTES, codeKey, foundFigures, sheetCandidates, type SheetKind } from "@/lib/domain/design/datasheets";
 import type { InverterElectrical, PanelElectrical } from "@/lib/domain/design/electrical";
 import { BLOCKED_SITES, SEARCH_FROM } from "@/lib/domain/design/sol-knowledge";
 import { todayInMarket } from "@/lib/domain/market";
 import { fetchableUrl, isPrivateAddress } from "@/lib/domain/net";
 import { MAX_SHEET_BYTES, readDatasheetWithClaude, type SheetType } from "./datasheet-reader";
-import { replaceWithFoundSheet, saveFoundSheet } from "./design-datasheets-repo";
+import { replaceWithFoundSheet, saveFoundSheet, saveProductFile, sheetsOnHand } from "./design-datasheets-repo";
+import { isFileOnly, type DocKind } from "@/lib/domain/design/proposal-datasheets";
 
 const MODEL = () => process.env.DATASHEET_MODEL?.trim() || "claude-sonnet-5-5";
 
@@ -26,8 +27,15 @@ const FIND_TOOLS: Anthropic.ToolUnion[] = [
   { type: "web_fetch_20260209", name: "web_fetch", max_uses: 3, blocked_domains: [...BLOCKED_SITES], max_content_tokens: 12_000 },
 ];
 
-const findPrompt = (kind: SheetKind, sku: string, name: string) =>
-  `Find the manufacturer's datasheet PDF for this ${kind === "panel" ? "solar panel" : "solar or hybrid inverter"}, sold in Australia:
+const WHAT: Record<DocKind, string> = {
+  panel: "solar panel",
+  inverter: "solar or hybrid inverter",
+  battery: "home battery",
+  charger: "electric vehicle (EV) charger",
+};
+
+const findPrompt = (kind: DocKind, sku: string, name: string) =>
+  `Find the manufacturer's datasheet PDF for this ${WHAT[kind]}, sold in Australia:
 product code "${sku}", named "${name}".
 Search the web. Prefer the maker's own website; a distributor's copy of the maker's datasheet will do only when the maker has none. Prefer the Australian version: the maker's Australian site (often .com.au) or a sheet marked AU, Australia or Oceania (OC), over a European, US or other market's sheet; take another market's only when there is no Australian one. It must be the datasheet (not a brochure, manual or listing) for this exact model, or a series datasheet whose table includes it: every letter of the product code counts (a -DV sheet is not a -DB panel's). Check the link points to a PDF.
 End your reply with one line: "URL: " and the https link to the PDF, or "URL: none" if you can't find one you're sure of. Never make up a link.`;
@@ -49,7 +57,7 @@ function linksIn(blocks: readonly unknown[]): string[] {
 }
 
 /** The links to try for the product's datasheet, best first: only those the search really showed (`sheetCandidates`). */
-export async function findSheetLinks(kind: SheetKind, sku: string, name: string, apiKey: string): Promise<string[]> {
+export async function findSheetLinks(kind: DocKind, sku: string, name: string, apiKey: string): Promise<string[]> {
   const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 1 });
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: findPrompt(kind, sku, name) }];
   let text = "";
@@ -275,4 +283,50 @@ export async function replaceDatasheetFromFile(
   const keep = file.type === "application/pdf" && file.bytes.length <= KEEP_SHEET_BYTES ? { bytes: file.bytes, type: file.type } : null;
   await replaceWithFoundSheet(businessId, sheet, keep);
   return { ok: true, sheet };
+}
+
+/**
+ * A battery's or EV charger's datasheet found online and kept as a file alone (26 Nov 2026, Martin: every quoted
+ * product's datasheet with the proposal). Its figures aren't read, so it is the first PDF the search showed that opens,
+ * closest to the product code first, kept marked to check with where it came from; never over a sheet already on hand.
+ */
+export async function findProductFile(businessId: string, product: { kind: DocKind; sku: string; name: string }): Promise<FindOutcome> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) return "off";
+  if ((await sheetsOnHand(businessId, [product])).size) return "kept-already";
+  const links = await findSheetLinks(product.kind, product.sku, product.name, apiKey).catch(() => []);
+  for (const url of links) {
+    const bytes = await safeDownload(url);
+    if (!bytes || bytes.length > KEEP_SHEET_BYTES) continue;
+    await saveProductFile(
+      businessId,
+      { kind: product.kind, sku: product.sku, model: product.name, fileName: sheetName(url) },
+      { bytes, type: "application/pdf" },
+      "found online",
+      url,
+    );
+    return "found";
+  }
+  return "not-found";
+}
+
+/**
+ * Looks online for each quoted product's datasheet the business has none of on hand (a few at most), whatever its
+ * kind: a panel's or inverter's is read for its figures as ever, a battery's or charger's kept as a file. How many found.
+ */
+export async function findQuotedSheets(
+  businessId: string,
+  products: readonly { kind: DocKind; sku: string; name: string }[],
+  most = 6,
+): Promise<number> {
+  const onHand = await sheetsOnHand(businessId, products);
+  const missing = products.filter((p) => !onHand.has(`${p.kind}:${codeKey(p.sku)}`)).slice(0, most);
+  let found = 0;
+  for (const p of missing) {
+    const outcome = isFileOnly(p.kind)
+      ? await findProductFile(businessId, p).catch(() => "not-found" as const)
+      : await findDatasheet(businessId, p as { kind: SheetKind; sku: string; name: string }).catch(() => "not-found" as const);
+    if (outcome === "found") found++;
+  }
+  return found;
 }

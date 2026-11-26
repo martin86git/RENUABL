@@ -15,6 +15,21 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Proposals",
+    words: "Each quoted panel, inverter, battery and EV charger's datasheet is listed on the customer's proposal and its PDF.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The proposal screen says which datasheets are missing, with a button to find them online.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Battery and EV charger datasheets can be uploaded or found online in Product datasheets.",
+  },
+  {
+    day: "2026-11-26",
     area: "Voice agents",
     words: "The voice agent's window is taller, the chat on the left, its deals and settings as slim panels to the right.",
   },

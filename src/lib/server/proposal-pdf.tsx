@@ -15,7 +15,8 @@
  * ground; the picture from above stays on the page. Every estimate carries
  * the same wording as the page.
  */
-import { Document, Image, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Image, Link, Page, Polygon, Polyline, Rect, StyleSheet, Svg, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { DATASHEET_WORDS, DOC_KIND_WORDS, type DocKind } from "@/lib/domain/design/proposal-datasheets";
 import { blockHeading, coverTitle, stepsShown, viewBlocks, type BlockId, type ViewBlock } from "@/lib/domain/design/blocks";
 import { contrast, fontOf, inkOn, lookOf, shownAbn, shownBsb, shownWebsite, type ChartStyle } from "@/lib/domain/design/brand";
 import { batteryHero } from "@/lib/domain/design/battery-hero";
@@ -160,14 +161,19 @@ const Row = ({ label, value, bold }: { label: string; value: string; bold?: bool
   </View>
 );
 
+/** A product's datasheet named in the file, with the link to open it (26 Nov 2026). */
+export type PdfDatasheet = { kind: DocKind; name: string; url: string };
+
 function ProposalDocument({
   view,
   images,
   accepted,
+  datasheets = [],
 }: {
   view: ProposalView;
   images: PdfImages;
   accepted: { name: string; at: string } | null;
+  datasheets?: readonly PdfDatasheet[];
 }) {
   const b = view.business;
   const terms = view.terms;
@@ -646,6 +652,23 @@ function ProposalDocument({
               </View>
             );
           })}
+        {datasheets.length > 0 && (
+          <View style={s.section} wrap={false}>
+            <Text style={heading}>{DATASHEET_WORDS.heading}</Text>
+            <Text style={s.small}>{DATASHEET_WORDS.intro}</Text>
+            {datasheets.map((d) => (
+              <View key={d.url} style={[s.row, { marginTop: 4 }]}>
+                <Text>
+                  <Text style={s.muted}>{DOC_KIND_WORDS[d.kind]} · </Text>
+                  {d.name}
+                </Text>
+                <Link src={d.url} style={{ color: accent }}>
+                  {DATASHEET_WORDS.open}
+                </Link>
+              </View>
+            ))}
+          </View>
+        )}
         {footer}
       </Page>
     </Document>
@@ -653,8 +676,13 @@ function ProposalDocument({
 }
 
 /** The proposal as the bytes of a PDF file. */
-export async function proposalPdf(view: ProposalView, images: PdfImages, accepted: { name: string; at: string } | null): Promise<Buffer> {
-  return renderToBuffer(<ProposalDocument view={view} images={images} accepted={accepted} />);
+export async function proposalPdf(
+  view: ProposalView,
+  images: PdfImages,
+  accepted: { name: string; at: string } | null,
+  datasheets: readonly PdfDatasheet[] = [],
+): Promise<Buffer> {
+  return renderToBuffer(<ProposalDocument view={view} images={images} accepted={accepted} datasheets={datasheets} />);
 }
 
 /** A name for the file: "Proposal - Alex Example.pdf", with nothing a file name can't hold. */
