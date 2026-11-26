@@ -25,6 +25,7 @@ import {
   Plus,
   ScrollText,
   Settings,
+  SpellCheck,
   ShieldCheck,
   SquareKanban,
   Trash2,
@@ -50,6 +51,8 @@ import { callerChanged, removeCallerPhoto, saveCallerTint, uploadCallerPhoto, us
 import { DELIVERY_COPY, type Delivery } from "@/lib/domain/design/delivery";
 import { CALL_SETUP_COPY, DEFAULT_CALL_SETUP, type CallSetup } from "@/lib/domain/design/call-setup";
 import { CallSetupSettings } from "./coach-call-setup";
+import { PronounceSettings, pronounceSummary } from "./coach-pronounce";
+import type { Pronunciation } from "@/lib/domain/design/pronounce";
 import type { ScriptLine } from "@/lib/domain/design/call-scripts";
 import { ScriptPicker } from "./coach-scripts";
 import { roleOfKey } from "@/lib/domain/install-call";
@@ -994,6 +997,8 @@ function CoachSettings(props: {
   const [whoOpen, setWhoOpen] = useState(true);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
+  const [wordsOpen, setWordsOpen] = useState(false);
+  const [words, setWords] = useState<Pronunciation[] | null>(null);
   const [fixedOpen, setFixedOpen] = useState(false);
   const locked = props.notes.filter((n) => n.locked);
   const loose = props.notes.filter((n) => !n.locked);
@@ -1074,6 +1079,18 @@ function CoachSettings(props: {
                 <p className="text-xs text-muted">Only an admin can change the voice.</p>
               )}
               {status && <p className={clsx("mt-2 text-xs", status.ok ? "text-ink-2" : "text-danger")}>{status.text}</p>}
+            </div>
+          )}
+        </section>
+
+        {/* How particular words are said, for every agent (pronounce.ts, 26 Nov 2026, Martin). */}
+        <section className={card}>
+          {head(<SpellCheck className="size-4" />, "bg-surface-2 text-ink", "How words are said", pronounceSummary(words), wordsOpen, () =>
+            setWordsOpen((o) => !o),
+          )}
+          {wordsOpen && (
+            <div className="border-t border-line px-3.5 py-3">
+              <PronounceSettings editable={props.mayCoach} onList={setWords} />
             </div>
           )}
         </section>
