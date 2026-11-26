@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Check, FileText, X } from "lucide-react";
+import { Check, FileText, Loader2, X } from "lucide-react";
 import {
   DATASHEET_WORDS,
   DOC_KIND_WORDS,
@@ -85,6 +85,11 @@ export function DatasheetCheck(props: { products: readonly ProductSheetStanding[
           <li key={`${p.kind}:${p.sku}`} className="flex items-start gap-2">
             {p.hasFile ? (
               <Check className="mt-0.5 size-3.5 shrink-0 text-positive" aria-label="On file" />
+            ) : busy ? (
+              <Loader2
+                className="mt-0.5 size-3.5 shrink-0 animate-spin text-sun-line motion-reduce:animate-none"
+                aria-label="Looking online"
+              />
             ) : (
               <X className="mt-0.5 size-3.5 shrink-0 text-warning" aria-label="Missing" />
             )}
@@ -102,8 +107,10 @@ export function DatasheetCheck(props: { products: readonly ProductSheetStanding[
             type="button"
             onClick={() => void find()}
             disabled={busy}
-            className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-white disabled:bg-line disabled:text-muted"
+            aria-busy={busy}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-white disabled:cursor-progress"
           >
+            {busy && <Loader2 className="size-3 animate-spin motion-reduce:animate-none" aria-hidden />}
             {busy ? "Looking online…" : DATASHEET_WORDS.find}
           </button>
           <Link href="/design/settings/datasheets" className="font-medium underline underline-offset-4">
@@ -111,7 +118,13 @@ export function DatasheetCheck(props: { products: readonly ProductSheetStanding[
           </Link>
         </div>
       )}
-      {said && (
+      {busy && (
+        <p role="status" className="mt-1.5 animate-pulse text-muted motion-reduce:animate-none">
+          Searching the makers&apos; sites for {Math.min(6, missing.length)} datasheet{Math.min(6, missing.length) === 1 ? "" : "s"}. This
+          can take a minute.
+        </p>
+      )}
+      {said && !busy && (
         <p role="status" className="mt-1.5 text-muted">
           {said}
         </p>
