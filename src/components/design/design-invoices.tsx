@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { FileUp, ReceiptText, RotateCcw, Trash2 } from "lucide-react";
+import { Check, FileUp, ReceiptText, RotateCcw, Trash2, X } from "lucide-react";
 import clsx from "clsx";
 import { LIKELY_MATCH, VARIANCE_LABELS, varianceText, type InstallerInvoice, type Variance } from "@/lib/domain/design/installer-invoices";
 import { dollars, shortDate } from "@/lib/services/crm";
@@ -128,16 +128,20 @@ export function InvoicesPage() {
               <Figure label="Installer billed" value={r.billed === null ? "–" : money2(r.billed)} />
               <span
                 className={clsx(
-                  "rounded px-2 py-1 text-xs font-medium",
-                  r.status === "over"
-                    ? "bg-warning-soft text-danger"
-                    : r.status === "under"
-                      ? "bg-positive-soft text-positive"
-                      : r.status === "match"
-                        ? "bg-surface-2 text-ink"
-                        : "bg-sun text-sun-ink",
+                  "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium",
+                  // Matches is green; over or under (it doesn't match) is red (26 Nov 2026, Martin).
+                  r.status === "match"
+                    ? "bg-positive-soft text-positive"
+                    : r.status === "over" || r.status === "under"
+                      ? "bg-danger/10 text-danger"
+                      : "bg-sun text-sun-ink",
                 )}
               >
+                {r.status === "match" ? (
+                  <Check className="size-3.5" aria-hidden />
+                ) : r.status === "over" || r.status === "under" ? (
+                  <X className="size-3.5" aria-hidden />
+                ) : null}
                 {varianceText(r)}
               </span>
               <div className="flex gap-2">
