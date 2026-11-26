@@ -10,6 +10,8 @@ import { createProposalPaymentCheckout } from "@/lib/server/stripe-billing";
 import { afterSigning } from "@/lib/server/design-after-sale-repo";
 import { tellAccepted, tellPaid } from "@/lib/server/design-notify";
 import { allow } from "@/lib/server/rate-limit";
+import { cleanLike } from "@/lib/domain/design/proposal-reveal";
+import { setLike } from "@/lib/server/design-proposal-likes";
 
 /** A link we never made and one that doesn't exist answer the same. */
 const notFound = () => Response.json({ ok: false, message: "This proposal isn't available." }, { status: 404 });
@@ -96,6 +98,18 @@ export async function POST(request: Request, ctx: RouteContext<"/api/proposal/[t
       if (result === "no-such-way") return Response.json({ ok: false, message: PAID_WAY_WRONG }, { status: 422 });
       const found = await publicProposal(token, today);
       return Response.json({ ok: true, ...found }, { headers: PRIVATE });
+    }
+    // A like on one of the systems offered (26 Nov 2026): only an option this proposal really offers.
+    if (read.body.action === "like") {
+      if (!allow(request, "proposal-like", 60)) return slowDown();
+      const like = cleanLike(read.body);
+      if (!like) return Response.json({ ok: false, message: "That can't be liked." }, { status: 422 });
+      const found = await publicProposal(token, today);
+      if (!found?.view) return notFound();
+      const options = found.view.options ?? [];
+      const likes = await setLike(token, like.option, like.liked, (o) => options.find((x) => x.goal === o)?.name ?? null);
+      if (!likes) return notFound();
+      return Response.json({ ok: true, likes }, { headers: PRIVATE });
     }
     if (read.body.action === "pay") {
       if (!allow(request, "proposal-pay", 20)) return slowDown();
