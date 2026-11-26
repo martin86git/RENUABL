@@ -24,8 +24,17 @@ import {
 import { SolNudges } from "./sol-nudges";
 import { WalkthroughRecorder } from "./walkthrough-recorder";
 import { PRESENTING_EVENT } from "@/lib/services/walkthrough";
-import { leftOffWords, nudgesFor, openedAs, SHADE_LOSS, type Nudge, type NudgeAction } from "@/lib/domain/design/sol-nudges";
-import { SideViewsButton } from "./side-views";
+import {
+  leftOffWords,
+  nudgesFor,
+  openedAs,
+  PRE_APPROVALS_HREF,
+  SHADE_LOSS,
+  type Nudge,
+  type NudgeAction,
+} from "@/lib/domain/design/sol-nudges";
+import { goUnderneath } from "./design-drawer";
+import { SideViewsButton, type SideDesign } from "./side-views";
 import { batteryFill } from "@/lib/domain/design/battery-fill";
 import {
   HAS_SOLAR_NOTE,
@@ -4162,6 +4171,8 @@ export function RoofDesigner(props: {
         ),
       ]
     : [];
+  // The design on Nearmap's angled photos (26 Nov 2026, Martin): every panel standing, at the roof's heights.
+  const sideDesign: SideDesign = { panels: standingPanels, terrain, lat: spot.lat };
   // The shade is worked out again a moment after the panels stop changing, not on every movement of a drag.
   const shadeKey =
     terrain && terrain !== "none" && standingPanels.length
@@ -5092,6 +5103,11 @@ export function RoofDesigner(props: {
       case "request-preapproval":
         // Filed in Pre-approvals on the deal; the card then says it is requested (19 Nov 2026, Martin).
         void dealNetwork.request(summary.kw).then((why) => why && console.warn(`Pre-approval request not raised: ${why}`));
+        return;
+      case "open-preapprovals":
+        // Shown underneath when the designer is the pop-up over a page, else gone to.
+        if (window.parent !== window) goUnderneath(PRE_APPROVALS_HREF);
+        else router.push(PRE_APPROVALS_HREF);
         return;
       case "ok":
         return aside();
@@ -7229,7 +7245,7 @@ export function RoofDesigner(props: {
           onRedo={redo}
           {...(costsHidden ? {} : { onCalc: () => setCalcOpen(true), calcOn: calcOpen })}
           msb={{ on: msb !== null, icon: <SwitchboardGlyph />, onClick: toggleMsb }}
-          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray /> } : {})}
+          {...(props.sidesReady && solHolds ? { sides: <SideViewsButton lat={spot.lat} lng={spot.lng} tray design={sideDesign} /> } : {})}
           {...(props.pictureMenu && solHolds ? { pictureMenu: props.pictureMenu } : {})}
           footRoom={solHolds ? 78 : 0}
         />
@@ -9731,9 +9747,9 @@ export function RoofDesigner(props: {
                     </button>
                     {props.sidesReady &&
                       (sideways ? (
-                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon />
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} icon design={sideDesign} />
                       ) : (
-                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab />
+                        <SideViewsButton lat={spot.lat} lng={spot.lng} tab design={sideDesign} />
                       ))}
                   </div>
                 </div>

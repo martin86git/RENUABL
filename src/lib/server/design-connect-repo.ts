@@ -34,6 +34,18 @@ export async function saveConnectAccount(businessId: string, account: string, by
   );
 }
 
+/**
+ * Puts a new account RENUABL runs in place of the standard one a business opened before (24 Nov 2026): the old account
+ * stays the business's at Stripe, and payments already made through it are kept.
+ */
+export async function replaceConnectAccount(businessId: string, account: string, by: string): Promise<void> {
+  await query(
+    `update design_connect set stripe_account = $2, charges_enabled = false, details_submitted = false, cards_on = true,
+            created_by = $3, updated_at = now() where business_id = $1`,
+    [businessId, account, by.toLowerCase()],
+  );
+}
+
 /** What Stripe says of an account (from the webhook, or read when the business comes back from Stripe's pages). */
 export async function updateConnect(account: string, facts: { chargesEnabled: boolean; detailsSubmitted: boolean }): Promise<void> {
   await query(`update design_connect set charges_enabled = $2, details_submitted = $3, updated_at = now() where stripe_account = $1`, [

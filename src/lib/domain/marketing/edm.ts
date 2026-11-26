@@ -33,6 +33,7 @@ export const EDM_BLOCK_KINDS = [
   "products",
   "countdown",
   "video",
+  "bar",
 ] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
@@ -48,6 +49,7 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   products: "Products",
   countdown: "Countdown",
   video: "Video",
+  bar: "Top bar",
 };
 
 export type EdmAlign = "left" | "center";
@@ -120,6 +122,24 @@ export interface EdmSocial {
 export const TILE_COLUMNS = [1, 2, 3] as const;
 export type TileColumns = (typeof TILE_COLUMNS)[number];
 
+/**
+ * A button's own look (26 Nov 2026, Martin: "i need the ability to: edit button shapes and sizes, button colors, button
+ * text"), on a Button block and on a Top bar's button. Each is left out of the block while it is the usual one, so an
+ * email made before reads as it did: a Button is a pill, a bar's button rounded, both medium, in the brand colour.
+ */
+export const BUTTON_SHAPES = ["pill", "rounded", "square"] as const;
+export type ButtonShape = (typeof BUTTON_SHAPES)[number];
+export const BUTTON_SHAPE_WORDS: Record<ButtonShape, string> = { pill: "Pill", rounded: "Rounded", square: "Square" };
+export const BUTTON_RADIUS: Record<ButtonShape, number> = { pill: 999, rounded: 10, square: 0 };
+export const BUTTON_SIZES = ["small", "medium", "large"] as const;
+export type ButtonSize = (typeof BUTTON_SIZES)[number];
+export const BUTTON_SIZE_WORDS: Record<ButtonSize, string> = { small: "Small", medium: "Medium", large: "Large" };
+/** Type size and padding (px) for each size: a Button block's, and the smaller ones of a bar's button. */
+const BUTTON_METRICS: Record<"button" | "bar", Record<ButtonSize, [font: number, padY: number, padX: number]>> = {
+  button: { small: [13, 9, 18], medium: [15, 12, 24], large: [17, 15, 32] },
+  bar: { small: [13, 8, 14], medium: [14, 10, 18], large: [15, 12, 22] },
+};
+
 export interface EdmBlock {
   id: string;
   kind: EdmBlockKind;
@@ -144,7 +164,27 @@ export interface EdmBlock {
   products?: EdmProduct[];
   /** A countdown's end, a wall-clock time in the market ("YYYY-MM-DDTHH:mm", countdown.ts); null until set. */
   endsAt?: string | null;
+  /**
+   * The panel colour behind the block (six hex digits), or left out for none (26 Nov 2026, Martin, from Xero's
+   * email: sections on coloured panels). Blocks in a row with the same colour make one panel; the words on it are
+   * drawn dark or light, whichever reads.
+   */
+  fill?: string;
+  /** A button's shape (a Button block or a bar's button); left out while it is the usual one for its kind. */
+  shape?: ButtonShape;
+  /** A button's size; left out while medium. */
+  size?: ButtonSize;
+  /** A button's own colour (six hex digits); left out for the brand colour. Its words are white or near-black, whichever reads. */
+  colour?: string;
+  /** A Button block as wide as the email's column. */
+  wide?: boolean;
+  /** A top bar's button words (its `text` is the line beside the button, its `url` where the button goes). */
+  label?: string;
 }
+
+/** What a new top bar says, and its button (26 Nov 2026, Martin: Xero's "Ready to choose a plan? Buy now"). */
+export const BAR_LINE = "Ready to get started?";
+export const BAR_BUTTON = "Start now";
 
 export interface EdmContent {
   subject: string;
@@ -389,7 +429,9 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
           ? EDM_LIMITS.alt
           : kind === "countdown" || kind === "video"
             ? EDM_LIMITS.caption
-            : EDM_LIMITS.text;
+            : kind === "bar"
+              ? EDM_LIMITS.heading
+              : EDM_LIMITS.text;
   return {
     id: blockId(r.id, i),
     kind,
@@ -399,7 +441,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
         : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products"
           ? ""
           : line(r.text, max),
-    url: kind === "button" || kind === "image" ? cleanLink(r.url) : kind === "video" ? webLink(r.url) : null,
+    url: kind === "button" || kind === "image" || kind === "bar" ? cleanLink(r.url) : kind === "video" ? webLink(r.url) : null,
     imageId: kind === "image" || kind === "video" ? imageIdOf(r.imageId) : null,
     align: r.align === "center" ? "center" : "left",
     ...(kind === "tiles" ? { tiles: cleanTiles(r.tiles), columns: cleanColumns(r.columns) } : {}),
@@ -407,7 +449,68 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
     ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
     ...(kind === "countdown" ? { endsAt: cleanEndsAt(r.endsAt) } : {}),
+    ...(kind === "bar" ? { label: line(r.label, EDM_LIMITS.label) } : {}),
+    ...(kind === "button" || kind === "bar" ? buttonFields(r, kind) : {}),
+    ...(cleanColour(r.fill, "") ? { fill: cleanColour(r.fill, "") } : {}),
   };
+}
+
+type ButtonBlock = Pick<EdmBlock, "kind" | "shape" | "size" | "colour" | "wide">;
+
+/** The shape a button has: its own, else a pill for a Button block and rounded for a bar's button. */
+export const buttonShapeOf = (b: ButtonBlock): ButtonShape => b.shape ?? (b.kind === "bar" ? "rounded" : "pill");
+export const buttonSizeOf = (b: ButtonBlock): ButtonSize => b.size ?? "medium";
+
+/** A button's look fields as kept: only real choices, and none that is the usual one for its kind. */
+function buttonFields(r: Record<string, unknown>, kind: "button" | "bar"): Partial<EdmBlock> {
+  const shape = (BUTTON_SHAPES as readonly unknown[]).includes(r.shape) ? (r.shape as ButtonShape) : null;
+  const size = r.size === "small" || r.size === "large" ? r.size : null;
+  const colour = cleanColour(r.colour, "");
+  return {
+    ...(shape && shape !== buttonShapeOf({ kind }) ? { shape } : {}),
+    ...(size ? { size } : {}),
+    ...(colour ? { colour } : {}),
+    ...(kind === "button" && r.wide === true ? { wide: true } : {}),
+  };
+}
+
+export interface ButtonLook {
+  radius: number;
+  fontSize: number;
+  padY: number;
+  padX: number;
+  background: string;
+  /** The words on it: white, or near-black on a colour too light for white to read. */
+  ink: string;
+  wide: boolean;
+}
+
+/** How a button is drawn, in the email and in the builder alike. */
+export function buttonLook(b: ButtonBlock, brandColour: string): ButtonLook {
+  const [fontSize, padY, padX] = BUTTON_METRICS[b.kind === "bar" ? "bar" : "button"][buttonSizeOf(b)];
+  const background = b.colour ?? brandColour;
+  return {
+    radius: BUTTON_RADIUS[buttonShapeOf(b)],
+    fontSize,
+    padY,
+    padX,
+    background,
+    ink: contrastRatio("#ffffff", background) < 2 ? HEADING_INK : "#ffffff",
+    wide: b.kind === "button" && b.wide === true,
+  };
+}
+
+/** A button's inline style in the email. */
+function buttonCss(b: ButtonBlock, brandColour: string): string {
+  const l = buttonLook(b, brandColour);
+  return `display:${l.wide ? "block;text-align:center" : "inline-block"};background:${l.background};color:${l.ink};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:${l.fontSize}px;font-weight:600;text-decoration:none;padding:${l.padY}px ${l.padX}px;border-radius:${l.radius}px`;
+}
+
+/** The words' colours on a panel: the email's own text colour when it reads there, else near-black or white. */
+export function inksOn(fill: string, style: EdmStyle): { heading: string; words: string } {
+  if (style.text && contrastRatio(style.text, fill) >= 4.5) return { heading: style.text, words: style.text };
+  const dark = contrastRatio(HEADING_INK, fill) >= contrastRatio("#ffffff", fill);
+  return dark ? { heading: HEADING_INK, words: WORDS_INK } : { heading: "#ffffff", words: "#f4f4f5" };
 }
 
 export function cleanBlocks(raw: unknown): EdmBlock[] {
@@ -494,6 +597,8 @@ export function contentProblem(c: EdmContent): string | null {
   if (!c.blocks.some((b) => (b.kind === "heading" || b.kind === "text") && b.text)) return "Add a heading or some words.";
   const button = c.blocks.find((b) => b.kind === "button" && (!b.text || !b.url));
   if (button) return "Every button needs a label and a link (https).";
+  if (c.blocks.some((b) => b.kind === "bar" && (!b.text || !b.label || !b.url)))
+    return "A top bar needs its line, its button's words and a link (https).";
   const picture = c.blocks.find((b) => b.kind === "image" && !b.imageId);
   if (picture) return "A picture block has no picture. Add one or take the block out.";
   const video = c.blocks.find((b) => b.kind === "video" && (!b.url || !videoStillKey(b.imageId, b.url)));
@@ -514,7 +619,7 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
         ? filledSocials(b).map((s) => s.url!)
         : b.kind === "products"
           ? filledProducts(b).flatMap((p) => (p.url ? [p.url] : []))
-          : (b.kind === "button" || b.kind === "image" || b.kind === "video") && b.url
+          : (b.kind === "button" || b.kind === "image" || b.kind === "video" || b.kind === "bar") && b.url
             ? [b.url]
             : [],
   );
@@ -538,7 +643,9 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
           ? "Find out more"
           : kind === "countdown"
             ? COUNTDOWN_LINE
-            : "";
+            : kind === "bar"
+              ? BAR_LINE
+              : "";
   return {
     id: newBlockId(rand),
     kind,
@@ -551,6 +658,7 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
     ...(kind === "products" ? { products: [EMPTY_PRODUCT, EMPTY_PRODUCT], columns: 2 as const } : {}),
     ...(kind === "countdown" ? { endsAt: null } : {}),
+    ...(kind === "bar" ? { label: BAR_BUTTON } : {}),
   };
 }
 
@@ -684,6 +792,8 @@ function renderLetter(content: EdmContent, brand: EdmBrand, sender: EdmSender, f
           .join(""),
       );
     else if (b.kind === "button" && b.text && b.url) parts.push(p(a(next(), esc(merge(b.text, fields)))));
+    else if (b.kind === "bar" && b.url)
+      parts.push(p(`${esc(merge(b.text, fields))} ${a(next(), esc(merge(b.label ?? "", fields) || BAR_BUTTON))}`));
     else if (b.kind === "image" && b.imageId) {
       const pic = img(links.image(b.imageId), merge(b.text, fields));
       parts.push(`<div style="margin:0 0 14px">${b.url ? a(next(), pic) : pic}</div>`);
@@ -741,13 +851,34 @@ function renderLetter(content: EdmContent, brand: EdmBrand, sender: EdmSender, f
 function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender, fields: MergeFields, links: RenderLinks): RenderedEdm {
   const colour = cleanColour(brand.colour);
   const style = styleOf(content);
-  const ink = inksOf(style);
+  const baseInk = inksOf(style);
+  let ink = baseInk;
   const linkList = edmLinks(content.blocks);
   let linkAt = 0;
   const rows: string[] = [];
   const textParts: string[] = [];
+  // Where each block's rows start and its panel colour, so blocks in a row of one colour become one panel.
+  const marks: { at: number; fill: string | null; bar: boolean }[] = [];
   for (const b of content.blocks) {
+    marks.push({ at: rows.length, fill: b.kind === "bar" ? null : (b.fill ?? null), bar: b.kind === "bar" });
+    ink = b.fill && b.kind !== "bar" ? inksOn(b.fill, style) : baseInk;
     const align = b.align === "center" ? "center" : "left";
+    if (b.kind === "bar") {
+      // A strip with its line beside a button, at the top of the email above the logo when it comes first.
+      if (!b.text || !b.url) continue;
+      const href = links.click(linkAt, linkList[linkAt]);
+      linkAt++;
+      const ground = b.fill ?? (contrastRatio("#000000", style.background) > 10 ? "#f4f4f5" : "#26282c");
+      const on = inksOn(ground, style);
+      const words = merge(b.text, fields);
+      const label = merge(b.label ?? "", fields) || BAR_BUTTON;
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      rows.push(
+        `<tr><td style="padding:8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${ground};border-radius:12px"><tr><td style="padding:14px 18px;${font};font-size:15px;line-height:1.35;color:${on.heading}">${esc(words)}</td><td align="right" style="padding:10px 14px 10px 0;white-space:nowrap"><a href="${esc(href)}" target="_blank" style="${buttonCss(b, colour)}">${esc(label)}</a></td></tr></table></td></tr>`,
+      );
+      textParts.push(`${words} ${label}: ${href}`);
+      continue;
+    }
     if (b.kind === "heading" && b.text) {
       const t = merge(b.text, fields);
       rows.push(
@@ -863,7 +994,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       linkAt++;
       const label = merge(b.text, fields);
       rows.push(
-        `<tr><td style="padding:16px 32px;text-align:${align}"><a href="${esc(href)}" target="_blank" style="display:inline-block;background:${colour};color:#ffffff;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:999px">${esc(label)}</a></td></tr>`,
+        `<tr><td style="padding:16px 32px;text-align:${align}"><a href="${esc(href)}" target="_blank" style="${buttonCss(b, colour)}">${esc(label)}</a></td></tr>`,
       );
       textParts.push(`${label}: ${href}`);
     } else if (b.kind === "divider") {
@@ -930,16 +1061,35 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       rows.push(`<tr><td style="padding:12px 28px 4px;text-align:${align}">${pills.join("")}</td></tr>`);
     }
   }
+  // Blocks in a row with one panel colour are drawn on one rounded panel; top bars that lead the email go above the logo.
+  const blockRows = marks.map((m, i) => ({ ...m, rows: rows.slice(m.at, marks[i + 1]?.at ?? rows.length) }));
+  let lead = 0;
+  while (lead < blockRows.length && blockRows[lead].bar) lead++;
+  const above = blockRows.slice(0, lead).flatMap((m) => m.rows);
+  const body: string[] = [];
+  for (let i = lead; i < blockRows.length;) {
+    const fill = blockRows[i].fill;
+    let j = i;
+    while (j < blockRows.length && blockRows[j].fill === fill) j++;
+    const inner = blockRows.slice(i, j).flatMap((m) => m.rows);
+    if (fill && inner.length)
+      body.push(
+        `<tr><td style="padding:10px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${fill};border-radius:16px"><tr><td style="height:16px;line-height:16px;font-size:1px">&nbsp;</td></tr>${inner.join("")}<tr><td style="height:16px;line-height:16px;font-size:1px">&nbsp;</td></tr></table></td></tr>`,
+      );
+    else body.push(...inner);
+    i = j;
+  }
+  const ink0 = baseInk;
   const foot = footerLines(brand, sender);
   const footHtml = `${foot.map((l) => esc(l)).join("<br>")}<br><a href="${esc(links.unsubscribe)}" style="color:#7b7d84;text-decoration:underline">Unsubscribe</a> from these emails.`;
   const preview = content.preview ? merge(content.preview, fields) : "";
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(merge(content.subject, fields))}</title></head><body style="margin:0;padding:0;background:#f4f4f5">${
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
-  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px"><tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink.heading}">${
+  }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px">${above.length ? `<tr><td style="height:8px;line-height:8px;font-size:1px">&nbsp;</td></tr>${above.join("")}` : ""}<tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink0.heading}">${
     brand.logoId
       ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
       : headerCell(sender)
-  }</td></tr>${rows.join(
+  }</td></tr>${body.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
     links.pixel ? `<img src="${esc(links.pixel)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""

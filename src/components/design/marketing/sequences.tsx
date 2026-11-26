@@ -35,7 +35,9 @@ import {
 import { ReportStrip } from "./campaigns";
 import { EdmBuilder, field } from "./edm-builder";
 
-const box = "rounded-2xl bg-surface p-5 shadow-[var(--shadow-soft)]";
+/** A card, and one with no padding of its own (its rows pad themselves): "p-0" over `box` didn't win, so each step row stood twice its height. */
+const card = "rounded-2xl bg-surface shadow-[var(--shadow-soft)]";
+const box = `${card} p-5`;
 const n = (v: number) => v.toLocaleString("en-AU");
 
 function OnBadge({ on }: { on: boolean }) {
@@ -77,7 +79,7 @@ export function SequencesPage() {
         </Button>
       </div>
       {problem && <p className="mt-4 text-[13px] text-danger">{problem}</p>}
-      <div className={cn(box, "mt-5 p-0")}>
+      <div className={cn(card, "mt-5")}>
         {!list ? (
           <p className="flex items-center gap-2 px-5 py-6 text-[13px] text-muted">
             <Loader2 className="size-4 animate-spin" /> Loading
@@ -236,9 +238,9 @@ export function SequenceEditor({ id }: { id: string }) {
             ["Stopped early", seq.stopped],
           ] as const
         ).map(([label, v]) => (
-          <div key={label} className={box}>
+          <div key={label} className={cn(card, "px-4 py-3")}>
             <p className="text-[12px] text-muted">{label}</p>
-            <p className="mt-1 font-mono text-[22px] tabular-nums">{n(v)}</p>
+            <p className="mt-0.5 font-mono text-[20px] tabular-nums">{n(v)}</p>
           </div>
         ))}
       </div>
@@ -267,29 +269,27 @@ export function SequenceEditor({ id }: { id: string }) {
         <h2 className="text-[15px] font-semibold">Then</h2>
         {draft.steps.map((s, i) => {
           if (s.kind === "email") emailNo++;
-          const label = s.kind === "email" ? `Email ${emailNo}` : `Wait ${s.days} working day${s.days === 1 ? "" : "s"}`;
           return (
-            <div key={s.id} className={cn(box, "p-0")}>
+            <div key={s.id} className={card}>
               <div className="flex items-center gap-3 px-5 py-3">
-                {s.kind === "email" ? <Mail className="size-4 text-sun-line" /> : <Clock className="size-4 text-muted" />}
-                <button className="min-w-0 flex-1 text-left" onClick={() => s.kind === "email" && setOpen(open === s.id ? null : s.id)}>
-                  <span className="text-[14px] font-medium">{label}</span>
-                  {s.kind === "email" && (
-                    <span className="ml-2 truncate text-[13px] text-muted">{s.content.subject || "No subject yet"}</span>
-                  )}
-                </button>
-                {s.kind === "wait" && (
-                  <input
-                    type="number"
-                    min={1}
-                    max={SEQUENCE_LIMITS.waitDays}
-                    value={s.days}
-                    onChange={(e) =>
-                      setStep(i, { ...s, days: Math.max(1, Math.min(SEQUENCE_LIMITS.waitDays, Number(e.target.value) || 1)) })
-                    }
-                    aria-label="Working days to wait"
-                    className={cn(field, "h-8 w-20")}
-                  />
+                {s.kind === "email" ? <Mail className="size-4 shrink-0 text-sun-line" /> : <Clock className="size-4 shrink-0 text-muted" />}
+                {s.kind === "email" ? (
+                  <button
+                    className="flex min-w-0 flex-1 items-baseline gap-2 text-left"
+                    aria-expanded={open === s.id}
+                    onClick={() => setOpen(open === s.id ? null : s.id)}
+                  >
+                    <span className="shrink-0 text-[14px] font-medium">Email {emailNo}</span>
+                    <span className="min-w-0 truncate text-[13px] text-muted">{s.content.subject || "No subject yet"}</span>
+                    <span className="ml-auto shrink-0 text-[12px] text-ink-2">{open === s.id ? "Close" : "Edit"}</span>
+                  </button>
+                ) : (
+                  // One line, "Wait [2] working days" (26 Nov 2026, Martin: the box took the row and crushed the words).
+                  <label className="flex min-w-0 flex-1 items-center gap-2 text-[14px] font-medium">
+                    Wait
+                    <WaitDays days={s.days} onChange={(days) => setStep(i, { ...s, days })} />
+                    working day{s.days === 1 ? "" : "s"}
+                  </label>
                 )}
                 <button
                   aria-label="Move up"
@@ -309,7 +309,12 @@ export function SequenceEditor({ id }: { id: string }) {
                 </button>
                 <button
                   aria-label="Remove step"
-                  onClick={() => update({ steps: draft.steps.filter((_, j) => j !== i) })}
+                  onClick={() => {
+                    // An email's words go with it: asked first.
+                    if (s.kind === "email" && !confirm(`Remove Email ${emailNo} and its words?`)) return;
+                    if (open === s.id) setOpen(null);
+                    update({ steps: draft.steps.filter((_, j) => j !== i) });
+                  }}
                   className="grid size-8 place-items-center rounded-full hover:bg-canvas"
                 >
                   <Trash2 className="size-4" />
@@ -371,6 +376,37 @@ export function SequenceEditor({ id }: { id: string }) {
   );
 }
 
+/** The days of a wait: typed freely (clearing it doesn't snap back to 1), kept within 1 to the limit. */
+function WaitDays({ days, onChange }: { days: number; onChange: (days: number) => void }) {
+  const [text, setText] = useState(String(days));
+  const [was, setWas] = useState(days);
+  if (days !== was) {
+    setWas(days);
+    setText(String(days));
+  }
+  const fit = (v: string) => Math.max(1, Math.min(SEQUENCE_LIMITS.waitDays, Math.round(Number(v)) || 1));
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={SEQUENCE_LIMITS.waitDays}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        if (e.target.value.trim() && Number(e.target.value) >= 1) onChange(fit(e.target.value));
+      }}
+      onBlur={() => {
+        const v = fit(text);
+        setText(String(v));
+        if (v !== days) onChange(v);
+      }}
+      aria-label="Working days to wait"
+      className="h-8 w-16 shrink-0 rounded-lg border border-line bg-surface px-2 text-center text-[14px] tabular-nums text-ink outline-none focus:border-ink/40"
+    />
+  );
+}
+
 function TriggerPicker({
   trigger,
   lists,
@@ -385,6 +421,15 @@ function TriggerPicker({
   onChange: (t: SequenceTrigger | null) => void;
 }) {
   const kind = trigger?.kind ?? "list";
+  // Why a kind of trigger can't be picked yet, said in place rather than the choice quietly undoing itself.
+  const blocked = (k: SequenceTrigger["kind"]) =>
+    k === "list" ? (lists.length ? null : "make a list first") : campaigns.length ? null : "send a campaign first";
+  const missing =
+    trigger?.kind === "list"
+      ? !lists.some((l) => l.id === trigger.listId)
+      : trigger
+        ? !campaigns.some((c) => c.id === trigger.campaignId)
+        : false;
   return (
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       <select
@@ -407,8 +452,9 @@ function TriggerPicker({
       >
         <option value="">Choose what starts it…</option>
         {(Object.keys(TRIGGER_WORDS) as SequenceTrigger["kind"][]).map((k) => (
-          <option key={k} value={k}>
+          <option key={k} value={k} disabled={Boolean(blocked(k))}>
             {TRIGGER_WORDS[k]}
+            {blocked(k) ? ` (${blocked(k)})` : ""}
           </option>
         ))}
       </select>
@@ -419,6 +465,7 @@ function TriggerPicker({
           onChange={(e) => onChange({ kind: "list", listId: e.target.value })}
           className={field}
         >
+          {missing && <option value={trigger.listId}>Choose a list…</option>}
           {lists.map((l) => (
             <option key={l.id} value={l.id}>
               {l.name}
@@ -433,12 +480,20 @@ function TriggerPicker({
           onChange={(e) => onChange({ kind: trigger.kind, campaignId: e.target.value })}
           className={field}
         >
+          {missing && <option value={trigger.campaignId}>Choose a campaign…</option>}
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
           ))}
         </select>
+      )}
+      {missing && (
+        <p className="text-[12px] text-danger sm:col-span-2">
+          {trigger?.kind === "list"
+            ? "The list it started from is gone. Choose another."
+            : "The campaign it started from isn't a sent campaign. Choose one that has been sent."}
+        </p>
       )}
       <p className="text-[12px] text-muted sm:col-span-2">
         Only people the trigger catches after the sequence is switched on are let in, each once. A list needs at least one list; opens and

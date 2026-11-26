@@ -18,6 +18,9 @@ import { NO_DESIGN, savedFor } from "./design-proposal-repo";
 import { linkedBusiness } from "./design-job-shares-repo";
 import { BUSINESS_LINK } from "@/lib/domain/design/job-shares";
 import { INSTALLED_STAGES } from "@/lib/domain/design/crm";
+import { customerDatasheets, designProducts, productForId, type ProposalDatasheet } from "@/lib/domain/design/proposal-datasheets";
+import { codeKey } from "@/lib/domain/design/datasheets";
+import { sheetFileByKey, sheetsOnHand } from "./design-datasheets-repo";
 
 const moment = (column: string) => `to_char(${column} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')`;
 
@@ -46,12 +49,17 @@ export interface JobCardView {
    */
   designed: Designed | null;
   asBuilt: AsBuilt | null;
+  /**
+   * The maker's datasheet of each product on the design the installer builds, those with a file on hand (26 Nov 2026,
+   * Martin). Each opened by its id through the card's own address. Optional: older callers have none.
+   */
+  datasheets?: ProposalDatasheet[];
   /** For the business's own people: the installers on file, and when the card last went to each. */
   installers?: (Installer & { sentAt: string | null })[];
 }
 
 /** The design the installer builds: the system the customer chose when they signed, else the roof's primary design. */
-async function chosenDesign(businessId: string, jobId: string, designs: RoofDesign[], primary: number): Promise<RoofDesign> {
+export async function chosenDesign(businessId: string, jobId: string, designs: RoofDesign[], primary: number): Promise<RoofDesign> {
   const rows = await query<{ option: string | null }>(
     `select v.accepted_option as option from design_proposals p
        join design_proposal_versions v on v.business_id = p.business_id and v.proposal_id = p.id
@@ -93,7 +101,8 @@ export async function jobCard(
         from: "design",
       }
     : plannedFromDetails(job.details ?? {});
-  const [notes, prefs, links, built] = await Promise.all([
+  const products = design ? designProducts(design) : [];
+  const [notes, prefs, links, built, onHand] = await Promise.all([
     jobNotes(member.businessId, jobId),
     loadPrefs(member.businessId),
     forInstaller
@@ -103,6 +112,7 @@ export async function jobCard(
           [member.businessId, jobId],
         ),
     asBuiltOf(member.businessId, jobId),
+    sheetsOnHand(member.businessId, products).catch(() => new Map<string, { unchecked: boolean }>()),
   ]);
   return {
     business: saved === NO_DESIGN ? member.businessName : saved.brand.name || member.businessName,
@@ -131,10 +141,23 @@ export async function jobCard(
     notes,
     designed,
     asBuilt: built,
+    datasheets: customerDatasheets(products, (p) => onHand.has(`${p.kind}:${codeKey(p.sku)}`)),
     ...(forInstaller
       ? {}
       : { installers: prefs.installers.map((i) => ({ ...i, sentAt: links.find((l) => l.installer === i.id)?.sentAt ?? null })) }),
   };
+}
+
+/**
+ * One product's datasheet from a job card: only a product on the design the installer builds, by the id the card was
+ * sent. Null for anything else.
+ */
+export async function jobDatasheet(member: { businessId: string; businessName: string }, jobId: string, id: string) {
+  const saved = await savedFor(member.businessId, member.businessName, jobId);
+  if (!saved || saved === NO_DESIGN) return null;
+  const design = await chosenDesign(member.businessId, jobId, saved.project.set.designs, saved.project.set.primary);
+  const product = design ? productForId(designProducts(design), id) : null;
+  return product ? sheetFileByKey(member.businessId, product.kind, product.sku) : null;
 }
 
 /** What was really installed on a job, or null until it is recorded. */

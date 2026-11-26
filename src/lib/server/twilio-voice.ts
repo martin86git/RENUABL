@@ -9,7 +9,7 @@
  * records nothing.
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { TOKEN_SECONDS, cleanSentences, type Sentence } from "@/lib/domain/browser-call";
+import { TOKEN_SECONDS, cleanSentences, liveTranscriptionParams, type Sentence } from "@/lib/domain/browser-call";
 import { siteUrl } from "@/lib/domain/sms";
 
 export interface BrowserCallSettings {
@@ -177,4 +177,36 @@ export async function transcriptSentences(s: BrowserCallSettings, transcriptSid:
   });
   const json = (await res.json().catch(() => ({}))) as { sentences?: unknown };
   return res.ok ? cleanSentences(json.sentences) : null;
+}
+
+/**
+ * Starts Twilio's real-time transcription of both sides of a call under way (the note-taker on a computer call); its
+ * id, or why not in words for the server's log. Each stretch is posted to `callbackUrl`. VERIFY on a first real call.
+ */
+export async function startLiveTranscription(
+  s: BrowserCallSettings,
+  callSid: string,
+  callbackUrl: string,
+): Promise<{ sid: string } | { problem: string }> {
+  if (!/^CA[0-9a-f]{32}$/.test(callSid)) return { problem: "no call sid" };
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${s.accountSid}/Calls/${callSid}/Transcriptions.json`, {
+    method: "POST",
+    headers: { authorization: auth(s), "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(liveTranscriptionParams(callbackUrl)),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const json = (await res.json().catch(() => ({}))) as { sid?: unknown; message?: unknown };
+  if (!res.ok || typeof json.sid !== "string") return { problem: `Twilio ${res.status}: ${String(json.message ?? "").slice(0, 200)}` };
+  return { sid: json.sid };
+}
+
+/** Stops it (the note-taker paused or closed). Quietly: a call that has ended has stopped its transcription already. */
+export async function stopLiveTranscription(s: BrowserCallSettings, callSid: string, sid: string): Promise<void> {
+  if (!/^CA[0-9a-f]{32}$/.test(callSid) || !/^GT[0-9a-f]{32}$/.test(sid)) return;
+  await fetch(`https://api.twilio.com/2010-04-01/Accounts/${s.accountSid}/Calls/${callSid}/Transcriptions/${sid}.json`, {
+    method: "POST",
+    headers: { authorization: auth(s), "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ Status: "stopped" }),
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
 }

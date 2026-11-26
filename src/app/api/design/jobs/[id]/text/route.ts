@@ -5,6 +5,8 @@ import { TEXT_WORDS, cleanText, textRecord } from "@/lib/domain/design/contact-r
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
 import { addActivity, jobById } from "@/lib/server/design-crm-repo";
 import { TEXTS_COPY, signedText, textSignOff } from "@/lib/domain/design/texts";
+import { cleanCallerKey } from "@/lib/domain/install-call";
+import { callerOf } from "@/lib/server/design-caller-repo";
 import { memberTextsOnDeal } from "@/lib/server/design-deal-team-repo";
 import { keepText, textFrom, textsOnDeal, textsOnFor, textsStopped } from "@/lib/server/design-texts";
 import { allow } from "@/lib/server/rate-limit";
@@ -15,10 +17,23 @@ const validId = (id: string) => /^job_[a-f0-9]{8,64}$/.test(id);
 const PRIVATE = { "cache-control": "private, no-store" };
 
 /**
+ * Who a text is signed by (26 Nov 2026, Martin: from the voice agent's call window, sign off as the agent or as me): the
+ * member, or one of the business's voice agents by its key once it has been set up. Its name is read here, never taken
+ * from the browser.
+ */
+async function signOffFor(member: { businessId: string; firstName?: string | null; businessName?: string | null }, as: unknown) {
+  if (typeof as === "string" && as && as !== "me") {
+    const agent = await callerOf(member.businessId, cleanCallerKey(as));
+    if (agent.named) return textSignOff(agent.name, member.businessName);
+  }
+  return textSignOff(member.firstName, member.businessName);
+}
+
+/**
  * GET → the texts with this deal's customer, both ways, oldest first; whether they replied STOP; and the sign-off this
  * member's texts end with. For a member who may see the deal.
  */
-export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs/[id]/text">) {
+export async function GET(request: Request, ctx: RouteContext<"/api/design/jobs/[id]/text">) {
   return answer(async () => {
     const { id } = await ctx.params;
     const who = await requireMember("design");
@@ -29,7 +44,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/design/jobs
       textsOnDeal(who.member.businessId, id),
       textsStopped(who.member.businessId, found.customer.id),
     ]);
-    const signOff = textSignOff(who.member.firstName, who.member.businessName);
+    const signOff = await signOffFor(who.member, new URL(request.url).searchParams.get("as"));
     return Response.json({ ok: true, lines, stopped, signOff }, { headers: PRIVATE });
   });
 }
@@ -60,7 +75,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
     const name = found.customer.firstName || found.customer.name;
     if (await textsStopped(who.member.businessId, found.customer.id))
       return Response.json({ ok: false, message: TEXTS_COPY.stopped(name) }, { status: 409 });
-    const words = signedText(clean.text, textSignOff(who.member.firstName, who.member.businessName));
+    const words = signedText(clean.text, await signOffFor(who.member, read.body.as));
     if ((await sendSms(mobile, words, await textFrom(who.member.businessId))) !== "sent")
       return Response.json({ ok: false, message: TEXT_WORDS.failed }, { status: 502 });
     await keepText(who.member.businessId, {

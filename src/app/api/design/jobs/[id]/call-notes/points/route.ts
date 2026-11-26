@@ -1,4 +1,12 @@
-import { CALL_POINTS_SCHEMA, callPointsPrompt, cleanPoints, cleanPointsInput, transcriptOf, wordsIn } from "@/lib/domain/design/call-notes";
+import {
+  CALL_POINTS_SCHEMA,
+  bothSides,
+  callPointsPrompt,
+  cleanPoints,
+  cleanPointsInput,
+  transcriptOf,
+  wordsIn,
+} from "@/lib/domain/design/call-notes";
 import { parseApiKey, redactSecrets } from "@/lib/server/bill-reader";
 import { readWithClaude } from "@/lib/server/claude-reader";
 import { answer, readBody, requireMember, viewerOf } from "@/lib/server/design-context";
@@ -43,7 +51,13 @@ export async function POST(request: Request, ctx: RouteContext<"/api/design/jobs
       const raw = await readWithClaude<unknown>(
         [],
         CALL_POINTS_SCHEMA,
-        callPointsPrompt(who.member.businessName, found.customer.name, transcriptOf(lines), previous),
+        callPointsPrompt(
+          who.member.businessName,
+          found.customer.name,
+          transcriptOf(lines, found.customer.name),
+          previous,
+          bothSides(lines),
+        ),
         apiKey,
         { model: modelFor("quick") },
       );

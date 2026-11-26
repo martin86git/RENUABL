@@ -49,7 +49,9 @@ export async function POST(request: Request) {
       heading: text(d.heading, EDM_LIMITS.heading),
       text: text(d.text, EDM_LIMITS.text),
     };
-    const note = part === "all" ? "" : text(b.note, EDM_SOL_LIMITS.note);
+    // For the whole email, the member's direction on what to change (26 Nov 2026, Martin: "provide sol feedback in a
+    // text box to give direction"); for one part, what to change about it.
+    const note = text(b.note, part === "all" ? EDM_SOL_LIMITS.direction : EDM_SOL_LIMITS.note);
     const choice = isLinePart(part) && b.options === true ? part : null;
     const avoid =
       choice && Array.isArray(b.avoid)
@@ -58,7 +60,7 @@ export async function POST(request: Request) {
             .filter(Boolean)
             .slice(0, EDM_SOL_LIMITS.avoid)
         : [];
-    if (part === "all" && !brief) return refuse("Tell Sol what the email is about.");
+    if (part === "all" && !brief && !note) return refuse("Tell Sol what the email is about.");
     if (!brief && !note && !Object.values(draft).some((v) => v && v !== "Hi {firstName},"))
       return refuse("Write a line about what the email is for, or some of the email first.");
     const business = (await senderFor(member.businessId)).name || member.businessName;
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
       (ai) =>
         readWithClaude<unknown>([], sections ? sectionsSchema() : choice ? edmSolOptionsSchema() : edmSolSchema(part), prompt, apiKey, ai),
       tier,
-      part === "all" ? "marketing email written" : `marketing ${part} written`,
+      part === "all" ? (note ? "marketing email changed" : "marketing email written") : `marketing ${part} written`,
     ).catch((e) => {
       console.error("marketing sol failed", redactSecrets(e instanceof Error ? e.message : String(e)));
       return null;

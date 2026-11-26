@@ -308,7 +308,7 @@ export function dealFromPylon(rawProject: unknown, rawDesign: unknown, stage: Py
 /** What became of one project brought in. */
 export type PylonOutcome =
   | { id: string; result: "in"; jobId: string; customer: string; pdf: boolean }
-  | { id: string; result: "already" }
+  | { id: string; result: "already"; pdf?: boolean }
   | { id: string; result: "failed"; why: string };
 
 /** What a run has done so far, in words: "142 of 180 sold jobs in · 3 already here". */

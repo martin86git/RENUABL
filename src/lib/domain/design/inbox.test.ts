@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  linkStart,
+  putLink,
   GMAIL_READONLY_SCOPE,
   GMAIL_SCOPE,
   afterAction,
@@ -289,5 +291,26 @@ describe("framedEmail", () => {
   it("puts it first in an email's own head, so its styles still win", () => {
     const out = framedEmail("<html><head><style>p{color:red}</style></head><body><p>x</p></body></html>");
     expect(out.indexOf("font-family:Inter")).toBeLessThan(out.indexOf("p{color:red}"));
+  });
+});
+
+describe("turning a written address into a link", () => {
+  const text = "You can open your proposal here:\nhttps://www.example.com.au/p/abc123\n\nKind regards";
+  const at = text.indexOf("https://");
+  const end = at + "https://www.example.com.au/p/abc123".length;
+  it("starts the link box from what is picked", () => {
+    // The address picked: it is the link's address, the words are still to type.
+    expect(linkStart(text, at, end)).toEqual({ start: at, end, words: "", url: "https://www.example.com.au/p/abc123" });
+    // Only the caret inside it: the whole address is taken.
+    expect(linkStart(text, at + 5, at + 5)).toEqual({ start: at, end, words: "", url: "https://www.example.com.au/p/abc123" });
+    // Words picked: they are the words, the address is still to type.
+    expect(linkStart(text, 8, 26)).toEqual({ start: 8, end: 26, words: "open your proposal", url: "" });
+    expect(linkStart(text, 3, 3)).toEqual({ start: 3, end: 3, words: "", url: "" });
+  });
+  it("puts the link in place of the address, and refuses what isn't one", () => {
+    const done = putLink(text, at, end, "Open your proposal", "https://www.example.com.au/p/abc123");
+    expect(done?.text).toBe("You can open your proposal here:\n[Open your proposal](https://www.example.com.au/p/abc123)\n\nKind regards");
+    expect(putLink(text, at, end, "", "www.example.com.au")?.text).toContain("[https://www.example.com.au/](https://www.example.com.au/)");
+    expect(putLink(text, at, end, "x", "javascript:alert(1)")).toBeNull();
   });
 });

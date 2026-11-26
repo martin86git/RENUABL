@@ -16,6 +16,7 @@ import {
   batteryOfVariant,
   invertersFor,
   isConfigKey,
+  mixWords,
   mixMarks,
   mixMarksWords,
   type MixMarks,
@@ -43,6 +44,8 @@ import { proposalUrls, tellOpened } from "@/lib/services/proposals";
 import { BatteryIcon, ChargerIcon, InverterIcon, PanelIcon } from "./deal-banner";
 import { Roof } from "./proposal-view";
 import { ShadeSummary } from "./shade-summary";
+import { ProposalDatasheets } from "./proposal-datasheets";
+import { sheetsInMix, type ProposalDatasheet } from "@/lib/domain/design/proposal-datasheets";
 
 const dollars = (n: number) => `$${Math.round(n).toLocaleString("en-AU")}`;
 const cents = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
@@ -70,6 +73,8 @@ export function ConfiguratorPage(props: {
   /** The mix and week to open on (coming back from the order page). */
   mix?: string | null;
   week?: string | null;
+  /** The maker's datasheet of each product the proposal quotes, those on hand (26 Nov 2026). */
+  datasheets?: ProposalDatasheet[];
 }) {
   const { token, view } = props;
   const cfg = useMemo(() => readConfigurator(view.configurator!), [view.configurator]);
@@ -543,6 +548,17 @@ export function ConfiguratorPage(props: {
               {STC_NOTE} {shown.bill?.saving ? SAVING_NOTE : ""}
             </p>
           </Step>
+
+          {(props.datasheets?.length ?? 0) > 0 && (
+            <ProposalDatasheets
+              sheets={sheetsInMix(props.datasheets ?? [], {
+                words: [...shown.system.details.map((d) => d.value), mixWords(cfg, mix.goal) ?? ""].join(" "),
+                has: { battery: now.battery !== null, charger: now.ev },
+              })}
+              chosen={null}
+              href={urls.datasheet}
+            />
+          )}
         </section>
       </main>
 

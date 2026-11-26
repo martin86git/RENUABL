@@ -238,8 +238,20 @@ async function keepDeal(
 
 /** Brings one Pylon project across as a customer and a deal, with its signed PDF on the deal. */
 async function bringIn(businessId: string, key: string, id: string, stage: PylonStage, by: string): Promise<PylonOutcome> {
-  const done = await query(`select 1 from design_imports where business_id = $1 and source = 'pylon' and ref = $2`, [businessId, id]);
-  if (done.length) return { id, result: "already" };
+  const done = await query<{ job_id: string | null; equipment_at: string | null; pdf_at: string | null; tries: number }>(
+    `select job_id, equipment_at, pdf_at, fill_tries as tries from design_imports where business_id = $1 and source = 'pylon' and ref = $2`,
+    [businessId, id],
+  );
+  if (done.length) {
+    // Brought in before (most often from the CSV export, which has no PDF or equipment): read it from Pylon now and
+    // fill it in, its signed PDF too, rather than passing it over (26 Nov 2026, Martin: the API run skipped every job
+    // the export had brought in, so none got its PDF).
+    const d = done[0];
+    if (!d.job_id || (d.equipment_at && d.pdf_at) || d.tries >= FILL_TRIES) return { id, result: "already" };
+    const fields = typedFields((await loadPrefs(businessId)).dealFields);
+    const f = await fillOne(businessId, key, { ref: id, jobId: d.job_id, needFill: !d.equipment_at }, true, by, fields);
+    return { id, result: "already", pdf: f.result === "filled" && f.pdf };
+  }
 
   const project = await pylonGet(projectUrl(id), key);
   if (!project) return { id, result: "failed", why: "Pylon no longer has this project." };

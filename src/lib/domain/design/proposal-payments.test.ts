@@ -35,9 +35,9 @@ describe("paying from a proposal", () => {
     expect(nextDue(dues, new Set(["deposit", "m0", "m1"]))).toBeNull();
   });
 
-  it("takes RENUABL's 1% to the cent", () => {
-    expect(platformFeeCents(50_000)).toBe(500);
-    expect(platformFeeCents(99_995)).toBe(1000);
+  it("takes RENUABL's 2.5% to the cent", () => {
+    expect(platformFeeCents(50_000)).toBe(1250);
+    expect(platformFeeCents(99_995)).toBe(2500);
   });
 
   it("takes cards only from a connected, checked account with them switched on", () => {
