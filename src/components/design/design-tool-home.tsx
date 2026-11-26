@@ -572,15 +572,20 @@ function FeedPost({ deal, pulse, onPlaced }: { deal: Waiting; pulse?: DealPulse;
             onClick={() => setPlacing((on) => !on)}
             className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold text-ink ring-1 ring-inset ring-line transition hover:ring-ink/40"
           >
-            <MapPin className="size-3.5" aria-hidden /> Place on map
+            <MapPin className="size-3.5" aria-hidden /> Find the roof
           </button>
         )}
       </div>
+      {/* 26 Nov 2026, Martin: "Place on map" wasn't obvious. The address on the deal was typed, not found on the map,
+          so the designer has no roof to open; the box opens with it already searched, and picking the match finds it. */}
       {!onMap && placing && (
         <div className="border-t border-line px-3 py-2.5">
-          <AddressEntry compact placeholder={deal.address || "Street address"} onPick={(a) => void place(a)} />
+          <p className="mb-2 text-xs text-ink-2">
+            This address was typed in, so we can&apos;t show the roof yet. Pick it from the list to find it on the map.
+          </p>
+          <AddressEntry compact autoFocus initial={deal.address || undefined} placeholder="Street address" onPick={(a) => void place(a)} />
           <p className={clsx("mt-1.5 text-xs", note ? "text-danger" : "text-muted")}>
-            {note ?? "Pick the address from the list, then design it here."}
+            {note ?? "Once it's found, the roof shows here and Design it takes you straight to it."}
           </p>
         </div>
       )}
