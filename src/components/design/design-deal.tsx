@@ -781,9 +781,9 @@ export function DealPage({ id }: { id: string }) {
           )}
 
           {tab === "team" ? (
-            <section className={clsx(ui.card, "mt-5 p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
-              <div className="mt-3">
+            <section className={clsx(ui.card, "mt-5 p-5 max-sm:p-4")}>
+              <h2 className="sr-only">Team chat on this deal</h2>
+              <div>
                 <DealTeamChat jobId={id} />
               </div>
             </section>
