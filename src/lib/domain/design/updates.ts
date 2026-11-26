@@ -21,8 +21,24 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
+    area: "Sol",
+    words: "Sol's side panel and the box on a deal suggest the rest of a question too, and the team's common questions join your own.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words: "Sol's box learns from what you ask him: your own questions come up first as you type.",
+  },
+  {
+    day: "2026-11-26",
     area: "Deals",
     words: "Tap the stage on a deal's cover to move it. Delete is now in the ⋯ menu, not a button of its own.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words:
+      "Sol's box is a line taller, send and the microphone sit apart on the right, and it suggests the rest of a question as you type.",
   },
   {
     day: "2026-11-26",
@@ -68,6 +84,11 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-26",
     area: "Sol",
     words: "Sol knows your voice agents by name and can read their calls. Typing an agent's name offers it as a chip.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "On a phone, a deal's install day sits on its own line under the kit at the top of the deal.",
   },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },

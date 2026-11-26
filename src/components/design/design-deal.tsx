@@ -3,6 +3,7 @@
 import { useDealStageLabel } from "./stage-select";
 import Link from "next/link";
 import { distributorFor } from "@/lib/domain/design/networks";
+import { interestsOf } from "@/lib/domain/design/deal-interest";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -423,13 +424,14 @@ export function DealPage({ id }: { id: string }) {
   }, [id, activity.length]);
   const [text, setText] = useState("");
   const [value, setValue] = useState("");
+  const [priceFocused, setPriceFocused] = useState(false);
 
   const load = useCallback(async () => {
     const res = await loadJob(id);
     if (!res.ok) return setProblem(res.message);
     setJob(res.job);
     setCustomer(res.customer);
-    setValue(res.job.value === null ? "" : String(Math.round(res.job.value)));
+    setValue(res.job.value === null ? "" : String(res.job.value));
     const [history, design] = await Promise.all([
       loadCustomer(res.job.customerId),
       res.job.projectId ? loadDealDesign(res.job.projectId) : Promise.resolve(null),
@@ -779,9 +781,9 @@ export function DealPage({ id }: { id: string }) {
           )}
 
           {tab === "team" ? (
-            <section className={clsx(ui.card, "mt-5 p-5")}>
-              <h2 className="text-[15px] font-medium text-ink">Team chat on this deal</h2>
-              <div className="mt-3">
+            <section className={clsx(ui.card, "mt-5 p-5 max-sm:p-4")}>
+              <h2 className="sr-only">Team chat on this deal</h2>
+              <div>
                 <DealTeamChat jobId={id} />
               </div>
             </section>
@@ -853,9 +855,9 @@ export function DealPage({ id }: { id: string }) {
                   <>
                     <div className="deal-fields grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3">
                       <EditLine
-                        key={`title:${job.title}`}
+                        key={`title:${job.title}:${customer.name}`}
                         label="Deal name"
-                        value={job.title}
+                        value={dealName(job.title, customer.name, job.address)}
                         max={120}
                         onSave={async (title) => {
                           if (!title) {
@@ -870,14 +872,17 @@ export function DealPage({ id }: { id: string }) {
                         <StageSelect job={job} className={clsx(ui.input, "mt-1 appearance-auto")} onChange={(to) => void patch(to)} />
                       </label>
                       <label className="block text-xs text-muted">
-                        Quoted price, inc. GST ($)
+                        Quoted price, inc. GST
+                        {/* With its $ and cents (26 Nov 2026, Martin); typed as plain figures. */}
                         <input
                           className={clsx(ui.input, "mt-1 tabular-nums")}
-                          inputMode="numeric"
-                          value={value}
-                          onChange={(e) => setValue(e.target.value.replace(/[^d]/g, "").slice(0, 8))}
+                          inputMode="decimal"
+                          value={priceFocused ? value : value === "" ? "" : dollarsAndCents(Number(value))}
+                          onFocus={() => setPriceFocused(true)}
+                          onChange={(e) => setValue(cleanPriceTyping(e.target.value))}
                           onBlur={() => {
-                            const next = value === "" ? null : Number(value);
+                            setPriceFocused(false);
+                            const next = value === "" ? null : Math.round(Number(value) * 100) / 100;
                             if (next !== job.value) void patch({ value: next });
                           }}
                           placeholder="From the design"
@@ -901,7 +906,7 @@ export function DealPage({ id }: { id: string }) {
                         onSave={(source) => saveWho({ source })}
                       />
                       <label className="block text-xs text-muted">
-                        Owner
+                        Deal owner
                         <select
                           className={clsx(ui.input, "mt-1 appearance-auto")}
                           value={job.owner ?? ""}
@@ -1821,4 +1826,25 @@ function MailEntry({ m }: { m: DealMail }) {
       </a>
     </li>
   );
+}
+
+/** A price as the business reads it: "$14,747.00". */
+function dollarsAndCents(n: number): string {
+  return Number.isFinite(n) ? `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "";
+}
+
+/** What is kept as a price is typed: figures and one point, two places after it. */
+function cleanPriceTyping(typed: string): string {
+  const [whole, ...rest] = typed.replace(/[^\d.]/g, "").split(".");
+  const cents = rest.join("").slice(0, 2);
+  return (whole.slice(0, 8) + (typed.includes(".") ? `.${cents}` : "")).replace(/^\./, "0.");
+}
+
+/**
+ * The deal's name as shown (26 Nov 2026, Martin: "Deal name should be the customer name or the address"): a deal named
+ * only by what they want ("Solar", "Solar and battery") reads as the customer's name, else its address. A name typed
+ * over it is kept as typed.
+ */
+function dealName(title: string, customer: string, address: string): string {
+  return interestsOf(title) !== null ? customer.trim() || address || title : title;
 }

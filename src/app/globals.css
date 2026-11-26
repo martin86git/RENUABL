@@ -1708,6 +1708,19 @@ html:has(.sales-snap) {
     appearance: none;
     text-align: left;
   }
+  /* Every value sits in the middle of its row (26 Nov 2026, Martin: the price and install date sat off centre). */
+  .deal-fields :is(input, select) {
+    line-height: 2.25rem;
+  }
+  .deal-fields input[type="date"] {
+    display: flex;
+    align-items: center;
+  }
+  .deal-fields input[type="date"]::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
+    line-height: 2.25rem;
+  }
 }
 
 /* Sol's sheet on a deal, on a phone, as a chat (22 Nov 2026, Martin): his line a bubble from him, the choices as quick
