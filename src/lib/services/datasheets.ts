@@ -4,6 +4,7 @@
  */
 import type { Datasheets, InverterForm, PanelForm, SavedSheet, SheetKind } from "@/lib/domain/design/datasheets";
 import type { DocKind } from "@/lib/domain/design/proposal-datasheets";
+import type { FindResult } from "@/lib/domain/design/find-all-sheets";
 import { ask } from "./crm";
 
 export type SheetForm = { kind: SheetKind; model: string; panel: PanelForm; inverter: InverterForm };
@@ -106,3 +107,10 @@ export const findDatasheetOnline = (product: { kind: SheetKind; sku: string; nam
 /** A person has checked figures found online against the sheet. */
 export const confirmDatasheet = (kind: DocKind, sku: string) =>
   ask<{ sheets: SavedSheet[] }>("/api/design/datasheets", { method: "POST", body: { do: "confirm", kind, sku } });
+
+/** Looks online for a couple of the price lists' products with no sheet on hand; each one's outcome (Settings' Find every datasheet). */
+export const findSheetBatch = (products: readonly { kind: DocKind; sku: string; name: string }[]) =>
+  ask<{ results: { kind: DocKind; sku: string; outcome: FindResult }[] }>("/api/design/datasheets", {
+    method: "POST",
+    body: { do: "find-batch", products },
+  });
