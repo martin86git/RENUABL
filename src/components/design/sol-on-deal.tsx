@@ -29,6 +29,8 @@ import { ContextLine } from "./context-line";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolMark } from "./sol-sun";
 import { CallChooser } from "./call-choice";
+import { DraftWords } from "./draft-words";
+import { plainBody } from "@/lib/domain/design/inbox";
 
 const REFRESH_MS = 60_000;
 const TYPE_MS = 14;
@@ -190,7 +192,8 @@ export function SolTerminal(props: {
       ? await emailDeal(props.jobId, { subject: answer.subject, body: answer.body, toCustomer: true, cc, from })
       : await sendReply(props.jobId, answer.body);
     // The same words in their proposal's chat, with no second email.
-    if (r.ok && asEmail && byChat) await sendReply(props.jobId, answer.body, [], true);
+    // Their chat shows words only: a link goes in as "words (address)".
+    if (r.ok && asEmail && byChat) await sendReply(props.jobId, plainBody(answer.body), [], true);
     setBusy(null);
     if (!r.ok) return setSaid(r.message);
     keep(null);
@@ -312,7 +315,7 @@ export function SolTerminal(props: {
             {state === "held" && <span>· held</span>}
           </div>
           {fields(sol.to ?? null, subject, setSubject)}
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={7} aria-label="The email" className={words} />
+          <DraftWords value={body} onChange={setBody} label="The email" className={words} links />
         </div>
       )}
 
@@ -324,12 +327,12 @@ export function SolTerminal(props: {
             {writing && <span className="text-sun-ink"> · writing it again…</span>}
           </div>
           {asEmail && fields(mail?.to || null, answer.subject, (v) => keep({ ...answer, subject: v }))}
-          <textarea
+          <DraftWords
             value={answer.body}
-            onChange={(e) => keep({ ...answer, body: e.target.value })}
-            rows={7}
-            aria-label={`The reply to ${name}`}
+            onChange={(v) => keep({ ...answer, body: v })}
+            label={`The reply to ${name}`}
             className={words}
+            links={asEmail || !byChat}
           />
         </div>
       )}

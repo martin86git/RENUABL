@@ -9,6 +9,7 @@
  */
 
 import { messageHtml } from "./email-compose";
+import { lineHtml, plainBody } from "./inbox";
 
 export interface DealEmailContext {
   firstName: string;
@@ -138,14 +139,16 @@ export function dealEmail(input: { business: string; subject: string; body: stri
   const foot = `Sent by ${input.business} using RENUABL. Reply to this email to reach ${input.business}.`;
   return {
     subject: input.subject,
-    text: `${input.body}${input.attached ? `\n\n${input.attached}` : ""}\n\n--\n${foot}`,
-    html: `<div style="font:14px/1.6 Arial,sans-serif;color:#111">${messageHtml(input.body)}${input.pictures ? `\n${input.pictures}` : ""}<p style="margin-top:24px;color:#888;font-size:12px">${esc(foot)}</p></div>`,
+    // A link written as [words](address) is a real link in the HTML and "words (address)" in the plain text; a web
+    // address written out is a link to itself (26 Nov 2026, Martin).
+    text: `${plainBody(input.body)}${input.attached ? `\n\n${input.attached}` : ""}\n\n--\n${foot}`,
+    html: `<div style="font:14px/1.6 Arial,sans-serif;color:#111">${messageHtml(input.body, (l) => lineHtml(l, true))}${input.pictures ? `\n${input.pictures}` : ""}<p style="margin-top:24px;color:#888;font-size:12px">${esc(foot)}</p></div>`,
   };
 }
 
 /** How the email is written on the deal's record, with what went with it before the words (so a long email can't cut it off). */
 export const emailRecord = (to: string, subject: string, body: string, files: readonly string[] = [], cc: readonly string[] = []) =>
-  `Email to ${to}${cc.length ? ` (Cc ${cc.join(", ")})` : ""}: ${subject}${files.length ? `\n${ATTACHED_LINE}${files.join(", ")}` : ""}\n\n${body}`;
+  `Email to ${to}${cc.length ? ` (Cc ${cc.join(", ")})` : ""}: ${subject}${files.length ? `\n${ATTACHED_LINE}${files.join(", ")}` : ""}\n\n${plainBody(body)}`;
 
 const ATTACHED_LINE = "Attached (kept in the deal's Attachments): ";
 
