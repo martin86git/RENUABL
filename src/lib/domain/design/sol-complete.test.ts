@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completionFor, learnedPhrases, phrasesWith } from "./sol-complete";
+import { completionFor, customerWordsOf, learnedPhrases, phrasesWith, shareable, teamPhrases } from "./sol-complete";
 
 describe("completionFor", () => {
   const phrases = ["Who should I call first today?", "Which proposals have gone quiet?", "Draft a text to"];
@@ -44,5 +44,41 @@ describe("learnedPhrases", () => {
   it("their own questions win over the usual ones", () => {
     const phrases = phrasesWith(["Which battery jobs are waiting on stock?"]);
     expect(completionFor("Which ba", phrases)).toBe("ttery jobs are waiting on stock?");
+  });
+});
+
+describe("team suggestions", () => {
+  const customers = customerWordsOf(["Jordan Smith", "Mia Nguyen"]);
+
+  it("never shares a question naming a customer, a person, a number or an email", () => {
+    expect(shareable("Where is jordan's install up to?", customers)).toBe(false);
+    expect(shareable("Draft a text to Bec about Friday", customers)).toBe(false);
+    expect(shareable("Call 0412345678 back", customers)).toBe(false);
+    expect(shareable("Email bob@example.com the proposal", customers)).toBe(false);
+    expect(shareable("What's at 12 Shearer Drive?", customers)).toBe(false);
+  });
+
+  it("shares plain questions, makers, months and solar terms", () => {
+    expect(shareable("Which Sigenergy jobs are waiting on stock in December?", customers)).toBe(true);
+    expect(shareable("How many STCs does a 10 kW system get?", customers)).toBe(true);
+  });
+
+  it("puts the questions most people asked first", () => {
+    const got = teamPhrases(
+      [
+        { who: "a", text: "Which proposals went out this week?", at: "2026-11-20" },
+        { who: "a", text: "Which proposals went out this week?", at: "2026-11-21" },
+        { who: "b", text: "What installs are on next Tuesday?", at: "2026-11-19" },
+        { who: "c", text: "What installs are on next Tuesday?", at: "2026-11-18" },
+        { who: "c", text: "Where is Mia's battery?", at: "2026-11-22" },
+      ],
+      customers,
+    );
+    expect(got).toEqual(["What installs are on next Tuesday?", "Which proposals went out this week?"]);
+  });
+
+  it("comes after their own but before the usual ones", () => {
+    const phrases = phrasesWith(["Who should I call about stock?"], ["Who should I call first this afternoon?"]);
+    expect(completionFor("Who should I call f", phrases)).toBe("irst this afternoon?");
   });
 });
