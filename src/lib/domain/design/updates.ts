@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Marketing",
+    words: "Email buttons: choose a button's shape, size, width and colour, on a Button block and on the top bar's button.",
+  },
+  {
+    day: "2026-11-26",
     area: "Today",
     words: "Minimise sits beside the chat's first message with a mark of its own; a minimised chat opens again from any page.",
   },

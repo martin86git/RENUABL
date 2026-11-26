@@ -122,6 +122,24 @@ export interface EdmSocial {
 export const TILE_COLUMNS = [1, 2, 3] as const;
 export type TileColumns = (typeof TILE_COLUMNS)[number];
 
+/**
+ * A button's own look (26 Nov 2026, Martin: "i need the ability to: edit button shapes and sizes, button colors, button
+ * text"), on a Button block and on a Top bar's button. Each is left out of the block while it is the usual one, so an
+ * email made before reads as it did: a Button is a pill, a bar's button rounded, both medium, in the brand colour.
+ */
+export const BUTTON_SHAPES = ["pill", "rounded", "square"] as const;
+export type ButtonShape = (typeof BUTTON_SHAPES)[number];
+export const BUTTON_SHAPE_WORDS: Record<ButtonShape, string> = { pill: "Pill", rounded: "Rounded", square: "Square" };
+export const BUTTON_RADIUS: Record<ButtonShape, number> = { pill: 999, rounded: 10, square: 0 };
+export const BUTTON_SIZES = ["small", "medium", "large"] as const;
+export type ButtonSize = (typeof BUTTON_SIZES)[number];
+export const BUTTON_SIZE_WORDS: Record<ButtonSize, string> = { small: "Small", medium: "Medium", large: "Large" };
+/** Type size and padding (px) for each size: a Button block's, and the smaller ones of a bar's button. */
+const BUTTON_METRICS: Record<"button" | "bar", Record<ButtonSize, [font: number, padY: number, padX: number]>> = {
+  button: { small: [13, 9, 18], medium: [15, 12, 24], large: [17, 15, 32] },
+  bar: { small: [13, 8, 14], medium: [14, 10, 18], large: [15, 12, 22] },
+};
+
 export interface EdmBlock {
   id: string;
   kind: EdmBlockKind;
@@ -152,6 +170,14 @@ export interface EdmBlock {
    * drawn dark or light, whichever reads.
    */
   fill?: string;
+  /** A button's shape (a Button block or a bar's button); left out while it is the usual one for its kind. */
+  shape?: ButtonShape;
+  /** A button's size; left out while medium. */
+  size?: ButtonSize;
+  /** A button's own colour (six hex digits); left out for the brand colour. Its words are white or near-black, whichever reads. */
+  colour?: string;
+  /** A Button block as wide as the email's column. */
+  wide?: boolean;
   /** A top bar's button words (its `text` is the line beside the button, its `url` where the button goes). */
   label?: string;
 }
@@ -424,8 +450,60 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
     ...(kind === "countdown" ? { endsAt: cleanEndsAt(r.endsAt) } : {}),
     ...(kind === "bar" ? { label: line(r.label, EDM_LIMITS.label) } : {}),
+    ...(kind === "button" || kind === "bar" ? buttonFields(r, kind) : {}),
     ...(cleanColour(r.fill, "") ? { fill: cleanColour(r.fill, "") } : {}),
   };
+}
+
+type ButtonBlock = Pick<EdmBlock, "kind" | "shape" | "size" | "colour" | "wide">;
+
+/** The shape a button has: its own, else a pill for a Button block and rounded for a bar's button. */
+export const buttonShapeOf = (b: ButtonBlock): ButtonShape => b.shape ?? (b.kind === "bar" ? "rounded" : "pill");
+export const buttonSizeOf = (b: ButtonBlock): ButtonSize => b.size ?? "medium";
+
+/** A button's look fields as kept: only real choices, and none that is the usual one for its kind. */
+function buttonFields(r: Record<string, unknown>, kind: "button" | "bar"): Partial<EdmBlock> {
+  const shape = (BUTTON_SHAPES as readonly unknown[]).includes(r.shape) ? (r.shape as ButtonShape) : null;
+  const size = r.size === "small" || r.size === "large" ? r.size : null;
+  const colour = cleanColour(r.colour, "");
+  return {
+    ...(shape && shape !== buttonShapeOf({ kind }) ? { shape } : {}),
+    ...(size ? { size } : {}),
+    ...(colour ? { colour } : {}),
+    ...(kind === "button" && r.wide === true ? { wide: true } : {}),
+  };
+}
+
+export interface ButtonLook {
+  radius: number;
+  fontSize: number;
+  padY: number;
+  padX: number;
+  background: string;
+  /** The words on it: white, or near-black on a colour too light for white to read. */
+  ink: string;
+  wide: boolean;
+}
+
+/** How a button is drawn, in the email and in the builder alike. */
+export function buttonLook(b: ButtonBlock, brandColour: string): ButtonLook {
+  const [fontSize, padY, padX] = BUTTON_METRICS[b.kind === "bar" ? "bar" : "button"][buttonSizeOf(b)];
+  const background = b.colour ?? brandColour;
+  return {
+    radius: BUTTON_RADIUS[buttonShapeOf(b)],
+    fontSize,
+    padY,
+    padX,
+    background,
+    ink: contrastRatio("#ffffff", background) < 2 ? HEADING_INK : "#ffffff",
+    wide: b.kind === "button" && b.wide === true,
+  };
+}
+
+/** A button's inline style in the email. */
+function buttonCss(b: ButtonBlock, brandColour: string): string {
+  const l = buttonLook(b, brandColour);
+  return `display:${l.wide ? "block;text-align:center" : "inline-block"};background:${l.background};color:${l.ink};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:${l.fontSize}px;font-weight:600;text-decoration:none;padding:${l.padY}px ${l.padX}px;border-radius:${l.radius}px`;
 }
 
 /** The words' colours on a panel: the email's own text colour when it reads there, else near-black or white. */
@@ -796,7 +874,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       const label = merge(b.label ?? "", fields) || BAR_BUTTON;
       const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
       rows.push(
-        `<tr><td style="padding:8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${ground};border-radius:12px"><tr><td style="padding:14px 18px;${font};font-size:15px;line-height:1.35;color:${on.heading}">${esc(words)}</td><td align="right" style="padding:10px 14px 10px 0;white-space:nowrap"><a href="${esc(href)}" target="_blank" style="display:inline-block;background:${colour};color:#ffffff;${font};font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:10px">${esc(label)}</a></td></tr></table></td></tr>`,
+        `<tr><td style="padding:8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${ground};border-radius:12px"><tr><td style="padding:14px 18px;${font};font-size:15px;line-height:1.35;color:${on.heading}">${esc(words)}</td><td align="right" style="padding:10px 14px 10px 0;white-space:nowrap"><a href="${esc(href)}" target="_blank" style="${buttonCss(b, colour)}">${esc(label)}</a></td></tr></table></td></tr>`,
       );
       textParts.push(`${words} ${label}: ${href}`);
       continue;
@@ -916,7 +994,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       linkAt++;
       const label = merge(b.text, fields);
       rows.push(
-        `<tr><td style="padding:16px 32px;text-align:${align}"><a href="${esc(href)}" target="_blank" style="display:inline-block;background:${colour};color:#ffffff;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;text-decoration:none;padding:12px 24px;border-radius:999px">${esc(label)}</a></td></tr>`,
+        `<tr><td style="padding:16px 32px;text-align:${align}"><a href="${esc(href)}" target="_blank" style="${buttonCss(b, colour)}">${esc(label)}</a></td></tr>`,
       );
       textParts.push(`${label}: ${href}`);
     } else if (b.kind === "divider") {
