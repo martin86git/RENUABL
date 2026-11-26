@@ -190,7 +190,7 @@ export const GTM_LAUNCH: EdmContent = email(
   "Your leads answered in minutes. Your follow-ups drafted. Your quotes priced as you draw.",
   [
     { hook: "Solar just got an AI sales force.", pictures: ["solintro"], cta: ["Meet Sol", SITE] },
-    { hook: "Leads answered, follow-ups drafted, while you're on the roof.", pictures: ["cards"], cta: ["See it work", DEMO] },
+    { hook: "Leads answered, follow-ups drafted, while you're with a customer.", pictures: ["cards"], cta: ["See it work", DEMO] },
   ],
 );
 
@@ -221,7 +221,7 @@ const SERIES: { wait: number; content: EdmContent }[] = [
   },
   {
     wait: 2,
-    content: email("d", "Answer every lead in minutes", "Emailed, rung and in your CRM while you're still on the roof.", [
+    content: email("d", "Answer every lead in minutes", "Emailed, rung and in your CRM while you're still with another customer.", [
       { hook: "Every new lead, answered in minutes.", pictures: ["xlead"], cta: ["See it answer", DEMO] },
       { hook: "Your calls written up. Your follow-ups drafted.", pictures: ["xcrm"], cta: ["See Sol at work", DEMO] },
       { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Open the demo", DEMO] },

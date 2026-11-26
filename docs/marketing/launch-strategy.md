@@ -87,7 +87,7 @@ Victoria first, then by state.
 - **Hook:** Solar just got an AI sales force.
   - **Picture** `marketing/launch/sol-intro.gif`: “Hi, I'm Sol. Meet your AI sales force: I answer your leads, write your emails and assist you to design a system.”
   - **Button:** Meet Sol → https://www.renuabl.com.au/
-- **Hook:** Answered, written, designed, booked. While you're on the roof.
+- **Hook:** Answered, written, designed, booked. While you're with a customer.
   - **Picture** `marketing/launch/cards.gif`: “Your customers, answered. Your emails, written. Your calls, written up. Your super-intelligent advisor. Your roofs, designed.”
   - **Button:** See it work → https://www.renuabl.com.au/business/demo
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
@@ -123,7 +123,7 @@ Victoria first, then by state.
 ### 2 · two days on
 
 **Subject:** Answer every lead in minutes  
-**Preview:** Emailed, rung and in your CRM while you're still on the roof.
+**Preview:** Emailed, rung and in your CRM while you're still with another customer.
 
 - **Hook:** Every new lead, answered in minutes.
   - **Picture** `marketing/launch/explain-lead.gif`: “A new lead comes in. Within minutes I've emailed them their home from above, and your voice agent is ringing them. In your hours, every time.”

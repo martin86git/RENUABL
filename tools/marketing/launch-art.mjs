@@ -55,6 +55,14 @@ const BUILD_SAYS = [
 ];
 const BUILD_FRAMES = BUILD_SAYS.length;
 const build = (n) => pathToFileURL(resolve(OWN_SHOTS, "designer-build", `${n}.webp`)).href;
+/** One example morning, as the log picture types it: a time and what happened. Each is something the product does. */
+const LOG = [
+  ["09:00", "A lead comes in."],
+  ["09:05", "Sol emails them their home from above."],
+  ["09:06", "Your voice agent rings them."],
+  ["09:14", "Questions answered. Call booked."],
+  ["09:15", "Written up, on the deal."],
+];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- The product's own marks ------------------------------------------------------------------------------------
@@ -361,6 +369,63 @@ const ART = {
        .say{position:absolute;left:32px;right:32px;bottom:30px;font-size:40px;font-weight:600;letter-spacing:-.02em;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}
        .bar{position:absolute;left:0;right:0;bottom:0;height:6px;background:rgba(255,255,255,.14)}.bar i{display:block;height:100%;width:0;background:#ff5a1f}`,
       `const SAYS = ${JSON.stringify(BUILD_SAYS)}; window.at = (t) => { const n = Math.round(t * (${BUILD_FRAMES} - 1)); document.querySelectorAll("[data-f]").forEach((el) => { el.style.opacity = +el.dataset.f <= n ? 1 : 0; }); document.getElementById("say").textContent = SAYS[n]; document.getElementById("bar").style.width = ((n + 1) / SAYS.length) * 100 + "%"; }; window.at(0);`,
+    ),
+  },
+
+  /**
+   * "09:00. A lead comes in." (26 Nov 2026, Martin: "lets create another marketing email. get creative with it the way
+   * xAi would"): stark black, monospace, almost no words. A log of one example morning typed a line at a time, ending
+   * on the line the email is about. Every line is something the product does in the business's own hours; the times
+   * are an example and the picture says so.
+   */
+  "log.gif": {
+    frames: LOG.length + 2,
+    delay: 720,
+    hold: 3600,
+    colours: 48,
+    html: page(
+      `<div class="grid"></div><div class="top"><i></i>SOL // LIVE LOG<b>EXAMPLE MORNING</b></div>
+       <div class="log">${LOG.map(([t, l], i) => `<p data-l="${i}"><span>${t}</span>${l}</p>`).join("")}</div>
+       <h1 id="end">You were with another customer.</h1><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:60px 60px;-webkit-mask-image:radial-gradient(ellipse at 30% 40%,#000,transparent 75%)}
+       .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}.top b{font-weight:400;color:rgba(255,255,255,.3);margin-left:18px}
+       .log{position:absolute;left:84px;top:132px;font-family:"JetBrains Mono",Consolas,monospace;font-size:29px;line-height:58px;color:#fff}
+       .log p{opacity:0;white-space:nowrap}.log span{color:#ff6a2c;margin-right:34px}
+       h1{position:absolute;left:84px;top:494px;font-size:66px;font-weight:600;letter-spacing:-.045em;opacity:0}`,
+      `window.at = (t) => { const n = Math.round(t * ${LOG.length + 1}); document.querySelectorAll("[data-l]").forEach((el) => { el.style.opacity = +el.dataset.l < n ? 1 : 0; }); document.getElementById("end").style.opacity = n > ${LOG.length} ? 1 : 0; }; window.at(0);`,
+    ),
+  },
+
+  /** The same email's second picture: what the voice agent costs, said flat. The figure is Calls & Texts' monthly price over a month's days. */
+  "aday.jpg": {
+    html: page(
+      `<div class="top"><i></i>CALLS &amp; TEXTS // YOUR VOICE AGENT</div><div class="fig">$1.61<small>a day.</small></div>
+       <p class="dry">Less than a coffee. Doesn't need a ute.</p>
+       <p class="foot">$49 A MONTH, ON TOP OF YOUR RENUABL PLAN. YOUR OWN NUMBER INCLUDED.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .fig{position:absolute;left:76px;top:120px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em}
+       .fig small{font-size:64px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5);margin-left:26px}
+       .dry{position:absolute;left:84px;top:428px;font-size:40px;letter-spacing:-.02em;color:#fff}
+       .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
+    ),
+  },
+
+  /** The same email's close (Martin: 'call out the "try for free" free for a month'): the plan's first month, said flat, with what follows it in the small print. */
+  "free.jpg": {
+    html: page(
+      `<div class="glow"></div><div class="top"><i></i>RENUABL // TRY IT FREE</div><div class="fig">$0<small>for your first month.</small></div>
+       <p class="dry">Try it. Break it. Keep it if it sells.</p>
+       <p class="foot">THEN $49 A USER A MONTH. NO LOCK-IN, CANCEL ANY TIME. ADD-ONS SUCH AS CALLS &amp; TEXTS ARE BILLED FROM THE DAY YOU ADD THEM.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 82% 108%,rgba(255,90,31,.38),transparent 55%)}
+       .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .fig{position:absolute;left:76px;top:120px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em;white-space:nowrap}
+       .fig small{font-size:64px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5);margin-left:30px}
+       .dry{position:absolute;left:84px;top:428px;font-size:40px;letter-spacing:-.02em;color:#fff}
+       .foot{position:absolute;left:84px;right:250px;bottom:40px;font-family:"JetBrains Mono",Consolas,monospace;font-size:13px;line-height:1.6;letter-spacing:.14em;color:rgba(255,255,255,.42)}`,
     ),
   },
 
