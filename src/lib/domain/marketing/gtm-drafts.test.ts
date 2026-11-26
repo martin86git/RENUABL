@@ -26,7 +26,7 @@ const ids = Object.fromEntries(Object.keys(GTM_PICTURES).map((k, i) => [k, `mimg
 
 describe("the launch drafts", () => {
   it("are whole, valid emails once their pictures are in, and come through the cleaner unchanged", () => {
-    expect(GTM_EMAILS).toHaveLength(8);
+    expect(GTM_EMAILS).toHaveLength(15);
     for (const raw of GTM_EMAILS) {
       const c = withPictures(raw, ids);
       expect(contentProblem(c)).toBeNull();

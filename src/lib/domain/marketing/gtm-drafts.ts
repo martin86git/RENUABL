@@ -84,6 +84,41 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
     file: "product-phonebook.jpg",
     alt: "In RENUABL: a voice agent on a call beside its phone book, with a contact opened to hand the call over (example data)",
   },
+  hfill: {
+    file: "hero-fill.jpg",
+    alt: "Design it once. The deal fills itself in: size, panels, inverter, battery, roof and strings, filled from the design (example data)",
+  },
+  hprop: { file: "hero-proposal.jpg", alt: "Your proposal, not ours: your logo, your colours, your layout, signed online (example data)" },
+  hpromo: {
+    file: "hero-promo.jpg",
+    alt: "Got an offer? Tell Sol. He writes the promotional email from your words and you press send (example)",
+  },
+  htech: { file: "hero-tech.jpg", alt: "Fronius State 475? Ask Sol: an example answer to a technical question, with his sources under it" },
+  hpaper: {
+    file: "hero-paper.jpg",
+    alt: "The paperwork, lined up: pre-approval, Solar Victoria, install, certificate, STCs and grid connection on one job (example data)",
+  },
+  hone: { file: "hero-one.jpg", alt: "Six tools. One login: lead, design, proposal, order, install and service in one place" },
+  hreply: {
+    file: "hero-reply.jpg",
+    alt: "Faster replies: a customer's question and the reply Sol drafted from the deal, ready to send (example data)",
+  },
+  slist: {
+    file: "say-list.jpg",
+    alt: `Customers with solar and no battery: one list, one email, written by Sol. Growth, ${dollars(ADD_ON_MONTHLY_CENTS.marketing ?? 0)} a month.`,
+  },
+  ssrc: {
+    file: "say-sources.jpg",
+    alt: "Every answer from Sol comes with sources: maker pages, datasheets and network rules, under the answer",
+  },
+  sready: {
+    file: "say-ready.jpg",
+    alt: "Ready to install: a light that goes green as strings, inverter limits and clearances check out. A guide, never a site inspection.",
+  },
+  sopen: {
+    file: "say-opened.jpg",
+    alt: "Under every email you send: opened 3 times. Know who's reading, and who to ring next. An open is a guide, not proof.",
+  },
   aday: { file: "aday.jpg", alt: `Calls & Texts, your voice agent: ${VOICE_DAY_WORDS}. ${VOICE}, on top of your RENUABL plan.` },
   dband: {
     file: "designer-band.jpg",
@@ -231,8 +266,114 @@ export const GTM_VOICE: EdmContent = email(
   ],
 );
 
+/**
+ * Seven more campaigns of their own (26 Nov 2026, Martin: "create 7 more… ready in campaigns… different hooks and
+ * selling propositions… the pain points in solar: admin, compliance, technical issues needing expertise and how Sol and
+ * RENUABL help reduce the burden… getting more work done, get answers to hard technical problems, one workspace end to
+ * end, faster responses to customers"). Four he named (the design filling in the customer's file, the custom proposal,
+ * promotional emails with Growth, technical questions) and three of ours (the paperwork after the sale, one workspace,
+ * faster replies). Each opens on its own hero picture; every claim is something the product does today.
+ */
+const GROWTH = `${dollars(ADD_ON_MONTHLY_CENTS.marketing ?? 0)} a month`;
+
+const MORE: { name: string; content: EdmContent }[] = [
+  {
+    name: "Design it once · the deal fills itself in",
+    content: email(
+      "g",
+      "Design the roof once. The customer's file fills itself in.",
+      "Panels, inverter, battery and strings, on the deal the moment you save.",
+      [
+        { hook: "Design it once. Every detail lands on the customer's file.", pictures: ["hfill"], cta: ["See it fill in", DEMO] },
+        { hook: "Take the call. Sol writes it up and fills in the rest.", pictures: ["xcrm"], cta: ["See Sol at work", DEMO] },
+      ],
+    ),
+  },
+  {
+    name: "Your proposal, your brand",
+    content: email(
+      "p",
+      "Your proposal should look like your business",
+      "Your logo, colours and layout. Your customer chooses a system and signs online.",
+      [
+        {
+          hook: "A proposal that looks like you, not like software.",
+          pictures: ["hprop"],
+          words: [
+            `Your logo, colours and type are in every plan. Layouts of your own come with Growth, ${GROWTH} on top of your RENUABL plan.`,
+          ],
+          cta: ["Build yours", DEMO],
+        },
+        { hook: "Their roof, their system, their price. Signed online.", pictures: ["xdesigner"], cta: ["See a proposal", DEMO] },
+      ],
+    ),
+  },
+  {
+    name: "Got an offer? Tell Sol",
+    content: email(
+      "m",
+      "Got an offer? Tell Sol. He writes the email.",
+      "Promotions to your own customers, sent from the CRM they already live in.",
+      [
+        {
+          hook: "Got an offer? Tell Sol. He writes the email.",
+          pictures: ["hpromo"],
+          words: [`Email marketing comes with Growth, ${GROWTH} on top of your RENUABL plan. Sol writes from your words. You press send.`],
+          cta: ["See it written", DEMO],
+        },
+        { hook: "Everyone with solar and no battery, in one list.", pictures: ["slist"], cta: ["See the pricing", PRICING] },
+      ],
+    ),
+  },
+  {
+    name: "Hard technical question? Ask Sol",
+    content: email("t", "State 475 on a Fronius. What now?", "Ask Sol. He answers from the maker's own pages and shows his sources.", [
+      {
+        hook: "Hard technical question? Ask Sol.",
+        pictures: ["htech"],
+        words: [
+          "Error codes, datasheets, network rules. Sol finds the answer and shows where it came from. Your electrician still makes the call on site.",
+        ],
+        cta: ["Ask Sol in the demo", DEMO],
+      },
+      { hook: "An inverter that's lost its Wi-Fi? Ask before you drive out.", pictures: ["ssrc"], cta: ["Meet Sol", SITE] },
+    ]),
+  },
+  {
+    name: "The paperwork after the sale",
+    content: email("k", "Pre-approvals, rebates, grid connection: one list", "Every sold job filed at the step it's waiting on.", [
+      { hook: "The paperwork after the sale, lined up for you.", pictures: ["hpaper"], cta: ["See after the sale", DEMO] },
+      { hook: "Every string checked against the inverter's limits as you draw.", pictures: ["sready"], cta: ["Try the designer", DEMO] },
+    ]),
+  },
+  {
+    name: "One workspace, end to end",
+    content: email(
+      "w",
+      "One workspace, from the enquiry to the final invoice",
+      "Leads, design, proposal, order, install and service. One login.",
+      [
+        { hook: "Stop copying the same job into five tools.", pictures: ["hone"], cta: ["See it end to end", DEMO] },
+        { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Open the demo", DEMO] },
+      ],
+    ),
+  },
+  {
+    name: "Faster replies · Sol drafts, you send",
+    content: email(
+      "r",
+      "Reply to every customer while they're still thinking about it",
+      "Sol drafts the reply from the deal. You read it and press send.",
+      [
+        { hook: "Faster replies. Sol drafts, you press send.", pictures: ["hreply"], cta: ["See a draft", DEMO] },
+        { hook: "See who opened it, and who to ring next.", pictures: ["sopen"], cta: ["Open the demo", DEMO] },
+      ],
+    ),
+  },
+];
+
 /** The campaigns of their own, beside the launch and its series: each added once by its name (the gtm route). */
-export const GTM_CAMPAIGNS: { name: string; content: EdmContent }[] = [{ name: GTM_VOICE_NAME, content: GTM_VOICE }];
+export const GTM_CAMPAIGNS: { name: string; content: EdmContent }[] = [{ name: GTM_VOICE_NAME, content: GTM_VOICE }, ...MORE];
 
 /** The series: one product an email, each picture with its own hook and button. */
 const SERIES: { wait: number; content: EdmContent }[] = [

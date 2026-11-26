@@ -171,6 +171,8 @@ const ICON = {
   ),
   chat: ico('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
   mail: ico('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>'),
+  tick: ico('<path d="M20 6 9 17l-5-5"/>', 18),
+  globe: ico('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20"/>', 14),
   search: ico('<circle cx="11" cy="11" r="7"/><path d="m21 21-4.300-4.300"/>'),
   hang: ico(
     '<path d="M10.700 13.300a14 14 0 0 1-2.300-3.100 1 1 0 0 1 .3-1.200l.5-.4A2 2 0 0 0 10 7V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2 18 18 0 0 0 3.500 10.500"/><path d="M22 2 2 22"/><path d="M14.500 16.200a1 1 0 0 0 .5.100l.4-.500a2 2 0 0 1 1.600-.800h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2 18 18 0 0 1-9.500-2.700"/>',
@@ -261,6 +263,47 @@ const product = (file, crop, tag) => {
      .tag{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.5);font-size:13px;letter-spacing:.24em;text-transform:uppercase}`,
   );
 };
+
+/**
+ * A campaign's hero (26 Nov 2026): the hook large on the left, the product drawn on a white card on the right. `panel`
+ * is the card's own HTML; rows (`.r`), a head (`.chead`), a caption (`.cap`) and a foot with Sol (`.cfoot`) are shared.
+ */
+const hero = (kicker, first, second, sub, panel, css = "") =>
+  page(
+    `<div class="glow"></div><div class="top"><i></i>${kicker}</div>
+     <div class="say"><h1>${first}<b>${second}</b></h1><p>${sub}</p></div>
+     <div class="card">${panel}</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+    `.glow{position:absolute;inset:0;background:radial-gradient(ellipse at 78% 110%,rgba(255,90,31,.3),transparent 55%)}
+     .top{position:absolute;left:64px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+     .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+     .say{position:absolute;left:64px;top:150px;width:520px}
+     .say h1{font-size:70px;line-height:1;font-weight:600;letter-spacing:-.05em}.say h1 b{display:block;font-weight:600;color:#ff6a2c;margin-top:6px}
+     .say p{margin-top:26px;font-size:23px;line-height:1.4;color:rgba(255,255,255,.7);max-width:440px}
+     .card{position:absolute;right:56px;top:66px;width:500px;border-radius:22px;background:#fff;color:#1d1d1f;padding:22px 24px;overflow:hidden;
+       box-shadow:0 40px 120px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.14)}
+     .chead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}.chead b{font-size:21px;font-weight:600;letter-spacing:-.02em}
+     .chead span{display:block;font-size:13.5px;color:#6e6e73;margin-top:2px}
+     .chead em{font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#c2410c;background:#fff1e8;border-radius:999px;padding:6px 11px}
+     .r{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid #ececef;font-size:15.5px}.r span{flex:1;color:#6e6e73}.r b{font-weight:600}
+     .r i{color:#ff5a1f;display:grid;place-items:center}
+     .cap{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#6e6e73;margin:4px 0 8px}
+     .cfoot{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13.5px;color:#3a3d43}.cfoot img,.a img{filter:none;mix-blend-mode:normal!important}
+     ${css}`,
+  );
+
+/** A statement picture, as aday.jpg: a small lead-in, a few words very large, a line under them, the small print. */
+const statement = (kicker, pre, big, dry, foot, size = 160, tint = "#fff") =>
+  page(
+    `<div class="top"><i></i>${kicker}</div><p class="pre">${pre}</p><div class="fig">${big}</div>
+     <p class="dry">${dry}</p><p class="foot">${foot}</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
+    `body{background:${GROUND}}
+     .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+     .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+     .pre{position:absolute;left:84px;top:150px;font-size:44px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5)}
+     .fig{position:absolute;left:80px;top:218px;font-size:${size}px;line-height:1;font-weight:600;letter-spacing:-.055em;color:${tint};white-space:nowrap}
+     .dry{position:absolute;left:84px;top:${250 + size + 40}px;font-size:34px;letter-spacing:-.02em;color:#fff;max-width:1000px}
+     .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
+  );
 
 /** Each picture: a page, and for a moving one how many frames, how long each shows and how long the last holds. */
 const ART = {
@@ -671,6 +714,201 @@ const ART = {
        .hand b{font-size:15.5px;font-weight:600}.hand>div>span{display:block;font-size:12.5px;color:rgba(255,255,255,.7)}
        .opt{display:flex;align-items:center;gap:13px;padding:6px 16px;color:#1d1d1f}.opt b{font-size:14px;font-weight:500}
        .opt>div>span{display:block;font-size:12px;color:#6e6e73}.opt svg,.search svg{flex:none}`,
+    ),
+  },
+
+  /**
+   * Seven more campaigns (26 Nov 2026, Martin: "create 7 more… different hooks and selling propositions… the pain
+   * points in solar: admin, compliance, technical issues needing expertise"). Each has a hero: the hook large on the
+   * left, the product drawn on a white card on the right (made-up customers; drawn, not photographed), and some a
+   * statement picture, the words alone, as aday.jpg is.
+   */
+  "hero-fill.jpg": {
+    html: hero(
+      "DESIGNER // CRM",
+      "Design it once.",
+      "The deal fills itself in.",
+      "Save the design and every detail is on the customer's file.",
+      `<div class="chead"><div><b>Olivia Hart</b><span>Solar and battery · Designed</span></div><em>FILLED FROM THE DESIGN</em></div>
+       ${[
+         ["System size", "6.65 kW"],
+         ["Panels", "14 × 475 W"],
+         ["Inverter", "5 kW hybrid"],
+         ["Battery", "16 kWh"],
+         ["Roof", "Tile · 22°"],
+         ["Storeys", "Single"],
+         ["Phase", "Single"],
+         ["Strings", "2"],
+       ]
+         .map(([k, v]) => `<div class="r"><span>${k}</span><b>${v}</b><i>${ICON.tick}</i></div>`)
+         .join("")}
+       <div class="cfoot">%%SOL%%<span>Filled in when the design was saved. Nothing typed twice.</span></div>`,
+    ),
+  },
+  "hero-proposal.jpg": {
+    html: hero(
+      "PROPOSALS // YOUR BRAND",
+      "Your proposal.",
+      "Not ours.",
+      "Your logo, your colours, your layout. Signed online.",
+      `<div class="pbar"><span class="logo">YOUR LOGO</span><span>Proposal for Olivia Hart</span></div>
+       <div class="pcover"><div class="roof">${Array.from({ length: 14 }, () => "<i></i>").join("")}</div>
+         <div><small>YOUR SYSTEM</small><b>6.65 kW solar</b><b>16 kWh battery</b></div></div>
+       <div class="r"><span>Your price, after the federal rebate</span><b>$18,400</b></div>
+       <div class="go">I'd like to go ahead</div>
+       <div class="chips"><span>Your logo</span><span>Your colours</span><span>Your type</span><span>Your blocks, in your order</span></div>`,
+      `.pbar{background:#0f766e;color:#fff;margin:-22px -24px 16px;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+       .logo{border:1.5px dashed rgba(255,255,255,.7);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;letter-spacing:.14em}
+       .pcover{display:flex;gap:18px;align-items:center;margin-bottom:10px}.pcover small{display:block;font-size:11px;letter-spacing:.14em;color:#6e6e73;font-weight:700}
+       .pcover b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+       .roof{width:190px;height:120px;border-radius:12px;background:#b9a48c;padding:14px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;transform:skewX(-8deg)}
+       .roof i{background:#1b2333;border:1px solid #9aa3b5;border-radius:2px}
+       .go{margin-top:16px;height:50px;border-radius:999px;background:#0f766e;color:#fff;font-weight:600;font-size:17px;display:grid;place-items:center}
+       .chips{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}.chips span{padding:6px 12px;border-radius:999px;background:#ececef;font-size:13px;color:#3a3d43}`,
+    ),
+  },
+  "hero-promo.jpg": {
+    html: hero(
+      "GROWTH // EMAIL MARKETING",
+      "Got an offer?",
+      "Tell Sol.",
+      "He writes the email. You press send.",
+      `<p class="cap">WHAT DO YOU WANT TO ACHIEVE?</p>
+       <div class="tiles"><span>Announce something</span><span class="on">Promote an offer</span><span>Win back quiet contacts</span></div>
+       <p class="cap">YOUR OFFER, IN YOUR WORDS</p>
+       <div class="brief">A battery for customers who already have solar. Free site check in March.</div>
+       <div class="cfoot" style="margin-top:14px">%%SOL%%<span>Written by Sol from your words. Nothing added.</span></div>
+       <div class="mail"><small>SUBJECT</small><b>Your solar is ready for a battery</b><p>Hi Olivia, your panels make more than you use by day. A battery keeps it for the evening…</p></div>`,
+      `.tiles{display:flex;gap:8px;margin-bottom:6px}.tiles span{flex:1;padding:12px 10px;border-radius:12px;box-shadow:inset 0 0 0 1px #d9d9de;font-size:13.5px;text-align:center}
+       .tiles .on{background:#1d1d1f;color:#fff;box-shadow:none;font-weight:600}
+       .brief{padding:12px 14px;border-radius:12px;background:#f4f4f6;font-size:15px;line-height:1.4}
+       .mail{margin-top:14px;padding:14px 16px;border-radius:14px;box-shadow:inset 0 0 0 1px #d9d9de}
+       .mail small{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#6e6e73}.mail b{display:block;font-size:18px;margin-top:3px}
+       .mail p{font-size:14px;line-height:1.45;color:#3a3d43;margin-top:6px}`,
+    ),
+  },
+  "hero-tech.jpg": {
+    html: hero(
+      "SOL // TECHNICAL",
+      "Fronius State 475?",
+      "Ask Sol.",
+      "Answers to hard technical questions, with his sources.",
+      `<div class="q">Fronius is showing State 475. What is it?</div>
+       <div class="a">%%SOL%%<div><p>Fronius lists State 475 as an insulation fault on the DC side: a path to earth somewhere between the panels and the inverter.</p>
+         <p class="k">Check the DC isolators and connectors for water first, then test each string's insulation resistance.</p>
+         <span class="src">${ICON.globe} Sources · 2</span></div></div>
+       <div class="q">And one that's lost its Wi-Fi?</div>
+       <div class="a">%%SOL%%<div><p>Start at the router: many inverters only join a 2.4 GHz network. Then run the inverter's network setup again from its app.</p></div></div>
+       <div class="note">An example answer. Your electrician makes the call on site.</div>`,
+      `.q{margin-left:auto;width:fit-content;max-width:330px;padding:10px 14px;border-radius:16px;box-shadow:inset 0 0 0 1.5px #1d1d1f;font-size:15px;margin-bottom:12px}
+       .a{display:flex;gap:12px;margin-bottom:14px}.a p{font-size:15px;line-height:1.5}.a .k{margin-top:8px;padding:10px 12px;border-radius:10px;background:#fff1e8;box-shadow:inset 0 0 0 1px #ffc9a8}
+       .src{display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:5px 11px;border-radius:999px;background:#ececef;font-size:12.5px;color:#3a3d43}
+       .note{font-size:12px;color:#8a8a90;margin-top:6px}`,
+    ),
+  },
+  "hero-paper.jpg": {
+    html: hero(
+      "AFTER THE SALE // PAPERWORK",
+      "The paperwork,",
+      "lined up.",
+      "Every sold job filed at the step it's waiting on.",
+      `<div class="chead"><div><b>Olivia Hart</b><span>6.65 kW solar · 16 kWh battery</span></div><em>SOLD</em></div>
+       ${[
+         ["Network pre-approval", "Approved", "g"],
+         ["Solar Victoria", "Applied", "a"],
+         ["Installation", "Booked · 12 March", "g"],
+         ["Inspection certificate", "Waiting", "n"],
+         ["STCs", "To claim", "n"],
+         ["Grid connection", "To raise", "n"],
+       ]
+         .map(([k, v, c]) => `<div class="r"><span>${k}</span><u class="${c}">${v}</u></div>`)
+         .join("")}
+       <div class="cfoot">%%SOL%%<span>The next step is the first one not done. Today tells you which.</span></div>`,
+      `.r u{text-decoration:none;font-size:13.5px;font-weight:600;padding:5px 12px;border-radius:999px;background:#ececef;color:#3a3d43}
+       .r u.g{background:#dff5ea;color:#12784f}.r u.a{background:#fff1d6;color:#8a5a00}`,
+    ),
+  },
+  "hero-one.jpg": {
+    html: hero(
+      "ONE WORKSPACE // END TO END",
+      "Six tools.",
+      "One login.",
+      "From the first call to the last invoice, in one place.",
+      `${[
+        ["Lead", "Answered in minutes"],
+        ["Design", "Priced as you draw"],
+        ["Proposal", "Signed online"],
+        ["Order", "Built from what was sold"],
+        ["Install", "On one calendar"],
+        ["Service", "Every case, with its history"],
+      ]
+        .map(([k, v], i) => `<div class="stop"><i>${i + 1}</i><div><b>${k}</b><span>${v}</span></div></div>`)
+        .join("")}
+       <div class="cfoot">%%SOL%%<span>Sol works across all six.</span></div>`,
+      `.stop{display:flex;align-items:center;gap:16px;padding:9px 0;position:relative}
+       .stop i{width:34px;height:34px;border-radius:50%;background:#1d1d1f;color:#fff;font-style:normal;font-weight:600;font-size:14px;display:grid;place-items:center;flex:none;position:relative;z-index:1}
+       .stop:not(:last-of-type)::after{content:"";position:absolute;left:16px;top:38px;width:2px;height:28px;background:#ff5a1f}
+       .stop b{font-size:18px;font-weight:600}.stop span{display:block;font-size:13.5px;color:#6e6e73}`,
+    ),
+  },
+  "hero-reply.jpg": {
+    html: hero(
+      "SOL // REPLIES",
+      "Faster replies.",
+      "Sol drafts. You send.",
+      "From the deal's own record, in your voice.",
+      `<p class="cap">OLIVIA WROTE · 2 MIN AGO</p>
+       <div class="q" style="margin-left:0">Is the battery big enough to get us through the evening?</div>
+       <div class="draft"><small>DRAFTED BY SOL · NOT SENT</small>
+         <p>Hi Olivia, good question. The battery on your proposal holds 16 kWh, and your bill shows about 12 kWh used after dark, so on a typical day it carries the evening.</p>
+         <p>Happy to go through it on a quick call.</p></div>
+       <div class="btns"><span class="on">Send</span><span>Edit first</span><span>Not now</span></div>`,
+      `.q{width:fit-content;max-width:380px;padding:10px 14px;border-radius:16px;background:#ececef;font-size:15px;margin-bottom:14px}
+       .draft{padding:14px 16px;border-radius:14px;background:#fff6ee;box-shadow:inset 0 0 0 1px #ffc9a8}
+       .draft small{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#c2410c}.draft p{font-size:15px;line-height:1.5;margin-top:8px}
+       .btns{display:flex;gap:10px;margin-top:16px}.btns span{height:42px;padding:0 20px;border-radius:999px;display:grid;place-items:center;font-size:15px;font-weight:600;box-shadow:inset 0 0 0 1px #d9d9de}
+       .btns .on{background:#ff5a1f;color:#fff;box-shadow:none}`,
+    ),
+  },
+  "say-list.jpg": {
+    html: statement(
+      "GROWTH // EMAIL MARKETING",
+      "Customers with",
+      "Solar. No battery.",
+      "One list. One email. Written by Sol.",
+      "GROWTH · $19 A MONTH, ON TOP OF YOUR RENUABL PLAN.",
+      128,
+    ),
+  },
+  "say-sources.jpg": {
+    html: statement(
+      "SOL // TECHNICAL",
+      "Every answer comes with",
+      "Sources.",
+      "Maker pages, datasheets and network rules, under the answer.",
+      "SOL IS IN EVERY PLAN.",
+      230,
+    ),
+  },
+  "say-ready.jpg": {
+    html: statement(
+      "DESIGNER // CHECKS",
+      "A light that goes green:",
+      "Ready to install.",
+      "Strings, inverter limits and clearances, checked as you draw.",
+      "A GUIDE, NEVER A SITE INSPECTION.",
+      132,
+      "#34c98a",
+    ),
+  },
+  "say-opened.jpg": {
+    html: statement(
+      "EMAIL // OPENS",
+      "Under every email you send:",
+      "Opened 3 times.",
+      "Know who's reading, and who to ring next.",
+      "AN OPEN IS A GUIDE, NOT PROOF.",
+      140,
     ),
   },
 

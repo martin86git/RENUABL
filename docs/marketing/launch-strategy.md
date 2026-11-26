@@ -217,6 +217,22 @@ Added 26 Nov 2026 (Martin: "another marketing email… emphasising voice… a ni
   - **Picture** `marketing/launch/aday.jpg`. Words: Calls & Texts is $49 a month, on top of your RENUABL plan. Every call says it's your automated assistant, and goes out in calling hours. Button: See the pricing.
 - **Hook:** Made for solar. Design and price a roof while you're on the phone.
 
+### Seven more campaigns of their own
+
+Added 26 Nov 2026 (Martin: "create 7 more… ready in campaigns… different hooks and selling propositions… the pain points in solar: admin, compliance, technical issues needing expertise"). Each is a draft campaign by its own name, opening on a hero picture (the hook large, the product drawn on a white card with made-up customers), then a second part, the designer part and the footers. None is in the series.
+
+| Campaign | Subject | First hook · picture | Second hook · picture |
+| --- | --- | --- | --- |
+| Design it once · the deal fills itself in | Design the roof once. The customer's file fills itself in. | Design it once. Every detail lands on the customer's file. · `hero-fill.jpg` | Take the call. Sol writes it up and fills in the rest. · `explain-crm.gif` |
+| Your proposal, your brand | Your proposal should look like your business | A proposal that looks like you, not like software. · `hero-proposal.jpg` (says custom layouts come with Growth, $19 a month) | Their roof, their system, their price. Signed online. · `explain-designer.gif` |
+| Got an offer? Tell Sol | Got an offer? Tell Sol. He writes the email. | Got an offer? Tell Sol. He writes the email. · `hero-promo.jpg` (Growth, $19 a month) | Everyone with solar and no battery, in one list. · `say-list.jpg` |
+| Hard technical question? Ask Sol | State 475 on a Fronius. What now? | Hard technical question? Ask Sol. · `hero-tech.jpg` (an example answer; the electrician makes the call on site) | An inverter that's lost its Wi-Fi? Ask before you drive out. · `say-sources.jpg` |
+| The paperwork after the sale | Pre-approvals, rebates, grid connection: one list | The paperwork after the sale, lined up for you. · `hero-paper.jpg` | Every string checked against the inverter's limits as you draw. · `say-ready.jpg` |
+| One workspace, end to end | One workspace, from the enquiry to the final invoice | Stop copying the same job into five tools. · `hero-one.jpg` | Open Today and see who needs you. · `today.jpg` |
+| Faster replies · Sol drafts, you send | Reply to every customer while they're still thinking about it | Faster replies. Sol drafts, you press send. · `hero-reply.jpg` | See who opened it, and who to ring next. · `say-opened.jpg` |
+
+**To check before sending:** the Fronius State 475 answer in `hero-tech.jpg` (an insulation fault on the DC side) and the Wi-Fi advice are written as examples from general knowledge, not read from Fronius's pages: have someone technical confirm them. The Growth emails say only its price; they promise no monthly allowance.
+
 ## 6. Must be true before anything is sent
 
 1. **Consent of the list.** Only contacts with express or inferred consent are ever emailed; anyone imported as "Not checked" is skipped. Confirm what consent the bought list carries.
