@@ -14,6 +14,7 @@ const creditsForPack = (n: number) => {
   return pack ? packDollars(pack) : n * 3;
 };
 import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
+import { webhookSecrets } from "@/lib/domain/stripe-webhook";
 
 /**
  * Stripe → RENUABL. On a paid deposit, notes it on the customer's HubSpot
@@ -31,13 +32,14 @@ import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payment
  */
 export async function POST(request: Request) {
   const stripe = stripeClient();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+  // Our own account's events are signed with one secret, the connected accounts' with another. Each variable may hold
+  // several (comma or space apart), and quote marks pasted with a value are forgiven (webhookSecrets).
+  const secrets = webhookSecrets(process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET);
   const signature = request.headers.get("stripe-signature");
-  if (!stripe || !secret || !signature) return new Response("Not configured", { status: 400 });
+  if (!stripe || !secrets.length || !signature) return new Response("Not configured", { status: 400 });
 
-  // Our own account's events are signed with one secret, the connected accounts' with another.
+  // The body exactly as Stripe sent it: the signature is over these bytes.
   const body = await request.text();
-  const secrets = [secret, process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim()].filter((x): x is string => Boolean(x));
   let event: Stripe.Event | null = null;
   for (const s of secrets) {
     try {
@@ -47,7 +49,14 @@ export async function POST(request: Request) {
       // Try the next secret.
     }
   }
-  if (!event) return new Response("Invalid signature", { status: 400 });
+  if (!event) {
+    // Never the secrets themselves: only how many were tried and whether each looks like a signing secret.
+    console.warn(
+      "stripe webhook: no secret matched",
+      secrets.map((x) => (x.startsWith("whsec_") ? "whsec_…" : "not a whsec_ value")),
+    );
+    return new Response("Invalid signature", { status: 400 });
+  }
 
   if (event.account) return connectedEvent(event);
 
