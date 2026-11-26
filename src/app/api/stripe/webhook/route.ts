@@ -8,12 +8,14 @@ import { connectFacts } from "@/lib/server/stripe-billing";
 import { businessOfAccount, updateConnect } from "@/lib/server/design-connect-repo";
 import { recordCardPayment } from "@/lib/server/design-proposal-repo";
 import { cleanPack, packDollars } from "@/lib/domain/design/plans";
+import { sendReceipt } from "@/lib/server/design-receipts";
 
 const creditsForPack = (n: number) => {
   const pack = cleanPack(n);
   return pack ? packDollars(pack) : n * 3;
 };
 import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payments";
+import { webhookSecrets } from "@/lib/domain/stripe-webhook";
 
 /**
  * Stripe → RENUABL. On a paid deposit, notes it on the customer's HubSpot
@@ -22,7 +24,8 @@ import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payment
  * tokens is credited once, and a subscription's changes (trial ending, seats,
  * cancelling) are followed. Configure in Stripe: Developers → Webhooks →
  * endpoint https://<site>/api/stripe/webhook, events checkout.session.completed,
- * customer.subscription.updated and customer.subscription.deleted.
+ * customer.subscription.updated, customer.subscription.deleted and invoice.paid (a business's receipt, with its tax
+ * invoice attached, emailed from RENUABL: design-receipts.ts).
  *
  * Businesses' own Stripe accounts (Stripe Connect, card payments on their proposals): a second endpoint at the same
  * address listening to events on connected accounts, with its own signing secret in STRIPE_CONNECT_WEBHOOK_SECRET:
@@ -31,13 +34,14 @@ import { isDueKey, platformFeeCents } from "@/lib/domain/design/proposal-payment
  */
 export async function POST(request: Request) {
   const stripe = stripeClient();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET?.trim();
+  // Our own account's events are signed with one secret, the connected accounts' with another. Each variable may hold
+  // several (comma or space apart), and quote marks pasted with a value are forgiven (webhookSecrets).
+  const secrets = webhookSecrets(process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET);
   const signature = request.headers.get("stripe-signature");
-  if (!stripe || !secret || !signature) return new Response("Not configured", { status: 400 });
+  if (!stripe || !secrets.length || !signature) return new Response("Not configured", { status: 400 });
 
-  // Our own account's events are signed with one secret, the connected accounts' with another.
+  // The body exactly as Stripe sent it: the signature is over these bytes.
   const body = await request.text();
-  const secrets = [secret, process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim()].filter((x): x is string => Boolean(x));
   let event: Stripe.Event | null = null;
   for (const s of secrets) {
     try {
@@ -47,7 +51,14 @@ export async function POST(request: Request) {
       // Try the next secret.
     }
   }
-  if (!event) return new Response("Invalid signature", { status: 400 });
+  if (!event) {
+    // Never the secrets themselves: only how many were tried and whether each looks like a signing secret.
+    console.warn(
+      "stripe webhook: no secret matched",
+      secrets.map((x) => (x.startsWith("whsec_") ? "whsec_…" : "not a whsec_ value")),
+    );
+    return new Response("Invalid signature", { status: 400 });
+  }
 
   if (event.account) return connectedEvent(event);
 
@@ -67,6 +78,12 @@ export async function POST(request: Request) {
         return new Response("Not saved", { status: 500 });
       }
     }
+    return Response.json({ received: true });
+  }
+
+  if (event.type === "invoice.paid") {
+    // A receipt never fails the webhook: Stripe would only send the event again.
+    await sendReceipt(stripe, event.data.object).catch((e) => console.error("receipt not sent", e instanceof Error ? e.message : e));
     return Response.json({ received: true });
   }
 

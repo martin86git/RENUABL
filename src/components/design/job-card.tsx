@@ -32,15 +32,18 @@ import {
   type Designed,
 } from "@/lib/domain/design/as-built";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
+import { DOC_KIND_WORDS } from "@/lib/domain/design/proposal-datasheets";
 import {
   addNote,
   checkCardPhotos,
   linkFileHref,
+  linkSheetHref,
   linkRoofHref,
   loadInstallerCard,
   loadJobCard,
   sendJobCard,
   teamFileHref,
+  teamSheetHref,
   type JobCardView,
   saveAsBuilt,
 } from "@/lib/services/job-card";
@@ -399,6 +402,7 @@ function CardBody({
   card,
   picture,
   fileHref,
+  sheetHref,
   composer,
   aside,
   onAsBuilt,
@@ -406,6 +410,8 @@ function CardBody({
   card: JobCardView;
   picture: string | null;
   fileHref: (id: string) => string;
+  /** Opens a product's datasheet through the card's own address. */
+  sheetHref?: (id: string) => string;
   composer: React.ReactNode;
   aside?: React.ReactNode;
   /** Keeps the as-built: the team's own way, or through the installer's link. */
@@ -495,6 +501,31 @@ function CardBody({
                 <SystemList details={card.details} racking={card.racking} />
               </section>
             )
+          )}
+
+          {sheetHref && (card.datasheets?.length ?? 0) > 0 && (
+            <section aria-label="Product datasheets">
+              <p className={head}>Product datasheets</p>
+              <ul className="mt-2 space-y-1.5">
+                {card.datasheets!.map((s) => (
+                  <li key={s.id}>
+                    <a
+                      href={sheetHref(s.id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2.5 rounded-md border border-line bg-surface px-3 py-2 text-sm transition hover:border-ink/30"
+                    >
+                      <FileText className="size-4 shrink-0 text-muted" aria-hidden />
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="text-muted">{DOC_KIND_WORDS[s.kind]} · </span>
+                        <span className="text-ink">{s.name}</span>
+                      </span>
+                      <span className="shrink-0 text-[13px] font-medium underline underline-offset-4">Open</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {aside && <section className="space-y-5">{aside}</section>}
@@ -798,6 +829,7 @@ export function JobCardDialog({ jobId, onClose, onEvent }: { jobId: string; onCl
               card={card}
               picture={picture}
               fileHref={(id) => teamFileHref(jobId, id)}
+              sheetHref={(id) => teamSheetHref(jobId, id)}
               onAsBuilt={async (input) => {
                 const res = await saveAsBuilt({ jobId }, input);
                 return res.ok ? { ok: true, asBuilt: res.asBuilt } : { ok: false, message: res.message };
@@ -932,6 +964,7 @@ export function InstallerJobCard({ token, framed, person: known }: { token: stri
           card={card}
           picture={card.roof ? linkRoofHref(token) : null}
           fileHref={(id) => linkFileHref(token, id)}
+          sheetHref={(id) => linkSheetHref(token, id)}
           onAsBuilt={async (input) => {
             const res = await saveAsBuilt({ token }, input, person);
             return res.ok ? { ok: true, asBuilt: res.asBuilt } : { ok: false, message: res.message };
@@ -973,12 +1006,14 @@ export function ReadOnlyJobCard({
   card,
   picture,
   fileHref,
+  sheetHref,
   aside,
 }: {
   card: JobCardView;
   picture: string | null;
   fileHref: (id: string) => string;
+  sheetHref?: (id: string) => string;
   aside?: React.ReactNode;
 }) {
-  return <CardBody card={card} picture={picture} fileHref={fileHref} composer={null} aside={aside} />;
+  return <CardBody card={card} picture={picture} fileHref={fileHref} sheetHref={sheetHref} composer={null} aside={aside} />;
 }

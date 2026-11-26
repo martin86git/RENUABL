@@ -7,6 +7,7 @@
  * The number rung from is the business's own (voice add-on), RENUABL's for RENUABL's own business (`mayCallFromBrowser`).
  */
 import {
+  MAX_LIVE_WORDS,
   MIN_WRITE_UP_WORDS,
   NOT_WRITTEN,
   TICKET_SECONDS,
@@ -16,6 +17,8 @@ import {
   recordingLine,
   wordCount,
   type CallEnd,
+  type LiveEvent,
+  type LiveWords,
 } from "@/lib/domain/browser-call";
 import { normaliseMobile } from "@/lib/domain/contact";
 import { MAX_LINES, joinRuns } from "@/lib/domain/live-call";
@@ -30,7 +33,14 @@ import { numberOf } from "./business-numbers";
 import { hasAddOn } from "./design-addons";
 import { renuablCrm } from "./renuabl-crm";
 import { withSolCredit } from "./sol-credits";
-import { browserCallSettings, startTranscript, transcriptSentences, type BrowserCallSettings } from "./twilio-voice";
+import {
+  browserCallSettings,
+  startLiveTranscription,
+  startTranscript,
+  stopLiveTranscription,
+  transcriptSentences,
+  type BrowserCallSettings,
+} from "./twilio-voice";
 
 export interface BrowserCallRow {
   id: string;
@@ -46,6 +56,8 @@ export interface BrowserCallRow {
   seconds: number | null;
   recording_sid: string | null;
   transcript_sid: string | null;
+  call_sid?: string | null;
+  live_sid?: string | null;
 }
 
 /**
@@ -209,4 +221,91 @@ async function solWritesUp(row: BrowserCallRow, transcript: string): Promise<str
   );
   if (raw === "out") return NOT_WRITTEN.noCredits;
   return callNotesText(cleanCallNotes(raw));
+}
+
+// --- Live words while the note-taker is on (26 Nov 2026, domain/browser-call.ts) ------------------------------------
+
+/** The member's own call under way, or null: only they may switch its live words on or read them. */
+export async function ownCall(id: string, businessId: string, memberEmail: string): Promise<BrowserCallRow | null> {
+  const row = await browserCallById(id);
+  return row && row.business_id === businessId && row.member_email === memberEmail ? row : null;
+}
+
+/**
+ * Has Twilio transcribe both sides of the call from now on. Only while it is ringing or on, and only where the call
+ * is recorded, so the customer has heard that it may be (`noticeTwiml`); "off" otherwise, and the note-taker hears the
+ * member's side in the browser instead.
+ */
+export async function startLiveWords(row: BrowserCallRow): Promise<"on" | "off" | "failed"> {
+  const s = browserCallSettings();
+  if (!s || !s.record || row.status !== "ringing" || !row.call_sid) return "off";
+  if (row.live_sid) await stopLiveTranscription(s, row.call_sid, row.live_sid);
+  const got = await startLiveTranscription(s, row.call_sid, `${s.site}/api/voice/twilio/live?call=${row.id}`);
+  if ("problem" in got) {
+    console.error("live words not started", redactSecrets(got.problem));
+    return "failed";
+  }
+  await query(`update design_browser_calls set live_sid = $2, live_problem = null, live_partial = null where id = $1`, [row.id, got.sid]);
+  return "on";
+}
+
+export async function stopLiveWords(row: BrowserCallRow): Promise<void> {
+  const s = browserCallSettings();
+  if (s && row.call_sid && row.live_sid) await stopLiveTranscription(s, row.call_sid, row.live_sid);
+  await query(`update design_browser_calls set live_sid = null, live_partial = null where id = $1`, [row.id]);
+}
+
+/** One of Twilio's callbacks kept: a final stretch added, a partial one shown on its side until it is final. */
+export async function keepLiveEvent(id: string, transcriptionSid: string, e: LiveEvent): Promise<void> {
+  if (!/^bc_[0-9a-f]{24}$/.test(id)) return;
+  if (e.kind === "words") {
+    const side = e.who;
+    if (e.final)
+      await query(
+        `update design_browser_calls
+            set live_words = coalesce(live_words, '[]'::jsonb) || $2::jsonb,
+                live_partial = coalesce(live_partial, '{}'::jsonb) - $3::text
+          where id = $1 and coalesce(jsonb_array_length(live_words), 0) < $4`,
+        [id, JSON.stringify([{ who: side, text: e.text }]), side, MAX_LIVE_WORDS],
+      );
+    else
+      await query(
+        `update design_browser_calls set live_partial = coalesce(live_partial, '{}'::jsonb) || $2::jsonb
+          where id = $1 and live_sid = $3`,
+        [id, JSON.stringify({ [side]: e.text }), transcriptionSid],
+      );
+  } else if (e.kind === "error") {
+    await query(`update design_browser_calls set live_problem = $2 where id = $1 and live_sid = $3`, [
+      id,
+      e.message || "error",
+      transcriptionSid,
+    ]);
+  } else if (e.kind === "stopped") {
+    await query(`update design_browser_calls set live_partial = null where id = $1 and live_sid = $2`, [id, transcriptionSid]);
+  }
+}
+
+/** What the note-taker shows: the final stretches from `from` on, what is still being made out, and whether it's on. */
+export async function liveWordsOf(
+  id: string,
+  from: number,
+): Promise<{ words: LiveWords[]; total: number; partial: Partial<Record<"us" | "them", string>>; on: boolean; problem: string | null }> {
+  const rows = await query<{
+    live_words: LiveWords[] | null;
+    live_partial: Record<string, string> | null;
+    live_sid: string | null;
+    live_problem: string | null;
+    status: string;
+  }>(`select live_words, live_partial, live_sid, live_problem, status from design_browser_calls where id = $1`, [id]);
+  const r = rows[0];
+  const all = Array.isArray(r?.live_words) ? r.live_words : [];
+  const partial: Partial<Record<"us" | "them", string>> = {};
+  for (const k of ["us", "them"] as const) if (typeof r?.live_partial?.[k] === "string") partial[k] = r.live_partial[k];
+  return {
+    words: all.slice(Math.max(0, from)),
+    total: all.length,
+    partial,
+    on: Boolean(r?.live_sid) && r?.status === "ringing",
+    problem: r?.live_problem ?? null,
+  };
 }

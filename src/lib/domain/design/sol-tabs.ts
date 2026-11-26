@@ -45,8 +45,23 @@ export function tabTitle(question: string): string {
 export const chatSince = (nowMs: number): string => new Date(nowMs - CLOCK_SLACK_MS).toISOString();
 
 /** A tab's turns in Today's conversation. */
-export const tabTurns = (turns: readonly SolTurn[], tab: Pick<SolTab, "since">): SolTurn[] =>
-  roomTurns(turns, "today").filter((t) => t.at >= tab.since);
+export function tabTurns(turns: readonly SolTurn[], tab: Pick<SolTab, "since"> & Partial<Pick<SolTab, "at">>): SolTurn[] {
+  const mine = roomTurns(turns, "today").filter((t) => t.at >= tab.since);
+  if (!tab.at) return mine;
+  // Only this chat's: a question asked after it was minimised belongs to the chat that came after it.
+  const end = new Date(Date.parse(tab.at) + CLOCK_SLACK_MS).toISOString();
+  const next = mine.findIndex((t) => t.role === "you" && t.at > end);
+  return next < 0 ? mine : mine.slice(0, next);
+}
+
+/** A tab's turns in a conversation filed away since (Sol's new chat files Today's turns with his panel's). */
+export const tabTurnsIn = (past: readonly { turns: readonly SolTurn[] }[], tab: Pick<SolTab, "since" | "at">): SolTurn[] => {
+  for (const p of past) {
+    const found = tabTurns(p.turns, tab);
+    if (found.length) return found;
+  }
+  return [];
+};
 
 /** Whether the answer a tab was waiting for has come (an answer of Sol's after its question was asked). */
 export const answerCame = (turns: readonly SolTurn[], tab: Pick<SolTab, "since" | "waitingSince">): boolean =>

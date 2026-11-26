@@ -28,7 +28,7 @@ describe("the sign-up page for solar businesses", () => {
       ["Your AI right hand", "50", "credits a user a month, included"],
       ["Your design studio", "$3", "a site"],
       ["Your marketing department", "$19", "a month for your business"],
-      ["Your checkout", "1%", "a payment"],
+      ["Your checkout", "2.5%", "a payment"],
     ]);
   });
 

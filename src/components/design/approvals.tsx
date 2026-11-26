@@ -7,6 +7,7 @@ import { GATES, atGate, daysWaiting, networkOf, preApprovalOf, solarVicOf, type 
 import { PRE_APPROVAL, SOLAR_VIC_STATUS } from "@/lib/domain/design/deal-sections";
 import { loadApprovals, saveJob, type JobLine } from "@/lib/services/crm";
 import { PATHS, PageHead, ui } from "./design-shell";
+import { PreApprovalCard } from "./sol-portal-card";
 
 const TONE: Record<Tone, string> = { through: "text-positive", waiting: "text-sun-ink", missing: "text-danger" };
 
@@ -19,15 +20,21 @@ const TONE: Record<Tone, string> = { through: "text-positive", waiting: "text-su
 export function ApprovalsPage({ gate }: { gate: Gate }) {
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [applying, setApplying] = useState<string | null>(null);
   useEffect(() => {
     let gone = false;
-    void loadApprovals().then((res) => {
-      if (gone) return;
-      if (res.ok) setJobs(res.jobs);
-      else setProblem(res.message);
-    });
+    const read = () =>
+      void loadApprovals().then((res) => {
+        if (gone) return;
+        if (res.ok) setJobs(res.jobs);
+        else setProblem(res.message);
+      });
+    read();
+    // A deal changed from its pre-approval card (or anywhere): the rows follow.
+    window.addEventListener("renuabl:approvals", read);
     return () => {
       gone = true;
+      window.removeEventListener("renuabl:approvals", read);
     };
   }, []);
   const here = GATES.find((g) => g.id === gate)!;
@@ -114,12 +121,28 @@ export function ApprovalsPage({ gate }: { gate: Gate }) {
                     ))}
                   </select>
                 </label>
-                <Link
-                  href={`${PATHS.deals}/${encodeURIComponent(j.id)}`}
-                  className={clsx(gate === "book" ? ui.primary : ui.quiet, "h-9 px-3")}
-                >
-                  {gate === "book" ? "Book a date" : "Open deal"}
-                </Link>
+                {gate === "preapproval" ? (
+                  <button
+                    type="button"
+                    className={clsx(applying === j.id ? ui.quiet : ui.primary, "h-9 px-3")}
+                    onClick={() => setApplying(applying === j.id ? null : j.id)}
+                  >
+                    {applying === j.id ? "Close" : pre.words === "Submitted" ? "Record outcome" : "Apply"}
+                  </button>
+                ) : (
+                  <Link
+                    href={`${PATHS.deals}/${encodeURIComponent(j.id)}`}
+                    className={clsx(gate === "book" ? ui.primary : ui.quiet, "h-9 px-3")}
+                  >
+                    {gate === "book" ? "Book a date" : "Open deal"}
+                  </Link>
+                )}
+                {/* The application worked through in place (26 Nov 2026, Martin): details, the network's portal, where it stands. */}
+                {applying === j.id && (
+                  <div className="md:col-span-4">
+                    <PreApprovalCard jobId={j.id} />
+                  </div>
+                )}
               </li>
             );
           })}

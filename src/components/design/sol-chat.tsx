@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { useNameHintBox } from "./name-hint-box";
 import { Bell, CornerUpLeft, History, MessageSquarePlus, Minus, Plus, RefreshCw, X, Pin } from "lucide-react";
 import type { SolGoTo } from "@/lib/domain/design/sol-goto";
+import { SolPortalCard } from "./sol-portal-card";
 import { openDesigner } from "./design-drawer";
 import { pageAt } from "@/lib/domain/design/sections";
 import { currentPageContext } from "@/lib/services/page-context";
@@ -667,6 +668,7 @@ export function SolChat({
                 }
               />
             ) : null}
+            {t.role === "sol" && t.portal && <SolPortalCard portal={t.portal} />}
             {t.charts?.map((c, k) => (
               <SolChartView key={k} chart={c} />
             ))}

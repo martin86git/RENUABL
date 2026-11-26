@@ -26,6 +26,8 @@ import {
   ShoppingBag,
   Timer,
   CirclePlay,
+  PanelTop,
+  PaintBucket,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
@@ -40,6 +42,13 @@ import {
   SOCIAL_NETWORKS,
   SOCIAL_WORDS,
   SPACER_SIZES,
+  BUTTON_SHAPES,
+  BUTTON_SHAPE_WORDS,
+  BUTTON_SIZES,
+  BUTTON_SIZE_WORDS,
+  buttonLook,
+  buttonShapeOf,
+  buttonSizeOf,
   SPACER_WORDS,
   SOCIAL_LOOKS,
   SOCIAL_LOOK_WORDS,
@@ -50,6 +59,8 @@ import {
   cleanColumns,
   cleanLink,
   footerLines,
+  inksOn,
+  BAR_BUTTON,
   fromNameOf,
   lookOf,
   letterWarnings,
@@ -100,6 +111,7 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   products: ShoppingBag,
   countdown: Timer,
   video: CirclePlay,
+  bar: PanelTop,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
@@ -107,7 +119,7 @@ const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
   { name: "Basics", kinds: ["heading", "text", "button", "image", "video", "products", "countdown"] },
-  { name: "Layout", kinds: ["tiles", "divider", "spacer", "social"] },
+  { name: "Layout", kinds: ["bar", "tiles", "divider", "spacer", "social"] },
 ];
 
 /** When a change was made, for grouping typing into one undo step. */
@@ -358,6 +370,33 @@ export function EdmBuilder({
     flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
     return true;
   }
+  // The member's direction for the whole email, and whether there is an email yet to change.
+  const [direction, setDirection] = useState("");
+  const hasDraft = Boolean(
+    content.subject.trim() ||
+    content.preview.trim() ||
+    content.blocks.some((b) => (b.kind === "text" || b.kind === "heading") && b.text.trim() && b.text.trim() !== "Hi {firstName},"),
+  );
+  async function changeEmail() {
+    const { draft } = draftFor();
+    setBusy("direction");
+    setSolMsg(null);
+    const r = await writeWithSol({ part: "all", brief, draft, note: direction });
+    setBusy(null);
+    if (!r.ok) return setSolMsg({ ok: false, text: r.message });
+    let blocks = content.blocks;
+    const fill = (kind: "heading" | "text", words: string | undefined) => {
+      if (words === undefined) return;
+      const id = blocks.find((b) => b.kind === kind)?.id;
+      if (id) blocks = blocks.map((b) => (b.id === id ? { ...b, text: words } : b));
+    };
+    fill("heading", r.heading);
+    fill("text", r.text);
+    change({ ...content, subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
+    setUndo(true);
+    setDirection("");
+    flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
+  }
   // Sol's button beside a field opens his box under it: what to change, then a choice. It no longer rewrites on a press.
   const solRound = (part: EdmSolPart, label: string, blockId?: string) =>
     readOnly ? null : (
@@ -570,7 +609,7 @@ export function EdmBuilder({
                   )}
                   <CanvasBlock
                     block={b}
-                    ink={ink}
+                    ink={b.fill && b.kind !== "bar" ? inksOn(b.fill, style) : ink}
                     picked={selected === b.id}
                     onPick={() => (setSelected(b.id), setAdding(null))}
                     onDragEnd={() => setDropAt(null)}
@@ -626,8 +665,39 @@ export function EdmBuilder({
                     <X className="size-4" />
                   </button>
                 </div>
+                {/* Direction for the whole email once there is one (26 Nov 2026, Martin: "the ability to provide sol feedback
+                    in a text box to give direction around the marketing"): Sol rewrites it as told, keeping what works. */}
+                {hasDraft && (
+                  <div className="mt-3">
+                    <label htmlFor="sol-direction" className="text-[12px] font-medium text-ink-2">
+                      Tell Sol what to change
+                    </label>
+                    <textarea
+                      id="sol-direction"
+                      autoFocus
+                      value={direction}
+                      maxLength={EDM_SOL_LIMITS.direction}
+                      rows={3}
+                      onChange={(e) => setDirection(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && direction.trim()) void changeEmail();
+                      }}
+                      placeholder="e.g. Lead with the voice agent booking calls. Shorter, less salesy. Make the subject a question."
+                      className={cn(field, "mt-1 h-auto resize-none py-2 text-[13px] leading-relaxed")}
+                    />
+                    <button
+                      disabled={busy !== null || !direction.trim()}
+                      onClick={() => void changeEmail()}
+                      className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas disabled:bg-line disabled:text-muted"
+                    >
+                      {busy === "direction" ? <Loader2 className="size-4 animate-spin" /> : <SolIcon className="size-4" />}
+                      Change the email
+                    </button>
+                    <p className="mt-3 text-[12px] font-medium text-ink-2">Or write it again from a brief</p>
+                  </div>
+                )}
                 <textarea
-                  autoFocus
+                  autoFocus={!hasDraft}
                   value={brief}
                   maxLength={EDM_SOL_LIMITS.brief}
                   rows={4}
@@ -908,7 +978,10 @@ function CanvasBlock({
         picked ? "outline-2 outline-sun-line outline-solid" : "outline-1 outline-dashed",
       )}
       // The dashed edge is drawn in the words' own colour, so it shows on a dark background as on a light one.
-      style={picked ? undefined : { outlineColor: `color-mix(in srgb, ${ink.words} 28%, transparent)` }}
+      style={{
+        ...(picked ? {} : { outlineColor: `color-mix(in srgb, ${ink.words} 28%, transparent)` }),
+        ...(b.fill && b.kind !== "bar" ? { background: b.fill } : {}),
+      }}
     >
       <div
         className={cn(
@@ -947,6 +1020,7 @@ function CanvasBlock({
         </IconButton>
       </div>
 
+      {b.kind === "bar" && <BarView block={b} colour={colour} picked={picked} onChange={onChange} />}
       {b.kind === "heading" && (
         <AutoText
           value={b.text}
@@ -972,18 +1046,21 @@ function CanvasBlock({
       {solAsk && <div onClick={(e) => e.stopPropagation()}>{solAsk}</div>}
       {b.kind === "button" && (
         <div className="py-2" style={{ textAlign: align }}>
-          <span className="inline-block rounded-full px-6 py-3" style={{ background: colour }}>
+          <span className={b.wide ? "block text-center" : "inline-block"} style={buttonStyle(b, colour)}>
             <input
               value={b.text}
               maxLength={EDM_LIMITS.label}
               size={Math.max(6, b.text.length)}
               onChange={(e) => onChange({ text: e.target.value })}
               placeholder="Button"
-              className="bg-transparent text-center text-[15px] font-semibold text-white outline-none placeholder:text-white/70"
+              className="bg-transparent text-center font-semibold outline-none placeholder:text-current placeholder:opacity-70"
+              style={{ color: "inherit", fontSize: "inherit" }}
             />
           </span>
           {picked && (
             <div className="mt-3 text-left">
+              <ButtonLookFields block={b} colour={colour} onChange={onChange} />
+              <div className="h-2" />
               <LinkInput value={b.url} onChange={(url) => onChange({ url })} />
               {b.url === null && <p className="mt-1 text-[12px] text-muted">A button needs an https link.</p>}
             </div>
@@ -1067,6 +1144,14 @@ function CanvasBlock({
           <CountdownView endsAt={b.endsAt ?? null} colour={colour} ink={ink} align={align} />
           {picked && <CountdownFields block={b} onChange={onChange} />}
         </>
+      )}
+      {picked && (
+        <PanelColour
+          value={b.fill ?? null}
+          colour={colour}
+          label={b.kind === "bar" ? "Bar colour" : "Panel colour"}
+          onChange={(fill) => onChange(() => ({ fill: fill ?? undefined }))}
+        />
       )}
       {b.kind === "products" &&
         (picked ? (
@@ -1768,6 +1853,224 @@ function Toggle({ on, onClick, label, children }: { on: boolean; onClick: () => 
     >
       {children}
     </button>
+  );
+}
+
+/** A top bar: its line beside a button, the strip in a soft grey (or its own colour), as the email will show it. */
+function BarView({
+  block: b,
+  colour,
+  picked,
+  onChange,
+}: {
+  block: EdmBlock;
+  colour: string;
+  picked: boolean;
+  onChange: (patch: BlockPatch) => void;
+}) {
+  const ground = b.fill ?? "#f4f4f5";
+  const on = inksOn(ground, DEFAULT_STYLE);
+  return (
+    <div>
+      <div className="flex items-center gap-3 rounded-xl px-4 py-2.5" style={{ background: ground }}>
+        <input
+          value={b.text}
+          maxLength={EDM_LIMITS.heading}
+          onChange={(e) => onChange({ text: e.target.value })}
+          placeholder="Ready to get started?"
+          aria-label="The bar's line"
+          className="min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+          style={{ color: on.heading }}
+        />
+        <span className="shrink-0" style={buttonStyle(b, colour)}>
+          <input
+            value={b.label ?? ""}
+            maxLength={EDM_LIMITS.label}
+            size={Math.max(6, (b.label ?? "").length)}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder={BAR_BUTTON}
+            aria-label="The bar's button"
+            className="bg-transparent text-center font-semibold outline-none placeholder:text-current placeholder:opacity-70"
+            style={{ color: "inherit", fontSize: "inherit" }}
+          />
+        </span>
+      </div>
+      {picked && (
+        <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+          <LinkInput value={b.url} onChange={(url) => onChange({ url })} />
+          <p className="mt-1 text-[12px] text-muted">
+            {b.url === null ? "The button needs an https link. " : ""}At the top of the email, it shows above your logo.
+          </p>
+          <ButtonLookFields block={b} colour={colour} onChange={onChange} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A button's box in the builder, as the email will draw it. */
+function buttonStyle(b: EdmBlock, colour: string) {
+  const l = buttonLook(b, colour);
+  return {
+    background: l.background,
+    color: l.ink,
+    fontSize: l.fontSize,
+    padding: `${l.padY}px ${l.padX}px`,
+    borderRadius: l.radius,
+  };
+}
+
+/**
+ * A button's look (26 Nov 2026, Martin: "edit button shapes and sizes, button colors"): its shape, its size, how wide
+ * (a Button block only) and its colour, the brand's unless another is picked. Its words are typed on the button itself.
+ */
+const BUTTON_SWATCHES = ["#0b0b0c", "#ff5a1f", "#1f6feb", "#16a34a"];
+function ButtonLookFields({ block: b, colour, onChange }: { block: EdmBlock; colour: string; onChange: (patch: BlockPatch) => void }) {
+  const shape = buttonShapeOf(b);
+  const size = buttonSizeOf(b);
+  const swatches = BUTTON_SWATCHES.filter((c) => c !== colour.toLowerCase());
+  const group = "flex items-center gap-1";
+  return (
+    <div
+      className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className={group} role="group" aria-label="Button shape">
+        <span className="pr-1 text-muted">Shape</span>
+        {BUTTON_SHAPES.map((k) => (
+          <Toggle
+            key={k}
+            on={shape === k}
+            onClick={() => onChange(() => ({ shape: k === buttonShapeOf({ kind: b.kind }) ? undefined : k }))}
+            label={`${BUTTON_SHAPE_WORDS[k]} button`}
+          >
+            <span
+              className="block h-3 w-6 border-[1.5px] border-current"
+              style={{ borderRadius: k === "pill" ? 999 : k === "rounded" ? 4 : 0 }}
+            />
+          </Toggle>
+        ))}
+      </div>
+      <div className={group} role="group" aria-label="Button size">
+        <span className="pr-1 text-muted">Size</span>
+        {BUTTON_SIZES.map((k) => (
+          <Toggle
+            key={k}
+            on={size === k}
+            onClick={() => onChange(() => ({ size: k === "medium" ? undefined : k }))}
+            label={`${BUTTON_SIZE_WORDS[k]} button`}
+          >
+            <span className="px-0.5 font-medium">{BUTTON_SIZE_WORDS[k][0]}</span>
+          </Toggle>
+        ))}
+      </div>
+      {b.kind === "button" && (
+        <div className={group} role="group" aria-label="Button width">
+          <span className="pr-1 text-muted">Width</span>
+          <Toggle on={!b.wide} onClick={() => onChange(() => ({ wide: undefined }))} label="As wide as its words">
+            <span className="px-1 font-medium">Fit</span>
+          </Toggle>
+          <Toggle on={b.wide === true} onClick={() => onChange(() => ({ wide: true }))} label="As wide as the email">
+            <span className="px-1 font-medium">Full</span>
+          </Toggle>
+        </div>
+      )}
+      <div className={group} role="group" aria-label="Button colour">
+        <span className="pr-1 text-muted">Colour</span>
+        <button
+          type="button"
+          onClick={() => onChange(() => ({ colour: undefined }))}
+          aria-pressed={!b.colour}
+          className={cn(
+            "flex h-7 items-center gap-1.5 rounded-full px-2.5 ring-1",
+            b.colour ? "ring-line hover:ring-ink/40" : "bg-ink text-canvas ring-ink",
+          )}
+        >
+          <span className="size-3 rounded-full ring-1 ring-white/40" style={{ background: colour }} />
+          Brand
+        </button>
+        {swatches.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-label={`Button colour ${c}`}
+            aria-pressed={b.colour === c}
+            onClick={() => onChange({ colour: c })}
+            className={cn(
+              "size-7 rounded-full ring-1 ring-black/15",
+              b.colour === c && "outline-2 outline-offset-2 outline-sun-line outline-solid",
+            )}
+            style={{ background: c }}
+          />
+        ))}
+        <label className="relative size-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-black/15" title="Another colour">
+          <span className="grid size-full place-items-center bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)]" />
+          <input
+            type="color"
+            value={b.colour ?? colour}
+            onChange={(e) => onChange({ colour: e.target.value.toLowerCase() })}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            aria-label="Another button colour"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/** A panel behind the block: none, a few quiet colours, the brand colour or any other. Blocks in a row of one colour make one panel. */
+const PANEL_SWATCHES = ["#f4f4f5", "#eef2ff", "#fff3ea", "#e8f5ec", "#26282c"];
+function PanelColour({
+  value,
+  colour,
+  label,
+  onChange,
+}: {
+  value: string | null;
+  colour: string;
+  label: string;
+  onChange: (fill: string | null) => void;
+}) {
+  const swatches = [...PANEL_SWATCHES, colour.toLowerCase()].filter((c, i, all) => all.indexOf(c) === i);
+  return (
+    <div
+      className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <PaintBucket className="size-3.5 text-muted" />
+      <span className="text-muted">{label}</span>
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        className={cn("h-7 rounded-full px-2.5 ring-1", value ? "ring-line hover:ring-ink/40" : "bg-ink text-canvas ring-ink")}
+      >
+        None
+      </button>
+      {swatches.map((c) => (
+        <button
+          key={c}
+          type="button"
+          aria-label={`Panel colour ${c}`}
+          aria-pressed={value === c}
+          onClick={() => onChange(c)}
+          className={cn(
+            "size-7 rounded-full ring-1 ring-black/15",
+            value === c && "outline-2 outline-offset-2 outline-sun-line outline-solid",
+          )}
+          style={{ background: c }}
+        />
+      ))}
+      <label className="relative size-7 cursor-pointer overflow-hidden rounded-full ring-1 ring-black/15" title="Another colour">
+        <span className="grid size-full place-items-center bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)] text-[10px]" />
+        <input
+          type="color"
+          value={value ?? "#eef2ff"}
+          onChange={(e) => onChange(e.target.value.toLowerCase())}
+          className="absolute inset-0 cursor-pointer opacity-0"
+        />
+      </label>
+      <span className="basis-full pt-0.5 text-[11px] text-muted">Blocks next to each other in one colour make one panel.</span>
+    </div>
   );
 }
 

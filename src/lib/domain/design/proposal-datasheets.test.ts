@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { COST_WORDS, type ProposalInternal } from "./proposal";
 import {
   customerDatasheets,
+  designProducts,
+  sheetsInMix,
   datasheetId,
   isDatasheetId,
   productForId,
@@ -98,5 +100,32 @@ describe("what the customer is sent", () => {
     ];
     expect(sheetsForChoice(sheets, "payback")).toHaveLength(1);
     expect(sheetsForChoice(sheets, "return")).toHaveLength(2);
+  });
+});
+
+describe("designProducts and sheetsInMix", () => {
+  it("reads a design's products once each", () => {
+    const got = designProducts({
+      panel: { sku: "JKM475", name: "Jinko 475 W" },
+      inverters: [
+        { sku: "SG5", name: "Sungrow 5 kW" },
+        { sku: "sg-5", name: "Sungrow 5 kW" },
+      ],
+      battery: { sku: "SIG8", name: "Sigenergy 8 kWh" },
+    });
+    expect(got.map((p) => p.kind)).toEqual(["panel", "inverter", "battery"]);
+  });
+
+  it("keeps the sheets the mix names, all of a kind when none is named, none of a kind it lacks", () => {
+    const sheets = [
+      { id: "a", kind: "panel", name: "Jinko 475 W" },
+      { id: "b", kind: "panel", name: "Tindo 430 W" },
+      { id: "c", kind: "inverter", name: "Odd inverter name" },
+      { id: "d", kind: "battery", name: "Sigenergy 8 kWh" },
+    ] as const;
+    const one = sheetsInMix([...sheets], { words: "Panels: 14 × Jinko 475 W; Inverter: Sungrow", has: { battery: true } });
+    expect(one.map((s) => s.id)).toEqual(["a", "c", "d"]);
+    const none = sheetsInMix([...sheets], { words: "Jinko 475 W", has: { battery: false } });
+    expect(none.map((s) => s.id)).toEqual(["a", "c"]);
   });
 });

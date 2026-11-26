@@ -15,6 +15,91 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Pre-approvals",
+    words: "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
+    words: "A minimised page waits as a tab on the top left of the grey pad, on every page, named by its section.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
+    words: "Every page's minimise is now the same larger round, inside the grey pad's top right corner.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Marketing",
+    words: "Email buttons: choose a button's shape, size, width and colour, on a Button block and on the top bar's button.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Today",
+    words: "Minimise sits beside the chat's first message with a mark of its own; a minimised chat opens again from any page.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Calls",
+    words: "Calling from the computer: Note-taker on the call bar types up both sides live, then writes the call up on the deal.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Voice agents",
+    words: "Texting a customer from a voice agent's call window lets you sign off as yourself or as the agent.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Design tool",
+    words: "Sides now draws your panels on the angled photos as you lay them, beside the plan, on the side that shows them best.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from HubSpot shows a moving bar and a timer while it looks, so you can see it is still working.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from HubSpot joins a deal to the customer's existing deal for the same job, rather than making a second.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Bring in from Pylon now fills in the jobs your export brought in, with their signed PDFs, instead of skipping them.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "A deal's timeline now says whenever its address changes. The designer moves a deal only after you say yes.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
+    words: "A deal's Installation details show its installer invoice: what the quote allowed, what was billed, and Compare.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Marketing",
+    words: "Email builder: a Top bar block (a line and a button above your logo) and a panel colour for any block.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "On a phone, Sol's chat stops above the foot bar, so its send button is never hidden behind it.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "On a phone, the dock's turning ball steps aside while Sol's chat is open, so his microphone isn't covered.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Sol",
+    words: "In Sol's draft emails, pick a written web address and press Link to turn it into linked words.",
+  },
+  {
+    day: "2026-11-26",
     area: "Everywhere",
     words: "A minus at the top right of a page puts it aside as a chip at the foot of the screen; press the chip to go back.",
   },
@@ -22,6 +107,16 @@ export const UPDATES: readonly Update[] = [
     day: "2026-11-26",
     area: "Deals",
     words: "The deal's buttons down the left are a little smaller.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Installations",
+    words: "The job card lists each product's datasheet, for your team, the installer's link and the inspector.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The configurator lists the datasheets for the system the customer has picked.",
   },
   {
     day: "2026-11-26",
@@ -124,6 +219,7 @@ export const UPDATES: readonly Update[] = [
     area: "Deals",
     words: "On a phone, a deal's install day sits on its own line under the kit at the top of the deal.",
   },
+  { day: "2026-11-26", area: "Billing", words: "When you pay RENUABL, a receipt is emailed with your tax invoice attached as a PDF." },
   { day: "2026-11-25", area: "Designer", words: "Tap Sol to ask him; his + opens the tools. Zoom − and + sit either side of him." },
   { day: "2026-11-25", area: "Designer", words: "Undo pops up beside a change you just made on the map, for a few seconds." },
   {

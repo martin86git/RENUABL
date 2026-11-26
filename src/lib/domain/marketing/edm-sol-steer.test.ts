@@ -58,3 +58,19 @@ describe("steering Sol on one part of an email", () => {
     expect(cleanEdmSolOptions("preview", { options: "no" })).toEqual([]);
   });
 });
+
+describe("direction for the whole email (26 Nov 2026, Martin)", () => {
+  it("rewrites the email as told, keeping what works, under the same rules", () => {
+    const draft = {
+      subject: "Your new AI sales team?",
+      preview: "Renuabl is AI for solar",
+      heading: "Hi",
+      text: "Hi {firstName},\n\nQuick question.",
+    };
+    const p = edmSolPrompt("all", { business: "Renuabl", brief: "", draft, note: "Shorter, and lead with the voice agent." });
+    expect(p).toContain("Rewrite this marketing email as the member's feedback asks");
+    expect(p).toContain("<feedback>\nShorter, and lead with the voice agent.\n</feedback>");
+    expect(p).toContain("Never add a figure");
+    expect(edmSolPrompt("all", { business: "Renuabl", brief: "A launch", draft })).toContain("Write all four parts");
+  });
+});

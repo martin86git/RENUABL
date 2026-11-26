@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { ArrowUpRight, Check, ChevronDown, CircleAlert, KeyRound } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, CircleAlert, KeyRound, Loader2 } from "lucide-react";
 import { JOB_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import {
   HUBSPOT_BATCH,
@@ -26,11 +26,46 @@ type Run = {
   failed: number;
   skipped: number;
   lines: number;
+  joined: number;
   running: boolean;
   stopped: boolean;
 };
 
 const ENGAGEMENT_WORDS: Record<EngagementType, string> = { notes: "notes", emails: "emails", calls: "calls", meetings: "meetings" };
+
+/**
+ * While HubSpot is being read (26 Nov 2026, Martin: the greyed button looked frozen): a bar that keeps moving, what is
+ * being done and how long it has been, counted each second, so it is plain the page is still working.
+ */
+function StillLooking() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const doing = seconds < 6 ? "Reading your pipelines and stages" : seconds < 20 ? "Reading your deals" : "Still reading your deals";
+  return (
+    <div className="mt-3 rounded-xl bg-surface-2 px-3 py-2.5" role="status" aria-live="polite">
+      <p className="flex items-center justify-between gap-3 text-sm text-ink">
+        <span>{doing}…</span>
+        <span className="tabular-nums text-muted">{seconds}s</span>
+      </p>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-line">
+        <div className="hubspot-looking h-full w-1/3 rounded-full bg-sun-line" />
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        {seconds < 20
+          ? "This can take up to a minute with a lot of deals. Leave this page open."
+          : "Still working: a large HubSpot takes a while. Nothing has failed; you'll see a message here if it does."}
+      </p>
+      <style>{`
+        @keyframes hubspot-looking { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+        .hubspot-looking { animation: hubspot-looking 1.4s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .hubspot-looking { animation: none; width: 100%; opacity: 0.5; } }
+      `}</style>
+    </div>
+  );
+}
 
 /**
  * Settings → CRM → Bring in from HubSpot (23 Nov 2026, Martin). The token is held in this page only while it runs; the
@@ -93,7 +128,7 @@ export function HubSpotImportSettings() {
     stop.current = false;
     const names = new Map(look.deals.map((d) => [d.id, d.name || `Deal ${d.id}`]));
     const list = toBring;
-    let state: Run = { done: 0, total: list.length, already: 0, failed: 0, skipped: 0, lines: 0, running: true, stopped: false };
+    let state: Run = { done: 0, total: list.length, already: 0, failed: 0, skipped: 0, lines: 0, joined: 0, running: true, stopped: false };
     setRun(state);
     setProblem(null);
     const failed: { name: string; why: string }[] = [];
@@ -118,7 +153,7 @@ export function HubSpotImportSettings() {
       for (const r of res.results as HsOutcome[]) {
         if (r.result === "in") {
           kept.push(r.id);
-          state = { ...state, done: state.done + 1, lines: state.lines + r.lines };
+          state = { ...state, done: state.done + 1, lines: state.lines + r.lines, joined: state.joined + (r.joined ? 1 : 0) };
         } else if (r.result === "already") {
           kept.push(r.id);
           state = { ...state, done: state.done + 1, already: state.already + 1 };
@@ -187,10 +222,12 @@ export function HubSpotImportSettings() {
             disabled={run?.running}
           />
           <button type="submit" className={ui.primary} disabled={!key.trim() || busy || run?.running}>
+            {busy && <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />}
             {busy ? "Looking in HubSpot…" : look ? "Look again" : "Find my deals"}
           </button>
         </form>
         <p className="mt-2 text-xs text-muted">{HUBSPOT_WORDS.keyKept}</p>
+        {busy && <StillLooking />}
       </div>
 
       {problem && (

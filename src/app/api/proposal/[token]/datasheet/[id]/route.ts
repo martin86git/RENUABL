@@ -1,3 +1,5 @@
+import { isDatasheetId } from "@/lib/domain/design/proposal-datasheets";
+import { datasheetResponse } from "@/lib/server/datasheet-response";
 import { answer } from "@/lib/server/design-context";
 import { publicDatasheet } from "@/lib/server/design-proposal-repo";
 import { allow } from "@/lib/server/rate-limit";
@@ -10,19 +12,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/proposal/[to
   return answer(async () => {
     const { token, id } = await ctx.params;
     if (!allow(request, "proposal-datasheet", 120)) return new Response(null, { status: 429 });
-    const file = /^[a-f0-9]{48}$/.test(token) ? await publicDatasheet(token, id) : null;
-    if (!file) return new Response("Not found", { status: 404 });
-    const name = file.fileName || `datasheet${file.type === "application/pdf" ? ".pdf" : ""}`;
-    return new Response(new Uint8Array(file.bytes), {
-      headers: {
-        "content-type": file.type,
-        "content-disposition": `inline; filename*=UTF-8''${encodeURIComponent(name)}`,
-        "cache-control": "private, max-age=3600",
-        "x-content-type-options": "nosniff",
-        "x-robots-tag": "noindex, nofollow",
-        "referrer-policy": "no-referrer",
-        "content-security-policy": "sandbox; default-src 'none'; img-src 'self'",
-      },
-    });
+    const ok = /^[a-f0-9]{48}$/.test(token) && isDatasheetId(id);
+    return datasheetResponse(ok ? await publicDatasheet(token, id) : null);
   });
 }

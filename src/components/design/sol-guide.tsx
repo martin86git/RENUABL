@@ -67,7 +67,8 @@ export function SolGuide(props: {
   onFind: () => void;
   onPanel: (use: boolean) => void;
   /** The panels already on the roof: replaced (new ones may go where they are) or worked around. */
-  onExisting: (replace: boolean) => void;
+  /** Replaced, worked around, or "none": the check was wrong and there are no panels there. */
+  onExisting: (replace: boolean | "none") => void;
   onPlace: () => void;
   onReached: (done: boolean) => void;
   /** Commence the shade analysis, or pass it by. */
@@ -444,10 +445,13 @@ export function SolGuide(props: {
       case "existing":
         return (
           <>
-            <p>There are panels on this roof already. Are they being replaced, or do we work around them?</p>
+            <p>
+              I think there are panels on this roof already (marked on the picture). Are they being replaced, or do we work around them?
+            </p>
             <Actions>
               <Quiet onClick={() => props.onExisting(true)}>Replace them</Quiet>
               <Quiet onClick={() => props.onExisting(false)}>Work around them</Quiet>
+              <Quiet onClick={() => props.onExisting("none")}>There aren&apos;t any</Quiet>
             </Actions>
           </>
         );

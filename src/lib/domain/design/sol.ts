@@ -19,6 +19,8 @@ import { SOL_REGULATIONS } from "./standards";
 import { SOL_ORACLE, cleanSources, type SolSource } from "./sol-knowledge";
 import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-context";
 import { cleanGoTo, type SolGoTo } from "./sol-goto";
+import { cleanPortal, type SolPortal } from "./sol-portal";
+import { cleanSuggestion } from "./preapproval";
 import { cleanNewCase, cleanRoom, sameTalk, type NewCaseAsk, type SolRoom } from "./sol-rooms";
 import { cleanLearnAsk, prefsBlock, SOL_LEARNING, type BusinessScope, type Induction, type LearnAsk } from "./sol-induction";
 
@@ -79,6 +81,8 @@ export interface SolTurn {
   shown?: string;
   /** A page Sol opened for them (sol-goto.ts): the chat goes there as the answer comes in. */
   goTo?: SolGoTo;
+  /** A network's pre-approval portal he put up to open, with the deal's details to copy across (sol-portal.ts). */
+  portal?: SolPortal;
   /** The screen it was asked from, whose own conversation it belongs to (sol-rooms.ts). */
   room?: SolRoom;
   /** The card he raised to start a service case (sol-rooms.ts). */
@@ -237,6 +241,8 @@ export function cleanTurns(raw: unknown): SolTurn[] {
       const sources = cleanSources(t.sources);
       const shown = role === "you" ? cleanShown(t.shown) : "";
       const goTo = role === "sol" ? cleanGoTo(t.goTo) : null;
+      const portal = role === "sol" ? cleanPortal(t.portal) : null;
+      const suggest = portal?.jobId ? cleanSuggestion((t.portal as { suggest?: unknown }).suggest) : null;
       const room = cleanRoom(t.room);
       const newCase = role === "sol" ? cleanNewCase(t.newCase) : undefined;
       const meeting = role === "sol" && isMeetingId(t.meeting) ? t.meeting : undefined;
@@ -262,6 +268,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(typeof t.credits === "number" && Number.isInteger(t.credits) && t.credits > 0 && t.credits < 100 ? { credits: t.credits } : {}),
         ...(shown ? { shown } : {}),
         ...(goTo ? { goTo } : {}),
+        ...(portal ? { portal: suggest ? { ...portal, suggest } : portal } : {}),
         ...(room ? { room } : {}),
         ...(newCase ? { newCase } : {}),
         ...(meeting ? { meeting } : {}),
@@ -537,7 +544,7 @@ export function dealsAtStage(jobs: readonly SolJob[], stage: string, today: stri
 export function whereThingsAre(): string {
   return [
     ...SECTIONS.map((s) => `- ${s.label}: ${s.pages.map((p) => p.label).join(", ")}`),
-    "- Inside Jobs, by stage (Selling, Getting ready, Installing, Finishing, Done) and as a list, board, calendar or map: the deals board, pre-approvals, Solar Victoria, booking installations, the installations calendar, the job map, after install and grid connections",
+    "- Inside Jobs, by stage (Selling, Getting ready, Installing, Finishing, Done) and as a list, board, calendar or map: the deals board, Solar Victoria, booking installations, the installations calendar, the job map, after install and grid connections",
   ].join("\n");
 }
 

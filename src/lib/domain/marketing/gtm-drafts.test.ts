@@ -6,11 +6,14 @@ import { SEAT_MONTHLY_CENTS, dollars } from "@/lib/domain/design/plans";
 import { cleanContent, contentProblem } from "./edm";
 import { claimsToCheck } from "./edm-sol";
 import {
+  PANEL_FIRST,
+  PANEL_REST,
   GTM_EMAILS,
   GTM_PICTURES,
   MAX_WORDS,
   PRICE_DAY_LINE,
   SOL_TYPES,
+  VOICE_MEET_LINE,
   voiceAday,
   gtmSequence,
   pictureKeyOf,
@@ -23,7 +26,7 @@ const ids = Object.fromEntries(Object.keys(GTM_PICTURES).map((k, i) => [k, `mimg
 
 describe("the launch drafts", () => {
   it("are whole, valid emails once their pictures are in, and come through the cleaner unchanged", () => {
-    expect(GTM_EMAILS).toHaveLength(7);
+    expect(GTM_EMAILS).toHaveLength(15);
     for (const raw of GTM_EMAILS) {
       const c = withPictures(raw, ids);
       expect(contentProblem(c)).toBeNull();
@@ -44,6 +47,9 @@ describe("the launch drafts", () => {
     const art = readFileSync(join(process.cwd(), "tools/marketing/launch-art.mjs"), "utf8");
     for (const words of Object.values(SOL_TYPES)) expect(art).toContain(JSON.stringify(words).slice(1, -1));
     expect(art).toContain(PRICE_DAY_LINE);
+    expect(art).toContain(VOICE_MEET_LINE);
+    // The drawn phone book uses only numbers from the range set aside for fiction.
+    for (const n of art.match(/04dd ?d{3} ?d{3}/g) ?? []) expect(n).toMatch(/^0491 570 /);
     expect(art).not.toMatch(/henderson|shearer/i);
     // The logo is the website's own file, never RENUABL typed in another weight or spacing.
     expect(art).toContain("public/brand/renuabl-logo-white.png");
@@ -52,8 +58,9 @@ describe("the launch drafts", () => {
 
   it("give every picture a hook above it and a button under it, show the designer but never first, and end on the Marketplace band", () => {
     for (const c of GTM_EMAILS) {
-      expect(c.blocks[0].kind).toBe("heading");
-      const body = c.blocks.slice(0, -2);
+      expect(c.blocks[0].kind).toBe("bar");
+      expect(c.blocks[1].kind).toBe("heading");
+      const body = c.blocks.slice(1, -2).filter((b) => b.kind !== "spacer");
       // Each part: a heading, then at least one picture, then a button before the next heading.
       const parts: (typeof body)[] = [];
       for (const b of body) b.kind === "heading" ? parts.push([b]) : parts.at(-1)!.push(b);
@@ -75,6 +82,19 @@ describe("the launch drafts", () => {
     expect(voiceAday(4900)).toBeCloseTo(1.61, 2);
     expect(4900 / 100 / 28).toBeLessThan(2);
     expect(PRICE_DAY_LINE).toBe("$49 a month is $1.61 a day.");
+  });
+
+  it("put each part on its own panel, apart from the next", () => {
+    for (const c of GTM_EMAILS) {
+      const heads = c.blocks.filter((b) => b.kind === "heading");
+      expect(heads[0].fill).toBe(PANEL_FIRST);
+      for (const h of heads.slice(1)) expect(h.fill).toBe(PANEL_REST);
+      // Neighbouring blocks of one colour join one panel, so parts are kept apart by an unfilled spacer.
+      c.blocks.forEach((b, i) => {
+        const n = c.blocks[i + 1];
+        if (n?.kind === "heading" && i > 1) expect(b.fill).toBeUndefined();
+      });
+    }
   });
 
   it("are short: a glance, not a read", () => {

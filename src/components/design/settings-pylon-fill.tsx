@@ -25,7 +25,7 @@ type Run = {
  * above on this page; each deal is read again from Pylon and given its equipment, site details and place on the map.
  */
 export function PylonFill({ pylonKey }: { pylonKey: string }) {
-  const [pdfs, setPdfs] = useState(false);
+  const [pdfs, setPdfs] = useState(true);
   const [left, setLeft] = useState<{ left: number; any: number } | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
