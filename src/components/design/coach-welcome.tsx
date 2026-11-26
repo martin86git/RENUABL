@@ -67,27 +67,35 @@ export function CoachWelcome(props: {
   const now = new Date();
   const room = CHATS_SHOWN - (props.current ? 1 : 0);
   const pastShown = allChats ? props.past : props.past.slice(0, room);
+  // Compact rows in the look of Sol's opening (26 Nov 2026, Martin: "make the chats smaller"; "be influenced by the
+  // cards on sol drawer chat"): white cards on a fine line, a graphite round with an orange mark, an orange ring on hover.
   const chatRow =
-    "flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-sun-line";
+    "flex w-full items-center gap-2.5 rounded-xl bg-surface px-2.5 py-1.5 text-left text-[13px] text-ink-2 ring-1 ring-line transition hover:text-ink hover:ring-sun-line";
+  const mark = "grid size-6 shrink-0 place-items-center rounded-full bg-primary text-sun-line";
+  const head = "px-1 font-mono text-[10px] uppercase tracking-[0.14em] text-muted";
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center px-2 py-4 text-center">
-      <CallerAvatar caller={caller} size={56} />
-      <p className="mt-3 text-lg font-semibold text-ink">{name}&apos;s day</p>
-      <p className="text-xs text-muted">
-        {!deals && !failed ? "Looking at today's calls…" : (callsTodayWords(today) ?? "No calls lined up for today")}
-      </p>
+    <div className="mx-auto flex w-full max-w-lg flex-col px-1 py-3">
+      <div className="flex items-center gap-3 px-1">
+        <CallerAvatar caller={caller} size={36} />
+        <div className="min-w-0">
+          <p className="text-[19px] font-light leading-tight tracking-tight text-ink">{name}&apos;s day</p>
+          <p className="truncate text-xs text-muted">
+            {!deals && !failed ? "Looking at today's calls…" : (callsTodayWords(today) ?? "No calls lined up for today")}
+          </p>
+        </div>
+      </div>
 
       {today.length > 0 && (
-        <ol aria-label={`${name}'s calls today, in the order they ring`} className="mt-4 w-full space-y-1.5 text-left">
+        <ol aria-label={`${name}'s calls today, in the order they ring`} className="mt-3 w-full space-y-1 text-left">
           {today.map((d) => (
             <li key={d.jobId}>
               <button
                 type="button"
                 onClick={() => props.onPick(d)}
-                className="flex w-full items-center gap-3 rounded-xl bg-canvas px-3 py-2.5 ring-1 ring-line transition hover:ring-sun-line"
+                className="flex w-full items-center gap-2.5 rounded-xl bg-surface px-2.5 py-1.5 ring-1 ring-line transition hover:ring-sun-line"
               >
-                <span className="w-16 shrink-0 text-xs font-semibold tabular-nums text-ink">
+                <span className="w-14 shrink-0 font-mono text-[11px] tabular-nums text-ink">
                   {d.standing === "live" ? (
                     <span className="inline-flex items-center gap-1 text-sun-line">
                       <span className="size-1.5 animate-pulse rounded-full bg-sun-line motion-reduce:animate-none" aria-hidden />
@@ -100,8 +108,8 @@ export function CoachWelcome(props: {
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-ink">{d.customer}</span>
-                  <span className="block truncate text-xs text-ink-2">
+                  <span className="block truncate text-[13px] font-medium text-ink">{d.customer}</span>
+                  <span className="block truncate text-[11px] text-muted">
                     {d.deal} · {d.headline}
                   </span>
                 </span>
@@ -112,14 +120,16 @@ export function CoachWelcome(props: {
         </ol>
       )}
 
-      <div className="mt-4 flex w-full flex-col gap-1.5">
+      <div className="mt-2 flex w-full flex-col gap-1">
         {needs > 0 && (
           <button
             type="button"
             onClick={props.onDeals}
-            className="flex items-center gap-2 rounded-xl bg-canvas px-3 py-2.5 text-left text-sm text-ink ring-1 ring-line transition hover:ring-sun-line"
+            className="flex items-center gap-2.5 rounded-xl bg-surface px-2.5 py-1.5 text-left text-[13px] text-ink ring-1 ring-line transition hover:ring-sun-line"
           >
-            <PhoneCall className="size-4 shrink-0 text-danger" aria-hidden />
+            <span className={mark}>
+              <PhoneCall className="size-3.5" aria-hidden />
+            </span>
             <span className="flex-1">
               <strong className="font-semibold">{needs}</strong> {needs === 1 ? "deal needs" : "deals need"} you after {name}&apos;s call
             </span>
@@ -129,20 +139,22 @@ export function CoachWelcome(props: {
       </div>
 
       {(props.current || props.past.length > 0) && (
-        <section aria-label={`Your chats with ${name}`} className="mt-5 w-full text-left">
-          <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Chats</p>
-          <ul className="mt-1.5 space-y-1.5">
+        <section aria-label={`Your chats with ${name}`} className="mt-4 w-full text-left">
+          <p className={head}>Chats</p>
+          <ul className="mt-1.5 space-y-1">
             {props.current && (
               <li>
                 <button type="button" onClick={props.onTalk} className={chatRow}>
-                  <MessageSquare className="size-4 shrink-0" aria-hidden />
+                  <span className={mark}>
+                    <MessageSquare className="size-3.5" aria-hidden />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-ink">{props.current.title}</span>
-                    <span className="block text-xs text-muted">
+                    <span className="block text-[11px] text-muted">
                       Latest · {chatDayWords(props.current.endedAt, now, LAUNCH_MARKET.timeZone)}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs font-medium text-ink">Carry on</span>
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-sun-line">Carry on</span>
                   <ChevronRight className="size-4 shrink-0" aria-hidden />
                 </button>
               </li>
@@ -150,10 +162,12 @@ export function CoachWelcome(props: {
             {pastShown.map((c) => (
               <li key={c.id} className="group relative">
                 <button type="button" onClick={() => props.onOpenChat(c.id)} className={chatRow}>
-                  <MessageSquare className="size-4 shrink-0" aria-hidden />
+                  <span className={mark}>
+                    <MessageSquare className="size-3.5" aria-hidden />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-ink">{c.title}</span>
-                    <span className="block text-xs text-muted">
+                    <span className="block text-[11px] text-muted">
                       {chatDayWords(c.endedAt, now, LAUNCH_MARKET.timeZone)} · {c.count} {c.count === 1 ? "message" : "messages"}
                     </span>
                   </span>
@@ -187,7 +201,7 @@ export function CoachWelcome(props: {
               Show all {props.past.length + (props.current ? 1 : 0)} chats
             </button>
           )}
-          <p className="mt-2 px-1 text-xs text-muted">Type below to start a new chat.</p>
+          <p className="mt-2 px-1 text-[11px] text-muted">Type below to start a new chat.</p>
         </section>
       )}
     </div>

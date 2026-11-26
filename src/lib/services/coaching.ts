@@ -109,6 +109,8 @@ export const coachAssistant = (message: string, call: CoachCall | null, dealJobI
     }),
   );
 
+/** Lines typed straight into the script, one a line, kept as written (26 Nov 2026, Martin: "notes feels less like a script"). */
+export const addScriptLines = (text: string) => ask<{ notes: CoachNote[]; added: number }>(at(), json("POST", { do: "script", text }));
 export const rewordNote = (id: string, text: string) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, text }));
 /** A note locked in as a rule the agent follows on every call, or unlocked back to a note. */
 export const lockNote = (id: string, locked: boolean) => ask<{ notes: CoachNote[] }>(at(), json("PUT", { id, locked }));

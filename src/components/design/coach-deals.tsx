@@ -115,7 +115,7 @@ export function CoachDeals(props: { picked: AssistantDeal | null; onPick: (d: As
   const shown = searchDeals(deals ?? [], typed);
 
   return (
-    <aside aria-label={`${name}'s deals`} className="flex w-full shrink-0 flex-col bg-canvas sm:w-[var(--coach-pane)]">
+    <aside aria-label={`${name}'s deals`} className="flex w-full shrink-0 flex-col bg-canvas sm:w-[var(--coach-deals)]">
       <button
         type="button"
         onClick={props.onBack}

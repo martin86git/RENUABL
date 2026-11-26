@@ -157,3 +157,33 @@ describe("the reason for the call", () => {
     );
   });
 });
+
+describe("the call's objective (26 Nov 2026)", () => {
+  it("reads only an objective it knows, none otherwise", async () => {
+    const { cleanCallSetup, cleanObjective } = await import("./call-setup");
+    expect(cleanObjective("visit")).toBe("visit");
+    expect(cleanObjective("sell them a car")).toBe("none");
+    expect(cleanCallSetup({ objective: "close" }).objective).toBe("close");
+    expect(cleanCallSetup({}).objective).toBeUndefined();
+  });
+
+  it("says nothing with none, and never lets a visit or install day be promised", async () => {
+    const { objectiveLine } = await import("./call-setup");
+    expect(objectiveLine("none", { canBook: true, business: "Sunrise" })).toBe("");
+    expect(objectiveLine(undefined, { canBook: true, business: "Sunrise" })).toBe("");
+    expect(objectiveLine("visit", { canBook: true, business: "Sunrise" })).toMatch(/can.t book it yourself[\s\S]*Never promise/);
+    expect(objectiveLine("install", { canBook: true, business: "Sunrise" })).toMatch(/Never promise a date/);
+    expect(objectiveLine("call", { canBook: true, business: "Sunrise" })).toMatch(/book them a call appointment/);
+    expect(objectiveLine("call", { canBook: false, business: "Sunrise" })).toMatch(/request_callback/);
+    expect(objectiveLine("close", { canBook: false, business: "Sunrise" })).toMatch(/Never change, discount or agree/);
+  });
+});
+
+describe("the objective on a call", () => {
+  const prompt = (over: Partial<CallBrief>) => voiceSystemPrompt(brief(over), [], { canTransfer: false });
+  it("goes into the instructions of the business's own calls only", () => {
+    expect(prompt({ objective: "visit" })).toMatch(/Your objective on this call: arrange a home visit/);
+    expect(prompt({ objective: "none" })).not.toMatch(/Your objective on this call/);
+    expect(prompt({ objective: "visit", teamAbout: "their invoice" })).not.toMatch(/Your objective on this call/);
+  });
+});

@@ -9,7 +9,15 @@
  * No rule changes with a script: what every call keeps is fixed (coaching.ts FIXED_RULES). Pure, tested.
  */
 import { cleanNotes, type CoachNote } from "./coaching";
-import { CALL_AUDIENCES, DEFAULT_CALL_SETUP, cleanReason, type CallAudience, type CallSetup } from "./call-setup";
+import {
+  CALL_AUDIENCES,
+  DEFAULT_CALL_SETUP,
+  cleanReason,
+  withObjective,
+  type CallAudience,
+  type CallObjective,
+  type CallSetup,
+} from "./call-setup";
 
 /** A script not in use, kept as it stood. */
 export interface SavedScript {
@@ -18,6 +26,8 @@ export interface SavedScript {
   notes: CoachNote[];
   audience: CallAudience;
   reason: string;
+  /** What its calls work towards (call-setup.ts); unset for scripts filed before 26 Nov 2026. */
+  objective?: CallObjective;
   /** When it was last in use, or made. */
   at: string;
 }
@@ -75,6 +85,7 @@ export function cleanScripts(raw: unknown): SavedScript[] {
       notes: cleanNotes(v.notes),
       audience: CALL_AUDIENCES.find((a) => a === v.audience) ?? DEFAULT_CALL_SETUP.audience,
       reason: cleanReason(v.reason),
+      ...withObjective(v.objective),
       at: typeof v.at === "string" ? v.at : "",
     });
     if (out.length >= MAX_SCRIPTS - 1) break;
@@ -96,6 +107,7 @@ const fileAway = (live: LiveScript, id: string, at: string): SavedScript => ({
   notes: live.notes,
   audience: live.setup.audience,
   reason: live.setup.reason,
+  ...withObjective(live.setup.objective),
   at,
 });
 
@@ -149,7 +161,7 @@ export function chooseScript(
     live: {
       name: chosen.name,
       notes: chosen.notes,
-      setup: { saidAs: live.setup.saidAs, audience: chosen.audience, reason: chosen.reason },
+      setup: { saidAs: live.setup.saidAs, audience: chosen.audience, reason: chosen.reason, ...withObjective(chosen.objective) },
     },
     saved: [fileAway(live, o.fileId, o.at), ...saved.filter((s) => s.id !== chosen.id)],
   };

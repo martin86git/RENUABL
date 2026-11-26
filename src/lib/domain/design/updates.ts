@@ -15,6 +15,12 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Voice agents",
+    words:
+      "The voice agent's window is taller, with the chat on the left and its deals and settings as slim panels to the right, one or both. Its script is numbered lines you can add to directly, and each call can have an objective: a call appointment, a home visit, an install date, or helping them go ahead.",
+  },
+  {
+    day: "2026-11-26",
     area: "Deals",
     words: "Tap the stage on a deal's cover to move it. Delete is now in the ⋯ menu, not a button of its own.",
   },
