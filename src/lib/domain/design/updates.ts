@@ -16,8 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Settings",
-    words:
-      "Product datasheets can find every datasheet on your price lists in one go: panels, inverters, batteries and EV chargers, the Australian version first.",
+    words: "Product datasheets can now find every datasheet on your price lists in one go, the Australian version first.",
   },
   {
     day: "2026-11-26",
