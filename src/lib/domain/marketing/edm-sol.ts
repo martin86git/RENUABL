@@ -15,7 +15,8 @@ export const EDM_SOL_PARTS = ["all", "subject", "preview", "heading", "text"] as
 export type EdmSolPart = (typeof EDM_SOL_PARTS)[number];
 export const isEdmSolPart = (v: unknown): v is EdmSolPart => typeof v === "string" && (EDM_SOL_PARTS as readonly string[]).includes(v);
 
-export const EDM_SOL_LIMITS = { brief: 2000, note: 300, options: 3, avoid: 9 } as const;
+/** `direction` is what the member tells Sol to change about the whole email (26 Nov 2026, Martin). */
+export const EDM_SOL_LIMITS = { brief: 2000, note: 300, direction: 1000, options: 3, avoid: 9 } as const;
 
 /** The one-line parts Sol offers a choice of, so a subject isn't a roll of the dice. */
 export const EDM_SOL_LINE_PARTS = ["subject", "preview", "heading"] as const;
@@ -97,11 +98,13 @@ export function edmSolPrompt(
     .join("\n");
   const asked = input.ask
     ? input.ask
-    : part === "all"
-      ? `Write all four parts of a marketing email: ${Object.values(PART_WORDS).join("; ")}.`
-      : several
-        ? `Offer ${several} options for ${PART_WORDS[part]}. Make them really different from each other (say a question, what the reader gets, a plain statement), each fitting the rest of the email as it stands.`
-        : `Write ${PART_WORDS[part]}. Fit it to the rest of the email as it stands${input.draft[part] ? ", and improve on the one there now" : ""}.`;
+    : part === "all" && note && draft
+      ? `Rewrite this marketing email as the member's feedback asks, all four parts, keeping what already works and changing what the feedback is about: ${Object.values(PART_WORDS).join("; ")}.`
+      : part === "all"
+        ? `Write all four parts of a marketing email: ${Object.values(PART_WORDS).join("; ")}.`
+        : several
+          ? `Offer ${several} options for ${PART_WORDS[part]}. Make them really different from each other (say a question, what the reader gets, a plain statement), each fitting the rest of the email as it stands.`
+          : `Write ${PART_WORDS[part]}. Fit it to the rest of the email as it stands${input.draft[part] ? ", and improve on the one there now" : ""}.`;
   return [
     `You are Sol, writing a marketing email for ${input.business} to people on its mailing list in Australia.`,
     asked,
