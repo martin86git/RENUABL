@@ -57,8 +57,10 @@ describe("a design drawn on the angled photos", () => {
       expect(p.y).toBeCloseTo(flat[i]!.y, 0);
     });
     expect(drawn!.seen).toBe(true);
-    // Looking north, a north-facing panel is behind the roof.
-    expect(panelsInPhoto([{ corners, facing: 0, tilt: 20 }], t, "North", LAT)[0]!.seen).toBe(false);
+    // Looking north, a north-facing panel on a usual roof is the far slope, still in the photo; on a steep one it is behind.
+    expect(panelsInPhoto([{ corners, facing: 0, tilt: 22 }], t, "North", LAT)[0]!.seen).toBe(true);
+    expect(panelsInPhoto([{ corners, facing: 0, tilt: 50 }], t, "North", LAT)[0]!.seen).toBe(false);
+    expect(panelsInPhoto([{ corners, facing: 0, tilt: 50 }], t, "East", LAT)[0]!.seen).toBe(true);
   });
   it("opens on the side that looks at the panels square on", () => {
     expect(bestSide([{ facing: 0, tilt: 22 }])).toBe("South");

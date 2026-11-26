@@ -258,7 +258,7 @@ function SideViewsWindow({ lat, lng, design, onClose }: { lat: number; lng: numb
       </div>
       {design ? (
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-white/60">
-          <span>{designLine(design, drawn.length)}</span>
+          <span>{designLine(design, drawn.length, drawn.filter((d) => !d.seen).length)}</span>
           {drawn.length > 0 && (
             <button
               type="button"
@@ -297,9 +297,9 @@ function SideViewsWindow({ lat, lng, design, onClose }: { lat: number; lng: numb
 }
 
 /** What the strip under the photo says about the design drawn on it. */
-function designLine(design: SideDesign, drawn: number): string {
+function designLine(design: SideDesign, drawn: number, hidden = 0): string {
   if (!design.panels.length) return "Lay panels on the plan and they appear here, on the roof.";
   if (design.terrain === null) return "Working out the roof's heights to draw your panels…";
   if (design.terrain === "none" || !drawn) return "There are no heights for this roof, so the panels can't be drawn on the photo.";
-  return `Your ${drawn} panels from the plan, drawn at the roof's height. Dashed: behind the roof from this side.`;
+  return `Your ${drawn} panels from the plan, drawn at the roof's height.${hidden ? ` Dashed: on a slope too steep to see from this side.` : ""}`;
 }

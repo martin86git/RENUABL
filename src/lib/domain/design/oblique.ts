@@ -61,7 +61,10 @@ export interface ObliquePanel {
 
 export interface DrawnPanel {
   points: Point[];
-  /** Whether the camera sees its face: a panel facing away is behind the roof in this photo. */
+  /**
+   * Whether the camera sees its face. Taken from 45° up, a slope facing away is still in the photo unless it is steeper
+   * than the camera (26 Nov 2026, Martin: the array on the far slope of a hip roof showed dashed though plain to see).
+   */
   seen: boolean;
 }
 
@@ -88,9 +91,16 @@ export function panelsInPhoto(panels: readonly ObliquePanel[], t: Terrain, side:
       const z = zm + (zi - zm) / (1 - READ_IN);
       return obliquePoint({ ...c, z }, side, lat);
     });
-    const off = Math.abs(((panel.facing - towards + 540) % 360) - 180);
-    return { points, seen: panel.tilt < 5 || off < 100 };
+    return { points, seen: facesCamera(panel, towards) };
   });
+}
+
+/**
+ * Whether a panel's face is turned to a camera 45° up: its upward side (the slope out along its facing, up by its
+ * tilt) has some part towards the camera. A little short of edge-on counts as hidden.
+ */
+function facesCamera(panel: Pick<ObliquePanel, "facing" | "tilt">, towards: number): boolean {
+  return Math.tan(rad(Math.min(89, panel.tilt))) * Math.cos(rad(panel.facing - towards)) > -0.9;
 }
 
 /**
