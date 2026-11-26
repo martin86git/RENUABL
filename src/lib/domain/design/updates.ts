@@ -25,6 +25,16 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
+    area: "Installations",
+    words: "The job card lists each product's datasheet, for your team, the installer's link and the inspector.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "The configurator lists the datasheets for the system the customer has picked.",
+  },
+  {
+    day: "2026-11-26",
     area: "Proposals",
     words: "Each quoted panel, inverter, battery and EV charger's datasheet is listed on the customer's proposal and its PDF.",
   },

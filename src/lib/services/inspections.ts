@@ -21,6 +21,7 @@ export const loadInspections = () => ask<{ inspections: InspectionLine[] }>(BASE
 export const nominatedInspections = () => ask<{ nominated: number }>(`${BASE}?count=1`);
 export const loadInspection = (id: string) => ask<{ card: JobCardView; inspection: InspectionView }>(one(id));
 export const declineInspection = (id: string) => ask<object>(one(id), { method: "POST", body: { do: "decline" } });
+export const inspectionSheetHref = (id: string, sheetId: string) => `${one(id)}/datasheet/${encodeURIComponent(sheetId)}`;
 export const inspectionFileHref = (id: string, fileId: string) => `${one(id)}/files/${encodeURIComponent(fileId)}`;
 export const inspectionRoofHref = (id: string) => `${one(id)}/roof`;
 export const certificateHref = (id: string) => `${one(id)}/certificate`;
