@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
+    area: "Settings",
+    words: "Product datasheets can now find every datasheet on your price lists in one go, the Australian version first.",
+  },
+  {
+    day: "2026-11-26",
     area: "Proposals",
     words: "Finding datasheets online now shows a spinner on the button and on each product it's looking for.",
   },

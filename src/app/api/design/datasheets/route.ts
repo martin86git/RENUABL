@@ -10,8 +10,9 @@ import {
   listSheets,
   saveSheet,
 } from "@/lib/server/design-datasheets-repo";
-import { findDatasheet, findQuotedSheets } from "@/lib/server/datasheet-finder";
-import { isDocKind, type DocKind } from "@/lib/domain/design/proposal-datasheets";
+import { findDatasheet, findProductFile, findQuotedSheets } from "@/lib/server/datasheet-finder";
+import { isDocKind, isFileOnly, type DocKind } from "@/lib/domain/design/proposal-datasheets";
+import { FIND_BATCH, type FindResult } from "@/lib/domain/design/find-all-sheets";
 import { allow } from "@/lib/server/rate-limit";
 
 /** Finding a datasheet online (a search, a download, a read) can take a couple of minutes, after the answer too. */
@@ -100,6 +101,32 @@ export async function POST(request: Request) {
       });
       const found = await findQuotedSheets(who.member.businessId, products, 6);
       return Response.json({ ok: true, found });
+    }
+    if (read.body.do === "find-batch") {
+      // Settings → Product datasheets → Find every datasheet (26 Nov 2026): the browser walks the whole price list a
+      // couple at a time; each is looked for here as the finder does (Australia's sheet first) and its outcome said.
+      const who = await requireMember("prices");
+      if ("refuse" in who) return who.refuse;
+      if (!allow(request, "datasheet-find-all", 300))
+        return Response.json(
+          { ok: false, message: "That's a lot of searching for one hour. Carry on in a little while." },
+          { status: 429 },
+        );
+      const raw = Array.isArray(read.body.products) ? (read.body.products as unknown[]).slice(0, FIND_BATCH) : [];
+      const products = raw.flatMap((r) => {
+        const o = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
+        const k = docKindOf(o.kind);
+        const code = cleanSku(o.sku);
+        return k && code ? [{ kind: k, sku: code, name: text(o.name, 160) || code }] : [];
+      });
+      const results: { kind: DocKind; sku: string; outcome: FindResult }[] = [];
+      for (const p of products) {
+        const outcome: FindResult = isFileOnly(p.kind)
+          ? await findProductFile(who.member.businessId, p).catch(() => "not-found" as const)
+          : await findDatasheet(who.member.businessId, { ...p, kind: p.kind as SheetKind }).catch(() => "not-found" as const);
+        results.push({ kind: p.kind, sku: p.sku, outcome });
+      }
+      return Response.json({ ok: true, results });
     }
     const kind = docKindOf(read.body.kind);
     const sku = cleanSku(read.body.sku);
