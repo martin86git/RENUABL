@@ -363,6 +363,33 @@ export function EdmBuilder({
     flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
     return true;
   }
+  // The member's direction for the whole email, and whether there is an email yet to change.
+  const [direction, setDirection] = useState("");
+  const hasDraft = Boolean(
+    content.subject.trim() ||
+    content.preview.trim() ||
+    content.blocks.some((b) => (b.kind === "text" || b.kind === "heading") && b.text.trim() && b.text.trim() !== "Hi {firstName},"),
+  );
+  async function changeEmail() {
+    const { draft } = draftFor();
+    setBusy("direction");
+    setSolMsg(null);
+    const r = await writeWithSol({ part: "all", brief, draft, note: direction });
+    setBusy(null);
+    if (!r.ok) return setSolMsg({ ok: false, text: r.message });
+    let blocks = content.blocks;
+    const fill = (kind: "heading" | "text", words: string | undefined) => {
+      if (words === undefined) return;
+      const id = blocks.find((b) => b.kind === kind)?.id;
+      if (id) blocks = blocks.map((b) => (b.id === id ? { ...b, text: words } : b));
+    };
+    fill("heading", r.heading);
+    fill("text", r.text);
+    change({ ...content, subject: r.subject ?? content.subject, preview: r.preview ?? content.preview, blocks });
+    setUndo(true);
+    setDirection("");
+    flag([r.subject, r.preview, r.heading, r.text].filter(Boolean).join(" "));
+  }
   // Sol's button beside a field opens his box under it: what to change, then a choice. It no longer rewrites on a press.
   const solRound = (part: EdmSolPart, label: string, blockId?: string) =>
     readOnly ? null : (
@@ -631,8 +658,39 @@ export function EdmBuilder({
                     <X className="size-4" />
                   </button>
                 </div>
+                {/* Direction for the whole email once there is one (26 Nov 2026, Martin: "the ability to provide sol feedback
+                    in a text box to give direction around the marketing"): Sol rewrites it as told, keeping what works. */}
+                {hasDraft && (
+                  <div className="mt-3">
+                    <label htmlFor="sol-direction" className="text-[12px] font-medium text-ink-2">
+                      Tell Sol what to change
+                    </label>
+                    <textarea
+                      id="sol-direction"
+                      autoFocus
+                      value={direction}
+                      maxLength={EDM_SOL_LIMITS.direction}
+                      rows={3}
+                      onChange={(e) => setDirection(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && direction.trim()) void changeEmail();
+                      }}
+                      placeholder="e.g. Lead with the voice agent booking calls. Shorter, less salesy. Make the subject a question."
+                      className={cn(field, "mt-1 h-auto resize-none py-2 text-[13px] leading-relaxed")}
+                    />
+                    <button
+                      disabled={busy !== null || !direction.trim()}
+                      onClick={() => void changeEmail()}
+                      className="mt-2 inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-full bg-ink px-4 text-[13px] font-medium text-canvas disabled:bg-line disabled:text-muted"
+                    >
+                      {busy === "direction" ? <Loader2 className="size-4 animate-spin" /> : <SolIcon className="size-4" />}
+                      Change the email
+                    </button>
+                    <p className="mt-3 text-[12px] font-medium text-ink-2">Or write it again from a brief</p>
+                  </div>
+                )}
                 <textarea
-                  autoFocus
+                  autoFocus={!hasDraft}
                   value={brief}
                   maxLength={EDM_SOL_LIMITS.brief}
                   rows={4}
