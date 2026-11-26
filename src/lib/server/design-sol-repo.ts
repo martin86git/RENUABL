@@ -209,6 +209,35 @@ const savePast = (q: Q, businessId: string, email: string, turns: SolTurn[], pas
     [businessId, email, JSON.stringify(turns), JSON.stringify(past)],
   );
 
+/** What the member has asked Sol, in every conversation: the words they see, for their box's suggestions. */
+export async function solAsked(businessId: string, email: string): Promise<{ text: string; at: string }[]> {
+  const { turns, past } = await transaction((q) => lockedPast(q, businessId, key(email)));
+  return [...turns, ...past.flatMap((p) => p.turns)].filter((t) => t.role === "you").map((t) => ({ text: t.shown ?? t.text, at: t.at }));
+}
+
+/**
+ * What the others in the business asked Sol, by who (kept only to count askers, never sent on), with the business's
+ * customers' names so the questions naming any can be left out (sol-complete.ts `teamPhrases`).
+ */
+export async function solTeamAsked(
+  businessId: string,
+  email: string,
+): Promise<{ asked: { who: string; text: string; at: string }[]; customers: string[] }> {
+  return transaction(async (q) => {
+    const rows = await q<{ email: string; turns: unknown; past: unknown }>(
+      `select email, turns, past from design_sol where business_id = $1 and email <> $2`,
+      [businessId, key(email)],
+    );
+    const people = await q<{ name: string }>(`select name from design_customers where business_id = $1 and not sample`, [businessId]);
+    const asked = rows.flatMap((r) =>
+      [...cleanTurns(r.turns), ...cleanPast(r.past).flatMap((p) => p.turns)]
+        .filter((t) => t.role === "you")
+        .map((t) => ({ who: r.email, text: t.shown ?? t.text, at: t.at })),
+    );
+    return { asked, customers: people.map((p) => p.name) };
+  });
+}
+
 /** The past conversations as the history lists them: titles and dates, not the messages. */
 export async function solPast(businessId: string, email: string): Promise<SolPastLine[]> {
   return transaction(async (q) => pastLines((await lockedPast(q, businessId, key(email))).past));

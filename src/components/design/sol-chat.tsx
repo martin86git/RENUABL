@@ -48,8 +48,10 @@ import {
   resumeSolChat,
   rememberAnswer,
   retrySol,
+  learnAsked,
   type SolDraft,
 } from "@/lib/services/sol";
+import { useSolAhead } from "./sol-ahead";
 import { askToStartAfresh, showStarters, titleOf, worthKeeping } from "@/lib/domain/design/sol-history";
 import { DictateButton, withSpoken } from "./dictate";
 import { SolHistory } from "./sol-history";
@@ -254,6 +256,8 @@ export function SolChat({
   const [dealAt, setDealAt] = useState<{ start: number; query: string } | null>(null);
   const [jobs, setJobs] = useState<JobLine[] | null>(null);
   const [hi, setHi] = useState(0);
+  // The rest of the sentence as they type (26 Nov 2026, Martin): their own questions, the team's, then the usual ones.
+  const guess = useSolAhead(text, setText, box, Boolean(heard) || Boolean(dealAt) || names.showing, MAX_SAID);
   // In the side panel he sees the page it lies beside (page-context.ts): what the page says it shows and the words on
   // it, sent with each question unless the member switches it off for this page.
   const path = usePathname();
@@ -382,6 +386,7 @@ export function SolChat({
       return;
     }
     if (!over) {
+      learnAsked(typed);
       setText("");
       setFiles([]);
       setFileProblem("");
@@ -802,58 +807,64 @@ export function SolChat({
               onRemove={(i) => setFiles(files.filter((_, j) => j !== i))}
               className="px-1 pt-2.5"
             />
-            <textarea
-              ref={box}
-              onPaste={(e) => {
-                // A screenshot pasted with Ctrl V or ⌘ V goes on the message; pasted words carry on as usual.
-                const got = filesFromPaste(e);
-                if (!got.length) return;
-                e.preventDefault();
-                void addFiles(got);
-              }}
-              value={heard ? withSpoken(text, heard) : text}
-              onChange={(e) => {
-                setHeard("");
-                setText(e.target.value);
-                const deal = typingDeal(e.target.value, e.target.selectionStart ?? e.target.value.length);
-                setDealAt(deal);
-                setHi(0);
-                if (deal) names.clear();
-                else names.typed(e.target.value, e.target.selectionStart);
-              }}
-              onKeyDown={(e) => {
-                if (dealAt && hits.length) {
-                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setHi((h) => (h + (e.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length);
-                    return;
-                  }
-                  if (e.key === "Enter" || e.key === "Tab") {
-                    e.preventDefault();
-                    pickDeal(hits[hi] ?? hits[0]);
-                    return;
-                  }
-                }
-                if (e.key === "Escape" && names.escape()) {
-                  e.stopPropagation();
-                  return;
-                }
-                if (dealAt && e.key === "Escape") {
-                  e.stopPropagation();
-                  setDealAt(null);
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
+            <div className="relative">
+              {guess.ghost("px-2 pt-2.5 pb-1 text-sm")}
+              <textarea
+                ref={box}
+                onPaste={(e) => {
+                  // A screenshot pasted with Ctrl V or ⌘ V goes on the message; pasted words carry on as usual.
+                  const got = filesFromPaste(e);
+                  if (!got.length) return;
                   e.preventDefault();
-                  void send();
-                }
-              }}
-              rows={3}
-              maxLength={MAX_SAID}
-              placeholder="Ask Sol, or # for a deal"
-              aria-label="Message Sol"
-              className="min-h-[5rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
-            />
+                  void addFiles(got);
+                }}
+                value={heard ? withSpoken(text, heard) : text}
+                onChange={(e) => {
+                  setHeard("");
+                  setText(e.target.value);
+                  guess.changed();
+                  const deal = typingDeal(e.target.value, e.target.selectionStart ?? e.target.value.length);
+                  setDealAt(deal);
+                  setHi(0);
+                  if (deal) names.clear();
+                  else names.typed(e.target.value, e.target.selectionStart);
+                }}
+                onKeyDown={(e) => {
+                  if (dealAt && hits.length) {
+                    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setHi((h) => (h + (e.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length);
+                      return;
+                    }
+                    if (e.key === "Enter" || e.key === "Tab") {
+                      e.preventDefault();
+                      pickDeal(hits[hi] ?? hits[0]);
+                      return;
+                    }
+                  }
+                  if (guess.key(e)) return;
+                  if (e.key === "Escape" && names.escape()) {
+                    e.stopPropagation();
+                    return;
+                  }
+                  if (dealAt && e.key === "Escape") {
+                    e.stopPropagation();
+                    setDealAt(null);
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+                rows={3}
+                maxLength={MAX_SAID}
+                placeholder="Ask Sol, or # for a deal"
+                aria-label="Message Sol"
+                className="relative block min-h-[5rem] w-full resize-none bg-transparent px-2 pt-2.5 pb-1 text-sm text-ink outline-none placeholder:text-muted"
+              />
+            </div>
+            {guess.pill("mb-1 ml-1")}
             <div className="flex items-center gap-1.5">
               <button
                 type="button"

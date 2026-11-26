@@ -306,3 +306,25 @@ export function moveTexts(stage: JobStage, own: readonly OwnStage[], names: Stag
   const words = new Set([STAGE_LABELS[stage], labelOf(stage, names), ...own.filter((s) => s.base === stage).map((s) => s.name)]);
   return [...words].map((w) => `Moved to ${w}`);
 }
+
+/**
+ * The stage menu in the pipelines it belongs to (26 Nov 2026, Martin: the deal's stage menu "should be indicative of
+ * the pipelines"): each of the twelve under one heading, the stages the business added under theirs. Won ends Sales
+ * and Installed starts Post installation, so each stage is listed once.
+ */
+export const STAGE_GROUPS: readonly { name: string; stages: readonly JobStage[] }[] = [
+  { name: "Sales", stages: ["lead", "designed", "proposal", "won"] },
+  { name: "Post sale", stages: ["ordered", "scheduled"] },
+  { name: "Post installation", stages: ["installed", "inspection", "coes", "grid", "claimed"] },
+  { name: "Lost", stages: ["lost"] },
+];
+
+export function groupedStageChoices(
+  own: readonly OwnStage[],
+  names: StageNames = {},
+): { name: string; choices: { key: StageKey; name: string; added: boolean }[] }[] {
+  const all = stageChoices(own, names);
+  const baseOf = (key: StageKey): JobStage | undefined =>
+    (JOB_STAGES as readonly string[]).includes(key) ? (key as JobStage) : own.find((o) => o.id === key)?.base;
+  return STAGE_GROUPS.map((g) => ({ name: g.name, choices: all.filter((c) => g.stages.includes(baseOf(c.key) as JobStage)) }));
+}
