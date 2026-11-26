@@ -409,15 +409,16 @@ const ART = {
   /** The same email's second picture: what the voice agent costs, said flat. The figure is Calls & Texts' monthly price over a month's days. */
   "aday.jpg": {
     html: page(
-      `<div class="top"><i></i>CALLS &amp; TEXTS // YOUR VOICE AGENT</div><div class="fig">$1.61<small>a day.</small></div>
-       <p class="dry">Less than a coffee. Doesn't need a ute.</p>
+      `<div class="top"><i></i>CALLS &amp; TEXTS // YOUR VOICE AGENT</div><p class="pre">Less than</p><div class="fig">$2<small>a day.</small></div>
+       <p class="dry">Cheaper than a coffee. Doesn't need a ute.</p>
        <p class="foot">$49 A MONTH, ON TOP OF YOUR RENUABL PLAN. YOUR OWN NUMBER INCLUDED.</p><img class="mark" src="${LOGO}" alt="RENUABL">`,
       `body{background:${GROUND}}
        .top{position:absolute;left:84px;top:64px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
        .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
-       .fig{position:absolute;left:76px;top:120px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em}
+       .pre{position:absolute;left:84px;top:112px;font-size:54px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5)}
+       .fig{position:absolute;left:76px;top:160px;font-size:264px;line-height:1;font-weight:600;letter-spacing:-.06em}
        .fig small{font-size:64px;font-weight:400;letter-spacing:-.03em;color:rgba(255,255,255,.5);margin-left:26px}
-       .dry{position:absolute;left:84px;top:428px;font-size:40px;letter-spacing:-.02em;color:#fff}
+       .dry{position:absolute;left:84px;top:462px;font-size:40px;letter-spacing:-.02em;color:#fff}
        .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
     ),
   },
