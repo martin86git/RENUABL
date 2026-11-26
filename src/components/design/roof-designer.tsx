@@ -4702,14 +4702,18 @@ export function RoofDesigner(props: {
    * laid panels over a home's existing ones). Null when it can't be had: then it designs as before.
    */
   const [roofCheckNow, setRoofCheckNow] = useState<RoofCheck | null>(null);
+  /** The person said the roof has no panels on it: what the check took for them is dropped, not kept clear of. */
+  const noSolarRef = useRef(false);
   const checkRoof = async (): Promise<RoofCheck | null> => {
     const picture = props.nearmapPicture ? `nearmap ${props.nearmapCaptured ?? ""}` : "google";
     const check = await Promise.race([
       loadRoofCheck(spot.lat, spot.lng, picture),
       new Promise<null>((done) => window.setTimeout(() => done(null), 45_000)),
     ]);
-    setRoofCheckNow(check);
-    return check;
+    // Told there aren't any (26 Nov 2026, Martin: the check took a pergola for panels), it stays out for the visit.
+    const kept = check && noSolarRef.current ? { ...check, things: withoutExisting(check.things) } : check;
+    setRoofCheckNow(kept);
+    return kept;
   };
   /**
    * The panels already on the roof are being replaced (9 Nov 2026, Martin: nothing let him disregard them): then panels
@@ -5395,10 +5399,17 @@ export function RoofDesigner(props: {
     },
     onFind: () => void askSol(),
     // The panels already on the roof (12 Nov 2026, Martin): replaced, so new ones may go where they are, or worked round.
-    onExisting: (replace: boolean) => {
+    onExisting: (replace: boolean | "none") => {
       existingAsked.current = true;
-      replacingRef.current = replace;
-      setReplacing(replace);
+      if (replace === "none") {
+        noSolarRef.current = true;
+        replacingRef.current = false;
+        setReplacing(false);
+        setRoofCheckNow((c) => (c ? { ...c, things: withoutExisting(c.things) } : c));
+      } else {
+        replacingRef.current = replace;
+        setReplacing(replace);
+      }
       answerGuide("existing");
     },
     // The panel chosen, the pointer lays panels straight away (12 Nov 2026, Martin: no tray; Sol counts down to the
