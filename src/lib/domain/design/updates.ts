@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Everywhere",
+    words: "A minimised page waits as a tab on the top left of the grey pad, on every page, named by its section.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
     words: "Every page's minimise is now the same larger round, inside the grey pad's top right corner.",
   },
   {
