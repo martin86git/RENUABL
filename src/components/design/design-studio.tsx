@@ -598,7 +598,7 @@ export function DesignStudio() {
           onUnsaved={noteUnsaved}
           tight={popped}
           footRoom={popped ? 52 : 0}
-          onNeedDeal={stray ? () => void putOnDeal("proposal") : popped && canMakeDeal ? () => setDealAsk((n) => n + 1) : undefined}
+          onNeedDeal={stray ? () => setStrayNo(null) : popped && canMakeDeal ? () => setDealAsk((n) => n + 1) : undefined}
           bar={
             <>
               {/* In the pop-up the frame around it says where you are: no wordmark, every bit of width for the work. */}

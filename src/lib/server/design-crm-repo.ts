@@ -655,6 +655,18 @@ export async function updateJob(
       const text = (sub && own[0]) || names[next.stage] ? moveText(next.stage, sub, own, names) : stageMoveText(next.stage);
       await record(q, businessId, { customerId: before.customerId, jobId: id, kind: "stage", text, by: who });
     }
+    // Every change of a deal's address is on its record, with what it was (26 Nov 2026, Martin: a deal brought in from
+    // Pylon showed another address and nothing said how it got there).
+    const was = (before.address ?? "").trim();
+    const now = (next.address ?? "").trim();
+    if (was !== now)
+      await record(q, businessId, {
+        customerId: before.customerId,
+        jobId: id,
+        kind: "note",
+        text: was ? `Address changed from ${was} to ${now || "no address"}` : `Address set to ${now}`,
+        by: who,
+      });
     if (moved) await link(q, businessId, { jobId: id }, who);
     const after = await q<Job>(`select ${JOB} from design_jobs j where j.business_id = $1 and j.id = $2`, [businessId, id]);
     return after[0];

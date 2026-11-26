@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Deals",
+    words: "A deal's timeline now says whenever its address changes. The designer moves a deal only after you say yes.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Deals",
     words: "A deal's Installation details show its installer invoice: what the quote allowed, what was billed, and Compare.",
   },
   {
