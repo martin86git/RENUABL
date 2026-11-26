@@ -35,6 +35,7 @@ import type { SolFile } from "@/lib/domain/design/sol";
 import { SolBox, SolSays, Typed } from "./today-pad";
 import { MessageTools, QuotedWords } from "./message-tools";
 import { replyToSol, type SolReply } from "@/lib/domain/design/sol-format";
+import type { OnAnswer } from "./sol-text";
 import type { NewCaseAsk } from "@/lib/domain/design/sol-rooms";
 import { NewCaseButton, NewCaseCard } from "./service-new-case";
 
@@ -285,6 +286,16 @@ export function ServicePlanner() {
     <NewCaseCard query={ask?.query} issue={ask?.issue} onFlagged={(c) => void flagged(c)} onOpenCase={(j) => void openCaseOn(j)} />
   );
 
+  /**
+   * A question of Sol's answered from his message (26 Nov 2026, Martin: "there should be pills i can click on to
+   * answer"): a Yes or No goes straight to him, naming the question; Reply puts the question over the box.
+   */
+  const answer: OnAnswer = (question, yes) => {
+    if (yes) return void ask(yes, focus, [], { kind: "question", text: question });
+    setReplyTo({ kind: "question", text: question });
+    window.setTimeout(() => document.getElementById("service-ask")?.focus(), 0);
+  };
+  const latest = [...turns].reverse().find((t) => t.kind === "ask")?.id;
   const box = (
     <SolBox
       id="service-ask"
@@ -363,7 +374,7 @@ export function ServicePlanner() {
                       <SolWorking busy={!t.a} />
                       {!t.a ? null : (
                         <div className="group/turn text-[15px] leading-relaxed text-ink">
-                          <Typed text={t.a.text} onDone={follow} />
+                          <Typed text={t.a.text} onDone={follow} onAnswer={!asking && t.id === latest ? answer : undefined} />
                           <MessageTools text={t.a.text} onReply={() => replyToMessage("sol", t.a!.text)} className="-ml-1.5 mt-1" />
                           {t.a.newCase && <div className="mt-3">{newCard(t.a.newCase)}</div>}
                           {t.a.designs?.length ? (
