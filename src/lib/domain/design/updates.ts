@@ -21,6 +21,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Settings",
+    words: "Bring in from HubSpot shows a moving bar and a timer while it looks, so you can see it is still working.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
     words: "Bring in from HubSpot joins a deal to the customer's existing deal for the same job, rather than making a second.",
   },
   {
