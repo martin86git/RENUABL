@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import clsx from "clsx";
-import { ChevronDown, LayoutGrid, Maximize2, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, Maximize2, PhoneIncoming, X } from "lucide-react";
 import { clockWords, joinRuns, liveNowWords, phaseWords, WALL_MAX, type LiveLine } from "@/lib/domain/live-call";
 import { CALL_HEADLINES } from "@/lib/domain/voice-agent";
 import {
@@ -75,7 +75,14 @@ export function LiveCallsTray() {
                       <span className="truncate text-sm font-semibold text-ink">{c.customer || "A customer"}</span>
                       <span className="shrink-0 text-xs font-semibold tabular-nums text-sun-line">{clockOf(c, now) ?? "Ringing…"}</span>
                     </span>
-                    <span className="block truncate text-xs text-muted">{c.deal}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {c.inbound && (
+                        <span className="mr-1 inline-flex items-center gap-1 font-semibold text-call">
+                          <PhoneIncoming className="size-3" aria-hidden /> Incoming ·
+                        </span>
+                      )}
+                      {c.deal}
+                    </span>
                     {c.last && (
                       <span className="mt-0.5 block truncate text-xs text-ink/70">
                         {c.last.role === "assistant" ? c.by : firstOf(c.customer)}: {c.last.text}
@@ -114,6 +121,8 @@ export function LiveCallsTray() {
           <span className="absolute -inset-0.5 animate-ping rounded-full bg-positive/40 motion-reduce:animate-none" aria-hidden />
           <CallerAvatar caller={caller} size={32} className="relative ring-2 ring-white/20" />
         </span>
+        {/* A call coming in is marked as such (26 Nov 2026, Martin): an incoming-phone mark before the words. */}
+        {calls.some((c) => c.inbound) && <PhoneIncoming className="size-4 shrink-0 text-sun-bright" aria-label="Incoming call" />}
         <span className="truncate">{liveNowWords(calls)}</span>
         {calls.length === 1 ? (
           <span className="tabular-nums text-sun-bright">{clockOf(calls[0], now) ?? ""}</span>
@@ -272,7 +281,7 @@ function WallPanel({ jobId, customer, deal, assistant }: { jobId: string; custom
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{customer || "A customer"}</p>
           <p className="truncate text-[11px] text-white/70">
-            {deal} · {assistant} {phaseWords(phase, first)}
+            {deal} · {assistant} {phaseWords(phase, first, call?.inbound)}
           </p>
         </div>
         {time && (

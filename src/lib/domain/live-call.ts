@@ -145,8 +145,14 @@ export function livePhase(o: { status: string; liveStatus: string | null }): Liv
 }
 
 /** The window's line under the assistant's name: "calling Jo", "on the call with Jo"… */
-export function phaseWords(phase: LivePhase, customer: string): string {
+export function phaseWords(phase: LivePhase, customer: string, inbound = false): string {
   const who = customer || "the customer";
+  // A call that came in (26 Nov 2026, Martin: "when the voice ai is receiving a call… it indicates on the page").
+  if (inbound) {
+    if (phase === "on-call") return `is taking a call from ${who}`;
+    if (phase === "lined-up" || phase === "ringing") return `is picking up a call from ${who}…`;
+    return `took a call from ${who}`;
+  }
   if (phase === "lined-up") return `will call ${who}`;
   if (phase === "ringing") return `is ringing ${who}…`;
   if (phase === "on-call") return `is on the call with ${who}`;
@@ -186,6 +192,8 @@ export interface LiveCallNow {
   by: string;
   /** The last thing said in full, when anything has been. */
   last: LiveLine | null;
+  /** They rang the business's number: the assistant is answering, not calling out. */
+  inbound?: boolean;
 }
 
 /** How many calls the tray lists, and how many the wall shows side by side (each asks the server every moment or two). */
@@ -204,11 +212,16 @@ export function liveNowOrder<T extends Pick<LiveCallNow, "phase" | "startedAgo">
 }
 
 /** The tray's words: "Charlie is on a call with Jo", "Charlie is ringing Jo", "3 calls live". */
-export function liveNowWords(calls: readonly Pick<LiveCallNow, "phase" | "customer" | "by">[]): string {
+export function liveNowWords(calls: readonly Pick<LiveCallNow, "phase" | "customer" | "by" | "inbound">[]): string {
   if (calls.length === 0) return "No calls right now";
-  if (calls.length > 1) return `${calls.length} calls live`;
+  if (calls.length > 1) {
+    const incoming = calls.filter((c) => c.inbound).length;
+    return `${calls.length} calls live${incoming ? ` · ${incoming} incoming` : ""}`;
+  }
   const c = calls[0];
   const who = c.customer.trim().split(/\s+/)[0] || "a customer";
+  if (c.inbound)
+    return c.phase === "on-call" ? `Incoming call · ${c.by} is talking to ${who}` : `Incoming call · ${who} is ringing ${c.by}`;
   return c.phase === "on-call" ? `${c.by} is on a call with ${who}` : `${c.by} is ringing ${who}`;
 }
 
@@ -237,4 +250,6 @@ export interface LiveCallView {
   outOfHours?: boolean;
   /** Once the call is over and written up: its transcript's id on the deal, to ask the assistant about this call. */
   transcriptId?: string | null;
+  /** They rang the business's number and the assistant answered. */
+  inbound?: boolean;
 }
