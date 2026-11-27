@@ -30,6 +30,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-27",
+    area: "Sol",
+    words: "Sol's draft emails have Polish, Relaxed, Professional and Formal buttons, and Cc addresses lock in as you type them.",
+  },
+  {
+    day: "2026-11-27",
     area: "Settings",
     words: "Product datasheets also swaps sheets found online before for the Australian version, where there is one.",
   },
@@ -72,7 +77,8 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Pre-approvals",
-    words: "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
+    words:
+      "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
   },
   {
     day: "2026-11-26",

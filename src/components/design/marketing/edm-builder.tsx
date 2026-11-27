@@ -95,6 +95,17 @@ import {
   type EdmTile,
   type EdmProduct,
 } from "@/lib/domain/marketing/edm";
+import {
+  EDM_FONTS,
+  EDM_TEXT_SIZES,
+  FONT_STACKS,
+  FONT_WORDS,
+  TEXT_SIZE_WORDS,
+  fontStackOf,
+  textPxOf,
+  type EdmFont,
+  type EdmTextSize,
+} from "@/lib/domain/marketing/edm";
 import { VIDEO_LINE, videoStillKey, youTubeId } from "@/lib/domain/marketing/edm-video";
 import { COUNTDOWN_UNITS, cleanEndsAt, endsAtMs, endsWords } from "@/lib/domain/marketing/countdown";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
@@ -854,6 +865,8 @@ function AutoText({
   className,
   align,
   colour,
+  font,
+  px,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -862,6 +875,9 @@ function AutoText({
   className: string;
   align: "left" | "center";
   colour: string;
+  /** The typeface and size chosen for it, drawn as the email will (edm.ts `fontStackOf`, `textPxOf`). */
+  font?: string;
+  px?: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -869,7 +885,7 @@ function AutoText({
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  }, [value, font, px]);
   return (
     <textarea
       ref={ref}
@@ -878,7 +894,7 @@ function AutoText({
       maxLength={max}
       placeholder={placeholder}
       onChange={(e) => onChange(e.target.value)}
-      style={{ textAlign: align, color: colour }}
+      style={{ textAlign: align, color: colour, ...(font ? { fontFamily: font } : {}), ...(px ? { fontSize: px } : {}) }}
       className={cn("block w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-[#b4b5bb]", className)}
     />
   );
@@ -1037,6 +1053,8 @@ function CanvasBlock({
           placeholder="A heading"
           className="text-[24px] leading-tight font-semibold"
           colour={ink.heading}
+          font={fontStackOf(b)}
+          px={textPxOf(b)}
         />
       )}
       {b.kind === "text" && (
@@ -1048,6 +1066,8 @@ function CanvasBlock({
           placeholder="Write here…"
           className="text-[15px] leading-relaxed"
           colour={ink.words}
+          font={fontStackOf(b)}
+          px={textPxOf(b)}
         />
       )}
       {solAsk && <div onClick={(e) => e.stopPropagation()}>{solAsk}</div>}
@@ -1153,6 +1173,15 @@ function CanvasBlock({
         </>
       )}
       {picked && hasWidth(b.kind) && <WidthField block={b} onChange={onChange} />}
+      {picked && (b.kind === "heading" || b.kind === "text") && (
+        <TypeChoice
+          font={b.font ?? "modern"}
+          size={b.textSize ?? "medium"}
+          onChange={(t) =>
+            onChange(() => ({ font: t.font === "modern" ? undefined : t.font, textSize: t.size === "medium" ? undefined : t.size }))
+          }
+        />
+      )}
       {picked && (
         <PanelColour
           value={b.fill ?? null}
@@ -2059,6 +2088,59 @@ function ButtonLookFields({ block: b, colour, onChange }: { block: EdmBlock; col
 
 /** A panel behind the block: none, a few quiet colours, the brand colour or any other. Blocks in a row of one colour make one panel. */
 const PANEL_SWATCHES = ["#f4f4f5", "#eef2ff", "#fff3ea", "#e8f5ec", "#26282c"];
+/**
+ * A heading's or the words' typeface and size (27 Nov 2026, Martin: "i need font options and font size options"): each
+ * typeface shown in itself, then S, M, L and XL. Only faces inboxes have to hand (edm.ts `EDM_FONTS`).
+ */
+function TypeChoice({
+  font,
+  size,
+  onChange,
+}: {
+  font: EdmFont;
+  size: EdmTextSize;
+  onChange: (t: { font: EdmFont; size: EdmTextSize }) => void;
+}) {
+  return (
+    <div
+      className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Type className="size-3.5 text-muted" />
+      <span className="text-muted">Font</span>
+      {EDM_FONTS.map((f) => (
+        <button
+          key={f}
+          type="button"
+          aria-pressed={font === f}
+          onClick={() => onChange({ font: f, size })}
+          style={{ fontFamily: FONT_STACKS[f] }}
+          className={cn(
+            "h-7 rounded-full px-2.5 text-[13px] ring-1",
+            font === f ? "bg-ink text-canvas ring-ink" : "ring-line hover:ring-ink/40",
+          )}
+        >
+          {FONT_WORDS[f]}
+        </button>
+      ))}
+      <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+      <span className="text-muted">Size</span>
+      {EDM_TEXT_SIZES.map((z) => (
+        <button
+          key={z}
+          type="button"
+          aria-pressed={size === z}
+          aria-label={`Size ${TEXT_SIZE_WORDS[z]}`}
+          onClick={() => onChange({ font, size: z })}
+          className={cn("h-7 min-w-7 rounded-full px-2 ring-1", size === z ? "bg-ink text-canvas ring-ink" : "ring-line hover:ring-ink/40")}
+        >
+          {TEXT_SIZE_WORDS[z]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function PanelColour({
   value,
   colour,

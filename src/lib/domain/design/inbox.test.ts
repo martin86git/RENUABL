@@ -13,6 +13,7 @@ import {
   SUMMARY_INSTRUCTIONS,
   cleanLinkUrl,
   composeHelpPrompt,
+  EMAIL_TONES,
   composeHtml,
   plainBody,
   withLink,
@@ -247,6 +248,19 @@ describe("writing a new email", () => {
       body: "Hi Sam",
     });
     expect(cleanComposeHelp({ subject: "x", body: "" })).toBeNull();
+  });
+
+  it("puts an email into another tone without adding facts, and only Formal keeps an introduction", () => {
+    const base = { business: "Sunrise Solar", to: [], subject: "Hello", body: "Hi Jo, I'm Sam from Sunrise Solar.", instructions: "" };
+    for (const tone of EMAIL_TONES) {
+      const p = composeHelpPrompt(tone, base);
+      expect(p).toContain("keeping every fact, question and request in it and adding none");
+      expect(p).toContain("Never add a figure, price");
+      expect(p).toContain("I'm Sam from Sunrise Solar.");
+    }
+    expect(composeHelpPrompt("relaxed", base)).toContain("Never introduce the sender");
+    expect(composeHelpPrompt("professional", base)).toContain("Never introduce the sender");
+    expect(composeHelpPrompt("formal", base)).not.toContain("Never introduce the sender");
   });
 });
 
