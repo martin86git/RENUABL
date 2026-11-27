@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanDemoRequest, cleanEnquiry, demoRequestEmail, enquiryEmail, interestEmail } from "./sales-leads";
+import { cleanDemoRequest, cleanEnquiry, demoRequestEmail, demoRequestNote, enquiryEmail, interestEmail } from "./sales-leads";
 
 describe("an Enterprise enquiry from the sign-up page", () => {
   const good = { name: " Sam  Lee ", business: "Bright Sparks Solar", email: "SAM@example.com", mobile: "0400 000 000", users: "15" };
@@ -40,6 +40,8 @@ describe("a demo request from the business page", () => {
       email: "sam@example.com",
       mobile: null,
       note: null,
+      time: null,
+      from: null,
     });
     expect(cleanDemoRequest({ ...good, mobile: "0400 000 000", note: "Mornings suit" })).toMatchObject({
       mobile: "0400 000 000",
@@ -57,8 +59,27 @@ describe("a demo request from the business page", () => {
     const d = cleanDemoRequest({ ...good, mobile: "0400 000 000" });
     if (typeof d === "string") throw new Error(d);
     const e = demoRequestEmail(d);
-    expect(e.subject).toBe("Demo request: Bright Sparks Solar");
+    expect(e.subject).toBe("Book a demo: Bright Sparks Solar");
     expect(e.text).toContain("sam@example.com");
     expect(e.text).toContain("0400 000 000");
+    expect(e.text).toContain("Would suit: not said");
+  });
+
+  it("keeps when would suit and where they came from, on the lead and in the email", () => {
+    const d = cleanDemoRequest({
+      ...good,
+      time: " Tuesday  after 2 ",
+      note: "The designer",
+      utm_source: "Rexel",
+      utm_campaign: "wholesaler-launch",
+    });
+    if (typeof d === "string") throw new Error(d);
+    expect(d.time).toBe("Tuesday after 2");
+    expect(d.from).toBe("rexel · wholesaler-launch");
+    expect(demoRequestNote(d)).toBe("Would suit: Tuesday after 2\nThe designer\nCame from: rexel · wholesaler-launch");
+    expect(demoRequestEmail(d).text).toContain("Came from: rexel · wholesaler-launch");
+    const plain = cleanDemoRequest(good);
+    if (typeof plain === "string") throw new Error(plain);
+    expect(demoRequestNote(plain)).toBeNull();
   });
 });

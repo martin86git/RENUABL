@@ -39,21 +39,31 @@ export const SALES_HERO = {
   /** Sol and the voice agents both named (17 Nov 2026, Martin: the home page shouldn't only be about Sol). */
   line: "Sol is the brain: he knows your deals and writes the work up. Your voice agents make the calls: sales, bookings and, soon, tech support.",
   cta: "Get started",
-  /** Beside Get started in a white pill, so it doesn't compete (21 Nov 2026, Martin). */
-  demo: "Request a demo",
+  /**
+   * Beside Get started in a white pill, so it doesn't compete (21 Nov 2026, Martin). Book a demo since 27 Nov 2026
+   * (Martin: no self-serve demo, "you either have to sign up, or book a demo in"): every demo button on the page opens
+   * the same short form.
+   */
+  demo: "Book a demo",
   small: ["Everything in one platform", "Up and running today", "Cancel any time"],
 } as const;
 
-/** The demo request's box (21 Nov 2026, Martin): a person shows them RENUABL; RENUABL's staff are told. */
+/**
+ * The Book a demo box (21 Nov 2026, Martin; the one way to see RENUABL without signing up since 27 Nov 2026): a person
+ * shows them RENUABL; RENUABL's staff are told. No time is booked by the form: `time` is what would suit, in words.
+ */
 export const DEMO_REQUEST = {
-  title: "Request a demo",
+  title: "Book a demo",
   sub: "Someone from RENUABL will show you round on a short video call. We'll be in touch within a business day to book it.",
   name: "Your name",
   business: "Business",
   email: "Work email",
   mobile: "Mobile (optional)",
+  time: "A day or time that suits (optional)",
   note: "What would you like to see? (optional)",
-  send: "Request my demo",
+  consent: "We'll use these to get in touch about RENUABL.",
+  privacy: "Privacy Policy",
+  send: "Book my demo",
   sending: "Sending…",
   close: "Close",
 } as const;
@@ -103,7 +113,7 @@ export const VOICE_INTRO = {
   pill: "RENUABL Voice AI",
   headline: ["Voice agents that", "ring every lead."],
   sub: "Give each one a name, a voice and your script. They ring your new leads, answer your number and book your installs.",
-  demo: "Start demo",
+  demo: "Book a demo",
   does: ["Rings new leads", "Answers your number", "Books installs", "Writes every call on the deal"],
   price: (monthly: string) => `Comes with Calls & Texts, ${monthly} a month on top of your plan.`,
 } as const;
@@ -183,7 +193,7 @@ export const LAUNCH = {
    * "launch" as a startup). */
   headline: ["Go", "further."],
   sub: "Supercharge your business with AI. Sol thinks, your voice agents call, and you take it to the next level.",
-  cta: "See it for yourself",
+  cta: "Book a demo",
   plans: "See the plans",
   replay: "Watch it again",
   /** Mission control, in the corners (18 Nov 2026, Martin). */
@@ -413,14 +423,14 @@ export const HERO_LIVE = {
         ask: "Can I try you now?",
         keys: ["try", "demo", "start", "test"],
         answer:
-          "Yes. Press Start demo and you're in a solar business of your own with example deals. Ask me there and I'll answer from them.",
+          "Book a demo and someone from RENUABL will show you me at work on a short call. Or sign up, and I'll answer from your own deals.",
       },
     ],
     price: {
       keys: ["price", "cost", "how much", "plan", "pay"],
       answer: "One price a user a month, with me in every plan. The plans are just below.",
     },
-    fallback: "Good question. I answer from your own deals, so press Start demo and ask me there.",
+    fallback: "Good question. I answer from a business's own deals, so book a demo and we'll show you, or sign up and ask me there.",
     note: "Written answers on this page. In RENUABL, Sol answers from your own business.",
   },
   film: { eyebrow: "See it work", headline: "A day with Sol, start to finish." },

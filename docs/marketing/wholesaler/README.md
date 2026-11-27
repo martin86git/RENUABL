@@ -4,13 +4,13 @@ A wholesaler is willing to mention RENUABL to its trade customers (solar retaile
 
 ## The recommendation
 
-**Lead with the demo, not a video.** A video can't play inside an email: every "video" in an email is a picture that links out. The strongest thing we have is **Try the demo**: one press opens a test account of the reader's own, with example customers and deals and 40 of Sol's answers, and no form to get in (it was built for exactly this: a link a wholesaler passes on). So the kit is:
+**Lead with a booked demo, not a video.** A video can't play inside an email: every "video" in an email is a picture that links out. The button is **Book a demo** (27 Nov 2026, Martin: nobody opens a demo account themselves any more, "you either have to sign up, or book a demo in"): it opens the front page with a short form (name, business, work email, mobile, a time that suits), RENUABL's staff are emailed, and someone shows them round on a short video call. So the kit is:
 
-1. **The email** (`email.html`): an animated picture of four real screens with example data (`hero.gif`), a short note in the wholesaler's voice, one button, **Try the demo**, then a line to the video and the price.
+1. **The email** (`email.html`): an animated picture of four real screens with example data (`hero.gif`), a short note in the wholesaler's voice, one button, **Book a demo**, then a line to the video and the price.
 2. **A newsletter block** (`newsletter-block.html`): the same in a heading, one paragraph and the button, for a wholesaler that would rather drop us into its usual newsletter than send an email of its own.
 3. **A 90-second Loom, recorded by you** (script below): the second link, for people who want to watch before they press. Recorded by the founder it reads as a person showing their work, which a polished film doesn't; it takes one take; and you can redo it as the product changes. `video-thumb.jpg` is ready for it (a frame with a play button).
 
-The product film already on `/business` stays the page's hero; the email sends people to the demo first and to `/business` second.
+The product film already on `/business` stays the page's hero; the email sends people to Book a demo first and to the front page second.
 
 ## What to give the wholesaler
 
@@ -22,9 +22,9 @@ The product film already on `/business` stays the page's hero; the email sends p
 
 ## Before they send
 
-1. **Fill in the tracking.** `SLUG` in `build.mjs` (for example `rexel`), then run `node docs/marketing/wholesaler/build.mjs`. Every link carries `utm_source=<slug>&utm_medium=email&utm_campaign=wholesaler-launch`. A demo opened from these links keeps its source and campaign: when the person later gives their details, the demo lead and the staff email say "Came from: <slug> · wholesaler-launch" (`cleanDemoSource` in `domain/design/demo.ts`). A demo opened but never given details is kept on the demo business (`businesses.demo_source`) and isn't emailed to anyone.
+1. **Fill in the tracking.** `SLUG` in `build.mjs` (for example `rexel`), then run `node docs/marketing/wholesaler/build.mjs`. Every link carries `utm_source=<slug>&utm_medium=email&utm_campaign=wholesaler-launch`. A demo booked from these links keeps its source and campaign: the lead's note and the staff email say "Came from: <slug> · wholesaler-launch" (`cleanDemoRequest` in `domain/design/sales-leads.ts`).
 2. **Record the Loom** and put its link in `LOOM` in `build.mjs` (or take the video line out).
-3. **Expect a wave of demos.** Each opens its own demo business with up to 40 Sol answers (Claude, paid by RENUABL; about US$0.04 a credit at list prices, so at most about US$1.60 a demo that uses them all) and is cleared after 30 days. Six demos an hour a visitor.
+3. **Expect a wave of demo bookings.** Each is a lead under Enquiries on RENUABL admin and in /admin's pipeline, where the time is booked and reminders go out. Someone has to ring or email each within a business day, as the form promises.
 4. **`/business` is still hidden** (`BUSINESS_LINK_SHOWN` false: noindex, out of search). The links still open for anyone given them, so the email works either way; decide whether launch day is the same day.
 5. **Test it** in their platform's preview on Outlook for Windows (it shows the GIF's first frame, which stands on its own), Gmail and Apple Mail.
 
@@ -32,7 +32,7 @@ The product film already on `/business` stays the page's hero; the email sends p
 
 **Subject:** Solar just got a brain
 **Or:** Software for solar businesses, with AI built in
-**Preview:** Design, CRM, proposals and service in one platform. Try the demo in one click.
+**Preview:** Design, CRM, proposals and service in one platform. Book a demo and see it at work.
 
 **Solar just got a brain.**
 
@@ -44,9 +44,9 @@ RENUABL Business puts the whole job in one place. Draw a roof and it's priced as
 
 Built into it is Sol, an AI that works inside your deals. He lines up who to call next, drafts the follow-up and answers questions on solar and the standards, with his sources. He never sends anything without you.
 
-The demo opens a test account of your own, with example customers and deals. No sign-up form to get in.
+Book a demo and someone from RENUABL will show you round on a short video call, with example customers and deals.
 
-**[Try the demo]** → https://www.renuabl.com.au/business/demo
+**[Book a demo]** → https://www.renuabl.com.au/?demo=1
 
 Rather watch first? Here's a 90-second walkthrough: {Loom link}
 
@@ -57,20 +57,20 @@ RENUABL Business is made by Reburthed Pty Ltd trading as RENUABL, ABN 96 662 374
 ### The newsletter block
 
 **Solar just got a brain**
-RENUABL Business is software for solar retailers and installers: roof design that prices as you draw, branded proposals customers accept online, and everything after the sale in one place. Sol, its built-in AI, lines up your day and drafts your follow-ups. The demo opens a test account of your own in one click.
-**[Try the demo]**
+RENUABL Business is software for solar retailers and installers: roof design that prices as you draw, branded proposals customers accept online, and everything after the sale in one place. Sol, its built-in AI, lines up your day and drafts your follow-ups. Book a demo and someone from RENUABL will show you round.
+**[Book a demo]**
 
 ### Claims checked
 
 - No best, first, leading or guaranteed; no other product named or compared.
 - "An Australian team": RENUABL is Reburthed Pty Ltd. Change it to "a Melbourne team" only if that's right.
 - Price as on `/business`, never shown as a discount. The wholesaler may prefer to leave the price out: the line can go without changing anything else.
-- "No sign-up form to get in": true of the demo's first press. It asks for name, company and work email the first time they design a roof, ask Sol or publish a proposal.
+- "Someone from RENUABL will show you round": a person has to follow up every booking; the form says within a business day.
 - Every screen in `hero.gif` is a real RENUABL screen with made-up example data. They were taken before the latest look; retake them with `node tools/demo/shoot.mjs` and run the build again if you want today's.
 
 ## The Loom: 90 seconds, one take
 
-Record in the demo business (Try the demo, or the local "Sunrise Solar (example)"), browser full screen, your face in the corner. Talk to one installer, not a crowd.
+Record in the demo account (RENUABL admin's Demo account, or the local "Sunrise Solar (example)"), browser full screen, your face in the corner. Talk to one installer, not a crowd.
 
 | Time    | On screen                                         | Say (in your own words)                                                                                                                                   |
 | ------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -79,6 +79,6 @@ Record in the demo business (Try the demo, or the local "Sunrise Solar (example)
 | 25–50 s | Design it for me on her roof, the quote building  | "One press and the roof is designed three ways, priced as it goes. Payback, best return, most independence."                                              |
 | 50–65 s | The proposal, Send to customer                    | "The proposal goes out under your own brand. She can accept it online, and chat to you on the same page."                                                 |
 | 65–80 s | Signed proposals, Ordering station, Installations | "Once she signs, the order, the install calendar and the installer's job card follow on. Nothing typed twice."                                            |
-| 80–90 s | Back to `/business/demo`                          | "Don't take my word for it. Press Try the demo: it opens an account of your own with example deals. Have a play."                                         |
+| 80–90 s | The front page, Book a demo                       | "Don't take my word for it. Press Book a demo and I'll show you round your own kind of jobs on a short call."                                             |
 
 Keep it to what the product does today: don't mention the Marketplace, calling or texting (RENUABL's own only for now), or anything marked coming soon.

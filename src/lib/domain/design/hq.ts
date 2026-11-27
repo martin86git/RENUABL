@@ -15,7 +15,10 @@ export type HqTab = (typeof HQ_TABS)[number]["id"];
 
 export const cleanHqTab = (raw: unknown): HqTab => HQ_TABS.find((t) => t.id === raw)?.id ?? "enquiries";
 
-/** Someone who put their hand up: gave their details in the demo, asked sales about Enterprise, or joined the Marketplace list. */
+/**
+ * Someone who put their hand up: booked a demo, gave their details in a demo account (while those could be opened),
+ * asked sales about Enterprise, or joined the Marketplace list.
+ */
 export interface HqLead {
   id: string;
   kind: string;
@@ -29,7 +32,8 @@ export interface HqLead {
 }
 
 export const LEAD_WORDS: Record<string, string> = {
-  demo: "Demo",
+  "demo-request": "Book a demo",
+  demo: "Demo account",
   enterprise: "Talk to sales",
   marketplace: "Marketplace list",
 };

@@ -5,7 +5,7 @@
 import type { HqLead } from "@/lib/domain/design/hq";
 import { query } from "./db";
 
-/** The latest enquiries: details given in the demo, Talk to sales, and the Marketplace waiting list. */
+/** The latest enquiries: demos booked, details given in a demo account, Talk to sales, and the Marketplace waiting list. */
 export async function hqLeads(): Promise<HqLead[]> {
   const rows = await query<{
     id: string;

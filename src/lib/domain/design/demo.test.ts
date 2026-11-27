@@ -174,20 +174,12 @@ describe("demoPageNeedsDetails", () => {
 });
 
 describe("the demo's words", () => {
-  const words = [
-    DEMO_PAGE.headline,
-    DEMO_PAGE.what,
-    DEMO_PAGE.note,
-    DEMO_PAGE.bar,
-    DEMO_DETAILS.title,
-    DEMO_DETAILS.intro,
-    DEMO_DETAILS.consent,
-    ...DEMO_PAGE.does.flatMap((d) => [d.title, d.body]),
-  ].join(" ");
+  const words = [DEMO_PAGE.closed, DEMO_PAGE.bar, DEMO_DETAILS.title, DEMO_DETAILS.intro, DEMO_DETAILS.consent].join(" ");
 
-  it("says what RENUABL is and what it does", () => {
-    expect(DEMO_PAGE.what).toMatch(/solar retailers and installers/);
-    expect(DEMO_PAGE.does.length).toBeGreaterThanOrEqual(3);
+  it("sends an old demo link to Book a demo, and offers no demo to open", () => {
+    expect(DEMO_PAGE.bookPath).toBe("/?demo=1");
+    expect(DEMO_PAGE.closed).toMatch(/Book a demo/);
+    expect(Object.values(DEMO_PAGE).join(" ")).not.toMatch(/try the demo|start demo|open(ing)? the demo/i);
   });
 
   it("makes no claim it can't prove, and quotes no price", () => {

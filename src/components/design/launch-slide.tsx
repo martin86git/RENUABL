@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { RotateCcw } from "lucide-react";
 import { LAUNCH } from "@/lib/domain/design/sales-page";
-import { TryDemoButton } from "./business-demo";
+import { DemoRequestButton } from "./demo-request";
 import { useMotionOk } from "./living-hero";
 import { LiveSun } from "./live-sun";
 
@@ -225,7 +225,7 @@ export function LaunchSlide({ signedIn }: { signedIn: boolean }) {
         <div className={clsx("transition-all duration-700", more ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0")}>
           <p className="mx-auto mt-5 max-w-xl text-[clamp(16px,1.3vw,19px)] leading-relaxed text-white/70">{LAUNCH.sub}</p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            {!signedIn && <TryDemoButton look="main" label={LAUNCH.cta} />}
+            {!signedIn && <DemoRequestButton look="main" label={LAUNCH.cta} />}
             <a href="#pricing" className="text-[15px] font-medium text-white/75 underline-offset-4 hover:text-white hover:underline">
               {LAUNCH.plans}
             </a>

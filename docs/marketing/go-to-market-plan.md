@@ -81,7 +81,7 @@ Subject: A design tool that designs itself
 Preview: Ask for 8 kW and a battery, or press once for three designs.
 Heading: Three designs. One press.
 Hi {firstName}, ask the designer for 8 kW and a battery, or press once and it lays out three designs for the roof, each priced as it's drawn, with strings checked against the inverter. You check it against the photo and send the one you like.
-Button: Try the demo → https://www.renuabl.com.au/business/demo
+Button: Book a demo → https://www.renuabl.com.au/?demo=1
 
 **2 · after 4 more working days**
 Subject: Your CRM, doing the typing

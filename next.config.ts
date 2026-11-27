@@ -10,9 +10,14 @@ const nextConfig: NextConfig = {
     "/api/design/marketing/updates": ["./marketing/launch/*"],
   },
   // RENUABL Business moved from /business to the front page (19 Nov 2026, Martin). Old links and ads still land on it,
-  // their query (utm tags) carried across; /business/demo stays where it is.
+  // their query (utm tags) carried across. /business/demo was the self-serve demo's page; nobody opens a demo account
+  // themselves any more (27 Nov 2026, Martin), so its links land on the front page with the Book a demo box open
+  // (DEMO_PAGE.bookPath in domain/design/demo.ts), utm tags kept.
   async redirects() {
-    return [{ source: "/business", destination: "/", permanent: true }];
+    return [
+      { source: "/business", destination: "/", permanent: true },
+      { source: "/business/demo", destination: "/?demo=1", permanent: false },
+    ];
   },
 };
 

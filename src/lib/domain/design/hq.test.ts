@@ -9,13 +9,15 @@ describe("RENUABL admin", () => {
   });
 
   it("names each kind of enquiry, and any it doesn't know", () => {
-    expect(leadWords("demo")).toBe("Demo");
+    expect(leadWords("demo")).toBe("Demo account");
+    expect(leadWords("demo-request")).toBe("Book a demo");
     expect(leadWords("enterprise")).toBe("Talk to sales");
     expect(leadWords("something")).toBe("Enquiry");
   });
 
   it("lists only the kinds that have someone, demos first", () => {
     expect(leadKinds([{ kind: "marketplace" }, { kind: "demo" }, { kind: "zz" }])).toEqual(["demo", "marketplace", "zz"]);
+    expect(leadKinds([{ kind: "demo" }, { kind: "demo-request" }])).toEqual(["demo-request", "demo"]);
     expect(leadKinds([])).toEqual([]);
   });
 

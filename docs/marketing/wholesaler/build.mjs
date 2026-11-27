@@ -19,7 +19,8 @@ const SITE = "https://www.renuabl.com.au";
 // The wholesaler's short name goes in WHOLESALER (as it should read) and SLUG (for the link's tracking).
 const WHOLESALER = "{Wholesaler}";
 const SLUG = "wholesaler";
-const DEMO = `${SITE}/business/demo?utm_source=${SLUG}&utm_medium=email&utm_campaign=wholesaler-launch`;
+// Book a demo: the front page with its box open. Nobody opens a demo account themselves (27 Nov 2026, Martin).
+const DEMO = `${SITE}/?demo=1&utm_source=${SLUG}&utm_medium=email&utm_campaign=wholesaler-launch`;
 const MORE = `${SITE}/business?utm_source=${SLUG}&utm_medium=email&utm_campaign=wholesaler-launch`;
 const IMAGES = `${SITE}/design/partner`;
 const LOOM = "{Loom link}";
@@ -133,7 +134,7 @@ async function pictures() {
 export const COPY = {
   subject: "Solar just got a brain",
   subjectB: "Software for solar businesses, with AI built in",
-  preheader: "Design, CRM, proposals and service in one platform. Try the demo in one click.",
+  preheader: "Design, CRM, proposals and service in one platform. Book a demo and see it at work.",
   eyebrow: "For solar retailers and installers",
   headline: "Solar just got a brain.",
   paras: [
@@ -142,15 +143,15 @@ export const COPY = {
     `RENUABL Business puts the whole job in one place. Draw a roof and it's priced as you draw. Send a proposal under your own brand that your customer accepts online. Once it's signed, the order, the install calendar and the installer's job card follow on.`,
     `Built into it is Sol, an AI that works inside your deals. He lines up who to call next, drafts the follow-up and answers questions on solar and the standards, with his sources. He never sends anything without you.`,
   ],
-  demoLine: "The demo opens a test account of your own, with example customers and deals. No sign-up form to get in.",
-  cta: "Try the demo",
+  demoLine: "Book a demo and someone from RENUABL will show you round on a short video call, with example customers and deals.",
+  cta: "Book a demo",
   videoLine: "Rather watch first? Here's a 90-second walkthrough.",
   price: "$99 a user a month, and the first month is $29 a user. Prices include GST. Cancel any time.",
   about: "RENUABL Business is made by Reburthed Pty Ltd trading as RENUABL, ABN 96 662 374 905.",
   newsletter: {
     heading: "Solar just got a brain",
     words:
-      "RENUABL Business is software for solar retailers and installers: roof design that prices as you draw, branded proposals customers accept online, and everything after the sale in one place. Sol, its built-in AI, lines up your day and drafts your follow-ups. The demo opens a test account of your own in one click.",
+      "RENUABL Business is software for solar retailers and installers: roof design that prices as you draw, branded proposals customers accept online, and everything after the sale in one place. Sol, its built-in AI, lines up your day and drafts your follow-ups. Book a demo and someone from RENUABL will show you round.",
   },
 };
 

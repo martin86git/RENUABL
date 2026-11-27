@@ -118,6 +118,17 @@ describe("the launch drafts", () => {
     }
   });
 
+  it("offer a demo only as one to book: no demo account to try or open (27 Nov 2026, Martin)", () => {
+    for (const c of GTM_EMAILS)
+      for (const b of c.blocks) {
+        expect(b.url ?? "").not.toContain("business/demo");
+        expect(b.text ?? "").not.toMatch(/\b(try|open|start)\b.*\b(demo|designer|calendar)\b|in the demo|build yours/i);
+      }
+    expect(
+      GTM_EMAILS.flatMap((c) => c.blocks).some((b) => b.url === "https://www.renuabl.com.au/?demo=1" && b.text === "Book a demo"),
+    ).toBe(true);
+  });
+
   it("say the voice agents are automated, link only to renuabl.com.au, and price as the plans do", () => {
     for (const c of GTM_EMAILS) for (const b of c.blocks) if (b.url) expect(b.url).toMatch(/^https:\/\/www\.renuabl\.com\.au(\/|$)/);
     const words = GTM_EMAILS.map(allText).join(" ");

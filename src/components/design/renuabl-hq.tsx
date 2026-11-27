@@ -223,7 +223,7 @@ function Enquiries({ leads }: { leads: HqLead[] }) {
   if (leads.length === 0)
     return (
       <p className={clsx(ui.card, "px-5 py-4 text-sm text-ink-2")}>
-        Nobody has asked yet. People show here once they give their details in the demo, ask to talk to sales, or join the Marketplace list.
+        Nobody has asked yet. People show here once they book a demo, ask to talk to sales, or join the Marketplace list.
       </p>
     );
   const chip = (id: string | null, label: string, n: number) => (
@@ -254,7 +254,7 @@ function Enquiries({ leads }: { leads: HqLead[] }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-ink">{l.name || l.business || l.email}</span>
               {l.name && l.business && <span className="text-sm text-ink-2">{l.business}</span>}
-              <Pill tone={l.kind === "demo" ? "hot" : undefined}>{leadWords(l.kind)}</Pill>
+              <Pill tone={l.kind === "demo-request" || l.kind === "demo" ? "hot" : undefined}>{leadWords(l.kind)}</Pill>
               <span className="ml-auto text-[12px] tabular-nums text-muted">{when(l.at)}</span>
             </div>
             <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">

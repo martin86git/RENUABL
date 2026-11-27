@@ -4,8 +4,13 @@ import { normaliseEmail } from "../accounts";
  * The RENUABL Business demo (11 Nov 2026, Martin: the way in for someone handed the link, such as a wholesaler passing
  * RENUABL to its retailers and installers; blended into signing up without being framed as it).
  *
- * "Try the demo" on /business opens a demo account in one press: no form. Each visitor gets a demo business of their
- * own, a retailer's, filled with the made-up example deals. They look around freely; their name, company and email are
+ * CLOSED TO THE PUBLIC since 27 Nov 2026 (Martin: "i dont want there to be access to the demo platform. you either
+ * have to sign up, or book a demo in"): nothing opens a demo account any more; the front page offers Book a demo
+ * (sales-leads.ts) and staff show the platform from the sample retailer (staff-view.ts). The rules below still hold for
+ * demo accounts opened before, until the daily clean-up clears them.
+ *
+ * As it was: "Try the demo" on /business opened a demo account in one press: no form. Each visitor got a demo business of
+ * their own, a retailer's, filled with the made-up example deals. They look around freely; their name, company and email are
  * asked for ("Put your business on it") the first time they do something that costs RENUABL money and shows the
  * product at its best: design a roof, ask Sol, publish a proposal (`demoNeedsDetails`). The demo is then named for
  * their company, so proposals carry it. A demo never reaches outside itself (`demoRefuses`), and Sol answers from a
@@ -216,24 +221,16 @@ export const DEMO_DETAILS = {
   barButton: "Put your business on it",
 } as const;
 
-/** The demo's words on /business and /business/demo. Nothing unprovable, no prices. */
+/**
+ * The demo's words. Its own page and its Try the demo button are gone (27 Nov 2026, Martin: "you either have to sign up,
+ * or book a demo in"): /business/demo sends to `bookPath`, the front page with its Book a demo box open
+ * (sales-leads.ts), and what is left here is for demo accounts opened before, until they are cleared.
+ */
 export const DEMO_PAGE = {
-  eyebrow: "RENUABL Business · Demo",
-  headline: "Run your whole solar business from one place.",
-  what: "RENUABL is software for Australian solar retailers and installers. It takes a job from the enquiry through to the grid connection, with Sol, its AI assistant, doing the admin alongside you.",
-  doesTitle: "What it does",
-  does: [
-    { title: "Designs the roof", body: "Panels laid on the satellite picture, strings checked, and the quote priced as you draw." },
-    { title: "Sends the proposal", body: "Under your own name and colours. Your customer reads it, asks questions and signs online." },
-    { title: "Runs the job", body: "Approvals, ordering from your wholesalers, the install calendar, job cards and the paperwork after." },
-    { title: "Sol, your AI assistant", body: "Answers solar questions, drafts your follow-ups and tells you what needs you today." },
-  ],
-  button: "Try the demo",
-  opening: "Opening the demo…",
-  note: "No sign-up and no card. A demo account of your own with made-up customers and deals.",
-  failed: "The demo couldn't be opened just now. Please try again in a moment.",
+  /** Where every old demo link lands: the front page, its Book a demo box open. */
+  bookPath: "/?demo=1",
+  closed: "The demo account isn't open any more. Book a demo and someone from RENUABL will show you round.",
   busy: "Please try again shortly.",
-  more: "See everything RENUABL does",
   /** The bar over every page of a demo account. */
   bar: "You're in a demo of RENUABL Business. The customers and deals are made up, and nothing is sent to anyone.",
   barLink: "About RENUABL",

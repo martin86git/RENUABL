@@ -2,13 +2,13 @@
 
 import { useRef } from "react";
 import { VOICE_AGENTS, VOICE_INTRO, voiceIntroPrice } from "@/lib/domain/design/sales-page";
-import { TryDemoButton } from "./business-demo";
+import { DemoRequestButton } from "./demo-request";
 import { useInView, useMotionOk } from "./living-hero";
 import { Ray, RayStyles } from "./rays";
 
 /**
  * The voice agents' opening slide (26 Nov 2026, Martin: a slide like a voice-agent builder's landing page, to talk about
- * our Voice AI). On black and centred: a pill with the agents' own sound wave, one large headline, one line, Start demo
+ * our Voice AI). On black and centred: a pill with the agents' own sound wave, one large headline, one line, Book a demo
  * (Hear a call was removed 27 Nov 2026, Martin), then a quiet row of what an agent does where such a page would show
  * its customers' logos. Copy in `VOICE_INTRO`.
  */
@@ -43,7 +43,7 @@ export function VoiceSlide({ signedIn }: { signedIn: boolean }) {
         </p>
         {!signedIn && (
           <div className="mt-9 flex justify-center">
-            <TryDemoButton look="main" label={VOICE_INTRO.demo} />
+            <DemoRequestButton look="main" label={VOICE_INTRO.demo} />
           </div>
         )}
         <p className="mt-5 text-[13px] text-white/45">{voiceIntroPrice()}</p>

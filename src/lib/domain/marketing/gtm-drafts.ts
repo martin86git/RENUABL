@@ -28,7 +28,11 @@ import type { EdmBlock, EdmContent } from "./edm";
 import type { SequenceDraft, SequenceStep } from "./sequences";
 
 const SITE = "https://www.renuabl.com.au/";
-const DEMO = `${SITE}business/demo`;
+/**
+ * Where a demo button lands: the front page with its Book a demo box open. Nobody opens a demo account themselves
+ * (27 Nov 2026, Martin: "you either have to sign up, or book a demo in"), so no button here says try or open.
+ */
+const DEMO = `${SITE}?demo=1`;
 const PRICING = `${SITE}#pricing`;
 const MARKETPLACE = `${SITE}design/marketplace`;
 
@@ -199,7 +203,7 @@ export const PANEL_REST = "#f4f4f5";
 const DESIGNER_PART: Section = {
   hook: "Made for solar. Design and price a roof while you're on the phone.",
   pictures: ["dband"],
-  cta: ["Try the designer", DEMO],
+  cta: ["See the designer", DEMO],
 };
 
 /**
@@ -271,7 +275,7 @@ export const GTM_VOICE: EdmContent = email(
   "You choose its name, its voice and its script. It always says it's automated.",
   [
     { hook: "Meet the voice agent that rings your leads.", pictures: ["vmeet"], cta: ["Hear it call", SITE] },
-    { hook: "Pick a contact. Hand over the call. Watch it happen.", pictures: ["pbook"], cta: ["Try the demo", DEMO] },
+    { hook: "Pick a contact. Hand over the call. Watch it happen.", pictures: ["pbook"], cta: ["Book a demo", DEMO] },
     {
       hook: `Your own number, for ${VOICE_DAY_WORDS}.`,
       pictures: ["aday"],
@@ -320,7 +324,7 @@ const MORE: { name: string; content: EdmContent }[] = [
           words: [
             `Your logo, colours and type are in every plan. Layouts of your own come with Growth, ${GROWTH} on top of your RENUABL plan.`,
           ],
-          cta: ["Build yours", DEMO],
+          cta: ["See one built", DEMO],
         },
         { hook: "Their roof, their system, their price. Signed online.", pictures: ["xdesigner"], cta: ["See a proposal", DEMO] },
       ],
@@ -352,7 +356,7 @@ const MORE: { name: string; content: EdmContent }[] = [
         words: [
           "Error codes, datasheets, network rules. Sol finds the answer and shows where it came from. Your electrician still makes the call on site.",
         ],
-        cta: ["Ask Sol in the demo", DEMO],
+        cta: ["See Sol answer", DEMO],
       },
       { hook: "An inverter that's lost its Wi-Fi? Ask before you drive out.", pictures: ["ssrc"], cta: ["Meet Sol", SITE] },
     ]),
@@ -361,7 +365,7 @@ const MORE: { name: string; content: EdmContent }[] = [
     name: "The paperwork after the sale",
     content: email("k", "Pre-approvals, rebates, grid connection: one list", "Every sold job filed at the step it's waiting on.", [
       { hook: "The paperwork after the sale, lined up for you.", pictures: ["hpaper"], cta: ["See after the sale", DEMO] },
-      { hook: "Every string checked against the inverter's limits as you draw.", pictures: ["sready"], cta: ["Try the designer", DEMO] },
+      { hook: "Every string checked against the inverter's limits as you draw.", pictures: ["sready"], cta: ["See the designer", DEMO] },
     ]),
   },
   {
@@ -372,7 +376,7 @@ const MORE: { name: string; content: EdmContent }[] = [
       "Leads, design, proposal, order, install and service. One login.",
       [
         { hook: "Stop copying the same job into five tools.", pictures: ["hone"], cta: ["See it end to end", DEMO] },
-        { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Open the demo", DEMO] },
+        { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Book a demo", DEMO] },
       ],
     ),
   },
@@ -384,7 +388,7 @@ const MORE: { name: string; content: EdmContent }[] = [
       "Size, battery and EV charger: they choose, the price follows, and they order on your proposal.",
       [
         { hook: "They build it. They order it.", pictures: ["hconf"], cta: ["See the configurator", DEMO] },
-        { hook: "See who opened it, and who to ring next.", pictures: ["sopen"], cta: ["Open the demo", DEMO] },
+        { hook: "See who opened it, and who to ring next.", pictures: ["sopen"], cta: ["Book a demo", DEMO] },
       ],
     ),
   },
@@ -423,7 +427,7 @@ export const GTM_TEAM: EdmContent = {
       url: null,
       align: "center",
     }),
-    go("b0", "Try the demo", DEMO),
+    go("b0", "Book a demo", DEMO),
     gap("g1"),
     frame("tone", DEMO),
     go("b1", "See it reach a lead", DEMO),
@@ -461,7 +465,7 @@ const SERIES: { wait: number; content: EdmContent }[] = [
           cta: ["Hear it call", SITE],
         },
         { hook: "It rings every new lead, and books them in.", pictures: ["xvoice"], cta: ["See how it books", DEMO] },
-        { hook: "Watch any call live. Step in whenever you like.", pictures: ["pvoice"], cta: ["Try the demo", DEMO] },
+        { hook: "Watch any call live. Step in whenever you like.", pictures: ["pvoice"], cta: ["Book a demo", DEMO] },
         {
           hook: `${PRICE_DAY_LINE.replace(" is ", ". That's ")} Your own number included.`,
           pictures: ["pricev"],
@@ -475,21 +479,21 @@ const SERIES: { wait: number; content: EdmContent }[] = [
     content: email("d", "Answer every lead in minutes", "Emailed, rung and in your CRM while you're still with another customer.", [
       { hook: "Every new lead, answered in minutes.", pictures: ["xlead"], cta: ["See it answer", DEMO] },
       { hook: "Your calls written up. Your follow-ups drafted.", pictures: ["xcrm"], cta: ["See Sol at work", DEMO] },
-      { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Open the demo", DEMO] },
+      { hook: "Open Today and see who needs you.", pictures: ["today"], cta: ["Book a demo", DEMO] },
     ]),
   },
   {
     wait: 3,
     content: email("b", "Who should you call this morning?", "Sol knows. And he's written what to say.", [
       { hook: "Know who to call, and what to say. Every morning.", pictures: ["sol"], cta: ["Meet Sol", SITE] },
-      { hook: "Ask Sol about any deal. He knows them all.", pictures: ["psol"], cta: ["Ask Sol in the demo", DEMO] },
+      { hook: "Ask Sol about any deal. He knows them all.", pictures: ["psol"], cta: ["See Sol answer", DEMO] },
     ]),
   },
   {
     wait: 3,
     content: email("c", "Quote it before you leave the driveway", "Lay out the panels and it's priced as you go. Signed online.", [
       { hook: "Quote it before you leave the driveway.", pictures: ["xdesigner"], cta: ["See it price", DEMO] },
-      { hook: "Real roofs, laid out and priced as you draw.", pictures: ["designer"], cta: ["Try the designer", DEMO] },
+      { hook: "Real roofs, laid out and priced as you draw.", pictures: ["designer"], cta: ["See the designer", DEMO] },
     ]),
   },
   {
@@ -500,7 +504,7 @@ const SERIES: { wait: number; content: EdmContent }[] = [
       "The order, approvals, install calendar and job card, together for your team.",
       [
         { hook: "Signed? Everything after the sale, in one place.", pictures: ["xruns"], cta: ["See after the sale", DEMO] },
-        { hook: "Every install on one calendar, ready for your crew.", pictures: ["runs"], cta: ["Open the calendar", DEMO] },
+        { hook: "Every install on one calendar, ready for your crew.", pictures: ["runs"], cta: ["See the calendar", DEMO] },
       ],
     ),
   },

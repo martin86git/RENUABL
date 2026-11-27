@@ -51,7 +51,16 @@ export function askSales(o: { name: string; business: string; email: string; mob
   return post("/api/design/sales-enquiry", o);
 }
 
-export function requestDemo(o: { name: string; business: string; email: string; mobile: string; note: string }) {
+export function requestDemo(o: {
+  name: string;
+  business: string;
+  email: string;
+  mobile: string;
+  time: string;
+  note: string;
+  utm_source?: string;
+  utm_campaign?: string;
+}) {
   return post("/api/design/demo-request", o);
 }
 

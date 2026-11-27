@@ -1,8 +1,29 @@
 import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { COMING_SOON, JOURNEY, MARKETPLACE, PRICING, SERVICE_SHOT, SOL, CRM_SHOT, salesCopy } from "./sales-page";
+import {
+  COMING_SOON,
+  CRM_SHOT,
+  DEMO_REQUEST,
+  HERO_LIVE,
+  JOURNEY,
+  LAUNCH,
+  MARKETPLACE,
+  PRICING,
+  SALES_HERO,
+  SERVICE_SHOT,
+  SOL,
+  VOICE_INTRO,
+  salesCopy,
+} from "./sales-page";
 
 describe("the sign-up page for solar businesses", () => {
+  it("offers a demo only as one to book: nobody opens a demo account themselves (27 Nov 2026, Martin)", () => {
+    for (const label of [SALES_HERO.demo, VOICE_INTRO.demo, LAUNCH.cta, DEMO_REQUEST.title]) expect(label).toBe("Book a demo");
+    const said = [...salesCopy(), HERO_LIVE.ask.fallback, ...HERO_LIVE.ask.questions.map((q) => q.answer)].join(" ");
+    expect(said).not.toMatch(/start demo|try the demo|press .*demo and you're in/i);
+    expect(DEMO_REQUEST.consent).toMatch(/get in touch about RENUABL/);
+  });
+
   it("makes no claim the product can't prove", () => {
     // "Your first month" is the offer, a plain fact, not a claim to be first at anything.
     for (const line of salesCopy())

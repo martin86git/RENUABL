@@ -10,6 +10,7 @@ import { LiveSun } from "./live-sun";
 import { SalesLoop } from "./sales-loop";
 import { DesignerSlide } from "./designer-slide";
 import { InterfaceSlide } from "./interface-slide";
+import { DemoRequestButton } from "./demo-request";
 import { LaunchSlide } from "./launch-slide";
 import { KnowledgeOrbit } from "./business-slides";
 import { RaysSlide } from "./rays-slide";
@@ -78,7 +79,7 @@ const PAGE_LINKS = [
 
 /**
  * The top bar (17 Nov 2026, Martin): the menu on the left, RENUABL alone in the middle (the wordmark, no "Business"
- * beside it), Start demo and Sign up on the right.
+ * beside it), Sign in, Book a demo and Get started on the right (no self-serve demo since 27 Nov 2026, Martin).
  */
 function Header({ signedIn }: { signedIn: boolean }) {
   const [open, setOpen] = useState(false);
@@ -148,6 +149,13 @@ function Header({ signedIn }: { signedIn: boolean }) {
           >
             {signedIn ? "Open RENUABL" : "Sign in"}
           </Link>
+          {/* Book a demo (27 Nov 2026, Martin: "you either have to sign up, or book a demo in"). From sm up: a phone's
+              bar has no room for a third button, and the hero's Book a demo is in its first screen. */}
+          {!signedIn && (
+            <span className="hidden sm:inline-flex">
+              <DemoRequestButton look="bar" />
+            </span>
+          )}
           {!signedIn && (
             <a
               href="#pricing"

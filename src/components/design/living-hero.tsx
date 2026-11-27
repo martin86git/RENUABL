@@ -397,7 +397,7 @@ export function LivingHero() {
           >
             {SALES_HERO.cta}
           </a>
-          <DemoRequestButton />
+          <DemoRequestButton auto />
         </div>
 
         {/* Get started sits level with the voice agents on a wide screen (18 Nov 2026, Martin: symmetry), the words above it

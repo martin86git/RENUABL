@@ -1,46 +1,13 @@
 /**
- * Server only. The RENUABL Business demo (domain/design/demo.ts): a demo business of the visitor's own, made in one
- * press with the example deals in it and a small allowance of Sol's answers; later, who they are, kept as a sales lead
- * with the demo named for their company; and demos cleared once they are old.
+ * Server only. The RENUABL Business demo (domain/design/demo.ts). Nothing makes a demo business any more (27 Nov 2026,
+ * Martin: no self-serve demo; `openDemo`, which made one in a press, was removed). What is left is for the demo
+ * accounts opened before: who they are, kept as a sales lead with the demo named for their company; and demos cleared
+ * once they are old.
  */
-import { randomBytes } from "node:crypto";
-import { BUSINESS_TERMS_VERSION } from "@/lib/domain/design/account";
-import {
-  DEMO_BUSINESS,
-  DEMO_DAYS,
-  DEMO_DOMAIN,
-  DEMO_SOL_CREDITS,
-  demoEmail,
-  demoSourceWords,
-  type DemoDetails,
-  type DemoSource,
-} from "@/lib/domain/design/demo";
-import { todayInMarket } from "@/lib/domain/market";
+import { DEMO_DAYS, DEMO_DOMAIN, demoSourceWords, type DemoDetails, type DemoSource } from "@/lib/domain/design/demo";
 import { query } from "./db";
-import { creditSolPack, recordLead } from "./design-billing-repo";
-import { addExampleDeals } from "./design-feed";
-import { createBusiness, markWelcomed, renameBusiness, saveProfile, type Member } from "./design-repo";
-
-/**
- * A new demo business, ready to open: the welcome skipped (Today opens on its deals), the example deals in, Sol's
- * allowance given. Nobody's name is on it yet. Answers the owner's email to sign in as.
- */
-export async function openDemo(from: DemoSource | null = null): Promise<string> {
-  const email = demoEmail(randomBytes(8).toString("hex"));
-  const member = await createBusiness(email, DEMO_BUSINESS, BUSINESS_TERMS_VERSION, "retailer");
-  if (from) {
-    await query(`update businesses set demo_source = $2, demo_campaign = $3 where id = $1`, [
-      member.businessId,
-      from.source,
-      from.campaign || null,
-    ]);
-  }
-  await markWelcomed(member.businessId, email);
-  await creditSolPack(member.businessId, `demo:${member.businessId}`, DEMO_SOL_CREDITS, null, todayInMarket());
-  // The deals are what make the demo worth opening, but a demo without them still opens.
-  await addExampleDeals(member.businessId).catch((e) => console.error("demo example deals failed", e instanceof Error ? e.message : e));
-  return email;
-}
+import { recordLead } from "./design-billing-repo";
+import { renameBusiness, saveProfile, type Member } from "./design-repo";
 
 /**
  * Who is trying this demo: kept as a sales lead first (so it is ours even if a later step fails), then their name put
