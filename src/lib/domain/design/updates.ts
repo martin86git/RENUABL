@@ -16,6 +16,11 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
     area: "Marketing",
+    words: "In a sequence, Add from a campaign starts an email from one you have already built, as a copy you can change.",
+  },
+  {
+    day: "2026-11-27",
+    area: "Marketing",
     words: "Email headings and words have 17 fonts to choose from, grouped as Plain, Serif and Display.",
   },
   {
