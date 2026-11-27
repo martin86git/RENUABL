@@ -1,15 +1,16 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronDown, LifeBuoy, Plus } from "lucide-react";
+import { ChevronDown, ImagePlus, LifeBuoy, Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   STATE_WORDS,
   SUPPORT_LIMITS,
   TICKET_AREAS,
   TICKET_TABS,
   ticketOrder,
+  ticketPicturesProblem,
   type Ticket,
   type TicketArea,
   type TicketState,
@@ -18,6 +19,7 @@ import {
 import { loadTickets, supportAction } from "@/lib/services/crm";
 import { useDesignAccount } from "./design-account";
 import { PageHead, ui } from "./design-shell";
+import { EmailFileChips, useEmailFiles, type EmailFiles } from "./email-compose";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-AU", {
@@ -60,8 +62,8 @@ export function SupportPage() {
     });
   }, [linked]);
 
-  const act = async (body: Record<string, unknown>) => {
-    const res = await supportAction(body);
+  const act = async (body: Record<string, unknown>, files: readonly File[] = []) => {
+    const res = await supportAction(body, files);
     if (!res.ok) {
       setProblem(res.message);
       return null;
@@ -113,8 +115,8 @@ export function SupportPage() {
       {raising && (
         <RaiseForm
           onCancel={() => setRaising(false)}
-          onRaise={async (ticket) => {
-            const res = await act({ do: "raise", ...ticket });
+          onRaise={async (ticket, files) => {
+            const res = await act({ do: "raise", ...ticket }, files);
             if (!res) return false;
             const made = res.tickets.find((t) => t.id === res.raised);
             setRaisedRef(made?.ref ?? null);
@@ -180,11 +182,49 @@ export function SupportPage() {
   );
 }
 
+/** Pictures to go with a message: a button to choose them, and what is chosen as chips (paste and drop work too). */
+function Pictures({ files }: { files: EmailFiles }) {
+  const pick = useRef<HTMLInputElement>(null);
+  const problem = ticketPicturesProblem(files.files);
+  return (
+    <div>
+      <input
+        ref={pick}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+        hidden
+        onChange={(e) => {
+          files.add(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <button
+          type="button"
+          className={clsx(ui.quiet, "gap-1.5")}
+          onClick={() => pick.current?.click()}
+          disabled={files.files.length >= SUPPORT_LIMITS.pictures}
+        >
+          <ImagePlus className="size-4" aria-hidden /> Add a picture
+        </button>
+        <span className="text-xs text-muted">A screenshot helps. Paste or drop one in, up to {SUPPORT_LIMITS.pictures}.</span>
+      </div>
+      <EmailFileChips files={files} />
+      {problem && !files.busy && (
+        <p className="mt-1.5 text-xs text-warning" role="alert">
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RaiseForm({
   onRaise,
   onCancel,
 }: {
-  onRaise: (ticket: { subject: string; area: TicketArea; urgent: boolean; text: string }) => Promise<boolean>;
+  onRaise: (ticket: { subject: string; area: TicketArea; urgent: boolean; text: string }, files: readonly File[]) => Promise<boolean>;
   onCancel: () => void;
 }) {
   const [subject, setSubject] = useState("");
@@ -192,13 +232,18 @@ function RaiseForm({
   const [urgent, setUrgent] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const files = useEmailFiles();
+  const notReady = files.busy || Boolean(ticketPicturesProblem(files.files));
   return (
     <form
       className={clsx(ui.card, "space-y-4 p-5")}
+      onPaste={files.onPaste}
+      onDragOver={files.onDragOver}
+      onDrop={files.onDrop}
       onSubmit={async (e) => {
         e.preventDefault();
         setBusy(true);
-        await onRaise({ subject, area, urgent, text });
+        await onRaise({ subject, area, urgent, text }, files.files);
         setBusy(false);
       }}
     >
@@ -243,12 +288,13 @@ function RaiseForm({
           className={clsx(ui.input, "mt-1.5 min-h-32 py-2")}
         />
       </label>
+      <Pictures files={files} />
       <label className="flex items-center gap-2 text-sm text-ink">
         <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} className="size-4" />
         It&apos;s stopping us from working
       </label>
       <div className="flex gap-2">
-        <button type="submit" className={ui.primary} disabled={busy || !subject.trim() || !text.trim()}>
+        <button type="submit" className={ui.primary} disabled={busy || notReady || !subject.trim() || !text.trim()}>
           {busy ? "Sending…" : "Send to RENUABL"}
         </button>
         <button type="button" className={ui.quiet} onClick={onCancel}>
@@ -270,10 +316,12 @@ function TicketCard({
   me: string;
   open: boolean;
   onOpen: () => void;
-  act: (body: Record<string, unknown>) => Promise<unknown>;
+  act: (body: Record<string, unknown>, files?: readonly File[]) => Promise<unknown>;
 }) {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
+  const files = useEmailFiles();
+  const notReady = files.busy || Boolean(ticketPicturesProblem(files.files));
   const last = t.messages[t.messages.length - 1];
   return (
     <li className={clsx(ui.card, "overflow-hidden", t.unread && "ring-1 ring-sun-line")}>
@@ -314,16 +362,39 @@ function TicketCard({
                     {m.side === "renuabl" ? "RENUABL support" : m.by === me ? "You" : handle(m.by)} · {when(m.at)}
                   </p>
                   <p className="mt-1 whitespace-pre-line">{m.text}</p>
+                  {m.pictures.length > 0 && (
+                    <ul className="mt-2 flex flex-wrap gap-2">
+                      {m.pictures.map((p, i) => (
+                        <li key={p}>
+                          <a href={`/api/design/support/pictures/${p}`} target="_blank" rel="noreferrer" title="Open the picture">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- the business's own picture, served to its members only */}
+                            <img
+                              src={`/api/design/support/pictures/${p}`}
+                              alt={`Picture ${i + 1} with this message`}
+                              loading="lazy"
+                              className="h-28 max-w-56 rounded-lg object-cover ring-1 ring-line"
+                            />
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </li>
             ))}
           </ol>
           <form
             className="space-y-2"
+            onPaste={files.onPaste}
+            onDragOver={files.onDragOver}
+            onDrop={files.onDrop}
             onSubmit={async (e) => {
               e.preventDefault();
               setBusy(true);
-              if (await act({ do: "reply", id: t.id, text: reply })) setReply("");
+              if (await act({ do: "reply", id: t.id, text: reply }, files.files)) {
+                setReply("");
+                files.clear();
+              }
               setBusy(false);
             }}
           >
@@ -335,8 +406,9 @@ function TicketCard({
               aria-label="Your reply"
               className={clsx(ui.input, "min-h-20 py-2")}
             />
+            <Pictures files={files} />
             <div className="flex flex-wrap gap-2">
-              <button type="submit" className={ui.primary} disabled={busy || !reply.trim()}>
+              <button type="submit" className={ui.primary} disabled={busy || notReady || (!reply.trim() && !files.files.length)}>
                 Send reply
               </button>
               {t.state === "resolved" ? (

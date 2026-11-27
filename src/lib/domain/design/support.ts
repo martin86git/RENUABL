@@ -22,7 +22,15 @@ export type TicketArea = (typeof TICKET_AREAS)[number];
 export const TICKET_STATES = ["open", "waiting", "resolved"] as const;
 export type TicketState = (typeof TICKET_STATES)[number];
 
-export const SUPPORT_LIMITS = { subject: 120, text: 4000, messages: 200, open: 30 } as const;
+export const SUPPORT_LIMITS = { subject: 120, text: 4000, messages: 200, open: 30, pictures: 4 } as const;
+
+/** Why these pictures can't go on a ticket, or null when they can. Each is checked and redrawn on the server too. */
+export function ticketPicturesProblem(files: readonly { size: number; type: string }[]): string | null {
+  if (files.length > SUPPORT_LIMITS.pictures) return `Up to ${SUPPORT_LIMITS.pictures} pictures with one message.`;
+  if (files.some((f) => !/^image\/(jpeg|png|webp)$/.test(f.type))) return "Add pictures as JPEG, PNG or WebP: a screenshot or a photo.";
+  if (files.reduce((a, f) => a + f.size, 0) > 4 * 1024 * 1024) return "Those pictures are too large together. Take one off.";
+  return null;
+}
 
 export const TICKET_TABS = [
   { id: "open", label: "Open" },
@@ -40,6 +48,8 @@ export interface TicketMessage {
   by: string;
   text: string;
   at: string;
+  /** Pictures sent with it (screenshots, photos), by id. */
+  pictures: string[];
 }
 
 export interface Ticket {
@@ -149,6 +159,8 @@ export function staffTicketNote(t: {
   text: string;
   reply: boolean;
   site: string | null;
+  /** How many pictures came with it (seen on /admin, never attached to this email). */
+  pictures?: number;
 }): { subject: string; text: string } {
   return {
     subject: `${t.urgent ? "URGENT · " : ""}Support ${t.ref}${t.reply ? " · reply" : ""}: ${t.subject}`,
@@ -157,6 +169,7 @@ export function staffTicketNote(t: {
       `About: ${t.area}${t.urgent ? " · it is stopping their work" : ""}`,
       "",
       t.text,
+      ...(t.pictures ? ["", `${t.pictures} ${t.pictures === 1 ? "picture" : "pictures"} with it: see them on the ticket.`] : []),
       "",
       t.site ? `Answer it on ${t.site}/admin#support` : "Answer it on /admin, under Support tickets.",
     ].join("\n"),

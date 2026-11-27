@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Support",
+    words: "Add screenshots or photos to a support ticket or a reply: choose, paste or drop them in.",
+  },
+  {
+    day: "2026-11-27",
     area: "Marketing",
     words: "Email builder: every logo you upload is kept. Hover your logo and press Switch logo to pick another or draw it larger.",
   },

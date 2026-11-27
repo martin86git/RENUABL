@@ -49,6 +49,16 @@ const tables = () =>
   text text not null,
   at timestamptz not null default now()
 )`);
+    await query(`create table if not exists design_support_pictures (
+  id text primary key,
+  message_id text not null references design_support_messages(id) on delete cascade,
+  ticket_id text not null references design_support_tickets(id) on delete cascade,
+  business_id text not null references businesses(id) on delete cascade,
+  bytes bytea not null,
+  content_type text not null,
+  at timestamptz not null default now()
+)`);
+    await query(`create index if not exists design_support_pictures_message on design_support_pictures(message_id, at)`);
     await query(`create index if not exists design_support_tickets_business on design_support_tickets(business_id, updated_at desc)`);
     await query(`create index if not exists design_support_messages_ticket on design_support_messages(ticket_id, at)`);
   })().catch((e) => {
@@ -70,7 +80,7 @@ interface Row {
   at: string;
   updatedAt: string;
   unread: boolean;
-  messages: { id: string; side: string; by: string; text: string; at: string }[];
+  messages: { id: string; side: string; by: string; text: string; at: string; pictures: string[] | null }[];
 }
 
 /** `staff` keeps who at RENUABL wrote each line; a business is never sent it. */
@@ -91,13 +101,15 @@ const ticketOf = (r: Row, staff: boolean): Ticket => ({
     by: m.side === "renuabl" && !staff ? "" : m.by,
     text: m.text,
     at: m.at,
+    pictures: m.pictures ?? [],
   })),
 });
 
 const SELECT = `select t.id, t.ref, t.subject, t.area, t.urgent, t.state, t.by_email as by, ${moment("t.at")} as at,
        ${moment("t.updated_at")} as "updatedAt",
        (t.replied_at is not null and (t.seen_at is null or t.seen_at < t.replied_at)) as unread,
-       coalesce((select json_agg(json_build_object('id', m.id, 'side', m.side, 'by', m.by_email, 'text', m.text, 'at', ${moment("m.at")}) order by m.at)
+       coalesce((select json_agg(json_build_object('id', m.id, 'side', m.side, 'by', m.by_email, 'text', m.text, 'at', ${moment("m.at")},
+                 'pictures', (select json_agg(p.id order by p.at, p.id) from design_support_pictures p where p.message_id = m.id)) order by m.at)
                    from design_support_messages m where m.ticket_id = t.id), '[]') as messages`;
 
 /** The business's tickets, newest touched first. Everyone in the business sees them. */
@@ -125,8 +137,46 @@ async function businessOf(businessId: string): Promise<{ name: string; kind: str
   return { name: rows[0]?.name ?? "A business", kind: kindLabel(cleanKind(rows[0]?.kind)) };
 }
 
+/** A picture already checked and redrawn (safeImage), ready to keep with a message. */
+export interface TicketPicture {
+  bytes: Buffer;
+  contentType: string;
+}
+
+/** Keeps the business's words on a ticket with any pictures sent with them. */
+async function keepMessage(businessId: string, ticketId: string, by: string, text: string, pictures: readonly TicketPicture[]) {
+  const messageId = id("sm");
+  await query(`insert into design_support_messages (id, ticket_id, business_id, side, by_email, text) values ($1,$2,$3,'business',$4,$5)`, [
+    messageId,
+    ticketId,
+    businessId,
+    by.toLowerCase(),
+    text,
+  ]);
+  for (const p of pictures.slice(0, SUPPORT_LIMITS.pictures))
+    await query(
+      `insert into design_support_pictures (id, message_id, ticket_id, business_id, bytes, content_type) values ($1,$2,$3,$4,$5,$6)`,
+      [id("sp"), messageId, ticketId, businessId, p.bytes, p.contentType],
+    );
+}
+
+/** One of the business's own ticket pictures; null for anyone else's or none. */
+export async function ticketPicture(businessId: string, pictureId: string): Promise<TicketPicture | null> {
+  await tables();
+  const rows = await query<{ bytes: Buffer; content_type: string }>(
+    `select bytes, content_type from design_support_pictures where business_id = $1 and id = $2`,
+    [businessId, pictureId],
+  );
+  return rows[0] ? { bytes: rows[0].bytes, contentType: rows[0].content_type } : null;
+}
+
 /** Raises a ticket and tells RENUABL's staff. "full" when the business already has too many open. */
-export async function raiseTicket(businessId: string, by: string, ticket: NewTicket): Promise<{ ref: string; id: string } | "full"> {
+export async function raiseTicket(
+  businessId: string,
+  by: string,
+  ticket: NewTicket,
+  pictures: readonly TicketPicture[] = [],
+): Promise<{ ref: string; id: string } | "full"> {
   await tables();
   const open = await query<{ n: number }>(
     `select count(*)::int as n from design_support_tickets where business_id = $1 and state <> 'resolved'`,
@@ -145,22 +195,31 @@ export async function raiseTicket(businessId: string, by: string, ticket: NewTic
     if (made.length) ref = candidate;
   }
   if (!ref) throw new Error("no support reference could be made");
-  await query(`insert into design_support_messages (id, ticket_id, business_id, side, by_email, text) values ($1,$2,$3,'business',$4,$5)`, [
-    id("sm"),
-    ticketId,
-    businessId,
-    by.toLowerCase(),
-    ticket.text,
-  ]);
+  await keepMessage(businessId, ticketId, by, ticket.text, pictures);
   const business = await businessOf(businessId);
   await tellStaff(
-    staffTicketNote({ ref, ...ticket, business: business.name, kind: business.kind, by: by.toLowerCase(), reply: false, site: siteUrl() }),
+    staffTicketNote({
+      ref,
+      ...ticket,
+      business: business.name,
+      kind: business.kind,
+      by: by.toLowerCase(),
+      reply: false,
+      site: siteUrl(),
+      pictures: pictures.length,
+    }),
   );
   return { ref, id: ticketId };
 }
 
 /** The business writes again on its own ticket (which reopens a resolved one). False when there's no such ticket. */
-export async function replyToTicket(businessId: string, ticketId: string, by: string, text: string): Promise<boolean> {
+export async function replyToTicket(
+  businessId: string,
+  ticketId: string,
+  by: string,
+  text: string,
+  pictures: readonly TicketPicture[] = [],
+): Promise<boolean> {
   await tables();
   const rows = await query<{ ref: string; subject: string; area: string; urgent: boolean }>(
     `update design_support_tickets t set state = $3, updated_at = now(), seen_at = now()
@@ -171,16 +230,19 @@ export async function replyToTicket(businessId: string, ticketId: string, by: st
   );
   const t = rows[0];
   if (!t) return false;
-  await query(`insert into design_support_messages (id, ticket_id, business_id, side, by_email, text) values ($1,$2,$3,'business',$4,$5)`, [
-    id("sm"),
-    ticketId,
-    businessId,
-    by.toLowerCase(),
-    text,
-  ]);
+  await keepMessage(businessId, ticketId, by, text, pictures);
   const business = await businessOf(businessId);
   await tellStaff(
-    staffTicketNote({ ...t, text, business: business.name, kind: business.kind, by: by.toLowerCase(), reply: true, site: siteUrl() }),
+    staffTicketNote({
+      ...t,
+      text,
+      business: business.name,
+      kind: business.kind,
+      by: by.toLowerCase(),
+      reply: true,
+      site: siteUrl(),
+      pictures: pictures.length,
+    }),
   );
   return true;
 }
@@ -217,6 +279,16 @@ export async function staffTickets(): Promise<StaffTicket[]> {
       order by t.updated_at desc limit 300`,
   );
   return rows.map((r) => ({ ...ticketOf(r, true), business: r.business, kind: kindLabel(cleanKind(r.kind)) }));
+}
+
+/** Any ticket's picture, for staff on /admin. */
+export async function staffTicketPicture(pictureId: string): Promise<TicketPicture | null> {
+  await tables();
+  const rows = await query<{ bytes: Buffer; content_type: string }>(
+    `select bytes, content_type from design_support_pictures where id = $1`,
+    [pictureId],
+  );
+  return rows[0] ? { bytes: rows[0].bytes, contentType: rows[0].content_type } : null;
 }
 
 /**

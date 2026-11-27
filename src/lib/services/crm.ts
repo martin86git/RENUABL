@@ -312,7 +312,17 @@ export const feedbackAction = (body: Record<string, unknown>) => ask<FeedbackAns
 /** RENUABL support (domain/design/support.ts): the business's tickets with RENUABL, raising, replying and resolving. */
 type SupportAnswer = { tickets: import("@/lib/domain/design/support").Ticket[]; raised?: string };
 export const loadTickets = () => ask<SupportAnswer>("/api/design/support");
-export const supportAction = (body: Record<string, unknown>) => ask<SupportAnswer>("/api/design/support", { method: "POST", body });
+/** A change to a support ticket; a raise or reply with pictures goes as a form. */
+export const supportAction = (body: Record<string, unknown>, files: readonly File[] = []) =>
+  ask<SupportAnswer>("/api/design/support", {
+    method: "POST",
+    body: files.length
+      ? withFiles(
+          Object.fromEntries(Object.entries(body).map(([k, v]) => [k, typeof v === "boolean" ? (v ? "1" : "0") : String(v ?? "")])),
+          files,
+        )
+      : body,
+  });
 export const supportUnread = () => ask<{ unread: number }>("/api/design/support?count=1");
 
 /** The call note-taker (wave 7): what was heard of a call on a deal, written up by Claude; nothing heard is kept. */
