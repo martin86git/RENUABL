@@ -131,9 +131,9 @@ function Header({ signedIn }: { signedIn: boolean }) {
         <Link href="/" aria-label="RENUABL Business" className="justify-self-start sm:justify-self-center">
           {/* The line under the logo (27 Nov 2026, Martin: smaller than the logo, spaced under it, centred). From sm up:
               on a phone the wordmark sits beside the menu and the buttons, with no room for it. */}
-          <span className="flex flex-col items-center gap-1.5">
+          <span className="flex flex-col items-center gap-3.5">
             <Wordmark className="leading-none" />
-            <span className="hidden whitespace-nowrap text-[9.5px] font-medium uppercase leading-none tracking-[0.2em] text-ink-2 sm:block">
+            <span className="hidden whitespace-nowrap text-[9.5px] font-medium uppercase leading-none tracking-[0.2em] text-muted sm:block">
               {LOGO_LINE}
             </span>
           </span>
