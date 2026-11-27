@@ -96,7 +96,7 @@ import {
   type EdmProduct,
 } from "@/lib/domain/marketing/edm";
 import {
-  EDM_FONTS,
+  FONT_GROUPS,
   EDM_TEXT_SIZES,
   FONT_STACKS,
   FONT_WORDS,
@@ -2090,7 +2090,8 @@ function ButtonLookFields({ block: b, colour, onChange }: { block: EdmBlock; col
 const PANEL_SWATCHES = ["#f4f4f5", "#eef2ff", "#fff3ea", "#e8f5ec", "#26282c"];
 /**
  * A heading's or the words' typeface and size (27 Nov 2026, Martin: "i need font options and font size options"): each
- * typeface shown in itself, then S, M, L and XL. Only faces inboxes have to hand (edm.ts `EDM_FONTS`).
+ * typeface shown in itself, by kind (`FONT_GROUPS`: Plain, Serif, Display), then S, M, L and XL. Only faces inboxes
+ * have to hand (edm.ts `EDM_FONTS`), so the line under them says a reader without one sees its nearest match.
  */
 function TypeChoice({
   font,
@@ -2106,25 +2107,34 @@ function TypeChoice({
       className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
       onClick={(e) => e.stopPropagation()}
     >
-      <Type className="size-3.5 text-muted" />
-      <span className="text-muted">Font</span>
-      {EDM_FONTS.map((f) => (
-        <button
-          key={f}
-          type="button"
-          aria-pressed={font === f}
-          onClick={() => onChange({ font: f, size })}
-          style={{ fontFamily: FONT_STACKS[f] }}
-          className={cn(
-            "h-7 rounded-full px-2.5 text-[13px] ring-1",
-            font === f ? "bg-ink text-canvas ring-ink" : "ring-line hover:ring-ink/40",
-          )}
-        >
-          {FONT_WORDS[f]}
-        </button>
+      {FONT_GROUPS.map((g, i) => (
+        <div key={g.name} role="group" aria-label={`${g.name} fonts`} className="flex basis-full flex-wrap items-center gap-1.5">
+          <span className="flex w-12 shrink-0 items-center gap-1 text-muted">
+            {i === 0 && <Type className="size-3.5" />}
+            {i === 0 ? "Font" : ""}
+          </span>
+          <span className="w-12 shrink-0 text-[11px] text-muted">{g.name}</span>
+          {g.fonts.map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={font === f}
+              onClick={() => onChange({ font: f, size })}
+              style={{ fontFamily: FONT_STACKS[f] }}
+              className={cn(
+                "h-7 rounded-full px-2.5 text-[13px] ring-1",
+                font === f ? "bg-ink text-canvas ring-ink" : "ring-line hover:ring-ink/40",
+              )}
+            >
+              {FONT_WORDS[f]}
+            </button>
+          ))}
+        </div>
       ))}
-      <span className="mx-1 h-4 w-px bg-line" aria-hidden />
-      <span className="text-muted">Size</span>
+      <p className="basis-full pl-[6.75rem] text-[11px] text-muted">
+        Emails use the reader&apos;s own fonts: where they haven&apos;t got one, its nearest match shows.
+      </p>
+      <span className="w-12 shrink-0 text-muted">Size</span>
       {EDM_TEXT_SIZES.map((z) => (
         <button
           key={z}

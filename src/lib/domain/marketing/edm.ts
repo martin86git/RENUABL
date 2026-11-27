@@ -210,21 +210,71 @@ export interface EdmBlock {
 /**
  * Typefaces for a heading or the words (27 Nov 2026, Martin: "i need font options and font size options"). Only faces
  * that inboxes have to hand, each with its fallbacks: an email can't count on a web font, and Gmail and Outlook drop them.
+ * More of them since the same day (Martin: "i need more font type options"), in three groups (`FONT_GROUPS`): a face a
+ * reader's device hasn't got is drawn in the next of its list, each list ending in one every device has.
  */
-export const EDM_FONTS = ["modern", "classic", "clean", "friendly", "typewriter"] as const;
+export const EDM_FONTS = [
+  "modern",
+  "clean",
+  "friendly",
+  "wide",
+  "geometric",
+  "soft",
+  "narrow",
+  "classic",
+  "elegant",
+  "bookish",
+  "newspaper",
+  "editorial",
+  "slab",
+  "heavy",
+  "poster",
+  "handwritten",
+  "typewriter",
+] as const;
 export type EdmFont = (typeof EDM_FONTS)[number];
 export const FONT_WORDS: Record<EdmFont, string> = {
   modern: "Modern",
-  classic: "Classic",
   clean: "Clean",
   friendly: "Friendly",
+  wide: "Wide",
+  geometric: "Geometric",
+  soft: "Soft",
+  narrow: "Narrow",
+  classic: "Classic",
+  elegant: "Elegant",
+  bookish: "Bookish",
+  newspaper: "Newspaper",
+  editorial: "Editorial",
+  slab: "Slab",
+  heavy: "Heavy",
+  poster: "Poster",
+  handwritten: "Handwritten",
   typewriter: "Typewriter",
 };
+/** The faces by kind, as the builder lists them. Every face is in exactly one. */
+export const FONT_GROUPS: readonly { name: string; fonts: readonly EdmFont[] }[] = [
+  { name: "Plain", fonts: ["modern", "clean", "friendly", "wide", "geometric", "soft", "narrow"] },
+  { name: "Serif", fonts: ["classic", "elegant", "bookish", "newspaper", "editorial", "slab"] },
+  { name: "Display", fonts: ["heavy", "poster", "handwritten", "typewriter"] },
+];
 export const FONT_STACKS: Record<EdmFont, string> = {
   modern: "Inter,Segoe UI,Helvetica,Arial,sans-serif",
-  classic: "Georgia,'Times New Roman',Times,serif",
   clean: "'Helvetica Neue',Helvetica,Arial,sans-serif",
   friendly: "'Trebuchet MS',Verdana,Tahoma,sans-serif",
+  wide: "Verdana,Geneva,Tahoma,sans-serif",
+  geometric: "Futura,'Century Gothic','Avenir Next',Avenir,'Trebuchet MS',Arial,sans-serif",
+  soft: "Optima,Candara,'Gill Sans','Gill Sans MT',Calibri,Arial,sans-serif",
+  narrow: "'Arial Narrow','Helvetica Neue Condensed','Roboto Condensed',Arial,sans-serif",
+  classic: "Georgia,'Times New Roman',Times,serif",
+  elegant: "'Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif",
+  bookish: "Garamond,Baskerville,'Baskerville Old Face','Hoefler Text','Times New Roman',serif",
+  newspaper: "'Times New Roman',Times,serif",
+  editorial: "Didot,'Bodoni MT','Bodoni 72','Playfair Display',Georgia,serif",
+  slab: "Rockwell,'Rockwell Nova','Roboto Slab','Courier New',Georgia,serif",
+  heavy: "'Arial Black','Helvetica Neue','Segoe UI Black',Arial,sans-serif",
+  poster: "Impact,Haettenschweiler,'Franklin Gothic Bold','Arial Narrow',Arial,sans-serif",
+  handwritten: "'Segoe Script','Bradley Hand','Brush Script MT','Comic Sans MS',cursive",
   typewriter: "'Courier New',Courier,monospace",
 };
 export const EDM_TEXT_SIZES = ["small", "medium", "large", "xl"] as const;
