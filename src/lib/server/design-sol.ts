@@ -15,6 +15,9 @@ import { asBuiltInWords } from "@/lib/domain/design/as-built";
 import { caseInWords } from "@/lib/domain/design/service";
 import { asBuiltOf, jobCard } from "./design-job-card-repo";
 import { preApprovalFor } from "./design-preapproval";
+import { gridConnectionFor } from "./design-grid-connection";
+import { cleanGridSuggestion, gridNote } from "@/lib/domain/design/grid-connection";
+import { INSTALLED_STAGES } from "@/lib/domain/design/crm";
 import { FIELD_WORDS, cleanSuggestion } from "@/lib/domain/design/preapproval";
 import { PRE_APPROVAL } from "@/lib/domain/design/deal-sections";
 import { networkNamed, networksForSol, portalNote, portalOf, type SolPortal } from "@/lib/domain/design/sol-portal";
@@ -442,7 +445,7 @@ ${placesForSol()}`,
  */
 const OPEN_PORTAL_TOOL: Anthropic.Tool = {
   name: "open_network_portal",
-  description: `A deal's network (distributor) pre-approval, worked through from a card under your answer. Use it when they ask for or to open a network's pre-approval or connection portal, want to get an application under way or finish one, or tell you something about one (the NMI, that it was submitted, its reference, that it was approved, export limited or declined). The card's button opens the network's portal in its own window beside RENUABL; with a deal it lists that deal's NMI, address and system to copy across, has boxes for what the application still needs, and records where it stands on the deal. Never answer with only the address, and never say you can't open the portal. Pass deal_id when it is for a deal (find it first with find_deal, or use the deal on their screen): the network is then read from the deal's NMI or address, so leave network out unless they named one. With no deal, pass network. Pass nmi, status, reference and export_limit_kw only when their own message gave them: they are filled in on the card and saved when they press Save, never by you. While they fill in the portal, answer what it asks from the deal (deal_details), the product's datasheet (datasheet_lookup) and the network's own pages, and say when the deal doesn't know something. You can't see or fill in the network's portal itself, and you never say an application will be approved. The networks: ${networksForSol()}.`,
+  description: `A deal's network (distributor) pre-approval, worked through from a card under your answer. Use it when they ask for or to open a network's pre-approval or connection portal, want to get an application under way or finish one, or tell you something about one (the NMI, that it was submitted, its reference, that it was approved, export limited or declined). The card's button opens the network's portal in its own window beside RENUABL; with a deal it lists that deal's NMI, address and system to copy across, has boxes for what the application still needs, and records where it stands on the deal. Never answer with only the address, and never say you can't open the portal. Pass deal_id when it is for a deal (find it first with find_deal, or use the deal on their screen): the network is then read from the deal's NMI or address, so leave network out unless they named one. With no deal, pass network. Pass nmi, status, reference and export_limit_kw only when their own message gave them: they are filled in on the card and saved when they press Save, never by you. While they fill in the portal, answer what it asks from the deal (deal_details), the product's datasheet (datasheet_lookup) and the network's own pages, and say when the deal doesn't know something. The same card works for the grid connection after the install (stage grid_connection, the default for an installed deal): raising the completed installation with the network and the customer's electricity retailer, with the as-built's serials to copy, and recording it raised or connected. You can't see or fill in the network's portal itself, and you never say an application will be approved. The networks: ${networksForSol()}.`,
   input_schema: {
     type: "object",
     properties: {
@@ -452,6 +455,17 @@ const OPEN_PORTAL_TOOL: Anthropic.Tool = {
       status: { type: "string", enum: PRE_APPROVAL, description: "Where they said the application now stands." },
       reference: { type: "string", description: "The application's reference they gave." },
       export_limit_kw: { type: "string", description: "The export limit in kW they said it was approved with." },
+      stage: {
+        type: "string",
+        enum: ["pre_approval", "grid_connection"],
+        description:
+          "Which application: the pre-approval before the install, or the grid connection after it. Leave out and an installed deal gets the grid connection.",
+      },
+      connection: {
+        type: "string",
+        enum: ["raised", "connected"],
+        description: "For the grid connection only: where they said it now stands (pass reference too when they gave one).",
+      },
     },
   },
 };
@@ -601,6 +615,25 @@ async function runTool(
         return view.network
           ? `This deal's network is ${view.network.name}, whose portal we don't hold: tell them so, and that its own website has the application.`
           : "The deal has no NMI or Victorian address to read its network from: ask which network, then call this again with network.";
+    }
+    // After the install it is the grid connection's card (grid-connection.ts), asked for or because the deal is installed.
+    const dealNow = (await jobById(businessId, dealId, viewer))?.job;
+    const after =
+      input.stage === "grid_connection" || (input.stage !== "pre_approval" && Boolean(dealNow && INSTALLED_STAGES.includes(dealNow.stage)));
+    if (after) {
+      const grid = await gridConnectionFor(member, dealId, viewer);
+      if (!grid) return "There's no such deal, or this person can't see it.";
+      const connect = cleanGridSuggestion({ nmi: input.nmi, state: input.connection, reference: input.reference });
+      shown.portal = {
+        network: named.id,
+        jobId: grid.jobId,
+        customer: grid.customer,
+        kind: "connection",
+        ...(grid.network?.guessed && !input.network ? { guessed: true as const } : {}),
+        facts: grid.facts.slice(0, 16),
+        ...(connect ? { connect } : {}),
+      };
+      return gridNote(grid, connect);
     }
     // What they said in this message (an NMI, submitted, a reference, a limit): put on the card, saved on their press.
     const suggest = cleanSuggestion({

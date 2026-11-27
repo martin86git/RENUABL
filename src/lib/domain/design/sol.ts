@@ -21,6 +21,7 @@ import { SOL_ON_SCREEN, cleanPageContext, type PageContext } from "./page-contex
 import { cleanGoTo, type SolGoTo } from "./sol-goto";
 import { cleanPortal, type SolPortal } from "./sol-portal";
 import { cleanSuggestion } from "./preapproval";
+import { cleanGridSuggestion } from "./grid-connection";
 import { cleanNewCase, cleanRoom, sameTalk, type NewCaseAsk, type SolRoom } from "./sol-rooms";
 import { cleanLearnAsk, prefsBlock, SOL_LEARNING, type BusinessScope, type Induction, type LearnAsk } from "./sol-induction";
 
@@ -243,6 +244,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
       const goTo = role === "sol" ? cleanGoTo(t.goTo) : null;
       const portal = role === "sol" ? cleanPortal(t.portal) : null;
       const suggest = portal?.jobId ? cleanSuggestion((t.portal as { suggest?: unknown }).suggest) : null;
+      const connect = portal?.kind === "connection" ? cleanGridSuggestion((t.portal as { connect?: unknown }).connect) : null;
       const room = cleanRoom(t.room);
       const newCase = role === "sol" ? cleanNewCase(t.newCase) : undefined;
       const meeting = role === "sol" && isMeetingId(t.meeting) ? t.meeting : undefined;
@@ -268,7 +270,7 @@ export function cleanTurns(raw: unknown): SolTurn[] {
         ...(typeof t.credits === "number" && Number.isInteger(t.credits) && t.credits > 0 && t.credits < 100 ? { credits: t.credits } : {}),
         ...(shown ? { shown } : {}),
         ...(goTo ? { goTo } : {}),
-        ...(portal ? { portal: suggest ? { ...portal, suggest } : portal } : {}),
+        ...(portal ? { portal: { ...portal, ...(suggest && !portal.kind ? { suggest } : {}), ...(connect ? { connect } : {}) } } : {}),
         ...(room ? { room } : {}),
         ...(newCase ? { newCase } : {}),
         ...(meeting ? { meeting } : {}),

@@ -12,7 +12,15 @@ import {
   type PreApprovalView,
 } from "@/lib/domain/design/preapproval";
 import { portalOf, portalWindow, type PortalFact, type SolPortal } from "@/lib/domain/design/sol-portal";
-import { loadPreApproval, savePreApproval } from "@/lib/services/preapproval";
+import { loadGridConnection, loadPreApproval, saveGridConnection, savePreApproval } from "@/lib/services/preapproval";
+import { GRID_STATE_WORDS, type GridState } from "@/lib/domain/design/deal";
+import {
+  GRID_FIELDS,
+  GRID_FIELD_WORDS,
+  type GridChange,
+  type GridConnectionView,
+  type GridField,
+} from "@/lib/domain/design/grid-connection";
 
 /** Opens the portal as a window of its own down the right of the screen, RENUABL staying in view beside it. */
 function openPortal(url: string) {
@@ -334,11 +342,205 @@ export function PreApprovalCard({ jobId, start, suggest }: { jobId: string; star
   );
 }
 
+const GRID_TONE: Record<GridState, string> = { "to-raise": "text-danger", raised: "text-warning", connected: "text-positive" };
+
+/**
+ * A deal's grid connection after the install, worked through in three steps (27 Nov 2026, Martin; grid-connection.ts):
+ * the details the network and the retailer ask for (the as-built's serials among them, with boxes for what the deal
+ * doesn't know yet), who to raise it with and the network's portal in its own window, and where it stands, kept on the
+ * deal. `suggest` is what Sol took from the member's words, saved only on a press. Used under Sol's answer and on the
+ * Grid connections page.
+ */
+export function GridConnectionCard({ jobId, suggest }: { jobId: string; suggest?: GridChange }) {
+  const [view, setView] = useState<GridConnectionView | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [typed, setTyped] = useState<Partial<Record<GridField, string>>>(() =>
+    Object.fromEntries(GRID_FIELDS.filter((k) => suggest?.[k]).map((k) => [k, suggest![k]!])),
+  );
+  const [reference, setReference] = useState(suggest?.reference ?? "");
+
+  useEffect(() => {
+    let live = true;
+    void loadGridConnection(jobId).then((res) => {
+      if (!live) return;
+      if (res.ok) setView(res.view);
+      else setProblem(res.message);
+    });
+    return () => {
+      live = false;
+    };
+  }, [jobId]);
+
+  const save = async (change: GridChange) => {
+    setBusy(true);
+    setProblem(null);
+    const res = await saveGridConnection(jobId, change);
+    setBusy(false);
+    if (!res.ok) return setProblem(res.message);
+    setView(res.view);
+    setTyped({});
+  };
+
+  if (!view)
+    return <div className="max-w-xl rounded-2xl bg-surface p-4 text-sm text-muted ring-1 ring-line">{problem ?? "Reading the deal…"}</div>;
+
+  const boxes = GRID_FIELDS.filter((k) => !view.fields[k] || typed[k] !== undefined);
+  const filled = Object.fromEntries(Object.entries(typed).filter(([, v]) => v?.trim())) as GridChange;
+  // What Sol took from their words about where it stands, where the deal doesn't say so already: saved on a press.
+  const pending: GridChange = {
+    ...(suggest?.state && suggest.state !== view.state ? { state: suggest.state } : {}),
+    ...(suggest?.reference && suggest.reference !== view.reference ? { reference: suggest.reference } : {}),
+  };
+  const pendingWords = [pending.state ? GRID_STATE_WORDS[pending.state] : "", pending.reference ? `reference ${pending.reference}` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  const network = view.network?.name ?? "the network";
+  const retailer = view.retailer || "the customer's electricity retailer";
+
+  return (
+    <div className="max-w-xl rounded-2xl bg-surface p-4 text-sm ring-1 ring-line" data-grid-connection={view.jobId}>
+      <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-sun-ink">
+        <PanelRight className="size-3.5" aria-hidden /> Grid connection
+      </p>
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="font-semibold text-ink">
+          {view.customer}
+          {view.network ? ` · ${view.network.name}` : ""}
+        </p>
+        <p className={clsx("text-xs font-medium", GRID_TONE[view.state])}>
+          {view.words}
+          {view.reference ? ` · ref ${view.reference}` : ""}
+        </p>
+      </div>
+      {view.network?.guessed && (
+        <p className="mt-1 text-xs text-warning">The network was read from the postcode: check the NMI on the bill.</p>
+      )}
+      {!view.inspected && (
+        <p className="mt-1 text-xs text-warning">
+          The inspection isn&apos;t marked done on this deal yet. A connection is usually raised once the certificate of electrical safety
+          is in.
+        </p>
+      )}
+
+      <div className="mt-4 space-y-5">
+        <Step n={1} done={!view.missing.fields.length && !view.missing.other.length} title="The details they ask for">
+          {(boxes.length > 0 || view.missing.other.length > 0) && (
+            <div className="mb-3 rounded-xl bg-canvas p-3">
+              <p className="text-xs font-medium text-ink">Still needed</p>
+              {boxes.length > 0 && (
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {boxes.map((k) => (
+                    <label key={k} className="text-[11px] text-muted">
+                      {GRID_FIELD_WORDS[k].label}
+                      <input
+                        className={clsx(field, "mt-1")}
+                        value={typed[k] ?? ""}
+                        placeholder={GRID_FIELD_WORDS[k].hint}
+                        onChange={(e) => setTyped((t) => ({ ...t, [k]: e.target.value }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+              )}
+              {view.missing.other.length > 0 && (
+                <ul className="mt-2 list-disc space-y-0.5 pl-4 text-xs text-ink-2">
+                  {view.missing.other.map((m) => (
+                    <li key={m}>{m}</li>
+                  ))}
+                </ul>
+              )}
+              {boxes.length > 0 && (
+                <button
+                  type="button"
+                  className={clsx(solid, "mt-3")}
+                  disabled={busy || !Object.keys(filled).length}
+                  onClick={() => void save(filled)}
+                >
+                  Save to the deal
+                </button>
+              )}
+            </div>
+          )}
+          <Facts facts={view.facts} heading="Copy across" />
+        </Step>
+
+        <Step n={2} done={view.state !== "to-raise"} title="Raise it">
+          <p className="text-xs text-muted">
+            The usual steps: lodge the completed installation with {network}
+            {view.portal?.known ? ` in ${view.portal.name}` : ""}, and send the electrical works request to {retailer}, who arranges the
+            meter. {view.network ? `${view.network.name}'s own connection guide decides.` : "The network's own connection guide decides."}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {view.portal && (
+              <button type="button" className={solid} onClick={() => openPortal(view.portal!.url)}>
+                Open {view.portal.known ? "the portal" : `${network}'s website`} <ArrowUpRight className="size-3.5" aria-hidden />
+              </button>
+            )}
+            <Link href={`/design/deals/${encodeURIComponent(view.jobId)}`} className={quiet}>
+              Open the deal
+            </Link>
+          </div>
+        </Step>
+
+        <Step n={3} done={view.state === "connected"} title="Where it stands">
+          {pendingWords && (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sun px-3 py-2">
+              <p className="text-xs text-sun-ink">From what you told Sol: {pendingWords}</p>
+              <button type="button" className={solid} disabled={busy} onClick={() => void save(pending)}>
+                Save
+              </button>
+            </div>
+          )}
+          {view.state === "to-raise" ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="min-w-40 flex-1 text-[11px] text-muted">
+                The reference you were given (optional)
+                <input className={clsx(field, "mt-1")} value={reference} onChange={(e) => setReference(e.target.value)} />
+              </label>
+              <button
+                type="button"
+                className={solid}
+                disabled={busy}
+                onClick={() => void save({ state: "raised", ...(reference.trim() ? { reference } : {}) })}
+              >
+                I&apos;ve raised it
+              </button>
+            </div>
+          ) : view.state === "raised" ? (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={solid} disabled={busy} onClick={() => void save({ state: "connected" })}>
+                It&apos;s connected
+              </button>
+              <button type="button" className={quiet} disabled={busy} onClick={() => void save({ state: "to-raise" })}>
+                Not raised after all
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs text-ink-2">Connected.</p>
+              <button type="button" className={quiet} disabled={busy} onClick={() => void save({ state: "raised" })}>
+                Not connected yet
+              </button>
+            </div>
+          )}
+        </Step>
+      </div>
+      {problem && (
+        <p className="mt-3 text-xs text-danger" role="alert">
+          {problem}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * A network's portal under Sol's answer (sol-portal.ts). For a deal it is the whole pre-approval card; with no deal,
  * the button that opens the network's portal in its own window.
  */
 export function SolPortalCard({ portal }: { portal: SolPortal }) {
+  if (portal.jobId && portal.kind === "connection") return <GridConnectionCard jobId={portal.jobId} suggest={portal.connect} />;
   if (portal.jobId) return <PreApprovalCard jobId={portal.jobId} suggest={portal.suggest} />;
   const o = portalOf(portal.network);
   if (!o) return null;

@@ -100,6 +100,7 @@ export const BUILTIN_FIELDS: readonly FieldInfo[] = [
   typed("network", "exportLimiting", "Export limiting", "select", ["No", "Yes"]),
   typed("network", "exportLimit", "Export limit (kW)", "text"),
   known("network", "gridConnection", "Grid connection"),
+  typed("network", "gridConnectionRef", "Grid connection reference", "text"),
 
   known("financials", "incGst", "Price, inc. GST"),
   known("financials", "stc", "STC value"),

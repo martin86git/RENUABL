@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Grid connections",
+    words: "Raise on Grid connections, or ask Sol: the details and serials to copy, the network's portal, and where the connection stands.",
+  },
+  {
+    day: "2026-11-27",
     area: "Settings",
     words: "Product datasheets also swaps sheets found online before for the Australian version, where there is one.",
   },

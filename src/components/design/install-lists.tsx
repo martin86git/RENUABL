@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { BatteryCharging, CalendarDays, Check, List as ListIcon, Plug, Sun } from "lucide-react";
 import clsx from "clsx";
 import { Segmented } from "./segmented";
+import { GridConnectionCard } from "./sol-portal-card";
 import { INSTALLED_STAGES, PROGRESS, PROGRESS_LABELS, type ProgressKey } from "@/lib/domain/design/crm";
 import {
   AFTER_INSTALL_STEPS,
@@ -493,6 +494,12 @@ function useJobs() {
       gone = true;
     };
   }, []);
+  // A deal changed from its grid connection card: the rows follow.
+  useEffect(() => {
+    const read = () => void listJobs().then((res) => res.ok && setJobs(res.jobs));
+    window.addEventListener("renuabl:grid", read);
+    return () => window.removeEventListener("renuabl:grid", read);
+  }, []);
   const changed = (job: JobLine) => setJobs((all) => (all ?? []).map((j) => (j.id === job.id ? job : j)));
   return { jobs, problem, changed };
 }
@@ -617,6 +624,7 @@ export function GridConnectionsPage() {
   const extras = useExtras();
   const today = todayInMarket();
   const [filter, setFilter] = useState<GridFilter>("open");
+  const [raising, setRaising] = useState<string | null>(null);
   const listed = jobs ? gridConnectionJobs(jobs) : null;
   const waiting = jobs ? jobs.filter((j) => INSTALLED_STAGES.includes(j.stage) && !inspectionDone(j)).length : 0;
   const open = listed?.filter((j) => gridStateOf(j) !== "connected") ?? [];
@@ -655,20 +663,23 @@ export function GridConnectionsPage() {
               <th className={head}>Electricity retailer</th>
               <th className={head}>Distributor</th>
               <th className={head}>NMI</th>
-              <th className={clsx(head, "pr-4")}>Grid connection</th>
+              <th className={head}>Grid connection</th>
+              <th className={clsx(head, "pr-4")}>
+                <span className="sr-only">Work through it</span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {!shown && (
               <tr>
-                <td colSpan={7} className="p-4 text-[13px] text-muted">
+                <td colSpan={8} className="p-4 text-[13px] text-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {shown?.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-4 text-[13px] text-ink-2">
+                <td colSpan={8} className="p-4 text-[13px] text-ink-2">
                   {filter === "connected" ? "None connected yet." : "Nothing waiting to be connected."}
                 </td>
               </tr>
@@ -677,48 +688,67 @@ export function GridConnectionsPage() {
               const on = installedOn(j);
               const state = gridStateOf(j);
               return (
-                <tr key={j.id}>
-                  <JobCell job={j} />
-                  <td className={cell}>
-                    <SystemMarks job={j} extra={extras?.find((e) => e.jobId === j.id)} />
-                  </td>
-                  <td className={clsx(cell, "text-[12.5px] tabular-nums text-ink-2")}>
-                    {on ? shortDate(on) : "–"}
-                    {on && state !== "connected" && daysUntil(on, today) < 0 && (
-                      <span className="block text-[11px] text-muted">{-daysUntil(on, today)} days ago</span>
-                    )}
-                  </td>
-                  <td className={cell}>
-                    <DetailCell job={j} field="retailer" label="Electricity retailer" onJob={changed} />
-                  </td>
-                  <td className={cell}>
-                    <DistributorCell job={j} onJob={changed} />
-                  </td>
-                  <td className={cell}>
-                    <DetailCell job={j} field="nmi" label="NMI" onJob={changed} />
-                  </td>
-                  <td className={clsx(cell, "pr-4")}>
-                    <select
-                      value={GRID_VALUE[state]}
-                      onChange={(e) => void setDetail(j, "gridConnection", e.target.value, changed)}
-                      aria-label={`Grid connection for ${j.customerName}`}
-                      className={clsx(
-                        "rounded border px-1.5 py-1 text-[12.5px]",
-                        state === "connected"
-                          ? "border-positive/40 bg-positive-soft text-positive"
-                          : state === "raised"
-                            ? "border-line bg-surface text-ink"
-                            : "border-sun-line bg-surface font-medium text-ink ring-1 ring-sun-line",
+                <Fragment key={j.id}>
+                  <tr>
+                    <JobCell job={j} />
+                    <td className={cell}>
+                      <SystemMarks job={j} extra={extras?.find((e) => e.jobId === j.id)} />
+                    </td>
+                    <td className={clsx(cell, "text-[12.5px] tabular-nums text-ink-2")}>
+                      {on ? shortDate(on) : "–"}
+                      {on && state !== "connected" && daysUntil(on, today) < 0 && (
+                        <span className="block text-[11px] text-muted">{-daysUntil(on, today)} days ago</span>
                       )}
-                    >
-                      {(Object.keys(GRID_VALUE) as GridState[]).map((s) => (
-                        <option key={s} value={GRID_VALUE[s]}>
-                          {GRID_STATE_WORDS[s]}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                </tr>
+                    </td>
+                    <td className={cell}>
+                      <DetailCell job={j} field="retailer" label="Electricity retailer" onJob={changed} />
+                    </td>
+                    <td className={cell}>
+                      <DistributorCell job={j} onJob={changed} />
+                    </td>
+                    <td className={cell}>
+                      <DetailCell job={j} field="nmi" label="NMI" onJob={changed} />
+                    </td>
+                    <td className={cell}>
+                      <select
+                        value={GRID_VALUE[state]}
+                        onChange={(e) => void setDetail(j, "gridConnection", e.target.value, changed)}
+                        aria-label={`Grid connection for ${j.customerName}`}
+                        className={clsx(
+                          "rounded border px-1.5 py-1 text-[12.5px]",
+                          state === "connected"
+                            ? "border-positive/40 bg-positive-soft text-positive"
+                            : state === "raised"
+                              ? "border-line bg-surface text-ink"
+                              : "border-sun-line bg-surface font-medium text-ink ring-1 ring-sun-line",
+                        )}
+                      >
+                        {(Object.keys(GRID_VALUE) as GridState[]).map((s) => (
+                          <option key={s} value={GRID_VALUE[s]}>
+                            {GRID_STATE_WORDS[s]}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className={clsx(cell, "pr-4")}>
+                      <button
+                        type="button"
+                        onClick={() => setRaising(raising === j.id ? null : j.id)}
+                        className={clsx(raising === j.id || state !== "to-raise" ? ui.quiet : ui.primary, "h-8 px-3 text-[12.5px]")}
+                      >
+                        {raising === j.id ? "Close" : state === "to-raise" ? "Raise" : "Update"}
+                      </button>
+                    </td>
+                  </tr>
+                  {/* The connection worked through in place (27 Nov 2026, Martin): details, the network's portal, where it stands. */}
+                  {raising === j.id && (
+                    <tr>
+                      <td colSpan={8} className="bg-canvas px-4 py-3">
+                        <GridConnectionCard jobId={j.id} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })}
           </tbody>

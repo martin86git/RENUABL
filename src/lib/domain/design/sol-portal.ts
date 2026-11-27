@@ -8,6 +8,7 @@
  * from its NMI or address; the address opened is always ours (networks.ts), never one he writes. Pure, tested.
  */
 import { VIC_DISTRIBUTORS, distributorNamed, type Distributor } from "./networks";
+import type { GridChange } from "./grid-connection";
 import type { PreApprovalChange } from "./preapproval";
 
 /** One line of the deal to copy into the portal. */
@@ -31,6 +32,10 @@ export interface SolPortal {
    * in on the card and saved only on their press (preapproval.ts). Cleaned where the turn is (sol.ts).
    */
   suggest?: PreApprovalChange;
+  /** The card is the grid connection after the install, not the pre-approval before it (grid-connection.ts). */
+  kind?: "connection";
+  /** What Sol took from their words about the connection (raised, its reference, connected): saved on their press. */
+  connect?: GridChange;
 }
 
 export const PORTAL_LIMITS = { facts: 16, label: 40, value: 160, customer: 80 } as const;
@@ -116,6 +121,7 @@ export function cleanPortal(raw: unknown): SolPortal | null {
     ...(JOB_ID.test(jobId) ? { jobId } : {}),
     ...(customer ? { customer } : {}),
     ...(r.guessed === true ? { guessed: true as const } : {}),
+    ...(r.kind === "connection" && JOB_ID.test(jobId) ? { kind: "connection" as const } : {}),
     facts,
   };
 }
