@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Support",
+    words: "RENUABL support, under the cog: raise a ticket when something isn't working and RENUABL answers there.",
+  },
+  {
+    day: "2026-11-27",
     area: "Grid connections",
     words: "Raise on Grid connections, or ask Sol: the details and serials to copy, the network's portal, and where the connection stands.",
   },

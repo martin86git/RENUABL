@@ -52,6 +52,8 @@ const COMMON_PAGES = [
   // The industry feed (Sol's news and businesses' posts), for every kind (10 Nov 2026).
   "/design/news",
   "/design/feedback",
+  // Support tickets to RENUABL (support.ts), for every kind.
+  "/design/support",
   "/design/terms",
   "/design/sign-in",
   "/design/welcome",
@@ -88,6 +90,7 @@ const COMMON_API = [
   "news",
   "posts",
   "feedback",
+  "support",
   "weather",
   "calendar",
   "marketplace-launch",

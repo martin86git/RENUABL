@@ -40,6 +40,7 @@ const EXTRA_PLACES: readonly SolPlace[] = [
   { key: "design-home", label: "the design tool", path: "/design/roof" },
   { key: "updates", label: "Updates", path: "/design/updates" },
   { key: "feedback", label: "Feedback", path: "/design/feedback" },
+  { key: "support", label: "RENUABL support", path: "/design/support" },
   { key: "account", label: "Your account", path: "/design/account" },
   { key: "settings", label: "Settings", path: "/design/settings" },
 ];

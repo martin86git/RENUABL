@@ -35,6 +35,9 @@ import { NotBilledSwitch } from "@/components/admin/not-billed";
 import { MakePlanCode, StopPlanCode } from "@/components/admin/plan-codes";
 import { stripeClient } from "@/lib/server/stripe";
 import { listPlanCodes } from "@/lib/server/stripe-plan-codes";
+import { SupportReply } from "@/components/admin/support-reply";
+import { STAFF_STATE_WORDS, staffOrder } from "@/lib/domain/design/support";
+import { staffTickets } from "@/lib/server/design-support";
 import { BusinessLeadsBoard } from "@/components/admin/business-leads";
 import { openLeads } from "@/lib/domain/design/business-leads";
 import { listBusinessLeads } from "@/lib/server/business-leads-repo";
@@ -63,7 +66,7 @@ export default async function AdminPage() {
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
   const stripe = stripeClient();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn, planCodes, salesLeads] =
+  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn, planCodes, salesLeads, support] =
     await Promise.all([
       listPartners(),
       listAllJobs(),
@@ -78,7 +81,10 @@ export default async function AdminPage() {
       addOnsOnForStaff().catch(() => []),
       stripe ? listPlanCodes(stripe).catch(() => null) : null,
       listBusinessLeads().catch(() => []),
+      staffTickets().catch(() => []),
     ]);
+  const tickets = staffOrder(support);
+  const toAnswer = tickets.filter((t) => t.state === "open").length;
   const kinds = countByKind(businesses);
   const tallies = interestSummary(checks);
   const held = claims.filter((c) => c.status !== "released").length;
@@ -363,6 +369,54 @@ export default async function AdminPage() {
         <p className="px-5 pb-4 text-[12px] text-muted">
           At list prices. Packs sell a credit for about US$0.09 or more: keep what a credit costs well under that.
         </p>
+      </Panel>
+
+      {/* Support tickets businesses raise to RENUABL (domain/design/support.ts): what needs a reply first. */}
+      <Panel className="mt-6" title={`Support tickets · ${toAnswer} to answer`}>
+        <span id="support" />
+        {tickets.length === 0 ? (
+          <p className="px-5 py-4 text-[14px] text-muted">No business has raised a ticket.</p>
+        ) : (
+          <ul className="divide-y divide-line">
+            {tickets.map((t) => (
+              <li key={t.id} className="px-5 py-4">
+                <details open={t.state === "open"}>
+                  <summary className="cursor-pointer list-none">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Badge tone={t.state === "open" ? "warning" : t.state === "resolved" ? "positive" : "neutral"}>
+                        {STAFF_STATE_WORDS[t.state]}
+                      </Badge>
+                      {t.urgent && t.state !== "resolved" && <Badge tone="warning">Urgent</Badge>}
+                      <span className="text-[15px] font-medium">{t.subject}</span>
+                    </span>
+                    <span className="mt-1 block text-[13px] text-muted">
+                      {t.ref} · {t.business} ({t.kind}) · {t.by} · {t.area} · {t.messages.length}{" "}
+                      {t.messages.length === 1 ? "message" : "messages"}
+                    </span>
+                  </summary>
+                  <ol className="mt-3 space-y-2">
+                    {t.messages.map((m) => (
+                      <li key={m.id} className={m.side === "renuabl" ? "border-l-2 border-line pl-3" : "border-l-2 border-ink pl-3"}>
+                        <p className="text-[12px] text-muted">
+                          {m.side === "renuabl" ? `RENUABL · ${m.by}` : m.by} ·{" "}
+                          {new Date(m.at).toLocaleString("en-AU", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "numeric",
+                            minute: "2-digit",
+                            timeZone: "Australia/Melbourne",
+                          })}
+                        </p>
+                        <p className="whitespace-pre-line text-[14px]">{m.text}</p>
+                      </li>
+                    ))}
+                  </ol>
+                  <SupportReply id={t.id} resolved={t.state === "resolved"} />
+                </details>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
 
       {/* The design tool's own customers (solar businesses) by kind: read only, for staff. Not installation partners. */}

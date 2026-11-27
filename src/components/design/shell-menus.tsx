@@ -15,6 +15,7 @@ import {
   CloudSnow,
   CloudSun,
   LogOut,
+  LifeBuoy,
   MessageSquarePlus,
   Newspaper,
   Moon,
@@ -422,6 +423,8 @@ export function ProfileMenu(props: {
   account: string;
   updates: string;
   feedback: string;
+  /** RENUABL support, with how many tickets RENUABL has answered that are still to open. */
+  support: { href: string; answered: number };
   /** For an installer: its connections, with how many ask to connect. */
   connections?: { href: string; waiting: number };
   /** Updates since this member last opened them. */
@@ -463,10 +466,14 @@ export function ProfileMenu(props: {
         )}
       >
         <Settings className="size-[18px]" aria-hidden />
-        {props.unseen > 0 && (
+        {props.unseen + props.support.answered > 0 && (
           <span
             className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-sun-line ring-2 ring-surface"
-            aria-label={`${props.unseen} new updates`}
+            aria-label={
+              props.support.answered > 0
+                ? `RENUABL support has answered ${props.support.answered} ${props.support.answered === 1 ? "ticket" : "tickets"}`
+                : `${props.unseen} new updates`
+            }
           />
         )}
       </button>
@@ -520,6 +527,7 @@ export function ProfileMenu(props: {
           {row("Industry news", "/design/news", Newspaper)}
           {row("Updates", props.updates, Sparkles, props.unseen)}
           {row("Feedback", props.feedback, MessageSquarePlus)}
+          {row("RENUABL support", props.support.href, LifeBuoy, props.support.answered)}
           <div className="mt-2 flex items-center gap-3 border-t border-line px-3 pt-3 text-sm">
             <LogOut className="size-4 text-muted" aria-hidden />
             <SignOut className="font-medium text-ink-2 hover:text-ink" />

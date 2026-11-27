@@ -309,6 +309,12 @@ type FeedbackAnswer = { items: import("@/lib/domain/design/feedback").FeedbackIt
 export const loadFeedback = () => ask<FeedbackAnswer>("/api/design/feedback");
 export const feedbackAction = (body: Record<string, unknown>) => ask<FeedbackAnswer>("/api/design/feedback", { method: "POST", body });
 
+/** RENUABL support (domain/design/support.ts): the business's tickets with RENUABL, raising, replying and resolving. */
+type SupportAnswer = { tickets: import("@/lib/domain/design/support").Ticket[]; raised?: string };
+export const loadTickets = () => ask<SupportAnswer>("/api/design/support");
+export const supportAction = (body: Record<string, unknown>) => ask<SupportAnswer>("/api/design/support", { method: "POST", body });
+export const supportUnread = () => ask<{ unread: number }>("/api/design/support?count=1");
+
 /** The call note-taker (wave 7): what was heard of a call on a deal, written up by Claude; nothing heard is kept. */
 export const writeUpCall = (jobId: string, lines: import("@/lib/domain/design/call-notes").HeardLine[]) =>
   ask<{

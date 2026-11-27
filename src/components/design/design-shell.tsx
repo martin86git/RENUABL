@@ -42,7 +42,7 @@ import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
 import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { DemoBar, DemoDetailsPrompt } from "./demo-details";
 import { staffView } from "./staff-view-as";
-import { notificationCount, serviceCount, approvalCounts, updatesUnseen } from "@/lib/services/crm";
+import { notificationCount, serviceCount, approvalCounts, supportUnread, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
 import { PageSearch } from "./page-search";
@@ -95,6 +95,7 @@ export const PATHS = {
   inbox: "/design/inbox",
   marketplace: "/design/marketplace",
   feedback: "/design/feedback",
+  support: "/design/support",
   proposalsSent: "/design/sales/proposals",
   proposalsSigned: "/design/sales/signed",
   calls: "/design/calls",
@@ -481,6 +482,11 @@ function Shell({
     const res = await updatesUnseen();
     return res.ok ? res.unseen : null;
   });
+  // Support tickets RENUABL has answered that nobody here has opened yet (support.ts).
+  const support = useCount(on, "renuabl:support", async () => {
+    const res = await supportUnread();
+    return res.ok ? res.unread : null;
+  });
   const path = usePathname();
   const router = useRouter();
   // A page that isn't part of this login (an installer following a link to a deal) goes back to its Today.
@@ -604,6 +610,7 @@ function Shell({
     { label: "Industry news", href: "/design/news", n: 0 },
     { label: "Updates", href: PATHS.updates, n: updates },
     { label: "Feedback", href: PATHS.feedback, n: 0 },
+    { label: "RENUABL support", href: PATHS.support, n: support },
   ];
   const linkRow = (r: { label: string; href: string; n: number }) => (
     <Link
@@ -960,6 +967,7 @@ function Shell({
                 account={PATHS.account}
                 updates={PATHS.updates}
                 feedback={PATHS.feedback}
+                support={{ href: PATHS.support, answered: support }}
                 // An installer's connections live here (its menu is My Jobs, the designer and the Marketplace).
                 connections={kind === "installer" ? { href: "/design/connections", waiting: requests } : undefined}
                 unseen={updates}
@@ -969,6 +977,7 @@ function Shell({
                   settingsOn ||
                   path.startsWith(PATHS.updates) ||
                   path.startsWith(PATHS.feedback) ||
+                  path.startsWith(PATHS.support) ||
                   (kind === "installer" && path.startsWith("/design/connections"))
                 }
               />
