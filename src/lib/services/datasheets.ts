@@ -109,7 +109,7 @@ export const confirmDatasheet = (kind: DocKind, sku: string) =>
   ask<{ sheets: SavedSheet[] }>("/api/design/datasheets", { method: "POST", body: { do: "confirm", kind, sku } });
 
 /** Looks online for a couple of the price lists' products with no sheet on hand; each one's outcome (Settings' Find every datasheet). */
-export const findSheetBatch = (products: readonly { kind: DocKind; sku: string; name: string }[]) =>
+export const findSheetBatch = (products: readonly { kind: DocKind; sku: string; name: string; swap?: boolean }[]) =>
   ask<{ results: { kind: DocKind; sku: string; outcome: FindResult }[] }>("/api/design/datasheets", {
     method: "POST",
     body: { do: "find-batch", products },

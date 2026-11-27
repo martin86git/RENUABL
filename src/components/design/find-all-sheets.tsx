@@ -72,7 +72,7 @@ export function FindAllSheets(props: { mayChange: boolean; onFound: () => void }
     while (queue.length && !stop.current) {
       const batch = queue.slice(0, FIND_BATCH);
       queue = queue.slice(FIND_BATCH);
-      const res = await findSheetBatch(batch.map(({ kind, sku, name }) => ({ kind, sku, name })));
+      const res = await findSheetBatch(batch.map(({ kind, sku, name, gap }) => ({ kind, sku, name, swap: gap === "not-au" })));
       if (!res.ok) {
         setProblem(res.message);
         break;
@@ -86,7 +86,7 @@ export function FindAllSheets(props: { mayChange: boolean; onFound: () => void }
         setProblem(FIND_RESULT_WORDS.off);
         break;
       }
-      if (got.some((g) => g.outcome === "found" || g.outcome === "kept-already")) props.onFound();
+      if (got.some((g) => g.outcome === "found" || g.outcome === "kept-already" || g.outcome === "replaced")) props.onFound();
     }
     setRunning(false);
     void readOnHand();
@@ -94,7 +94,11 @@ export function FindAllSheets(props: { mayChange: boolean; onFound: () => void }
 
   if (!toFind) return null;
   const found = done.filter((d) => d.outcome === "found" || d.outcome === "kept-already").length;
-  const missed = done.filter((d) => d.outcome === "not-found" || d.outcome === "not-read");
+  const missed = done.filter((d) => d.gap !== "not-au" && (d.outcome === "not-found" || d.outcome === "not-read"));
+  const swapped = done.filter((d) => d.outcome === "replaced").length;
+  const stillForeign = done.filter((d) => d.gap === "not-au" && d.outcome !== "replaced" && d.outcome !== "off");
+  const toSwap = left.filter((p) => p.gap === "not-au").length;
+  const toLook = left.length - toSwap;
   const total = done.length + left.length;
   if (!total) {
     return (
@@ -110,12 +114,22 @@ export function FindAllSheets(props: { mayChange: boolean; onFound: () => void }
         <div className="max-w-xl">
           <p className="text-sm font-medium text-ink">
             {left.length
-              ? `${left.length} product${left.length === 1 ? "" : "s"} on your price lists ${left.length === 1 ? "has" : "have"} no datasheet yet`
+              ? [
+                  toLook
+                    ? `${toLook} product${toLook === 1 ? "" : "s"} on your price lists ${toLook === 1 ? "has" : "have"} no datasheet yet`
+                    : "",
+                  toSwap
+                    ? `${toSwap} sheet${toSwap === 1 ? "" : "s"} found online ${toSwap === 1 ? "isn't" : "aren't"} the Australian version`
+                    : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")
               : "Looked for every one"}
           </p>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
             RENUABL looks for each maker&apos;s own datasheet for that exact model, the Australian version first, and keeps it. Panel and
-            inverter figures found this way are marked to check until someone confirms them below. Each takes up to a minute.
+            inverter figures found this way are marked to check until someone confirms them below. A sheet found before from a link that
+            isn&apos;t Australia&apos;s is swapped only when an Australian one is found. Each takes up to a minute.
           </p>
         </div>
         {props.mayChange &&
@@ -141,7 +155,8 @@ export function FindAllSheets(props: { mayChange: boolean; onFound: () => void }
           </div>
           <p className="mt-2 text-[13px] text-ink-2" aria-live="polite">
             {running ? "Looking… " : ""}
-            {done.length} of {total} looked for · {found} kept · {missed.length} not found
+            {done.length} of {total} looked for · {found} kept{swapped ? ` · ${swapped} swapped for Australia's` : ""} · {missed.length} not
+            found
           </p>
         </div>
       )}
@@ -155,6 +170,18 @@ export function FindAllSheets(props: { mayChange: boolean; onFound: () => void }
               <li key={`${m.kind}:${m.sku}`}>
                 <span className="font-mono text-xs">{m.sku}</span> · {m.name} ({DOC_KIND_WORDS[m.kind].toLowerCase()}) ·{" "}
                 <span className="text-muted">{FIND_RESULT_WORDS[m.outcome]}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {stillForeign.length > 0 && !running && (
+        <div className="mt-4 border-t border-line pt-3">
+          <p className="text-[13px] font-medium text-ink">No Australian sheet found: the one on file is kept</p>
+          <ul className="mt-2 space-y-1 text-[13px] text-ink-2">
+            {stillForeign.map((m) => (
+              <li key={`${m.kind}:${m.sku}`}>
+                <span className="font-mono text-xs">{m.sku}</span> · {m.name} ({DOC_KIND_WORDS[m.kind].toLowerCase()})
               </li>
             ))}
           </ul>

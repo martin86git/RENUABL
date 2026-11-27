@@ -32,4 +32,23 @@ describe("sheetsToFind", () => {
       ["SIGEN-BAT-8", "none"],
     ]);
   });
+
+  it("adds sheets found online from a link that isn't Australia's, after everything missing", () => {
+    const out = sheetsToFind(
+      products,
+      [
+        { kind: "panel", sku: "JKM475N-48QL6-DB", hasFile: true, foundUrl: "https://www.jinkosolar.com/uploads/EU/JKM475N.pdf" },
+        { kind: "panel", sku: "TSM-440", hasFile: true, foundUrl: "https://www.trinasolar.com/au/TSM-440.pdf" },
+        { kind: "inverter", sku: "SGWSH10RT", hasFile: true, foundUrl: null },
+      ],
+      [
+        { kind: "battery", sku: "SIGEN-BAT-8", foundUrl: "https://sigenergy.com/us/sheet.pdf" },
+        { kind: "charger", sku: "ZAPPI-7" },
+      ],
+    );
+    expect(out.map((p) => [p.sku, p.gap])).toEqual([
+      ["JKM475N-48QL6-DB", "not-au"],
+      ["SIGEN-BAT-8", "not-au"],
+    ]);
+  });
 });

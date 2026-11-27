@@ -11,7 +11,14 @@ import { lookup as dnsLookup } from "node:dns";
 import type { LookupFunction } from "node:net";
 import { get as httpsGet } from "node:https";
 import Anthropic from "@anthropic-ai/sdk";
-import { KEEP_SHEET_BYTES, codeKey, foundFigures, sheetCandidates, type SheetKind } from "@/lib/domain/design/datasheets";
+import {
+  KEEP_SHEET_BYTES,
+  codeKey,
+  foundFigures,
+  isAustralianSheet,
+  sheetCandidates,
+  type SheetKind,
+} from "@/lib/domain/design/datasheets";
 import type { InverterElectrical, PanelElectrical } from "@/lib/domain/design/electrical";
 import { BLOCKED_SITES, SEARCH_FROM } from "@/lib/domain/design/sol-knowledge";
 import { todayInMarket } from "@/lib/domain/market";
@@ -329,4 +336,39 @@ export async function findQuotedSheets(
     if (outcome === "found") found++;
   }
   return found;
+}
+
+/**
+ * A sheet found online before from a link that isn't Australia's, swapped for the Australian version (27 Nov 2026,
+ * Martin: "replace the non-Australian sheets already found"). Only a link the search showed that reads as Australia's
+ * (`isAustralianSheet`) is tried; a panel's or inverter's must read for this exact model, as any found sheet. Kept marked
+ * to check. When no Australian sheet is found the one on file stays as it is ("no-au").
+ */
+export async function swapForAustralian(
+  businessId: string,
+  product: { kind: DocKind; sku: string; name: string },
+): Promise<"replaced" | "no-au" | "not-read" | "off"> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) return "off";
+  const links = (await findSheetLinks(product.kind, product.sku, product.name, apiKey).catch(() => [])).filter(isAustralianSheet);
+  if (!links.length) return "no-au";
+  if (isFileOnly(product.kind)) {
+    for (const url of links) {
+      const bytes = await safeDownload(url);
+      if (!bytes || bytes.length > KEEP_SHEET_BYTES) continue;
+      await saveProductFile(
+        businessId,
+        { kind: product.kind, sku: product.sku, model: product.name, fileName: sheetName(url) },
+        { bytes, type: "application/pdf" },
+        "found online",
+        url,
+      );
+      return "replaced";
+    }
+    return "no-au";
+  }
+  const got = await firstReadable({ ...product, kind: product.kind as SheetKind }, links, apiKey);
+  if (typeof got === "string") return got === "not-read" ? "not-read" : "no-au";
+  await replaceWithFoundSheet(businessId, got.sheet, got.file);
+  return "replaced";
 }

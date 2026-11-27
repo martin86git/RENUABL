@@ -10,7 +10,7 @@ import {
   listSheets,
   saveSheet,
 } from "@/lib/server/design-datasheets-repo";
-import { findDatasheet, findProductFile, findQuotedSheets } from "@/lib/server/datasheet-finder";
+import { findDatasheet, findProductFile, findQuotedSheets, swapForAustralian } from "@/lib/server/datasheet-finder";
 import { isDocKind, isFileOnly, type DocKind } from "@/lib/domain/design/proposal-datasheets";
 import { FIND_BATCH, type FindResult } from "@/lib/domain/design/find-all-sheets";
 import { allow } from "@/lib/server/rate-limit";
@@ -117,13 +117,15 @@ export async function POST(request: Request) {
         const o = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
         const k = docKindOf(o.kind);
         const code = cleanSku(o.sku);
-        return k && code ? [{ kind: k, sku: code, name: text(o.name, 160) || code }] : [];
+        return k && code ? [{ kind: k, sku: code, name: text(o.name, 160) || code, swap: o.swap === true }] : [];
       });
       const results: { kind: DocKind; sku: string; outcome: FindResult }[] = [];
       for (const p of products) {
-        const outcome: FindResult = isFileOnly(p.kind)
-          ? await findProductFile(who.member.businessId, p).catch(() => "not-found" as const)
-          : await findDatasheet(who.member.businessId, { ...p, kind: p.kind as SheetKind }).catch(() => "not-found" as const);
+        const outcome: FindResult = p.swap
+          ? await swapForAustralian(who.member.businessId, p).catch(() => "no-au" as const)
+          : isFileOnly(p.kind)
+            ? await findProductFile(who.member.businessId, p).catch(() => "not-found" as const)
+            : await findDatasheet(who.member.businessId, { ...p, kind: p.kind as SheetKind }).catch(() => "not-found" as const);
         results.push({ kind: p.kind, sku: p.sku, outcome });
       }
       return Response.json({ ok: true, results });

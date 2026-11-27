@@ -1,4 +1,4 @@
-import { codeKey } from "./datasheets";
+import { codeKey, isAustralianSheet } from "./datasheets";
 import type { DocKind } from "./proposal-datasheets";
 
 /**
@@ -14,8 +14,11 @@ export interface ListedProduct {
   name: string;
 }
 
-/** Why a product is to be looked for: no sheet at all, or figures on file but not the sheet itself to open. */
-export type SheetGap = "none" | "no-file";
+/**
+ * Why a product is to be looked for: no sheet at all, figures on file but not the sheet itself to open, or a sheet found
+ * online from a link that isn't Australia's ("not-au", 27 Nov 2026), to swap for the Australian version.
+ */
+export type SheetGap = "none" | "no-file" | "not-au";
 
 export interface ToFind extends ListedProduct {
   gap: SheetGap;
@@ -34,8 +37,8 @@ export const FIND_RUN_MAX = 400;
  */
 export function sheetsToFind(
   products: readonly ListedProduct[],
-  sheets: readonly { kind: DocKind; sku: string; hasFile?: boolean }[],
-  files: readonly { kind: DocKind; sku: string }[],
+  sheets: readonly { kind: DocKind; sku: string; hasFile?: boolean; foundUrl?: string | null }[],
+  files: readonly { kind: DocKind; sku: string; foundUrl?: string | null }[],
 ): ToFind[] {
   const withFile = new Set<string>();
   const figuresOnly = new Set<string>();
@@ -53,11 +56,22 @@ export function sheetsToFind(
       seen.add(key);
       out.push({ ...p, gap: figuresOnly.has(key) ? "no-file" : "none" });
     }
+  // Sheets found online from a link that isn't Australia's, on the price lists: the Australian version looked for.
+  const notAu = new Set<string>();
+  for (const s of [...sheets, ...files])
+    if (s.foundUrl && /^https?:/i.test(s.foundUrl) && !isAustralianSheet(s.foundUrl)) notAu.add(`${s.kind}:${codeKey(s.sku)}`);
+  for (const kind of order)
+    for (const p of products) {
+      const key = `${kind}:${codeKey(p.sku)}`;
+      if (p.kind !== kind || seen.has(key) || !notAu.has(key)) continue;
+      seen.add(key);
+      out.push({ ...p, gap: "not-au" });
+    }
   return out.slice(0, FIND_RUN_MAX);
 }
 
 /** What one product's look came to, as the run's list says it. */
-export type FindResult = "found" | "kept-already" | "not-found" | "not-read" | "off";
+export type FindResult = "found" | "kept-already" | "not-found" | "not-read" | "off" | "replaced" | "no-au";
 
 export const FIND_RESULT_WORDS: Record<FindResult, string> = {
   found: "Found and kept",
@@ -65,4 +79,6 @@ export const FIND_RESULT_WORDS: Record<FindResult, string> = {
   "not-found": "No datasheet found online",
   "not-read": "Found a sheet but couldn't read it for this model",
   off: "Finding datasheets isn't set up on this site",
+  replaced: "Swapped for the Australian sheet",
+  "no-au": "No Australian sheet found online, the one on file kept",
 };
