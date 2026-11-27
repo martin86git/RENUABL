@@ -283,7 +283,33 @@ export function rawEmail(from: string, mail: ComposedEmail, files: readonly Comp
 }
 
 /** What Sol is asked to do with an email being written: tidy the words up, or write it from what the member says. */
-export type ComposeHelp = "polish" | "write";
+export type ComposeHelp = "polish" | "write" | EmailTone;
+
+/**
+ * The tones an email can be put into (27 Nov 2026, Martin: Sol's draft opened "I'm Martin from Renuabl", which "alot of
+ * the time isnt how people talk. the signature sign off will tell who the person is"). Relaxed and Professional never
+ * introduce the sender; Formal may keep an introduction the draft already has.
+ */
+export const EMAIL_TONES = ["relaxed", "professional", "formal"] as const;
+export type EmailTone = (typeof EMAIL_TONES)[number];
+export const isEmailTone = (v: unknown): v is EmailTone => EMAIL_TONES.includes(v as EmailTone);
+export const TONE_WORDS: Record<EmailTone, { label: string; hint: string; how: string }> = {
+  relaxed: {
+    label: "Relaxed",
+    hint: "How you'd write to someone you've spoken to. No introduction: your sign-off says who you are.",
+    how: 'Relaxed and friendly, the way a person writes to someone they have already spoken to: contractions, short sentences, straight to the point after the greeting. Never introduce the sender by name, role or company ("I am Sam from …", "My name is …"): the sign-off says who they are. Take any such introduction out. No "I hope this email finds you well", no "I am writing to".',
+  },
+  professional: {
+    label: "Professional",
+    hint: "Clear and courteous, without being stiff. No introduction either.",
+    how: 'Professional: clear, courteous and confident, neither chatty nor stiff. Never introduce the sender by name, role or company ("I am Sam from …"): the sign-off says who they are. Take any such introduction out, and open with why you are writing.',
+  },
+  formal: {
+    label: "Formal",
+    hint: "Full sentences and a formal greeting, for a first letter or a serious matter.",
+    how: 'Formal: full sentences, no contractions or slang, a formal greeting ("Dear …" when there is a name). An introduction of the sender already in the email may stay; never add one.',
+  },
+};
 
 /**
  * Sol's instructions for an email being written (8 Nov 2026, Martin: a Polish button, and telling Sol what the email
@@ -303,6 +329,14 @@ export function composeHelpPrompt(
   if (mode === "polish")
     return [
       `You are Sol, the assistant at ${input.business}, a solar business in Australia. Tidy up this email: fix spelling, grammar and punctuation, make it clearer and easier to read, and keep the writer's meaning, voice and every fact. Don't make it longer than it needs to be. Keep the subject unless it is empty or unclear.`,
+      ...rules,
+      "",
+      draft || "(nothing written yet)",
+    ].join("\n");
+  if (isEmailTone(mode))
+    return [
+      `You are Sol, the assistant at ${input.business}, a solar business in Australia. Rewrite this email in another tone, keeping every fact, question and request in it and adding none. Keep it about the same length or shorter, and keep the subject unless it clashes with the tone.`,
+      `The tone: ${TONE_WORDS[mode].how}`,
       ...rules,
       "",
       draft || "(nothing written yet)",

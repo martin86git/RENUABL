@@ -6,6 +6,7 @@ import {
   SUMMARY_INSTRUCTIONS,
   cleanEmailNote,
   composeHelpPrompt,
+  isEmailTone,
   isEmailAction,
   isMessageId,
   type ComposedFile,
@@ -225,12 +226,12 @@ export async function POST(request: Request) {
       if (!allow(request, "inbox-sol", 120)) return json({ ok: false, message: "Too many in the last hour. Try again shortly." }, 429);
       const apiKey = parseApiKey(process.env.ANTHROPIC_API_KEY);
       if (!apiKey) return json({ ok: false, message: "Sol isn't set up here." }, 503);
-      const mode = b.mode === "write" ? "write" : "polish";
+      const mode = b.mode === "write" ? "write" : isEmailTone(b.mode) ? b.mode : "polish";
       const text = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).slice(0, max) : "");
       const instructions = text("instructions", COMPOSE_LIMITS.instructions).trim();
       const body = text("body", COMPOSE_LIMITS.body);
       if (mode === "write" && !instructions) return json({ ok: false, message: "Tell Sol what the email should say." }, 422);
-      if (mode === "polish" && !body.trim()) return json({ ok: false, message: "Write something first, then Sol can polish it." }, 422);
+      if (mode !== "write" && !body.trim()) return json({ ok: false, message: "Write something first, then Sol can polish it." }, 422);
       const to = text("to", 1000)
         .split(/[\s,;]+/)
         .filter((a) => a.includes("@"))
@@ -249,7 +250,7 @@ export async function POST(request: Request) {
         member.email,
         (ai) => readWithClaude<{ subject: string; body: string }>([], COMPOSE_SCHEMA, prompt, apiKey, ai),
         inboxTier(mode === "write"),
-        mode === "write" ? "email written" : "email polished",
+        mode === "write" ? "email written" : mode === "polish" ? "email polished" : `email made ${mode}`,
       ).catch((e) => {
         console.error("compose sol failed", redactSecrets(e instanceof Error ? e.message : String(e)));
         return null;
