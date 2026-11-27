@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowRight, Check, Flame, MapPin, PenTool, Plus, Search, Sun, X } from "lucide-react";
+import { ArrowRight, Check, Clock, Flame, MapPin, PenTool, Plus, Search, Sun, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { goUnderneath, inDrawer, openDesigner } from "./design-drawer";
@@ -20,6 +20,7 @@ import {
   type Waiting,
 } from "@/lib/domain/design/design-home";
 import { ROOF_IMAGE } from "@/lib/domain/design/roof-design";
+import { RECENT_SEARCHES_KEY, cleanRecentSearches, withRecent, type RecentSearch } from "@/lib/domain/design/recent-searches";
 import type { Address } from "@/lib/domain/types";
 import { resolveAddress, suggestAddresses } from "@/lib/services/consumer";
 import { attachSite, listJobs, loadDesignHome, saveJob, shortDate, type JobLine } from "@/lib/services/crm";
@@ -211,6 +212,25 @@ function FindBar({
   const [newSite, setNewSite] = useState(false);
   const session = useRef("");
   const asked = typed.trim();
+  // The last three opened from here, on this device (26 Nov 2026, Martin), shown while the box is empty and in focus.
+  const [focused, setFocused] = useState(false);
+  // Read once on the device; it is only drawn once the box is in focus, so the server's empty list never shows.
+  const [recent, setRecent] = useState<RecentSearch[]>(() => {
+    try {
+      return typeof window === "undefined" ? [] : cleanRecentSearches(JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) ?? "[]"));
+    } catch {
+      return [];
+    }
+  });
+  const remember = (r: RecentSearch) => {
+    const next = withRecent(recent, r);
+    setRecent(next);
+    try {
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+    } catch {
+      /* not kept on this device */
+    }
+  };
   useEffect(() => {
     session.current = newSession();
   }, []);
@@ -240,15 +260,35 @@ function FindBar({
       const m = outsideMarketMessage(address);
       return setNote(`${m.title} ${m.body}`);
     }
+    remember({
+      kind: "place",
+      address,
+      label: address.line,
+      sub: [address.suburb, address.state].filter(Boolean).join(" "),
+    });
     onPick(address);
   };
   const openDeal = (j: JobLine) => {
+    remember({ kind: "deal", id: j.id, label: `${j.customerName} · ${j.title}`, sub: j.lat !== null ? j.address : "Not on the map yet" });
     if (j.lat !== null) return openDesigner(designHref(j.id), router);
     const deal = `/design/deals/${encodeURIComponent(j.id)}`;
     if (inDrawer()) goUnderneath(deal);
     else router.push(deal);
   };
   const open = asked.length >= 2;
+  const openRecent = (r: RecentSearch) => {
+    if (r.kind === "place") {
+      remember(r);
+      return onPick(r.address);
+    }
+    const j = jobs?.find((x) => x.id === r.id);
+    if (j) return openDeal(j);
+    remember(r);
+    const deal = `/design/deals/${encodeURIComponent(r.id)}`;
+    if (inDrawer()) goUnderneath(deal);
+    else router.push(deal);
+  };
+  const showRecent = focused && !asked && !note && recent.length > 0;
   // On a phone the box is too narrow for the whole sentence (22 Nov 2026, Martin: the placeholder was cut off), so
   // it reads shorter there, a size down; what is typed stays 16px so Safari doesn't zoom.
   const narrow = useSyncExternalStore(narrowWatch, narrowNow, () => false);
@@ -273,6 +313,9 @@ function FindBar({
               setTyped(e.target.value);
               setNote(null);
             }}
+            onFocus={() => setFocused(true)}
+            // Long enough after leaving for a press on a recent search to land.
+            onBlur={() => setTimeout(() => setFocused(false), 200)}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 setTyped("");
@@ -323,6 +366,37 @@ function FindBar({
           <Plus className="size-7" strokeWidth={2.25} aria-hidden />
         </button>
       </div>
+      {showRecent && (
+        <div
+          className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl bg-surface py-2 shadow-lift ring-1 ring-line"
+          role="listbox"
+          aria-label="Recent searches"
+        >
+          <p className={clsx(head, "px-5 py-1")}>Recent</p>
+          {recent.map((r) => (
+            <button
+              key={r.kind === "deal" ? `d${r.id}` : `p${r.label}${r.sub}`}
+              type="button"
+              role="option"
+              aria-selected={false}
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => openRecent(r)}
+              className="flex w-full items-center gap-3 px-5 py-2.5 text-left hover:bg-surface-2"
+            >
+              <Clock className="size-4 shrink-0 text-muted" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm text-ink">{r.label}</span>
+                {r.sub && <span className="block truncate text-xs text-muted">{r.sub}</span>}
+              </span>
+              {r.kind === "place" ? (
+                <MapPin className="size-4 shrink-0 text-sun-line" aria-hidden />
+              ) : (
+                <ArrowRight className="size-4 shrink-0 text-muted" aria-hidden />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
       {(open || note) && (
         <div
           className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl bg-surface shadow-lift ring-1 ring-line"

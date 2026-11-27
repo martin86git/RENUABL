@@ -467,7 +467,7 @@ async function productsBehind(row: Found): Promise<QuotedProduct[]> {
     `select internal from design_proposal_versions where business_id = $1 and id = $2`,
     [row.businessId, row.versionId],
   );
-  return rows[0] ? quotedProducts(rows[0].internal, row.acceptedAt ? row.acceptedOption : null) : [];
+  return rows[0] ? quotedProducts(rows[0].internal, row.acceptedAt ? row.acceptedOption : null, { mixes: true }) : [];
 }
 
 /** The sheets on hand for what a version quotes, as its customer is sent them. */

@@ -15,7 +15,7 @@ export interface MinimisedPage {
 }
 
 /** The most kept at once; the oldest goes first. */
-export const MAX_MINIMISED = 5;
+export const MAX_MINIMISED = 8;
 export const MINIMISED_KEY = "renuabl.design.minimised";
 
 /** Today is where a person lands; it isn't put aside. */
@@ -54,3 +54,36 @@ export function cleanMinimised(raw: unknown): MinimisedPage[] {
 /** Where to go once a page is put aside: the page before it, unless that was itself, else Today. */
 export const afterMinimise = (current: string, previous: string | null) =>
   previous && pathOf(previous) !== pathOf(current) ? previous : "/design";
+
+/**
+ * The headings minimised pages sit under on the left, beside Sol's chats (26 Nov 2026, Martin: "minimize on the left
+ * hand side under chat… headers only appear if somethings been minimized that correspond"). In order; a page under none
+ * of them goes under Other.
+ */
+export const MINIMISED_GROUPS: readonly { label: string; starts: readonly string[] }[] = [
+  { label: "Deals", starts: ["/design/deals", "/design/sales", "/design/calls"] },
+  { label: "Customers", starts: ["/design/customers"] },
+  { label: "Service", starts: ["/design/service"] },
+  { label: "Installations", starts: ["/design/installations", "/design/procurement", "/design/jobs", "/design/inspections"] },
+  { label: "Marketing", starts: ["/design/marketing"] },
+  { label: "Marketplace", starts: ["/design/marketplace"] },
+  { label: "Messages", starts: ["/design/messages", "/design/inbox", "/design/team", "/design/notifications"] },
+  { label: "Calendar", starts: ["/design/calendar"] },
+  { label: "Settings", starts: ["/design/settings", "/design/account"] },
+];
+const OTHER = "Other";
+
+/** The heading a minimised page sits under. */
+export function minimisedGroup(href: string): string {
+  const path = pathOf(href);
+  const hit = MINIMISED_GROUPS.find((g) => g.starts.some((s) => path === s || path.startsWith(`${s}/`)));
+  return hit?.label ?? OTHER;
+}
+
+/** Minimised pages under their headings, in the headings' order, newest first in each; empty headings left out. */
+export function groupMinimised(list: readonly MinimisedPage[]): { label: string; pages: MinimisedPage[] }[] {
+  const order = [...MINIMISED_GROUPS.map((g) => g.label), OTHER];
+  return order
+    .map((label) => ({ label, pages: [...list].reverse().filter((p) => minimisedGroup(p.href) === label) }))
+    .filter((g) => g.pages.length > 0);
+}

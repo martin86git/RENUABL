@@ -1013,7 +1013,7 @@ function Shell({
       ) : (
         // `studio-room`: beside Sol's panel the pad keeps clear of the floating bar and of the panel (globals.css).
         <div className="studio-room relative px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
-          {/* A minus over the pad's top right puts the page aside as a chip at the foot (26 Nov 2026, Martin). */}
+          {/* Minimise, inside the pad's top right, puts the page aside as a chip at the foot (26 Nov 2026, Martin). */}
           <PageMinimise fallback={here?.page.label ?? current.label} />
           <div data-tour="pad" data-sol-page className={PAD}>
             {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad

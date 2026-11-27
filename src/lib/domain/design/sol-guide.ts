@@ -267,3 +267,23 @@ export function cellWords(c: { toGo: number; over: number }): string {
   if (c.toGo === 0) return "On target";
   return `${c.toGo} to go`;
 }
+
+/**
+ * The panel counter in the dock while Add a panel is in hand (26 Nov 2026, Martin: "a panel counter in the dock so I can
+ * see how many panels left until target… it should also show how many kWs"): the panels on the design (with any row
+ * being dragged out), their kW, and with a target how many are still to go, or how far past it.
+ */
+export function panelCounter(
+  placed: number,
+  laying: number,
+  watts: number,
+  target: GuideTarget | null,
+): { panels: number; kw: string; line: string | null; state: "short" | "on" | "over" | "none" } {
+  const panels = placed + laying;
+  const kw = (Math.round((panels * (watts || 475)) / 10) / 100).toFixed(2);
+  if (!target || !(target.kw > 0)) return { panels, kw, line: null, state: "none" };
+  const need = panelsFor(target.kw, watts) - panels;
+  if (need > 0) return { panels, kw, line: `${need} to go to ${target.kw} kW`, state: "short" };
+  if (need === 0) return { panels, kw, line: `On target: ${target.kw} kW`, state: "on" };
+  return { panels, kw, line: `${-need} over the ${target.kw} kW target`, state: "over" };
+}

@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { MAX_MINIMISED, afterMinimise, chipTitle, cleanMinimised, mayMinimise, withMinimised, withoutMinimised } from "./minimised-pages";
+import {
+  MAX_MINIMISED,
+  afterMinimise,
+  chipTitle,
+  cleanMinimised,
+  groupMinimised,
+  minimisedGroup,
+  mayMinimise,
+  withMinimised,
+  withoutMinimised,
+} from "./minimised-pages";
 
 const page = (href: string, title = "T") => ({ href, title, scrollY: 0 });
 
@@ -31,5 +41,15 @@ describe("pages put aside", () => {
       { href: "/design/a", title: "Page", scrollY: 0 },
     ]);
     expect(chipTitle("A".repeat(40))).toHaveLength(28);
+  });
+});
+
+describe("minimised pages under their headings", () => {
+  it("groups by section, empty headings left out, newest first", () => {
+    const p = (href: string) => ({ href, title: href, scrollY: 0 });
+    const groups = groupMinimised([p("/design/deals/1"), p("/design/service"), p("/design/deals/2"), p("/design/updates")]);
+    expect(groups.map((g) => g.label)).toEqual(["Deals", "Service", "Other"]);
+    expect(groups[0].pages.map((x) => x.href)).toEqual(["/design/deals/2", "/design/deals/1"]);
+    expect(minimisedGroup("/design/sales/pipelines?x=1")).toBe("Deals");
   });
 });

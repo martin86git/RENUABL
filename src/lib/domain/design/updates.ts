@@ -14,6 +14,42 @@ export interface Update {
 
 export const UPDATES: readonly Update[] = [
   {
+    day: "2026-11-27",
+    area: "Settings",
+    words: "Product datasheets also swaps sheets found online before for the Australian version, where there is one.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Settings",
+    words: "Product datasheets can now find every datasheet on your price lists in one go, the Australian version first.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Proposals",
+    words: "Finding datasheets online now shows a spinner on the button and on each product it's looking for.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Designer",
+    words: "On a phone, laying panels shows a counter in the dock: panels, kW and how many to go. Portrait and landscape are larger.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Pre-approvals",
+    words:
+      "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
+    words: "A minimised page waits as a tab on the top left of the grey pad, on every page, named by its section.",
+  },
+  {
+    day: "2026-11-26",
+    area: "Everywhere",
+    words: "Every page's minimise is now the same larger round, inside the grey pad's top right corner.",
+  },
+  {
     day: "2026-11-26",
     area: "Pre-approvals",
     words: "Ask Sol for a network's pre-approval portal, or press Apply on Pre-approvals: the details to copy, the portal, where it stands.",

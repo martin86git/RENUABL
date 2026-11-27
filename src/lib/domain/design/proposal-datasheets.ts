@@ -43,6 +43,8 @@ export interface QuotedProduct {
   name: string;
   /** The options it is in, when the customer chooses between options; null when it goes with every view of the proposal. */
   options: OptionKey[] | null;
+  /** Only in the configurator's mixes, on none of the designs (26 Nov 2026, Martin): never looked for, never on the proposal page. */
+  mixOnly?: true;
 }
 
 /** A quote line's product name without the count in front of it. */
@@ -66,12 +68,16 @@ function productsOf(lines: Lines): Omit<QuotedProduct, "options">[] {
  * With options, each product says which options it is in, so the page shows the sheets for the system on show. The
  * configurator's mixes (often hundreds) aren't split out: their products go with every view.
  */
-export function quotedProducts(internal: ProposalInternal, accepted?: OptionKey | null): QuotedProduct[] {
+export function quotedProducts(internal: ProposalInternal, accepted?: OptionKey | null, how: { mixes?: boolean } = {}): QuotedProduct[] {
   const found = new Map<string, QuotedProduct>();
-  const add = (lines: Lines, option: OptionKey | null) => {
+  const add = (lines: Lines, option: OptionKey | null, mix = false) => {
     for (const p of productsOf(lines)) {
       const key = `${p.kind}:${codeKey(p.sku)}`;
       const had = found.get(key);
+      if (mix) {
+        if (!had) found.set(key, { ...p, options: null, mixOnly: true });
+        continue;
+      }
       if (!had) found.set(key, { ...p, options: option === null ? null : [option] });
       else if (had.options && option !== null && !had.options.includes(option)) had.options.push(option);
       else if (option === null) had.options = null;
@@ -84,7 +90,9 @@ export function quotedProducts(internal: ProposalInternal, accepted?: OptionKey 
   } else {
     add(internal.lines, null);
   }
-  if (!accepted) for (const c of internal.configurator ?? []) add(c.lines, null);
+  // The configurator's other panels, inverters and batteries are on none of the designs: only when asked for (the
+  // configurator page shows the sheets on hand for the mix on show), never looked for online or listed as missing.
+  if (!accepted && how.mixes) for (const c of internal.configurator ?? []) add(c.lines, null, true);
   const order = (k: DocKind) => DOC_KINDS.indexOf(k);
   return [...found.values()].sort((a, b) => order(a.kind) - order(b.kind) || a.name.localeCompare(b.name));
 }
@@ -116,18 +124,24 @@ export interface ProposalDatasheet {
   name: string;
   /** The options it goes with; absent when it goes with every view. */
   options?: OptionKey[];
+  /** Only in the configurator's mixes: shown there, never on the proposal page. */
+  mixOnly?: true;
 }
 
 /** The products with a file on hand, as the customer is sent them. */
 export function customerDatasheets(products: readonly QuotedProduct[], hasFile: (p: QuotedProduct) => boolean): ProposalDatasheet[] {
-  return products
-    .filter(hasFile)
-    .map((p) => ({ id: datasheetId(p.kind, p.sku), kind: p.kind, name: p.name, ...(p.options ? { options: [...p.options] } : {}) }));
+  return products.filter(hasFile).map((p) => ({
+    id: datasheetId(p.kind, p.sku),
+    kind: p.kind,
+    name: p.name,
+    ...(p.options ? { options: [...p.options] } : {}),
+    ...(p.mixOnly ? { mixOnly: true as const } : {}),
+  }));
 }
 
 /** The sheets for the system on show. */
 export const sheetsForChoice = (sheets: readonly ProposalDatasheet[], chosen: OptionKey | null) =>
-  sheets.filter((s) => !s.options || (chosen !== null && s.options.includes(chosen)));
+  sheets.filter((s) => !s.mixOnly && (!s.options || (chosen !== null && s.options.includes(chosen))));
 
 /** The product behind an id a customer's page asked for, or null for one this version doesn't quote. */
 export const productForId = (products: readonly QuotedProduct[], id: string) =>

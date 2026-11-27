@@ -21,6 +21,7 @@ import { loadWorkspace } from "@/lib/services/design-store";
 import { ui } from "./design-shell";
 import { useDesignAccount } from "./design-account";
 import { ProductFileSettings } from "./settings-product-files";
+import { FindAllSheets } from "./find-all-sheets";
 
 const EMPTY_PANEL: PanelForm = { voc: "", vmp: "", isc: "", imp: "", vocPercent: "", iscPercent: "", pmaxPercent: "" };
 const EMPTY_INVERTER: InverterForm = {
@@ -62,6 +63,7 @@ export function DatasheetSettings() {
   const [form, setForm] = useState<(SheetForm & { sku: string; fileName: string; file?: File }) | null>(null);
   const [reading, setReading] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [filesKey, setFilesKey] = useState(0);
 
   useEffect(() => {
     void loadDatasheets().then((res) => (res.ok ? setSheets(res.sheets) : setStatus({ ok: false, text: res.message })));
@@ -130,6 +132,14 @@ export function DatasheetSettings() {
         save: the designer&apos;s string check, String automatically and Design it for me use them for that product code. The sheet is kept
         with the figures (up to 4 MB) so your team can open it again, and Sol can give them the figures.
       </p>
+
+      <FindAllSheets
+        mayChange={Boolean(may?.prices)}
+        onFound={() => {
+          void loadDatasheets().then((res) => res.ok && setSheets(res.sheets));
+          setFilesKey((k) => k + 1);
+        }}
+      />
 
       {missing.length > 0 && (
         <div className="mt-5 rounded-md bg-sun px-4 py-3 text-sm text-sun-ink">
@@ -424,7 +434,7 @@ export function DatasheetSettings() {
         </ul>
       </section>
 
-      <ProductFileSettings mayChange={Boolean(may?.prices)} />
+      <ProductFileSettings key={filesKey} mayChange={Boolean(may?.prices)} />
     </div>
   );
 }
