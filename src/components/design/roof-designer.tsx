@@ -177,7 +177,16 @@ import { SolThinking, useSolLaunch } from "./sol-thinking";
 import { CaptureButtons } from "@/components/ui/capture";
 import { hitRun, labelAt, msbRuns, runWords, RUN_NOTE } from "@/lib/domain/design/msb-run";
 import { switchboardAdvice, type SwitchboardAdvice, type SwitchboardRead } from "@/lib/domain/design/switchboard";
-import { lightOf, readiness, readinessLight, shadeLight, type CheckLight, type ReadinessItem } from "@/lib/domain/design/readiness";
+import {
+  lightOf,
+  readiness,
+  readinessLight,
+  readyWords,
+  shadeLight,
+  type CheckLight,
+  type ReadinessItem,
+} from "@/lib/domain/design/readiness";
+import { ReadyMoment } from "./ready-moment";
 import { designGreeting, type ProposalGlance } from "@/lib/domain/design/design-greeting";
 import {
   faces as facesWay,
@@ -4358,6 +4367,22 @@ export function RoofDesigner(props: {
     });
   })();
   const light = readinessLight(ready);
+  /**
+   * The Ready to install moment (26 Nov 2026, Martin: "a message like this appearing when a design is complete",
+   * `ReadyMoment`): shown when the open design's light turns green while it is being worked on, once a design a visit,
+   * never for a design that opened ready or on switching to another design.
+   */
+  const [readyWas, setReadyWas] = useState({ active, ready: light.ready });
+  const [readyMoment, setReadyMoment] = useState(false);
+  const [readySaid, setReadySaid] = useState<number[]>([]);
+  if (readyWas.active !== active || readyWas.ready !== light.ready) {
+    setReadyWas({ active, ready: light.ready });
+    if (readyWas.active === active && light.ready && !readySaid.includes(active)) {
+      setReadyMoment(true);
+      setReadySaid([...readySaid, active]);
+    } else if (readyMoment) setReadyMoment(false);
+  }
+  const endReadyMoment = useCallback(() => setReadyMoment(false), []);
   /**
    * How the roof was when opened (20 Nov 2026, Martin, `openedAs`): a finished design keeps Sol quiet until he's asked or
    * something on it needs doing again; one left part way opens on "Here's where we left off" over its next question.
@@ -8672,6 +8697,7 @@ export function RoofDesigner(props: {
                   </button>
                 </div>
               )}
+              {readyMoment && <ReadyMoment {...readyWords(ready)} onDone={endReadyMoment} />}
               {wheelHint && (
                 <p
                   role="status"
