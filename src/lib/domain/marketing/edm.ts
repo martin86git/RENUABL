@@ -180,6 +180,52 @@ export interface EdmBlock {
   wide?: boolean;
   /** A top bar's button words (its `text` is the line beside the button, its `url` where the button goes). */
   label?: string;
+  /** A heading's or the words' typeface (EDM_FONTS); left out while Modern. */
+  font?: EdmFont;
+  /** A heading's or the words' size; left out while medium. */
+  textSize?: EdmTextSize;
+}
+
+/**
+ * Typefaces for a heading or the words (27 Nov 2026, Martin: "i need font options and font size options"). Only faces
+ * that inboxes have to hand, each with its fallbacks: an email can't count on a web font, and Gmail and Outlook drop them.
+ */
+export const EDM_FONTS = ["modern", "classic", "clean", "friendly", "typewriter"] as const;
+export type EdmFont = (typeof EDM_FONTS)[number];
+export const FONT_WORDS: Record<EdmFont, string> = {
+  modern: "Modern",
+  classic: "Classic",
+  clean: "Clean",
+  friendly: "Friendly",
+  typewriter: "Typewriter",
+};
+export const FONT_STACKS: Record<EdmFont, string> = {
+  modern: "Inter,Segoe UI,Helvetica,Arial,sans-serif",
+  classic: "Georgia,'Times New Roman',Times,serif",
+  clean: "'Helvetica Neue',Helvetica,Arial,sans-serif",
+  friendly: "'Trebuchet MS',Verdana,Tahoma,sans-serif",
+  typewriter: "'Courier New',Courier,monospace",
+};
+export const EDM_TEXT_SIZES = ["small", "medium", "large", "xl"] as const;
+export type EdmTextSize = (typeof EDM_TEXT_SIZES)[number];
+export const TEXT_SIZE_WORDS: Record<EdmTextSize, string> = { small: "S", medium: "M", large: "L", xl: "XL" };
+/** Pixels for a heading and for the words at each size; medium is what they always were. */
+export const TEXT_SIZE_PX: Record<"heading" | "text", Record<EdmTextSize, number>> = {
+  heading: { small: 19, medium: 24, large: 30, xl: 36 },
+  text: { small: 13, medium: 15, large: 17, xl: 19 },
+};
+
+type TypeBlock = Pick<EdmBlock, "kind" | "font" | "textSize">;
+/** A heading's or the words' typeface, as drawn. */
+export const fontStackOf = (b: Pick<EdmBlock, "font">): string => FONT_STACKS[b.font ?? "modern"];
+/** A heading's or the words' size in pixels, as drawn. */
+export const textPxOf = (b: TypeBlock): number => TEXT_SIZE_PX[b.kind === "heading" ? "heading" : "text"][b.textSize ?? "medium"];
+
+/** The typeface and size as kept: only real choices, and neither while it is the usual. */
+function typeFields(r: Record<string, unknown>): Partial<EdmBlock> {
+  const font = (EDM_FONTS as readonly unknown[]).includes(r.font) ? (r.font as EdmFont) : null;
+  const size = (EDM_TEXT_SIZES as readonly unknown[]).includes(r.textSize) ? (r.textSize as EdmTextSize) : null;
+  return { ...(font && font !== "modern" ? { font } : {}), ...(size && size !== "medium" ? { textSize: size } : {}) };
 }
 
 /** What a new top bar says, and its button (26 Nov 2026, Martin: Xero's "Ready to choose a plan? Buy now"). */
@@ -451,6 +497,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "countdown" ? { endsAt: cleanEndsAt(r.endsAt) } : {}),
     ...(kind === "bar" ? { label: line(r.label, EDM_LIMITS.label) } : {}),
     ...(kind === "button" || kind === "bar" ? buttonFields(r, kind) : {}),
+    ...(kind === "heading" || kind === "text" ? typeFields(r) : {}),
     ...(cleanColour(r.fill, "") ? { fill: cleanColour(r.fill, "") } : {}),
   };
 }
@@ -882,7 +929,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
     if (b.kind === "heading" && b.text) {
       const t = merge(b.text, fields);
       rows.push(
-        `<tr><td style="padding:8px 32px 4px;text-align:${align};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:24px;line-height:1.25;font-weight:600;color:${ink.heading}">${esc(t)}</td></tr>`,
+        `<tr><td style="padding:8px 32px 4px;text-align:${align};font-family:${fontStackOf(b)};font-size:${textPxOf(b)}px;line-height:1.25;font-weight:600;color:${ink.heading}">${esc(t)}</td></tr>`,
       );
       textParts.push(t.toUpperCase());
     } else if (b.kind === "text" && b.text) {
@@ -892,7 +939,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
         .map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`)
         .join("");
       rows.push(
-        `<tr><td style="padding:8px 32px;text-align:${align};font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:${ink.words}">${paras}</td></tr>`,
+        `<tr><td style="padding:8px 32px;text-align:${align};font-family:${fontStackOf(b)};font-size:${textPxOf(b)}px;line-height:1.6;color:${ink.words}">${paras}</td></tr>`,
       );
       textParts.push(t);
     } else if (b.kind === "image" && b.imageId) {
