@@ -66,23 +66,37 @@ export default async function AdminPage() {
   // Briefs left partway for a few hours get their "not finished" note when staff look (and from the daily cron).
   await noteUnfinishedBriefs();
   const stripe = stripeClient();
-  const [partners, jobs, uploads, claims, checks, briefs, businesses, voiceCalls, solCosts, addOnsAsked, addOnsOn, planCodes, salesLeads, support] =
-    await Promise.all([
-      listPartners(),
-      listAllJobs(),
-      listPriceUploads(),
-      listWhoopClaims(),
-      allHealthAnswers(),
-      listBriefs(),
-      listDesignBusinesses(),
-      listVoiceCalls().catch(() => []),
-      solCostsThisMonth(todayInMarket()).catch(() => []),
-      addOnsAskedFor().catch(() => []),
-      addOnsOnForStaff().catch(() => []),
-      stripe ? listPlanCodes(stripe).catch(() => null) : null,
-      listBusinessLeads().catch(() => []),
-      staffTickets().catch(() => []),
-    ]);
+  const [
+    partners,
+    jobs,
+    uploads,
+    claims,
+    checks,
+    briefs,
+    businesses,
+    voiceCalls,
+    solCosts,
+    addOnsAsked,
+    addOnsOn,
+    planCodes,
+    salesLeads,
+    support,
+  ] = await Promise.all([
+    listPartners(),
+    listAllJobs(),
+    listPriceUploads(),
+    listWhoopClaims(),
+    allHealthAnswers(),
+    listBriefs(),
+    listDesignBusinesses(),
+    listVoiceCalls().catch(() => []),
+    solCostsThisMonth(todayInMarket()).catch(() => []),
+    addOnsAskedFor().catch(() => []),
+    addOnsOnForStaff().catch(() => []),
+    stripe ? listPlanCodes(stripe).catch(() => null) : null,
+    listBusinessLeads().catch(() => []),
+    staffTickets().catch(() => []),
+  ]);
   const tickets = staffOrder(support);
   const toAnswer = tickets.filter((t) => t.state === "open").length;
   const kinds = countByKind(businesses);
@@ -408,6 +422,21 @@ export default async function AdminPage() {
                           })}
                         </p>
                         <p className="whitespace-pre-line text-[14px]">{m.text}</p>
+                        {m.pictures.length > 0 && (
+                          <p className="mt-1.5 flex flex-wrap gap-2">
+                            {m.pictures.map((p, i) => (
+                              <a key={p} href={`/api/admin/support/pictures/${p}`} target="_blank" rel="noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element -- a picture sent with the ticket, staff only */}
+                                <img
+                                  src={`/api/admin/support/pictures/${p}`}
+                                  alt={`Picture ${i + 1} with this message`}
+                                  loading="lazy"
+                                  className="h-32 max-w-64 rounded-md border border-line object-cover"
+                                />
+                              </a>
+                            ))}
+                          </p>
+                        )}
                       </li>
                     ))}
                   </ol>

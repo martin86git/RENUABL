@@ -225,3 +225,30 @@ export function stepAction(steps: SequenceStep[], step: number, now: Date = new 
   if (s.kind === "wait") return { kind: "wait", next: afterWorkingDays(s.days, now) };
   return { kind: "email", step, content: s.content, next: now };
 }
+
+// ---- An email started from a campaign --------------------------------------------------------------------------
+
+/** The wait put between two emails picked one after another. */
+export const WAIT_BETWEEN_PICKED = 3;
+
+/**
+ * A sequence's steps with a campaign's email added at the end (27 Nov 2026, Martin: "in the sequence mode, can i select
+ * pre built emails from campaigns as an option to starting from scratch"). The step holds its own copy of the email,
+ * pictures and all: changing the campaign afterwards never changes a sequence, and the other way round. When the step
+ * before it is an email too, a wait goes between them, so campaigns picked one after another go out days apart, not
+ * together. Null when the sequence has no room left for it.
+ */
+export function withCampaignEmail(
+  steps: readonly SequenceStep[],
+  content: EdmContent,
+  ids: { email: string; wait: string },
+): SequenceStep[] | null {
+  const wait = steps.at(-1)?.kind === "email";
+  if (steps.length + (wait ? 2 : 1) > SEQUENCE_LIMITS.steps) return null;
+  const copy = cleanContent(JSON.parse(JSON.stringify(content)));
+  return [
+    ...steps,
+    ...(wait ? [{ id: ids.wait, kind: "wait" as const, days: WAIT_BETWEEN_PICKED }] : []),
+    { id: ids.email, kind: "email" as const, content: copy },
+  ];
+}

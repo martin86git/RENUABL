@@ -14,6 +14,7 @@ import { renuablCrm } from "./renuabl-crm";
 
 /** RENUABL's own wordmark as the website shows it, sized for the top of an email (public/brand/renuabl-logo-email.png, 2x). */
 export const RENUABL_EMAIL_LOGO = `${publicSiteUrl()}/brand/renuabl-logo-email.png`;
+export const RENUABL_EMAIL_LOGO_LIGHT = `${publicSiteUrl()}/brand/renuabl-logo-email-light.png`;
 
 export async function marketingOn(businessId: string): Promise<boolean> {
   if (!dbConfigured()) return false;
@@ -47,5 +48,6 @@ export async function senderFor(businessId: string): Promise<EdmSender> {
     address: kit.address.trim() || null,
     // RENUABL's own emails carry its logo; another business's still name it in words (its logo isn't served publicly yet).
     logo: own ? RENUABL_EMAIL_LOGO : null,
+    logoOnDark: own ? RENUABL_EMAIL_LOGO_LIGHT : null,
   };
 }

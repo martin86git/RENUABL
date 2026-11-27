@@ -24,6 +24,7 @@ import {
   Undo2,
   X,
   ShoppingBag,
+  ListOrdered,
   Timer,
   CirclePlay,
   PanelTop,
@@ -32,11 +33,15 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
 import {
+  SITE_LOGOS,
+  SITE_LOGO_KEYS,
+  logoBox,
   EDM_BLOCK_KINDS,
   EDM_BLOCK_WORDS,
   EDM_LIMITS,
   EMPTY_TILE,
   EMPTY_PRODUCT,
+  EMPTY_STEP,
   PRODUCT_BUTTON,
   MERGE_FIELDS,
   SOCIAL_NETWORKS,
@@ -94,9 +99,10 @@ import {
   type EdmStyle,
   type EdmTile,
   type EdmProduct,
+  type EdmStep,
 } from "@/lib/domain/marketing/edm";
 import {
-  EDM_FONTS,
+  FONT_GROUPS,
   EDM_TEXT_SIZES,
   FONT_STACKS,
   FONT_WORDS,
@@ -109,7 +115,7 @@ import {
 import { VIDEO_LINE, videoStillKey, youTubeId } from "@/lib/domain/marketing/edm-video";
 import { COUNTDOWN_UNITS, cleanEndsAt, endsAtMs, endsWords } from "@/lib/domain/marketing/countdown";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
-import { saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
+import { changeMarketingLogos, saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
 import { emptyHistory, record, redo as redoHistory, undo as undoHistory } from "@/lib/domain/marketing/edm-history";
 import { SolAsk, type SolAskResult } from "./edm-sol-ask";
 import { SolIcon } from "../sol-icon";
@@ -128,6 +134,7 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   countdown: Timer,
   video: CirclePlay,
   bar: PanelTop,
+  steps: ListOrdered,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
@@ -135,7 +142,7 @@ const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
   { name: "Basics", kinds: ["heading", "text", "button", "image", "video", "products", "countdown"] },
-  { name: "Layout", kinds: ["bar", "tiles", "divider", "spacer", "social"] },
+  { name: "Layout", kinds: ["bar", "steps", "tiles", "divider", "spacer", "social"] },
 ];
 
 /** When a change was made, for grouping typing into one undo step. */
@@ -1190,6 +1197,8 @@ function CanvasBlock({
           onChange={(fill) => onChange(() => ({ fill: fill ?? undefined }))}
         />
       )}
+      {b.kind === "steps" &&
+        (picked ? <StepsFields block={b} onChange={onChange} /> : <StepRows steps={b.steps ?? []} colour={colour} ink={ink} />)}
       {b.kind === "products" &&
         (picked ? (
           <ProductsFields block={b} onChange={onChange} />
@@ -1853,6 +1862,196 @@ function ProductsFields({ block: b, onChange }: { block: EdmBlock; onChange: (pa
   );
 }
 
+/** A numbered steps block on the canvas as the email draws it: each picture beside its number, title, words and link. */
+function StepRows({ steps, colour, ink }: { steps: EdmStep[]; colour: string; ink: { heading: string; words: string } }) {
+  const shown = steps.filter((st) => st.title);
+  if (!shown.length)
+    return (
+      <div className="grid h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <ListOrdered className="size-4" /> Press to add your steps
+        </span>
+      </div>
+    );
+  return (
+    <div className="space-y-5 text-left">
+      {shown.map((st, i) => (
+        <div key={i} className="flex items-center gap-5">
+          {st.imageId && (
+            // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+            <img src={`/api/m/i/${st.imageId}`} alt={st.title} className="block w-[46%] shrink-0 rounded-[14px]" />
+          )}
+          <div className="min-w-0">
+            <span
+              className="grid size-[34px] place-items-center rounded-full text-[16px] font-bold text-white"
+              style={{ background: colour }}
+            >
+              {i + 1}
+            </span>
+            <p className="pt-3 text-[19px] leading-snug font-bold" style={{ color: ink.heading }}>
+              {st.title}
+            </p>
+            {st.text && (
+              <p className="pt-1.5 text-[14px] leading-normal" style={{ color: ink.words }}>
+                {st.text}
+              </p>
+            )}
+            {st.url && (
+              <p className="pt-3 text-[14px] font-semibold underline" style={{ color: colour }}>
+                {st.label || PRODUCT_BUTTON} →
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A numbered steps block's fields: each step's picture, title, words, link words and link, numbered as they stand. */
+function StepsFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const steps = b.steps ?? [];
+  const [busy, setBusy] = useState<number | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const full = steps.length >= EDM_LIMITS.steps;
+  const setStep = (i: number, patch: Partial<EdmStep>) => onChange({ steps: steps.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
+
+  async function picture(file: File | undefined, i: number) {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      setProblem("Pictures are JPEG, PNG, WebP or GIF.");
+      return;
+    }
+    setProblem(null);
+    setBusy(i);
+    const r = await uploadMarketingImage(file);
+    setBusy(null);
+    if (!r.ok) {
+      setProblem(r.message);
+      return;
+    }
+    onChange((now) => ({ steps: (now.steps ?? []).map((p, j) => (j === i ? { ...p, imageId: r.id } : p)) }));
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <p className="text-[12px] text-muted">
+        Each step is a picture beside its number, title, words and a link, numbered in this order. {steps.filter((p) => p.title).length} of{" "}
+        {EDM_LIMITS.steps}.
+      </p>
+      {steps.map((p, i) => (
+        <div key={i} className="flex gap-3 rounded-lg border border-line p-2">
+          <div className="relative w-36 shrink-0">
+            <label
+              className={cn(
+                "grid aspect-[4/3] cursor-pointer place-items-center overflow-hidden rounded-md bg-canvas text-muted hover:text-ink",
+                !p.imageId && "border border-dashed border-line-strong",
+              )}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void picture(e.dataTransfer.files[0], i);
+              }}
+            >
+              {p.imageId ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/m/i/${p.imageId}`} alt="" className="size-full object-cover" />
+              ) : busy === i ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <span className="flex flex-col items-center gap-1 px-2 text-center text-[11.5px]">
+                  <ImagePlus className="size-5" /> Drop or choose a picture
+                </span>
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  void picture(e.target.files?.[0], i);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {p.imageId && (
+              <button
+                type="button"
+                aria-label="Remove the picture"
+                title="Remove the picture"
+                onClick={() => setStep(i, { imageId: null })}
+                className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] hover:text-ink"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-[12px] font-bold text-white">
+                {i + 1}
+              </span>
+              <input
+                value={p.title}
+                maxLength={EDM_LIMITS.stepTitle}
+                onChange={(e) => setStep(i, { title: e.target.value })}
+                placeholder="Step title"
+                aria-label={`Step ${i + 1} title`}
+                className={field}
+              />
+            </div>
+            <textarea
+              value={p.text}
+              maxLength={EDM_LIMITS.stepText}
+              onChange={(e) => setStep(i, { text: e.target.value })}
+              placeholder="A line or two about it (optional)"
+              aria-label={`Step ${i + 1} words`}
+              rows={2}
+              className={cn(field, "h-auto py-2")}
+            />
+            <input
+              value={p.label}
+              maxLength={EDM_LIMITS.label}
+              onChange={(e) => setStep(i, { label: e.target.value })}
+              placeholder={`Link words, e.g. ${PRODUCT_BUTTON}`}
+              aria-label={`Step ${i + 1} link words`}
+              className={field}
+            />
+            <LinkInput value={p.url} onChange={(url) => setStep(i, { url })} placeholder="Link (shown once there is one)" />
+            <div className="flex gap-3 text-[12px] text-muted">
+              {i > 0 && (
+                <button
+                  type="button"
+                  className="hover:text-ink"
+                  onClick={() => onChange({ steps: steps.map((x, j) => (j === i - 1 ? steps[i] : j === i ? steps[i - 1] : x)) })}
+                >
+                  Move up
+                </button>
+              )}
+              <button type="button" onClick={() => onChange({ steps: steps.filter((_, j) => j !== i) })} className="hover:text-danger">
+                Remove this step
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+      {!full && (
+        <button
+          type="button"
+          onClick={() => onChange({ steps: [...steps, EMPTY_STEP] })}
+          className="grid h-12 w-full place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted hover:border-ink/40 hover:text-ink"
+        >
+          <span className="flex items-center gap-1.5">
+            <Plus className="size-4" /> Add a step
+          </span>
+        </button>
+      )}
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] text-muted">A step with no title is left out of the email.</p>
+    </div>
+  );
+}
+
 function IconButton({
   label,
   onClick,
@@ -2090,7 +2289,8 @@ function ButtonLookFields({ block: b, colour, onChange }: { block: EdmBlock; col
 const PANEL_SWATCHES = ["#f4f4f5", "#eef2ff", "#fff3ea", "#e8f5ec", "#26282c"];
 /**
  * A heading's or the words' typeface and size (27 Nov 2026, Martin: "i need font options and font size options"): each
- * typeface shown in itself, then S, M, L and XL. Only faces inboxes have to hand (edm.ts `EDM_FONTS`).
+ * typeface shown in itself, by kind (`FONT_GROUPS`: Plain, Serif, Display), then S, M, L and XL. Only faces inboxes
+ * have to hand (edm.ts `EDM_FONTS`), so the line under them says a reader without one sees its nearest match.
  */
 function TypeChoice({
   font,
@@ -2106,25 +2306,34 @@ function TypeChoice({
       className="mt-2 flex flex-wrap items-center gap-1.5 rounded-xl bg-surface p-2 text-[12px] text-ink ring-1 ring-line"
       onClick={(e) => e.stopPropagation()}
     >
-      <Type className="size-3.5 text-muted" />
-      <span className="text-muted">Font</span>
-      {EDM_FONTS.map((f) => (
-        <button
-          key={f}
-          type="button"
-          aria-pressed={font === f}
-          onClick={() => onChange({ font: f, size })}
-          style={{ fontFamily: FONT_STACKS[f] }}
-          className={cn(
-            "h-7 rounded-full px-2.5 text-[13px] ring-1",
-            font === f ? "bg-ink text-canvas ring-ink" : "ring-line hover:ring-ink/40",
-          )}
-        >
-          {FONT_WORDS[f]}
-        </button>
+      {FONT_GROUPS.map((g, i) => (
+        <div key={g.name} role="group" aria-label={`${g.name} fonts`} className="flex basis-full flex-wrap items-center gap-1.5">
+          <span className="flex w-12 shrink-0 items-center gap-1 text-muted">
+            {i === 0 && <Type className="size-3.5" />}
+            {i === 0 ? "Font" : ""}
+          </span>
+          <span className="w-12 shrink-0 text-[11px] text-muted">{g.name}</span>
+          {g.fonts.map((f) => (
+            <button
+              key={f}
+              type="button"
+              aria-pressed={font === f}
+              onClick={() => onChange({ font: f, size })}
+              style={{ fontFamily: FONT_STACKS[f] }}
+              className={cn(
+                "h-7 rounded-full px-2.5 text-[13px] ring-1",
+                font === f ? "bg-ink text-canvas ring-ink" : "ring-line hover:ring-ink/40",
+              )}
+            >
+              {FONT_WORDS[f]}
+            </button>
+          ))}
+        </div>
       ))}
-      <span className="mx-1 h-4 w-px bg-line" aria-hidden />
-      <span className="text-muted">Size</span>
+      <p className="basis-full pl-[6.75rem] text-[11px] text-muted">
+        Emails use the reader&apos;s own fonts: where they haven&apos;t got one, its nearest match shows.
+      </p>
+      <span className="w-12 shrink-0 text-muted">Size</span>
       {EDM_TEXT_SIZES.map((z) => (
         <button
           key={z}
@@ -2385,7 +2594,9 @@ function CountdownFields({ block: b, onChange }: { block: EdmBlock; onChange: (p
 /**
  * The business's logo at the top of the email (22 Nov 2026, Martin: "we need a clear upload business logo drop field"):
  * with none, a plain drop field that says what it is for; with one, the logo with Change and Remove. It is saved as the
- * business's marketing setting at once, so it heads every email, not only this one.
+ * business's marketing setting at once, so it heads every email, not only this one. Every logo uploaded is kept (27 Nov
+ * 2026, Martin: "so i can switch between logos"): Switch logo lists them to pick from, with a tick to draw the one in
+ * use larger, and for RENUABL's own business its own logos to add in one press.
  */
 function LogoField({
   brand,
@@ -2404,12 +2615,24 @@ function LogoField({
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const files = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
   const keep = async (id: string | null) => {
     const r = await saveMarketingLogo(id);
     if (!r.ok) return setProblem(r.message);
     onBrand?.(r.settings.brand);
   };
+  const change = async (c: Parameters<typeof changeMarketingLogos>[0]) => {
+    setProblem(null);
+    const r = await changeMarketingLogos(c);
+    if (!r.ok) return setProblem(r.message);
+    onBrand?.(r.settings.brand);
+  };
+  const box = logoBox(brand);
+  const logoStyle = { height: box.height, maxWidth: box.maxWidth };
+  const inUse = brand.logos.find((l) => l.id === brand.logoId);
+  // RENUABL's own business (the one sender with a logo of the site's) can add the site's logos it hasn't yet.
+  const siteToAdd = Boolean(sender.logo) && SITE_LOGO_KEYS.some((k) => !brand.logos.some((l) => l.site === k));
   const upload = async (file: File | undefined) => {
     if (!file) return;
     setProblem(null);
@@ -2450,12 +2673,66 @@ function LogoField({
   if (readOnly || !onBrand)
     return brand.logoId ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="mx-8 mb-2 block h-11 w-auto max-w-[240px]" />
+      <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="mx-8 mb-2 block w-auto" style={logoStyle} />
     ) : (
       <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
         {sender.name}
       </p>
     );
+  const choices = (
+    <div className="mt-2 rounded-xl bg-canvas p-3" data-logo-choices>
+      <p className="text-[12px] font-medium text-ink-2">Your logos · press one to use it on every email</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {brand.logos.map((l) => (
+          <span key={l.id} className="group/tile relative">
+            <button
+              type="button"
+              aria-pressed={l.id === brand.logoId}
+              title={l.site ? SITE_LOGOS[l.site].label : "Use this logo"}
+              onClick={() => void keep(l.id)}
+              className={cn(
+                "grid h-14 w-36 place-items-center rounded-lg bg-white px-3 ring-inset",
+                l.id === brand.logoId ? "ring-2 ring-ink" : "ring-1 ring-line hover:ring-ink/40",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/m/i/${l.id}`} alt={l.site ? SITE_LOGOS[l.site].label : "A logo of yours"} className="max-h-9 max-w-full" />
+            </button>
+            <button
+              type="button"
+              aria-label="Forget this logo"
+              title="Forget this logo"
+              onClick={() => void change({ forgetLogo: l.id })}
+              className="absolute -right-1.5 -top-1.5 hidden size-5 place-items-center rounded-full bg-ink text-white group-focus-within/tile:grid group-hover/tile:grid"
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          className="grid h-14 w-36 place-items-center rounded-lg border-2 border-dashed border-line-strong text-[12px] font-medium text-ink-2 hover:border-ink/40"
+        >
+          {busy ? "Uploading…" : "Upload another"}
+        </button>
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-ink-2">
+        {inUse && (
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={inUse.large} onChange={(e) => void change({ logoLarge: e.target.checked })} />
+            Draw it larger (for a logo with a line under it)
+          </label>
+        )}
+        {siteToAdd && (
+          <button type="button" onClick={() => void change({ siteLogos: true })} className="font-medium underline">
+            Add RENUABL&apos;s logos
+          </button>
+        )}
+      </div>
+    </div>
+  );
   return (
     <div className="px-5 pb-2" onClick={(e) => e.stopPropagation()}>
       {picker}
@@ -2468,15 +2745,16 @@ function LogoField({
           )}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="block h-11 w-auto max-w-[240px]" />
+          <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="block w-auto" style={logoStyle} />
           <div className="ml-auto flex gap-1.5 opacity-0 transition-opacity group-focus-within/logo:opacity-100 group-hover/logo:opacity-100">
             <button
               type="button"
-              onClick={() => input.current?.click()}
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
               disabled={busy}
               className="h-8 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink/40"
             >
-              {busy ? "Uploading…" : "Change logo"}
+              {busy ? "Uploading…" : "Switch logo"}
             </button>
             <button
               type="button"
@@ -2511,6 +2789,7 @@ function LogoField({
           </span>
         </button>
       )}
+      {(brand.logoId ? open : brand.logos.length > 0 || siteToAdd) && choices}
       {problem && <p className="mt-1.5 px-1 text-[12px] text-warning">{problem}</p>}
     </div>
   );

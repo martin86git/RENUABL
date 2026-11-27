@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_BRAND, cleanBlock, newBlock, renderEdm, type EdmBlock, type EdmContent } from "./edm";
+import {
+  DEFAULT_BRAND,
+  EDM_FONTS,
+  FONT_GROUPS,
+  FONT_STACKS,
+  FONT_WORDS,
+  cleanBlock,
+  newBlock,
+  renderEdm,
+  type EdmBlock,
+  type EdmContent,
+} from "./edm";
 
 const sender = { name: "Sunrise Solar", abn: "", email: "hello@example.com", phone: "", address: "1 Sample Street" };
 const links = { click: (_i: number, url: string) => url, open: "", unsubscribe: "https://example.com/u", image: (id: string) => id };
@@ -24,6 +35,20 @@ describe("a heading's and the words' font and size (27 Nov 2026, Martin)", () =>
     expect(odd).not.toHaveProperty("textSize");
     // Only on a heading or the words.
     expect(cleanBlock({ ...newBlock("button"), text: "Go", url: "https://example.com/", font: "classic" })).not.toHaveProperty("font");
+  });
+
+  it("lists every face once by kind, each ending in a face every device has", () => {
+    const grouped = FONT_GROUPS.flatMap((g) => g.fonts);
+    expect([...grouped].sort()).toEqual([...EDM_FONTS].sort());
+    expect(new Set(Object.values(FONT_WORDS)).size).toBe(EDM_FONTS.length);
+    for (const f of EDM_FONTS) {
+      expect(FONT_STACKS[f]).toMatch(/,(sans-serif|serif|monospace|cursive)$/);
+      // Goes inside a style="…" attribute, so never a double quote.
+      expect(FONT_STACKS[f]).not.toContain('"');
+      const kept = cleanBlock({ ...newBlock("heading"), text: "Hi", font: f });
+      expect(kept.font).toBe(f === "modern" ? undefined : f);
+    }
+    expect(html([{ ...newBlock("text"), text: "Hi", font: "handwritten" } as EdmBlock])).toContain("font-family:'Segoe Script'");
   });
 
   it("draws them in the email, and draws the usual as it always was", () => {

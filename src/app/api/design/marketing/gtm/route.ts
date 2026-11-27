@@ -10,6 +10,7 @@ import {
   gtmSequence,
   withPictures,
 } from "@/lib/domain/marketing/gtm-drafts";
+import { GTM_ERA, GTM_ERA_CAMPAIGN_NAME, GTM_ERA_NEEDS } from "@/lib/domain/marketing/gtm-era-draft";
 import { GTM_SOL, GTM_SOL_CAMPAIGN_NAME, GTM_SOL_NEEDS, GTM_SOL_PICTURES } from "@/lib/domain/marketing/gtm-sol-draft";
 import { answer } from "@/lib/server/design-context";
 import { marketingImage } from "@/lib/server/design-images";
@@ -21,7 +22,7 @@ import { marketingMember, refuse } from "@/lib/server/marketing-guard";
  * RENUABL's own launch drafts (domain/marketing/gtm-drafts.ts, "One giant leap"), only for RENUABL's own business.
  * GET: whether to offer them and whether they are there. POST (members who may publish): reads the drafts' pictures from
  * marketing/launch/ (kept out of the public folder, so nobody can open them by address) into RENUABL's Marketing pictures (redrawn as any upload is), then adds the launch
- * campaign, the series, the Meet Sol campaign (gtm-sol-draft.ts) and each campaign of its own (`GTM_CAMPAIGNS`: the
+ * campaign, the series, the Meet Sol campaign (gtm-sol-draft.ts), email one, A new era (gtm-era-draft.ts), and each campaign of its own (`GTM_CAMPAIGNS`: the
  * voice email and those after it) as drafts, each once by name; nothing is scheduled, sent or switched on.
  */
 export const maxDuration = 60;
@@ -32,6 +33,7 @@ async function state(businessId: string) {
     campaign: campaigns.find((c) => c.name === GTM_CAMPAIGN_NAME)?.id ?? null,
     sequence: sequences.find((s) => s.name === GTM_SEQUENCE_NAME)?.id ?? null,
     sol: campaigns.find((c) => c.name === GTM_SOL_CAMPAIGN_NAME)?.id ?? null,
+    era: campaigns.find((c) => c.name === GTM_ERA_CAMPAIGN_NAME)?.id ?? null,
     /** The campaigns of their own that aren't there yet. */
     missing: GTM_CAMPAIGNS.filter((d) => !campaigns.some((c) => c.name === d.name)),
   };
@@ -57,7 +59,7 @@ export async function GET() {
     const b = gate.member.businessId;
     if (!(await isRenuablBusiness(b))) return Response.json({ ok: true, offer: false });
     const s = await state(b);
-    return Response.json({ ok: true, offer: true, made: Boolean(s.campaign && s.sequence && s.sol && s.missing.length === 0) });
+    return Response.json({ ok: true, offer: true, made: Boolean(s.campaign && s.sequence && s.sol && s.era && s.missing.length === 0) });
   });
 }
 
@@ -75,11 +77,13 @@ export async function POST() {
     const which = {
       ...(s.campaign && s.sequence ? own : GTM_PICTURES),
       ...(s.sol ? {} : s.campaign && s.sequence ? GTM_SOL_NEEDS : GTM_SOL_PICTURES),
+      ...(s.era ? {} : GTM_ERA_NEEDS),
     };
     const ids = await pictures(businessId, email, which);
     const campaign = s.campaign ?? (await createCampaign(businessId, GTM_CAMPAIGN_NAME, withPictures(GTM_LAUNCH, ids), email));
     const sequence = s.sequence ?? (await createSequence(businessId, gtmSequence(campaign, ids), email));
     const sol = s.sol ?? (await createCampaign(businessId, GTM_SOL_CAMPAIGN_NAME, withPictures(GTM_SOL, ids), email));
+    const era = s.era ?? (await createCampaign(businessId, GTM_ERA_CAMPAIGN_NAME, withPictures(GTM_ERA, ids), email));
     const added: string[] = [];
     for (const d of s.missing) {
       await createCampaign(businessId, d.name, withPictures(d.content, ids), email);
@@ -90,8 +94,9 @@ export async function POST() {
       campaign,
       sequence,
       sol,
+      era,
       pictures: Object.keys(ids).length,
-      added: { campaign: !s.campaign, sequence: !s.sequence, sol: !s.sol, campaigns: added },
+      added: { campaign: !s.campaign, sequence: !s.sequence, sol: !s.sol, era: !s.era, campaigns: added },
     });
   });
 }

@@ -66,4 +66,28 @@ describe.skipIf(!url)("RENUABL support tickets (database)", () => {
     expect(again.messages).toHaveLength(3);
     expect(await support.staffReply("st_nothere", "staff@renuabl.test", "x", false)).toBeNull();
   });
+
+  it("keeps a message's pictures for its own business and staff only", async () => {
+    const pic = { bytes: Buffer.from([1, 2, 3, 4]), contentType: "image/jpeg" };
+    const made = await support.raiseTicket(a, A, { subject: "Looks wrong", area: "Design tool", urgent: false, text: "See this." }, [
+      pic,
+      pic,
+    ]);
+    if (made === "full") throw new Error("full");
+    const ticket = (await support.listTickets(a)).find((t) => t.id === made.id)!;
+    expect(ticket.messages[0].pictures).toHaveLength(2);
+    const id = ticket.messages[0].pictures[0];
+    expect(id).toMatch(/^sp_[0-9a-f]{20}$/);
+    const mine = await support.ticketPicture(a, id);
+    expect(mine?.contentType).toBe("image/jpeg");
+    expect([...mine!.bytes]).toEqual([1, 2, 3, 4]);
+    // Another business can't open it; staff can.
+    expect(await support.ticketPicture(b, id)).toBeNull();
+    expect((await support.staffTicketPicture(id))?.contentType).toBe("image/jpeg");
+    // A reply carries its own, and one with none has none.
+    expect(await support.replyToTicket(a, made.id, A, "And this.", [pic])).toBe(true);
+    const after = (await support.listTickets(a)).find((t) => t.id === made.id)!;
+    expect(after.messages.map((m) => m.pictures.length)).toEqual([2, 1]);
+    expect((await support.staffTickets()).find((t) => t.id === made.id)!.messages[1].pictures).toHaveLength(1);
+  });
 });

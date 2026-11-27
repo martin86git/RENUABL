@@ -34,6 +34,7 @@ export const EDM_BLOCK_KINDS = [
   "countdown",
   "video",
   "bar",
+  "steps",
 ] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
@@ -50,6 +51,7 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   countdown: "Countdown",
   video: "Video",
   bar: "Top bar",
+  steps: "Numbered steps",
 };
 
 export type EdmAlign = "left" | "center";
@@ -86,6 +88,20 @@ export interface EdmProduct {
 }
 
 export const PRODUCT_BUTTON = "Find out more";
+
+/**
+ * One row of a numbered steps block (27 Nov 2026, Martin, from Xero's invoicing email: a cover, then "1 Customise your
+ * invoice, 2 Accept instant online payments…", each a picture beside its number, title, words and a link). Numbered in
+ * order; a step is sent once it has a title.
+ */
+export interface EdmStep {
+  imageId: string | null;
+  title: string;
+  text: string;
+  /** The link's words; blank is "Find out more". */
+  label: string;
+  url: string | null;
+}
 
 /** The places a social links block can point to, in the order they are offered. */
 export const SOCIAL_NETWORKS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "website"] as const;
@@ -181,6 +197,8 @@ export interface EdmBlock {
   socialLook?: SocialLook;
   /** A products block's products, laid out `columns` across. */
   products?: EdmProduct[];
+  /** A numbered steps block's steps, one a row. */
+  steps?: EdmStep[];
   /** A countdown's end, a wall-clock time in the market ("YYYY-MM-DDTHH:mm", countdown.ts); null until set. */
   endsAt?: string | null;
   /**
@@ -210,21 +228,71 @@ export interface EdmBlock {
 /**
  * Typefaces for a heading or the words (27 Nov 2026, Martin: "i need font options and font size options"). Only faces
  * that inboxes have to hand, each with its fallbacks: an email can't count on a web font, and Gmail and Outlook drop them.
+ * More of them since the same day (Martin: "i need more font type options"), in three groups (`FONT_GROUPS`): a face a
+ * reader's device hasn't got is drawn in the next of its list, each list ending in one every device has.
  */
-export const EDM_FONTS = ["modern", "classic", "clean", "friendly", "typewriter"] as const;
+export const EDM_FONTS = [
+  "modern",
+  "clean",
+  "friendly",
+  "wide",
+  "geometric",
+  "soft",
+  "narrow",
+  "classic",
+  "elegant",
+  "bookish",
+  "newspaper",
+  "editorial",
+  "slab",
+  "heavy",
+  "poster",
+  "handwritten",
+  "typewriter",
+] as const;
 export type EdmFont = (typeof EDM_FONTS)[number];
 export const FONT_WORDS: Record<EdmFont, string> = {
   modern: "Modern",
-  classic: "Classic",
   clean: "Clean",
   friendly: "Friendly",
+  wide: "Wide",
+  geometric: "Geometric",
+  soft: "Soft",
+  narrow: "Narrow",
+  classic: "Classic",
+  elegant: "Elegant",
+  bookish: "Bookish",
+  newspaper: "Newspaper",
+  editorial: "Editorial",
+  slab: "Slab",
+  heavy: "Heavy",
+  poster: "Poster",
+  handwritten: "Handwritten",
   typewriter: "Typewriter",
 };
+/** The faces by kind, as the builder lists them. Every face is in exactly one. */
+export const FONT_GROUPS: readonly { name: string; fonts: readonly EdmFont[] }[] = [
+  { name: "Plain", fonts: ["modern", "clean", "friendly", "wide", "geometric", "soft", "narrow"] },
+  { name: "Serif", fonts: ["classic", "elegant", "bookish", "newspaper", "editorial", "slab"] },
+  { name: "Display", fonts: ["heavy", "poster", "handwritten", "typewriter"] },
+];
 export const FONT_STACKS: Record<EdmFont, string> = {
   modern: "Inter,Segoe UI,Helvetica,Arial,sans-serif",
-  classic: "Georgia,'Times New Roman',Times,serif",
   clean: "'Helvetica Neue',Helvetica,Arial,sans-serif",
   friendly: "'Trebuchet MS',Verdana,Tahoma,sans-serif",
+  wide: "Verdana,Geneva,Tahoma,sans-serif",
+  geometric: "Futura,'Century Gothic','Avenir Next',Avenir,'Trebuchet MS',Arial,sans-serif",
+  soft: "Optima,Candara,'Gill Sans','Gill Sans MT',Calibri,Arial,sans-serif",
+  narrow: "'Arial Narrow','Helvetica Neue Condensed','Roboto Condensed',Arial,sans-serif",
+  classic: "Georgia,'Times New Roman',Times,serif",
+  elegant: "'Palatino Linotype',Palatino,'Book Antiqua',Georgia,serif",
+  bookish: "Garamond,Baskerville,'Baskerville Old Face','Hoefler Text','Times New Roman',serif",
+  newspaper: "'Times New Roman',Times,serif",
+  editorial: "Didot,'Bodoni MT','Bodoni 72','Playfair Display',Georgia,serif",
+  slab: "Rockwell,'Rockwell Nova','Roboto Slab','Courier New',Georgia,serif",
+  heavy: "'Arial Black','Helvetica Neue','Segoe UI Black',Arial,sans-serif",
+  poster: "Impact,Haettenschweiler,'Franklin Gothic Bold','Arial Narrow',Arial,sans-serif",
+  handwritten: "'Segoe Script','Bradley Hand','Brush Script MT','Comic Sans MS',cursive",
   typewriter: "'Courier New',Courier,monospace",
 };
 export const EDM_TEXT_SIZES = ["small", "medium", "large", "xl"] as const;
@@ -295,7 +363,8 @@ export function letterWarnings(c: EdmContent): string[] {
       (b.kind === "image" && b.imageId ? 1 : 0) +
       (b.kind === "video" && b.url ? 1 : 0) +
       filledTiles(b).length +
-      filledProducts(b).filter((p) => p.imageId).length,
+      filledProducts(b).filter((p) => p.imageId).length +
+      filledSteps(b).filter((p) => p.imageId).length,
     0,
   );
   const links = edmLinks(c.blocks).length;
@@ -336,6 +405,68 @@ export interface EdmBrand {
   address: string | null;
   /** The business's logo at the top of every email (a marketing picture's id); without it, its name in words. */
   logoId: string | null;
+  /**
+   * The logos the business keeps to switch between (27 Nov 2026, Martin: "upload these into the marketing area… so i
+   * can switch between logos"), newest first, up to `LOGOS_MAX`; the one in use is `logoId`.
+   */
+  logos: EdmLogo[];
+}
+
+/** A logo kept for emails: its picture, whether it is drawn larger (one with a line under it needs the room), and which of the site's own it came from. */
+export interface EdmLogo {
+  id: string;
+  large: boolean;
+  site?: SiteLogo;
+}
+
+export const LOGOS_MAX = 6;
+/** How a larger logo is drawn: tall enough for a line under a wordmark to be read. */
+export const LOGO_LARGE = { height: 67, maxWidth: 320 };
+
+/** RENUABL's own logos, files of the site, which its own business can add to its kept logos in one press. */
+export const SITE_LOGOS = {
+  plain: { label: "RENUABL", path: "/brand/renuabl-logo.png", large: false },
+  tagline: { label: "RENUABL with its line", path: "/brand/renuabl-logo-tagline-email.png", large: true },
+} as const;
+export type SiteLogo = keyof typeof SITE_LOGOS;
+export const SITE_LOGO_KEYS = Object.keys(SITE_LOGOS) as SiteLogo[];
+
+/** The kept logos, each once, the one in use always among them. */
+export function cleanLogos(raw: unknown, inUse: string | null = null): EdmLogo[] {
+  const out: EdmLogo[] = [];
+  for (const v of Array.isArray(raw) ? raw : []) {
+    const r = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+    const id = imageIdOf(r.id);
+    if (!id || out.some((l) => l.id === id)) continue;
+    const site = SITE_LOGO_KEYS.find((k) => k === r.site);
+    out.push({ id, large: r.large === true, ...(site ? { site } : {}) });
+  }
+  if (inUse && !out.some((l) => l.id === inUse)) out.unshift({ id: inUse, large: false });
+  // Never the one in use dropped for room.
+  return out.length > LOGOS_MAX ? [...out.filter((l) => l.id === inUse), ...out.filter((l) => l.id !== inUse)].slice(0, LOGOS_MAX) : out;
+}
+
+/** The brand with this logo in use: kept at the front if new, left where it is if already kept. */
+export function withLogo(brand: EdmBrand, id: string, as: { large?: boolean; site?: SiteLogo } = {}): EdmBrand {
+  const kept = brand.logos.some((l) => l.id === id);
+  const logos = kept ? brand.logos : [{ id, large: as.large === true, ...(as.site ? { site: as.site } : {}) }, ...brand.logos];
+  return { ...brand, logoId: id, logos: cleanLogos(logos, id) };
+}
+
+/** The brand without this kept logo; if it was the one in use, the business's name shows in words until another is picked. */
+export function withoutLogo(brand: EdmBrand, id: string): EdmBrand {
+  const logoId = brand.logoId === id ? null : brand.logoId;
+  return { ...brand, logoId, logos: brand.logos.filter((l) => l.id !== id) };
+}
+
+/** The logo in use drawn regular or larger. */
+export function withLogoSize(brand: EdmBrand, large: boolean): EdmBrand {
+  return { ...brand, logos: brand.logos.map((l) => (l.id === brand.logoId ? { ...l, large } : l)) };
+}
+
+/** How tall and how wide at most the logo in use is drawn. */
+export function logoBox(brand: EdmBrand): { height: number; maxWidth: number } {
+  return brand.logos.find((l) => l.id === brand.logoId)?.large ? LOGO_LARGE : { height: LOGO_HEIGHT, maxWidth: 240 };
 }
 
 export const DEFAULT_BRAND: EdmBrand = {
@@ -345,6 +476,7 @@ export const DEFAULT_BRAND: EdmBrand = {
   reason: "You're receiving this because you're one of our customers or contacts.",
   address: null,
   logoId: null,
+  logos: [],
 };
 
 export const EDM_LIMITS = {
@@ -361,6 +493,9 @@ export const EDM_LIMITS = {
   productName: 80,
   price: 40,
   productText: 240,
+  steps: 5,
+  stepTitle: 80,
+  stepText: 300,
 } as const;
 
 const line = (v: unknown, max: number) =>
@@ -470,6 +605,25 @@ export function cleanProducts(raw: unknown): EdmProduct[] {
   });
 }
 
+/** A numbered steps block's steps: up to the limit, each cleaned as its own fields are. */
+export function cleanSteps(raw: unknown): EdmStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, EDM_LIMITS.steps).map((p) => {
+    const r = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
+    const url = cleanLink(r.url);
+    return {
+      imageId: imageIdOf(r.imageId),
+      title: line(r.title, EDM_LIMITS.stepTitle),
+      text: line(r.text, EDM_LIMITS.stepText),
+      label: line(r.label, EDM_LIMITS.label),
+      url: url && !url.startsWith("mailto:") ? url : null,
+    };
+  });
+}
+
+/** A numbered steps block's steps that have a title: the ones an email shows, numbered in this order. */
+export const filledSteps = (b: EdmBlock): EdmStep[] => (b.kind === "steps" ? (b.steps ?? []).filter((p) => p.title) : []);
+
 /** A products block's products that have a name: the ones an email shows. */
 export const filledProducts = (b: EdmBlock): EdmProduct[] => (b.kind === "products" ? (b.products ?? []).filter((p) => p.name) : []);
 
@@ -505,7 +659,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     text:
       kind === "text"
         ? words(r.text, max)
-        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products"
+        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products" || kind === "steps"
           ? ""
           : line(r.text, max),
     url: kind === "button" || kind === "image" || kind === "bar" ? cleanLink(r.url) : kind === "video" ? webLink(r.url) : null,
@@ -515,6 +669,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
     ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
     ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
+    ...(kind === "steps" ? { steps: cleanSteps(r.steps) } : {}),
     ...(kind === "countdown" ? { endsAt: cleanEndsAt(r.endsAt) } : {}),
     ...(kind === "bar" ? { label: line(r.label, EDM_LIMITS.label) } : {}),
     ...(kind === "button" || kind === "bar" ? buttonFields(r, kind) : {}),
@@ -664,6 +819,7 @@ export function cleanBrand(raw: unknown): EdmBrand {
     reason: line(r.reason, 240) || DEFAULT_BRAND.reason,
     address: line(r.address, 200) || null,
     logoId: imageIdOf(r.logoId),
+    logos: cleanLogos(r.logos, imageIdOf(r.logoId)),
   };
 }
 
@@ -695,9 +851,11 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
         ? filledSocials(b).map((s) => s.url!)
         : b.kind === "products"
           ? filledProducts(b).flatMap((p) => (p.url ? [p.url] : []))
-          : (b.kind === "button" || b.kind === "image" || b.kind === "video" || b.kind === "bar") && b.url
-            ? [b.url]
-            : [],
+          : b.kind === "steps"
+            ? filledSteps(b).flatMap((p) => (p.url ? [p.url] : []))
+            : (b.kind === "button" || b.kind === "image" || b.kind === "video" || b.kind === "bar") && b.url
+              ? [b.url]
+              : [],
   );
 }
 
@@ -708,6 +866,7 @@ export function newBlockId(rand: () => number = Math.random): string {
 
 export const EMPTY_TILE: EdmTile = { imageId: null, text: "", url: null };
 export const EMPTY_PRODUCT: EdmProduct = { imageId: null, name: "", price: "", text: "", label: "", url: null };
+export const EMPTY_STEP: EdmStep = { imageId: null, title: "", text: "", label: "", url: null };
 
 export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
   const text =
@@ -733,6 +892,7 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     ...(kind === "spacer" ? { space: "medium" as const } : {}),
     ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
     ...(kind === "products" ? { products: [EMPTY_PRODUCT, EMPTY_PRODUCT], columns: 2 as const } : {}),
+    ...(kind === "steps" ? { steps: [EMPTY_STEP, EMPTY_STEP, EMPTY_STEP] } : {}),
     ...(kind === "countdown" ? { endsAt: null } : {}),
     ...(kind === "bar" ? { label: BAR_BUTTON } : {}),
   };
@@ -812,11 +972,14 @@ export interface EdmSender {
    * 2026, Martin: RENUABL's own emails carry the website's logo). None, or not https, and the name is written as before.
    */
   logo?: string | null;
+  /** The same logo drawn light, for an email on a dark ground (27 Nov 2026: RENUABL's black wordmark vanished on a dark email). */
+  logoOnDark?: string | null;
 }
 
-/** The email's top line: the sender's logo when there is a safe one, else its name. */
-export function headerCell(sender: EdmSender): string {
-  const logo = sender.logo && /^https:\/\/[^\s"'<>]+$/.test(sender.logo) ? sender.logo : null;
+/** The email's top line: the sender's logo when there is a safe one (its light one on a dark ground), else its name. */
+export function headerCell(sender: EdmSender, dark = false): string {
+  const wanted = dark && sender.logoOnDark ? sender.logoOnDark : sender.logo;
+  const logo = wanted && /^https:\/\/[^\s"'<>]+$/.test(wanted) ? wanted : null;
   return logo
     ? `<img src="${esc(logo)}" alt="${esc(sender.name || "Logo")}" width="132" style="display:block;width:132px;max-width:132px;height:auto;border:0">`
     : esc(sender.name);
@@ -893,6 +1056,18 @@ function renderLetter(content: EdmContent, brand: EdmBrand, sender: EdmSender, f
         ].filter(Boolean);
         parts.push(`${pic ? `<div style="margin:0 0 8px">${href ? a(href, pic) : pic}</div>` : ""}${p(lines.join("<br>"))}`);
       }
+    else if (b.kind === "steps")
+      filledSteps(b).forEach((st, n) => {
+        const title = `${n + 1}. ${merge(st.title, fields)}`;
+        const href = st.url ? next() : null;
+        const pic = st.imageId ? img(links.image(st.imageId), title) : "";
+        const lines = [
+          `<strong>${esc(title)}</strong>`,
+          st.text ? esc(merge(st.text, fields)) : "",
+          href ? a(href, esc(merge(st.label, fields) || PRODUCT_BUTTON)) : "",
+        ].filter(Boolean);
+        parts.push(`${pic ? `<div style="margin:0 0 8px">${href ? a(href, pic) : pic}</div>` : ""}${p(lines.join("<br>"))}`);
+      });
     else if (b.kind === "divider") parts.push(`<hr style="border:0;border-top:1px solid #dadce0;margin:18px 0">`);
     else if (b.kind === "spacer") parts.push(`<div style="height:${SPACER_SIZES[cleanSpace(b.space)]}px"></div>`);
     else if (b.kind === "video" && b.url) {
@@ -1017,6 +1192,38 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       }
       rows.push(
         `<tr><td style="padding:12px ${blockSide(b)}px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
+      );
+    } else if (b.kind === "steps") {
+      // Each step a row: its picture on the left, then its number, title, words and link; numbered in order.
+      const steps = filledSteps(b);
+      if (!steps.length) continue;
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      const picW = Math.floor(EDM_INNER * 0.46);
+      const trs = steps.map((st, n) => {
+        const title = merge(st.title, fields);
+        const href = st.url ? links.click(linkAt, linkList[linkAt]) : null;
+        if (st.url) linkAt++;
+        const label = merge(st.label, fields) || PRODUCT_BUTTON;
+        const pic = st.imageId
+          ? `<td width="46%" valign="middle" style="padding:0 20px ${n < steps.length - 1 ? 22 : 0}px 0"><img src="${esc(links.image(st.imageId))}" alt="${esc(title)}" width="${picW}" style="display:block;width:100%;max-width:${picW}px;height:auto;border:0;border-radius:14px"></td>`
+          : "";
+        const words = [
+          `<div style="width:34px;height:34px;line-height:34px;border-radius:50%;background:${colour};color:#ffffff;${font};font-size:16px;font-weight:700;text-align:center">${n + 1}</div>`,
+          `<div style="padding-top:12px;${font};font-size:19px;line-height:1.3;font-weight:700;color:${ink.heading}">${esc(title)}</div>`,
+          st.text
+            ? `<div style="padding-top:6px;${font};font-size:14px;line-height:1.5;color:${ink.words}">${esc(merge(st.text, fields))}</div>`
+            : "",
+          href
+            ? `<div style="padding-top:12px;${font};font-size:14px;font-weight:600"><a href="${esc(href)}" target="_blank" style="color:${colour};text-decoration:underline">${esc(label)}</a> <span style="color:${colour}">&rarr;</span></div>`
+            : "",
+        ].join("");
+        textParts.push(
+          [`${n + 1}. ${title}`, st.text ? merge(st.text, fields) : "", href ? `${label}: ${href}` : ""].filter(Boolean).join("\n"),
+        );
+        return `<tr>${pic}<td valign="middle" style="padding:0 0 ${n < steps.length - 1 ? 22 : 0}px">${words}</td></tr>`;
+      });
+      rows.push(
+        `<tr><td style="padding:16px ${blockSide(b)}px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
       );
     } else if (b.kind === "products") {
       // A product is sent once it has a name; its picture and button only when given.
@@ -1164,8 +1371,8 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
   }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px">${above.length ? `<tr><td style="height:8px;line-height:8px;font-size:1px">&nbsp;</td></tr>${above.join("")}` : ""}<tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink0.heading}">${
     brand.logoId
-      ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
-      : headerCell(sender)
+      ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${logoBox(brand).height}" style="display:block;height:${logoBox(brand).height}px;width:auto;max-width:${logoBox(brand).maxWidth}px;border:0">`
+      : headerCell(sender, contrastRatio("#ffffff", style.background) > contrastRatio("#000000", style.background))
   }</td></tr>${body.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${

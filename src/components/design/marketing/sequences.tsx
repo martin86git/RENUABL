@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Clock, Loader2, Mail, Plus, Power, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Clock, Copy, Loader2, Mail, Plus, Power, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,10 +8,12 @@ import { Button, cn } from "@/components/ui/primitives";
 import type { MarketingList } from "@/lib/domain/marketing/contacts";
 import { DEFAULT_BRAND, type EdmSender, newBlockId, starterContent, type EdmBrand } from "@/lib/domain/marketing/edm";
 import {
+  CAMPAIGN_STATE_WORDS,
   SEQUENCE_LIMITS,
   STOP_WORDS,
   TRIGGER_WORDS,
   sequenceProblem,
+  withCampaignEmail,
   type SequenceDraft,
   type SequenceStep,
   type SequenceTrigger,
@@ -19,6 +21,7 @@ import {
 } from "@/lib/domain/marketing/sequences";
 import {
   deleteSequence,
+  loadCampaign,
   loadCampaigns,
   loadContacts,
   NO_SENDER,
@@ -115,6 +118,10 @@ export function SequenceEditor({ id }: { id: string }) {
   const [draft, setDraft] = useState<SequenceDraft | null>(null);
   const [lists, setLists] = useState<MarketingList[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignLine[]>([]);
+  // Every campaign, drafts too: an email can be started from any of them (the trigger takes only sent ones).
+  const [built, setBuilt] = useState<CampaignLine[]>([]);
+  const [picking, setPicking] = useState(false);
+  const [copying, setCopying] = useState<string | null>(null);
   const [brand, setBrand] = useState<EdmBrand>(DEFAULT_BRAND);
   const [sender, setSender] = useState<EdmSender>(NO_SENDER);
   const [renuabl, setRenuabl] = useState(false);
@@ -136,7 +143,11 @@ export function SequenceEditor({ id }: { id: string }) {
   useEffect(() => {
     void Promise.resolve().then(refresh);
     loadContacts({ q: "", list: null, offset: 0 }).then((r) => r.ok && setLists(r.lists));
-    loadCampaigns().then((r) => r.ok && setCampaigns(r.campaigns.filter((c) => c.status !== "draft")));
+    loadCampaigns().then((r) => {
+      if (!r.ok) return;
+      setBuilt(r.campaigns);
+      setCampaigns(r.campaigns.filter((c) => c.status !== "draft"));
+    });
     loadMarketingSettings().then((r) => {
       if (!r.ok) return;
       setBrand(r.settings.brand);
@@ -178,6 +189,25 @@ export function SequenceEditor({ id }: { id: string }) {
     [steps[i], steps[j]] = [steps[j], steps[i]];
     update({ steps });
   };
+  /** A campaign's email copied in as the next step (its pictures are the business's own, so the copy shows them too). */
+  async function addFromCampaign(campaignId: string) {
+    setCopying(campaignId);
+    const r = await loadCampaign(campaignId);
+    setCopying(null);
+    if (!r.ok) return setMsg({ ok: false, text: r.message });
+    const email = newBlockId();
+    let full = false;
+    setDraft((d) => {
+      if (!d) return d;
+      const steps = withCampaignEmail(d.steps, r.campaign.content, { email, wait: newBlockId() });
+      full = !steps;
+      return steps ? { ...d, steps } : d;
+    });
+    if (full) return setMsg({ ok: false, text: `A sequence holds ${SEQUENCE_LIMITS.steps} steps. Remove one to add this email.` });
+    setSaved("unsaved");
+    setPicking(false);
+    setMsg({ ok: true, text: `Added a copy of "${r.campaign.name}". Change it here without touching the campaign.` });
+  }
   const problem = sequenceProblem(draft);
   let emailNo = 0;
 
@@ -343,6 +373,9 @@ export function SequenceEditor({ id }: { id: string }) {
             >
               <Mail className="size-4" /> Add an email
             </Button>
+            <Button size="sm" variant="secondary" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+              <Copy className="size-4" /> Add from a campaign
+            </Button>
             <Button
               size="sm"
               variant="secondary"
@@ -350,6 +383,40 @@ export function SequenceEditor({ id }: { id: string }) {
             >
               <Clock className="size-4" /> Add a wait
             </Button>
+          </div>
+        )}
+        {picking && draft.steps.length < SEQUENCE_LIMITS.steps && (
+          <div className={card}>
+            <div className="px-5 py-3">
+              <p className="text-[14px] font-medium">Start an email from a campaign</p>
+              <p className="text-[12px] text-muted">
+                It comes in as a copy you can change here; the campaign itself is left as it is. Picked after another email, it gets a wait
+                before it.
+              </p>
+            </div>
+            {built.length === 0 ? (
+              <p className="border-t border-line px-5 py-4 text-[13px] text-muted">No campaigns yet. Build one under Campaigns first.</p>
+            ) : (
+              <ul className="max-h-72 divide-y divide-line overflow-y-auto border-t border-line">
+                {built.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      className="flex w-full items-baseline gap-3 px-5 py-2.5 text-left hover:bg-canvas disabled:opacity-60"
+                      disabled={copying !== null}
+                      onClick={() => addFromCampaign(c.id)}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13.5px] font-medium">{c.name}</span>
+                        <span className="block truncate text-[12px] text-muted">{c.subject || "No subject yet"}</span>
+                      </span>
+                      <span className="shrink-0 text-[12px] text-ink-2">
+                        {copying === c.id ? <Loader2 className="size-4 animate-spin" /> : CAMPAIGN_STATE_WORDS[c.status]}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
         {on && <p className="text-[12px] text-muted">People already in it carry on from the step number they&apos;re at.</p>}

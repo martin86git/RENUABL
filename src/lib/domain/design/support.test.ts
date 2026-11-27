@@ -7,6 +7,7 @@ import {
   stateAfter,
   supportReplyEmail,
   ticketOrder,
+  ticketPicturesProblem,
   ticketRef,
   SUPPORT_LIMITS,
 } from "./support";
@@ -96,5 +97,35 @@ describe("the emails", () => {
     expect(mail.text).toContain("Open the quote");
     expect(mail.text).toContain("/design/support?ticket=st_1");
     expect(mail.text).not.toMatch(/@/);
+  });
+});
+
+describe("pictures with a ticket", () => {
+  const png = (size = 1000) => ({ type: "image/png", size });
+  it("takes up to four screenshots or photos", () => {
+    expect(ticketPicturesProblem([])).toBeNull();
+    expect(ticketPicturesProblem([png(), { type: "image/jpeg", size: 5 }, { type: "image/webp", size: 5 }, png()])).toBeNull();
+    expect(ticketPicturesProblem([png(), png(), png(), png(), png()])).toMatch(/Up to 4/);
+  });
+  it("turns away anything that isn't a picture, and pictures too large together", () => {
+    expect(ticketPicturesProblem([{ type: "application/pdf", size: 5 }])).toMatch(/JPEG, PNG or WebP/);
+    expect(ticketPicturesProblem([{ type: "image/svg+xml", size: 5 }])).toMatch(/JPEG, PNG or WebP/);
+    expect(ticketPicturesProblem([png(3 * 1024 * 1024), png(2 * 1024 * 1024)])).toMatch(/too large/);
+  });
+  it("tells staff how many came with it", () => {
+    const note = staffTicketNote({
+      ref: "RS-ABC234",
+      subject: "Won't publish",
+      area: "Proposals",
+      urgent: false,
+      business: "Sunrise Solar",
+      kind: "retailer",
+      by: "sam@sunrise.test",
+      text: "See the screenshot.",
+      reply: false,
+      site: null,
+      pictures: 2,
+    });
+    expect(note.text).toContain("2 pictures with it");
   });
 });

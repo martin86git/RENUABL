@@ -268,6 +268,13 @@ const product = (file, crop, tag) => {
  * A campaign's hero (26 Nov 2026): the hook large on the left, the product drawn on a white card on the right. `panel`
  * is the card's own HTML; rows (`.r`), a head (`.chead`), a caption (`.cap`) and a foot with Sol (`.cfoot`) are shared.
  */
+/** A feature frame of the AI sales team email: the big thin number, the mono kicker, the headline, the line, the small print. */
+const FRAME_CSS = `.num{position:absolute;right:56px;top:20px;font-size:260px;font-weight:200;letter-spacing:-.06em;line-height:1;color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.22)}
+  .hd{position:absolute;left:64px;top:76px;width:820px}
+  .k{font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.32em;color:#ff8a3d}
+  .hd h2{margin-top:22px;font-size:92px;line-height:1;font-weight:300;letter-spacing:-.05em}
+  .hd .s{margin-top:24px;font-size:24px;color:rgba(255,255,255,.62);letter-spacing:-.01em}
+  .ex{position:absolute;left:64px;bottom:34px;font-family:"JetBrains Mono",Consolas,monospace;font-size:11px;letter-spacing:.24em;color:rgba(255,255,255,.32)}`;
 const hero = (kicker, first, second, sub, panel, css = "") =>
   page(
     `<div class="glow"></div><div class="top"><i></i>${kicker}</div>
@@ -305,6 +312,12 @@ const statement = (kicker, pre, big, dry, foot, size = 160, tint = "#fff") =>
      .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
   );
 
+/** Sol's sun as the homepage has it (a still of it, its glow on nothing), for the pictures he is the middle of. */
+const ERA_SUN = pathToFileURL(resolve("public/design/landing/sol-brain.png")).href;
+
+/** Sol's sun-brain as the homepage draws it (a still, transparent PNG), for the product tiles. */
+const SOL_SUN = pathToFileURL(resolve("public/design/landing/sol-brain.png")).href;
+const SUN = (size) => `<img src="${SOL_SUN}" width="${size}" height="${size}" style="flex:none;display:block">`;
 /** Each picture: a page, and for a moving one how many frames, how long each shows and how long the last holds. */
 const ART = {
   /** The launch: the products as a staggered stack of cards, dealt in one by one. */
@@ -564,6 +577,173 @@ const ART = {
       },
     ]),
   ),
+
+  /**
+   * Email one, "A new era" (27 Nov 2026, Martin: "it should feel like something huge has landed… its finally arrived
+   * and we welcome in the dawn of a new era"; pictures "influenced by grok bot, spacex, tesla, apple"). Its opening
+   * picture: Sol's own sun rising over the earth's curve, the stars dimming as the limb lights, then the line.
+   */
+  "era-dawn.gif": {
+    // Few frames and colours: a sunrise is a photograph in every frame, and each one weighs the GIF down.
+    frames: 14,
+    delay: 150,
+    hold: 4200,
+    colours: 64,
+    width: 680,
+    html: page(
+      `<div id="stars"></div><div class="halo" id="halo"></div><img class="sun" id="sun" src="${ERA_SUN}">
+       <div class="earth" id="earth"></div><div class="flare" id="flare"></div>
+       <div class="top"><i></i>RENUABL // SOL ONLINE</div>
+       <div class="say" id="say"><small>The dawn of</small><h1>A new era <span>for solar.</span></h1></div>
+       <img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       #stars i{position:absolute;border-radius:50%;background:#fff}
+       .halo{position:absolute;left:600px;top:260px;width:1700px;height:1700px;margin:-850px;border-radius:50%;
+         background:radial-gradient(circle,rgba(255,160,80,.5) 0,rgba(255,90,31,.22) 14%,rgba(255,90,31,.07) 30%,transparent 52%)}
+       .sun{position:absolute;left:370px;top:20px;width:460px;height:460px}
+       .earth{--k:1;position:absolute;left:-700px;top:400px;width:2600px;height:2600px;border-radius:50%;
+         background:radial-gradient(circle at 50% 0%,#0d0f15 0,#05060a 9%,#000 30%);
+         box-shadow:0 -2px 0 rgba(255,200,150,calc(.95*var(--k))),0 -12px 50px rgba(255,120,50,calc(.8*var(--k))),0 -50px 170px rgba(255,90,31,calc(.5*var(--k)))}
+       .flare{position:absolute;left:100px;top:399px;width:1000px;height:3px;border-radius:3px;
+         background:linear-gradient(90deg,transparent,rgba(255,170,110,.5) 30%,#fff 50%,rgba(255,170,110,.5) 70%,transparent);filter:blur(1px)}
+       .top{position:absolute;left:84px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .say{position:absolute;left:0;right:0;top:452px;text-align:center}
+       .say small{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:16px;letter-spacing:.42em;text-transform:uppercase;color:#ff8f4a}
+       .say h1{margin-top:14px;font-size:84px;line-height:1;font-weight:600;letter-spacing:-.045em}
+       .say h1 span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}`,
+      `let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+       const stars = document.getElementById("stars");
+       for (let i = 0; i < 120; i++) {
+         const d = document.createElement("i"), r = rnd() < 0.12 ? 2.6 : 1.3;
+         d.style.cssText = "left:" + rnd() * 1200 + "px;top:" + rnd() * 400 + "px;width:" + r + "px;height:" + r + "px;opacity:" + (0.2 + rnd() * 0.7);
+         stars.appendChild(d);
+       }
+       const $ = (id) => document.getElementById(id);
+       window.at = (t) => {
+         const rise = span(t, 0, 0.7);
+         $("sun").style.transform = "translateY(" + 280 * (1 - rise) + "px) scale(" + (0.84 + 0.16 * rise) + ")";
+         $("halo").style.opacity = 0.1 + 0.9 * span(t, 0.1, 0.8);
+         $("earth").style.setProperty("--k", 0.2 + 0.8 * span(t, 0, 0.6));
+         $("flare").style.opacity = span(t, 0.05, 0.5) * (1 - 0.45 * span(t, 0.6, 1));
+         stars.style.opacity = 1 - 0.55 * rise;
+         const k = span(t, 0.55, 0.9);
+         $("say").style.opacity = k; $("say").style.transform = "translateY(" + 14 * (1 - k) + "px)";
+       };
+       window.at(1);`,
+    ),
+  },
+
+  /**
+   * The same email's second picture: Sol as the oracle. What he is asked about stands round him; three questions are
+   * typed into his box one after another, and each is answered from where its answer really comes from (the network's
+   * own page, the product's datasheet, the business's own deals). A test keeps the words in step with the email's.
+   */
+  "era-oracle.gif": {
+    frames: 43,
+    delay: 85,
+    hold: 3800,
+    colours: 128,
+    html: page(
+      `<div class="halo"></div><div class="rings"><i></i><i></i><i></i></div><div class="pulse" id="pulse"></div>
+       <img class="sun" src="${ERA_SUN}"><div id="nodes"></div>
+       <div class="top"><i></i>SOL // SUPERCHARGED INTELLIGENCE</div>
+       <h1>The oracle<br><span>of solar.</span></h1>
+       <div class="ask"><img src="${ERA_SUN}"><p id="q"></p></div><p class="status" id="status"></p>
+       <img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       .halo{position:absolute;left:880px;top:300px;width:1300px;height:1300px;margin:-650px;border-radius:50%;
+         background:radial-gradient(circle,rgba(255,150,70,.42) 0,rgba(255,90,31,.18) 16%,rgba(255,90,31,.06) 34%,transparent 56%)}
+       .rings i,.pulse{position:absolute;left:880px;top:300px;border-radius:50%;border:1px solid rgba(255,170,110,.2)}
+       .rings i:nth-child(1){width:300px;height:300px;margin:-150px}.rings i:nth-child(2){width:460px;height:460px;margin:-230px;border-style:dashed;border-color:rgba(255,170,110,.26)}
+       .rings i:nth-child(3){width:640px;height:640px;margin:-320px;border-color:rgba(255,170,110,.08)}
+       .pulse{width:460px;height:460px;margin:-230px;border:2px solid #ff8a3d;opacity:0}
+       .sun{position:absolute;left:700px;top:120px;width:360px;height:360px}
+       .node{position:absolute;transform:translate(-50%,-50%);padding:9px 16px;border-radius:999px;white-space:nowrap;
+         font-family:"JetBrains Mono",Consolas,monospace;font-size:13px;letter-spacing:.16em;color:rgba(255,255,255,.62);
+         background:#101216;border:1px solid rgba(255,255,255,.16)}
+       .node.on{color:#fff;background:#ff5a1f;border-color:#ff8a3d;box-shadow:0 0 26px rgba(255,90,31,.75)}
+       .top{position:absolute;left:84px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       h1{position:absolute;left:80px;top:150px;font-size:96px;line-height:.98;font-weight:600;letter-spacing:-.05em}
+       h1 span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}
+       .ask{position:absolute;left:84px;top:404px;width:520px;height:70px;border-radius:35px;display:flex;align-items:center;gap:6px;padding:0 22px 0 8px;
+         background:#0e1014;border:1px solid rgba(255,255,255,.2);box-shadow:0 0 0 6px rgba(255,255,255,.03),0 24px 60px -20px rgba(255,90,31,.45)}
+       .ask img{width:62px;height:62px;flex:none}.ask p{font-size:21px;letter-spacing:-.01em;white-space:nowrap}
+       .ask b{color:#ff7a2e;font-weight:700}
+       .status{position:absolute;left:112px;top:500px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.2em;color:#ff8f4a}`,
+      `const NODES = ["NETWORKS", "REBATES", "STANDARDS", "DATASHEETS", "YOUR DEALS", "YOUR CALLS"];
+       const ASKS = [
+         ["What's the export limit on this network?", 0, "ANSWERED, WITH ITS SOURCES."],
+         ["What's this inverter's max input voltage?", 3, "ANSWERED FROM ITS DATASHEET."],
+         ["Who should I call first this morning?", 4, "ANSWERED FROM YOUR OWN DEALS."],
+       ];
+       const box = document.getElementById("nodes");
+       NODES.forEach((n, i) => {
+         const a = ((-90 + i * 60) * Math.PI) / 180, el = document.createElement("span");
+         el.className = "node"; el.textContent = n; el.style.left = 880 + 230 * Math.cos(a) + "px"; el.style.top = 300 + 230 * Math.sin(a) + "px";
+         box.appendChild(el);
+       });
+       window.at = (t) => {
+         const at = Math.min(ASKS.length - 0.0001, t * ASKS.length), k = Math.floor(at), p = at - k, [q, node, said] = ASKS[k];
+         const typed = t >= 1 ? q.length : Math.round(q.length * Math.min(1, p / 0.58)), done = t >= 1 || p > 0.64;
+         document.getElementById("q").innerHTML = q.slice(0, typed).replace(/</g, "&lt;") + (done ? "" : "<b> |</b>");
+         document.getElementById("status").textContent = done ? "SOL // " + said : "";
+         [...box.children].forEach((el, i) => el.classList.toggle("on", t >= 1 ? true : (done && i === node) || ASKS.slice(0, k).some((x) => x[1] === i)));
+         const w = done && t < 1 ? (p - 0.64) / 0.36 : 0, pulse = document.getElementById("pulse");
+         pulse.style.opacity = w ? 0.9 * (1 - w) : 0; pulse.style.transform = "scale(" + (0.5 + 1.1 * w) + ")";
+       };
+       window.at(1);`,
+    ),
+  },
+
+  /**
+   * The same email's third picture: the admin, handed over. Each job is struck through in turn and what happens to it
+   * now is said beside it; then the line. Every one is something the product does today.
+   */
+  "era-admin.gif": {
+    frames: 31,
+    delay: 95,
+    hold: 4200,
+    colours: 128,
+    html: page(
+      `<div class="glow"></div><img class="sun" src="${ERA_SUN}">
+       <div class="top"><i></i>RENUABL // ADMIN, HANDED OVER</div><div id="rows"></div>
+       <h1 id="say">The admin era <span>is over.</span></h1><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       .glow{position:absolute;inset:0;background:radial-gradient(circle at 84% 44%,rgba(255,110,40,.34),rgba(255,90,31,.1) 26%,transparent 50%)}
+       .sun{position:absolute;left:830px;top:120px;width:360px;height:360px}
+       .top{position:absolute;left:84px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       #rows{position:absolute;left:84px;top:124px;width:760px}
+       .row{display:flex;align-items:center;height:62px;border-bottom:1px solid rgba(255,255,255,.09)}
+       .row em{position:relative;font-style:normal;font-family:"JetBrains Mono",Consolas,monospace;font-size:17px;letter-spacing:.18em;color:rgba(255,255,255,.5);white-space:nowrap}
+       .row em u{position:absolute;left:-6px;top:50%;height:2px;margin-top:-1px;background:#ff5a1f;border-radius:2px}
+       .row b{position:absolute;left:470px;font-size:25px;font-weight:600;letter-spacing:-.02em;white-space:nowrap}
+       h1{position:absolute;left:80px;top:486px;font-size:76px;line-height:1;font-weight:600;letter-spacing:-.045em}
+       h1 span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}`,
+      `const ROWS = [
+         ["FOLLOW-UP EMAILS", "Drafted by Sol."],
+         ["CALL NOTES", "Written up by Sol."],
+         ["NEW LEADS", "Answered in minutes."],
+         ["QUOTES", "Priced as you draw."],
+         ["AFTER-SALE PAPERWORK", "Lined up when they sign."],
+       ];
+       const rows = document.getElementById("rows");
+       rows.innerHTML = ROWS.map(([a, b]) => "<div class='row'><em>" + a + "<u></u></em><b>" + b + "</b></div>").join("");
+       window.at = (t) => {
+         [...rows.children].forEach((el, i) => {
+           const a = 0.04 + i * 0.15, cut = span(t, a, a + 0.1), shown = span(t, a + 0.07, a + 0.17);
+           el.querySelector("u").style.width = "calc(" + cut * 100 + "% + " + 12 * cut + "px)";
+           el.querySelector("em").style.color = "rgba(255,255,255," + (0.8 - 0.22 * cut) + ")";
+           const b = el.querySelector("b"); b.style.opacity = shown; b.style.transform = "translateX(" + 14 * (1 - shown) + "px)";
+         });
+         const k = span(t, 0.82, 1), say = document.getElementById("say");
+         say.style.opacity = k; say.style.transform = "translateY(" + 14 * (1 - k) + "px)";
+       };
+       window.at(1);`,
+    ),
+  },
 
   ...Object.fromEntries(Object.entries(EXPLAINERS).map(([name, e]) => [name, { frames: 40, delay: 80, hold: 3800, html: explainer(e) }])),
 
@@ -892,6 +1072,127 @@ const ART = {
        .order{height:46px;padding:0 30px;border-radius:999px;background:#1d1d1f;color:#fff;display:grid;place-items:center;font-size:16px;font-weight:600}`,
     ),
   },
+  /**
+   * The AI sales team email as frames (27 Nov 2026, Martin, on the first two tries: "this looks very average… it doesnt
+   * ooze the intelligence and sophistication… it doesnt feel like a product of grok bot + space x + tesla + apple").
+   * Full-width frames, one idea each: huge light type, small mono telemetry, the real product (Sol's sun-brain, the
+   * designer's own capture, the customer's proposal) lit like a launch, not drawn as cards. The ground is GROUND, as
+   * Martin asked for every email (softer than black), and the email itself sits on it, so frame meets frame unseen.
+   */
+  "team-cover.jpg": {
+    h: 1180,
+    html: page(
+      `<div class="stars"></div>
+       <div class="top"><span><i></i>INTRODUCING</span><span>AI SALES TEAM</span></div>
+       <h1>Meet your<br><b>AI sales team.</b></h1>
+       <p class="sub">WRITES <s>/</s> CALLS <s>/</s> QUOTES <s>/</s> PROPOSES</p>
+       <div class="orbit"></div><div class="orbit o2"></div>
+       <img class="sun" src="${pathToFileURL(resolve("public/design/landing/sol-brain.png")).href}">
+       <div class="read l"><b>SOL</b>RENUABL'S BUILT-IN INTELLIGENCE</div>
+       <div class="read r"><b>MADE FOR SOLAR</b>RETAILERS AND INSTALLERS</div>`,
+      `html,body{height:1180px}
+       .stars{position:absolute;inset:0;background-image:radial-gradient(1px 1px at 12% 18%,rgba(255,255,255,.5),transparent 60%),radial-gradient(1px 1px at 78% 12%,rgba(255,255,255,.4),transparent 60%),radial-gradient(1px 1px at 64% 34%,rgba(255,255,255,.3),transparent 60%),radial-gradient(1px 1px at 30% 40%,rgba(255,255,255,.25),transparent 60%),radial-gradient(1px 1px at 90% 46%,rgba(255,255,255,.35),transparent 60%),radial-gradient(1px 1px at 6% 52%,rgba(255,255,255,.3),transparent 60%)}
+       .top{position:absolute;left:64px;right:64px;top:56px;display:flex;justify-content:space-between;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.3em;color:rgba(255,255,255,.5)}
+       .top span:first-child{display:flex;align-items:center;gap:12px;color:#fff}.top i{width:7px;height:7px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 12px #ff5a1f}
+       h1{position:absolute;left:0;right:0;top:170px;text-align:center;font-size:118px;line-height:1.02;font-weight:300;letter-spacing:-.055em}
+       h1 b{font-weight:600;background:linear-gradient(180deg,#fff 30%,#ffc29e 100%);-webkit-background-clip:text;color:transparent}
+       .sub{position:absolute;left:0;right:0;top:450px;text-align:center;font-family:"JetBrains Mono",Consolas,monospace;font-size:17px;letter-spacing:.42em;color:rgba(255,255,255,.62)}
+       .sub s{text-decoration:none;color:#ff5a1f;margin:0 8px}
+       .sun{position:absolute;left:50%;top:700px;width:980px;height:980px;transform:translateX(-50%);filter:drop-shadow(0 0 120px rgba(255,90,31,.55))}
+       .limb{position:absolute;left:50%;top:860px;width:1100px;height:1100px;transform:translateX(-50%);border-radius:50%;box-shadow:0 -2px 0 rgba(255,220,180,.6),0 -30px 120px rgba(255,120,40,.35)}
+       .orbit{position:absolute;left:50%;top:620px;width:1500px;height:1500px;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.12)}
+       .orbit.o2{top:560px;width:1700px;height:1700px;border-color:rgba(255,255,255,.06)}
+       .read{position:absolute;top:560px;font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;letter-spacing:.24em;color:rgba(255,255,255,.45);line-height:1.9}
+       .read b{display:block;color:#fff;font-weight:500}.read.l{left:64px}.read.r{right:64px;text-align:right}`,
+    ),
+  },
+  "team-01.jpg": {
+    h: 980,
+    html: page(
+      `<div class="num">01</div>
+       <div class="hd"><p class="k">FIRST CONTACT</p><h2>It reaches<br>every lead.</h2><p class="s">Sol writes to them. Your voice agent rings them.</p></div>
+       <svg class="wave" viewBox="0 0 1200 260" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ff5a1f" stop-opacity="0"/><stop offset=".25" stop-color="#ff5a1f"/><stop offset=".7" stop-color="#ffb37a"/><stop offset="1" stop-color="#a78bfa" stop-opacity="0"/></linearGradient></defs>
+         ${Array.from({ length: 150 }, (_, i) => {
+           const x = 8 + i * 8;
+           const env = Math.sin((i / 149) * Math.PI);
+           const h = Math.max(3, env * (40 + 90 * Math.abs(Math.sin(i * 0.37) * Math.cos(i * 0.11))));
+           return `<rect x="${x}" y="${130 - h / 2}" width="3" height="${h.toFixed(1)}" rx="1.5" fill="url(#g)"/>`;
+         }).join("")}</svg>
+       <div class="tl">${[
+         ["T+0", "LEAD IN", "Olivia Hart · solar and a battery"],
+         ["SOL", "EMAILED", "Her home from above"],
+         ["AGENT", "CALLING", "00:42 on the call"],
+         ["DONE", "BOOKED", "Thursday · 10:00 am"],
+       ]
+         .map(([t, k, v], i) => `<div class="st${i === 3 ? " on" : ""}"><span>${t}</span><b>${k}</b><em>${v}</em></div>`)
+         .join("")}</div>
+       <p class="ex">EXAMPLE · VOICE CALLS COME WITH CALLS &amp; TEXTS</p>`,
+      `html,body{height:980px}${FRAME_CSS}
+       .wave{position:absolute;left:0;top:470px;width:1200px;height:260px;filter:drop-shadow(0 0 18px rgba(255,90,31,.45))}
+       .tl{position:absolute;left:64px;right:64px;top:780px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(255,255,255,.14)}
+       .st{padding:22px 18px 0 0;position:relative}.st::before{content:"";position:absolute;left:0;top:-4px;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
+       .st.on::before{background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .st span{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;letter-spacing:.22em;color:rgba(255,255,255,.4)}
+       .st b{display:block;margin-top:8px;font-family:"JetBrains Mono",Consolas,monospace;font-size:17px;letter-spacing:.18em;font-weight:500}
+       .st.on b{color:#ff8a3d}.st em{display:block;margin-top:6px;font-style:normal;font-size:16px;color:rgba(255,255,255,.6)}`,
+    ),
+  },
+  "team-02.jpg": {
+    h: 980,
+    html: page(
+      `<div class="num">02</div>
+       <div class="hd"><p class="k">DESIGN</p><h2>It quotes<br>as you draw.</h2><p class="s">Every panel you lay is priced, to the STCs.</p></div>
+       <div class="shot"><div class="img"></div><div class="vig"></div>
+         <div class="hud a"><span>SYSTEM</span><b>19.95 kW</b></div>
+         <div class="hud b"><span>BATTERY</span><b>18 kWh</b></div>
+         <div class="hud c"><span>PANELS</span><b>42 × 475 W</b></div>
+         <div class="hud d"><span>EST. SAVING</span><b>$3,423 / yr</b></div>
+         <i class="tick t1"></i><i class="tick t2"></i><i class="tick t3"></i><i class="tick t4"></i></div>
+       <p class="ex">A REAL DESIGN IN RENUABL · FIGURES ARE ESTIMATES</p>`,
+      `html,body{height:980px}${FRAME_CSS}
+       .shot{position:absolute;left:64px;right:64px;top:420px;height:470px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 60px 140px rgba(0,0,0,.6)}
+       .img{position:absolute;inset:0;background:url("${pathToFileURL(resolve("marketing/launch/source/designer-site-1.webp")).href}") no-repeat;
+         background-size:2100px auto;background-position:-560px -330px;filter:saturate(.7) contrast(1.08) brightness(.82)}
+       .vig{position:absolute;inset:0;background:radial-gradient(ellipse at 42% 50%,transparent 30%,rgba(${GROUND_RGB},.85) 92%)}
+       .hud{position:absolute;font-family:"JetBrains Mono",Consolas,monospace;padding:10px 14px;border-left:2px solid #ff5a1f;background:rgba(${GROUND_RGB},.62);backdrop-filter:blur(6px)}
+       .hud span{display:block;font-size:11px;letter-spacing:.24em;color:rgba(255,255,255,.55)}.hud b{display:block;margin-top:4px;font-size:22px;font-weight:500;letter-spacing:.02em}
+       .hud.a{left:28px;top:28px}.hud.b{left:28px;bottom:28px}.hud.c{right:28px;top:28px}.hud.d{right:28px;bottom:28px}.hud.d b{color:#ff8a3d}
+       .tick{position:absolute;width:22px;height:22px;border-color:rgba(255,255,255,.55);border-style:solid;border-width:0}
+       .t1{left:50%;top:50%;margin:-90px 0 0 -170px;border-left-width:1px;border-top-width:1px}.t2{left:50%;top:50%;margin:-90px 0 0 150px;border-right-width:1px;border-top-width:1px}
+       .t3{left:50%;top:50%;margin:70px 0 0 -170px;border-left-width:1px;border-bottom-width:1px}.t4{left:50%;top:50%;margin:70px 0 0 150px;border-right-width:1px;border-bottom-width:1px}`,
+    ),
+  },
+  "team-03.jpg": {
+    h: 980,
+    html: page(
+      `<div class="num">03</div>
+       <div class="hd"><p class="k">PROPOSAL</p><h2>It sends your<br>proposal.</h2><p class="s">Your logo, your colours. Signed online.</p></div>
+       <div class="stage"><div class="glow"></div><div class="dev"><img src="${pathToFileURL(resolve("public/design/landing/film/proposal-customer.webp")).href}"></div><div class="floor"></div></div>
+       <p class="ex">AN EXAMPLE PROPOSAL IN A BUSINESS'S OWN NAME</p>`,
+      `html,body{height:980px}${FRAME_CSS}
+       .stage{position:absolute;left:0;right:0;top:400px;height:520px;perspective:1600px}
+       .glow{position:absolute;left:50%;top:60%;width:900px;height:300px;transform:translate(-50%,-50%);background:radial-gradient(ellipse,rgba(255,90,31,.38),transparent 65%);filter:blur(30px)}
+       .dev{position:absolute;left:50%;top:20px;width:780px;height:488px;margin-left:-360px;border-radius:12px;overflow:hidden;transform:rotateX(8deg) rotateY(-12deg);
+         box-shadow:0 0 0 1px rgba(255,255,255,.2),0 50px 120px rgba(0,0,0,.75),-30px 0 80px rgba(255,90,31,.18)}
+       .dev img{display:block;width:100%}
+       .floor{position:absolute;left:10%;right:10%;bottom:-10px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,200,160,.5),transparent)}`,
+    ),
+  },
+  "team-close.jpg": {
+    h: 640,
+    html: page(
+      `<div class="horizon"></div><div class="rim"></div>
+       <h2>Built for solar.</h2><p class="m">SOL <s>·</s> VOICE AGENTS <s>·</s> DESIGNER <s>·</s> PROPOSALS <s>·</s> CRM</p>
+       <img class="logo" src="${LOGO}" alt="RENUABL">`,
+      `html,body{height:640px}
+       .horizon{position:absolute;left:50%;top:420px;width:2400px;height:2400px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle at 50% 0%,rgba(255,90,31,.32),rgba(${GROUND_RGB},1) 18%)}
+       .rim{position:absolute;left:50%;top:420px;width:2400px;height:2400px;transform:translateX(-50%);border-radius:50%;box-shadow:0 -1px 0 rgba(255,210,170,.8),0 -40px 120px rgba(255,110,40,.35)}
+       h2{position:absolute;left:0;right:0;top:150px;text-align:center;font-size:104px;font-weight:300;letter-spacing:-.055em}
+       .m{position:absolute;left:0;right:0;top:300px;text-align:center;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.34em;color:rgba(255,255,255,.55)}
+       .m s{text-decoration:none;color:#ff5a1f;margin:0 6px}
+       .logo{position:absolute;left:50%;bottom:70px;width:150px;margin-left:-75px;opacity:.8}`,
+    ),
+  },
   "say-list.jpg": {
     html: statement(
       "GROWTH // EMAIL MARKETING",
@@ -954,6 +1255,39 @@ const ART = {
     ),
   },
 
+  /**
+   * The weekly product updates email's masthead (27 Nov 2026, Martin: "we need a product updates email… i want to
+   * create excitement around it"; domain/marketing/product-updates.ts): its name over the sun coming up on the earth's
+   * curve, with a trail of small lights rising from it, one for each thing that ships. The top 1200 x 380.
+   */
+  "updates-header.jpg": {
+    clipH: 380,
+    html: page(
+      `<div class="mast"><div class="earth"></div><div class="sunrise"></div>
+        ${[
+          [840, 250, 5],
+          [900, 196, 4],
+          [968, 150, 6],
+          [1030, 96, 4],
+          [1092, 58, 3],
+        ]
+          .map(([x, y, r]) => `<i style="left:${x}px;top:${y}px;width:${r * 2}px;height:${r * 2}px"></i>`)
+          .join("")}
+        <div class="words"><small>Every week · Something new</small><b>Launch Day</b><em>This week's new features in RENUABL</em></div>
+        <img class="mark" src="${LOGO}" alt="RENUABL" style="left:80px;right:auto;top:44px;bottom:auto;opacity:.9"></div>`,
+      `.mast{position:absolute;left:0;top:0;width:1200px;height:380px;overflow:hidden;background:#05060a}
+       .earth{position:absolute;left:-300px;top:290px;width:1800px;height:1800px;border-radius:50%;background:#05060a;
+         box-shadow:0 -2px 0 rgba(255,170,110,.9),0 -10px 40px rgba(255,110,40,.7),0 -40px 140px rgba(255,90,31,.45)}
+       .sunrise{position:absolute;left:760px;top:170px;width:260px;height:260px;border-radius:50%;
+         background:radial-gradient(circle,rgba(255,236,200,.95) 0 6%,rgba(255,150,70,.55) 22%,rgba(255,90,31,.18) 48%,transparent 70%)}
+       .mast i{position:absolute;border-radius:50%;background:#ffd9b8;box-shadow:0 0 14px 4px rgba(255,120,50,.7)}
+       .words{position:absolute;left:80px;top:112px}
+       small{display:block;font-size:17px;letter-spacing:.24em;text-transform:uppercase;color:#ff8a4d}
+       b{display:block;margin-top:12px;font-size:92px;line-height:1;font-weight:600;letter-spacing:-.045em}
+       em{display:block;margin-top:16px;font-style:normal;font-size:24px;color:rgba(255,255,255,.62)}`,
+    ),
+  },
+
   /** A slim strip above the Marketplace band in every email (22 Nov 2026, Martin): the saving, as a reminder. */
   "footer-voice.jpg": {
     clipH: 120,
@@ -1012,6 +1346,275 @@ const ART = {
        .badge{position:absolute;right:56px;top:48px;width:190px;height:190px;border-radius:50%;display:grid;place-content:center;text-align:center;transform:rotate(10deg);
          background:radial-gradient(circle at 35% 25%,#ffb08a 0 10%,#ff6a2c 45%,#e8470f 100%);box-shadow:inset 0 2px 1px rgba(255,255,255,.55),0 16px 40px rgba(255,90,31,.45)}
        .badge b{font-size:24px;font-weight:600}.badge span{font-size:52px;font-weight:700;letter-spacing:-.03em;line-height:1}`,
+    ),
+  },
+  /**
+   * Product tile 1: the voice agent (27 Nov 2026, Martin: "make voice look more exciting… purple is also a good color for
+   * the audio icon avatar against a white backdrop"). On white: the agent as a purple round mid-call, its voice across the
+   * tile, the lead it's ringing and the call it booked.
+   */
+  "tile-voice.jpg": {
+    html: page(
+      `<div class="glow"></div><div class="copy"><p class="kind"><span>01</span>Voice agent</p>
+        <h1>Your AI salesperson,<br>on every lead.</h1>
+        <p class="line">It rings each new lead within minutes, answers their questions and books them in with your team. Always as your automated assistant.</p></div>
+       <div class="rings"><i></i><i></i><i></i></div>
+       <div class="avatar"><span class="bars">${[0.4, 0.75, 1, 0.6, 0.85, 0.45].map((v) => `<b style="height:${v * 100}%"></b>`).join("")}</span></div>
+       <div class="who"><b>Charlie</b><span>Sales agent · Sunrise Solar</span></div>
+       <div class="live"><i></i>On a call · 01:42</div>
+       <div class="wave">${Array.from({ length: 64 }, (_, i) => {
+         const v = 0.18 + 0.82 * Math.abs(Math.sin(i * 0.55) * Math.cos(i * 0.21 + 1));
+         return `<b style="height:${Math.round(v * 100)}%;opacity:${(0.35 + 0.65 * Math.sin((i / 63) * Math.PI)).toFixed(2)}"></b>`;
+       }).join("")}</div>
+       <div class="card lead"><s>New lead · 2 min ago</s><b>Jo Lee</b><em>Solar and battery · Glen Waverley</em></div>
+       <div class="card quote"><s>Charlie</s>“With most of your power used after dark, a battery can make sense. Shall I book you a time with the team?”</div>
+       <div class="booked">✓ Booked · Thursday 4:30 pm</div>
+       <img class="mark dark" src="${pathToFileURL(resolve("public/brand/renuabl-logo.png")).href}" alt="RENUABL">`,
+      `html,body{background:#fff;color:#0b0b0c}
+       .glow{position:absolute;inset:0;background:radial-gradient(circle at 74% 44%,rgba(124,58,237,.16),transparent 42%),radial-gradient(ellipse at 100% 100%,rgba(124,58,237,.1),transparent 50%)}
+       .copy{position:absolute;left:64px;top:92px;width:440px}
+       .kind{font-size:14px;letter-spacing:.22em;text-transform:uppercase;color:#7c3aed;font-weight:600}
+       .kind span{color:#9a9aa3;margin-right:14px;font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:.05em}
+       h1{margin-top:18px;font-size:54px;line-height:1.04;font-weight:600;letter-spacing:-.035em}
+       .line{margin-top:22px;font-size:20px;line-height:1.5;color:#55565f}
+       .rings{position:absolute;left:775px;top:262px}.rings i{position:absolute;border-radius:50%;border:1.5px solid rgba(124,58,237,.35);transform:translate(-50%,-50%)}
+       .rings i:nth-child(1){width:250px;height:250px}.rings i:nth-child(2){width:340px;height:340px;opacity:.6}.rings i:nth-child(3){width:440px;height:440px;opacity:.3}
+       .avatar{position:absolute;left:690px;top:177px;width:170px;height:170px;border-radius:50%;display:grid;place-items:center;
+         background:radial-gradient(circle at 32% 25%,#b794ff 0 8%,#8b5cf6 42%,#6d28d9 100%);
+         box-shadow:0 30px 70px -20px rgba(109,40,217,.65),inset 0 2px 2px rgba(255,255,255,.5),inset 0 -6px 14px rgba(60,10,140,.35)}
+       .bars{display:flex;align-items:center;gap:8px;height:70px}.bars b{display:block;width:9px;border-radius:9px;background:#fff}
+       .who{position:absolute;left:775px;top:372px;transform:translateX(-50%);text-align:center;white-space:nowrap}
+       .who b{display:block;font-size:24px;font-weight:600;letter-spacing:-.02em}.who span{font-size:15px;color:#6b6c75}
+       .live{position:absolute;left:775px;top:440px;transform:translateX(-50%);padding:8px 16px;border-radius:999px;background:#f3eefe;color:#6d28d9;
+         font-size:14px;font-family:"JetBrains Mono",Consolas,monospace;white-space:nowrap}
+       .live i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7c3aed;margin-right:8px;box-shadow:0 0 0 4px rgba(124,58,237,.2)}
+       .wave{position:absolute;left:560px;right:60px;top:500px;height:70px;display:flex;align-items:center;gap:4px}
+       .wave b{flex:1;border-radius:4px;background:linear-gradient(180deg,#a78bfa,#6d28d9)}
+       .card{position:absolute;background:#fff;border-radius:18px;padding:14px 18px;box-shadow:0 24px 50px -18px rgba(40,20,90,.35),0 0 0 1px rgba(20,10,60,.06)}
+       .card s{display:block;text-decoration:none;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#7c3aed;margin-bottom:4px}
+       .lead{left:930px;top:70px;width:230px}.lead b{display:block;font-size:19px;font-weight:600}.lead em{font-style:normal;font-size:14px;color:#6b6c75}
+       .quote{left:950px;top:300px;width:220px;font-size:15px;line-height:1.42}
+       .booked{position:absolute;left:556px;top:90px;padding:11px 18px;border-radius:999px;background:#7c3aed;color:#fff;font-weight:600;font-size:16px;
+         box-shadow:0 14px 34px -10px rgba(109,40,217,.7)}
+       .mark.dark{opacity:.9}`,
+    ),
+  },
+
+  /**
+   * Product tile 2: Sol (27 Nov 2026, Martin: "im not feeling the emotion of wow this feels groundbreaking intelligent.
+   * knows all there is to know on solar"). His sun-brain large in a night sky, what he knows of the trade on the orbits
+   * round him, and the box to ask him. "Knows everything" isn't said: it can't be proved.
+   */
+  "tile-sol.jpg": {
+    html: page(
+      `<div class="stars">${Array.from({ length: 90 }, (_, i) => {
+        const x = (i * 137.5) % 1200;
+        const y = (i * 71.3 + (i % 7) * 53) % 675;
+        const s = i % 9 === 0 ? 2.4 : i % 3 === 0 ? 1.6 : 1;
+        return `<i style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;width:${s}px;height:${s}px;opacity:${(0.25 + (i % 5) * 0.12).toFixed(2)}"></i>`;
+      }).join("")}</div>
+       <div class="halo"></div>
+       <svg class="orbits" width="1200" height="675" viewBox="0 0 1200 675">
+         <defs><linearGradient id="og" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff7a2e" stop-opacity=".05"/><stop offset=".5" stop-color="#ffb36b" stop-opacity=".7"/><stop offset="1" stop-color="#ff7a2e" stop-opacity=".05"/></linearGradient></defs>
+         <ellipse cx="820" cy="330" rx="330" ry="118" transform="rotate(-14 820 330)" fill="none" stroke="url(#og)" stroke-width="1.4"/>
+         <ellipse cx="820" cy="330" rx="250" ry="215" transform="rotate(22 820 330)" fill="none" stroke="url(#og)" stroke-width="1.2" stroke-dasharray="2 7"/>
+         <ellipse cx="820" cy="330" rx="390" ry="250" transform="rotate(-4 820 330)" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+       </svg>
+       <div class="sun">${SUN(420)}</div>
+       ${[
+         ["Networks & export limits", 650, 232],
+         ["STCs & rebates", 1012, 152],
+         ["AS/NZS standards", 1078, 318],
+         ["Batteries", 556, 402],
+         ["Inverters & strings", 958, 500],
+         ["EV chargers", 690, 560],
+         ["Datasheets", 668, 86],
+         ["Every deal you run", 1030, 562],
+       ]
+         .map(([w, x, y]) => `<div class="node" style="left:${x}px;top:${y}px"><i></i>${w}</div>`)
+         .join("")}
+       <div class="copy"><p class="kind"><span>02</span>Sol</p><h1>The solar mind<br>of your business.</h1>
+         <p class="line">Networks, rebates, standards, products, and every deal you run. Ask Sol anything: he answers from your business and the trade's own sources.</p>
+         <div class="ask">${SUN(30)}<span>Is a battery worth it on this home?</span><b></b></div></div>
+       <img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:radial-gradient(ellipse at 70% 50%,#160d08 0,#05060a 60%)}
+       .stars i{position:absolute;border-radius:50%;background:#fff}
+       .halo{position:absolute;left:520px;top:30px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(255,110,40,.28),transparent 62%)}
+       .orbits{position:absolute;inset:0}
+       .sun{position:absolute;left:610px;top:120px;filter:drop-shadow(0 0 60px rgba(255,120,40,.55))}
+       .node{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;padding:8px 14px 8px 12px;border-radius:999px;font-size:14px;font-weight:600;
+         color:rgba(255,255,255,.92);background:rgba(20,16,14,.72);border:1px solid rgba(255,160,100,.28);backdrop-filter:blur(6px)}
+       .node i{display:inline-block;width:6px;height:6px;border-radius:50%;background:#ffb36b;margin-right:9px;box-shadow:0 0 8px #ff7a2e;vertical-align:1px}
+       .copy{position:absolute;left:64px;top:96px;width:440px}
+       .kind{font-size:14px;letter-spacing:.22em;text-transform:uppercase;color:#ff8f4a;font-weight:600}
+       .kind span{color:rgba(255,255,255,.4);margin-right:14px;font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:.05em}
+       h1{margin-top:18px;font-size:58px;line-height:1.02;font-weight:600;letter-spacing:-.035em;
+         background:linear-gradient(180deg,#fff 40%,#ffd9bd);-webkit-background-clip:text;color:transparent}
+       .line{margin-top:22px;font-size:19px;line-height:1.52;color:rgba(255,255,255,.66)}
+       .ask{margin-top:34px;display:flex;align-items:center;gap:12px;padding:10px 18px 10px 12px;border-radius:999px;width:420px;
+         background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);font-size:17px;color:rgba(255,255,255,.85)}
+       .ask b{width:2px;height:20px;background:#ff7a2e;margin-left:-6px}`,
+    ),
+  },
+
+  /**
+   * Product tile 3: intelligence (27 Nov 2026, Martin: "lack luster. can do so much better with this visual"). The
+   * business's own streams run into Sol and come out as what to change, as Today's Business view shows it. Figures
+   * marked as an example.
+   */
+  "tile-intelligence.jpg": {
+    html: page(
+      `<div class="sky"></div>
+       <div class="copy"><p class="kind"><span>03</span>Intelligence</p><h1>It sees the whole business. Then tells you what to change.</h1>
+         <p class="line">Every deal, call, email, proposal and install, read together: what's working, what's slipping, and the next move.</p></div>
+       <svg class="flow" width="1200" height="675" viewBox="0 0 1200 675"><defs>
+         <linearGradient id="fl" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff7a2e" stop-opacity=".1"/><stop offset="1" stop-color="#ffb36b" stop-opacity=".9"/></linearGradient>
+         <linearGradient id="fr" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffb36b" stop-opacity=".9"/><stop offset="1" stop-color="#ff7a2e" stop-opacity=".15"/></linearGradient></defs>
+         ${[215, 287, 359, 431, 503, 575]
+           .map((y) => `<path d="M 168 ${y} C 300 ${y}, 330 395, 470 395" fill="none" stroke="url(#fl)" stroke-width="2"/>`)
+           .join("")}
+         <path d="M 540 395 C 620 395, 620 270, 700 270" fill="none" stroke="url(#fr)" stroke-width="2.4"/>
+         <path d="M 540 395 C 620 395, 620 500, 700 500" fill="none" stroke="url(#fr)" stroke-width="2.4"/>
+       </svg>
+       <div class="srcs">${[
+         ["Deals", "48 open"],
+         ["Calls", "212 this month"],
+         ["Emails", "1,340 sent"],
+         ["Proposals", "36 out"],
+         ["Installs", "19 booked"],
+         ["Pipeline", "$1.2m"],
+       ]
+         .map(([a, b], i) => `<div class="src" style="top:${215 + i * 72}px"><b>${a}</b><em>${b}</em></div>`)
+         .join("")}</div>
+       <div class="core">${SUN(130)}</div>
+       <div class="ins one"><s>Worth changing</s><b>Leads called within an hour sign more often.</b><p>3 new leads haven't been called yet.</p><span>Call them now</span></div>
+       <div class="ins two"><s>November</s><b>$186k sold <em>of $240k goal</em></b>
+         <div class="bar"><i style="width:77%"></i><u style="left:70%"></u></div><p>Ahead of the month · 6 proposals likely to sign</p></div>
+       <div class="ex">Example figures</div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `html,body{background:#05060a}
+       .sky{position:absolute;inset:0;background:radial-gradient(circle at 42% 50%,rgba(255,110,40,.2),transparent 30%),radial-gradient(ellipse at 100% 0%,rgba(90,140,255,.08),transparent 50%)}
+       .copy{position:absolute;left:52px;top:40px;width:1100px}
+       .kind{font-size:14px;letter-spacing:.22em;text-transform:uppercase;color:#ff8f4a;font-weight:600}
+       .kind span{color:rgba(255,255,255,.4);margin-right:14px;font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:.05em}
+       h1{margin-top:12px;font-size:34px;line-height:1.1;font-weight:600;letter-spacing:-.03em;white-space:nowrap}
+       .line{margin-top:8px;font-size:18px;color:rgba(255,255,255,.62)}
+       .flow{position:absolute;inset:0}
+       .src{position:absolute;left:40px;width:150px;transform:translateY(-50%);padding:10px 14px;border-radius:14px;background:#1c1e24;border:1px solid rgba(255,255,255,.1)}
+       .src b{display:block;font-size:16px;font-weight:600}.src em{display:block;font-style:normal;font-size:12px;color:rgba(255,255,255,.5);font-family:"JetBrains Mono",Consolas,monospace;margin-top:2px}
+       .core{position:absolute;left:440px;top:330px;filter:drop-shadow(0 0 40px rgba(255,120,40,.6))}
+       .ins{position:absolute;left:700px;width:440px;padding:18px 22px;border-radius:22px;background:linear-gradient(180deg,#2a2d34,#1b1d22);
+         border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 70px -24px rgba(0,0,0,.9)}
+       .ins s{display:block;text-decoration:none;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#ff8f4a}
+       .ins b{display:block;margin-top:6px;font-size:21px;font-weight:600;letter-spacing:-.015em;line-height:1.25}.ins b em{font-style:normal;color:rgba(255,255,255,.5);font-weight:500}
+       .ins p{margin-top:6px;font-size:14px;color:rgba(255,255,255,.6)}
+       .ins span{display:inline-block;margin-top:12px;padding:8px 14px;border-radius:999px;background:#ff5a1f;font-size:14px;font-weight:600}
+       .one{top:190px}.two{top:432px}
+       .bar{position:relative;margin-top:14px;height:6px;border-radius:6px;background:rgba(255,255,255,.1)}
+       .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,#ff5a1f,#ffb36b);box-shadow:0 0 12px rgba(255,120,40,.6)}
+       .bar u{position:absolute;top:-6px;width:2px;height:18px;background:#fff;opacity:.6}
+       .ex{position:absolute;left:52px;bottom:40px;color:rgba(255,255,255,.4);font-size:12px;letter-spacing:.22em;text-transform:uppercase}`,
+    ),
+  },
+
+  /**
+   * Product tile 4: design, for the sales retailer (27 Nov 2026, Martin: "we are not marketing to installers. we are
+   * marketing to sales retailers. perhaps try both desktop and mobile views of the designer"). The real designer on a
+   * laptop, and on a phone the way it lays out under 640 px, with the three designs to choose from and the proposal to send.
+   */
+  "tile-design.jpg": {
+    html: page(
+      `<div class="sky"></div>
+       <div class="copy"><p class="kind"><span>04</span>AI design for sales</p><h1>Quote it at the kitchen table.</h1>
+         <p class="line">Pull up their roof, get three designs priced in one click, and send the proposal before you leave the driveway.</p>
+         <div class="chips"><span>Three designs · one click</span><span>Priced as you draw</span><span>Signed online</span></div></div>
+       <div class="laptop"><div class="screen"><img src="${shot("designer-site-1.webp")}"></div><div class="base"></div></div>
+       <div class="phone"><div class="notch"></div>
+         <div class="fig"><b>11.4 kW</b> · 24 panels <span>13.5 kWh</span></div>
+         <div class="kit"><i></i><i class="mid"></i><i></i></div>
+         <div class="map"><img src="${shot("designer-strung.webp")}"></div>
+         <div class="opts"><s>Choose a design</s>
+           <div class="opt"><b>Fastest payback</b><em>4.8 yrs</em></div>
+           <div class="opt on"><b>Best return</b><em>Recommended</em></div>
+           <div class="opt"><b>Most independence</b><em>Backup</em></div></div>
+         <div class="send">Send the proposal</div></div>
+       <img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `html,body{background:#05060a}
+       .sky{position:absolute;inset:0;background:radial-gradient(ellipse at 76% 100%,rgba(255,90,31,.34),transparent 55%),radial-gradient(ellipse at 0% 0%,rgba(90,140,255,.07),transparent 50%)}
+       .copy{position:absolute;left:64px;top:92px;width:400px}
+       .kind{font-size:14px;letter-spacing:.22em;text-transform:uppercase;color:#ff8f4a;font-weight:600}
+       .kind span{color:rgba(255,255,255,.4);margin-right:14px;font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:.05em}
+       h1{margin-top:18px;font-size:54px;line-height:1.04;font-weight:600;letter-spacing:-.035em}
+       .line{margin-top:22px;font-size:19px;line-height:1.52;color:rgba(255,255,255,.66)}
+       .chips{margin-top:26px;display:flex;flex-wrap:wrap;gap:8px}.chips span{padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;
+         background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)}
+       .laptop{position:absolute;left:470px;top:96px;width:640px}
+       .screen{height:400px;border-radius:18px 18px 4px 4px;border:10px solid #1a1b1f;border-bottom-width:14px;overflow:hidden;background:#000;
+         box-shadow:0 0 0 1px rgba(255,255,255,.14),0 40px 90px -20px rgba(0,0,0,.95)}
+       .screen img{width:100%;height:calc(100% + 30px);object-fit:cover;object-position:left top}
+       .base{height:16px;margin:0 -44px;border-radius:2px 2px 16px 16px;background:linear-gradient(180deg,#3a3c42,#1c1d21);box-shadow:0 16px 30px -10px rgba(0,0,0,.9)}
+       .phone{position:absolute;left:940px;top:118px;width:230px;height:470px;border-radius:38px;padding:34px 10px 12px;background:#0d0e11;
+         border:7px solid #2a2b30;box-shadow:0 0 0 1px rgba(255,255,255,.16),0 40px 80px -10px rgba(0,0,0,.95)}
+       .notch{position:absolute;left:50%;top:9px;width:74px;height:20px;border-radius:12px;background:#000;transform:translateX(-50%)}
+       .fig{font-size:11px;color:rgba(255,255,255,.7);font-family:"JetBrains Mono",Consolas,monospace;padding:0 4px}.fig b{color:#ff7a2e}
+       .fig span{float:right}
+       .kit{display:flex;justify-content:center;align-items:center;gap:4px;margin:8px 0}.kit i{width:28px;height:28px;border-radius:50%;border:2px solid #ff5a1f;background:#232428}
+       .kit i.mid{width:36px;height:36px;background:#2a1a12}
+       .map{height:170px;border-radius:12px;overflow:hidden}.map img{width:100%;height:100%;object-fit:cover;object-position:35% 50%}
+       .opts{margin-top:10px}.opts s{display:block;text-decoration:none;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 4px 6px}
+       .opt{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:10px;margin-bottom:5px;background:#1c1d22;font-size:12px}
+       .opt b{font-weight:600}.opt em{font-style:normal;font-size:10px;color:rgba(255,255,255,.5)}
+       .opt.on{background:rgba(255,90,31,.16);box-shadow:inset 0 0 0 1px #ff5a1f}.opt.on em{color:#ff8f4a}
+       .send{margin-top:8px;text-align:center;padding:10px;border-radius:12px;background:#ff5a1f;font-size:13px;font-weight:600;box-shadow:0 8px 20px rgba(255,90,31,.45)}`,
+    ),
+  },
+
+  /**
+   * Product tile 5: technical support (27 Nov 2026, Martin: "lack luster. make it feel sophisticated"). One answer laid out
+   * like a research note: the question, the answer with its numbered references, and the sources beside it. Sol says what
+   * the rules ask and where; the licensed electrician signs off, never Sol.
+   */
+  "tile-support.jpg": {
+    html: page(
+      `<div class="sky"></div><div class="grid"></div>
+       <div class="copy"><p class="kind"><span>05</span>Technical support</p><h1>Technical answers you can stand behind.</h1>
+         <p class="line">Networks, standards, rebates and datasheets, with every source shown. Your customers' questions are answered too, and handed to your team when it matters.</p></div>
+       <div class="note">
+         <div class="q"><s>Asked by your installer</s>Can this 10 kW hybrid go on a single-phase home here?</div>
+         <div class="a">${SUN(34)}<p>Not without the network's say. Single-phase homes are usually limited on export, so apply for pre-approval with export limiting<sup>1</sup>.
+           The inverter takes this array on the coldest morning<sup>2</sup>. Check the clause in your edition<sup>3</sup>.</p></div>
+         <div class="refs">
+           <div class="ref"><sup>1</sup><b>Network connection rules</b><em>The distributor's own page</em><i>WEB</i></div>
+           <div class="ref"><sup>2</sup><b>Inverter datasheet</b><em>Checked by your team</em><i>PDF</i></div>
+           <div class="ref"><sup>3</sup><b>AS/NZS 4777.1</b><em>Your licensed copy</em><i>STD</i></div>
+         </div>
+         <div class="foot"><span>Kept in Sol's memory</span><span>3 sources</span><span>Your electrician signs off</span></div>
+       </div><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `html,body{background:#05060a}
+       .sky{position:absolute;inset:0;background:radial-gradient(ellipse at 80% 30%,rgba(255,110,40,.16),transparent 50%),radial-gradient(ellipse at 10% 100%,rgba(90,140,255,.08),transparent 50%)}
+       .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+         background-size:40px 40px;-webkit-mask-image:radial-gradient(ellipse at 75% 50%,#000 20%,transparent 70%)}
+       .copy{position:absolute;left:64px;top:96px;width:410px}
+       .kind{font-size:14px;letter-spacing:.22em;text-transform:uppercase;color:#ff8f4a;font-weight:600}
+       .kind span{color:rgba(255,255,255,.4);margin-right:14px;font-family:"JetBrains Mono",Consolas,monospace;letter-spacing:.05em}
+       h1{margin-top:18px;font-size:50px;line-height:1.05;font-weight:600;letter-spacing:-.035em}
+       .line{margin-top:22px;font-size:19px;line-height:1.52;color:rgba(255,255,255,.66)}
+       .note{position:absolute;left:520px;top:60px;width:620px;border-radius:26px;padding:26px 30px;
+         background:linear-gradient(180deg,rgba(34,36,42,.92),rgba(18,19,23,.92));border:1px solid rgba(255,255,255,.12);
+         box-shadow:0 50px 110px -30px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.08)}
+       .q s,.ref em{text-decoration:none}
+       .q s{display:block;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45);font-weight:600}
+       .q{font-size:22px;font-weight:600;letter-spacing:-.015em;line-height:1.3;padding-bottom:18px;border-bottom:1px solid rgba(255,255,255,.1)}
+       .q s{margin-bottom:8px}
+       .a{display:flex;gap:14px;margin-top:18px}.a img{margin:-4px}
+       .a p{font-size:17px;line-height:1.6;color:rgba(255,255,255,.88)}
+       sup{font-family:"JetBrains Mono",Consolas,monospace;font-size:11px;color:#ff8f4a;font-weight:700;margin-left:2px}
+       .refs{margin-top:20px;border-top:1px solid rgba(255,255,255,.1)}
+       .ref{display:grid;grid-template-columns:24px 1fr auto;align-items:center;column-gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+       .ref sup{margin:0}.ref b{font-size:15px;font-weight:600}.ref em{grid-column:2;font-style:normal;font-size:13px;color:rgba(255,255,255,.5)}
+       .ref i{grid-row:1/3;grid-column:3;font-style:normal;font-family:"JetBrains Mono",Consolas,monospace;font-size:11px;letter-spacing:.1em;
+         padding:5px 8px;border-radius:6px;border:1px solid rgba(255,140,80,.4);color:#ffb38a}
+       .foot{margin-top:16px;display:flex;gap:8px}.foot span{padding:6px 11px;border-radius:999px;font-size:12px;font-weight:600;
+         background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.75)}`,
     ),
   },
 };
@@ -1195,7 +1798,8 @@ let solStill = null;
 }
 
 for (const [name, art] of Object.entries(ART)) {
-  if (ONLY && ONLY !== name) continue;
+  // A name, or the start of several ("tile-" makes the product tiles).
+  if (ONLY && ONLY !== name && !(ONLY.endsWith("-") && name.startsWith(ONLY))) continue;
   const file = join(work, name.replace(/\.\w+$/, ".html"));
   const sun = solStill
     ? `<img src="${pathToFileURL(solStill).href}" width="96" height="96" style="flex:none;margin:-18px -12px -18px -20px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
@@ -1208,13 +1812,17 @@ for (const [name, art] of Object.entries(ART)) {
     ? `<img src="${pathToFileURL(solStill).href}" width="360" height="360" style="flex:none;margin:-40px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
     : SOL(280);
   writeFileSync(file, art.html.replaceAll("%%SOLHERO%%", hero).replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
+  // A picture taller than the page (`h`, a frame of an email) is drawn in a window of its own height.
+  if (art.h) await send("Emulation.setDeviceMetricsOverride", { width: W, height: art.h, deviceScaleFactor: 2, mobile: false });
   await send("Page.navigate", { url: pathToFileURL(file).href });
   await sleep(1200);
   if (!art.frames) {
-    await sharp(await grab(art.clipH ? { x: 0, y: 0, width: W, height: art.clipH } : undefined))
-      .resize(W, art.clipH ?? H)
+    const tall = art.h ?? art.clipH ?? H;
+    await sharp(await grab(art.h || art.clipH || art.clipW ? { x: 0, y: 0, width: art.clipW ?? W, height: tall } : undefined))
+      .resize(art.clipW ?? W, tall)
       .jpeg({ quality: 86, mozjpeg: true })
       .toFile(join(OUT, name));
+    if (art.h) await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: false });
   } else {
     const frames = [];
     for (let i = 0; i < art.frames; i++) {
@@ -1227,7 +1835,7 @@ for (const [name, art] of Object.entries(ART)) {
       frames,
       frames.map((_, i) => (i === frames.length - 1 ? art.hold : i === 0 && art.first ? art.first : art.delay)),
       art.colours ?? 160,
-      GIF_W,
+      art.width ?? GIF_W,
       art.photo === true,
     );
   }

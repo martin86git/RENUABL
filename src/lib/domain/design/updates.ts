@@ -15,13 +15,34 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Support",
+    words: "Add screenshots or photos to a support ticket or a reply: choose, paste or drop them in.",
+  },
+  {
+    day: "2026-11-27",
+    area: "Marketing",
+    words: "Email builder: every logo you upload is kept. Hover your logo and press Switch logo to pick another or draw it larger.",
+  },
+  {
+    day: "2026-11-27",
+    area: "Marketing",
+    words: "In a sequence, Add from a campaign starts an email from one you have already built, as a copy you can change.",
+  },
+  {
+    day: "2026-11-27",
+    area: "Marketing",
+    words: "Email headings and words have 17 fonts to choose from, grouped as Plain, Serif and Display.",
+  },
+  {
+    day: "2026-11-27",
     area: "Design tool",
     words: "When a design's light turns green, Ready to install shows over the roof with what was checked.",
   },
   {
     day: "2026-11-27",
     area: "Marketing",
-    words: "A top bar, picture, picture tiles or video in an email can be made Full, Column or Narrow, so a bar lines up with the picture under it.",
+    words:
+      "A top bar, picture, picture tiles or video in an email can be made Full, Column or Narrow, so a bar lines up with the picture under it.",
   },
   {
     day: "2026-11-27",

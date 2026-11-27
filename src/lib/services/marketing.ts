@@ -198,6 +198,9 @@ export const deleteSequence = (id: string) => send(`/api/design/marketing/sequen
 
 export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/design/marketing/settings`, { cache: "no-store" });
 /** Sets or clears the logo at the top of every email (anyone who builds emails). */
+/** The kept logos: the one in use drawn larger or not, one forgotten, or RENUABL's own added (its own business only). */
+export const changeMarketingLogos = (change: { logoLarge: boolean } | { forgetLogo: string } | { siteLogos: true }) =>
+  send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", change));
 export const saveMarketingLogo = (logoId: string | null) =>
   send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", { logoId }));
 
@@ -207,6 +210,14 @@ export const saveMarketingSettings = (s: MarketingSettingsView["settings"]) =>
 /** RENUABL's own go-to-market drafts: whether they're offered and made, and adding them (drafts only). */
 export const loadGtmDrafts = () => send<{ offer: boolean; made?: boolean }>(`/api/design/marketing/gtm`, { cache: "no-store" });
 export const addGtmDrafts = () => send<{ campaign: string; sequence: string }>(`/api/design/marketing/gtm`, { method: "POST" });
+
+/** RENUABL's weekly product updates email ("Launch Day"): what the week has, this week's draft if made, and making it. */
+export const loadUpdatesEmail = () =>
+  send<{ offer: boolean; count?: number; from?: string; to?: string; id?: string | null }>(`/api/design/marketing/updates`, {
+    cache: "no-store",
+  });
+export const draftUpdatesEmail = () =>
+  send<{ id: string; added: boolean; bySol: boolean }>(`/api/design/marketing/updates`, { method: "POST" });
 
 /** Sol writes a marketing email's part, or all four from a brief; nothing is kept or sent. */
 export const writeWithSol = (body: {
