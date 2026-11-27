@@ -89,7 +89,7 @@ function Header({ signedIn }: { signedIn: boolean }) {
     return () => window.removeEventListener("keydown", close);
   }, [open]);
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-line/70 bg-canvas/85 backdrop-blur-md sm:pb-2">
       {/* RENUABL Business: the network's side for retailers and installers (the front page since 19 Nov 2026; the homeowner homepage is kept at /homeowners). */}
       <div className="mx-auto grid h-16 w-full max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-2 px-4 sm:grid-cols-[1fr_auto_1fr] sm:gap-3 sm:px-5 lg:px-8">
         <div className="relative">
@@ -130,10 +130,11 @@ function Header({ signedIn }: { signedIn: boolean }) {
         </div>
         <Link href="/" aria-label="RENUABL Business" className="justify-self-start sm:justify-self-center">
           {/* The line under the logo (27 Nov 2026, Martin: smaller than the logo, spaced under it, centred). From sm up:
-              on a phone the wordmark sits beside the menu and the buttons, with no room for it. */}
-          <span className="flex flex-col items-center gap-3.5">
+              on a phone the wordmark sits beside the menu and the buttons, with no room for it. The wordmark stays
+              level with the menu icon; the line hangs below it, and the bar is a little deeper from sm to hold it. */}
+          <span className="relative flex flex-col items-center">
             <Wordmark className="leading-none" />
-            <span className="hidden whitespace-nowrap text-[9.5px] font-medium uppercase leading-none tracking-[0.2em] text-muted sm:block">
+            <span className="absolute left-1/2 top-full mt-3.5 hidden -translate-x-1/2 whitespace-nowrap text-[9.5px] font-medium uppercase leading-none tracking-[0.2em] text-muted sm:block">
               {LOGO_LINE}
             </span>
           </span>
