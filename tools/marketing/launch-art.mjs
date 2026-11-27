@@ -851,23 +851,45 @@ const ART = {
        .stop b{font-size:18px;font-weight:600}.stop span{display:block;font-size:13.5px;color:#6e6e73}`,
     ),
   },
-  "hero-reply.jpg": {
+  /**
+   * In place of hero-reply (27 Nov 2026, Martin: "its not important enough. they can just use an external ai to draft
+   * their email… think of something better"): the configurator, which no email tool can do. The customer picks the
+   * size, battery and add-ons on their own proposal, the price follows, and they order. Example data.
+   */
+  "hero-configure.jpg": {
     html: hero(
-      "SOL // REPLIES",
-      "Faster replies.",
-      "Sol drafts. You send.",
-      "From the deal's own record, in your voice.",
-      `<p class="cap">OLIVIA WROTE · 2 MIN AGO</p>
-       <div class="q" style="margin-left:0">Is the battery big enough to get us through the evening?</div>
-       <div class="draft"><small>DRAFTED BY SOL · NOT SENT</small>
-         <p>Hi Olivia, good question. The battery on your proposal holds 16 kWh, and your bill shows about 12 kWh used after dark, so on a typical day it carries the evening.</p>
-         <p>Happy to go through it on a quick call.</p></div>
-       <div class="btns"><span class="on">Send</span><span>Edit first</span><span>Not now</span></div>`,
-      `.q{width:fit-content;max-width:380px;padding:10px 14px;border-radius:16px;background:#ececef;font-size:15px;margin-bottom:14px}
-       .draft{padding:14px 16px;border-radius:14px;background:#fff6ee;box-shadow:inset 0 0 0 1px #ffc9a8}
-       .draft small{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#c2410c}.draft p{font-size:15px;line-height:1.5;margin-top:8px}
-       .btns{display:flex;gap:10px;margin-top:16px}.btns span{height:42px;padding:0 20px;border-radius:999px;display:grid;place-items:center;font-size:15px;font-weight:600;box-shadow:inset 0 0 0 1px #d9d9de}
-       .btns .on{background:#ff5a1f;color:#fff;box-shadow:none}`,
+      "PROPOSALS // CONFIGURATOR",
+      "They build it.",
+      "They order it.",
+      "Size, battery and EV charger. Priced as they choose, on the proposal you sent.",
+      `<div class="chead"><div><b>Build your system</b><span>For Olivia Hart</span></div><em>THEIR PROPOSAL</em></div>
+       <p class="cap">SIZE</p>
+       <div class="sizes">${[
+         ["5.2 kW", "11 panels", false],
+         ["6.65 kW", "14 panels", true],
+         ["8.1 kW", "17 panels", false],
+       ]
+         .map(([k, n, on]) => `<div class="${on ? "on" : ""}"><b>${k}</b><span>${n}</span></div>`)
+         .join("")}</div>
+       <p class="cap">BATTERY</p>
+       <div class="bat"><span>None</span><span class="on">16 kWh</span><span>24 kWh</span></div>
+       <p class="cap">ADD-ONS</p>
+       <div class="tog"><span>Blackout backup</span><i class="on"></i></div>
+       <div class="tog"><span>EV charger</span><i></i></div>
+       <div class="foot"><div><small>After the federal rebate</small><b>$18,400</b><span>Due today $1,840</span></div><div class="order">Order</div></div>`,
+      `.sizes{display:flex;gap:8px;margin-bottom:12px}.sizes div{flex:1;padding:10px 12px;border-radius:12px;box-shadow:inset 0 0 0 1px #d9d9de}
+       .sizes b{display:block;font-size:17px;font-weight:600}.sizes span{font-size:12.5px;color:#6e6e73}
+       .sizes .on{box-shadow:inset 0 0 0 2px #ff5a1f;background:#fff6ee}
+       .bat{display:flex;gap:8px;margin-bottom:12px}.bat span{flex:1;height:38px;border-radius:10px;display:grid;place-items:center;font-size:14.5px;font-weight:500;box-shadow:inset 0 0 0 1px #d9d9de}
+       .bat .on{box-shadow:inset 0 0 0 2px #ff5a1f;background:#fff6ee;font-weight:600}
+       .tog{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:15px}
+       .tog i{width:40px;height:24px;border-radius:999px;background:#d9d9de;position:relative}
+       .tog i::after{content:"";position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#fff}
+       .tog i.on{background:#ff5a1f}.tog i.on::after{left:19px}
+       .foot{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid #ececef}
+       .foot small{display:block;font-size:12px;color:#6e6e73}.foot b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em}
+       .foot span{font-size:13px;color:#3a3d43}
+       .order{height:46px;padding:0 30px;border-radius:999px;background:#1d1d1f;color:#fff;display:grid;place-items:center;font-size:16px;font-weight:600}`,
     ),
   },
   "say-list.jpg": {

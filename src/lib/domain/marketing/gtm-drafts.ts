@@ -99,9 +99,9 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
     alt: "The paperwork, lined up: pre-approval, Solar Victoria, install, certificate, STCs and grid connection on one job (example data)",
   },
   hone: { file: "hero-one.jpg", alt: "Six tools. One login: lead, design, proposal, order, install and service in one place" },
-  hreply: {
-    file: "hero-reply.jpg",
-    alt: "Faster replies: a customer's question and the reply Sol drafted from the deal, ready to send (example data)",
+  hconf: {
+    file: "hero-configure.jpg",
+    alt: "The configurator: on the proposal you sent, the customer picks the size, battery and add-ons, sees the price and orders (example data)",
   },
   slist: {
     file: "say-list.jpg",
@@ -272,7 +272,8 @@ export const GTM_VOICE: EdmContent = email(
  * RENUABL help reduce the burden… getting more work done, get answers to hard technical problems, one workspace end to
  * end, faster responses to customers"). Four he named (the design filling in the customer's file, the custom proposal,
  * promotional emails with Growth, technical questions) and three of ours (the paperwork after the sale, one workspace,
- * faster replies). Each opens on its own hero picture; every claim is something the product does today.
+ * the configurator, which took the place of faster replies on 27 Nov 2026: Martin, "its not important enough. they can
+ * just use an external ai to draft their email"). Each opens on its own hero picture; every claim is something the product does today.
  */
 const GROWTH = `${dollars(ADD_ON_MONTHLY_CENTS.marketing ?? 0)} a month`;
 
@@ -359,13 +360,13 @@ const MORE: { name: string; content: EdmContent }[] = [
     ),
   },
   {
-    name: "Faster replies · Sol drafts, you send",
+    name: "Let them build it · the configurator",
     content: email(
       "r",
-      "Reply to every customer while they're still thinking about it",
-      "Sol drafts the reply from the deal. You read it and press send.",
+      "Let your customer build their own system",
+      "Size, battery and EV charger: they choose, the price follows, and they order on your proposal.",
       [
-        { hook: "Faster replies. Sol drafts, you press send.", pictures: ["hreply"], cta: ["See a draft", DEMO] },
+        { hook: "They build it. They order it.", pictures: ["hconf"], cta: ["See the configurator", DEMO] },
         { hook: "See who opened it, and who to ring next.", pictures: ["sopen"], cta: ["Open the demo", DEMO] },
       ],
     ),
