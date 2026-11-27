@@ -85,7 +85,8 @@ export async function jobCard(
     saved === NO_DESIGN ? null : await chosenDesign(member.businessId, jobId, saved.project.set.designs, saved.project.set.primary);
   const at = design && saved !== NO_DESIGN ? saved.project.set.designs.indexOf(design) : -1;
   const form = at >= 0 && saved !== NO_DESIGN ? (saved.project.extras.quotes[at]?.form ?? null) : null;
-  const details = systemDetails(design, form, job.details)
+  const existingOut = at >= 0 && saved !== NO_DESIGN ? Boolean(saved.project.extras.quotes[at]?.existingOut) : undefined;
+  const details = systemDetails(design, form, job.details, existingOut)
     .filter((d) => d.value && d.value.trim() && d.value.trim() !== "--")
     .map((d) => ({ key: d.key, label: d.label, value: d.value!.trim() }));
   const racking = design && form ? rackingOf(systemSpecOf(design), form).map((r) => ({ name: r.name, qty: r.qty })) : [];

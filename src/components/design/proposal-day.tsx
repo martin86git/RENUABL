@@ -47,6 +47,7 @@ export function ProposalDay({ view }: { view: ProposalView }) {
       latitude: view.roof.lat,
       panels,
       monthKwh: view.production?.monthlyKwh ?? [],
+      ...(view.system.existing?.monthlyKwh ? { extraMonthKwh: view.system.existing.monthlyKwh } : {}),
       homeDayKwh: view.bill?.dailyKwh ?? null,
       batteryKwh: battery,
       terrain: null,

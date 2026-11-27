@@ -18,6 +18,7 @@
  * Wording that holds whatever the business writes: a saving or an output is
  * an estimate and says so, a saving is rounded down, nothing is guaranteed.
  */
+import { existingForCustomer, existingForFinance } from "./existing-system";
 import type { ISODate } from "../types";
 import { roofShadeFor, type RoofShade } from "./design-shade";
 import type { RebateRates } from "../rebates";
@@ -168,6 +169,11 @@ export interface ProposalView {
     eveningKwh?: number;
     /** The system in lines, as the deal shows it: "PV panel", "Inverter", "Roof type". */
     details: { label: string; value: string }[];
+    /**
+     * What the home already has (`existing-system.ts`): the words said under the details, and, while it stays, what its
+     * panels make in each month by rule of thumb, for the home's day. Left out when the home has none on file.
+     */
+    existing?: { note: string; monthlyKwh?: number[] };
   };
   roof: {
     lat: number;
@@ -617,6 +623,7 @@ const SHOWN_DETAILS: readonly DetailKey[] = [
   "batteryQty",
   "batteryStorage",
   "evCharger",
+  "existingSystem",
   "roofType",
   "storeys",
   "phases",
@@ -746,9 +753,10 @@ export function buildProposal(given: ProposalInputs): Built {
       kw: summary.kw,
       batteryKwh,
       eveningKwh: shiftingKwhOf(design),
-      details: systemDetails(design, form, input.job.details)
+      details: systemDetails(design, form, input.job.details, Boolean(project.extras.quotes[index]?.existingOut))
         .filter((d) => SHOWN_DETAILS.includes(d.key) && d.value)
         .map((d) => ({ label: d.label, value: d.value as string })),
+      ...(main.existing ? { existing: main.existing } : {}),
     },
     roof: {
       lat: project.lat,
@@ -872,9 +880,10 @@ function optionFrom(
       kw: designSummary(d, YIELD_PER_KW_DAY).kw,
       batteryKwh: batteryKwhOf(d),
       eveningKwh: shiftingKwhOf(d),
-      details: systemDetails(d, quoteForm, input.job.details)
+      details: systemDetails(d, quoteForm, input.job.details, Boolean(input.project.extras.quotes[at].existingOut))
         .filter((x) => SHOWN_DETAILS.includes(x.key) && x.value)
         .map((x) => ({ label: x.label, value: x.value as string })),
+      ...(out.existing ? { existing: out.existing } : {}),
     },
     roofPanels: roofPanels(d),
     roofAspects: roofAspects(d),
@@ -1217,8 +1226,14 @@ function workOut(input: ProposalInputs, at: number) {
     feedIn: Number(b.feedIn) || 0,
   };
   const selfUseShare = workspace.settings.bill.selfUseShare;
-  const finance = monthlyKwh ? designFinance({ interval: b.interval, ...entered }, monthlyKwh, batteryKwh, selfUseShare) : null;
+  // The system the home already has, when this design keeps it: counted in the bill, so a battery on its own has a saving.
+  const there = covered && !quote.existingOut ? existingForFinance(form.existing, YIELD_PER_KW_DAY) : null;
+  const finance =
+    monthlyKwh || there
+      ? designFinance({ interval: b.interval, ...entered }, monthlyKwh ?? new Array<number>(12).fill(0), batteryKwh, selfUseShare, there)
+      : null;
   const saving = finance ? shownSaving(finance.billNow, finance.billAfter) : 0;
+  const existingNote = form.existing ? existingForCustomer(form.existing, Boolean(quote.existingOut)) : "";
   const variations = variationsOf(costing.lines, quote.edits);
   const extras = includedExtrasOf(costing.lines, quote.edits);
   return {
@@ -1233,6 +1248,9 @@ function workOut(input: ProposalInputs, at: number) {
     monthlyKwh,
     finance,
     saving,
+    existing: existingNote
+      ? { note: existingNote, ...(there?.monthlyKwh.some((k) => k > 0) ? { monthlyKwh: there.monthlyKwh } : {}) }
+      : null,
     b,
     entered,
     selfUseShare,

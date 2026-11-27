@@ -16,6 +16,8 @@ import {
   versionLines,
   wantsInputs,
 } from "@/lib/domain/design/sol-guide";
+import type { ExistingSystem } from "@/lib/domain/design/existing-system";
+import { ExistingAsk } from "./existing-system-card";
 import { SolIcon } from "./sol-icon";
 
 type Phase = "single" | "three";
@@ -67,8 +69,13 @@ export function SolGuide(props: {
   onFind: () => void;
   onPanel: (use: boolean) => void;
   /** The panels already on the roof: replaced (new ones may go where they are) or worked around. */
-  /** Replaced, worked around, or "none": the check was wrong and there are no panels there. */
-  onExisting: (replace: boolean | "none") => void;
+  /**
+   * Replaced, worked around, or "none": the check was wrong and there are no panels there. Worked around, Sol asks what
+   * is there (27 Nov 2026, Martin), and `details` is what was typed (null: not known yet).
+   */
+  onExisting: (replace: boolean | "none", details?: ExistingSystem | null) => void;
+  /** What is already known of the system on the home, to start the fields from. */
+  existing?: ExistingSystem | null;
   onPlace: () => void;
   onReached: (done: boolean) => void;
   /** Commence the shade analysis, or pass it by. */
@@ -104,6 +111,8 @@ export function SolGuide(props: {
   // The target step in two parts (24 Nov 2026, Martin, from his iPhone: the bill and the battery in one card was "too
   // much in one instance"): first the bill and the size, then the battery.
   const [targetPart, setTargetPart] = useState<"size" | "battery">("size");
+  // The existing panels: whether they stay first, then what is there.
+  const [existingPart, setExistingPart] = useState<"stay" | "details">("stay");
   const [triedStep, setTriedStep] = useState(props.step);
   if (triedStep !== props.step) {
     setTriedStep(props.step);
@@ -443,6 +452,15 @@ export function SolGuide(props: {
         );
       }
       case "existing":
+        if (existingPart === "details")
+          return (
+            <>
+              <ExistingAsk existing={props.existing ?? null} onDone={(details) => props.onExisting(false, details)} />
+              <Actions>
+                <Quiet onClick={() => setExistingPart("stay")}>Back</Quiet>
+              </Actions>
+            </>
+          );
         return (
           <>
             <p>
@@ -450,7 +468,7 @@ export function SolGuide(props: {
             </p>
             <Actions>
               <Quiet onClick={() => props.onExisting(true)}>Replace them</Quiet>
-              <Quiet onClick={() => props.onExisting(false)}>Work around them</Quiet>
+              <Quiet onClick={() => setExistingPart("details")}>Work around them</Quiet>
               <Quiet onClick={() => props.onExisting("none")}>There aren&apos;t any</Quiet>
             </Actions>
           </>
