@@ -24,6 +24,7 @@ import {
   Undo2,
   X,
   ShoppingBag,
+  ListOrdered,
   Timer,
   CirclePlay,
   PanelTop,
@@ -37,6 +38,7 @@ import {
   EDM_LIMITS,
   EMPTY_TILE,
   EMPTY_PRODUCT,
+  EMPTY_STEP,
   PRODUCT_BUTTON,
   MERGE_FIELDS,
   SOCIAL_NETWORKS,
@@ -94,6 +96,7 @@ import {
   type EdmStyle,
   type EdmTile,
   type EdmProduct,
+  type EdmStep,
 } from "@/lib/domain/marketing/edm";
 import {
   FONT_GROUPS,
@@ -128,6 +131,7 @@ const ICONS: Record<EdmBlockKind, typeof Heading> = {
   countdown: Timer,
   video: CirclePlay,
   bar: PanelTop,
+  steps: ListOrdered,
 };
 
 const KIND_TYPE = "application/x-renuabl-edm-kind";
@@ -135,7 +139,7 @@ const MOVE_TYPE = "application/x-renuabl-edm-move";
 /** The blocks on the left, in Klaviyo's and instant's way: the everyday ones first. */
 const BLOCK_GROUPS: { name: string; kinds: EdmBlockKind[] }[] = [
   { name: "Basics", kinds: ["heading", "text", "button", "image", "video", "products", "countdown"] },
-  { name: "Layout", kinds: ["bar", "tiles", "divider", "spacer", "social"] },
+  { name: "Layout", kinds: ["bar", "steps", "tiles", "divider", "spacer", "social"] },
 ];
 
 /** When a change was made, for grouping typing into one undo step. */
@@ -1190,6 +1194,8 @@ function CanvasBlock({
           onChange={(fill) => onChange(() => ({ fill: fill ?? undefined }))}
         />
       )}
+      {b.kind === "steps" &&
+        (picked ? <StepsFields block={b} onChange={onChange} /> : <StepRows steps={b.steps ?? []} colour={colour} ink={ink} />)}
       {b.kind === "products" &&
         (picked ? (
           <ProductsFields block={b} onChange={onChange} />
@@ -1849,6 +1855,196 @@ function ProductsFields({ block: b, onChange }: { block: EdmBlock; onChange: (pa
       <p className="text-[12px] text-muted">
         A product with no name is left out of the email. Prices are as you type them: check they are ones you can honour.
       </p>
+    </div>
+  );
+}
+
+/** A numbered steps block on the canvas as the email draws it: each picture beside its number, title, words and link. */
+function StepRows({ steps, colour, ink }: { steps: EdmStep[]; colour: string; ink: { heading: string; words: string } }) {
+  const shown = steps.filter((st) => st.title);
+  if (!shown.length)
+    return (
+      <div className="grid h-24 place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <ListOrdered className="size-4" /> Press to add your steps
+        </span>
+      </div>
+    );
+  return (
+    <div className="space-y-5 text-left">
+      {shown.map((st, i) => (
+        <div key={i} className="flex items-center gap-5">
+          {st.imageId && (
+            // eslint-disable-next-line @next/next/no-img-element -- the same picture the email carries
+            <img src={`/api/m/i/${st.imageId}`} alt={st.title} className="block w-[46%] shrink-0 rounded-[14px]" />
+          )}
+          <div className="min-w-0">
+            <span
+              className="grid size-[34px] place-items-center rounded-full text-[16px] font-bold text-white"
+              style={{ background: colour }}
+            >
+              {i + 1}
+            </span>
+            <p className="pt-3 text-[19px] leading-snug font-bold" style={{ color: ink.heading }}>
+              {st.title}
+            </p>
+            {st.text && (
+              <p className="pt-1.5 text-[14px] leading-normal" style={{ color: ink.words }}>
+                {st.text}
+              </p>
+            )}
+            {st.url && (
+              <p className="pt-3 text-[14px] font-semibold underline" style={{ color: colour }}>
+                {st.label || PRODUCT_BUTTON} →
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A numbered steps block's fields: each step's picture, title, words, link words and link, numbered as they stand. */
+function StepsFields({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const steps = b.steps ?? [];
+  const [busy, setBusy] = useState<number | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const full = steps.length >= EDM_LIMITS.steps;
+  const setStep = (i: number, patch: Partial<EdmStep>) => onChange({ steps: steps.map((p, j) => (j === i ? { ...p, ...patch } : p)) });
+
+  async function picture(file: File | undefined, i: number) {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      setProblem("Pictures are JPEG, PNG, WebP or GIF.");
+      return;
+    }
+    setProblem(null);
+    setBusy(i);
+    const r = await uploadMarketingImage(file);
+    setBusy(null);
+    if (!r.ok) {
+      setProblem(r.message);
+      return;
+    }
+    onChange((now) => ({ steps: (now.steps ?? []).map((p, j) => (j === i ? { ...p, imageId: r.id } : p)) }));
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-xl bg-surface p-3 text-left ring-1 ring-line" onClick={(e) => e.stopPropagation()}>
+      <p className="text-[12px] text-muted">
+        Each step is a picture beside its number, title, words and a link, numbered in this order. {steps.filter((p) => p.title).length} of{" "}
+        {EDM_LIMITS.steps}.
+      </p>
+      {steps.map((p, i) => (
+        <div key={i} className="flex gap-3 rounded-lg border border-line p-2">
+          <div className="relative w-36 shrink-0">
+            <label
+              className={cn(
+                "grid aspect-[4/3] cursor-pointer place-items-center overflow-hidden rounded-md bg-canvas text-muted hover:text-ink",
+                !p.imageId && "border border-dashed border-line-strong",
+              )}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                void picture(e.dataTransfer.files[0], i);
+              }}
+            >
+              {p.imageId ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={`/api/m/i/${p.imageId}`} alt="" className="size-full object-cover" />
+              ) : busy === i ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <span className="flex flex-col items-center gap-1 px-2 text-center text-[11.5px]">
+                  <ImagePlus className="size-5" /> Drop or choose a picture
+                </span>
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  void picture(e.target.files?.[0], i);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {p.imageId && (
+              <button
+                type="button"
+                aria-label="Remove the picture"
+                title="Remove the picture"
+                onClick={() => setStep(i, { imageId: null })}
+                className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-full bg-surface text-ink-2 shadow-[var(--shadow-soft)] hover:text-ink"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-[12px] font-bold text-white">
+                {i + 1}
+              </span>
+              <input
+                value={p.title}
+                maxLength={EDM_LIMITS.stepTitle}
+                onChange={(e) => setStep(i, { title: e.target.value })}
+                placeholder="Step title"
+                aria-label={`Step ${i + 1} title`}
+                className={field}
+              />
+            </div>
+            <textarea
+              value={p.text}
+              maxLength={EDM_LIMITS.stepText}
+              onChange={(e) => setStep(i, { text: e.target.value })}
+              placeholder="A line or two about it (optional)"
+              aria-label={`Step ${i + 1} words`}
+              rows={2}
+              className={cn(field, "h-auto py-2")}
+            />
+            <input
+              value={p.label}
+              maxLength={EDM_LIMITS.label}
+              onChange={(e) => setStep(i, { label: e.target.value })}
+              placeholder={`Link words, e.g. ${PRODUCT_BUTTON}`}
+              aria-label={`Step ${i + 1} link words`}
+              className={field}
+            />
+            <LinkInput value={p.url} onChange={(url) => setStep(i, { url })} placeholder="Link (shown once there is one)" />
+            <div className="flex gap-3 text-[12px] text-muted">
+              {i > 0 && (
+                <button
+                  type="button"
+                  className="hover:text-ink"
+                  onClick={() => onChange({ steps: steps.map((x, j) => (j === i - 1 ? steps[i] : j === i ? steps[i - 1] : x)) })}
+                >
+                  Move up
+                </button>
+              )}
+              <button type="button" onClick={() => onChange({ steps: steps.filter((_, j) => j !== i) })} className="hover:text-danger">
+                Remove this step
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+      {!full && (
+        <button
+          type="button"
+          onClick={() => onChange({ steps: [...steps, EMPTY_STEP] })}
+          className="grid h-12 w-full place-items-center rounded-lg border border-dashed border-line-strong text-[13px] text-muted hover:border-ink/40 hover:text-ink"
+        >
+          <span className="flex items-center gap-1.5">
+            <Plus className="size-4" /> Add a step
+          </span>
+        </button>
+      )}
+      {problem && <p className="text-[12px] text-danger">{problem}</p>}
+      <p className="text-[12px] text-muted">A step with no title is left out of the email.</p>
     </div>
   );
 }

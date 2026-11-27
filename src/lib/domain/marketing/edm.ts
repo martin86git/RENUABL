@@ -34,6 +34,7 @@ export const EDM_BLOCK_KINDS = [
   "countdown",
   "video",
   "bar",
+  "steps",
 ] as const;
 export type EdmBlockKind = (typeof EDM_BLOCK_KINDS)[number];
 
@@ -50,6 +51,7 @@ export const EDM_BLOCK_WORDS: Record<EdmBlockKind, string> = {
   countdown: "Countdown",
   video: "Video",
   bar: "Top bar",
+  steps: "Numbered steps",
 };
 
 export type EdmAlign = "left" | "center";
@@ -86,6 +88,20 @@ export interface EdmProduct {
 }
 
 export const PRODUCT_BUTTON = "Find out more";
+
+/**
+ * One row of a numbered steps block (27 Nov 2026, Martin, from Xero's invoicing email: a cover, then "1 Customise your
+ * invoice, 2 Accept instant online payments…", each a picture beside its number, title, words and a link). Numbered in
+ * order; a step is sent once it has a title.
+ */
+export interface EdmStep {
+  imageId: string | null;
+  title: string;
+  text: string;
+  /** The link's words; blank is "Find out more". */
+  label: string;
+  url: string | null;
+}
 
 /** The places a social links block can point to, in the order they are offered. */
 export const SOCIAL_NETWORKS = ["facebook", "instagram", "linkedin", "youtube", "tiktok", "x", "website"] as const;
@@ -181,6 +197,8 @@ export interface EdmBlock {
   socialLook?: SocialLook;
   /** A products block's products, laid out `columns` across. */
   products?: EdmProduct[];
+  /** A numbered steps block's steps, one a row. */
+  steps?: EdmStep[];
   /** A countdown's end, a wall-clock time in the market ("YYYY-MM-DDTHH:mm", countdown.ts); null until set. */
   endsAt?: string | null;
   /**
@@ -345,7 +363,8 @@ export function letterWarnings(c: EdmContent): string[] {
       (b.kind === "image" && b.imageId ? 1 : 0) +
       (b.kind === "video" && b.url ? 1 : 0) +
       filledTiles(b).length +
-      filledProducts(b).filter((p) => p.imageId).length,
+      filledProducts(b).filter((p) => p.imageId).length +
+      filledSteps(b).filter((p) => p.imageId).length,
     0,
   );
   const links = edmLinks(c.blocks).length;
@@ -411,6 +430,9 @@ export const EDM_LIMITS = {
   productName: 80,
   price: 40,
   productText: 240,
+  steps: 5,
+  stepTitle: 80,
+  stepText: 300,
 } as const;
 
 const line = (v: unknown, max: number) =>
@@ -520,6 +542,25 @@ export function cleanProducts(raw: unknown): EdmProduct[] {
   });
 }
 
+/** A numbered steps block's steps: up to the limit, each cleaned as its own fields are. */
+export function cleanSteps(raw: unknown): EdmStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, EDM_LIMITS.steps).map((p) => {
+    const r = (p && typeof p === "object" ? p : {}) as Record<string, unknown>;
+    const url = cleanLink(r.url);
+    return {
+      imageId: imageIdOf(r.imageId),
+      title: line(r.title, EDM_LIMITS.stepTitle),
+      text: line(r.text, EDM_LIMITS.stepText),
+      label: line(r.label, EDM_LIMITS.label),
+      url: url && !url.startsWith("mailto:") ? url : null,
+    };
+  });
+}
+
+/** A numbered steps block's steps that have a title: the ones an email shows, numbered in this order. */
+export const filledSteps = (b: EdmBlock): EdmStep[] => (b.kind === "steps" ? (b.steps ?? []).filter((p) => p.title) : []);
+
 /** A products block's products that have a name: the ones an email shows. */
 export const filledProducts = (b: EdmBlock): EdmProduct[] => (b.kind === "products" ? (b.products ?? []).filter((p) => p.name) : []);
 
@@ -555,7 +596,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     text:
       kind === "text"
         ? words(r.text, max)
-        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products"
+        : kind === "divider" || kind === "tiles" || kind === "spacer" || kind === "social" || kind === "products" || kind === "steps"
           ? ""
           : line(r.text, max),
     url: kind === "button" || kind === "image" || kind === "bar" ? cleanLink(r.url) : kind === "video" ? webLink(r.url) : null,
@@ -565,6 +606,7 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "spacer" ? { space: cleanSpace(r.space) } : {}),
     ...(kind === "social" ? { socials: cleanSocials(r.socials), socialLook: cleanSocialLook(r.socialLook) } : {}),
     ...(kind === "products" ? { products: cleanProducts(r.products), columns: cleanColumns(r.columns) } : {}),
+    ...(kind === "steps" ? { steps: cleanSteps(r.steps) } : {}),
     ...(kind === "countdown" ? { endsAt: cleanEndsAt(r.endsAt) } : {}),
     ...(kind === "bar" ? { label: line(r.label, EDM_LIMITS.label) } : {}),
     ...(kind === "button" || kind === "bar" ? buttonFields(r, kind) : {}),
@@ -745,9 +787,11 @@ export function edmLinks(blocks: EdmBlock[]): string[] {
         ? filledSocials(b).map((s) => s.url!)
         : b.kind === "products"
           ? filledProducts(b).flatMap((p) => (p.url ? [p.url] : []))
-          : (b.kind === "button" || b.kind === "image" || b.kind === "video" || b.kind === "bar") && b.url
-            ? [b.url]
-            : [],
+          : b.kind === "steps"
+            ? filledSteps(b).flatMap((p) => (p.url ? [p.url] : []))
+            : (b.kind === "button" || b.kind === "image" || b.kind === "video" || b.kind === "bar") && b.url
+              ? [b.url]
+              : [],
   );
 }
 
@@ -758,6 +802,7 @@ export function newBlockId(rand: () => number = Math.random): string {
 
 export const EMPTY_TILE: EdmTile = { imageId: null, text: "", url: null };
 export const EMPTY_PRODUCT: EdmProduct = { imageId: null, name: "", price: "", text: "", label: "", url: null };
+export const EMPTY_STEP: EdmStep = { imageId: null, title: "", text: "", label: "", url: null };
 
 export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
   const text =
@@ -783,6 +828,7 @@ export function newBlock(kind: EdmBlockKind, rand?: () => number): EdmBlock {
     ...(kind === "spacer" ? { space: "medium" as const } : {}),
     ...(kind === "social" ? { socials: [], socialLook: "icons" as const } : {}),
     ...(kind === "products" ? { products: [EMPTY_PRODUCT, EMPTY_PRODUCT], columns: 2 as const } : {}),
+    ...(kind === "steps" ? { steps: [EMPTY_STEP, EMPTY_STEP, EMPTY_STEP] } : {}),
     ...(kind === "countdown" ? { endsAt: null } : {}),
     ...(kind === "bar" ? { label: BAR_BUTTON } : {}),
   };
@@ -862,11 +908,14 @@ export interface EdmSender {
    * 2026, Martin: RENUABL's own emails carry the website's logo). None, or not https, and the name is written as before.
    */
   logo?: string | null;
+  /** The same logo drawn light, for an email on a dark ground (27 Nov 2026: RENUABL's black wordmark vanished on a dark email). */
+  logoOnDark?: string | null;
 }
 
-/** The email's top line: the sender's logo when there is a safe one, else its name. */
-export function headerCell(sender: EdmSender): string {
-  const logo = sender.logo && /^https:\/\/[^\s"'<>]+$/.test(sender.logo) ? sender.logo : null;
+/** The email's top line: the sender's logo when there is a safe one (its light one on a dark ground), else its name. */
+export function headerCell(sender: EdmSender, dark = false): string {
+  const wanted = dark && sender.logoOnDark ? sender.logoOnDark : sender.logo;
+  const logo = wanted && /^https:\/\/[^\s"'<>]+$/.test(wanted) ? wanted : null;
   return logo
     ? `<img src="${esc(logo)}" alt="${esc(sender.name || "Logo")}" width="132" style="display:block;width:132px;max-width:132px;height:auto;border:0">`
     : esc(sender.name);
@@ -943,6 +992,18 @@ function renderLetter(content: EdmContent, brand: EdmBrand, sender: EdmSender, f
         ].filter(Boolean);
         parts.push(`${pic ? `<div style="margin:0 0 8px">${href ? a(href, pic) : pic}</div>` : ""}${p(lines.join("<br>"))}`);
       }
+    else if (b.kind === "steps")
+      filledSteps(b).forEach((st, n) => {
+        const title = `${n + 1}. ${merge(st.title, fields)}`;
+        const href = st.url ? next() : null;
+        const pic = st.imageId ? img(links.image(st.imageId), title) : "";
+        const lines = [
+          `<strong>${esc(title)}</strong>`,
+          st.text ? esc(merge(st.text, fields)) : "",
+          href ? a(href, esc(merge(st.label, fields) || PRODUCT_BUTTON)) : "",
+        ].filter(Boolean);
+        parts.push(`${pic ? `<div style="margin:0 0 8px">${href ? a(href, pic) : pic}</div>` : ""}${p(lines.join("<br>"))}`);
+      });
     else if (b.kind === "divider") parts.push(`<hr style="border:0;border-top:1px solid #dadce0;margin:18px 0">`);
     else if (b.kind === "spacer") parts.push(`<div style="height:${SPACER_SIZES[cleanSpace(b.space)]}px"></div>`);
     else if (b.kind === "video" && b.url) {
@@ -1067,6 +1128,38 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       }
       rows.push(
         `<tr><td style="padding:12px ${blockSide(b)}px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
+      );
+    } else if (b.kind === "steps") {
+      // Each step a row: its picture on the left, then its number, title, words and link; numbered in order.
+      const steps = filledSteps(b);
+      if (!steps.length) continue;
+      const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
+      const picW = Math.floor(EDM_INNER * 0.46);
+      const trs = steps.map((st, n) => {
+        const title = merge(st.title, fields);
+        const href = st.url ? links.click(linkAt, linkList[linkAt]) : null;
+        if (st.url) linkAt++;
+        const label = merge(st.label, fields) || PRODUCT_BUTTON;
+        const pic = st.imageId
+          ? `<td width="46%" valign="middle" style="padding:0 20px ${n < steps.length - 1 ? 22 : 0}px 0"><img src="${esc(links.image(st.imageId))}" alt="${esc(title)}" width="${picW}" style="display:block;width:100%;max-width:${picW}px;height:auto;border:0;border-radius:14px"></td>`
+          : "";
+        const words = [
+          `<div style="width:34px;height:34px;line-height:34px;border-radius:50%;background:${colour};color:#ffffff;${font};font-size:16px;font-weight:700;text-align:center">${n + 1}</div>`,
+          `<div style="padding-top:12px;${font};font-size:19px;line-height:1.3;font-weight:700;color:${ink.heading}">${esc(title)}</div>`,
+          st.text
+            ? `<div style="padding-top:6px;${font};font-size:14px;line-height:1.5;color:${ink.words}">${esc(merge(st.text, fields))}</div>`
+            : "",
+          href
+            ? `<div style="padding-top:12px;${font};font-size:14px;font-weight:600"><a href="${esc(href)}" target="_blank" style="color:${colour};text-decoration:underline">${esc(label)}</a> <span style="color:${colour}">&rarr;</span></div>`
+            : "",
+        ].join("");
+        textParts.push(
+          [`${n + 1}. ${title}`, st.text ? merge(st.text, fields) : "", href ? `${label}: ${href}` : ""].filter(Boolean).join("\n"),
+        );
+        return `<tr>${pic}<td valign="middle" style="padding:0 0 ${n < steps.length - 1 ? 22 : 0}px">${words}</td></tr>`;
+      });
+      rows.push(
+        `<tr><td style="padding:16px ${blockSide(b)}px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
       );
     } else if (b.kind === "products") {
       // A product is sent once it has a name; its picture and button only when given.
@@ -1215,7 +1308,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
   }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px">${above.length ? `<tr><td style="height:8px;line-height:8px;font-size:1px">&nbsp;</td></tr>${above.join("")}` : ""}<tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink0.heading}">${
     brand.logoId
       ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
-      : headerCell(sender)
+      : headerCell(sender, contrastRatio("#ffffff", style.background) > contrastRatio("#000000", style.background))
   }</td></tr>${body.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${

@@ -268,6 +268,13 @@ const product = (file, crop, tag) => {
  * A campaign's hero (26 Nov 2026): the hook large on the left, the product drawn on a white card on the right. `panel`
  * is the card's own HTML; rows (`.r`), a head (`.chead`), a caption (`.cap`) and a foot with Sol (`.cfoot`) are shared.
  */
+/** A feature frame of the AI sales team email: the big thin number, the mono kicker, the headline, the line, the small print. */
+const FRAME_CSS = `.num{position:absolute;right:56px;top:20px;font-size:260px;font-weight:200;letter-spacing:-.06em;line-height:1;color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.22)}
+  .hd{position:absolute;left:64px;top:76px;width:820px}
+  .k{font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.32em;color:#ff8a3d}
+  .hd h2{margin-top:22px;font-size:92px;line-height:1;font-weight:300;letter-spacing:-.05em}
+  .hd .s{margin-top:24px;font-size:24px;color:rgba(255,255,255,.62);letter-spacing:-.01em}
+  .ex{position:absolute;left:64px;bottom:34px;font-family:"JetBrains Mono",Consolas,monospace;font-size:11px;letter-spacing:.24em;color:rgba(255,255,255,.32)}`;
 const hero = (kicker, first, second, sub, panel, css = "") =>
   page(
     `<div class="glow"></div><div class="top"><i></i>${kicker}</div>
@@ -1062,6 +1069,127 @@ const ART = {
        .order{height:46px;padding:0 30px;border-radius:999px;background:#1d1d1f;color:#fff;display:grid;place-items:center;font-size:16px;font-weight:600}`,
     ),
   },
+  /**
+   * The AI sales team email as frames (27 Nov 2026, Martin, on the first two tries: "this looks very average… it doesnt
+   * ooze the intelligence and sophistication… it doesnt feel like a product of grok bot + space x + tesla + apple").
+   * Full-width frames, one idea each: huge light type, small mono telemetry, the real product (Sol's sun-brain, the
+   * designer's own capture, the customer's proposal) lit like a launch, not drawn as cards. The ground is GROUND, as
+   * Martin asked for every email (softer than black), and the email itself sits on it, so frame meets frame unseen.
+   */
+  "team-cover.jpg": {
+    h: 1180,
+    html: page(
+      `<div class="stars"></div>
+       <div class="top"><span><i></i>INTRODUCING</span><span>AI SALES TEAM</span></div>
+       <h1>Meet your<br><b>AI sales team.</b></h1>
+       <p class="sub">WRITES <s>/</s> CALLS <s>/</s> QUOTES <s>/</s> PROPOSES</p>
+       <div class="orbit"></div><div class="orbit o2"></div>
+       <img class="sun" src="${pathToFileURL(resolve("public/design/landing/sol-brain.png")).href}">
+       <div class="read l"><b>SOL</b>RENUABL'S BUILT-IN INTELLIGENCE</div>
+       <div class="read r"><b>MADE FOR SOLAR</b>RETAILERS AND INSTALLERS</div>`,
+      `html,body{height:1180px}
+       .stars{position:absolute;inset:0;background-image:radial-gradient(1px 1px at 12% 18%,rgba(255,255,255,.5),transparent 60%),radial-gradient(1px 1px at 78% 12%,rgba(255,255,255,.4),transparent 60%),radial-gradient(1px 1px at 64% 34%,rgba(255,255,255,.3),transparent 60%),radial-gradient(1px 1px at 30% 40%,rgba(255,255,255,.25),transparent 60%),radial-gradient(1px 1px at 90% 46%,rgba(255,255,255,.35),transparent 60%),radial-gradient(1px 1px at 6% 52%,rgba(255,255,255,.3),transparent 60%)}
+       .top{position:absolute;left:64px;right:64px;top:56px;display:flex;justify-content:space-between;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.3em;color:rgba(255,255,255,.5)}
+       .top span:first-child{display:flex;align-items:center;gap:12px;color:#fff}.top i{width:7px;height:7px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 12px #ff5a1f}
+       h1{position:absolute;left:0;right:0;top:170px;text-align:center;font-size:118px;line-height:1.02;font-weight:300;letter-spacing:-.055em}
+       h1 b{font-weight:600;background:linear-gradient(180deg,#fff 30%,#ffc29e 100%);-webkit-background-clip:text;color:transparent}
+       .sub{position:absolute;left:0;right:0;top:450px;text-align:center;font-family:"JetBrains Mono",Consolas,monospace;font-size:17px;letter-spacing:.42em;color:rgba(255,255,255,.62)}
+       .sub s{text-decoration:none;color:#ff5a1f;margin:0 8px}
+       .sun{position:absolute;left:50%;top:700px;width:980px;height:980px;transform:translateX(-50%);filter:drop-shadow(0 0 120px rgba(255,90,31,.55))}
+       .limb{position:absolute;left:50%;top:860px;width:1100px;height:1100px;transform:translateX(-50%);border-radius:50%;box-shadow:0 -2px 0 rgba(255,220,180,.6),0 -30px 120px rgba(255,120,40,.35)}
+       .orbit{position:absolute;left:50%;top:620px;width:1500px;height:1500px;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.12)}
+       .orbit.o2{top:560px;width:1700px;height:1700px;border-color:rgba(255,255,255,.06)}
+       .read{position:absolute;top:560px;font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;letter-spacing:.24em;color:rgba(255,255,255,.45);line-height:1.9}
+       .read b{display:block;color:#fff;font-weight:500}.read.l{left:64px}.read.r{right:64px;text-align:right}`,
+    ),
+  },
+  "team-01.jpg": {
+    h: 980,
+    html: page(
+      `<div class="num">01</div>
+       <div class="hd"><p class="k">FIRST CONTACT</p><h2>It reaches<br>every lead.</h2><p class="s">Sol writes to them. Your voice agent rings them.</p></div>
+       <svg class="wave" viewBox="0 0 1200 260" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#ff5a1f" stop-opacity="0"/><stop offset=".25" stop-color="#ff5a1f"/><stop offset=".7" stop-color="#ffb37a"/><stop offset="1" stop-color="#a78bfa" stop-opacity="0"/></linearGradient></defs>
+         ${Array.from({ length: 150 }, (_, i) => {
+           const x = 8 + i * 8;
+           const env = Math.sin((i / 149) * Math.PI);
+           const h = Math.max(3, env * (40 + 90 * Math.abs(Math.sin(i * 0.37) * Math.cos(i * 0.11))));
+           return `<rect x="${x}" y="${130 - h / 2}" width="3" height="${h.toFixed(1)}" rx="1.5" fill="url(#g)"/>`;
+         }).join("")}</svg>
+       <div class="tl">${[
+         ["T+0", "LEAD IN", "Olivia Hart · solar and a battery"],
+         ["SOL", "EMAILED", "Her home from above"],
+         ["AGENT", "CALLING", "00:42 on the call"],
+         ["DONE", "BOOKED", "Thursday · 10:00 am"],
+       ]
+         .map(([t, k, v], i) => `<div class="st${i === 3 ? " on" : ""}"><span>${t}</span><b>${k}</b><em>${v}</em></div>`)
+         .join("")}</div>
+       <p class="ex">EXAMPLE · VOICE CALLS COME WITH CALLS &amp; TEXTS</p>`,
+      `html,body{height:980px}${FRAME_CSS}
+       .wave{position:absolute;left:0;top:470px;width:1200px;height:260px;filter:drop-shadow(0 0 18px rgba(255,90,31,.45))}
+       .tl{position:absolute;left:64px;right:64px;top:780px;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(255,255,255,.14)}
+       .st{padding:22px 18px 0 0;position:relative}.st::before{content:"";position:absolute;left:0;top:-4px;width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4)}
+       .st.on::before{background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .st span{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:12px;letter-spacing:.22em;color:rgba(255,255,255,.4)}
+       .st b{display:block;margin-top:8px;font-family:"JetBrains Mono",Consolas,monospace;font-size:17px;letter-spacing:.18em;font-weight:500}
+       .st.on b{color:#ff8a3d}.st em{display:block;margin-top:6px;font-style:normal;font-size:16px;color:rgba(255,255,255,.6)}`,
+    ),
+  },
+  "team-02.jpg": {
+    h: 980,
+    html: page(
+      `<div class="num">02</div>
+       <div class="hd"><p class="k">DESIGN</p><h2>It quotes<br>as you draw.</h2><p class="s">Every panel you lay is priced, to the STCs.</p></div>
+       <div class="shot"><div class="img"></div><div class="vig"></div>
+         <div class="hud a"><span>SYSTEM</span><b>19.95 kW</b></div>
+         <div class="hud b"><span>BATTERY</span><b>18 kWh</b></div>
+         <div class="hud c"><span>PANELS</span><b>42 × 475 W</b></div>
+         <div class="hud d"><span>EST. SAVING</span><b>$3,423 / yr</b></div>
+         <i class="tick t1"></i><i class="tick t2"></i><i class="tick t3"></i><i class="tick t4"></i></div>
+       <p class="ex">A REAL DESIGN IN RENUABL · FIGURES ARE ESTIMATES</p>`,
+      `html,body{height:980px}${FRAME_CSS}
+       .shot{position:absolute;left:64px;right:64px;top:420px;height:470px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.12),0 60px 140px rgba(0,0,0,.6)}
+       .img{position:absolute;inset:0;background:url("${pathToFileURL(resolve("marketing/launch/source/designer-site-1.webp")).href}") no-repeat;
+         background-size:2100px auto;background-position:-560px -330px;filter:saturate(.7) contrast(1.08) brightness(.82)}
+       .vig{position:absolute;inset:0;background:radial-gradient(ellipse at 42% 50%,transparent 30%,rgba(${GROUND_RGB},.85) 92%)}
+       .hud{position:absolute;font-family:"JetBrains Mono",Consolas,monospace;padding:10px 14px;border-left:2px solid #ff5a1f;background:rgba(${GROUND_RGB},.62);backdrop-filter:blur(6px)}
+       .hud span{display:block;font-size:11px;letter-spacing:.24em;color:rgba(255,255,255,.55)}.hud b{display:block;margin-top:4px;font-size:22px;font-weight:500;letter-spacing:.02em}
+       .hud.a{left:28px;top:28px}.hud.b{left:28px;bottom:28px}.hud.c{right:28px;top:28px}.hud.d{right:28px;bottom:28px}.hud.d b{color:#ff8a3d}
+       .tick{position:absolute;width:22px;height:22px;border-color:rgba(255,255,255,.55);border-style:solid;border-width:0}
+       .t1{left:50%;top:50%;margin:-90px 0 0 -170px;border-left-width:1px;border-top-width:1px}.t2{left:50%;top:50%;margin:-90px 0 0 150px;border-right-width:1px;border-top-width:1px}
+       .t3{left:50%;top:50%;margin:70px 0 0 -170px;border-left-width:1px;border-bottom-width:1px}.t4{left:50%;top:50%;margin:70px 0 0 150px;border-right-width:1px;border-bottom-width:1px}`,
+    ),
+  },
+  "team-03.jpg": {
+    h: 980,
+    html: page(
+      `<div class="num">03</div>
+       <div class="hd"><p class="k">PROPOSAL</p><h2>It sends your<br>proposal.</h2><p class="s">Your logo, your colours. Signed online.</p></div>
+       <div class="stage"><div class="glow"></div><div class="dev"><img src="${pathToFileURL(resolve("public/design/landing/film/proposal-customer.webp")).href}"></div><div class="floor"></div></div>
+       <p class="ex">AN EXAMPLE PROPOSAL IN A BUSINESS'S OWN NAME</p>`,
+      `html,body{height:980px}${FRAME_CSS}
+       .stage{position:absolute;left:0;right:0;top:400px;height:520px;perspective:1600px}
+       .glow{position:absolute;left:50%;top:60%;width:900px;height:300px;transform:translate(-50%,-50%);background:radial-gradient(ellipse,rgba(255,90,31,.38),transparent 65%);filter:blur(30px)}
+       .dev{position:absolute;left:50%;top:20px;width:780px;height:488px;margin-left:-360px;border-radius:12px;overflow:hidden;transform:rotateX(8deg) rotateY(-12deg);
+         box-shadow:0 0 0 1px rgba(255,255,255,.2),0 50px 120px rgba(0,0,0,.75),-30px 0 80px rgba(255,90,31,.18)}
+       .dev img{display:block;width:100%}
+       .floor{position:absolute;left:10%;right:10%;bottom:-10px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,200,160,.5),transparent)}`,
+    ),
+  },
+  "team-close.jpg": {
+    h: 640,
+    html: page(
+      `<div class="horizon"></div><div class="rim"></div>
+       <h2>Built for solar.</h2><p class="m">SOL <s>·</s> VOICE AGENTS <s>·</s> DESIGNER <s>·</s> PROPOSALS <s>·</s> CRM</p>
+       <img class="logo" src="${LOGO}" alt="RENUABL">`,
+      `html,body{height:640px}
+       .horizon{position:absolute;left:50%;top:420px;width:2400px;height:2400px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle at 50% 0%,rgba(255,90,31,.32),rgba(${GROUND_RGB},1) 18%)}
+       .rim{position:absolute;left:50%;top:420px;width:2400px;height:2400px;transform:translateX(-50%);border-radius:50%;box-shadow:0 -1px 0 rgba(255,210,170,.8),0 -40px 120px rgba(255,110,40,.35)}
+       h2{position:absolute;left:0;right:0;top:150px;text-align:center;font-size:104px;font-weight:300;letter-spacing:-.055em}
+       .m{position:absolute;left:0;right:0;top:300px;text-align:center;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.34em;color:rgba(255,255,255,.55)}
+       .m s{text-decoration:none;color:#ff5a1f;margin:0 6px}
+       .logo{position:absolute;left:50%;bottom:70px;width:150px;margin-left:-75px;opacity:.8}`,
+    ),
+  },
   "say-list.jpg": {
     html: statement(
       "GROWTH // EMAIL MARKETING",
@@ -1411,13 +1539,17 @@ for (const [name, art] of Object.entries(ART)) {
     ? `<img src="${pathToFileURL(solStill).href}" width="360" height="360" style="flex:none;margin:-40px;mix-blend-mode:screen;-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)">`
     : SOL(280);
   writeFileSync(file, art.html.replaceAll("%%SOLHERO%%", hero).replaceAll("%%SOL%%", sun).replaceAll("%%SOLBIG%%", big));
+  // A picture taller than the page (`h`, a frame of an email) is drawn in a window of its own height.
+  if (art.h) await send("Emulation.setDeviceMetricsOverride", { width: W, height: art.h, deviceScaleFactor: 2, mobile: false });
   await send("Page.navigate", { url: pathToFileURL(file).href });
   await sleep(1200);
   if (!art.frames) {
-    await sharp(await grab(art.clipH ? { x: 0, y: 0, width: W, height: art.clipH } : undefined))
-      .resize(W, art.clipH ?? H)
+    const tall = art.h ?? art.clipH ?? H;
+    await sharp(await grab(art.h || art.clipH || art.clipW ? { x: 0, y: 0, width: art.clipW ?? W, height: tall } : undefined))
+      .resize(art.clipW ?? W, tall)
       .jpeg({ quality: 86, mozjpeg: true })
       .toFile(join(OUT, name));
+    if (art.h) await send("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 2, mobile: false });
   } else {
     const frames = [];
     for (let i = 0; i < art.frames; i++) {

@@ -149,6 +149,23 @@ export const GTM_PICTURES: Record<string, GtmPicture> = {
   runs: { file: "runs.jpg", alt: "RENUABL's install calendar after the sale (example data)" },
   xruns: { file: "explain-runs.gif", alt: SOL_TYPES.xruns },
   coupon: { file: "coupon.jpg", alt: "Yes. I want my AI sales force. First month free. No contract, cancel any time." },
+  tcover: {
+    file: "team-cover.jpg",
+    alt: "Meet your AI sales team. Writes, calls, quotes, proposes. Sol, RENUABL's built-in intelligence, made for solar retailers and installers.",
+  },
+  tone: {
+    file: "team-01.jpg",
+    alt: "01, contact: it reaches every lead. Sol writes to them; your voice agent rings them. Lead in, emailed, calling, booked (example).",
+  },
+  ttwo: {
+    file: "team-02.jpg",
+    alt: "02, design: it quotes as you draw. A real design in RENUABL: 19.95 kW, 42 panels, an 18 kWh battery (estimates).",
+  },
+  tthree: {
+    file: "team-03.jpg",
+    alt: "03, proposal: it sends your proposal, in your logo and colours, signed online (an example proposal).",
+  },
+  tclose: { file: "team-close.jpg", alt: "Built for solar. Sol, voice agents, designer, proposals, CRM. RENUABL." },
   footv: {
     file: "footer-voice.jpg",
     alt: `Your AI salesperson: ${VOICE_DAY_WORDS}. Calls & Texts, ${VOICE}.`,
@@ -373,8 +390,60 @@ const MORE: { name: string; content: EdmContent }[] = [
   },
 ];
 
+/** The campaigns laid out hook, picture, button, beside the launch and its series. */
+const OWN: { name: string; content: EdmContent }[] = [{ name: GTM_VOICE_NAME, content: GTM_VOICE }, ...MORE];
+
+/**
+ * Your AI sales team (27 Nov 2026, Martin: from Xero's email, "a cover, then outlining core features: 1. AI contacts
+ * your lead (sol written + voice call) 2. Assists in your design (builds the quote) 3. Customise your proposal"; then
+ * "remain in RENUABL style (space x, xai, tesla, apple)"; then "this looks very average… it doesnt ooze the intelligence
+ * and sophistication"). Told in frames, as a launch is: a cover, the three features as 01, 02, 03, and a close, each a
+ * full-width picture drawn in launch-art.mjs (huge light type, mono telemetry, the real product lit on the dark), a white
+ * button under each. A few live words under the cover say it all for an inbox that holds pictures back. Laid out as no
+ * other draft is, so it has its own checks (gtm-team.test.ts).
+ */
+export const GTM_TEAM_NAME = "Your AI sales team · three steps";
+/** The ground the frames are drawn on (launch-art.mjs GROUND), so frame meets email without a seam. */
+const FRAME_GROUND = "#1d1f25";
+const WHITE = "#ffffff";
+const team = (id: string, b: Omit<EdmBlock, "id" | "imageId">): EdmBlock => ({ id: `gtmteam${id}`, imageId: null, ...b });
+const frame = (key: keyof typeof GTM_PICTURES, url: string) =>
+  team(`pic${key}`, { kind: "image", text: GTM_PICTURES[key].alt, url, align: "center", width: "full" });
+const go = (id: string, text: string, url: string) => team(id, { kind: "button", text, url, align: "center", colour: WHITE });
+const gap = (id: string) => team(id, { kind: "spacer", text: "", url: null, align: "left", space: "medium" });
+export const GTM_TEAM: EdmContent = {
+  style: { background: FRAME_GROUND, text: "#f5f5f7" },
+  subject: "Meet your AI sales team",
+  preview: "It writes to every lead, calls them, quotes as you draw and sends the proposal in your name.",
+  blocks: [
+    frame("tcover", DEMO),
+    team("t0", {
+      kind: "text",
+      text: "Sol writes to every new lead and your voice agent rings them. The quote builds as you draw, and the proposal goes out in your name.",
+      url: null,
+      align: "center",
+    }),
+    go("b0", "Try the demo", DEMO),
+    gap("g1"),
+    frame("tone", DEMO),
+    go("b1", "See it reach a lead", DEMO),
+    gap("g2"),
+    frame("ttwo", DEMO),
+    go("b2", "See it quote", DEMO),
+    gap("g3"),
+    frame("tthree", DEMO),
+    go("b3", "See a proposal", DEMO),
+    gap("g4"),
+    frame("tclose", SITE),
+    go("b4", "See the pricing", PRICING),
+    gap("g5"),
+    team("picfootv", { kind: "image", text: GTM_PICTURES.footv.alt, url: SITE, align: "center" }),
+    team("picfooter", { kind: "image", text: GTM_PICTURES.footer.alt, url: MARKETPLACE, align: "center" }),
+  ],
+};
+
 /** The campaigns of their own, beside the launch and its series: each added once by its name (the gtm route). */
-export const GTM_CAMPAIGNS: { name: string; content: EdmContent }[] = [{ name: GTM_VOICE_NAME, content: GTM_VOICE }, ...MORE];
+export const GTM_CAMPAIGNS: { name: string; content: EdmContent }[] = [...OWN, { name: GTM_TEAM_NAME, content: GTM_TEAM }];
 
 /** The series: one product an email, each picture with its own hook and button. */
 const SERIES: { wait: number; content: EdmContent }[] = [
@@ -466,7 +535,7 @@ export function gtmSequence(launchCampaignId: string, ids: Record<string, string
 }
 
 /** Every email in the drafts, for the checks and the review copy. */
-export const GTM_EMAILS: EdmContent[] = [GTM_LAUNCH, ...SERIES.map((s) => s.content), ...GTM_CAMPAIGNS.map((c) => c.content)];
+export const GTM_EMAILS: EdmContent[] = [GTM_LAUNCH, ...SERIES.map((s) => s.content), ...OWN.map((c) => c.content)];
 
 /** The picture keys an email uses, so only those are read in when it alone is added. */
 export const pictureKeys = (c: EdmContent): string[] => c.blocks.map(pictureKeyOf).filter((k): k is string => Boolean(k));
