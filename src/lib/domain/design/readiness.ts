@@ -182,6 +182,26 @@ export function readinessLight(items: readonly ReadinessItem[]): { ready: boolea
   };
 }
 
+/**
+ * The words under "Ready to install." when the light turns green (26 Nov 2026, Martin: "a message like this appearing
+ * when a design is complete"). Only what really passed is named, and what is still worth a check is said beside it.
+ */
+export function readyWords(items: readonly ReadinessItem[]): { passed: string; toCheck: string | null } {
+  const pass = (id: ReadinessItem["id"]) => items.some((i) => i.id === id && i.state === "pass");
+  const named = [pass("strings") ? "strings" : null, pass("ratio") ? "inverter limits" : null, pass("edges") ? "clearances" : null].filter(
+    (x): x is string => x !== null,
+  );
+  const list = named.length > 1 ? `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}` : (named[0] ?? "");
+  const check = items.filter((i) => i.state === "check").length;
+  return {
+    passed: list ? `${list[0].toUpperCase()}${list.slice(1)}, checked as you draw.` : "Every check that can be made from here, passed.",
+    toCheck: check ? `${check} still worth a check.` : null,
+  };
+}
+
+/** How long the Ready to install message stays before it goes by itself, ms. */
+export const READY_MOMENT_MS = 4500;
+
 /** A check's light: green passed, amber worth a look, red to fix, none while it doesn't apply yet. */
 export type CheckLight = "pass" | "check" | "fix";
 

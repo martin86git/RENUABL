@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readiness, readinessLight, type ReadinessInput } from "./readiness";
+import { readiness, readinessLight, readyWords, type ReadinessInput } from "./readiness";
 
 const good: ReadinessInput = {
   panels: 14,
@@ -20,6 +20,15 @@ describe("ready to install", () => {
   it("goes green only when nothing needs fixing", () => {
     const items = readiness(good);
     expect(readinessLight(items)).toEqual({ ready: true, fix: 0, check: 0 });
+  });
+  it("names only what passed when the light turns green", () => {
+    expect(readyWords(readiness(good))).toEqual({
+      passed: "Strings, inverter limits and clearances, checked as you draw.",
+      toCheck: null,
+    });
+    const untraced = readyWords(readiness({ ...good, tooClose: null }));
+    expect(untraced.passed).toBe("Strings and inverter limits, checked as you draw.");
+    expect(untraced.toCheck).toBe("1 still worth a check.");
   });
   it("asks for panels first, and nothing else, on an empty roof", () => {
     const items = readiness({ ...good, panels: 0 });

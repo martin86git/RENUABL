@@ -1208,6 +1208,55 @@ body {
   }
 }
 
+/* The designer's Ready to install moment (ready-moment.tsx): the card rises, the dot and the words turn from the signal
+   orange to green, then it fades by itself (4.5 s, READY_MOMENT_MS). Still, and green from the start, with reduced motion. */
+@keyframes ready-moment {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  8%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+@keyframes ready-moment-green {
+  0%,
+  12% {
+    color: rgb(255 255 255 / 0.35);
+    background-color: #ff5a1f;
+  }
+  30%,
+  100% {
+    color: #34d399;
+    background-color: #34d399;
+  }
+}
+.ready-moment {
+  animation: ready-moment 4.5s ease-out both;
+}
+.ready-moment-title {
+  color: #34d399;
+  animation: ready-moment-green 4.5s ease-out both;
+  background-color: transparent !important;
+}
+.ready-moment-dot {
+  background-color: #34d399;
+  animation: ready-moment-green 4.5s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ready-moment,
+  .ready-moment-title,
+  .ready-moment-dot {
+    animation: none;
+  }
+}
+
 @keyframes fade-up {
   from {
     opacity: 0;
