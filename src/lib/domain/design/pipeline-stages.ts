@@ -52,6 +52,11 @@ export interface ShownPipeline {
   set: boolean;
   /** A set pipeline the business has changed: it can be put back. */
   changed: boolean;
+  /**
+   * Where a deal goes by itself on reaching the stage `at`, which this pipeline doesn't show (Sales: a deal won, to
+   * Post sale). None once the pipeline shows that stage, or a stage that counts as it.
+   */
+  next?: { at: JobStage; to: string };
 }
 
 export const MAX_OWN_STAGES = 40;
@@ -170,18 +175,27 @@ export function insertStage(stages: readonly StageKey[], key: StageKey, after: n
  * has are left out; a pipeline left with none shows the stages it came with
  * (set) or is left out (its own).
  */
-export function pipelinesFor(kept: readonly KeptPipeline[], own: readonly OwnStage[]): ShownPipeline[] {
+export function pipelinesFor(
+  kept: readonly KeptPipeline[],
+  own: readonly OwnStage[],
+  setOnes: readonly Pipeline[] = PIPELINES,
+): ShownPipeline[] {
   const tidy = (s: readonly StageKey[]) => cleanStageKeys(s, own);
-  const set = PIPELINES.map((p: Pipeline): ShownPipeline => {
+  const baseOf = (k: StageKey) => (isJobStage(k) ? k : own.find((s) => s.id === k)?.base);
+  const set = setOnes.map((p: Pipeline): ShownPipeline => {
     const row = kept.find((k) => k.baseId === p.id);
-    const stages = row ? tidy(row.stages) : [...p.stages];
+    const tidied = row ? tidy(row.stages) : [...p.stages];
+    const stages = tidied.length ? tidied : [...p.stages];
+    const next = p.next;
     return {
       id: p.id,
       name: row?.name || p.name,
-      stages: stages.length ? stages : [...p.stages],
+      stages,
       rowId: row?.id ?? null,
       set: true,
       changed: !!row,
+      // The hand-on holds only while the pipeline doesn't show the stage itself (the business may have put it back).
+      ...(next && !stages.some((k) => baseOf(k) === next.at) ? { next } : {}),
     };
   });
   const mine = kept
@@ -254,8 +268,12 @@ export function cleanPipelineSave(raw: unknown, own: readonly OwnStage[]): Clean
  * The business's pipelines as runs of the twelve stages, for places that read deals by stage only (Today's feed):
  * an added stage stands as the stage it counts as, each once, in the pipeline's order. Names as the business set them.
  */
-export function pipelinesByStage(kept: readonly KeptPipeline[], own: readonly OwnStage[]): Pipeline[] {
-  return pipelinesFor(kept, own).map((p) => {
+export function pipelinesByStage(
+  kept: readonly KeptPipeline[],
+  own: readonly OwnStage[],
+  setOnes: readonly Pipeline[] = PIPELINES,
+): Pipeline[] {
+  return pipelinesFor(kept, own, setOnes).map((p) => {
     const stages: JobStage[] = [];
     for (const k of p.stages) {
       const b = isJobStage(k) ? k : own.find((s) => s.id === k)?.base;

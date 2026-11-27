@@ -124,7 +124,11 @@ export const saveJob = (
 export const deleteJob = (id: string) => ask<object>(`/api/design/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 /** The pipelines the business keeps (its own, and set ones it renamed or changed) and the stages it added: shared by everyone in it. */
-export const listPipelines = () => ask<{ pipelines: KeptPipeline[]; stages: OwnStage[]; names: StageNames }>("/api/design/pipelines");
+export const listPipelines = () =>
+  ask<{ pipelines: KeptPipeline[]; stages: OwnStage[]; names: StageNames; wonLeavesSales?: boolean }>("/api/design/pipelines");
+/** Settings → Pipeline automations: whether a deal won leaves the Sales pipeline for Post sale by itself. */
+export const saveWonLeavesSales = (wonLeavesSales: boolean) =>
+  ask<{ wonLeavesSales: boolean }>("/api/design/pipelines", { method: "PUT", body: { wonLeavesSales } });
 /** A new pipeline, or with `baseId` a set pipeline renamed or given other stages. */
 export const createPipeline = (input: { name: string; stages: StageKey[]; baseId?: string | null }) =>
   ask<{ pipeline: KeptPipeline }>("/api/design/pipelines", { method: "POST", body: input });

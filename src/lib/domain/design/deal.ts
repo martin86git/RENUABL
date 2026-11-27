@@ -29,6 +29,11 @@ export interface Pipeline {
   id: string;
   name: string;
   stages: readonly JobStage[];
+  /**
+   * Where a deal goes by itself when it leaves this pipeline: reaching the stage `at`, it is no longer in this
+   * pipeline and is in the pipeline `to` (which starts at that stage).
+   */
+  next?: { at: JobStage; to: string };
 }
 
 /**
@@ -37,14 +42,25 @@ export interface Pipeline {
  * "Custom" is whichever stages the person has ticked without saving.
  */
 export const PIPELINES: readonly Pipeline[] = [
-  // Selling: from a new lead to the deal signed.
-  { id: "sales", name: "Sales pipeline", stages: ["lead", "designed", "proposal", "won"] },
+  // Selling: from a new lead to the proposal out. A deal won (marked so, or its proposal signed) leaves it for the
+  // Post sale pipeline by itself (27 Nov 2026, Martin: "it doesnt sit in the sales pipeline"), unless the business
+  // switched that off (`setPipelines`).
+  { id: "sales", name: "Sales pipeline", stages: ["lead", "designed", "proposal"], next: { at: "won", to: "post-sale" } },
   // Sold, and being got ready: the stock and the date.
   { id: "post-sale", name: "Post sale pipeline", stages: ["won", "ordered", "scheduled", "installed"] },
   // On the roof, and being finished off: inspection, the certificate, the grid connection, the rebates.
   { id: "post-installation", name: "Post installation pipeline", stages: ["installed", "inspection", "coes", "grid", "claimed"] },
   { id: "lost", name: "Lost", stages: ["lost"] },
 ];
+
+/**
+ * The set pipelines as a business has them (Settings → Pipeline automations): with the hand-on from Sales to Post
+ * sale switched off, a deal won stays in the Sales pipeline as its last column, as well as starting Post sale.
+ */
+export function setPipelines(wonLeavesSales: boolean): readonly Pipeline[] {
+  if (wonLeavesSales) return PIPELINES;
+  return PIPELINES.map((p) => (p.next ? { id: p.id, name: p.name, stages: [...p.stages, p.next.at] } : p));
+}
 
 export type DealView = "cards" | "list";
 

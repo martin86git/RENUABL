@@ -58,6 +58,7 @@ import {
   type OwnStage,
   type StageNames,
 } from "@/lib/domain/design/pipeline-stages";
+import { setPipelines } from "@/lib/domain/design/deal";
 
 export type Q = Parameters<Parameters<typeof transaction>[0]>[0];
 
@@ -773,7 +774,12 @@ export async function addOwnStage(
     const stage = made[0];
     if (!place) return { stage, pipeline: null };
     const kept = await q<KeptPipeline>(`select ${PIPELINE} from design_pipelines where business_id = $1`, [businessId]);
-    const shown = pipelinesFor(kept, [...own, stage]).find((p) => p.id === place.pipelineId);
+    // The set pipelines as this business has them: Won is Sales' last column only where it switched the hand-on off.
+    const pref = await q<{ off: boolean }>(
+      `select (prefs->'automations'->>'wonLeavesSales') = 'false' as off from design_prefs where business_id = $1`,
+      [businessId],
+    );
+    const shown = pipelinesFor(kept, [...own, stage], setPipelines(!pref[0]?.off)).find((p) => p.id === place.pipelineId);
     if (!shown) return { refused: "That pipeline isn't here." };
     const stages = insertStage(shown.stages, stage.id, place.after);
     if (stages.length > MAX_PIPELINE_STAGES) return { refused: PIPELINE_TOO_LONG };

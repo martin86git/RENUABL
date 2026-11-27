@@ -46,6 +46,12 @@ export interface BusinessPrefs {
   automations: {
     /** Emails the customer before their installation day, so they can get ready. */
     installReminders: boolean;
+    /**
+     * A deal won (marked so, or its proposal signed) leaves the Sales pipeline for the Post sale pipeline by itself
+     * (Settings → Pipeline automations). On unless the business switches it off, which keeps Won as the Sales
+     * pipeline's last column.
+     */
+    wonLeavesSales: boolean;
   };
   /** How many days before the installation the reminder goes. */
   reminderDaysBefore: number;
@@ -75,7 +81,7 @@ export const DEFAULT_PREFS: BusinessPrefs = {
   suppliers: {},
   supplierRank: [],
   invoiceTolerance: 50,
-  automations: { installReminders: false },
+  automations: { installReminders: false, wonLeavesSales: true },
   reminderDaysBefore: 2,
   reminderFrom: null,
   dealFields: null,
@@ -123,7 +129,7 @@ export function cleanPrefs(raw: unknown, newId?: () => string): BusinessPrefs {
     supplierRank: rank,
     invoiceTolerance:
       Number.isFinite(tolerance) && tolerance >= 0 && tolerance <= 2000 ? Math.round(tolerance) : DEFAULT_PREFS.invoiceTolerance,
-    automations: { installReminders: auto.installReminders === true },
+    automations: { installReminders: auto.installReminders === true, wonLeavesSales: auto.wonLeavesSales !== false },
     reminderDaysBefore: (REMINDER_DAY_CHOICES as readonly number[]).includes(days) ? days : DEFAULT_PREFS.reminderDaysBefore,
     reminderFrom: cleanMailboxChoice(r.reminderFrom),
     dealFields: r.dealFields && typeof r.dealFields === "object" ? cleanDealFields(r.dealFields) : null,

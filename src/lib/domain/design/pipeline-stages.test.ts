@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { setPipelines } from "./deal";
 import { cleanJobInput } from "./crm";
 import { panelTabsFor, stagePill } from "./deal-feed";
 import { pipelineBoard } from "./today-pad";
@@ -90,6 +91,29 @@ describe("pipelines", () => {
 
   it("reads as runs of the twelve for the feed", () => {
     expect(pipelinesByStage(kept, own)[0].stages).toEqual(["lead", "designed", "proposal", "won"]);
+  });
+
+  it("hands a deal won on from Sales to Post sale, unless the business keeps Won in Sales", () => {
+    // As it comes: Sales ends at Proposal sent, and a deal won goes to Post sale.
+    const asItComes = pipelinesFor([], own);
+    expect(asItComes[0].stages).toEqual(["lead", "designed", "proposal"]);
+    expect(asItComes[0].next).toEqual({ at: "won", to: "post-sale" });
+    expect(asItComes[1].next).toBeUndefined();
+    expect(pipelinesByStage([], own)[0].stages).toEqual(["lead", "designed", "proposal"]);
+    // Switched off in Settings: Won is Sales' last column again, and nothing is handed on.
+    const off = pipelinesFor([], own, setPipelines(false));
+    expect(off[0].stages).toEqual(["lead", "designed", "proposal", "won"]);
+    expect(off[0].next).toBeUndefined();
+    // A Sales pipeline the business changed keeps its stages: with Won in it, nothing is handed on.
+    expect(pipelinesFor(kept, own)[0].next).toBeUndefined();
+    // With Won taken off it by hand, a deal won is handed on while the switch is on, and not while it is off.
+    const noWon: KeptPipeline[] = [{ id: "pipe_9", name: "Selling", stages: ["lead", "proposal"], baseId: "sales" }];
+    expect(pipelinesFor(noWon, own)[0].next).toEqual({ at: "won", to: "post-sale" });
+    expect(pipelinesFor(noWon, own, setPipelines(false))[0].next).toBeUndefined();
+    // A stage the business added that counts as Won keeps won deals in view too.
+    const wonSub = { id: "st_bbbbbbbb", name: "Deposit paid", base: "won" as const };
+    const withSub: KeptPipeline[] = [{ id: "pipe_8", name: "Selling", stages: ["lead", wonSub.id], baseId: "sales" }];
+    expect(pipelinesFor(withSub, [...own, wonSub])[0].next).toBeUndefined();
   });
 });
 

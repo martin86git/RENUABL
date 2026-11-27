@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Deals",
+    words: "A won or signed deal leaves the Sales pipeline for Post sale by itself. Switch it off in Settings, Pipeline automations.",
+  },
+  {
+    day: "2026-11-27",
     area: "Design tool",
     words: "Designer: fill in the solar, inverter and battery a home already has. Kept, it counts in the yield and the bill.",
   },

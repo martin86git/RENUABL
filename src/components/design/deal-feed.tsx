@@ -85,7 +85,7 @@ import { OPEN_STAGES, type JobStage } from "@/lib/domain/design/crm";
 import { countdownWords } from "@/lib/domain/design/sol-agents";
 import { emailDeal, listPipelines, saveJob, setDealOwner } from "@/lib/services/crm";
 import { dayChip, installDayEmail } from "@/lib/domain/design/install-days";
-import { PIPELINES, type Pipeline } from "@/lib/domain/design/deal";
+import { PIPELINES, setPipelines, type Pipeline } from "@/lib/domain/design/deal";
 import { pipelinesByStage } from "@/lib/domain/design/pipeline-stages";
 import { actOnOutbox, editOutbox, putOffOutbox } from "@/lib/services/sol-agents";
 import { briefHref } from "@/lib/domain/design/deal-team";
@@ -209,7 +209,10 @@ export function DealFeed(props: {
   const [saved, setSaved] = useState<Pipeline[]>([]);
   useEffect(() => {
     let gone = false;
-    void listPipelines().then((r) => !gone && r.ok && setSaved(pipelinesByStage(r.pipelines, r.stages)));
+    // The set pipelines as the business has them: a deal won leaves Sales for Post sale unless it switched that off.
+    void listPipelines().then(
+      (r) => !gone && r.ok && setSaved(pipelinesByStage(r.pipelines, r.stages, setPipelines(r.wonLeavesSales !== false))),
+    );
     return () => {
       gone = true;
     };

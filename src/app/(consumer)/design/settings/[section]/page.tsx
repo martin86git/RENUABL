@@ -8,6 +8,7 @@ import { DesignShell } from "@/components/design/design-shell";
 import { DealFieldsSettings } from "@/components/design/settings-deal-fields";
 import { DatasheetSettings } from "@/components/design/settings-datasheets";
 import { StandardsSettings } from "@/components/design/settings-standards";
+import { PipelineSettings } from "@/components/design/settings-pipelines";
 import { TargetsSettings } from "@/components/design/settings-targets";
 import { CrmImportSettings } from "@/components/design/settings-crm-import";
 import { PylonImportSettings } from "@/components/design/settings-pylon";
@@ -81,6 +82,8 @@ export default async function DesignSettingPage({ params }: PageProps<"/design/s
           <HubSpotImportSettings />
         ) : section === "lead-inbox" ? (
           <LeadInboxSettings />
+        ) : section === "pipelines" ? (
+          <PipelineSettings />
         ) : section === "targets" ? (
           <TargetsSettings />
         ) : section === "datasheets" ? (

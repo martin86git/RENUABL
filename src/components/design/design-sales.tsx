@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  ArrowRight,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -16,6 +17,7 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Trophy,
   User,
   UserX,
   Users,
@@ -23,7 +25,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { JOB_STAGES, OPEN_STAGES, STAGE_LABELS, WON_STAGES, type JobStage } from "@/lib/domain/design/crm";
-import { DEFAULT_PIPELINE, cleanPipelineChoice, type PipelineChoice } from "@/lib/domain/design/deal";
+import { DEFAULT_PIPELINE, cleanPipelineChoice, setPipelines, type PipelineChoice } from "@/lib/domain/design/deal";
 import {
   STAGE_NAME_MAX,
   baseAt,
@@ -144,6 +146,10 @@ export function PipelinesPage() {
   // The business's own names for the twelve stages (only those it changed).
   const [names, setNames] = useState<StageNames>({});
   const [naming, setNaming] = useState<{ mode: "new" | "rename"; name: string } | null>(null);
+  // Whether a deal won leaves the Sales pipeline for Post sale by itself: the business's setting, on unless switched off.
+  const [leaves, setLeaves] = useState(true);
+  // The deal that just left the pipeline on show for the next by itself (a deal won goes to Post sale).
+  const [moved, setMoved] = useState<{ id: string; name: string; from: StageKey; at: JobStage; to: ShownPipeline } | null>(null);
   // The deal being dragged, and the column it is over.
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<StageKey | null>(null);
@@ -199,6 +205,7 @@ export function PipelinesPage() {
       setKept(res.pipelines);
       setOwn(res.stages);
       setNames(res.names ?? {});
+      setLeaves(res.wonLeavesSales !== false);
     });
     return () => {
       gone = true;
@@ -215,7 +222,7 @@ export function PipelinesPage() {
   };
 
   // Every pipeline the business sees (the set ones as it renamed or changed them, then its own), and the one on show.
-  const all = pipelinesFor(kept, own);
+  const all = pipelinesFor(kept, own, setPipelines(leaves));
   const named = all.find((p) => p.id === choice.pipeline) ?? all[0];
   const stages = order && order.pipeline === named.id ? order.stages : named.stages;
   // New deals start as leads, so the lead column takes "+ Add new deal" in place of a button up top.
@@ -238,6 +245,7 @@ export function PipelinesPage() {
     const fixed = p.stages.filter(isJobStage);
     choose({ ...choice, stages: fixed.length ? fixed : [...DEFAULT_PIPELINE.stages], pipeline: p.id });
     setNaming(null);
+    setMoved(null);
   };
   /** The pipeline kept as it now stands on the server, put in place of its old row (or added). */
   const keepRow = (row: KeptPipeline) => setKept((now) => [...now.filter((k) => k.id !== row.id), row]);
@@ -359,8 +367,18 @@ export function PipelinesPage() {
     if (!res.ok) {
       setProblem(res.message);
       setJobs((now) => (now ?? []).map((j) => (j.id === id ? { ...j, stage: job.stage, subStage: job.subStage ?? null } : j)));
-    } else setProblem(null);
+      return;
+    }
+    setProblem(null);
+    // A deal won in the Sales pipeline has left it for Post sale: say so, with the way there and the way back.
+    const next = named.next;
+    const dest = next && to.stage === next.at ? all.find((p) => p.id === next.to) : undefined;
+    setMoved(next && dest ? { id, name: job.customerName, from: keyOfDeal(job, own), at: next.at, to: dest } : null);
   };
+  // Where a deal goes by itself from the pipeline on show, and the stage that sends it (Sales: a deal won, to Post sale).
+  const onward = named.next ? (all.find((p) => p.id === named.next?.to) ?? null) : null;
+  const onwardAt = onward && named.next ? named.next.at : null;
+  const waitingThere = onwardAt ? (jobs ?? []).filter((j) => j.stage === onwardAt).length : 0;
 
   const shown = (jobs ?? []).filter(
     (j) => columnOf(j, stages, own) !== null && (whose === "all" || (whose === "mine" ? j.owner === me : !j.owner)),
@@ -587,6 +605,37 @@ export function PipelinesPage() {
         </p>
       )}
 
+      {moved && (
+        <p
+          className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md bg-positive-soft px-4 py-2.5 text-sm text-ink"
+          role="status"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Check className="size-4 text-positive" aria-hidden />
+            {moved.name}&apos;s deal is {labelOf(moved.at, names).toLowerCase()}. It has moved to the {moved.to.name}.
+          </span>
+          <button className={clsx(ui.link, "text-[13px] font-medium")} onClick={() => pick(moved.to)}>
+            See it there
+          </button>
+          <button
+            className="text-[13px] font-medium text-ink-2 underline underline-offset-4 hover:text-ink"
+            onClick={() => void move(moved.id, moved.from)}
+          >
+            Undo
+          </button>
+        </p>
+      )}
+
+      {choice.view === "list" && onward && onwardAt && (
+        <p className="mt-3 text-xs text-ink-2">
+          A deal marked {labelOf(onwardAt, names).toLowerCase()}, or whose proposal is signed, moves to the{" "}
+          <button className={ui.link} onClick={() => pick(onward)}>
+            {onward.name}
+          </button>{" "}
+          by itself.
+        </p>
+      )}
+
       {choice.view === "cards" ? (
         <div
           ref={board}
@@ -754,6 +803,45 @@ export function PipelinesPage() {
               </section>
             );
           })}
+          {onward && onwardAt && (
+            // Not a column: a deal dropped here is won, and leaves this pipeline for the next by itself.
+            <section
+              aria-label={`${labelOf(onwardAt, names)}: moves to the ${onward.name}`}
+              onDragOver={(e) => {
+                if (!dragging) return;
+                e.preventDefault();
+                setOver(onwardAt);
+              }}
+              onDragLeave={() => setOver((now) => (now === onwardAt ? null : now))}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragging) void move(dragging, onwardAt);
+                setDragging(null);
+                setOver(null);
+                setMovingCol(null);
+                setColOver(null);
+              }}
+              className={clsx(
+                "flex w-[64%] shrink-0 snap-start flex-col items-center justify-center gap-2 self-start rounded-xl border-2 border-dashed px-4 py-8 text-center sm:w-56 sm:rounded-lg",
+                over === onwardAt ? "border-sun-line bg-sun" : dragging ? "border-ink-2 bg-surface" : "border-line bg-surface",
+              )}
+            >
+              <span className="inline-flex size-9 items-center justify-center rounded-full bg-positive-soft text-positive">
+                <Trophy className="size-4" aria-hidden />
+              </span>
+              <h2 className="text-[12px] font-medium uppercase tracking-[0.12em] text-ink">
+                Deal {labelOf(onwardAt, names).toLowerCase()}
+              </h2>
+              <p className="text-xs text-ink-2">
+                Drop a deal here, or have its proposal signed, and it moves to the {onward.name} by itself.
+              </p>
+              <button className={clsx(ui.link, "inline-flex items-center gap-1 text-[13px] font-medium")} onClick={() => pick(onward)}>
+                {onward.name}
+                {waitingThere > 0 ? ` · ${waitingThere} at ${labelOf(onwardAt, names).toLowerCase()}` : ""}
+                <ArrowRight className="size-3.5" aria-hidden />
+              </button>
+            </section>
+          )}
           <AddStageColumn stages={stages} own={own} names={names} pipelineName={named.name} onAdd={addOwnStage} />
         </div>
       ) : (

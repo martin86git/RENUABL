@@ -13,8 +13,10 @@ import {
   materialsCsv,
   materialsOrder,
   pipelineOf,
+  setPipelines,
   systemDetails,
 } from "./deal";
+import { cleanPrefs } from "./prefs";
 import { lineKey } from "./quote";
 import type { RoofDesign } from "./roof-design";
 
@@ -32,7 +34,7 @@ describe("pipelines", () => {
       stages: ["lead", "won"],
       pipeline: "pipe_ab12",
     });
-    expect(cleanPipelineChoice({ stages: [] }).stages).toEqual(["lead", "designed", "proposal", "won"]);
+    expect(cleanPipelineChoice({ stages: [] }).stages).toEqual(["lead", "designed", "proposal"]);
     expect(cleanPipelineChoice(null).view).toBe("cards");
   });
 
@@ -48,8 +50,23 @@ describe("pipelines", () => {
 
   it("hand a deal on from one to the next: each starts at the stage the last one ends on", () => {
     const [sales, postSale, postInstall] = PIPELINES;
-    expect(sales.stages[sales.stages.length - 1]).toBe(postSale.stages[0]);
     expect(postSale.stages[postSale.stages.length - 1]).toBe(postInstall.stages[0]);
+    // A deal won doesn't sit in the Sales pipeline: it moves to Post sale by itself, which starts there.
+    expect(sales.stages).not.toContain("won");
+    expect(sales.next).toEqual({ at: "won", to: postSale.id });
+    expect(postSale.stages[0]).toBe("won");
+  });
+
+  it("keep a deal won in the Sales pipeline for a business that switched the hand-on off", () => {
+    expect(setPipelines(true)).toBe(PIPELINES);
+    const set = setPipelines(false);
+    expect(set[0].stages).toEqual(["lead", "designed", "proposal", "won"]);
+    expect(set[0].next).toBeUndefined();
+    // Post sale and the rest are as they were.
+    expect(set.slice(1)).toEqual(PIPELINES.slice(1));
+    // On unless switched off, whatever else was kept.
+    expect(cleanPrefs({}).automations.wonLeavesSales).toBe(true);
+    expect(cleanPrefs({ automations: { wonLeavesSales: false } }).automations.wonLeavesSales).toBe(false);
   });
 });
 
