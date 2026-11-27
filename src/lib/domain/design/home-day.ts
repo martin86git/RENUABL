@@ -10,6 +10,7 @@
  * own hours: a customer's smart-meter data would make that real. No dollars are worked out here.
  */
 import { MONTH_MID_DAYS, sunPosition, type SunPosition } from "./shade";
+import { TILT } from "./tilt";
 
 /** The days the seasons are shown by: the middle of January, of April and of June. */
 export const DAY_SEASONS = [
@@ -64,6 +65,11 @@ export interface HomeDayInput {
   batteryKwh: number;
   /** Whether something stands between a panel and the sun at a moment, when the heights round the roof are known. */
   shaded?: (panel: number, sun: SunPosition) => boolean;
+  /**
+   * What panels already on the home make on an average day of this month, kWh, when they stay (`existing-system.ts`):
+   * no place on the picture, so shaped through the day as a north roof at the usual pitch, with no shade.
+   */
+  extraDayKwh?: number;
 }
 
 export interface DayStep {
@@ -167,6 +173,10 @@ export function homeDay(input: HomeDayInput): HomeDay {
   const reachedAll = sum(reached);
   // The day's output is the designer's own figure, shaped by the open sun; shade then takes its share away.
   const scale = openAll > 0 ? Math.max(0, input.dayKwh) / (openAll * STEP_HOURS) : 0;
+  // Panels already on the home, when they stay: a north roof at the usual pitch, scaled to their day.
+  const extra = suns.map((sun) => sunOn({ kw: 1, tilt: TILT.roof, facing: 0 }, sun, false));
+  const extraAll = extra.reduce((a, b) => a + b, 0);
+  const extraScale = extraAll > 0 ? Math.max(0, input.extraDayKwh ?? 0) / (extraAll * STEP_HOURS) : 0;
   // The most any panel gets at any moment, for each kW of it: what a panel's glow is measured against.
   const best = Math.max(0, ...open.flatMap((row) => row.map((v, n) => (panels[n].kw > 0 ? v / panels[n].kw : 0))));
 
@@ -177,7 +187,7 @@ export function homeDay(input: HomeDayInput): HomeDay {
     steps = [];
     for (let i = 0; i < DAY_STEPS; i++) {
       const hour = (i + 0.5) * STEP_HOURS;
-      const solar = reached[i].reduce((a, b) => a + b, 0) * scale;
+      const solar = reached[i].reduce((a, b) => a + b, 0) * scale + extra[i] * extraScale;
       const use = homeKwh * shareOfUseAt(hour);
       const direct = Math.min(solar, use);
       const spare = solar - direct;

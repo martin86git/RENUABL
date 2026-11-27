@@ -1053,6 +1053,7 @@ export function ProposalPage({
         {view.system.details.map((d) => (
           <Line key={d.label} label={d.label} value={d.value} />
         ))}
+        {view.system.existing?.note && <p className="mt-3 text-[13px] leading-relaxed text-muted">{view.system.existing.note}</p>}
       </div>
     ),
     roof: () => (view.roof.panels.length > 0 && hero?.kind !== "roof" ? roofPicture(null) : null),

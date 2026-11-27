@@ -147,6 +147,8 @@ export interface SelfDesignInput {
   bill: { interval: BillInterval; amount: number; supplyPerDay: number; rate: number; feedIn: number } | null;
   selfUseShare: number;
   yieldPerKwDay: number;
+  /** The system the home already has, when the designs keep it (`existingForFinance`): counted in the bill and the battery. */
+  existing?: { monthlyKwh: number[]; batteryKwh: number } | null;
   form: QuoteForm;
   workspace: Workspace;
   rates: RebateRates;
@@ -315,8 +317,8 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
     const idea = suggestBatteries({
       batteries: input.batteries,
       inverters: inverters.map((i) => ({ name: i.name, hybrid: true })),
-      monthlyKwh: year,
-      dailyKwh: input.bill ? dailyUse(input.bill) : null,
+      monthlyKwh: input.existing ? year.map((k, m) => k + input.existing!.monthlyKwh[m]) : year,
+      dailyKwh: input.bill ? dailyUse(input.bill, input.existing) : null,
       selfUseShare: input.selfUseShare,
       eveningShare: DAY.eveningShare,
     });
@@ -326,7 +328,7 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
     if (!product || !(product.kwh > 0)) return null;
     let qty = pick?.qty ?? 0;
     if (way === "blackout") {
-      const daily = input.bill ? dailyUse(input.bill) : null;
+      const daily = input.bill ? dailyUse(input.bill, input.existing) : null;
       // The same product, stacked to hold the whole of the evenings (after what a battery gives back), and one more for blackouts.
       const evenings = daily ? Math.ceil((daily * DAY.eveningShare) / DAY.batteryRoundTrip / product.kwh - 1e-9) : 0;
       qty = Math.max(qty, evenings) + 1;
@@ -361,7 +363,7 @@ function build(input: SelfDesignInput, source: Source, n: number, way: BatteryWa
   const youPay = Math.max(0, Math.round(costing.priceIncGst - stc));
   const batteryKwh = battery ? r1(battery.kwh * battery.qty) : 0;
   // The module held back for blackouts doesn't carry the evenings.
-  const finance = input.bill ? designFinance(input.bill, year, shiftingKwhOf(design), input.selfUseShare) : null;
+  const finance = input.bill ? designFinance(input.bill, year, shiftingKwhOf(design), input.selfUseShare, input.existing) : null;
   const saving = finance ? finance.saving : null;
   return {
     n,
@@ -390,8 +392,8 @@ function smallestBattery(batteries: CatalogueBattery[], inverterName: string): C
 }
 
 /** What the home uses a day, worked back from the bill as `designFinance` does it. */
-function dailyUse(bill: NonNullable<SelfDesignInput["bill"]>): number | null {
-  const f = designFinance(bill, new Array(12).fill(0), 0, 0);
+function dailyUse(bill: NonNullable<SelfDesignInput["bill"]>, existing?: SelfDesignInput["existing"]): number | null {
+  const f = designFinance(bill, new Array(12).fill(0), 0, 0, existing);
   return f ? f.dailyKwh : null;
 }
 
@@ -415,10 +417,10 @@ export function selfDesign(input: SelfDesignInput): SelfDesignResult {
   const watts = panelOf({ panel: input.panel }).watts;
   const low = Math.min(source.most, MIN_SELF_PANELS);
   const counts = Array.from({ length: source.most - low + 1 }, (_, i) => low + i);
-  const hasBill = Boolean(input.bill && dailyUse(input.bill));
+  const hasBill = Boolean(input.bill && dailyUse(input.bill, input.existing));
   if (!hasBill) notes.push("Add the customer's bill to size these against their payback. Until then they are sized by rule.");
 
-  const nights = hasBill ? (dailyUse(input.bill!) ?? 0) * DAY.eveningShare : null;
+  const nights = hasBill ? (dailyUse(input.bill!, input.existing) ?? 0) * DAY.eveningShare : null;
   const smallNights = nights !== null && nights < SMALL_NIGHTS_KWH;
   if (smallNights)
     notes.push(

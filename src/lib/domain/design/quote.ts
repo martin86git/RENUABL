@@ -10,6 +10,7 @@
  * rather than failing or inventing a figure. No inverter or battery is added
  * unless the design names one.
  */
+import { cleanExisting, type ExistingSystem } from "./existing-system";
 import { deemingYears, batteryFactor, taperedKwh, type RebateRates } from "../rebates";
 import { cleanDesignShade, type DesignShade } from "./design-shade";
 import { zoneRating } from "../zone-ratings";
@@ -80,6 +81,8 @@ export interface QuoteForm {
    * main one (`pitch`): each a roof new panels can be laid at, chosen on the designer's pitch mark. Up to `MAX_ROOFS` - 1.
    */
   pitches?: number[];
+  /** The system the home already has (`existing-system.ts`): the home's, the same on every design of the roof. */
+  existing?: ExistingSystem;
 }
 
 /** The most roofs a home's pitch mark holds, the main one included. */
@@ -424,6 +427,8 @@ export interface QuoteFields {
   edits: Record<string, LineEdit>;
   /** The design's shade from its last reading in the designer (`design-shade.ts`), carried to its proposal. */
   shade?: DesignShade;
+  /** This design takes the home's existing system off (it replaces it): then nothing of it is counted. Kept otherwise. */
+  existingOut?: boolean;
 }
 
 /**
@@ -556,7 +561,8 @@ export function withHomeOf(from: QuoteFields, to: QuoteFields): QuoteFields {
     edits[key] = { ...rest, ...cost };
   }
   // A design's shade is its own panels', never the home's.
-  return { form: { ...from.form }, edits, ...(to.shade ? { shade: to.shade } : {}) };
+  // Whether a design keeps the home's existing system or takes it off is that design's own.
+  return { form: { ...from.form }, edits, ...(to.shade ? { shade: to.shade } : {}), ...(to.existingOut ? { existingOut: true } : {}) };
 }
 
 /** Every design's quote given the home of the one at `from` (the one being worked on). */
@@ -760,6 +766,8 @@ export interface DesignFinance {
   selfConsumption: number;
   /** The share of what the home uses that the system supplies, 0 to 1. */
   selfReliance: number;
+  /** Of what is made in a year, what the home's existing panels make (they stay): only with an existing system. */
+  existingKwh?: number;
 }
 
 /** The share of a day's use taken to fall after dark, and what a battery gives back of what is put in. */
@@ -779,38 +787,68 @@ export function designFinance(
   monthlyKwh: readonly number[],
   batteryKwh: number,
   selfUseShare: number,
+  /**
+   * The system the home already has, when it stays (`existingForFinance`): what its panels make in each month and what
+   * its battery holds. The bill then shows only what was bought with it there, so the home's real use is worked back
+   * from it, and the saving is what the design changes on top: less bought, and less (or more) sold.
+   */
+  existing?: { monthlyKwh: readonly number[]; batteryKwh: number } | null,
 ): DesignFinance | null {
   const days = BILL_INTERVALS[bill.interval];
   if (!(bill.amount > 0) || !(bill.rate > 0) || !(bill.supplyPerDay >= 0) || !(bill.feedIn >= 0) || monthlyKwh.length !== 12) return null;
-  const dailyKwh = (bill.amount / days - bill.supplyPerDay) / bill.rate;
-  if (!(dailyKwh > 0)) return null;
-  let production = 0;
-  let used = 0;
-  let exported = 0;
-  let bought = 0;
-  monthlyKwh.forEach((kwh, m) => {
-    const n = MONTH_DAYS[m];
-    const made = kwh / n;
-    const asMade = Math.min(made * selfUseShare, dailyKwh * (1 - DAY.eveningShare), dailyKwh);
-    const shifted = batteryKwh > 0 ? Math.min(batteryKwh * DAY.batteryRoundTrip, made - asMade, dailyKwh * DAY.eveningShare) : 0;
-    const own = asMade + shifted;
-    production += kwh;
-    used += Math.min(own, made) * n;
-    exported += Math.max(0, made - own) * n;
-    bought += Math.max(0, dailyKwh - own) * n;
-  });
-  const billNow = Math.round((dailyKwh * bill.rate + bill.supplyPerDay) * 365);
-  const billAfter = Math.round(bought * bill.rate + bill.supplyPerDay * 365 - exported * bill.feedIn);
+  const boughtDaily = (bill.amount / days - bill.supplyPerDay) / bill.rate;
+  if (!(boughtDaily > 0)) return null;
+  const there = existing && existing.monthlyKwh.length === 12 ? existing : null;
+  const thereKwh = (m: number) => (there ? Math.max(0, there.monthlyKwh[m]) : 0);
+  /** A year at a daily use of `use`, with what is made each month and a battery. */
+  const yearAt = (use: number, made: (m: number) => number, battery: number) => {
+    let production = 0;
+    let used = 0;
+    let exported = 0;
+    let bought = 0;
+    MONTH_DAYS.forEach((n, m) => {
+      const kwh = made(m);
+      const day = kwh / n;
+      const asMade = Math.min(day * selfUseShare, use * (1 - DAY.eveningShare), use);
+      const shifted = battery > 0 ? Math.min(battery * DAY.batteryRoundTrip, day - asMade, use * DAY.eveningShare) : 0;
+      const own = asMade + shifted;
+      production += kwh;
+      used += Math.min(own, day) * n;
+      exported += Math.max(0, day - own) * n;
+      bought += Math.max(0, use - own) * n;
+    });
+    return { production, used, exported, bought };
+  };
+  // The home's real use: what it bought, plus what the system already there gave it. Found by halving, since what is
+  // bought only rises with use.
+  let dailyKwh = boughtDaily;
+  if (there) {
+    let low = boughtDaily;
+    let high = boughtDaily + Math.max(...MONTH_DAYS.map((n, m) => thereKwh(m) / n));
+    for (let i = 0; i < 40; i++) {
+      const mid = (low + high) / 2;
+      if (yearAt(mid, thereKwh, there.batteryKwh).bought / 365 < boughtDaily) low = mid;
+      else high = mid;
+    }
+    dailyKwh = (low + high) / 2;
+  }
+  const now = there ? yearAt(dailyKwh, thereKwh, there.batteryKwh) : null;
+  const after = yearAt(dailyKwh, (m) => monthlyKwh[m] + thereKwh(m), batteryKwh + (there?.batteryKwh ?? 0));
+  // The bill as typed is taken as what was bought, before any credit for what the existing panels sold: the design
+  // changes what is bought and what is sold from there.
+  const billNow = Math.round((boughtDaily * bill.rate + bill.supplyPerDay) * 365);
+  const billAfter = Math.round(after.bought * bill.rate + bill.supplyPerDay * 365 - (after.exported - (now?.exported ?? 0)) * bill.feedIn);
   return {
     dailyKwh: Math.round(dailyKwh * 10) / 10,
     billNow,
     billAfter,
     saving: billNow - billAfter,
-    productionKwh: Math.round(production),
-    usedKwh: Math.round(used),
-    exportedKwh: Math.round(exported),
-    selfConsumption: production > 0 ? used / production : 0,
-    selfReliance: Math.min(1, used / (dailyKwh * 365)),
+    productionKwh: Math.round(after.production),
+    usedKwh: Math.round(after.used),
+    exportedKwh: Math.round(after.exported),
+    selfConsumption: after.production > 0 ? after.used / after.production : 0,
+    selfReliance: Math.min(1, after.used / (dailyKwh * 365)),
+    ...(now ? { existingKwh: Math.round(now.production) } : {}),
   };
 }
 
@@ -869,8 +907,10 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
       form?: Record<string, unknown>;
       edits?: unknown;
       shade?: unknown;
+      existingOut?: unknown;
     };
     const shade = cleanDesignShade(q.shade);
+    const existing = cleanExisting((q.form as Record<string, unknown> | undefined)?.existing);
     const f = q.form && typeof q.form === "object" ? q.form : {};
     const start = defaultQuote(defaults.postcode);
     const edits: Record<string, LineEdit> = {};
@@ -949,9 +989,11 @@ export function cleanExtras(raw: unknown, designs: number, defaults: { bill: Bil
                 .map((x) => Math.round(x)),
             }
           : {}),
+        ...(existing ? { existing } : {}),
       },
       edits,
       ...(shade ? { shade } : {}),
+      ...(existing && q.existingOut === true ? { existingOut: true } : {}),
     });
   }
   return { bill, quotes };

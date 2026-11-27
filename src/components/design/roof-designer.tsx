@@ -49,6 +49,8 @@ import {
   withoutExisting,
   type RoofCheck,
 } from "@/lib/domain/design/roof-check";
+import { existingDaily, existingForFinance, existingLine, type ExistingSystem } from "@/lib/domain/design/existing-system";
+import { ExistingAsk, ExistingSystemCard } from "./existing-system-card";
 import { loadModelFit, loadRoofInfo, loadRoofModel } from "@/lib/services/roof-model";
 import { loadNearmapOutline } from "@/lib/services/nearmap";
 import { OLD_FACE_CORNERS, mendCutOutline } from "@/lib/domain/design/nearmap";
@@ -2382,9 +2384,20 @@ export function RoofDesigner(props: {
     setBillFields(next);
     setSaved("changed");
   };
+  // Bumped when Sol's question fills the existing system in, so the card beside the picture starts again from it.
+  const [existingRev, setExistingRev] = useState(0);
   // The quote's postcode is the roof's own: the one in the address searched for. One typed before that rule stays only where the address has none.
   const stored = quotes[active] ?? defaultQuote(props.postcode);
   const quoteNow = props.postcode ? { ...stored, form: { ...stored.form, postcode: props.postcode } } : stored;
+  // The system the home already has (27 Nov 2026, Martin; `existing-system.ts`): the home's, the same on every design.
+  // A design keeps it unless it takes it off; kept, what it makes is counted in the yield, the bill and the battery.
+  const existingNow = quoteNow.form.existing ?? null;
+  const existingKept = Boolean(existingNow) && !quoteNow.existingOut;
+  const existingThere = useMemo(
+    () => (existingKept ? existingForFinance(existingNow, props.yieldPerKwDay) : null),
+    [existingKept, existingNow, props.yieldPerKwDay],
+  );
+  const existingDailyKwh = existingKept && existingNow && existingNow.kw > 0 ? existingDaily(existingNow, props.yieldPerKwDay) : null;
   // Inverters on the design that can't go on the home's supply: a three-phase one on a single-phase home (`supply-match.ts`).
   const clashNow = supplyClashes(
     fitted.map((f) => props.inverters.find((i) => i.sku === f.sku) ?? { name: f.name }),
@@ -2422,6 +2435,16 @@ export function RoofDesigner(props: {
       ),
     );
     setSaved("changed");
+  };
+  /** The home's existing system set (null: none), and whether this design takes it off. */
+  const setExisting = (existing: ExistingSystem | null, out = Boolean(quoteNow.existingOut)) => {
+    const form = { ...quoteNow.form };
+    if (existing) form.existing = existing;
+    else delete form.existing;
+    const next: QuoteFields = { ...quoteNow, form };
+    if (out) next.existingOut = true;
+    else delete next.existingOut;
+    setQuote(next);
   };
   const addDesign = (copy: boolean) => {
     const list = everyDesign();
@@ -4325,7 +4348,10 @@ export function RoofDesigner(props: {
     // A module held back for blackouts doesn't carry the evenings.
     shiftingKwhOf({ battery }),
     props.workspace.settings.bill.selfUseShare,
+    existingThere,
   );
+  // What is made each month with the existing panels that stay: what a battery has to fill from.
+  const yearAll = existingThere ? year.map((k, m) => k + existingThere.monthlyKwh[m]) : year;
   const dollars = (n: number) => (n < 0 ? "-$" : "$") + Math.abs(Math.round(n)).toLocaleString("en-AU");
   // The system as the quote reads it. Worked out in the domain (systemSpecOf), so a published proposal reads the design the same way.
   const firstListed = props.catalogue[0];
@@ -4364,6 +4390,8 @@ export function RoofDesigner(props: {
       phase: quoteNow.form.phase,
       inverterKw: fittedKw,
       supplyClash: clashNow,
+      existing: existingKept && existingNow ? { kw: existingNow.kw, inverterKw: existingNow.inverterKw ?? 0 } : null,
+      battery: Boolean(battery),
     });
   })();
   const light = readinessLight(ready);
@@ -4466,7 +4494,7 @@ export function RoofDesigner(props: {
     );
     const fill = battery
       ? batteryFill({
-          solarDayKwh: Number(summary.kwhPerDay) || 0,
+          solarDayKwh: (Number(summary.kwhPerDay) || 0) + (existingDailyKwh ?? 0),
           homeDayKwh: finance?.dailyKwh ?? null,
           batteryKwh: battery.kwh * battery.qty,
           backupKwh: heldModulesOf({ battery }) * battery.kwh,
@@ -4548,13 +4576,15 @@ export function RoofDesigner(props: {
             : i === active && net !== null
               ? net
               : Math.max(0, Math.round(costing.priceIncGst - stc));
+        const thereFor = quotes[i]?.existingOut ? null : existingForFinance(existingNow, props.yieldPerKwDay);
         const f =
-          sum.panels > 0
+          sum.panels > 0 || (thereFor && shiftingKwhOf(d) > 0)
             ? designFinance(
                 billNow,
                 monthlyProduction(d, props.yieldPerKwDay),
                 shiftingKwhOf(d),
                 props.workspace.settings.bill.selfUseShare,
+                thereFor,
               )
             : null;
         return {
@@ -4802,6 +4832,14 @@ export function RoofDesigner(props: {
    */
   const replacingRef = useRef(false);
   const [replacing, setReplacing] = useState(false);
+  // A design that takes the existing system off replaces its panels; one that keeps a known system works round them.
+  const outNow = Boolean(quoteNow.existingOut);
+  const existingKnown = Boolean(existingNow);
+  useEffect(() => {
+    if (outNow === replacingRef.current || !(outNow || existingKnown)) return;
+    replacingRef.current = outNow;
+    setReplacing(outNow);
+  }, [outNow, existingKnown, active]);
   /** What is kept clear of: everything found, less the existing panels while they are being replaced. */
   const inUse = (check: RoofCheck | null): RoofCheck | null =>
     check && replacingRef.current ? { ...check, things: withoutExisting(check.things) } : check;
@@ -4829,6 +4867,8 @@ export function RoofDesigner(props: {
   /** Whether Sol has asked about the panels already on the roof this visit, and his question is waiting for an answer. */
   const existingAsked = useRef(false);
   const [existingQ, setExistingQ] = useState(false);
+  /** The panels are staying and nothing is known of them yet: Sol asks what is there (27 Nov 2026, Martin). */
+  const [existingAsk, setExistingAsk] = useState(false);
   const askExisting = () => {
     setExistingQ(true);
     setCommandReply(EXISTING_QUESTION);
@@ -4885,6 +4925,7 @@ export function RoofDesigner(props: {
           : null,
       selfUseShare: props.workspace.settings.bill.selfUseShare,
       yieldPerKwDay: props.yieldPerKwDay,
+      existing: replacingRef.current ? null : existingForFinance(existingNow, props.yieldPerKwDay),
       form: quoteNow.form,
       workspace: props.workspace,
       rates: props.rates,
@@ -4905,7 +4946,9 @@ export function RoofDesigner(props: {
       0,
       result.options.findIndex((o) => o.key === goal),
     );
-    setQuotes(list.map(() => withHomeOf(quoteNow, { form: quoteNow.form, edits: {} })));
+    setQuotes(
+      list.map(() => withHomeOf(quoteNow, { form: quoteNow.form, edits: {}, ...(replacingRef.current ? { existingOut: true } : {}) })),
+    );
     setPrimary(lead);
     show(list, lead);
     setSaved("changed");
@@ -5068,14 +5111,14 @@ export function RoofDesigner(props: {
   const batteriesShown = allBatteries ? props.batteries : batteriesThatFit;
   // How much storage the home needs, by rule (`battery-suggest.ts`): from what the panels make each month and, with the bill in, the home's evenings.
   const batteryIdea =
-    menu === "batteries" && summary.panels > 0
+    menu === "batteries" && (summary.panels > 0 || Boolean(existingThere))
       ? suggestBatteries({
           batteries: props.batteries,
           inverters: fitted.map((f, n) => ({
             name: f.name,
             ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
           })),
-          monthlyKwh: year,
+          monthlyKwh: yearAll,
           dailyKwh: finance?.dailyKwh ?? null,
           selfUseShare: props.workspace.settings.bill.selfUseShare,
           eveningShare: DAY.eveningShare,
@@ -5411,7 +5454,7 @@ export function RoofDesigner(props: {
           const idea = suggestBatteries({
             batteries: batteriesThatFit.length ? batteriesThatFit : props.batteries,
             inverters: fittedInverters,
-            monthlyKwh: year,
+            monthlyKwh: yearAll,
             dailyKwh: finance?.dailyKwh ?? null,
             selfUseShare: props.workspace.settings.bill.selfUseShare,
             eveningShare: DAY.eveningShare,
@@ -5484,7 +5527,7 @@ export function RoofDesigner(props: {
     },
     onFind: () => void askSol(),
     // The panels already on the roof (12 Nov 2026, Martin): replaced, so new ones may go where they are, or worked round.
-    onExisting: (replace: boolean | "none") => {
+    onExisting: (replace: boolean | "none", details?: ExistingSystem | null) => {
       existingAsked.current = true;
       if (replace === "none") {
         noSolarRef.current = true;
@@ -5494,6 +5537,9 @@ export function RoofDesigner(props: {
       } else {
         replacingRef.current = replace;
         setReplacing(replace);
+        // Staying, what Sol was told is there is kept for the home; replaced, this design takes it off.
+        setExisting(details ?? existingNow, replace);
+        if (details) setExistingRev((n) => n + 1);
       }
       answerGuide("existing");
     },
@@ -5726,6 +5772,8 @@ export function RoofDesigner(props: {
   const answerExistingQ = (replace: boolean) => {
     existingAsked.current = true;
     setExistingQ(false);
+    // Staying, with nothing known of them: ask what is there, so it can be counted.
+    setExistingAsk(!replace && !existingNow);
     void answerExisting(replace);
   };
   // A press anywhere outside the panel (on the map, say) puts it away, as its cross does.
@@ -5750,6 +5798,9 @@ export function RoofDesigner(props: {
         ? `Strings: ${strings.map((x, i) => `${letterOf(i)} (${x.panels.length} panels): ${checks[i]?.words ?? ""}`).join(" | ")}`
         : "No strings yet.",
       `Ready to install: ${ready.map((r) => `${r.label} ${r.state}: ${r.words}`).join(" | ")}`,
+      existingNow
+        ? `Existing system on the home: ${existingLine(existingNow)}. This design ${quoteNow.existingOut ? "removes it" : "keeps it, and what it makes is counted"}.`
+        : "No existing system recorded for the home.",
       finance
         ? `Bill: about ${finance.dailyKwh} kWh a day; bill ${finance.billNow} → ${finance.billAfter} a year; saving ${finance.saving}.`
         : "No bill entered.",
@@ -5932,7 +5983,7 @@ export function RoofDesigner(props: {
         const idea = suggestBatteries({
           batteries: pool,
           inverters: onDesign,
-          monthlyKwh: year,
+          monthlyKwh: yearAll,
           dailyKwh: finance?.dailyKwh ?? null,
           selfUseShare: props.workspace.settings.bill.selfUseShare,
           eveningShare: DAY.eveningShare,
@@ -6019,6 +6070,7 @@ export function RoofDesigner(props: {
   const existingPanels = async (replace: boolean): Promise<string> => {
     replacingRef.current = replace;
     setReplacing(replace);
+    setExisting(existingNow, replace);
     const said = replace
       ? "The existing panels are being replaced: new panels may go where they are."
       : "Keeping clear of the existing panels again.";
@@ -6104,7 +6156,7 @@ export function RoofDesigner(props: {
                   name: f.name,
                   ...(fittedItems[n]?.hybrid !== undefined ? { hybrid: fittedItems[n]?.hybrid } : {}),
                 })),
-                monthlyKwh: year,
+                monthlyKwh: yearAll,
                 dailyKwh: finance?.dailyKwh ?? null,
                 selfUseShare: props.workspace.settings.bill.selfUseShare,
                 eveningShare: DAY.eveningShare,
@@ -7733,9 +7785,20 @@ export function RoofDesigner(props: {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55">Daily yield</p>
+                    <p
+                      className="text-[9px] font-medium uppercase tracking-[0.16em] text-white/55"
+                      title={
+                        existingDailyKwh
+                          ? `${summary.kwhPerDay} kWh from this design, ${existingDailyKwh} kWh from the panels already there`
+                          : undefined
+                      }
+                    >
+                      {existingDailyKwh ? "Yield · with existing" : "Daily yield"}
+                    </p>
                     <p className="whitespace-nowrap">
-                      <span className="text-[20px] font-semibold tracking-[-0.02em] text-white">{summary.kwhPerDay}</span>
+                      <span className="text-[20px] font-semibold tracking-[-0.02em] text-white">
+                        {existingDailyKwh ? Math.round((summary.kwhPerDay + existingDailyKwh) * 10) / 10 : summary.kwhPerDay}
+                      </span>
                       <span className="ml-0.5 text-[11px] text-white/60">kWh</span>
                     </p>
                     <p className={clsx("truncate text-[10.5px]", oversize?.over ? "font-medium text-sun-bright" : "text-white/60")}>
@@ -7811,9 +7874,20 @@ export function RoofDesigner(props: {
                       </p>
                     </div>
                     <div>
-                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60">Daily yield</p>
+                      <p
+                        className="text-[9px] font-medium uppercase tracking-[0.2em] text-white/60"
+                        title={
+                          existingDailyKwh
+                            ? `${summary.kwhPerDay} kWh from this design, ${existingDailyKwh} kWh from the panels already there`
+                            : undefined
+                        }
+                      >
+                        {existingDailyKwh ? "Yield · with existing" : "Daily yield"}
+                      </p>
                       <p className="whitespace-nowrap leading-tight">
-                        <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">{summary.kwhPerDay}</span>
+                        <span className="text-xl font-semibold tabular-nums tracking-[-0.02em]">
+                          {existingDailyKwh ? Math.round((summary.kwhPerDay + existingDailyKwh) * 10) / 10 : summary.kwhPerDay}
+                        </span>
                         <span className="ml-1 text-xs text-white/60">kWh</span>
                       </p>
                       <p
@@ -8331,6 +8405,19 @@ export function RoofDesigner(props: {
                           {commandReply}
                           {systemWords && ` ${systemWords}`}
                         </p>
+                        {existingAsk && !existingQ && (
+                          <div className="mt-3 text-[14px] leading-relaxed text-white/90">
+                            <ExistingAsk
+                              existing={existingNow}
+                              onDone={(details) => {
+                                setExistingAsk(false);
+                                if (!details) return;
+                                setExisting(details, false);
+                                setExistingRev((n) => n + 1);
+                              }}
+                            />
+                          </div>
+                        )}
                         {existingQ && (
                           <span className="mt-2 flex flex-wrap gap-1.5">
                             <button
@@ -9256,7 +9343,7 @@ export function RoofDesigner(props: {
                         const lh = 8 * ku;
                         const top = by - (layers * lh) / 2;
                         const fill = batteryFill({
-                          solarDayKwh: Number(summary.kwhPerDay) || 0,
+                          solarDayKwh: (Number(summary.kwhPerDay) || 0) + (existingDailyKwh ?? 0),
                           homeDayKwh: finance?.dailyKwh ?? null,
                           batteryKwh: battery.kwh * battery.qty,
                           backupKwh: heldModulesOf({ battery }) * battery.kwh,
@@ -12102,6 +12189,7 @@ export function RoofDesigner(props: {
                     canFind={Boolean(props.jobId)}
                     finding={Boolean(usageRead?.busy)}
                     panelName={guidePanel?.name ?? "standard panel"}
+                    existing={existingNow}
                     inverterName={
                       guideInverter ? `${guideInverter.count > 1 ? `${guideInverter.count} × ` : ""}${guideInverter.inverter.name}` : null
                     }
@@ -13290,6 +13378,16 @@ export function RoofDesigner(props: {
                   </button>
                 )}
               </section>
+              {/* What the home already has: counted in the yield, the bill and the battery while this design keeps it. */}
+              <ExistingSystemCard
+                key={existingRev}
+                existing={existingNow}
+                out={Boolean(quoteNow.existingOut)}
+                dailyKwh={existingDailyKwh}
+                seen={Boolean(roofCheckNow && hasSolar(roofCheckNow.things))}
+                onChange={(existing) => setExisting(existing)}
+                onOut={(out) => setExisting(existingNow, out)}
+              />
               {/* The switchboard from a photo: Sol reads it, a rule suggests the upgrade and RCBO, one press puts them on the quote. */}
               <section className="rounded-lg border border-line bg-surface p-3" aria-label="The switchboard">
                 <p className="text-sm font-medium text-ink">The switchboard</p>

@@ -264,6 +264,7 @@ function ProposalDocument({
         {view.system.details.map((d) => (
           <Row key={d.label} label={d.label} value={d.value} />
         ))}
+        {view.system.existing?.note ? <Text style={[s.small, { marginTop: 6 }]}>{view.system.existing.note}</Text> : null}
       </>
     ),
     roof: () =>

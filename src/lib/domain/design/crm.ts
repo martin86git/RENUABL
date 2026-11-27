@@ -296,6 +296,7 @@ export const DETAIL_KEYS = [
   "arrays",
   "strings",
   "tiltFrames",
+  "existingSystem",
   "switchboard",
   "distributor",
   "nmi",

@@ -16,6 +16,7 @@ import {
 } from "./crm";
 import { todayInMarket } from "../market";
 import type { ISODate } from "../types";
+import { existingDetail } from "./existing-system";
 import { editOf, type CostGroup, type CostLine, type QuoteForm } from "./quote";
 import { arrayCount, designSummary, tiltedPanels, type RoofDesign } from "./roof-design";
 
@@ -113,6 +114,7 @@ export const DETAIL_LABELS: Record<DetailKey, string> = {
   arrays: "Arrays",
   strings: "Strings",
   tiltFrames: "Tilt frames",
+  existingSystem: "Already on the home",
   switchboard: "Switchboard",
   distributor: "Electricity distributor",
   nmi: "NMI",
@@ -127,7 +129,12 @@ const ROOFS: Record<QuoteForm["roof"], string> = { tile: "Tile", tin: "Tin", fla
  * quote settings. A detail the design can't know (the property type, the
  * NMI) is never here: only a person can give those.
  */
-export function designDetails(design: RoofDesign | null, form: QuoteForm | null): Partial<Record<DetailKey, string>> {
+export function designDetails(
+  design: RoofDesign | null,
+  form: QuoteForm | null,
+  /** Whether this design takes the home's existing system off (`QuoteFields.existingOut`), when the caller knows. */
+  existingOut?: boolean,
+): Partial<Record<DetailKey, string>> {
   const summary = design ? designSummary(design) : null;
   const panels = summary?.panels ?? 0;
   const inverters = design?.inverters ?? [];
@@ -162,6 +169,8 @@ export function designDetails(design: RoofDesign | null, form: QuoteForm | null)
     arrays: panels && design ? String(arrayCount(design)) : null,
     strings: strings ? String(strings) : null,
     tiltFrames: tilted ? `${tilted} panels` : null,
+    // What the home already has (`existing-system.ts`): the home's own, never part of what is supplied.
+    existingSystem: form?.existing ? existingDetail(form.existing, existingOut) : null,
   };
   const kept: Partial<Record<DetailKey, string>> = {};
   for (const key of DETAIL_KEYS) if (said[key]) kept[key] = said[key]!;
@@ -181,8 +190,13 @@ export interface DealDetail extends DetailLine {
  * hand, else what the design says, else empty, so it is plain what is still
  * to come.
  */
-export function systemDetails(design: RoofDesign | null, form: QuoteForm | null, typed: Record<string, string> = {}): DealDetail[] {
-  const designed = designDetails(design, form);
+export function systemDetails(
+  design: RoofDesign | null,
+  form: QuoteForm | null,
+  typed: Record<string, string> = {},
+  existingOut?: boolean,
+): DealDetail[] {
+  const designed = designDetails(design, form, existingOut);
   return DETAIL_KEYS.map((key) => ({
     key,
     label: DETAIL_LABELS[key],

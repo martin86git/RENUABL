@@ -80,6 +80,7 @@ export const BUILTIN_FIELDS: readonly FieldInfo[] = [
   design("arrays", "Arrays"),
   design("strings", "Strings"),
   design("tiltFrames", "Tilt frames"),
+  design("existingSystem", "Already on the home"),
   design("switchboard", "Switchboard"),
 
   known("installation", "installDate", "Installation date"),

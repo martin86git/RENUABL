@@ -41,6 +41,13 @@ export interface ReadinessInput {
   inverterKw: number;
   /** Inverters on the design that can't go on the home's supply (three phase on single), by name (`supply-match.ts`). */
   supplyClash?: readonly string[];
+  /**
+   * The system the home already has, when this design keeps it (`existing-system.ts`): its panels and its inverter's
+   * rating, kW. Never counted against the design's own inverter; its inverter counts towards the connection's total.
+   */
+  existing?: { kw: number; inverterKw: number } | null;
+  /** The design has a battery: with existing panels kept and none added, it is a battery on its own. */
+  battery?: boolean;
 }
 
 /** A single-phase connection's usual export limit without the distributor's approval, kW (VERIFY with each network). */
@@ -52,11 +59,52 @@ const letter = (i: number) => String.fromCharCode(65 + i);
 export function readiness(input: ReadinessInput): ReadinessItem[] {
   const items: ReadinessItem[] = [];
   const add = (item: ReadinessItem) => items.push(item);
+  const there = input.existing ?? null;
+  const totalKw = Math.round((input.inverterKw + (there?.inverterKw ?? 0)) * 100) / 100;
+  const exportCheck = () => {
+    if (input.phase !== "single" || !(totalKw > SINGLE_PHASE_EXPORT_KW)) return;
+    add({
+      id: "export",
+      state: "check",
+      label: "Export limit",
+      words: `${totalKw} kW of inverter on single phase${there?.inverterKw ? ` (${there.inverterKw} kW of it already there)` : ""}: the distributor's pre-approval or export limiting is needed above ${SINGLE_PHASE_EXPORT_KW} kW. Check the network's rule from the NMI.`,
+    });
+  };
   if (input.panels === 0) {
-    add({ id: "panels", state: "fix", label: "Panels", words: "Put panels on the roof.", goTo: "trace" });
+    // A battery on its own beside the panels the home already has: nothing to lay or string.
+    if (!(there && there.kw > 0 && input.battery)) {
+      add({ id: "panels", state: "fix", label: "Panels", words: "Put panels on the roof.", goTo: "trace" });
+      return items;
+    }
+    add({ id: "panels", state: "pass", label: "Panels", words: `None added: a battery beside the ${there.kw} kW already on the home.` });
+    if (input.missing)
+      add({
+        id: "priced",
+        state: "fix",
+        label: "Quote",
+        words: `${input.missing} ${input.missing === 1 ? "line has" : "lines have"} no cost on file.`,
+        goTo: "quote",
+      });
+    add(
+      input.undecided.length
+        ? {
+            id: "costs",
+            state: "fix",
+            label: "Decided on each job",
+            words: `Include or leave out: ${input.undecided.join(", ").toLowerCase()}.`,
+            goTo: "quote",
+          }
+        : { id: "costs", state: "pass", label: "Decided on each job", words: "Each one decided." },
+    );
+    exportCheck();
     return items;
   }
-  add({ id: "panels", state: "pass", label: "Panels", words: `${input.panels} on the roof.` });
+  add({
+    id: "panels",
+    state: "pass",
+    label: "Panels",
+    words: `${input.panels} on the roof${there && there.kw > 0 ? `, beside the ${there.kw} kW already there (not counted against this design's inverter)` : ""}.`,
+  });
   add(
     input.inverters
       ? { id: "inverter", state: "pass", label: "Inverter", words: "Chosen." }
@@ -163,13 +211,7 @@ export function readiness(input: ReadinessInput): ReadinessItem[] {
   );
   if (input.solarVic.on && input.solarVic.bar)
     add({ id: "solarVic", state: "fix", label: "Solar Victoria", words: `The rebate is on, but: ${input.solarVic.bar}`, goTo: "quote" });
-  if (input.phase === "single" && input.inverterKw > SINGLE_PHASE_EXPORT_KW)
-    add({
-      id: "export",
-      state: "check",
-      label: "Export limit",
-      words: `${input.inverterKw} kW of inverter on single phase: the distributor's pre-approval or export limiting is needed above ${SINGLE_PHASE_EXPORT_KW} kW. Check the network's rule from the NMI.`,
-    });
+  exportCheck();
   return items;
 }
 

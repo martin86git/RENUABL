@@ -40,6 +40,8 @@ export interface HomeDayArgs {
   panels: readonly (DayPanel & { x: number; y: number })[];
   /** What the design makes in each month, kWh (January first). */
   monthKwh: readonly number[];
+  /** What panels already on the home make in each month, kWh, when they stay. */
+  extraMonthKwh?: readonly number[];
   homeDayKwh: number | null;
   /** The battery's size less anything held for blackouts, kWh. */
   batteryKwh: number;
@@ -71,6 +73,7 @@ export function useHomeDay(args: HomeDayArgs, startOn = false): HomeDayState {
   const [playing, setPlaying] = useState(false);
   const month = DAY_SEASONS.find((s) => s.id === season)?.month ?? 0;
   const dayKwh = (args.monthKwh[month] ?? 0) / MONTH_DAYS[month];
+  const extraDayKwh = (args.extraMonthKwh?.[month] ?? 0) / MONTH_DAYS[month];
   const panelsKey = args.panels.map((p) => `${p.kw},${p.tilt},${Math.round(p.facing)},${p.x},${p.y}`).join("|");
   const terrain = args.terrain;
   const day = useMemo(
@@ -81,6 +84,7 @@ export function useHomeDay(args: HomeDayArgs, startOn = false): HomeDayState {
             month,
             panels: args.panels,
             dayKwh,
+            ...(extraDayKwh > 0 ? { extraDayKwh } : {}),
             homeDayKwh: args.homeDayKwh,
             batteryKwh: Math.max(0, args.batteryKwh) * ASSUMPTIONS.batteryUsableShare,
             // A panel sits a little above the roof under it, as the shade analysis takes it to.
@@ -96,7 +100,7 @@ export function useHomeDay(args: HomeDayArgs, startOn = false): HomeDayState {
         : null,
     // The panels are stood for by their key, which changes exactly when any of them does.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [on, month, panelsKey, dayKwh, args.homeDayKwh, args.batteryKwh, terrain, args.latitude],
+    [on, month, panelsKey, dayKwh, extraDayKwh, args.homeDayKwh, args.batteryKwh, terrain, args.latitude],
   );
   useEffect(() => {
     if (!on || !playing) return;
