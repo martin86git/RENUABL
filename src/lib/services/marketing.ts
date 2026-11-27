@@ -208,6 +208,14 @@ export const saveMarketingSettings = (s: MarketingSettingsView["settings"]) =>
 export const loadGtmDrafts = () => send<{ offer: boolean; made?: boolean }>(`/api/design/marketing/gtm`, { cache: "no-store" });
 export const addGtmDrafts = () => send<{ campaign: string; sequence: string }>(`/api/design/marketing/gtm`, { method: "POST" });
 
+/** RENUABL's weekly product updates email ("Launch Day"): what the week has, this week's draft if made, and making it. */
+export const loadUpdatesEmail = () =>
+  send<{ offer: boolean; count?: number; from?: string; to?: string; id?: string | null }>(`/api/design/marketing/updates`, {
+    cache: "no-store",
+  });
+export const draftUpdatesEmail = () =>
+  send<{ id: string; added: boolean; bySol: boolean }>(`/api/design/marketing/updates`, { method: "POST" });
+
 /** Sol writes a marketing email's part, or all four from a brief; nothing is kept or sent. */
 export const writeWithSol = (body: {
   part: "all" | "subject" | "preview" | "heading" | "text";

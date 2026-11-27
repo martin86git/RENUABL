@@ -954,6 +954,39 @@ const ART = {
     ),
   },
 
+  /**
+   * The weekly product updates email's masthead (27 Nov 2026, Martin: "we need a product updates email… i want to
+   * create excitement around it"; domain/marketing/product-updates.ts): its name over the sun coming up on the earth's
+   * curve, with a trail of small lights rising from it, one for each thing that ships. The top 1200 x 380.
+   */
+  "updates-header.jpg": {
+    clipH: 380,
+    html: page(
+      `<div class="mast"><div class="earth"></div><div class="sunrise"></div>
+        ${[
+          [840, 250, 5],
+          [900, 196, 4],
+          [968, 150, 6],
+          [1030, 96, 4],
+          [1092, 58, 3],
+        ]
+          .map(([x, y, r]) => `<i style="left:${x}px;top:${y}px;width:${r * 2}px;height:${r * 2}px"></i>`)
+          .join("")}
+        <div class="words"><small>Every week · Something new</small><b>Launch Day</b><em>This week's new features in RENUABL</em></div>
+        <img class="mark" src="${LOGO}" alt="RENUABL" style="left:80px;right:auto;top:44px;bottom:auto;opacity:.9"></div>`,
+      `.mast{position:absolute;left:0;top:0;width:1200px;height:380px;overflow:hidden;background:#05060a}
+       .earth{position:absolute;left:-300px;top:290px;width:1800px;height:1800px;border-radius:50%;background:#05060a;
+         box-shadow:0 -2px 0 rgba(255,170,110,.9),0 -10px 40px rgba(255,110,40,.7),0 -40px 140px rgba(255,90,31,.45)}
+       .sunrise{position:absolute;left:760px;top:170px;width:260px;height:260px;border-radius:50%;
+         background:radial-gradient(circle,rgba(255,236,200,.95) 0 6%,rgba(255,150,70,.55) 22%,rgba(255,90,31,.18) 48%,transparent 70%)}
+       .mast i{position:absolute;border-radius:50%;background:#ffd9b8;box-shadow:0 0 14px 4px rgba(255,120,50,.7)}
+       .words{position:absolute;left:80px;top:112px}
+       small{display:block;font-size:17px;letter-spacing:.24em;text-transform:uppercase;color:#ff8a4d}
+       b{display:block;margin-top:12px;font-size:92px;line-height:1;font-weight:600;letter-spacing:-.045em}
+       em{display:block;margin-top:16px;font-style:normal;font-size:24px;color:rgba(255,255,255,.62)}`,
+    ),
+  },
+
   /** A slim strip above the Marketplace band in every email (22 Nov 2026, Martin): the saving, as a reminder. */
   "footer-voice.jpg": {
     clipH: 120,

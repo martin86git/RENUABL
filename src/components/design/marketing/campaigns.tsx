@@ -17,6 +17,8 @@ import {
 import type { MarketingList } from "@/lib/domain/marketing/contacts";
 import {
   addGtmDrafts,
+  draftUpdatesEmail,
+  loadUpdatesEmail,
   loadGtmDrafts,
   campaignAction,
   deleteCampaign,
@@ -84,10 +86,21 @@ export function CampaignsPage() {
   const [problem, setProblem] = useState<string | null>(null);
   const [gtm, setGtm] = useState<{ offer: boolean; made?: boolean } | null>(null);
   const [adding, setAdding] = useState(false);
+  const [updates, setUpdates] = useState<{ offer: boolean; count?: number; id?: string | null } | null>(null);
+  const [drafting, setDrafting] = useState(false);
+  const router = useRouter();
   const refresh = useCallback(() => {
     loadCampaigns().then((r) => (r.ok ? setList(r.campaigns) : setProblem(r.message)));
     loadGtmDrafts().then((r) => r.ok && setGtm(r));
+    loadUpdatesEmail().then((r) => r.ok && setUpdates(r));
   }, []);
+  async function draftUpdates() {
+    setDrafting(true);
+    const r = await draftUpdatesEmail();
+    setDrafting(false);
+    if (!r.ok) return setProblem(r.message);
+    router.push(`/design/marketing/campaigns/${r.id}`);
+  }
   useEffect(refresh, [refresh]);
   async function addDrafts() {
     setAdding(true);
@@ -110,6 +123,29 @@ export function CampaignsPage() {
         </ButtonLink>
       </div>
       {problem && <p className="mt-4 text-[13px] text-danger">{problem}</p>}
+      {updates?.offer && (
+        <div className={cn(box, "mt-5 flex flex-wrap items-center justify-between gap-3")}>
+          <div>
+            <p className="text-[14px] font-medium">Launch Day · this week&apos;s product updates</p>
+            <p className="text-[13px] text-muted">
+              {updates.id
+                ? "This week's email is drafted. Read it, change it, then send it when you're ready."
+                : updates.count
+                  ? `${updates.count} ${updates.count === 1 ? "change" : "changes"} on the Updates list in the last 7 days. Sol writes them up as a draft; nothing is sent.`
+                  : "Nothing is on the Updates list for the last 7 days yet."}
+            </p>
+          </div>
+          {updates.id ? (
+            <ButtonLink size="sm" variant="secondary" href={`/design/marketing/campaigns/${updates.id}`}>
+              Open the draft
+            </ButtonLink>
+          ) : (
+            <Button size="sm" onClick={draftUpdates} disabled={drafting || !updates.count}>
+              {drafting && <Loader2 className="size-4 animate-spin" />} {drafting ? "Sol is writing it" : "Draft this week's email"}
+            </Button>
+          )}
+        </div>
+      )}
       {gtm?.offer && !gtm.made && (
         <div className={cn(box, "mt-5 flex flex-wrap items-center justify-between gap-3")}>
           <div>
