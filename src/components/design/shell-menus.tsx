@@ -39,6 +39,7 @@ import type { ChatThread } from "@/lib/domain/design/chat";
 import { loadNotifications, loadWeather, markNotificationsRead, shortDate } from "@/lib/services/crm";
 import { lineTime, loadMessages } from "@/lib/services/chat";
 import { SignOut } from "./design-account";
+import { staffView } from "./staff-view-as";
 import { MyCalendar } from "./my-calendar";
 import { ResizeGrip, useCalendarSize } from "./calendar-resize";
 import { loadUsageBrief, type MeterNow } from "@/lib/services/usage";
@@ -434,8 +435,21 @@ export function ProfileMenu(props: {
   onSetup?: () => void;
   /** The Usage page: this month's allowances, read as the menu opens (only for those who may see them). */
   usage?: string;
+  /** RENUABL staff: the switch between their own account (RENUABL admin) and the demo account, and which is on. */
+  staff?: { demo: boolean; hq: string };
 }) {
   const [open, setOpen, box] = useWindow();
+  const [switching, setSwitching] = useState<"own" | "demo" | null>(null);
+  // My account lands on RENUABL admin; Demo account is the sample retailer, as a solar business sees RENUABL.
+  const flick = async (to: "own" | "demo") => {
+    if (!props.staff || switching) return;
+    const there = to === "demo" ? "/design" : props.staff.hq;
+    if ((to === "demo") === props.staff.demo) return window.location.assign(there);
+    setSwitching(to);
+    const res = await staffView(to === "demo" ? "retailer" : "own");
+    if (!res.ok) return setSwitching(null);
+    window.location.assign(there);
+  };
   const [meters, setMeters] = useState<MeterNow[] | null>(null);
   const usageHref = props.usage;
   useEffect(() => {
@@ -480,6 +494,34 @@ export function ProfileMenu(props: {
       {open && (
         <div className="absolute right-0 top-11 z-50 w-64 rounded-2xl bg-surface p-2 shadow-2xl ring-1 ring-line">
           <p className="truncate px-3 pb-2 pt-1 text-xs text-muted">{props.email}</p>
+          {props.staff && (
+            <div role="group" aria-label="Which account" className="mx-1 mb-2 grid grid-cols-2 gap-1 rounded-xl bg-canvas p-1">
+              {(
+                [
+                  ["own", "My account", "RENUABL admin: enquiries, support tickets, emails and businesses"],
+                  ["demo", "Demo account", "RENUABL as a solar business sees it"],
+                ] as const
+              ).map(([to, label, title]) => {
+                const on = (to === "demo") === props.staff!.demo;
+                return (
+                  <button
+                    key={to}
+                    type="button"
+                    title={title}
+                    aria-pressed={on}
+                    disabled={switching !== null}
+                    onClick={() => void flick(to)}
+                    className={clsx(
+                      "h-8 rounded-lg text-[13px] font-medium transition-colors",
+                      on ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:text-ink",
+                    )}
+                  >
+                    {switching === to ? "Switching…" : label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {row("Settings", props.settings, SlidersHorizontal)}
           {row("Your account", props.account, UserRound)}
           {usageHref && meters && (

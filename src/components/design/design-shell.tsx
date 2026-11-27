@@ -42,6 +42,7 @@ import { MarketplaceMark, MarketplaceMenu } from "./marketplace-bar";
 import { BUSINESS_KINDS, cleanKind, pageAllowed, type BusinessKind } from "@/lib/domain/design/business-kind";
 import { DemoBar, DemoDetailsPrompt } from "./demo-details";
 import { staffView } from "./staff-view-as";
+import { HQ_PATH } from "@/lib/domain/design/hq";
 import { notificationCount, serviceCount, approvalCounts, supportUnread, updatesUnseen } from "@/lib/services/crm";
 import { useUnreadMessages } from "./chat-panel";
 import { DesignAccountGate, Reconnecting, SignOut, useDesignAccount } from "./design-account";
@@ -766,7 +767,7 @@ function Shell({
             type="button"
             onClick={async () => {
               await staffView("own");
-              window.location.replace("/design/settings/view-as");
+              window.location.replace(HQ_PATH);
             }}
             className="rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-ink"
           >
@@ -972,6 +973,7 @@ function Shell({
                 connections={kind === "installer" ? { href: "/design/connections", waiting: requests } : undefined}
                 unseen={updates}
                 onSetup={retail && !account.demo ? openSetup : undefined}
+                staff={account.staff ? { demo: !!account.staffViewing, hq: HQ_PATH } : undefined}
                 usage={kind !== "inspector" ? `${PATHS.settings}/usage` : undefined}
                 on={
                   settingsOn ||

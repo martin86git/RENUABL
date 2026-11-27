@@ -220,6 +220,83 @@
 .studio-frame .studio-pad {
   --canvas: #f0f0f2;
 }
+/*
+ * The admin skin (27 Nov 2026, Martin: "a dark mode skin… to help me distinguish between the platform for users and
+ * admin"): while RENUABL admin is the page on show (it carries data-admin-skin), the whole frame turns dark: the same
+ * semantic tokens swapped, so the top bar, the pad, cards, pills and the cog's menu follow. Every other page, and the
+ * demo account, stay light, so dark always means admin.
+ */
+.theme-studio.studio-frame:has([data-admin-skin]) {
+  --canvas: #131416;
+  --surface: #26282d;
+  --surface-2: #32353b;
+  --ink: #f5f5f6;
+  --ink-2: #d3d5da;
+  --muted: #979aa3;
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.2);
+  --primary: #ececee;
+  --primary-ink: #17181b;
+  --forest: #ffffff;
+  --sage: rgb(61 220 151 / 0.14);
+  --sun: rgb(255 90 31 / 0.18);
+  --sun-ink: #ffb08a;
+  --positive: #3ddc97;
+  --positive-soft: rgb(61 220 151 / 0.14);
+  --warning: #f5b041;
+  --warning-soft: rgb(245 176 65 / 0.14);
+  --danger: #ff6b5e;
+  --shadow-soft: 0 0 0 1px rgb(0 0 0 / 0.3), 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.35), 0 14px 34px -12px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+.theme-studio.studio-frame:has([data-admin-skin]) .studio-pad {
+  --canvas: #1b1c20;
+}
+html:has(.studio-frame [data-admin-skin]),
+body:has(.studio-frame [data-admin-skin]) {
+  background: #131416;
+}
+.studio-frame:has([data-admin-skin]) .pad-cap {
+  background: #131416;
+}
+/* The agents' rounds on the floating bar keep their graphite, and the proposal bead in the menu turns to dark glass. */
+.studio-frame:has([data-admin-skin]) .sol-rail {
+  --primary: #3a3d43;
+  --primary-ink: #ffffff;
+}
+.studio-frame:has([data-admin-skin]) .glass-bead {
+  background: linear-gradient(180deg, rgb(86 90 99 / 0.96), rgb(52 55 62 / 0.9));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.22),
+    0 0 0 1px rgb(0 0 0 / 0.4),
+    0 5px 14px rgb(0 0 0 / 0.35);
+}
+/* A lit round is filled with the ink, now light: its icon takes the dark ground's colour, not white on white. */
+.studio-frame:has([data-admin-skin]) .bg-ink.text-white {
+  color: #17181b;
+}
+.studio-frame:has([data-admin-skin]) .glass-bar {
+  background: linear-gradient(180deg, rgb(70 74 82 / 0.82) 0%, rgb(44 47 53 / 0.7) 52%, rgb(52 55 62 / 0.78) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.2),
+    inset 0 0 0 1px rgb(255 255 255 / 0.07),
+    0 0 0 1px rgb(0 0 0 / 0.4),
+    0 14px 34px rgb(0 0 0 / 0.4);
+}
+.studio-frame:has([data-admin-skin]) .glass-bar::before {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0));
+}
+.studio-frame:has([data-admin-skin]) .glass-bar .glass-item:hover {
+  background: rgb(255 255 255 / 0.1);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.1);
+}
+.studio-frame:has([data-admin-skin]) .glass-bar .glass-lit {
+  background: linear-gradient(180deg, #ffffff, #dcdde1);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 4px 10px rgb(0 0 0 / 0.35);
+}
 /* The pad's top edge, kept in place as the page scrolls under the lowered menu (15 Nov 2026, Martin): a band of the
    page's ground with the pad's own grey rounded into it, sticking where the pad's top rests. Today's strip sits a little
    lower, so its band reaches down to it. The cover behind the menu then stops at the pad's top (.pad-under). */
