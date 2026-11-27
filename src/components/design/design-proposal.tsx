@@ -258,6 +258,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [assistant, setAssistant] = useState(false);
   // The builder (15 Nov 2026, Martin): off until turned on, since a proposal is usually sent as it is.
   const [building, setBuilding] = useState(false);
+  // On a phone the publish-and-send column and the page take turns (27 Nov 2026, Martin: "It takes a lot of scrolling to
+  // get down to the proposal"): the page shows first, and Publish or Send is one press away in the switch.
+  const [phonePane, setPhonePane] = useState<"send" | "page">("page");
   const [customAllowed, setCustomAllowed] = useState(true);
   // Sol's price check (18 Nov 2026, Martin: "add the price check to the proposal screen too"): only for a member who
   // sees costs, from the margin the preview gives them and the business's own proposals.
@@ -349,11 +352,57 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
   const [picked, setPicked] = useState<OptionKey | null>(null);
   const chosen = view ? (view.options?.some((o) => o.goal === picked) ? picked : recommendedGoal(view)) : null;
 
+  // With nothing to show yet (still working it out, or it can't be priced), the column says why.
+  const pane = view ? phonePane : "send";
+  const sendWord = out ? "Send" : "Publish";
+  const showPage = (on: boolean) => {
+    setBuilding(on);
+    setPhonePane("page");
+  };
+
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
+      {/* On a phone, one switch for the three: publish and send, the page, and the builder. */}
+      <div className="sticky top-2 z-40 mx-auto mt-3 flex w-fit items-center gap-1 rounded-full bg-surface p-1 shadow-[var(--shadow-lift)] ring-1 ring-line lg:hidden">
+        <button
+          type="button"
+          aria-pressed={pane === "send"}
+          onClick={() => setPhonePane("send")}
+          className={clsx(
+            "relative flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium",
+            pane === "send" ? "bg-ink text-white" : "text-ink-2",
+          )}
+        >
+          <Send className="size-3.5" aria-hidden /> {sendWord}
+          {problems.length > 0 && <span className="absolute right-1 top-1 size-2 rounded-full bg-sun-line" aria-label="Needs a look" />}
+        </button>
+        {(
+          [
+            [false, "Preview"],
+            [true, "Builder"],
+          ] as const
+        ).map(([on, name]) => (
+          <button
+            key={name}
+            type="button"
+            disabled={!view}
+            aria-pressed={pane === "page" && building === on}
+            onClick={() => showPage(on)}
+            className={clsx(
+              "rounded-full px-4 py-1.5 text-sm font-medium disabled:text-muted",
+              pane === "page" && building === on ? (on ? "bg-sun-line text-white" : "bg-ink text-white") : "text-ink-2",
+            )}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
       {/* Beside the page it stays put with a scroll of its own, so its choices are in reach wherever the page is. */}
       <aside
-        className="w-full shrink-0 border-b border-line bg-surface lg:sticky lg:top-0 lg:h-dvh lg:w-[340px] lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r"
+        className={clsx(
+          "w-full shrink-0 border-b border-line bg-surface lg:sticky lg:top-0 lg:block lg:h-dvh lg:w-[340px] lg:self-start lg:overflow-y-auto lg:border-b-0 lg:border-r",
+          pane !== "send" && "max-lg:hidden",
+        )}
         aria-label="Proposal"
       >
         <div className="space-y-5 px-5 py-5">
@@ -624,9 +673,9 @@ export function ProposalStudio({ jobId }: { jobId: string }) {
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1 bg-surface-2 p-3 sm:p-6">
+      <div className={clsx("min-w-0 flex-1 bg-surface-2 p-3 sm:p-6", pane === "send" && "max-lg:hidden")}>
         {/* Preview or Builder: the builder is turned on, never on by itself. */}
-        <div className="sticky top-3 z-40 mx-auto mb-4 flex w-fit items-center gap-1 rounded-full bg-surface p-1 shadow-[var(--shadow-lift)] ring-1 ring-line">
+        <div className="sticky top-3 z-40 mx-auto mb-4 hidden w-fit items-center lg:flex gap-1 rounded-full bg-surface p-1 shadow-[var(--shadow-lift)] ring-1 ring-line">
           {(
             [
               [false, "Preview"],

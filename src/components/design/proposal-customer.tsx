@@ -4,13 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import type { PublicDeposit } from "@/lib/domain/design/deposit";
 import { recommendedGoal, viewForChoice, type ProposalState, type ProposalView } from "@/lib/domain/design/proposal";
 import type { OptionKey } from "@/lib/domain/design/proposal";
-import { acceptProposal, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
+import { acceptProposal, likeOption, proposalUrls, sayPaid, tellOpened } from "@/lib/services/proposals";
 import { CallMe } from "./call-me";
 import { ChatDock, ChatGreeting, useCustomerChat } from "./chat-panel";
 import { PayDeposit } from "./deposit-panel";
 import { PaySchedule } from "./pay-schedule";
 import type { PublicPayments } from "@/lib/services/proposals";
 import { PoweredByRenuabl, ProposalPage } from "./proposal-view";
+import { ProposalOptionBar } from "./proposal-option-bar";
+import { ProposalReveal } from "./proposal-reveal";
 import { ProposalDatasheets } from "./proposal-datasheets";
 import type { ProposalDatasheet } from "@/lib/domain/design/proposal-datasheets";
 import { WalkthroughPlayer } from "./walkthrough-player";
@@ -34,6 +36,8 @@ export function CustomerProposal(props: {
   callMe?: { assistant: string } | null;
   /** The datasheets for the products it quotes (26 Nov 2026). */
   datasheets?: ProposalDatasheet[];
+  /** The systems the customer likes (26 Nov 2026), with a choice of systems. */
+  likes?: string[];
 }) {
   const { token, view } = props;
   const [state, setState] = useState(props.state);
@@ -46,12 +50,20 @@ export function CustomerProposal(props: {
   // With a choice of systems: the one shown (the one chosen once they have gone ahead, else the recommended one to start).
   const [chosen, setChosen] = useState<OptionKey | null>(props.accepted?.option ?? recommendedGoal(view));
   const shown = viewForChoice(view, chosen);
+  const [likes, setLikes] = useState<string[]>(props.likes ?? []);
+  const onLike = (goal: OptionKey, like: boolean) => {
+    // Shown at once; the server's answer puts it right.
+    setLikes((now) => (like ? [...now.filter((x) => x !== goal), goal] : now.filter((x) => x !== goal)));
+    void likeOption(token, goal, like).then((res) => res.ok && setLikes(res.likes));
+  };
+  const onChoose = state === "accepted" ? undefined : setChosen;
+  const many = (view.options?.length ?? 0) > 1 && state !== "withdrawn";
 
   return (
     <ProposalPage
       view={shown}
       state={state}
-      choice={{ chosen, onChoose: state === "accepted" ? undefined : setChosen }}
+      choice={{ chosen, onChoose, liked: likes, onLike: many ? onLike : undefined }}
       accepted={accepted}
       urls={urls}
       deposit={
@@ -93,6 +105,10 @@ export function CustomerProposal(props: {
         <>
           <ChatDock chat={chat} />
           <PoweredByRenuabl />
+          {state !== "withdrawn" && <ProposalReveal token={token} chat={chat} />}
+          {many && view.options && (
+            <ProposalOptionBar options={view.options} chosen={chosen} onChoose={onChoose} liked={likes} onLike={onLike} />
+          )}
         </>
       }
       actions={{
