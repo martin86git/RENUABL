@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "CRM",
+    words: "Bring in from HubSpot has Check first: how many deals would join one already here, and which might be doubles.",
+  },
+  {
+    day: "2026-11-27",
     area: "Support",
     words: "Add screenshots or photos to a support ticket or a reply: choose, paste or drop them in.",
   },

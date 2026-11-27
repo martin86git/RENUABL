@@ -11,15 +11,19 @@ import {
   ENGAGEMENT_TYPES,
   HUBSPOT_API,
   HUBSPOT_BATCH,
+  HUBSPOT_CHECK_BATCH,
   HUBSPOT_MAX_DEALS,
   HUBSPOT_WORDS,
   MAX_ENGAGEMENTS,
+  checkDeal,
   dealFromHubSpot,
   engagementLine,
   fieldTargets,
   fillEmpty,
   mergeTarget,
   type DealHere,
+  type DealHereNamed,
+  type HsCheck,
   guessFields,
   guessStage,
   hubspotSaid,
@@ -487,4 +491,104 @@ export async function bringInHubSpotDeals(
     }
   }
   return { results, unread };
+}
+
+/**
+ * Check first (27 Nov 2026, Martin): what bringing these deals in would do, by the same reading and the same rules as
+ * `bringInHubSpotDeals`, with nothing written here or in HubSpot. No notes, emails or calls are read, so it is quick.
+ */
+export async function checkHubSpotDeals(businessId: string, token: string, ids: readonly string[], map: HubSpotMap): Promise<HsCheck[]> {
+  await ensureTable();
+  const batch = ids.slice(0, HUBSPOT_CHECK_BATCH);
+  const doneRows = await query<{ ref: string }>(
+    `select ref from design_imports where business_id = $1 and source = 'hubspot' and ref = any($2::text[])`,
+    [businessId, batch],
+  );
+  const done = new Set(doneRows.map((r) => r.ref));
+  const todo = batch.filter((id) => !done.has(id));
+  const results: HsCheck[] = batch.filter((id) => done.has(id)).map((id) => ({ id, result: "already" as const }));
+  if (!todo.length) return results;
+
+  const prefs = await loadPrefs(businessId);
+  const targets = fieldTargets(prefs.dealFields);
+  const typed = typedFields(prefs.dealFields);
+  const [pipelines, properties, ownerList] = [
+    readPipelines(await hs("/crm/v3/pipelines/deals", token)),
+    readProperties(await hs("/crm/v3/properties/deals", token)),
+    await owners(token),
+  ];
+  const wanted = [...new Set([...DEAL_PROPERTIES, ...properties.map((p) => p.name)])];
+  const deals = await batchRead("deals", todo, wanted, token);
+  const live = deals.filter((d) => {
+    const s = map.stages[d.properties.dealstage ?? ""];
+    return s && s !== "skip";
+  });
+  const contactsOf = live.length
+    ? await associations(
+        "contacts",
+        live.map((d) => d.id),
+        token,
+      )
+    : new Map<string, string[]>();
+  const firstContacts = [...new Set(live.map((d) => contactsOf.get(d.id)?.[0]).filter(Boolean) as string[])];
+  const contacts = new Map((await batchRead("contacts", firstContacts, CONTACT_PROPERTIES, token)).map((c) => [c.id, c]));
+
+  const read = new Set(deals.map((d) => d.id));
+  for (const id of todo) if (!read.has(id)) results.push({ id, result: "failed", why: "HubSpot no longer has this deal." });
+  for (const d of deals) {
+    try {
+      const contactId = contactsOf.get(d.id)?.[0] ?? null;
+      const deal = dealFromHubSpot(d, contactId ? (contacts.get(contactId) ?? null) : null, {
+        map,
+        targets,
+        props: properties,
+        pipelines,
+        owners: ownerList,
+      });
+      if (!deal) {
+        results.push({ id: d.id, result: "skipped" });
+        continue;
+      }
+      let customerIn = cleanCustomerInput({ ...deal.customer, lat: null, lng: null, notes: "" });
+      if (!customerIn.ok) customerIn = cleanCustomerInput({ ...deal.customer, email: "", phone: "", lat: null, lng: null, notes: "" });
+      if (!customerIn.ok) {
+        results.push({ id: d.id, result: "failed", why: customerIn.message });
+        continue;
+      }
+      let jobIn = cleanJobInput({ ...deal.job }, undefined, typed);
+      if (!jobIn.ok) jobIn = cleanJobInput({ ...deal.job, installDate: null }, undefined, typed);
+      if (!jobIn.ok) {
+        results.push({ id: d.id, result: "failed", why: jobIn.message });
+        continue;
+      }
+      const customer = `${deal.customer.firstName} ${deal.customer.lastName}`.trim();
+      const about = { id: d.id, customer, contact: contactId };
+      const found = await findCustomer(businessId, customerIn.value.email ?? "", customerIn.value.phone ?? "");
+      if (found) {
+        const here = await query<DealHereNamed>(
+          `select id, stage, title,
+                  to_char((won_at at time zone 'Australia/Melbourne')::date, 'YYYY-MM-DD') as "wonOn",
+                  to_char((created_at at time zone 'Australia/Melbourne')::date, 'YYYY-MM-DD') as "madeOn"
+             from design_jobs where business_id = $1 and customer_id = $2`,
+          [businessId, found],
+        );
+        results.push(checkDeal(about, deal, here, 0));
+        continue;
+      }
+      // Nobody by email or mobile: someone here of the same first and last name is the double the match can't see.
+      const whole = deal.customer.firstName.trim() && deal.customer.lastName.trim() ? customer.toLowerCase() : "";
+      const same = whole
+        ? await query<{ n: number }>(
+            `select count(*)::int as n from design_customers
+              where business_id = $1 and lower(btrim(coalesce(nullif(btrim(first_name || ' ' || last_name), ''), name))) = $2`,
+            [businessId, whole],
+          )
+        : [];
+      results.push(checkDeal(about, deal, null, same[0]?.n ?? 0));
+    } catch {
+      console.error("[hubspot-import] a deal couldn't be checked");
+      results.push({ id: d.id, result: "failed", why: "Something went wrong reading this one." });
+    }
+  }
+  return results;
 }

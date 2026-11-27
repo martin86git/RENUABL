@@ -319,3 +319,57 @@ describe("one job, not two", () => {
     });
   });
 });
+
+import { checkDeal, checkLines, checkWhy, siblingJoins, tallyChecks, type HsCheck } from "./hubspot-import";
+
+describe("check first", () => {
+  const about = { id: "1", customer: "Kim Example", contact: "501" };
+  const pylon = { id: "j1", title: "Solar and battery", stage: "won" as const, wonOn: "2026-11-16", madeOn: "2026-11-20" };
+  it("says a deal near the customer's own would join it, as the import does", () => {
+    const c = checkDeal(about, { wonOn: "2026-11-10", createdAt: null }, [pylon], 0);
+    expect(c).toMatchObject({ result: "join", into: { title: "Solar and battery", gapDays: 6 } });
+  });
+  it("flags a second deal with how far the nearest is", () => {
+    const c = checkDeal(about, { wonOn: "2025-01-10", createdAt: null }, [pylon], 0);
+    expect(c.result).toBe("second");
+    expect(checkWhy(c)).toBe("Nearest here: Solar and battery, 675 days apart.");
+    const lost = checkDeal(about, { wonOn: "2026-11-10", createdAt: null }, [{ ...pylon, stage: "lost" }], 0);
+    expect(checkWhy(lost)).toBe("Every deal of theirs here is lost.");
+  });
+  it("flags a new customer who shares a name with one here", () => {
+    const c = checkDeal(about, { wonOn: null, createdAt: "2026-10-01T00:00:00Z" }, null, 1);
+    expect(c).toMatchObject({ result: "new", namesakes: 1, day: "2026-10-01" });
+    expect(checkWhy(c)).toBe("A customer here has the same name.");
+  });
+  it("counts HubSpot deals of one contact that would become one deal", () => {
+    const fresh = (id: string, contact: string | null, day: string | null): HsCheck => ({
+      id,
+      result: "new",
+      customer: "x",
+      contact,
+      day,
+      namesakes: 0,
+    });
+    const list = [
+      fresh("1", "a", "2026-01-01"),
+      fresh("2", "a", "2026-02-01"),
+      fresh("3", "a", "2027-06-01"),
+      fresh("4", "b", "2026-01-01"),
+      fresh("5", null, "2026-01-01"),
+    ];
+    expect(siblingJoins(list)).toBe(1);
+  });
+  it("sums it up, marking what to look at", () => {
+    const t = tallyChecks([
+      checkDeal(about, { wonOn: "2026-11-10", createdAt: null }, [pylon], 0),
+      checkDeal({ ...about, id: "2" }, { wonOn: "2024-01-10", createdAt: null }, [pylon], 0),
+      checkDeal({ ...about, id: "3", contact: "9" }, { wonOn: null, createdAt: null }, null, 2),
+      { id: "4", result: "skipped" },
+    ]);
+    expect(t).toMatchObject({ join: 1, second: 1, fresh: 1, namesakes: 1, skipped: 1 });
+    const lines = checkLines(t);
+    expect(lines[0]).toEqual({ words: "1 deal would join a deal already here (no second deal is made).", look: false });
+    expect(lines.filter((l) => l.look)).toHaveLength(2);
+    expect(checkLines(tallyChecks([]))[0].words).toBe("Nothing to bring in.");
+  });
+});

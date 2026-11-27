@@ -3,20 +3,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { ArrowUpRight, Check, ChevronDown, CircleAlert, KeyRound, Loader2 } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, CircleAlert, KeyRound, Loader2, SearchCheck } from "lucide-react";
 import { JOB_STAGES, STAGE_LABELS } from "@/lib/domain/design/crm";
 import {
+  CHECK_LIST_MAX,
   HUBSPOT_BATCH,
+  HUBSPOT_CHECK_BATCH,
   HUBSPOT_KEY_HELP,
   HUBSPOT_SCOPES,
   HUBSPOT_WORDS,
+  checkLines,
+  checkWhy,
   hubspotProgress,
+  tallyChecks,
   type EngagementType,
+  type HsCheck,
   type HsOutcome,
   type HubSpotMap,
   type StageChoice,
 } from "@/lib/domain/design/hubspot-import";
-import { bringFromHubSpot, lookAtHubSpot, type HubSpotLookView } from "@/lib/services/hubspot-import";
+import { bringFromHubSpot, checkHubSpot, lookAtHubSpot, type HubSpotLookView } from "@/lib/services/hubspot-import";
 import { PATHS, ui } from "./design-shell";
 
 type Run = {
@@ -29,6 +35,17 @@ type Run = {
   joined: number;
   running: boolean;
   stopped: boolean;
+};
+
+/** A check of what bringing the deals in would do: nothing is written while it runs. */
+type Checked = {
+  done: number;
+  total: number;
+  running: boolean;
+  stopped: boolean;
+  checks: HsCheck[];
+  names: Record<string, string>;
+  of: string;
 };
 
 const ENGAGEMENT_WORDS: Record<EngagementType, string> = { notes: "notes", emails: "emails", calls: "calls", meetings: "meetings" };
@@ -84,11 +101,14 @@ export function HubSpotImportSettings() {
   const [unread, setUnread] = useState<EngagementType[]>([]);
   const [broughtIn, setBroughtIn] = useState<string[]>([]);
   const stop = useRef(false);
+  const [checked, setChecked] = useState<Checked | null>(null);
+  const stopCheck = useRef(false);
 
   const check = async () => {
     setBusy(true);
     setProblem(null);
     setLook(null);
+    setChecked(null);
     setRun(null);
     setFailures([]);
     setUnread([]);
@@ -120,6 +140,42 @@ export function HubSpotImportSettings() {
       return pipelinesOn.includes(d.pipeline) && !have.has(d.id) && s && s !== "skip";
     });
   }, [look, map, pipelinesOn, broughtIn]);
+
+  // What the check was made for: a stage or pipeline changed since makes it out of date.
+  const matchKey = useMemo(
+    () => JSON.stringify([map.stages, [...pipelinesOn].sort(), broughtIn.length]),
+    [map.stages, pipelinesOn, broughtIn],
+  );
+
+  /** Check first (27 Nov 2026, Martin): reads every deal that would come in and says what would happen, writing nothing. */
+  const checkFirst = async () => {
+    if (!look) return;
+    stopCheck.current = false;
+    const list = toBring;
+    const names = Object.fromEntries(list.map((d) => [d.id, d.name || `Deal ${d.id}`]));
+    let state: Checked = { done: 0, total: list.length, running: true, stopped: false, checks: [], names, of: matchKey };
+    setChecked(state);
+    setProblem(null);
+    for (let i = 0; i < list.length; i += HUBSPOT_CHECK_BATCH) {
+      if (stopCheck.current) {
+        state = { ...state, stopped: true };
+        break;
+      }
+      const res = await checkHubSpot(
+        key,
+        list.slice(i, i + HUBSPOT_CHECK_BATCH).map((d) => d.id),
+        map,
+      );
+      if (!res.ok) {
+        setProblem(res.message);
+        state = { ...state, stopped: true };
+        break;
+      }
+      state = { ...state, done: Math.min(list.length, i + HUBSPOT_CHECK_BATCH), checks: [...state.checks, ...res.checks] };
+      setChecked(state);
+    }
+    setChecked({ ...state, running: false });
+  };
 
   const matched = look ? look.targets.filter((t) => map.fields[t.key]).length : 0;
 
@@ -366,22 +422,48 @@ export function HubSpotImportSettings() {
             <p className="mt-1 text-xs leading-relaxed text-muted">{HUBSPOT_WORDS.again}</p>
 
             {!run?.running && (
-              <button
-                type="button"
-                className={clsx(ui.primary, "mt-4")}
-                onClick={() => void bring()}
-                disabled={!key.trim() || !toBring.length}
-              >
-                {toBring.length
-                  ? `${run?.stopped ? "Carry on: bring in" : "Bring in"} ${toBring.length.toLocaleString("en-AU")} deal${toBring.length === 1 ? "" : "s"}`
-                  : "Nothing new to bring in"}
-              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className={ui.quiet}
+                  data-hs-check
+                  onClick={() => void checkFirst()}
+                  disabled={!key.trim() || !toBring.length || checked?.running}
+                >
+                  {checked?.running ? (
+                    <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                  ) : (
+                    <SearchCheck className="size-4" aria-hidden />
+                  )}
+                  {checked?.running ? "Checking…" : checked ? "Check again" : "Check first"}
+                </button>
+                <button
+                  type="button"
+                  className={ui.primary}
+                  onClick={() => void bring()}
+                  disabled={!key.trim() || !toBring.length || checked?.running}
+                >
+                  {toBring.length
+                    ? `${run?.stopped ? "Carry on: bring in" : "Bring in"} ${toBring.length.toLocaleString("en-AU")} deal${toBring.length === 1 ? "" : "s"}`
+                    : "Nothing new to bring in"}
+                </button>
+              </div>
+            )}
+            {!run?.running && !checked && toBring.length > 0 && (
+              <p className="mt-2 text-xs text-muted">
+                Check first reads every deal and says how many would join a deal already here, and which might be doubles. It changes
+                nothing.
+              </p>
             )}
             {!key.trim() && look && toBring.length > 0 && !run?.running && (
               <p className="mt-2 text-xs text-muted">Paste the token again to carry on.</p>
             )}
           </div>
         </>
+      )}
+
+      {checked && !run?.running && (
+        <CheckCard checked={checked} outOfDate={checked.of !== matchKey && !checked.running} onStop={() => (stopCheck.current = true)} />
       )}
 
       {run && (
@@ -437,6 +519,94 @@ export function HubSpotImportSettings() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** What the check found: the counts, then the deals worth a look by name with why. Nothing here has been brought in. */
+function CheckCard({ checked, outOfDate, onStop }: { checked: Checked; outOfDate: boolean; onStop: () => void }) {
+  const tally = tallyChecks(checked.checks);
+  const share = checked.total ? checked.done / checked.total : 0;
+  const lists: { title: string; rows: HsCheck[] }[] = [
+    { title: "Another deal for a customer already here", rows: checked.checks.filter((c) => c.result === "second") },
+    {
+      title: "New customer with the same name as one here",
+      rows: checked.checks.filter((c) => c.result === "new" && c.namesakes > 0),
+    },
+    { title: "Couldn't be read", rows: checked.checks.filter((c) => c.result === "failed") },
+  ].filter((l) => l.rows.length > 0);
+  return (
+    <div className="mt-4 rounded-2xl border border-line bg-surface p-5" aria-live="polite" data-hs-checked>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[15px] font-medium text-ink">
+          {checked.running
+            ? "Checking: nothing is being brought in"
+            : checked.stopped
+              ? "Check stopped part way"
+              : "What bringing them in would do"}
+        </p>
+        {checked.running && (
+          <button type="button" className={ui.link} onClick={onStop}>
+            Stop
+          </button>
+        )}
+      </div>
+      {(checked.running || checked.stopped) && (
+        <>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
+            <div
+              className="h-full rounded-full bg-sun-line transition-[width] duration-300"
+              style={{ width: `${Math.round(share * 100)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-ink-2">
+            {checked.done.toLocaleString("en-AU")} of {checked.total.toLocaleString("en-AU")} deals read
+          </p>
+        </>
+      )}
+      {outOfDate && (
+        <p className="mt-3 flex items-start gap-2 rounded-xl bg-warning-soft px-3 py-2 text-sm text-ink">
+          <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+          The stages or pipelines have changed since this check. Press Check again.
+        </p>
+      )}
+      {checked.checks.length > 0 && (
+        <ul className="mt-3 space-y-1.5 text-sm">
+          {checkLines(tally).map((l) => (
+            <li key={l.words} className="flex items-start gap-2 text-ink">
+              {l.look ? (
+                <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              ) : (
+                <Check className="mt-0.5 size-4 shrink-0 text-positive" aria-hidden />
+              )}
+              <span>{l.words}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!checked.running && checked.checks.length > 0 && (
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          Read against what is in RENUABL now. A customer is matched by the email, then the mobile, of the deal&rsquo;s first HubSpot
+          contact. Nothing has been brought in or changed.
+        </p>
+      )}
+      {lists.map((l) => (
+        <details key={l.title} className="mt-4">
+          <summary className="cursor-pointer text-sm font-medium text-ink">
+            {l.title} <span className="font-normal text-muted">· {l.rows.length.toLocaleString("en-AU")}</span>
+          </summary>
+          <ul className="mt-1.5 max-h-72 divide-y divide-line overflow-y-auto rounded-xl border border-line text-sm">
+            {l.rows.slice(0, CHECK_LIST_MAX).map((c) => (
+              <li key={c.id} className="px-3 py-2">
+                <span className="text-ink">{"customer" in c && c.customer ? c.customer : (checked.names[c.id] ?? c.id)}</span>
+                <span className="text-muted"> · {checked.names[c.id] ?? `Deal ${c.id}`}</span>
+                <span className="block text-xs text-ink-2">{checkWhy(c)}</span>
+              </li>
+            ))}
+          </ul>
+          {l.rows.length > CHECK_LIST_MAX && <p className="mt-1 text-xs text-muted">The first {CHECK_LIST_MAX} are listed.</p>}
+        </details>
+      ))}
     </div>
   );
 }

@@ -131,6 +131,59 @@ describe.skipIf(!url)("bringing deals in from HubSpot (database)", () => {
     expect(look.unread).toEqual(["meetings"]);
   });
 
+  it("checks first what bringing them in would do, and writes nothing", async () => {
+    vi.stubGlobal("fetch", fakeHubSpot());
+    const { cleanCustomerInput, cleanJobInput } = await import("@/lib/domain/design/crm");
+    const { tallyChecks } = await import("@/lib/domain/design/hubspot-import");
+    const map = { stages: { closedwon: "won", closedlost: "skip", appointmentscheduled: "lead" } as const, fields: { nmi: "nmi" } };
+    const counts = async () =>
+      (
+        await db.query<{ c: number; j: number; i: number }>(
+          `select (select count(*)::int from design_customers where business_id = $1) as c,
+                  (select count(*)::int from design_jobs where business_id = $1) as j,
+                  (select count(*)::int from design_imports where business_id = $1) as i`,
+          [a],
+        )
+      )[0];
+
+    // Nobody here yet: both of Kim's deals would be new, and the second would join the first as they come in.
+    const before = await counts();
+    const empty = await hs.checkHubSpotDeals(a, KEY, ["101", "102", "103"], map);
+    expect(Object.fromEntries(empty.map((r) => [r.id, r.result]))).toEqual({ "101": "new", "102": "skipped", "103": "new" });
+    expect(tallyChecks(empty)).toMatchObject({ fresh: 2, siblings: 1, namesakes: 0, skipped: 1 });
+    expect(await counts()).toEqual(before);
+
+    // A Kim Example here under another email, with a deal: the email doesn't find her, so the name is flagged.
+    const who = cleanCustomerInput({
+      firstName: "Kim",
+      lastName: "Example",
+      email: "kim.other@example.com",
+      phone: "",
+      address: "",
+      notes: "",
+    });
+    const job = cleanJobInput({ title: "Solar from Pylon", stage: "won" });
+    if (!who.ok || !job.ok) throw new Error("test input");
+    const made = await crm.createCustomer(a, who.value, job.value, A);
+    if (made === "full" || !made.job) throw new Error("not made");
+    const named = await hs.checkHubSpotDeals(a, KEY, ["101"], map);
+    expect(named[0]).toMatchObject({ result: "new", namesakes: 1 });
+
+    // The same customer by email, her deal won a week from HubSpot's: it would join; won years away: a second deal.
+    await db.query(`update design_customers set email = 'kim@example.com' where business_id = $1 and id = $2`, [a, made.customer.id]);
+    await db.query(`update design_jobs set won_at = '2026-02-17T02:00:00Z' where business_id = $1 and id = $2`, [a, made.job.id]);
+    const near = await hs.checkHubSpotDeals(a, KEY, ["101"], map);
+    expect(near[0]).toMatchObject({ result: "join", into: { title: "Solar from Pylon", gapDays: 7 } });
+    await db.query(`update design_jobs set won_at = '2023-02-17T02:00:00Z' where business_id = $1 and id = $2`, [a, made.job.id]);
+    const far = await hs.checkHubSpotDeals(a, KEY, ["101"], map);
+    expect(far[0]).toMatchObject({ result: "second", near: { title: "Solar from Pylon" } });
+
+    // Nothing of HubSpot's was written, and the test's own customer goes before the import's test.
+    expect((await counts()).i).toBe(0);
+    await db.query(`delete from design_customers where business_id = $1 and id = $2`, [a, made.customer.id]);
+    expect(await counts()).toEqual(before);
+  });
+
   it("brings deals in by the match, with their record, and never twice", async () => {
     vi.stubGlobal("fetch", fakeHubSpot());
     const map = { stages: { closedwon: "won", closedlost: "skip", appointmentscheduled: "lead" } as const, fields: { nmi: "nmi" } };
@@ -153,12 +206,16 @@ describe.skipIf(!url)("bringing deals in from HubSpot (database)", () => {
       `select kind, text from design_activity where business_id = $1 and job_id = $2 order by at`,
       [a, ref[0].job_id],
     );
-    expect(lines.map((l) => l.kind)).toEqual(["call", "note", "email", "note"]);
-    expect(lines.at(-1)?.text).toContain("Battery model: Sample 13.5");
+    // Kim's second HubSpot deal (made 36 days from the first one's close) joined the first, so its note is on it too.
+    expect(lines.map((l) => l.kind)).toEqual(["call", "note", "email", "note", "note"]);
+    expect(lines.at(-2)?.text).toContain("Battery model: Sample 13.5");
+    expect(lines.at(-1)?.text).toContain("Joined with this deal from HubSpot");
+    expect(run.results.find((r) => r.id === "103")).toMatchObject({ result: "in", joined: true });
 
-    // One person, two deals.
+    // One person, and one deal: the two HubSpot deals of one contact dated within MERGE_DAYS became one here.
     const people = await db.query(`select id from design_customers where business_id = $1 and lower(email) = 'kim@example.com'`, [a]);
     expect(people).toHaveLength(1);
+    expect(await db.query(`select id from design_jobs where business_id = $1`, [a])).toHaveLength(1);
 
     const again = await hs.bringInHubSpotDeals(a, KEY, ["101", "103"], map, A);
     expect(again.results.map((r) => r.result)).toEqual(["already", "already"]);
