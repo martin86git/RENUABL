@@ -57,18 +57,33 @@ export function PageMinimise(props: { fallback: string }) {
     router.push(afterMinimise(href, previous.current));
   };
 
+  // Closed, not put aside (27 Nov 2026, Martin: "each page also needs an X next to the minimize icon, otherwise there is
+  // no way to close a tab"): back to the page before with no tab kept, and its tab gone if it had one.
+  const close = () => {
+    const href = `${window.location.pathname}${window.location.search}`;
+    closeMinimised(href);
+    router.push(afterMinimise(href, previous.current));
+  };
+
+  const round =
+    "flex size-11 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary";
   return (
     <>
       {mayMinimise(path) && (
-        <button
-          type="button"
-          onClick={minimise}
-          title="Minimise: put this page aside as a tab at the top"
-          aria-label="Minimise this page"
-          className="absolute right-[2.25rem] top-[1.25rem] z-20 hidden size-11 items-center justify-center rounded-full bg-surface text-ink shadow-[0_4px_14px_-8px_rgb(20_22_26_/_0.45)] ring-1 ring-line transition hover:bg-primary hover:text-white hover:ring-primary lg:flex lg:right-[4.25rem] lg:top-[2.75rem]"
-        >
-          <FoldToTab className="size-[22px]" />
-        </button>
+        <div className="absolute right-[2.25rem] top-[1.25rem] z-20 hidden items-center gap-2 lg:flex lg:right-[4.25rem] lg:top-[2.75rem]">
+          <button
+            type="button"
+            onClick={minimise}
+            title="Minimise: put this page aside as a tab at the top"
+            aria-label="Minimise this page"
+            className={round}
+          >
+            <FoldToTab className="size-[22px]" />
+          </button>
+          <button type="button" onClick={close} title="Close this page: no tab is kept" aria-label="Close this page" className={round}>
+            <X className="size-5" aria-hidden />
+          </button>
+        </div>
       )}
     </>
   );
