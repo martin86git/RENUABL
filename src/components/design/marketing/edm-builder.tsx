@@ -61,6 +61,11 @@ import {
   footerLines,
   inksOn,
   BAR_BUTTON,
+  BLOCK_WIDTHS,
+  BLOCK_WIDTH_WORDS,
+  blockSide,
+  blockWidthOf,
+  hasWidth,
   fromNameOf,
   lookOf,
   letterWarnings,
@@ -981,6 +986,8 @@ function CanvasBlock({
       style={{
         ...(picked ? {} : { outlineColor: `color-mix(in srgb, ${ink.words} 28%, transparent)` }),
         ...(b.fill && b.kind !== "bar" ? { background: b.fill } : {}),
+        // The block's width as the email draws it: the builder's own margin and padding make the column (32 px a side).
+        ...(hasWidth(b.kind) ? { marginInline: 20 + blockSide(b) - 32 } : {}),
       }}
     >
       <div
@@ -1145,6 +1152,7 @@ function CanvasBlock({
           {picked && <CountdownFields block={b} onChange={onChange} />}
         </>
       )}
+      {picked && hasWidth(b.kind) && <WidthField block={b} onChange={onChange} />}
       {picked && (
         <PanelColour
           value={b.fill ?? null}
@@ -1904,6 +1912,37 @@ function BarView({
           <ButtonLookFields block={b} colour={colour} onChange={onChange} />
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * How wide a block is drawn (27 Nov 2026, Martin: a top bar wider than the picture under it): to the card's edge, the
+ * column the words and pictures sit in, or narrower. The block in the builder takes the width as it is picked.
+ */
+function WidthField({ block: b, onChange }: { block: EdmBlock; onChange: (patch: BlockPatch) => void }) {
+  const now = blockWidthOf(b);
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      <span className="text-[12px] font-medium text-muted">Width</span>
+      <div className="flex rounded-full bg-canvas p-0.5" role="radiogroup" aria-label="Width">
+        {BLOCK_WIDTHS.map((w) => (
+          <button
+            key={w}
+            type="button"
+            role="radio"
+            aria-checked={now === w}
+            onClick={() => onChange(() => ({ width: w === blockWidthOf({ kind: b.kind }) ? undefined : w }))}
+            className={cn(
+              "rounded-full px-3 py-1 text-[12px] font-medium",
+              now === w ? "bg-surface text-ink shadow-[var(--shadow-soft)]" : "text-muted hover:text-ink",
+            )}
+          >
+            {BLOCK_WIDTH_WORDS[w]}
+          </button>
+        ))}
+      </div>
+      <span className="text-[11px] text-muted">Column lines it up with the words and pictures.</span>
     </div>
   );
 }

@@ -127,6 +127,25 @@ export type TileColumns = (typeof TILE_COLUMNS)[number];
  * text"), on a Button block and on a Top bar's button. Each is left out of the block while it is the usual one, so an
  * email made before reads as it did: a Button is a pill, a bar's button rounded, both medium, in the brand colour.
  */
+/**
+ * How wide a block is drawn across the email (27 Nov 2026, Martin: "i want the ability to resize the horizontal sections",
+ * a top bar wider than the picture under it): to the card's edge, the column the words and pictures sit in, or narrower.
+ * Kept on the bar, a picture, picture tiles and a video; left out while it is the usual one for its kind.
+ */
+export const BLOCK_WIDTHS = ["full", "column", "narrow"] as const;
+export type BlockWidth = (typeof BLOCK_WIDTHS)[number];
+export const BLOCK_WIDTH_WORDS: Record<BlockWidth, string> = { full: "Full", column: "Column", narrow: "Narrow" };
+/** The space each side, in pixels of the 680 px email, for each width. */
+export const BLOCK_WIDTH_SIDE: Record<BlockWidth, number> = { full: 16, column: 32, narrow: 96 };
+export const WIDTH_KINDS = ["bar", "image", "tiles", "video"] as const;
+export const hasWidth = (kind: EdmBlockKind): boolean => (WIDTH_KINDS as readonly string[]).includes(kind);
+/** A block's width: its own, else the usual one (a top bar to the card's edge, the rest the column). */
+export const blockWidthOf = (b: Pick<EdmBlock, "kind" | "width">): BlockWidth => b.width ?? (b.kind === "bar" ? "full" : "column");
+/** The space each side of a block, in the email's pixels. */
+export const blockSide = (b: Pick<EdmBlock, "kind" | "width">): number => BLOCK_WIDTH_SIDE[blockWidthOf(b)];
+/** How wide a picture in the block may be, in the email's pixels. */
+export const blockInner = (b: Pick<EdmBlock, "kind" | "width">): number => EDM_WIDTH - 2 * blockSide(b);
+
 export const BUTTON_SHAPES = ["pill", "rounded", "square"] as const;
 export type ButtonShape = (typeof BUTTON_SHAPES)[number];
 export const BUTTON_SHAPE_WORDS: Record<ButtonShape, string> = { pill: "Pill", rounded: "Rounded", square: "Square" };
@@ -180,6 +199,8 @@ export interface EdmBlock {
   wide?: boolean;
   /** A top bar's button words (its `text` is the line beside the button, its `url` where the button goes). */
   label?: string;
+  /** How wide it is drawn (`BLOCK_WIDTHS`); left out while the usual one for its kind. */
+  width?: BlockWidth;
 }
 
 /** What a new top bar says, and its button (26 Nov 2026, Martin: Xero's "Ready to choose a plan? Buy now"). */
@@ -452,7 +473,15 @@ export function cleanBlock(raw: unknown, i = 0): EdmBlock | null {
     ...(kind === "bar" ? { label: line(r.label, EDM_LIMITS.label) } : {}),
     ...(kind === "button" || kind === "bar" ? buttonFields(r, kind) : {}),
     ...(cleanColour(r.fill, "") ? { fill: cleanColour(r.fill, "") } : {}),
+    ...widthField(r.width, kind),
   };
+}
+
+/** A block's width as kept: only a real one, on a kind that has one, and not the usual one for its kind. */
+function widthField(raw: unknown, kind: EdmBlockKind): Partial<EdmBlock> {
+  if (!hasWidth(kind) || !(BLOCK_WIDTHS as readonly unknown[]).includes(raw)) return {};
+  const width = raw as BlockWidth;
+  return width === blockWidthOf({ kind }) ? {} : { width };
 }
 
 type ButtonBlock = Pick<EdmBlock, "kind" | "shape" | "size" | "colour" | "wide">;
@@ -874,7 +903,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       const label = merge(b.label ?? "", fields) || BAR_BUTTON;
       const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
       rows.push(
-        `<tr><td style="padding:8px 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${ground};border-radius:12px"><tr><td style="padding:14px 18px;${font};font-size:15px;line-height:1.35;color:${on.heading}">${esc(words)}</td><td align="right" style="padding:10px 14px 10px 0;white-space:nowrap"><a href="${esc(href)}" target="_blank" style="${buttonCss(b, colour)}">${esc(label)}</a></td></tr></table></td></tr>`,
+        `<tr><td style="padding:8px ${blockSide(b)}px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${ground};border-radius:12px"><tr><td style="padding:14px 18px;${font};font-size:15px;line-height:1.35;color:${on.heading}">${esc(words)}</td><td align="right" style="padding:10px 14px 10px 0;white-space:nowrap"><a href="${esc(href)}" target="_blank" style="${buttonCss(b, colour)}">${esc(label)}</a></td></tr></table></td></tr>`,
       );
       textParts.push(`${words} ${label}: ${href}`);
       continue;
@@ -896,13 +925,14 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       );
       textParts.push(t);
     } else if (b.kind === "image" && b.imageId) {
-      const img = `<img src="${esc(links.image(b.imageId))}" alt="${esc(merge(b.text, fields))}" width="${EDM_INNER}" style="display:block;width:100%;max-width:${EDM_INNER}px;height:auto;border:0;border-radius:8px">`;
+      const inner = blockInner(b);
+      const img = `<img src="${esc(links.image(b.imageId))}" alt="${esc(merge(b.text, fields))}" width="${inner}" style="display:block;width:100%;max-width:${inner}px;height:auto;border:0;border-radius:8px">`;
       let cell = img;
       if (b.url) {
         cell = `<a href="${esc(links.click(linkAt, linkList[linkAt]))}" target="_blank">${img}</a>`;
         linkAt++;
       }
-      rows.push(`<tr><td style="padding:12px 32px">${cell}</td></tr>`);
+      rows.push(`<tr><td style="padding:12px ${blockSide(b)}px">${cell}</td></tr>`);
       if (b.text) textParts.push(`[${merge(b.text, fields)}]`);
     } else if (b.kind === "tiles") {
       // Only tiles with a picture are sent; an empty spot in the builder is left out.
@@ -910,7 +940,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       if (!tiles.length) continue;
       const cols = Math.min(cleanColumns(b.columns), tiles.length) as TileColumns;
       const gap = 12;
-      const width = Math.floor((EDM_INNER - gap * (cols - 1)) / cols);
+      const width = Math.floor((blockInner(b) - gap * (cols - 1)) / cols);
       const cells = tiles.map((t) => {
         const caption = merge(t.text, fields);
         const img = `<img src="${esc(links.image(t.imageId!))}" alt="${esc(caption)}" width="${width}" style="display:block;width:100%;max-width:${width}px;height:auto;border:0;border-radius:8px">`;
@@ -939,7 +969,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
         );
       }
       rows.push(
-        `<tr><td style="padding:12px 32px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
+        `<tr><td style="padding:12px ${blockSide(b)}px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${trs.join("")}</table></td></tr>`,
       );
     } else if (b.kind === "products") {
       // A product is sent once it has a name; its picture and button only when given.
@@ -1012,10 +1042,10 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
       const font = "font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif";
       const src = key && links.video ? links.video(key, colour.replace("#", "")) : b.imageId ? links.image(b.imageId) : null;
       let inner = src
-        ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none"><img src="${esc(src)}" alt="${esc(`Play: ${line}`)}" width="${EDM_INNER}" style="display:block;width:100%;max-width:${EDM_INNER}px;height:auto;border:0;border-radius:8px"></a>`
+        ? `<a href="${esc(href)}" target="_blank" style="text-decoration:none"><img src="${esc(src)}" alt="${esc(`Play: ${line}`)}" width="${blockInner(b)}" style="display:block;width:100%;max-width:${blockInner(b)}px;height:auto;border:0;border-radius:8px"></a>`
         : "";
       inner += `<div style="padding:${src ? 10 : 0}px 0 0;text-align:${align}"><a href="${esc(href)}" target="_blank" style="${font};font-size:14px;font-weight:600;color:${colour};text-decoration:none">&#9654;&nbsp;${esc(line)}</a></div>`;
-      rows.push(`<tr><td style="padding:12px 32px">${inner}</td></tr>`);
+      rows.push(`<tr><td style="padding:12px ${blockSide(b)}px">${inner}</td></tr>`);
       textParts.push(`${line}: ${href}`);
     } else if (b.kind === "countdown") {
       // The timer is a picture drawn at each open; the line over it, the units and the end in words are text.

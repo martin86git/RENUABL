@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Marketing",
+    words: "A top bar, picture, picture tiles or video in an email can be made Full, Column or Narrow, so a bar lines up with the picture under it.",
+  },
+  {
+    day: "2026-11-27",
     area: "Support",
     words: "RENUABL support, under the cog: raise a ticket when something isn't working and RENUABL answers there.",
   },
