@@ -703,3 +703,186 @@ export function fillEmpty(
   }
   return { details, filled };
 }
+
+// ---------------------------------------------------------------------------
+// Check first (27 Nov 2026, Martin: "last we checked there was a risk of adding duplicate deals"): what bringing the
+// deals in would do, read against what is in RENUABL now and with nothing written, so the risk is a count before the
+// press. The same rules as the import itself (`mergeTarget`), so the two can't disagree.
+// ---------------------------------------------------------------------------
+
+/** How many deals one check request reads (no notes, emails or calls are read, so more than a bring-in batch). */
+export const HUBSPOT_CHECK_BATCH = 50;
+/** How many of each kind the check lists by name. */
+export const CHECK_LIST_MAX = 300;
+
+/** A deal of the customer's already here, with its name for the check's lists. */
+export interface DealHereNamed extends DealHere {
+  title: string;
+}
+
+/** The deal here nearest in time to a HubSpot deal, however far, for saying why it didn't join. */
+export interface NearDeal {
+  title: string;
+  /** The day it is dated by (won, else made). */
+  day: string;
+  /** Days between it and the HubSpot deal; null when the HubSpot deal has no date. */
+  gapDays: number | null;
+}
+
+/** What bringing one deal in would do. */
+export type HsCheck =
+  | { id: string; result: "join"; customer: string; contact: string | null; day: string | null; into: NearDeal }
+  | {
+      id: string;
+      result: "second";
+      customer: string;
+      contact: string | null;
+      day: string | null;
+      /** Their nearest deal here that isn't lost; null when every deal of theirs is lost. */
+      near: NearDeal | null;
+    }
+  | {
+      id: string;
+      result: "new";
+      customer: string;
+      contact: string | null;
+      day: string | null;
+      /** Customers already here with the same name, whom the email and mobile didn't find. */
+      namesakes: number;
+    }
+  | { id: string; result: "already" }
+  | { id: string; result: "skipped" }
+  | { id: string; result: "failed"; why: string };
+
+/** The day a HubSpot deal is dated by for joining: its won day, else the day it was made. */
+export const hubDayOf = (hub: { wonOn: string | null; createdAt: string | null }): string | null =>
+  hub.wonOn ?? hub.createdAt?.slice(0, 10) ?? null;
+
+function nearestDeal(here: readonly DealHereNamed[], hubDay: string | null): NearDeal | null {
+  const open = here.filter((d) => d.stage !== "lost");
+  if (!open.length) return null;
+  if (!hubDay) return { title: open[0].title, day: open[0].wonOn ?? open[0].madeOn, gapDays: null };
+  let best: NearDeal | null = null;
+  for (const d of open) {
+    const day = d.wonOn ?? d.madeOn;
+    const gap = Math.round(Math.abs(dayNumber(day) - dayNumber(hubDay)));
+    if (!best || gap < (best.gapDays ?? Infinity)) best = { title: d.title, day, gapDays: gap };
+  }
+  return best;
+}
+
+/**
+ * What the import would do with one deal: `here` is the found customer's deals (null when the email and mobile find
+ * nobody), `namesakes` how many customers here share the name.
+ */
+export function checkDeal(
+  about: { id: string; customer: string; contact: string | null },
+  hub: { wonOn: string | null; createdAt: string | null },
+  here: readonly DealHereNamed[] | null,
+  namesakes: number,
+): HsCheck {
+  const day = hubDayOf(hub);
+  if (!here) return { ...about, result: "new", day, namesakes };
+  const target = mergeTarget(here, hub);
+  if (target) {
+    const named = here.find((d) => d.id === target.id)!;
+    const targetDay = named.wonOn ?? named.madeOn;
+    return {
+      ...about,
+      result: "join",
+      day,
+      into: { title: named.title, day: targetDay, gapDays: day ? Math.round(Math.abs(dayNumber(targetDay) - dayNumber(day))) : null },
+    };
+  }
+  return { ...about, result: "second", day, near: nearestDeal(here, day) };
+}
+
+/**
+ * HubSpot deals that would join another HubSpot deal brought in by the same run: two deals of one contact dated within
+ * `MERGE_DAYS` of each other become one deal here (the first makes it, the next joins it). Counted from the deals that
+ * would otherwise be new or a second deal, in the order they come.
+ */
+export function siblingJoins(checks: readonly HsCheck[]): number {
+  const made = new Map<string, (string | null)[]>();
+  let joins = 0;
+  for (const c of checks) {
+    if ((c.result !== "new" && c.result !== "second") || !c.contact) continue;
+    const days = made.get(c.contact) ?? [];
+    const day = c.day;
+    const near = day
+      ? days.some((d) => d !== null && Math.abs(dayNumber(d) - dayNumber(day)) <= MERGE_DAYS)
+      : days.length === 1 && c.result === "new";
+    if (near) joins++;
+    else made.set(c.contact, [...days, day]);
+  }
+  return joins;
+}
+
+export interface CheckTally {
+  join: number;
+  second: number;
+  fresh: number;
+  namesakes: number;
+  siblings: number;
+  already: number;
+  skipped: number;
+  failed: number;
+}
+
+export function tallyChecks(checks: readonly HsCheck[]): CheckTally {
+  const n = (r: HsCheck["result"]) => checks.filter((c) => c.result === r).length;
+  return {
+    join: n("join"),
+    second: n("second"),
+    fresh: n("new"),
+    namesakes: checks.filter((c) => c.result === "new" && c.namesakes > 0).length,
+    siblings: siblingJoins(checks),
+    already: n("already"),
+    skipped: n("skipped"),
+    failed: n("failed"),
+  };
+}
+
+const dealCount = (n: number) => `${n.toLocaleString("en-AU")} deal${n === 1 ? "" : "s"}`;
+
+/** The check in plain lines, the ones to look at marked. */
+export function checkLines(t: CheckTally): { words: string; look: boolean }[] {
+  const out: { words: string; look: boolean }[] = [];
+  if (t.join) out.push({ words: `${dealCount(t.join)} would join a deal already here (no second deal is made).`, look: false });
+  if (t.second)
+    out.push({
+      words: `${dealCount(t.second)} would be another deal for a customer already here, because none of their deals is dated within ${MERGE_DAYS} days. Check these for doubles.`,
+      look: true,
+    });
+  if (t.fresh)
+    out.push({
+      words: `${dealCount(t.fresh)} would come in with a new customer${t.namesakes ? `; ${t.namesakes.toLocaleString("en-AU")} of them share a name with a customer already here whose email and mobile didn't match. Check these for doubles.` : "."}`,
+      look: t.namesakes > 0,
+    });
+  if (t.siblings)
+    out.push({
+      words: `${dealCount(t.siblings)} would join another HubSpot deal of the same contact dated within ${MERGE_DAYS} days, so the two become one deal here.`,
+      look: true,
+    });
+  if (t.already) out.push({ words: `${dealCount(t.already)} already brought in.`, look: false });
+  if (t.skipped) out.push({ words: `${dealCount(t.skipped)} at a stage left in HubSpot.`, look: false });
+  if (t.failed) out.push({ words: `${dealCount(t.failed)} couldn't be read as a customer and a deal.`, look: true });
+  if (!out.length) out.push({ words: "Nothing to bring in.", look: false });
+  return out;
+}
+
+/** One listed deal's reason, for the check's lists. */
+export function checkWhy(c: HsCheck): string {
+  if (c.result === "second") {
+    if (!c.near) return "Every deal of theirs here is lost.";
+    return c.near.gapDays === null
+      ? `No date in HubSpot to match by; they have ${c.near.title || "a deal"} here.`
+      : `Nearest here: ${c.near.title || "a deal"}, ${c.near.gapDays.toLocaleString("en-AU")} days apart.`;
+  }
+  if (c.result === "new")
+    return c.namesakes === 1 ? "A customer here has the same name." : `${c.namesakes} customers here have the same name.`;
+  if (c.result === "join")
+    return `Joins ${c.into.title || "their deal"}${c.into.gapDays === null ? "" : `, ${c.into.gapDays} days apart`}.`;
+  if (c.result === "failed") return c.why;
+  return "";
+}

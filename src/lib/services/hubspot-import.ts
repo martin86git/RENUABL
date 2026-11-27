@@ -3,6 +3,7 @@
 import type {
   EngagementType,
   FieldTarget,
+  HsCheck,
   HsListed,
   HsOutcome,
   HsPipeline,
@@ -28,3 +29,7 @@ export const lookAtHubSpot = (key: string) => ask<HubSpotLookView>("/api/design/
 /** Brings a few HubSpot deals across by the business's match. */
 export const bringFromHubSpot = (key: string, ids: string[], map: HubSpotMap) =>
   ask<{ results: HsOutcome[]; unread: EngagementType[] }>("/api/design/hubspot", { method: "POST", body: { do: "bring", key, ids, map } });
+
+/** What bringing a few HubSpot deals in would do, with nothing written. */
+export const checkHubSpot = (key: string, ids: string[], map: HubSpotMap) =>
+  ask<{ checks: HsCheck[] }>("/api/design/hubspot", { method: "POST", body: { do: "check", key, ids, map } });
