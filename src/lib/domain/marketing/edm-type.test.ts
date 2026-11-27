@@ -46,7 +46,7 @@ describe("a heading's and the words' font and size (27 Nov 2026, Martin)", () =>
       // Goes inside a style="…" attribute, so never a double quote.
       expect(FONT_STACKS[f]).not.toContain('"');
       const kept = cleanBlock({ ...newBlock("heading"), text: "Hi", font: f });
-      expect(kept.font).toBe(f === "modern" ? undefined : f);
+      expect(kept?.font).toBe(f === "modern" ? undefined : f);
     }
     expect(html([{ ...newBlock("text"), text: "Hi", font: "handwritten" } as EdmBlock])).toContain("font-family:'Segoe Script'");
   });
