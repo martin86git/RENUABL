@@ -16,7 +16,7 @@ export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-26",
     area: "Sol",
-    words: "A chat with Sol you minimise now waits in the tab row on the top left of the pad, beside the pages you've put aside.",
+    words: "Pages you minimise and Sol's minimised chats now wait as tabs in a strip across the top of the screen, like a web browser's.",
   },
   {
     day: "2026-11-26",
