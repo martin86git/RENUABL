@@ -50,7 +50,7 @@ import { SolDock, SolNavButton, SolRail, useSolOpen } from "./sol-dock";
 import { UsageButton } from "./usage-pop";
 import { PhoneVoiceTab } from "./phone-voice";
 import { PhoneTop } from "./phone-top";
-import { PageMinimise } from "./page-minimise";
+import { MinimisedTabs, PageMinimise } from "./page-minimise";
 import { toggleSolHere } from "@/lib/services/sol";
 import { DrawerFrameLinks, ShellDesignDrawer, useInDrawer } from "./design-drawer";
 import { ComputerCallBar } from "./computer-call";
@@ -781,6 +781,8 @@ function Shell({
         {/* Each side is at least as wide as what it holds (5 Nov 2026, from Primero's), so on a narrower window nothing
             runs under anything else: the wordmark shrinks to its small mark and the day and weather give way first
             (`.studio-mark-*`, `.studio-day*` in globals.css). */}
+        {/* Minimised pages and Sol's chats as a browser's tabs across the top (27 Nov 2026, Martin). */}
+        <MinimisedTabs />
         <div className="grid grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-start gap-4 px-2 pt-4">
           <div className="flex min-w-0 items-start gap-5">
             <Link href={PATHS.home} aria-label="RENUABL, today" className="shrink-0">
@@ -1013,7 +1015,7 @@ function Shell({
       ) : (
         // `studio-room`: beside Sol's panel the pad keeps clear of the floating bar and of the panel (globals.css).
         <div className="studio-room relative px-3 pb-4 pt-2 lg:pb-20 sm:px-6 lg:px-14 lg:pt-9">
-          {/* Minimise, inside the pad's top right, puts the page aside as a chip at the foot (26 Nov 2026, Martin). */}
+          {/* Minimise, inside the pad's top right, puts the page aside as a tab in the strip across the top. */}
           <PageMinimise fallback={here?.page.label ?? current.label} />
           <div data-tour="pad" data-sol-page className={PAD}>
             {/* The pad's top edge stays put while the page scrolls under it (15 Nov 2026, Martin: the top of the grey pad

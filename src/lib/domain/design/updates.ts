@@ -25,6 +25,11 @@ export const UPDATES: readonly Update[] = [
   },
   {
     day: "2026-11-26",
+    area: "Sol",
+    words: "Pages you minimise and Sol's minimised chats now wait as tabs in a strip across the top of the screen, like a web browser's.",
+  },
+  {
+    day: "2026-11-26",
     area: "Proposals",
     words: "Finding datasheets online now shows a spinner on the button and on each product it's looking for.",
   },
