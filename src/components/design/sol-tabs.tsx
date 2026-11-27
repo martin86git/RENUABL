@@ -2,9 +2,9 @@
 
 /**
  * Sol's chats kept as tabs (domain/design/sol-tabs.ts, 26 Nov 2026, Martin): a chat minimised on Today waits here, as
- * a web browser's tab, while you carry on elsewhere. On Today and Sol's page, where the left side is empty on a wide
- * screen, they stand there as a column; on every other page, or a narrower screen, they fold into one round on the
- * left edge (its count, pulsing while Sol is still writing, lit when an answer is ready), opening over the page.
+ * a web browser's tab, while you carry on elsewhere. From 1024px they stand in the pad's tab row with the pages put
+ * aside (`PageMinimise`); narrower, they fold into one round on the left edge (its count, pulsing while Sol is still
+ * writing, lit when an answer is ready), opening over the page.
  */
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
@@ -13,9 +13,6 @@ import { Loader2, X } from "lucide-react";
 import { tabWords, tabsGlance, type SolTab } from "@/lib/domain/design/sol-tabs";
 import { OPEN_SOL_TAB, dropTab, useSolTabs } from "@/lib/services/sol-tabs";
 import { SolBadge } from "./sol-sun";
-
-/** The pages with room on the left for the column. */
-const ROOMY = new Set(["/design", "/design/sol"]);
 
 export function SolTabs() {
   const tabs = useSolTabs();
@@ -52,22 +49,10 @@ export function SolTabs() {
     else router.push(`/design?soltab=${encodeURIComponent(tab.id)}`);
   };
   const glance = tabsGlance(tabs);
-  const roomy = ROOMY.has(path ?? "");
 
   return (
     <div ref={box} className="theme-studio contents print:hidden">
-      {roomy && (
-        <nav
-          aria-label="Sol's chats"
-          className="fixed left-[4.75rem] top-[calc(var(--studio-head,8rem)+1.5rem)] z-20 hidden w-44 space-y-2 min-[1600px]:block"
-        >
-          <p className="pl-1 font-mono text-[10.5px] tracking-[0.16em] text-muted">TABS</p>
-          {tabs.map((t) => (
-            <TabCard key={t.id} tab={t} now={now} onOpen={() => go(t)} />
-          ))}
-        </nav>
-      )}
-      <div className={clsx("fixed left-0 top-[42%] z-30", roomy && "min-[1600px]:hidden")}>
+      <div className="fixed left-0 top-[42%] z-30 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}

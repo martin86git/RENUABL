@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import { tabWords, type SolTab } from "@/lib/domain/design/sol-tabs";
+import { OPEN_SOL_TAB, dropTab, useSolTabs } from "@/lib/services/sol-tabs";
+import { SolBadge } from "./sol-sun";
 import { FoldToTab } from "./minimise-mark";
 import { afterMinimise, chipTitle, mayMinimise, minimisedGroup, withMinimised } from "@/lib/domain/design/minimised-pages";
 import {
@@ -24,6 +27,13 @@ export function PageMinimise(props: { fallback: string }) {
   const path = usePathname();
   const router = useRouter();
   const list = useMinimised();
+  const solTabs = useSolTabs();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!solTabs.length) return;
+    const t = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(t);
+  }, [solTabs.length]);
   const previous = useRef<string | null>(null);
   const current = useRef<string | null>(null);
 
@@ -57,6 +67,11 @@ export function PageMinimise(props: { fallback: string }) {
 
   // The page on show isn't a tab (it was opened another way).
   const tabs = [...list].reverse().filter((p) => p.href.split(/[?#]/)[0] !== path);
+  // Sol's chats minimised on Today stand in the same row, first (26 Nov 2026, Martin).
+  const openSol = (tab: SolTab) => {
+    if (path === "/design") window.dispatchEvent(new CustomEvent(OPEN_SOL_TAB, { detail: tab.id }));
+    else router.push(`/design?soltab=${encodeURIComponent(tab.id)}`);
+  };
 
   return (
     <>
@@ -72,11 +87,48 @@ export function PageMinimise(props: { fallback: string }) {
         </button>
       )}
       {/* The tabs, as Gmail's minimised windows, on the pad's top left edge: the page on show isn't one of them. */}
-      {tabs.length > 0 && (
+      {tabs.length + solTabs.length > 0 && (
         <nav
           aria-label="Minimised pages"
           className="no-scrollbar absolute left-[4.5rem] top-0 z-20 hidden h-9 max-w-[calc(50%-17rem)] items-end gap-1 overflow-x-auto lg:flex print:hidden"
         >
+          {solTabs.map((t) => {
+            const ready = t.status === "ready";
+            return (
+              <span
+                key={t.id}
+                className={`group flex h-8 shrink-0 items-center rounded-t-xl bg-canvas pl-2.5 pr-1 shadow-[0_-2px_8px_-6px_rgb(20_22_26_/_0.35)] [clip-path:inset(-6px_-6px_0_-6px)] hover:bg-surface ${ready ? "ring-[1.5px] ring-sun-line" : "ring-1 ring-line"}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => openSol(t)}
+                  title={`${t.title} · ${tabWords(t, now)}`}
+                  className="flex max-w-[14rem] items-center gap-1.5 text-[12.5px] font-medium text-ink"
+                >
+                  {t.status === "writing" ? (
+                    <Loader2
+                      className="size-3.5 shrink-0 animate-spin text-sun-line motion-reduce:animate-none"
+                      aria-label="Sol is writing"
+                    />
+                  ) : (
+                    <SolBadge className="size-3.5 shrink-0" />
+                  )}
+                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">Sol</span>
+                  <span className="truncate">{chipTitle(t.title)}</span>
+                  {ready && <span className="size-2 shrink-0 rounded-full bg-sun-line" aria-label="Answer ready" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dropTab(t.id)}
+                  aria-label={`Close ${t.title}`}
+                  title="Close this tab (the chat stays in Sol's history)"
+                  className="ml-1 grid size-6 place-items-center rounded-full text-muted hover:bg-line/60 hover:text-ink"
+                >
+                  <X className="size-3" aria-hidden />
+                </button>
+              </span>
+            );
+          })}
           {tabs.map((p) => (
             <span
               key={p.href}
