@@ -33,6 +33,9 @@ import {
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/components/ui/primitives";
 import {
+  SITE_LOGOS,
+  SITE_LOGO_KEYS,
+  logoBox,
   EDM_BLOCK_KINDS,
   EDM_BLOCK_WORDS,
   EDM_LIMITS,
@@ -112,7 +115,7 @@ import {
 import { VIDEO_LINE, videoStillKey, youTubeId } from "@/lib/domain/marketing/edm-video";
 import { COUNTDOWN_UNITS, cleanEndsAt, endsAtMs, endsWords } from "@/lib/domain/marketing/countdown";
 import { EDM_SOL_LIMITS, claimsToCheck, type EdmSolPart } from "@/lib/domain/marketing/edm-sol";
-import { saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
+import { changeMarketingLogos, saveMarketingLogo, uploadMarketingImage, writeWithSol } from "@/lib/services/marketing";
 import { emptyHistory, record, redo as redoHistory, undo as undoHistory } from "@/lib/domain/marketing/edm-history";
 import { SolAsk, type SolAskResult } from "./edm-sol-ask";
 import { SolIcon } from "../sol-icon";
@@ -2591,7 +2594,9 @@ function CountdownFields({ block: b, onChange }: { block: EdmBlock; onChange: (p
 /**
  * The business's logo at the top of the email (22 Nov 2026, Martin: "we need a clear upload business logo drop field"):
  * with none, a plain drop field that says what it is for; with one, the logo with Change and Remove. It is saved as the
- * business's marketing setting at once, so it heads every email, not only this one.
+ * business's marketing setting at once, so it heads every email, not only this one. Every logo uploaded is kept (27 Nov
+ * 2026, Martin: "so i can switch between logos"): Switch logo lists them to pick from, with a tick to draw the one in
+ * use larger, and for RENUABL's own business its own logos to add in one press.
  */
 function LogoField({
   brand,
@@ -2610,12 +2615,24 @@ function LogoField({
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const files = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
   const keep = async (id: string | null) => {
     const r = await saveMarketingLogo(id);
     if (!r.ok) return setProblem(r.message);
     onBrand?.(r.settings.brand);
   };
+  const change = async (c: Parameters<typeof changeMarketingLogos>[0]) => {
+    setProblem(null);
+    const r = await changeMarketingLogos(c);
+    if (!r.ok) return setProblem(r.message);
+    onBrand?.(r.settings.brand);
+  };
+  const box = logoBox(brand);
+  const logoStyle = { height: box.height, maxWidth: box.maxWidth };
+  const inUse = brand.logos.find((l) => l.id === brand.logoId);
+  // RENUABL's own business (the one sender with a logo of the site's) can add the site's logos it hasn't yet.
+  const siteToAdd = Boolean(sender.logo) && SITE_LOGO_KEYS.some((k) => !brand.logos.some((l) => l.site === k));
   const upload = async (file: File | undefined) => {
     if (!file) return;
     setProblem(null);
@@ -2656,12 +2673,66 @@ function LogoField({
   if (readOnly || !onBrand)
     return brand.logoId ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="mx-8 mb-2 block h-11 w-auto max-w-[240px]" />
+      <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="mx-8 mb-2 block w-auto" style={logoStyle} />
     ) : (
       <p className="px-8 pb-2 text-[15px] font-bold" style={{ color: ink.heading }}>
         {sender.name}
       </p>
     );
+  const choices = (
+    <div className="mt-2 rounded-xl bg-canvas p-3" data-logo-choices>
+      <p className="text-[12px] font-medium text-ink-2">Your logos · press one to use it on every email</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {brand.logos.map((l) => (
+          <span key={l.id} className="group/tile relative">
+            <button
+              type="button"
+              aria-pressed={l.id === brand.logoId}
+              title={l.site ? SITE_LOGOS[l.site].label : "Use this logo"}
+              onClick={() => void keep(l.id)}
+              className={cn(
+                "grid h-14 w-36 place-items-center rounded-lg bg-white px-3 ring-inset",
+                l.id === brand.logoId ? "ring-2 ring-ink" : "ring-1 ring-line hover:ring-ink/40",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={`/api/m/i/${l.id}`} alt={l.site ? SITE_LOGOS[l.site].label : "A logo of yours"} className="max-h-9 max-w-full" />
+            </button>
+            <button
+              type="button"
+              aria-label="Forget this logo"
+              title="Forget this logo"
+              onClick={() => void change({ forgetLogo: l.id })}
+              className="absolute -right-1.5 -top-1.5 hidden size-5 place-items-center rounded-full bg-ink text-white group-focus-within/tile:grid group-hover/tile:grid"
+            >
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          disabled={busy}
+          className="grid h-14 w-36 place-items-center rounded-lg border-2 border-dashed border-line-strong text-[12px] font-medium text-ink-2 hover:border-ink/40"
+        >
+          {busy ? "Uploading…" : "Upload another"}
+        </button>
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-ink-2">
+        {inUse && (
+          <label className="flex items-center gap-1.5">
+            <input type="checkbox" checked={inUse.large} onChange={(e) => void change({ logoLarge: e.target.checked })} />
+            Draw it larger (for a logo with a line under it)
+          </label>
+        )}
+        {siteToAdd && (
+          <button type="button" onClick={() => void change({ siteLogos: true })} className="font-medium underline">
+            Add RENUABL&apos;s logos
+          </button>
+        )}
+      </div>
+    </div>
+  );
   return (
     <div className="px-5 pb-2" onClick={(e) => e.stopPropagation()}>
       {picker}
@@ -2674,15 +2745,16 @@ function LogoField({
           )}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="block h-11 w-auto max-w-[240px]" />
+          <img src={`/api/m/i/${brand.logoId}`} alt={sender.name} className="block w-auto" style={logoStyle} />
           <div className="ml-auto flex gap-1.5 opacity-0 transition-opacity group-focus-within/logo:opacity-100 group-hover/logo:opacity-100">
             <button
               type="button"
-              onClick={() => input.current?.click()}
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
               disabled={busy}
               className="h-8 rounded-full bg-surface px-3 text-[12px] font-medium text-ink ring-1 ring-line hover:ring-ink/40"
             >
-              {busy ? "Uploading…" : "Change logo"}
+              {busy ? "Uploading…" : "Switch logo"}
             </button>
             <button
               type="button"
@@ -2717,6 +2789,7 @@ function LogoField({
           </span>
         </button>
       )}
+      {(brand.logoId ? open : brand.logos.length > 0 || siteToAdd) && choices}
       {problem && <p className="mt-1.5 px-1 text-[12px] text-warning">{problem}</p>}
     </div>
   );

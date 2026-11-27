@@ -198,6 +198,9 @@ export const deleteSequence = (id: string) => send(`/api/design/marketing/sequen
 
 export const loadMarketingSettings = () => send<MarketingSettingsView>(`/api/design/marketing/settings`, { cache: "no-store" });
 /** Sets or clears the logo at the top of every email (anyone who builds emails). */
+/** The kept logos: the one in use drawn larger or not, one forgotten, or RENUABL's own added (its own business only). */
+export const changeMarketingLogos = (change: { logoLarge: boolean } | { forgetLogo: string } | { siteLogos: true }) =>
+  send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", change));
 export const saveMarketingLogo = (logoId: string | null) =>
   send<{ settings: MarketingSettingsView["settings"] }>(`/api/design/marketing/settings`, json("PUT", { logoId }));
 

@@ -405,6 +405,68 @@ export interface EdmBrand {
   address: string | null;
   /** The business's logo at the top of every email (a marketing picture's id); without it, its name in words. */
   logoId: string | null;
+  /**
+   * The logos the business keeps to switch between (27 Nov 2026, Martin: "upload these into the marketing area… so i
+   * can switch between logos"), newest first, up to `LOGOS_MAX`; the one in use is `logoId`.
+   */
+  logos: EdmLogo[];
+}
+
+/** A logo kept for emails: its picture, whether it is drawn larger (one with a line under it needs the room), and which of the site's own it came from. */
+export interface EdmLogo {
+  id: string;
+  large: boolean;
+  site?: SiteLogo;
+}
+
+export const LOGOS_MAX = 6;
+/** How a larger logo is drawn: tall enough for a line under a wordmark to be read. */
+export const LOGO_LARGE = { height: 67, maxWidth: 320 };
+
+/** RENUABL's own logos, files of the site, which its own business can add to its kept logos in one press. */
+export const SITE_LOGOS = {
+  plain: { label: "RENUABL", path: "/brand/renuabl-logo.png", large: false },
+  tagline: { label: "RENUABL with its line", path: "/brand/renuabl-logo-tagline-email.png", large: true },
+} as const;
+export type SiteLogo = keyof typeof SITE_LOGOS;
+export const SITE_LOGO_KEYS = Object.keys(SITE_LOGOS) as SiteLogo[];
+
+/** The kept logos, each once, the one in use always among them. */
+export function cleanLogos(raw: unknown, inUse: string | null = null): EdmLogo[] {
+  const out: EdmLogo[] = [];
+  for (const v of Array.isArray(raw) ? raw : []) {
+    const r = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+    const id = imageIdOf(r.id);
+    if (!id || out.some((l) => l.id === id)) continue;
+    const site = SITE_LOGO_KEYS.find((k) => k === r.site);
+    out.push({ id, large: r.large === true, ...(site ? { site } : {}) });
+  }
+  if (inUse && !out.some((l) => l.id === inUse)) out.unshift({ id: inUse, large: false });
+  // Never the one in use dropped for room.
+  return out.length > LOGOS_MAX ? [...out.filter((l) => l.id === inUse), ...out.filter((l) => l.id !== inUse)].slice(0, LOGOS_MAX) : out;
+}
+
+/** The brand with this logo in use: kept at the front if new, left where it is if already kept. */
+export function withLogo(brand: EdmBrand, id: string, as: { large?: boolean; site?: SiteLogo } = {}): EdmBrand {
+  const kept = brand.logos.some((l) => l.id === id);
+  const logos = kept ? brand.logos : [{ id, large: as.large === true, ...(as.site ? { site: as.site } : {}) }, ...brand.logos];
+  return { ...brand, logoId: id, logos: cleanLogos(logos, id) };
+}
+
+/** The brand without this kept logo; if it was the one in use, the business's name shows in words until another is picked. */
+export function withoutLogo(brand: EdmBrand, id: string): EdmBrand {
+  const logoId = brand.logoId === id ? null : brand.logoId;
+  return { ...brand, logoId, logos: brand.logos.filter((l) => l.id !== id) };
+}
+
+/** The logo in use drawn regular or larger. */
+export function withLogoSize(brand: EdmBrand, large: boolean): EdmBrand {
+  return { ...brand, logos: brand.logos.map((l) => (l.id === brand.logoId ? { ...l, large } : l)) };
+}
+
+/** How tall and how wide at most the logo in use is drawn. */
+export function logoBox(brand: EdmBrand): { height: number; maxWidth: number } {
+  return brand.logos.find((l) => l.id === brand.logoId)?.large ? LOGO_LARGE : { height: LOGO_HEIGHT, maxWidth: 240 };
 }
 
 export const DEFAULT_BRAND: EdmBrand = {
@@ -414,6 +476,7 @@ export const DEFAULT_BRAND: EdmBrand = {
   reason: "You're receiving this because you're one of our customers or contacts.",
   address: null,
   logoId: null,
+  logos: [],
 };
 
 export const EDM_LIMITS = {
@@ -756,6 +819,7 @@ export function cleanBrand(raw: unknown): EdmBrand {
     reason: line(r.reason, 240) || DEFAULT_BRAND.reason,
     address: line(r.address, 200) || null,
     logoId: imageIdOf(r.logoId),
+    logos: cleanLogos(r.logos, imageIdOf(r.logoId)),
   };
 }
 
@@ -1307,7 +1371,7 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
   }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px">${above.length ? `<tr><td style="height:8px;line-height:8px;font-size:1px">&nbsp;</td></tr>${above.join("")}` : ""}<tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink0.heading}">${
     brand.logoId
-      ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${LOGO_HEIGHT}" style="display:block;height:${LOGO_HEIGHT}px;width:auto;max-width:240px;border:0">`
+      ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${logoBox(brand).height}" style="display:block;height:${logoBox(brand).height}px;width:auto;max-width:${logoBox(brand).maxWidth}px;border:0">`
       : headerCell(sender, contrastRatio("#ffffff", style.background) > contrastRatio("#000000", style.background))
   }</td></tr>${body.join(
     "",
