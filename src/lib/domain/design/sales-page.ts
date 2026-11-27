@@ -96,13 +96,15 @@ export const VOICE_AGENTS = [
  * buttons. Where that page shows customers' logos we show what an agent does, since RENUABL names no customers. Every
  * line is something the agents do today; the price is read from the add-on.
  */
+/** The line under the logo in the page's top bar (27 Nov 2026, Martin's words). */
+export const LOGO_LINE = "The All-in-One AI powered platform for Solar";
+
 export const VOICE_INTRO = {
   pill: "RENUABL Voice AI",
   headline: ["Voice agents that", "ring every lead."],
   sub: "Give each one a name, a voice and your script. They ring your new leads, answer your number and book your installs.",
   demo: "Start demo",
-  hear: "Hear a call",
-  does: ["Rings new leads", "Answers your number", "Books installs", "Writes every call on the deal", "Always says it's automated"],
+  does: ["Rings new leads", "Answers your number", "Books installs", "Writes every call on the deal"],
   price: (monthly: string) => `Comes with Calls & Texts, ${monthly} a month on top of your plan.`,
 } as const;
 
@@ -1167,11 +1169,11 @@ export function salesCopy(): string[] {
   return [
     ...Object.values(STICKY),
     ...Object.values(SALES_HERO).flat(),
+    LOGO_LINE,
     VOICE_INTRO.pill,
     ...VOICE_INTRO.headline,
     VOICE_INTRO.sub,
     VOICE_INTRO.demo,
-    VOICE_INTRO.hear,
     ...VOICE_INTRO.does,
     voiceIntroPrice(),
     RAYS.eyebrow,

@@ -16,7 +16,7 @@ import { RaysSlide } from "./rays-slide";
 import { VoiceSlide } from "./voice-slide";
 import { Wordmark } from "@/components/ui/primitives";
 import { ENTERPRISE_FROM, TOKEN_PACKS, packWords, type BillingInterval } from "@/lib/domain/design/plans";
-import { CLOSING, FAQ, PRICING, SALES_HERO, STICKY } from "@/lib/domain/design/sales-page";
+import { CLOSING, FAQ, LOGO_LINE, PRICING, SALES_HERO, STICKY } from "@/lib/domain/design/sales-page";
 import { askSales, startPlan } from "@/lib/services/billing";
 import { PlanCodeField, type AppliedCode } from "./plan-code-field";
 import { Reveal } from "./front-hero";
@@ -129,7 +129,14 @@ function Header({ signedIn }: { signedIn: boolean }) {
           )}
         </div>
         <Link href="/" aria-label="RENUABL Business" className="justify-self-start sm:justify-self-center">
-          <Wordmark />
+          {/* The line under the logo (27 Nov 2026, Martin: smaller than the logo, spaced under it, centred). From sm up:
+              on a phone the wordmark sits beside the menu and the buttons, with no room for it. */}
+          <span className="flex flex-col items-center gap-1.5">
+            <Wordmark className="leading-none" />
+            <span className="hidden whitespace-nowrap text-[9.5px] font-medium uppercase leading-none tracking-[0.2em] text-ink-2 sm:block">
+              {LOGO_LINE}
+            </span>
+          </span>
         </Link>
         {/* Top right (21 Nov 2026, Martin: "We need a get started button next to Sign In"): Sign in, or straight back
             into RENUABL when signed in, and Get started (to the pricing, as every Get started on the page) when signed out. On a phone (21 Nov 2026, Martin: "show it on phones too, make them smaller") both are smaller and the wordmark sits beside the menu, so they fit. */}

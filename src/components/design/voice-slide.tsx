@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef } from "react";
-import { Play } from "lucide-react";
 import { VOICE_AGENTS, VOICE_INTRO, voiceIntroPrice } from "@/lib/domain/design/sales-page";
 import { TryDemoButton } from "./business-demo";
 import { useInView, useMotionOk } from "./living-hero";
@@ -10,7 +9,7 @@ import { Ray, RayStyles } from "./rays";
 /**
  * The voice agents' opening slide (26 Nov 2026, Martin: a slide like a voice-agent builder's landing page, to talk about
  * our Voice AI). On black and centred: a pill with the agents' own sound wave, one large headline, one line, Start demo
- * and Hear a call (the next slide's example call), then a quiet row of what an agent does where such a page would show
+ * (Hear a call was removed 27 Nov 2026, Martin), then a quiet row of what an agent does where such a page would show
  * its customers' logos. Copy in `VOICE_INTRO`.
  */
 export function VoiceSlide({ signedIn }: { signedIn: boolean }) {
@@ -42,16 +41,11 @@ export function VoiceSlide({ signedIn }: { signedIn: boolean }) {
         <p className="mx-auto mt-6 max-w-2xl text-balance text-[clamp(16px,1.35vw,20px)] leading-relaxed text-white/70">
           {VOICE_INTRO.sub}
         </p>
-        <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          {!signedIn && <TryDemoButton look="main" label={VOICE_INTRO.demo} />}
-          <a
-            href="#rays"
-            className="inline-flex h-14 items-center justify-center gap-2.5 rounded-full bg-white/[0.08] px-7 text-[17px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/[0.14]"
-          >
-            <Play className="size-4 fill-current" aria-hidden />
-            {VOICE_INTRO.hear}
-          </a>
-        </div>
+        {!signedIn && (
+          <div className="mt-9 flex justify-center">
+            <TryDemoButton look="main" label={VOICE_INTRO.demo} />
+          </div>
+        )}
         <p className="mt-5 text-[13px] text-white/45">{voiceIntroPrice()}</p>
 
         {/* Where a page like this shows logos: what an agent does, each with a role's own wave. */}
