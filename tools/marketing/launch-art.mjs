@@ -305,6 +305,9 @@ const statement = (kicker, pre, big, dry, foot, size = 160, tint = "#fff") =>
      .foot{position:absolute;left:84px;bottom:44px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.16em;color:rgba(255,255,255,.42)}`,
   );
 
+/** Sol's sun as the homepage has it (a still of it, its glow on nothing), for the pictures he is the middle of. */
+const ERA_SUN = pathToFileURL(resolve("public/design/landing/sol-brain.png")).href;
+
 /** Each picture: a page, and for a moving one how many frames, how long each shows and how long the last holds. */
 const ART = {
   /** The launch: the products as a staggered stack of cards, dealt in one by one. */
@@ -564,6 +567,173 @@ const ART = {
       },
     ]),
   ),
+
+  /**
+   * Email one, "A new era" (27 Nov 2026, Martin: "it should feel like something huge has landed… its finally arrived
+   * and we welcome in the dawn of a new era"; pictures "influenced by grok bot, spacex, tesla, apple"). Its opening
+   * picture: Sol's own sun rising over the earth's curve, the stars dimming as the limb lights, then the line.
+   */
+  "era-dawn.gif": {
+    // Few frames and colours: a sunrise is a photograph in every frame, and each one weighs the GIF down.
+    frames: 14,
+    delay: 150,
+    hold: 4200,
+    colours: 64,
+    width: 680,
+    html: page(
+      `<div id="stars"></div><div class="halo" id="halo"></div><img class="sun" id="sun" src="${ERA_SUN}">
+       <div class="earth" id="earth"></div><div class="flare" id="flare"></div>
+       <div class="top"><i></i>RENUABL // SOL ONLINE</div>
+       <div class="say" id="say"><small>The dawn of</small><h1>A new era <span>for solar.</span></h1></div>
+       <img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       #stars i{position:absolute;border-radius:50%;background:#fff}
+       .halo{position:absolute;left:600px;top:260px;width:1700px;height:1700px;margin:-850px;border-radius:50%;
+         background:radial-gradient(circle,rgba(255,160,80,.5) 0,rgba(255,90,31,.22) 14%,rgba(255,90,31,.07) 30%,transparent 52%)}
+       .sun{position:absolute;left:370px;top:20px;width:460px;height:460px}
+       .earth{--k:1;position:absolute;left:-700px;top:400px;width:2600px;height:2600px;border-radius:50%;
+         background:radial-gradient(circle at 50% 0%,#0d0f15 0,#05060a 9%,#000 30%);
+         box-shadow:0 -2px 0 rgba(255,200,150,calc(.95*var(--k))),0 -12px 50px rgba(255,120,50,calc(.8*var(--k))),0 -50px 170px rgba(255,90,31,calc(.5*var(--k)))}
+       .flare{position:absolute;left:100px;top:399px;width:1000px;height:3px;border-radius:3px;
+         background:linear-gradient(90deg,transparent,rgba(255,170,110,.5) 30%,#fff 50%,rgba(255,170,110,.5) 70%,transparent);filter:blur(1px)}
+       .top{position:absolute;left:84px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       .say{position:absolute;left:0;right:0;top:452px;text-align:center}
+       .say small{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:16px;letter-spacing:.42em;text-transform:uppercase;color:#ff8f4a}
+       .say h1{margin-top:14px;font-size:84px;line-height:1;font-weight:600;letter-spacing:-.045em}
+       .say h1 span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}`,
+      `let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+       const stars = document.getElementById("stars");
+       for (let i = 0; i < 120; i++) {
+         const d = document.createElement("i"), r = rnd() < 0.12 ? 2.6 : 1.3;
+         d.style.cssText = "left:" + rnd() * 1200 + "px;top:" + rnd() * 400 + "px;width:" + r + "px;height:" + r + "px;opacity:" + (0.2 + rnd() * 0.7);
+         stars.appendChild(d);
+       }
+       const $ = (id) => document.getElementById(id);
+       window.at = (t) => {
+         const rise = span(t, 0, 0.7);
+         $("sun").style.transform = "translateY(" + 280 * (1 - rise) + "px) scale(" + (0.84 + 0.16 * rise) + ")";
+         $("halo").style.opacity = 0.1 + 0.9 * span(t, 0.1, 0.8);
+         $("earth").style.setProperty("--k", 0.2 + 0.8 * span(t, 0, 0.6));
+         $("flare").style.opacity = span(t, 0.05, 0.5) * (1 - 0.45 * span(t, 0.6, 1));
+         stars.style.opacity = 1 - 0.55 * rise;
+         const k = span(t, 0.55, 0.9);
+         $("say").style.opacity = k; $("say").style.transform = "translateY(" + 14 * (1 - k) + "px)";
+       };
+       window.at(1);`,
+    ),
+  },
+
+  /**
+   * The same email's second picture: Sol as the oracle. What he is asked about stands round him; three questions are
+   * typed into his box one after another, and each is answered from where its answer really comes from (the network's
+   * own page, the product's datasheet, the business's own deals). A test keeps the words in step with the email's.
+   */
+  "era-oracle.gif": {
+    frames: 43,
+    delay: 85,
+    hold: 3800,
+    colours: 128,
+    html: page(
+      `<div class="halo"></div><div class="rings"><i></i><i></i><i></i></div><div class="pulse" id="pulse"></div>
+       <img class="sun" src="${ERA_SUN}"><div id="nodes"></div>
+       <div class="top"><i></i>SOL // SUPERCHARGED INTELLIGENCE</div>
+       <h1>The oracle<br><span>of solar.</span></h1>
+       <div class="ask"><img src="${ERA_SUN}"><p id="q"></p></div><p class="status" id="status"></p>
+       <img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       .halo{position:absolute;left:880px;top:300px;width:1300px;height:1300px;margin:-650px;border-radius:50%;
+         background:radial-gradient(circle,rgba(255,150,70,.42) 0,rgba(255,90,31,.18) 16%,rgba(255,90,31,.06) 34%,transparent 56%)}
+       .rings i,.pulse{position:absolute;left:880px;top:300px;border-radius:50%;border:1px solid rgba(255,170,110,.2)}
+       .rings i:nth-child(1){width:300px;height:300px;margin:-150px}.rings i:nth-child(2){width:460px;height:460px;margin:-230px;border-style:dashed;border-color:rgba(255,170,110,.26)}
+       .rings i:nth-child(3){width:640px;height:640px;margin:-320px;border-color:rgba(255,170,110,.08)}
+       .pulse{width:460px;height:460px;margin:-230px;border:2px solid #ff8a3d;opacity:0}
+       .sun{position:absolute;left:700px;top:120px;width:360px;height:360px}
+       .node{position:absolute;transform:translate(-50%,-50%);padding:9px 16px;border-radius:999px;white-space:nowrap;
+         font-family:"JetBrains Mono",Consolas,monospace;font-size:13px;letter-spacing:.16em;color:rgba(255,255,255,.62);
+         background:#101216;border:1px solid rgba(255,255,255,.16)}
+       .node.on{color:#fff;background:#ff5a1f;border-color:#ff8a3d;box-shadow:0 0 26px rgba(255,90,31,.75)}
+       .top{position:absolute;left:84px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       h1{position:absolute;left:80px;top:150px;font-size:96px;line-height:.98;font-weight:600;letter-spacing:-.05em}
+       h1 span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}
+       .ask{position:absolute;left:84px;top:404px;width:520px;height:70px;border-radius:35px;display:flex;align-items:center;gap:6px;padding:0 22px 0 8px;
+         background:#0e1014;border:1px solid rgba(255,255,255,.2);box-shadow:0 0 0 6px rgba(255,255,255,.03),0 24px 60px -20px rgba(255,90,31,.45)}
+       .ask img{width:62px;height:62px;flex:none}.ask p{font-size:21px;letter-spacing:-.01em;white-space:nowrap}
+       .ask b{color:#ff7a2e;font-weight:700}
+       .status{position:absolute;left:112px;top:500px;font-family:"JetBrains Mono",Consolas,monospace;font-size:14px;letter-spacing:.2em;color:#ff8f4a}`,
+      `const NODES = ["NETWORKS", "REBATES", "STANDARDS", "DATASHEETS", "YOUR DEALS", "YOUR CALLS"];
+       const ASKS = [
+         ["What's the export limit on this network?", 0, "ANSWERED, WITH ITS SOURCES."],
+         ["What's this inverter's max input voltage?", 3, "ANSWERED FROM ITS DATASHEET."],
+         ["Who should I call first this morning?", 4, "ANSWERED FROM YOUR OWN DEALS."],
+       ];
+       const box = document.getElementById("nodes");
+       NODES.forEach((n, i) => {
+         const a = ((-90 + i * 60) * Math.PI) / 180, el = document.createElement("span");
+         el.className = "node"; el.textContent = n; el.style.left = 880 + 230 * Math.cos(a) + "px"; el.style.top = 300 + 230 * Math.sin(a) + "px";
+         box.appendChild(el);
+       });
+       window.at = (t) => {
+         const at = Math.min(ASKS.length - 0.0001, t * ASKS.length), k = Math.floor(at), p = at - k, [q, node, said] = ASKS[k];
+         const typed = t >= 1 ? q.length : Math.round(q.length * Math.min(1, p / 0.58)), done = t >= 1 || p > 0.64;
+         document.getElementById("q").innerHTML = q.slice(0, typed).replace(/</g, "&lt;") + (done ? "" : "<b> |</b>");
+         document.getElementById("status").textContent = done ? "SOL // " + said : "";
+         [...box.children].forEach((el, i) => el.classList.toggle("on", t >= 1 ? true : (done && i === node) || ASKS.slice(0, k).some((x) => x[1] === i)));
+         const w = done && t < 1 ? (p - 0.64) / 0.36 : 0, pulse = document.getElementById("pulse");
+         pulse.style.opacity = w ? 0.9 * (1 - w) : 0; pulse.style.transform = "scale(" + (0.5 + 1.1 * w) + ")";
+       };
+       window.at(1);`,
+    ),
+  },
+
+  /**
+   * The same email's third picture: the admin, handed over. Each job is struck through in turn and what happens to it
+   * now is said beside it; then the line. Every one is something the product does today.
+   */
+  "era-admin.gif": {
+    frames: 31,
+    delay: 95,
+    hold: 4200,
+    colours: 128,
+    html: page(
+      `<div class="glow"></div><img class="sun" src="${ERA_SUN}">
+       <div class="top"><i></i>RENUABL // ADMIN, HANDED OVER</div><div id="rows"></div>
+       <h1 id="say">The admin era <span>is over.</span></h1><img class="mark" src="${LOGO}" alt="RENUABL">`,
+      `body{background:#000}
+       .glow{position:absolute;inset:0;background:radial-gradient(circle at 84% 44%,rgba(255,110,40,.34),rgba(255,90,31,.1) 26%,transparent 50%)}
+       .sun{position:absolute;left:830px;top:120px;width:360px;height:360px}
+       .top{position:absolute;left:84px;top:56px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;letter-spacing:.22em;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:14px}
+       .top i{width:9px;height:9px;border-radius:50%;background:#ff5a1f;box-shadow:0 0 14px #ff5a1f}
+       #rows{position:absolute;left:84px;top:124px;width:760px}
+       .row{display:flex;align-items:center;height:62px;border-bottom:1px solid rgba(255,255,255,.09)}
+       .row em{position:relative;font-style:normal;font-family:"JetBrains Mono",Consolas,monospace;font-size:17px;letter-spacing:.18em;color:rgba(255,255,255,.5);white-space:nowrap}
+       .row em u{position:absolute;left:-6px;top:50%;height:2px;margin-top:-1px;background:#ff5a1f;border-radius:2px}
+       .row b{position:absolute;left:470px;font-size:25px;font-weight:600;letter-spacing:-.02em;white-space:nowrap}
+       h1{position:absolute;left:80px;top:486px;font-size:76px;line-height:1;font-weight:600;letter-spacing:-.045em}
+       h1 span{background:linear-gradient(90deg,#ffd27a,#ff8a3d 45%,#ff5a1f);-webkit-background-clip:text;background-clip:text;color:transparent}`,
+      `const ROWS = [
+         ["FOLLOW-UP EMAILS", "Drafted by Sol."],
+         ["CALL NOTES", "Written up by Sol."],
+         ["NEW LEADS", "Answered in minutes."],
+         ["QUOTES", "Priced as you draw."],
+         ["AFTER-SALE PAPERWORK", "Lined up when they sign."],
+       ];
+       const rows = document.getElementById("rows");
+       rows.innerHTML = ROWS.map(([a, b]) => "<div class='row'><em>" + a + "<u></u></em><b>" + b + "</b></div>").join("");
+       window.at = (t) => {
+         [...rows.children].forEach((el, i) => {
+           const a = 0.04 + i * 0.15, cut = span(t, a, a + 0.1), shown = span(t, a + 0.07, a + 0.17);
+           el.querySelector("u").style.width = "calc(" + cut * 100 + "% + " + 12 * cut + "px)";
+           el.querySelector("em").style.color = "rgba(255,255,255," + (0.8 - 0.22 * cut) + ")";
+           const b = el.querySelector("b"); b.style.opacity = shown; b.style.transform = "translateX(" + 14 * (1 - shown) + "px)";
+         });
+         const k = span(t, 0.82, 1), say = document.getElementById("say");
+         say.style.opacity = k; say.style.transform = "translateY(" + 14 * (1 - k) + "px)";
+       };
+       window.at(1);`,
+    ),
+  },
 
   ...Object.fromEntries(Object.entries(EXPLAINERS).map(([name, e]) => [name, { frames: 40, delay: 80, hold: 3800, html: explainer(e) }])),
 
@@ -1260,7 +1430,7 @@ for (const [name, art] of Object.entries(ART)) {
       frames,
       frames.map((_, i) => (i === frames.length - 1 ? art.hold : i === 0 && art.first ? art.first : art.delay)),
       art.colours ?? 160,
-      GIF_W,
+      art.width ?? GIF_W,
       art.photo === true,
     );
   }
