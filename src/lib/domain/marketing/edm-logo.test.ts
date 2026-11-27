@@ -8,6 +8,8 @@ import {
   SITE_LOGO_KEYS,
   cleanBrand,
   cleanLogos,
+  darkGround,
+  logoSrc,
   logoBox,
   newBlock,
   renderEdm,
@@ -37,7 +39,7 @@ describe("the logo at the top of an email", () => {
 
   it("heads the email with the logo, named for a screen reader", () => {
     const r = renderEdm(content, { ...DEFAULT_BRAND, logoId: logo }, sender, { firstName: "Sam", company: null }, links);
-    expect(r.html).toContain(`src="https://site.test/api/m/i/${logo}" alt="Sunrise Solar" height="${LOGO_HEIGHT}"`);
+    expect(r.html).toContain(`src="https://site.test/api/m/i/${logo}?glow=1" alt="Sunrise Solar" height="${LOGO_HEIGHT}"`);
   });
 
   it("says the business's name in words without one", () => {
@@ -92,5 +94,19 @@ describe("the logos a business keeps to switch between", () => {
   it("names RENUABL's own logos as files of the site", () => {
     for (const k of SITE_LOGO_KEYS) expect(SITE_LOGOS[k].path).toMatch(/^\/brand\/renuabl-logo[a-z-]*\.png$/);
     expect(SITE_LOGOS.tagline.large).toBe(true);
+  });
+});
+
+describe("a logo that reads when a phone's dark mode darkens the email", () => {
+  it("asks for an uploaded logo with its glow on a light ground, and as it is on a dark one", () => {
+    expect(darkGround("#ffffff")).toBe(false);
+    expect(darkGround("#1f2023")).toBe(true);
+    expect(logoSrc("https://site.test/api/m/i/x", "#ffffff")).toBe("https://site.test/api/m/i/x?glow=1");
+    expect(logoSrc("https://site.test/api/m/i/x", "#1f2023")).toBe("https://site.test/api/m/i/x");
+    const brand = { ...DEFAULT_BRAND, logoId: logo };
+    const fields = { firstName: "Sam", company: null };
+    expect(renderEdm(content, brand, sender, fields, links).html).toContain(`/api/m/i/${logo}?glow=1"`);
+    const dark = { ...content, style: { background: "#1f2023", text: null } };
+    expect(renderEdm(dark, brand, sender, fields, links).html).toContain(`/api/m/i/${logo}"`);
   });
 });

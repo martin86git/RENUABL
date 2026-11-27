@@ -123,3 +123,49 @@ export async function marketingImage(file: Uint8Array): Promise<MarketingImage |
     return { problem: IMAGE_WRONG };
   }
 }
+
+/**
+ * A dark logo on a clear ground, given a soft white glow behind its marks (27 Nov 2026, Martin: "on mobile, the
+ * marketing emails, show the renuabl logo in black… might have something to do with dark mode"). A phone's mail app in
+ * dark mode turns an email's white ground dark and leaves its pictures alone, so a black logo ends up black on dark, and
+ * an email can't ask the app which it did. The glow can't be seen on white and outlines the logo on dark, so the one
+ * picture reads on both. Anything else (no clear ground, a light or coloured logo, not a PNG) comes back as it was.
+ */
+export async function glowLogo(bytes: Buffer): Promise<Buffer> {
+  try {
+    const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    if (info.channels !== 4) return bytes;
+    const pixels = info.width * info.height;
+    let clear = 0;
+    let weight = 0;
+    let light = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 16) clear++;
+      if (a < 128) continue;
+      weight++;
+      light += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+    }
+    // Needs a clear ground round it (a fifth of the picture or more) and marks that are dark on the whole.
+    if (!weight || clear / pixels < 0.2 || light / weight > 96) return bytes;
+    const alpha = Buffer.alloc(pixels);
+    for (let i = 0; i < pixels; i++) alpha[i] = data[i * 4 + 3];
+    // How far the glow reaches: about a twentieth of the logo's height, so it scales with the size it is shown at.
+    const reach = Math.max(1.2, info.height / 22);
+    const spread = await sharp(alpha, { raw: { width: info.width, height: info.height, channels: 1 } })
+      .blur(reach / 2)
+      .linear(5, 0)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    // The blurred shape comes back with as many channels as the library chose: read the first of each pixel.
+    const step = spread.info.channels;
+    const glow = Buffer.alloc(pixels * 4, 255);
+    for (let i = 0; i < pixels; i++) glow[i * 4 + 3] = Math.round(spread.data[i * step] * 0.92);
+    return await sharp(glow, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .composite([{ input: bytes }])
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+  } catch {
+    return bytes;
+  }
+}

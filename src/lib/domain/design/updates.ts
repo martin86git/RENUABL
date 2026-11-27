@@ -15,6 +15,11 @@ export interface Update {
 export const UPDATES: readonly Update[] = [
   {
     day: "2026-11-27",
+    area: "Marketing",
+    words: "A dark logo on your emails now reads on a phone in dark mode too: it is outlined in white when the phone darkens the email.",
+  },
+  {
+    day: "2026-11-27",
     area: "CRM",
     words: "Bring in from HubSpot has Check first: how many deals would join one already here, and which might be doubles.",
   },

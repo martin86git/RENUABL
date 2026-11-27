@@ -13,7 +13,8 @@ import { publicSiteUrl } from "@/lib/domain/site";
 import { renuablCrm } from "./renuabl-crm";
 
 /** RENUABL's own wordmark as the website shows it, sized for the top of an email (public/brand/renuabl-logo-email.png, 2x). */
-export const RENUABL_EMAIL_LOGO = `${publicSiteUrl()}/brand/renuabl-logo-email.png`;
+// The dark wordmark with a soft white glow behind it (glowLogo), so it also reads when a phone's dark mode darkens the email.
+export const RENUABL_EMAIL_LOGO = `${publicSiteUrl()}/brand/renuabl-logo-email-glow.png`;
 export const RENUABL_EMAIL_LOGO_LIGHT = `${publicSiteUrl()}/brand/renuabl-logo-email-light.png`;
 
 export async function marketingOn(businessId: string): Promise<boolean> {

@@ -976,6 +976,17 @@ export interface EdmSender {
   logoOnDark?: string | null;
 }
 
+/** Whether an email's ground is dark enough that light marks read better on it than dark ones. */
+export const darkGround = (background: string) => contrastRatio("#ffffff", background) > contrastRatio("#000000", background);
+
+/**
+ * Where an uploaded logo is asked for. On a light ground it is asked for with a glow (27 Nov 2026, Martin: on his
+ * phone the logo was black on a dark screen): a phone's mail app in dark mode darkens the email's ground and leaves
+ * pictures alone, so a dark logo is served with a soft white glow that can't be seen on white and outlines it on dark
+ * (`glowLogo` in design-images.ts; a logo that isn't dark on a clear ground comes back unchanged).
+ */
+export const logoSrc = (address: string, background: string) => (darkGround(background) ? address : `${address}?glow=1`);
+
 /** The email's top line: the sender's logo when there is a safe one (its light one on a dark ground), else its name. */
 export function headerCell(sender: EdmSender, dark = false): string {
   const wanted = dark && sender.logoOnDark ? sender.logoOnDark : sender.logo;
@@ -1371,8 +1382,8 @@ function renderDesigned(content: EdmContent, brand: EdmBrand, sender: EdmSender,
     preview ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${esc(preview)}</div>` : ""
   }<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px;background:${style.background};border-radius:16px">${above.length ? `<tr><td style="height:8px;line-height:8px;font-size:1px">&nbsp;</td></tr>${above.join("")}` : ""}<tr><td style="padding:28px 32px 8px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:${ink0.heading}">${
     brand.logoId
-      ? `<img src="${esc(links.image(brand.logoId))}" alt="${esc(sender.name)}" height="${logoBox(brand).height}" style="display:block;height:${logoBox(brand).height}px;width:auto;max-width:${logoBox(brand).maxWidth}px;border:0">`
-      : headerCell(sender, contrastRatio("#ffffff", style.background) > contrastRatio("#000000", style.background))
+      ? `<img src="${esc(logoSrc(links.image(brand.logoId), style.background))}" alt="${esc(sender.name)}" height="${logoBox(brand).height}" style="display:block;height:${logoBox(brand).height}px;width:auto;max-width:${logoBox(brand).maxWidth}px;border:0">`
+      : headerCell(sender, darkGround(style.background))
   }</td></tr>${body.join(
     "",
   )}<tr><td style="padding:24px 32px 28px"></td></tr></table><table role="presentation" width="${EDM_WIDTH}" cellpadding="0" cellspacing="0" style="width:100%;max-width:${EDM_WIDTH}px"><tr><td style="padding:16px 32px;font-family:Inter,Segoe UI,Helvetica,Arial,sans-serif;font-size:12px;line-height:1.6;color:#7b7d84;text-align:center">${footHtml}</td></tr></table>${
